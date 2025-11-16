@@ -311,7 +311,7 @@ const Sidebar = () => {
                   </>
                 )}
 
-                {/* Production - Submenu Category with Caret (no items yet) */}
+                {/* Production - Submenu Category with Caret */}
                 <div 
                   className={`flex items-center justify-between px-4 py-2 text-sm font-semibold ${themeClasses.text} ml-6 mt-2 ${themeClasses.hover} rounded-lg cursor-pointer`}
                   onClick={() => toggleMenu('production')}
@@ -322,9 +322,20 @@ const Sidebar = () => {
                   </svg>
                 </div>
                 {expandedMenus.production && (
-                  <div className={`px-4 py-2 text-xs ${themeClasses.textSecondary} ml-12 italic`}>
-                    No items yet
-                  </div>
+                  <>
+                    <div className={subSubMenuItemClass('/production/planning')} onClick={() => navigate('/dashboard/production/planning')}>
+                      Planning
+                    </div>
+                    <div className={subSubMenuItemClass('/production/manufacturing')} onClick={() => navigate('/dashboard/production/manufacturing')}>
+                      Manufacturing
+                    </div>
+                    <div className={subSubMenuItemClass('/production/packaging')} onClick={() => navigate('/dashboard/production/packaging')}>
+                      Packaging
+                    </div>
+                    <div className={subSubMenuItemClass('/production/inventory')} onClick={() => navigate('/dashboard/production/inventory')}>
+                      Inventory
+                    </div>
+                  </>
                 )}
               </div>
             )}
@@ -371,7 +382,10 @@ const Sidebar = () => {
                 <div className={`text-xs ${themeClasses.textSecondary} px-2 py-1.5 ${themeClasses.hover} rounded cursor-pointer`} onClick={() => navigate('/dashboard/supply-chain/raw-materials')}>• Raw Materials</div>
                 
                 <div className={`text-xs font-semibold ${themeClasses.text} mt-2 px-2`}>Production</div>
-                <div className={`text-xs ${themeClasses.textSecondary} px-2 py-1 italic`}>No items</div>
+                <div className={`text-xs ${themeClasses.textSecondary} px-2 py-1.5 ${themeClasses.hover} rounded cursor-pointer`} onClick={() => navigate('/dashboard/production/planning')}>• Planning</div>
+                <div className={`text-xs ${themeClasses.textSecondary} px-2 py-1.5 ${themeClasses.hover} rounded cursor-pointer`} onClick={() => navigate('/dashboard/production/manufacturing')}>• Manufacturing</div>
+                <div className={`text-xs ${themeClasses.textSecondary} px-2 py-1.5 ${themeClasses.hover} rounded cursor-pointer`} onClick={() => navigate('/dashboard/production/packaging')}>• Packaging</div>
+                <div className={`text-xs ${themeClasses.textSecondary} px-2 py-1.5 ${themeClasses.hover} rounded cursor-pointer`} onClick={() => navigate('/dashboard/production/inventory')}>• Inventory</div>
               </div>
             )}
           </div>

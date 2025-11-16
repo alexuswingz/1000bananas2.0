@@ -20,6 +20,10 @@ import Closures from './supply-chain/Closures';
 import Boxes from './supply-chain/Boxes';
 import Labels from './supply-chain/Labels';
 import RawMaterials from './supply-chain/RawMaterials';
+import Planning from './production/Planning';
+import Manufacturing from './production/Manufacturing';
+import Packaging from './production/Packaging';
+import Inventory from './production/Inventory';
 import Notifications from './Notifications';
 import Settings from './Settings';
 
@@ -50,6 +54,10 @@ const Landing = () => {
           <Route path="/supply-chain/boxes" element={<Boxes />} />
           <Route path="/supply-chain/labels" element={<Labels />} />
           <Route path="/supply-chain/raw-materials" element={<RawMaterials />} />
+          <Route path="/production/planning" element={<Planning />} />
+          <Route path="/production/manufacturing" element={<Manufacturing />} />
+          <Route path="/production/packaging" element={<Packaging />} />
+          <Route path="/production/inventory" element={<Inventory />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>

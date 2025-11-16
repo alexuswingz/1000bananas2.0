@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTheme } from '../../../context/ThemeContext';
@@ -29,6 +29,12 @@ const ProductDetail = () => {
   const [activeTab, setActiveTab] = useState('essential');
   const [showTemplateMenu, setShowTemplateMenu] = useState(false);
   const [configVersion, setConfigVersion] = useState(0); // Force re-render when template changes
+
+  // Ref and state for grab-to-scroll behavior on tabs header
+  const tabsContainerRef = useRef(null);
+  const isDraggingRef = useRef(false);
+  const startXRef = useRef(0);
+  const scrollLeftRef = useRef(0);
   
   // Get product configuration (re-fetch when configVersion changes)
   const productConfig = useMemo(() => {
@@ -369,11 +375,39 @@ const ProductDetail = () => {
 
       {/* Tabs Navigation */}
       <div 
-        className={`${themeClasses.cardBg} border-b ${themeClasses.border}`}
+        className={`${themeClasses.cardBg} border-b ${themeClasses.border} scrollbar-hide`}
         style={{
           flexShrink: 0,
           overflowX: 'auto',
-          overflowY: 'hidden'
+          overflowY: 'hidden',
+          cursor: 'grab',
+        }}
+        ref={tabsContainerRef}
+        onMouseDown={(e) => {
+          const el = tabsContainerRef.current;
+          if (!el) return;
+          isDraggingRef.current = true;
+          startXRef.current = e.pageX - el.offsetLeft;
+          scrollLeftRef.current = el.scrollLeft;
+          el.style.cursor = 'grabbing';
+        }}
+        onMouseLeave={() => {
+          const el = tabsContainerRef.current;
+          isDraggingRef.current = false;
+          if (el) el.style.cursor = 'grab';
+        }}
+        onMouseUp={() => {
+          const el = tabsContainerRef.current;
+          isDraggingRef.current = false;
+          if (el) el.style.cursor = 'grab';
+        }}
+        onMouseMove={(e) => {
+          const el = tabsContainerRef.current;
+          if (!isDraggingRef.current || !el) return;
+          e.preventDefault();
+          const x = e.pageX - el.offsetLeft;
+          const walk = x - startXRef.current;
+          el.scrollLeft = scrollLeftRef.current - walk;
         }}
       >
         <div style={{ 
@@ -402,7 +436,7 @@ const ProductDetail = () => {
 
       {/* Tab Content */}
       <div 
-        className="custom-scrollbar"
+        className="custom-scrollbar scrollbar-hide"
         style={{
           flex: 1,
           overflowY: 'auto',
