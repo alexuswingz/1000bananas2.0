@@ -110,3 +110,4 @@ const ListingHeader = ({ onSearch }) => {
 
 export default ListingHeader;
 
+

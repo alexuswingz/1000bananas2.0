@@ -184,3 +184,4 @@ const PDPSetup = ({ data }) => {
 
 export default PDPSetup;
 
+

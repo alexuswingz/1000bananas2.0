@@ -147,3 +147,4 @@ const Pagination = ({ currentPage, totalPages, pageSize, totalItems, onPageChang
 
 export default Pagination;
 
+

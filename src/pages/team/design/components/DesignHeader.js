@@ -110,3 +110,4 @@ const DesignHeader = ({ onSearch }) => {
 
 export default DesignHeader;
 
+

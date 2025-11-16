@@ -188,3 +188,4 @@ const FinishedGoods = ({ data }) => {
 
 export default FinishedGoods;
 
+

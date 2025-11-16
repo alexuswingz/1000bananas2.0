@@ -155,3 +155,4 @@ const ListingSetup = ({ data }) => {
 
 export default ListingSetup;
 
+

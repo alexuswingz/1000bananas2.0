@@ -110,3 +110,4 @@ const AdsHeader = ({ onSearch }) => {
 
 export default AdsHeader;
 
+

@@ -81,3 +81,4 @@ const Formula = ({ data }) => {
 
 export default Formula;
 
+

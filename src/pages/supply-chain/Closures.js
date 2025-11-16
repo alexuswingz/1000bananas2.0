@@ -11,3 +11,4 @@ const Closures = () => {
 
 export default Closures;
 
+

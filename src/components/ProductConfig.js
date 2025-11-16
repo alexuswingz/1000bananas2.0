@@ -218,3 +218,4 @@ const ProductConfig = ({ product, onClose, availableTabs }) => {
 
 export default ProductConfig;
 
+

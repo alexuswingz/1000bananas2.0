@@ -117,3 +117,4 @@ const LabelCopy = ({ data }) => {
 
 export default LabelCopy;
 
+

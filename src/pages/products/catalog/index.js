@@ -6,3 +6,4 @@ export { default as CatalogTable } from './components/CatalogTable';
 export { default as CatalogHeader } from './components/CatalogHeader';
 export { default as Pagination } from './components/Pagination';
 
+
