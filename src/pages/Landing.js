@@ -24,6 +24,7 @@ import Planning from './production/Planning';
 import Manufacturing from './production/Manufacturing';
 import Packaging from './production/Packaging';
 import Inventory from './production/Inventory';
+import NewShipment from './production/NewShipment';
 import Notifications from './Notifications';
 import Settings from './Settings';
 
@@ -58,6 +59,7 @@ const Landing = () => {
           <Route path="/production/manufacturing" element={<Manufacturing />} />
           <Route path="/production/packaging" element={<Packaging />} />
           <Route path="/production/inventory" element={<Inventory />} />
+          <Route path="/production/shipment/new" element={<NewShipment />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
