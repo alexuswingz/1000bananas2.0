@@ -16,6 +16,7 @@ import Design from './team/Design';
 import Listing from './team/Listing';
 import Ads from './team/Ads';
 import Bottles from './supply-chain/Bottles';
+import BottleOrderPage from './supply-chain/BottleOrderPage';
 import Closures from './supply-chain/Closures';
 import Boxes from './supply-chain/Boxes';
 import Labels from './supply-chain/Labels';
@@ -51,6 +52,7 @@ const Landing = () => {
           <Route path="/team/listing" element={<Listing />} />
           <Route path="/team/ads" element={<Ads />} />
           <Route path="/supply-chain/bottles" element={<Bottles />} />
+          <Route path="/supply-chain/bottles/order" element={<BottleOrderPage />} />
           <Route path="/supply-chain/closures" element={<Closures />} />
           <Route path="/supply-chain/boxes" element={<Boxes />} />
           <Route path="/supply-chain/labels" element={<Labels />} />

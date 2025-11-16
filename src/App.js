@@ -15,9 +15,8 @@ function ToasterWrapper() {
   
   return (
     <Toaster
-      position="top-right"
+      position="top-center"
       expand={false}
-      richColors
       closeButton
       theme={isDarkMode ? 'dark' : 'light'}
       toastOptions={{
@@ -28,6 +27,18 @@ function ToasterWrapper() {
         },
         className: 'sonner-toast',
         duration: 4000,
+        success: {
+          style: {
+            background: '#F0FDF4',
+            color: '#34C759',
+            border: '1px solid #86EFAC',
+          },
+          className: 'success-toast-green',
+          iconTheme: {
+            primary: '#34C759',
+            secondary: '#FFFFFF',
+          },
+        },
       }}
     />
   );

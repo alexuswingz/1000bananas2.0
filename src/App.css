@@ -36,3 +36,15 @@
     transform: rotate(360deg);
   }
 }
+
+/* Custom success toast styling */
+[data-sonner-toast][data-type="success"],
+.success-toast-green {
+  color: #34C759 !important;
+}
+
+[data-sonner-toast][data-type="success"] [data-title],
+.success-toast-green [data-title],
+.success-toast-green > div {
+  color: #34C759 !important;
+}
