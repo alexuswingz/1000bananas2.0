@@ -51,12 +51,12 @@ const PDPSetup = ({ data }) => {
             {isEditing ? (
               <input 
                 type="text" 
-                defaultValue="TPS Plant Foods Cherry Tree Fertilizer - 8 fl oz - Organic Liquid Plant Food for Cherry Trees"
+                defaultValue={data.title || `${data.brand} ${data.product}`}
                 className={`w-full ${themeClasses.text} ${themeClasses.inputBg} border ${themeClasses.border} rounded px-3 py-2 text-sm`}
               />
             ) : (
               <div className={`text-sm ${themeClasses.text}`}>
-                TPS Plant Foods Cherry Tree Fertilizer - 8 fl oz - Organic Liquid Plant Food for Cherry Trees
+                {data.title || `${data.brand} ${data.product}`}
               </div>
             )}
           </div>
@@ -64,13 +64,13 @@ const PDPSetup = ({ data }) => {
             <label className={`text-xs ${themeClasses.textSecondary} block mb-2`}>Product Description</label>
             {isEditing ? (
               <textarea 
-                defaultValue="Premium organic fertilizer specially formulated for cherry trees. Contains essential nutrients to promote healthy growth, abundant fruit production, and vibrant foliage. Safe for use around children and pets. OMRI Listed for organic gardening."
+                defaultValue={data.description || 'No description yet'}
                 className={`w-full ${themeClasses.text} ${themeClasses.inputBg} border ${themeClasses.border} rounded px-3 py-2 text-sm`}
                 rows={4}
               />
             ) : (
               <div className={`text-sm ${themeClasses.text} leading-relaxed`}>
-                Premium organic fertilizer specially formulated for cherry trees. Contains essential nutrients to promote healthy growth, abundant fruit production, and vibrant foliage. Safe for use around children and pets. OMRI Listed for organic gardening.
+                {data.description || 'No description yet'}
               </div>
             )}
           </div>
@@ -82,17 +82,13 @@ const PDPSetup = ({ data }) => {
           <div className={`${themeClasses.inputBg} rounded-lg p-4`}>
             {isEditing ? (
               <textarea 
-                defaultValue="• SPECIALLY FORMULATED for cherry trees to promote healthy growth and abundant fruit production&#10;• ORGANIC INGREDIENTS - OMRI Listed and USDA Organic certified&#10;• FAST ACTING liquid formula absorbs quickly for rapid results&#10;• SAFE FOR USE around children, pets, and wildlife&#10;• EASY APPLICATION - Mix with water and apply every 2-4 weeks during growing season"
+                defaultValue={data.bullets || data.bullet_points || 'No bullet points yet'}
                 className={`w-full ${themeClasses.text} ${themeClasses.inputBg} border ${themeClasses.border} rounded px-3 py-2 text-sm`}
                 rows={6}
               />
             ) : (
-              <div className={`text-sm ${themeClasses.text} space-y-2`}>
-                <div>• SPECIALLY FORMULATED for cherry trees to promote healthy growth and abundant fruit production</div>
-                <div>• ORGANIC INGREDIENTS - OMRI Listed and USDA Organic certified</div>
-                <div>• FAST ACTING liquid formula absorbs quickly for rapid results</div>
-                <div>• SAFE FOR USE around children, pets, and wildlife</div>
-                <div>• EASY APPLICATION - Mix with water and apply every 2-4 weeks during growing season</div>
+              <div className={`text-sm ${themeClasses.text} whitespace-pre-wrap`}>
+                {data.bullets || data.bullet_points || 'No bullet points yet'}
               </div>
             )}
           </div>
@@ -107,12 +103,12 @@ const PDPSetup = ({ data }) => {
               {isEditing ? (
                 <input 
                   type="text" 
-                  defaultValue="cherry tree fertilizer, cherry tree food, organic cherry fertilizer"
+                  defaultValue={data.search_terms || data.searchTerms || ''}
                   className={`w-full text-sm ${themeClasses.text} ${themeClasses.inputBg} border ${themeClasses.border} rounded px-3 py-2`}
                 />
               ) : (
                 <div className={`text-sm ${themeClasses.text}`}>
-                  cherry tree fertilizer, cherry tree food, organic cherry fertilizer
+                  {data.search_terms || data.searchTerms || 'No search terms yet'}
                 </div>
               )}
             </div>

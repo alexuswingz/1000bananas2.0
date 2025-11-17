@@ -3,27 +3,18 @@
 
 Write-Host "Packaging Lambda function..." -ForegroundColor Green
 
-# Create temp directory
-$tempDir = "package"
-if (Test-Path $tempDir) {
-    Remove-Item $tempDir -Recurse -Force
+# Remove old zip if exists
+if (Test-Path lambda_function.zip) {
+    Remove-Item lambda_function.zip -Force
 }
-New-Item -ItemType Directory -Path $tempDir | Out-Null
 
-# Install dependencies
-Write-Host "Installing dependencies..." -ForegroundColor Yellow
-pip install -r requirements.txt -t $tempDir
-
-# Copy handler
-Copy-Item selection_handler.py $tempDir/
-
-# Create zip
+# Create zip with just lambda_function.py (no dependencies, using layers)
 Write-Host "Creating zip file..." -ForegroundColor Yellow
-Compress-Archive -Path "$tempDir/*" -DestinationPath "lambda_function.zip" -Force
-
-# Cleanup
-Remove-Item $tempDir -Recurse -Force
+Compress-Archive -Path lambda_function.py -DestinationPath lambda_function.zip -Force
 
 Write-Host "Package created: lambda_function.zip" -ForegroundColor Green
+$sizeKB = [math]::Round((Get-Item lambda_function.zip).Length / 1KB, 2)
+Write-Host "Size: $sizeKB KB" -ForegroundColor Cyan
 Write-Host "Upload this file to AWS Lambda" -ForegroundColor Cyan
+Write-Host "Note: Ensure psycopg2 is provided via Lambda Layer" -ForegroundColor Yellow
 

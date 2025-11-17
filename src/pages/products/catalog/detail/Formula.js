@@ -12,73 +12,133 @@ const Formula = ({ data }) => {
     inputBg: isDarkMode ? 'bg-dark-bg-tertiary' : 'bg-gray-50',
   };
 
+  // Determine which brand data to display (first available)
+  const brandData = data?.tps?.guaranteedAnalysis ? data.tps :
+                    data?.tpsNutrients?.guaranteedAnalysis ? data.tpsNutrients :
+                    data?.bloomCity?.guaranteedAnalysis ? data.bloomCity : null;
+
+  const activeBrand = data?.tps?.guaranteedAnalysis ? 'TPS Plant Foods' :
+                      data?.tpsNutrients?.guaranteedAnalysis ? 'TPS Nutrients' :
+                      data?.bloomCity?.guaranteedAnalysis ? 'Bloom City' : null;
+
+  const hasContent = !!(data?.formulaName || brandData);
+
   return (
     <div className={`${themeClasses.bg} rounded-xl border ${themeClasses.border} shadow-sm`}>
-      <div className="px-6 py-4 flex items-center justify-between">
+      <div className={`px-6 py-4 border-b ${themeClasses.border}`}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <h2 className={`text-lg font-semibold ${themeClasses.text}`}>Formula</h2>
-          <span className="px-2 py-0.5 rounded-md bg-green-500/10 text-green-600 text-xs font-medium flex items-center gap-1">
-            <svg style={{ width: '0.875rem', height: '0.875rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            Completed
-          </span>
-          <span className="px-2 py-0.5 rounded-md bg-red-500/10 text-red-600 text-xs font-medium flex items-center gap-1">
-            <svg style={{ width: '0.875rem', height: '0.875rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            MSDS
-          </span>
+          {hasContent ? (
+            <span className="px-2 py-0.5 rounded-md bg-green-500/10 text-green-600 text-xs font-medium flex items-center gap-1">
+              <svg style={{ width: '0.875rem', height: '0.875rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Completed
+            </span>
+          ) : (
+            <span className="px-2 py-0.5 rounded-md bg-gray-500/10 text-gray-600 text-xs font-medium">
+              No Content
+            </span>
+          )}
         </div>
       </div>
 
-      <div className={`px-6 pb-6 border-t ${themeClasses.border}`} style={{ paddingTop: '1.5rem' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          {/* Formula Name */}
-          <div>
-            <label className={`text-sm font-medium ${themeClasses.text} block mb-2`}>Formula Name</label>
-            <div className={`${themeClasses.inputBg} rounded-lg p-3 text-sm ${themeClasses.text}`}>
-              F UltraGrow
-            </div>
+      <div className="px-6 pb-6" style={{ paddingTop: '1.5rem' }}>
+        {hasContent ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
+            {data?.formulaName && (
+              <div>
+                <label className={`text-xs ${themeClasses.textSecondary} block mb-2`}>Formula Name</label>
+                <div className={`text-sm font-medium ${themeClasses.text}`}>{data.formulaName}</div>
+              </div>
+            )}
+            {activeBrand && (
+              <div>
+                <label className={`text-xs ${themeClasses.textSecondary} block mb-2`}>Brand</label>
+                <div className={`text-sm font-medium ${themeClasses.text}`}>{activeBrand}</div>
+              </div>
+            )}
+            {data?.category && (
+              <div>
+                <label className={`text-xs ${themeClasses.textSecondary} block mb-2`}>Category</label>
+                <div className={`text-sm ${themeClasses.text}`}>{data.category}</div>
+              </div>
+            )}
+            {data?.type && (
+              <div>
+                <label className={`text-xs ${themeClasses.textSecondary} block mb-2`}>Type</label>
+                <div className={`text-sm ${themeClasses.text}`}>{data.type}</div>
+              </div>
+            )}
+            {brandData?.npk && (
+              <div>
+                <label className={`text-xs ${themeClasses.textSecondary} block mb-2`}>NPK</label>
+                <div className={`text-sm font-medium ${themeClasses.text}`}>{brandData.npk}</div>
+              </div>
+            )}
+            {brandData?.guaranteedAnalysis && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label className={`text-xs ${themeClasses.textSecondary} block mb-2`}>Guaranteed Analysis</label>
+                <div className={`${themeClasses.inputBg} rounded-lg p-4`}>
+                  <pre className={`text-sm ${themeClasses.text} whitespace-pre-wrap font-sans`}>
+                    {brandData.guaranteedAnalysis}
+                  </pre>
+                </div>
+              </div>
+            )}
+            {brandData?.derivedFrom && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label className={`text-xs ${themeClasses.textSecondary} block mb-2`}>
+                  {data?.bloomCity ? 'Ingredients' : 'Derived From'}
+                </label>
+                <div className={`${themeClasses.inputBg} rounded-lg p-4`}>
+                  <pre className={`text-sm ${themeClasses.text} whitespace-pre-wrap font-sans`}>
+                    {brandData.derivedFrom}
+                  </pre>
+                </div>
+              </div>
+            )}
+            {(brandData?.storageWarranty || data?.bloomCity?.storage) && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label className={`text-xs ${themeClasses.textSecondary} block mb-2`}>
+                  {data?.bloomCity ? 'Storage' : 'Storage & Warranty'}
+                </label>
+                <div className={`${themeClasses.inputBg} rounded-lg p-4`}>
+                  <pre className={`text-sm ${themeClasses.text} whitespace-pre-wrap font-sans`}>
+                    {brandData?.storageWarranty || data?.bloomCity?.storage}
+                  </pre>
+                </div>
+              </div>
+            )}
+            {data?.msds && (
+              <div>
+                <label className={`text-xs ${themeClasses.textSecondary} block mb-2`}>MSDS Document</label>
+                <a 
+                  href={data.msds} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-500 hover:text-blue-600 flex items-center gap-1"
+                >
+                  <svg style={{ width: '1rem', height: '1rem' }} fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zM6 20V4h7v5h5v11H6z" />
+                  </svg>
+                  View MSDS
+                </a>
+              </div>
+            )}
           </div>
-
-          {/* Guaranteed Analysis */}
-          <div>
-            <label className={`text-sm font-medium ${themeClasses.text} block mb-2`}>Guaranteed Analysis</label>
-            <div className={`${themeClasses.inputBg} rounded-lg p-3 text-sm ${themeClasses.text}`}>
-              Total Nitrogen (N) 3.8%, Available Phosphate (P2O5) 3.0%, Soluble Potash (K2O) 4.3%, Calcium (Ca) 2.1%, Magnesium (Mg) 0.73%, Iron (Fe) 0.1%, Manganese (Mn) 0.03%, Zinc (Zn) 0.03%, Copper (Cu) 0.03%, Boron (B) 0.02%, Copper (Cu) 0.01%
-            </div>
+        ) : (
+          <div className={`${themeClasses.inputBg} rounded-lg p-8 text-center`}>
+            <svg style={{ width: '4rem', height: '4rem', margin: '0 auto 1rem' }} className={themeClasses.textSecondary} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+            </svg>
+            <p className={`text-sm ${themeClasses.text} font-medium mb-2`}>No Formula Information Yet</p>
+            <p className={`text-xs ${themeClasses.textSecondary}`}>Add formula details for this product</p>
           </div>
-
-          {/* NPK */}
-          <div>
-            <label className={`text-sm font-medium ${themeClasses.text} block mb-2`}>NPK</label>
-            <div className={`${themeClasses.inputBg} rounded-lg p-3 text-sm ${themeClasses.text}`}>
-              3.8 - 3 - 5.1
-            </div>
-          </div>
-
-          {/* Derived From */}
-          <div>
-            <label className={`text-sm font-medium ${themeClasses.text} block mb-2`}>Derived From</label>
-            <div className={`${themeClasses.inputBg} rounded-lg p-3 text-sm ${themeClasses.text}`}>
-              ammonium molybdate, potassium phosphate, potassium nitrate, calcium nitrate, magnesium nitrate, boric acid, copper sulfate, ferric sulfate, manganese sulfate, zinc sulfate
-            </div>
-          </div>
-
-          {/* Storage / Warranty / Precautionary / Metals */}
-          <div>
-            <label className={`text-sm font-medium ${themeClasses.text} block mb-2`}>Storage / Warranty / Precautionary / Metals</label>
-            <div className={`${themeClasses.inputBg} rounded-lg p-3 text-sm ${themeClasses.text}`}>
-              Storage: Store in a cool and dark place. (40°F - 80°F). Keep out of direct sunlight. Warranty: We guarantee at TPS products for 12 months from date of purchase. However, useful life is up to 2 years when properly stored. This product is suitable for all climates, not for human or animal consumption.
-            </div>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );
 };
 
 export default Formula;
-
-

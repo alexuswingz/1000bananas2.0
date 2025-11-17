@@ -1,10 +1,69 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useTheme } from '../../context/ThemeContext';
 import { useDialog } from '../../context/DialogContext';
 import DashboardHeader from './dashboard/components/DashboardHeader';
 import DashboardTable from './dashboard/components/DashboardTable';
 import FilterDrawer from './dashboard/components/FilterDrawer';
+import DevelopmentAPI from '../../services/developmentApi';
+
+// Loading skeleton component
+const LoadingTable = () => {
+  const { isDarkMode } = useTheme();
+  
+  const themeClasses = {
+    bg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
+    border: isDarkMode ? 'border-dark-border-primary' : 'border-gray-200',
+    headerBg: isDarkMode ? 'bg-[#2C3544]' : 'bg-[#2C3544]',
+    skeletonBg: isDarkMode ? 'bg-dark-bg-tertiary' : 'bg-gray-200',
+  };
+
+  const stages = ['ESSENT.\nINFO', 'FORM.', 'DESIGN', 'LISTING', 'PROD.', 'PACK.', 'LABELS', 'ADS'];
+
+  return (
+    <div className={`${themeClasses.bg} rounded-xl border ${themeClasses.border} shadow-lg`} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, overflowX: 'auto', overflowY: 'auto' }}>
+        <table style={{ width: '100%', minWidth: '1200px' }}>
+          <thead className={themeClasses.headerBg} style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+            <tr>
+              <th className="text-left text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0.5rem 1rem', width: '180px' }}>ACCOUNT</th>
+              <th className="text-left text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0.5rem 1rem', width: '180px' }}>BRAND</th>
+              <th className="text-left text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0.5rem 1rem', width: '250px' }}>PRODUCT</th>
+              {stages.map((stage, idx) => (
+                <th key={idx} className="text-center text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0.5rem 0.75rem', width: '90px', whiteSpace: 'pre-line', lineHeight: '1.2' }}>
+                  {stage}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {[...Array(8)].map((_, rowIdx) => (
+              <tr key={rowIdx}>
+                <td style={{ padding: '0.375rem 1rem' }}>
+                  <div className={`${themeClasses.skeletonBg} h-4 rounded animate-pulse`} style={{ width: '120px' }}></div>
+                </td>
+                <td style={{ padding: '0.375rem 1rem' }}>
+                  <div className={`${themeClasses.skeletonBg} h-4 rounded animate-pulse`} style={{ width: '100px' }}></div>
+                </td>
+                <td style={{ padding: '0.375rem 1rem' }}>
+                  <div className={`${themeClasses.skeletonBg} h-4 rounded animate-pulse`} style={{ width: '180px' }}></div>
+                </td>
+                {stages.map((_, stageIdx) => (
+                  <td key={stageIdx} style={{ padding: '0.375rem 0.75rem', textAlign: 'center' }}>
+                    <div className={`${themeClasses.skeletonBg} h-3 w-3 rounded-full mx-auto animate-pulse`}></div>
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ padding: '1.5rem', textAlign: 'center' }}>
+        <p className="text-sm text-gray-500">Loading dashboard data...</p>
+      </div>
+    </div>
+  );
+};
 
 const Dashboard = () => {
   const { isDarkMode } = useTheme();
@@ -14,7 +73,30 @@ const Dashboard = () => {
     bg: isDarkMode ? 'bg-dark-bg-primary' : 'bg-light-bg-primary',
   };
 
-  // Sample data
+  const [dashboardData, setDashboardData] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  // Load development data from backend (same as Products > Development)
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      const data = await DevelopmentAPI.getAll();
+      setDashboardData(data);
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+      toast.error('Failed to load dashboard data', {
+        description: error.message
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Sample data (fallback)
   const initialData = [
     {
       id: '1',
@@ -186,7 +268,6 @@ const Dashboard = () => {
     },
   ];
 
-  const [dashboardData, setDashboardData] = useState(initialData);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -202,9 +283,12 @@ const Dashboard = () => {
   });
   const filterButtonRef = useRef(null);
 
+  // Only use initial data if not loading and no data fetched
+  const dataToUse = loading ? [] : (dashboardData.length > 0 ? dashboardData : initialData);
+
   // Filter data based on search and filters
   const filteredData = useMemo(() => {
-    return dashboardData.filter((item) => {
+    return dataToUse.filter((item) => {
       // Search filter
       const searchLower = searchTerm.toLowerCase();
       const matchesSearch = searchTerm === '' || 
@@ -219,7 +303,7 @@ const Dashboard = () => {
 
       return matchesSearch && matchesSellerAccount && matchesBrandName;
     });
-  }, [dashboardData, searchTerm, filters]);
+  }, [dataToUse, searchTerm, filters]);
 
   // Paginate data
   const paginatedData = useMemo(() => {
@@ -308,16 +392,20 @@ const Dashboard = () => {
         />
       </div>
       <div style={{ flex: 1, padding: '0 2rem 2rem 2rem' }}>
-        <DashboardTable 
-          data={paginatedData}
-          totalItems={filteredData.length}
-          currentPage={currentPage}
-          totalPages={totalPages}
-          pageSize={pageSize}
-          onPageChange={handlePageChange}
-          onPageSizeChange={handlePageSizeChange}
-          onStatusClick={handleStatusClick}
-        />
+        {loading ? (
+          <LoadingTable />
+        ) : (
+          <DashboardTable 
+            data={paginatedData}
+            totalItems={filteredData.length}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+            onStatusClick={handleStatusClick}
+          />
+        )}
       </div>
 
       {/* Filter Drawer */}

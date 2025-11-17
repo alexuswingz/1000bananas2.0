@@ -121,23 +121,19 @@ const ListingSetup = ({ data }) => {
             <div>
               <label className={`text-xs ${themeClasses.textSecondary} block mb-2`}>Title</label>
               <div className={`${themeClasses.inputBg} rounded-lg p-3 text-sm ${themeClasses.text}`}>
-                Cherry Tree Fertilizer 8oz
+                {data.title || `${data.product} ${activeTab}`}
               </div>
             </div>
             <div>
               <label className={`text-xs ${themeClasses.textSecondary} block mb-2`}>Bullet Points</label>
               <div className={`${themeClasses.inputBg} rounded-lg p-3 text-sm ${themeClasses.text}`}>
-                <ul style={{ listStyle: 'disc', paddingLeft: '1.5rem' }}>
-                  <li>Designed specifically for cherry trees, from flowering to harvest</li>
-                  <li>Boosts growth and fruit production in both potted and outdoor trees</li>
-                  <li>Liquid formula for easy, even feeding with fast absorption</li>
-                </ul>
+                {data.bullets || data.bullet_points || 'No bullet points yet'}
               </div>
             </div>
             <div>
               <label className={`text-xs ${themeClasses.textSecondary} block mb-2`}>Description</label>
               <div className={`${themeClasses.inputBg} rounded-lg p-3 text-sm ${themeClasses.text}`}>
-                There's nothing quite like the sight of cherry blossoms or the taste of freshly picked cherries from your own backyard...
+                {data.description || 'No description yet'}
               </div>
             </div>
             <div>

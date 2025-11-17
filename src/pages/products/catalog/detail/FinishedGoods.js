@@ -48,106 +48,145 @@ const FinishedGoods = ({ data }) => {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
           <div>
-            <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Product Weight</label>
-            {isEditing ? (
-              <input 
-                type="text" 
-                defaultValue="8 fl oz (237 ml)"
-                className={`text-sm ${themeClasses.text} ${themeClasses.inputBg} border ${themeClasses.border} rounded px-2 py-1 w-full`}
-              />
-            ) : (
-              <div className={`text-sm ${themeClasses.text}`}>8 fl oz (237 ml)</div>
-            )}
+            <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Packaging Name</label>
+            <div className={`text-sm ${themeClasses.text}`}>{data?.packaging_name || 'N/A'}</div>
+          </div>
+          <div>
+            <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Closure Name</label>
+            <div className={`text-sm ${themeClasses.text}`}>{data?.closure_name || 'N/A'}</div>
+          </div>
+          <div>
+            <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Label Size</label>
+            <div className={`text-sm ${themeClasses.text}`}>{data?.label_size || 'N/A'}</div>
+          </div>
+          <div>
+            <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Label Location</label>
+            <div className={`text-sm ${themeClasses.text}`}>{data?.label_location || 'N/A'}</div>
           </div>
           <div>
             <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Package Dimensions</label>
-            {isEditing ? (
-              <input 
-                type="text" 
-                defaultValue="6.5 x 2.5 x 2.5 inches"
-                className={`text-sm ${themeClasses.text} ${themeClasses.inputBg} border ${themeClasses.border} rounded px-2 py-1 w-full`}
-              />
-            ) : (
-              <div className={`text-sm ${themeClasses.text}`}>6.5 x 2.5 x 2.5 inches</div>
-            )}
+            <div className={`text-sm ${themeClasses.text}`}>
+              {data?.product_dimensions_length_in && data?.product_dimensions_width_in && data?.product_dimensions_height_in 
+                ? `${data.product_dimensions_length_in} x ${data.product_dimensions_width_in} x ${data.product_dimensions_height_in} inches`
+                : 'N/A'}
+            </div>
           </div>
           <div>
             <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Item Weight</label>
-            {isEditing ? (
-              <input 
-                type="text" 
-                defaultValue="9.6 ounces"
-                className={`text-sm ${themeClasses.text} ${themeClasses.inputBg} border ${themeClasses.border} rounded px-2 py-1 w-full`}
-              />
-            ) : (
-              <div className={`text-sm ${themeClasses.text}`}>9.6 ounces</div>
-            )}
+            <div className={`text-sm ${themeClasses.text}`}>
+              {data?.product_dimensions_weight_lbs ? `${data.product_dimensions_weight_lbs} lbs` : 'N/A'}
+            </div>
           </div>
           <div>
             <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>UPC</label>
-            {isEditing ? (
-              <input 
-                type="text" 
-                defaultValue="810012345678"
-                className={`text-sm ${themeClasses.text} ${themeClasses.inputBg} border ${themeClasses.border} rounded px-2 py-1 w-full`}
-              />
-            ) : (
-              <div className={`text-sm ${themeClasses.text}`}>810012345678</div>
-            )}
+            <div className={`text-sm ${themeClasses.text}`}>{data?.upc || 'N/A'}</div>
           </div>
           <div>
-            <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>ASIN</label>
-            {isEditing ? (
-              <input 
-                type="text" 
-                defaultValue="B08XXXXXXX"
-                className={`text-sm ${themeClasses.text} ${themeClasses.inputBg} border ${themeClasses.border} rounded px-2 py-1 w-full`}
-              />
-            ) : (
-              <div className={`text-sm ${themeClasses.text}`}>B08XXXXXXX</div>
-            )}
+            <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Child ASIN</label>
+            <div className={`text-sm ${themeClasses.text}`}>{data?.child_asin || 'N/A'}</div>
           </div>
           <div>
-            <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>SKU</label>
-            {isEditing ? (
-              <input 
-                type="text" 
-                defaultValue="TPS-CTF-8OZ"
-                className={`text-sm ${themeClasses.text} ${themeClasses.inputBg} border ${themeClasses.border} rounded px-2 py-1 w-full`}
-              />
-            ) : (
-              <div className={`text-sm ${themeClasses.text}`}>TPS-CTF-8OZ</div>
-            )}
+            <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Child SKU</label>
+            <div className={`text-sm ${themeClasses.text}`}>{data?.child_sku_final || 'N/A'}</div>
+          </div>
+          <div>
+            <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Case Size</label>
+            <div className={`text-sm ${themeClasses.text}`}>{data?.case_size || 'N/A'}</div>
+          </div>
+          <div>
+            <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Units Per Case</label>
+            <div className={`text-sm ${themeClasses.text}`}>{data?.units_per_case || 'N/A'}</div>
+          </div>
+          <div>
+            <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Units Sold (30 days)</label>
+            <div className={`text-sm ${themeClasses.text}`}>{data?.units_sold_30_days || 'N/A'}</div>
           </div>
         </div>
 
-        {/* Material & Compliance */}
+        {/* Formula Information */}
+        {(data?.guaranteed_analysis || data?.npk || data?.derived_from) && (
+          <div style={{ marginBottom: '2rem' }}>
+            <h3 className={`text-sm font-semibold ${themeClasses.text} mb-3`}>Formula Information</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+              {data?.npk && (
+                <div>
+                  <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>NPK</label>
+                  <div className={`text-sm ${themeClasses.text}`}>{data.npk}</div>
+                </div>
+              )}
+              {data?.guaranteed_analysis && (
+                <div>
+                  <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Guaranteed Analysis</label>
+                  <div className={`text-sm ${themeClasses.text} whitespace-pre-wrap`}>{data.guaranteed_analysis}</div>
+                </div>
+              )}
+              {data?.derived_from && (
+                <div>
+                  <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Derived From</label>
+                  <div className={`text-sm ${themeClasses.text} whitespace-pre-wrap`}>{data.derived_from}</div>
+                </div>
+              )}
+              {data?.msds && (
+                <div>
+                  <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>MSDS</label>
+                  <a 
+                    href={data.msds} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-500 hover:text-blue-600"
+                  >
+                    View MSDS Document
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* All Variations Table */}
+        {data?.allVariations && data.allVariations.length > 1 && (
+          <div style={{ marginBottom: '2rem' }}>
+            <h3 className={`text-sm font-semibold ${themeClasses.text} mb-3`}>
+              All Variants ({data.allVariations.length})
+            </h3>
+            <div className={`${themeClasses.inputBg} rounded-lg overflow-hidden`}>
+              <table style={{ width: '100%' }}>
+                <thead className={isDarkMode ? 'bg-[#2C3544]' : 'bg-gray-800'}>
+                  <tr>
+                    <th className="text-left text-xs font-bold text-white uppercase tracking-wider px-4 py-2">Size</th>
+                    <th className="text-left text-xs font-bold text-white uppercase tracking-wider px-4 py-2">ASIN</th>
+                    <th className="text-left text-xs font-bold text-white uppercase tracking-wider px-4 py-2">SKU</th>
+                    <th className="text-left text-xs font-bold text-white uppercase tracking-wider px-4 py-2">UPC</th>
+                    <th className="text-left text-xs font-bold text-white uppercase tracking-wider px-4 py-2">Units Sold (30d)</th>
+                  </tr>
+                </thead>
+                <tbody className={isDarkMode ? 'divide-y divide-gray-700' : 'divide-y divide-gray-200'}>
+                  {data.allVariations.map((variant, index) => (
+                    <tr key={index} className={isDarkMode ? 'hover:bg-dark-bg-tertiary' : 'hover:bg-gray-50'}>
+                      <td className={`px-4 py-3 text-sm ${themeClasses.text}`}>{variant.size || 'N/A'}</td>
+                      <td className={`px-4 py-3 text-sm ${themeClasses.text}`}>{variant.child_asin || 'N/A'}</td>
+                      <td className={`px-4 py-3 text-sm ${themeClasses.text}`}>{variant.child_sku_final || 'N/A'}</td>
+                      <td className={`px-4 py-3 text-sm ${themeClasses.text}`}>{variant.upc || 'N/A'}</td>
+                      <td className={`px-4 py-3 text-sm ${themeClasses.text}`}>{variant.units_sold_30_days || '0'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Material & Compliance - Keep this section but simplified */}
         <div style={{ marginBottom: '2rem' }}>
           <h3 className={`text-sm font-semibold ${themeClasses.text} mb-3`}>Material & Compliance</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
             <div>
-              <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Material Type</label>
-              {isEditing ? (
-                <input 
-                  type="text" 
-                  defaultValue="HDPE Plastic"
-                  className={`text-sm ${themeClasses.text} ${themeClasses.inputBg} border ${themeClasses.border} rounded px-2 py-1 w-full`}
-                />
-              ) : (
-                <div className={`text-sm ${themeClasses.text}`}>HDPE Plastic</div>
-              )}
+              <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Formula Name</label>
+              <div className={`text-sm ${themeClasses.text}`}>{data?.formula_name || 'N/A'}</div>
             </div>
             <div>
-              <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Certifications</label>
-              {isEditing ? (
-                <input 
-                  type="text" 
-                  defaultValue="OMRI Listed, USDA Organic"
-                  className={`text-sm ${themeClasses.text} ${themeClasses.inputBg} border ${themeClasses.border} rounded px-2 py-1 w-full`}
-                />
-              ) : (
-                <div className={`text-sm ${themeClasses.text}`}>OMRI Listed, USDA Organic</div>
-              )}
+              <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Product Type</label>
+              <div className={`text-sm ${themeClasses.text}`}>{data?.type || 'N/A'}</div>
             </div>
             <div>
               <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Shelf Life</label>

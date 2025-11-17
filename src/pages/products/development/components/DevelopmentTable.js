@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 import StatusIndicator from './StatusIndicator';
 import Pagination from './Pagination';
@@ -10,8 +10,7 @@ const DevelopmentTable = ({
   totalPages,
   pageSize,
   onPageChange,
-  onPageSizeChange,
-  onStatusClick 
+  onPageSizeChange
 }) => {
   const { isDarkMode } = useTheme();
 
@@ -100,12 +99,12 @@ const DevelopmentTable = ({
                     key={stage.key}
                     style={{ padding: '0.375rem 0.75rem', verticalAlign: 'middle', textAlign: 'center' }}
                   >
-                    <button
-                      onClick={() => onStatusClick && onStatusClick(row.id, stage.key, row[stage.key])}
-                      className="inline-flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
+                    <div
+                      className="inline-flex items-center justify-center cursor-default"
+                      aria-label={`${stage.label} status is ${row[stage.key]}`}
                     >
                       <StatusIndicator status={row[stage.key]} />
-                    </button>
+                    </div>
                   </td>
                 ))}
               </tr>

@@ -14,6 +14,17 @@ const Slides = ({ data }) => {
 
   const variations = data?.variations || ['Default'];
   const variationType = data?.variationType || 'variation';
+  
+  // Six-sided images from API
+  const sixSidedImages = [
+    { label: 'Product Image', url: data?.product_image_url, key: 'product' },
+    { label: 'Front', url: data?.six_sided_image_front, key: 'front' },
+    { label: 'Back', url: data?.six_sided_image_back, key: 'back' },
+    { label: 'Left', url: data?.six_sided_image_left, key: 'left' },
+    { label: 'Right', url: data?.six_sided_image_right, key: 'right' },
+    { label: 'Top', url: data?.six_sided_image_top, key: 'top' },
+    { label: 'Bottom', url: data?.six_sided_image_bottom, key: 'bottom' }
+  ].filter(img => img.url); // Only show images that have URLs
 
   return (
     <div className={`${themeClasses.bg} rounded-xl border ${themeClasses.border} shadow-sm`}>
@@ -44,55 +55,96 @@ const Slides = ({ data }) => {
             </button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1.5rem' }}>
-            {variations.map((size, index) => (
-              <div key={size} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <div style={{
-                  aspectRatio: '16/9',
-                  border: `2px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
-                  borderRadius: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: isDarkMode ? '#1F2937' : '#F9FAFB',
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}>
-                  <svg style={{ width: '3rem', height: '3rem' }} className={themeClasses.textSecondary} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                  </svg>
+          {sixSidedImages.length > 0 ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1.5rem' }}>
+              {sixSidedImages.map((image) => (
+                <div key={image.key} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   <div style={{
-                    position: 'absolute',
-                    top: '8px',
-                    right: '8px',
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '50%',
-                    backgroundColor: '#10B981',
+                    aspectRatio: '1/1',
+                    border: `2px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                    borderRadius: '8px',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center'
+                    justifyContent: 'center',
+                    backgroundColor: isDarkMode ? '#1F2937' : '#F9FAFB',
+                    position: 'relative',
+                    overflow: 'hidden'
                   }}>
-                    <svg style={{ width: '14px', height: '14px' }} fill="none" stroke="white" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
+                    <img 
+                      src={image.url} 
+                      alt={image.label}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        padding: '8px'
+                      }}
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'flex';
+                      }}
+                    />
+                    <div style={{ 
+                      width: '100%', 
+                      height: '100%', 
+                      display: 'none', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      flexDirection: 'column',
+                      gap: '0.5rem'
+                    }}>
+                      <svg style={{ width: '3rem', height: '3rem' }} className={themeClasses.textSecondary} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <span className={`text-xs ${themeClasses.textSecondary}`}>Image unavailable</span>
+                    </div>
+                    {image.url && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '8px',
+                        right: '8px',
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        backgroundColor: '#10B981',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <svg style={{ width: '14px', height: '14px' }} fill="none" stroke="white" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    <span className={`text-sm font-medium ${themeClasses.text}`}>{image.label}</span>
+                    <span className={`text-xs ${themeClasses.textSecondary}`}>{data?.brand || ''} {data?.product || ''}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <a 
+                      href={image.url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="flex-1 text-center text-xs px-3 py-1.5 border border-blue-500 text-blue-500 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                    >
+                      View
+                    </a>
+                    <button className={`flex-1 text-xs px-3 py-1.5 border ${themeClasses.border} ${themeClasses.text} rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors`}>
+                      Replace
+                    </button>
                   </div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                  <span className={`text-sm font-medium ${themeClasses.text}`}>{size} - Slide Deck</span>
-                  <span className={`text-xs ${themeClasses.textSecondary}`}>Last updated: Aug 15, 2025</span>
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button className="flex-1 text-xs px-3 py-1.5 border border-blue-500 text-blue-500 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
-                    View
-                  </button>
-                  <button className="flex-1 text-xs px-3 py-1.5 border ${themeClasses.border} ${themeClasses.text} rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                    Replace
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className={`${themeClasses.inputBg} rounded-lg p-8 text-center`}>
+              <svg style={{ width: '4rem', height: '4rem', margin: '0 auto 1rem' }} className={themeClasses.textSecondary} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <p className={`text-sm ${themeClasses.textSecondary}`}>No slides available yet</p>
+            </div>
+          )}
         </div>
 
         {/* Notes */}

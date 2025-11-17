@@ -58,12 +58,6 @@ const FormulaTable = ({
               <tr>
                 <th 
                   className="text-left text-xs font-bold text-white uppercase tracking-wider"
-                  style={{ padding: '0.5rem 1rem', width: '300px' }}
-                >
-                  ACCOUNT
-                </th>
-                <th 
-                  className="text-left text-xs font-bold text-white uppercase tracking-wider"
                   style={{ padding: '0.5rem 1rem' }}
                 >
                   FORMULA
@@ -71,6 +65,12 @@ const FormulaTable = ({
                 <th 
                   className="text-left text-xs font-bold text-white uppercase tracking-wider"
                   style={{ padding: '0.5rem 1rem', width: '150px' }}
+                >
+                  NPK
+                </th>
+                <th 
+                  className="text-left text-xs font-bold text-white uppercase tracking-wider"
+                  style={{ padding: '0.5rem 1rem', width: '100px' }}
                 >
                   MSDS
                 </th>
@@ -84,18 +84,11 @@ const FormulaTable = ({
                 key={row.id}
                 className={`${themeClasses.rowHover} transition-colors duration-150`}
               >
-                {/* Account */}
-                <td style={{ padding: '0.375rem 1rem', verticalAlign: 'middle' }}>
-                  <span style={{ fontSize: '0.8125rem', fontWeight: '500' }} className={themeClasses.text}>
-                    {row.account}
-                  </span>
-                </td>
-
-                {/* Formula with Edit Icon */}
+                {/* Formula Name with Edit Icon */}
                 <td style={{ padding: '0.375rem 1rem', verticalAlign: 'middle' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <span style={{ fontSize: '0.8125rem', fontWeight: '500' }} className={themeClasses.text}>
-                      {row.formulaName}
+                      {row.formula}
                     </span>
                     <button
                       onClick={() => onEditFormula(row)}
@@ -108,6 +101,13 @@ const FormulaTable = ({
                       </svg>
                     </button>
                   </div>
+                </td>
+
+                {/* NPK */}
+                <td style={{ padding: '0.375rem 1rem', verticalAlign: 'middle' }}>
+                  <span style={{ fontSize: '0.8125rem' }} className={themeClasses.text}>
+                    {row.tps_npk || row.tps_nutrients_npk || row.bloom_city_npk || '-'}
+                  </span>
                 </td>
 
                 {/* MSDS View Button */}

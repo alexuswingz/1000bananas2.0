@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 import { toast } from 'sonner';
 import FormulaTable from './formula/components/FormulaTable';
 import FormulaEditor from './formula/components/FormulaEditor';
+import formulaApi from '../../services/formulaApi';
 
 const Formula = () => {
   const { isDarkMode } = useTheme();
@@ -10,26 +11,34 @@ const Formula = () => {
   const [selectedFormula, setSelectedFormula] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [formulas, setFormulas] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const themeClasses = {
     bg: isDarkMode ? 'bg-dark-bg-primary' : 'bg-light-bg-primary',
   };
 
-  // Sample data (expanded for pagination)
-  const [formulas, setFormulas] = useState([
-    { id: 1, account: 'TPS Nutrients', formulaName: 'F.Ultra Grow', brand: 'TPS Plant Foods' },
-    { id: 2, account: 'TPS Nutrients', formulaName: 'F.Bloom Boost', brand: 'TPS Plant Foods' },
-    { id: 3, account: 'TPS Nutrients', formulaName: 'F.Root Developer', brand: 'TPS Plant Foods' },
-    { id: 4, account: 'TPS Nutrients', formulaName: 'F.Flower Power', brand: 'TPS Plant Foods' },
-    { id: 5, account: 'Green Earth Co', formulaName: 'F.Organic Mix', brand: 'Nature\'s Choice' },
-    { id: 6, account: 'Green Earth Co', formulaName: 'F.Eco Blend', brand: 'Nature\'s Choice' },
-    { id: 7, account: 'Garden Masters', formulaName: 'F.Pro Formula', brand: 'ProGrow' },
-    { id: 8, account: 'Garden Masters', formulaName: 'F.Advanced Nutrients', brand: 'ProGrow' },
-    { id: 9, account: 'TPS Nutrients', formulaName: 'F.Micro Boost', brand: 'TPS Plant Foods' },
-    { id: 10, account: 'TPS Nutrients', formulaName: 'F.Macro Plus', brand: 'TPS Plant Foods' },
-    { id: 11, account: 'TPS Nutrients', formulaName: 'F.Cal-Mag', brand: 'TPS Plant Foods' },
-    { id: 12, account: 'Green Earth Co', formulaName: 'F.Natural Growth', brand: 'Nature\'s Choice' },
-  ]);
+  // Fetch formulas from API
+  useEffect(() => {
+    const fetchFormulas = async () => {
+      try {
+        setIsLoading(true);
+        const response = await formulaApi.getAll();
+        if (response.success && response.data) {
+          setFormulas(response.data);
+        } else {
+          toast.error('Failed to load formulas');
+        }
+      } catch (error) {
+        console.error('Error loading formulas:', error);
+        toast.error('Failed to load formulas');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchFormulas();
+  }, []);
 
   const handleNewFormula = () => {
     setSelectedFormula(null);
@@ -63,24 +72,46 @@ const Formula = () => {
     setCurrentPage(1);
   };
 
-  const handleSaveFormula = (formulaData) => {
-    if (selectedFormula) {
-      // Update existing formula
-      setFormulas(prev => prev.map(f => 
-        f.id === selectedFormula.id ? { ...f, ...formulaData } : f
-      ));
-      toast.success('Formula updated successfully!');
-    } else {
-      // Add new formula
-      const newFormula = {
-        id: formulas.length + 1,
-        ...formulaData
-      };
-      setFormulas(prev => [...prev, newFormula]);
-      toast.success('Formula created successfully!');
+  const handleSaveFormula = async (formulaData) => {
+    try {
+      if (selectedFormula) {
+        // Update existing formula
+        const response = await formulaApi.update(selectedFormula.id, formulaData);
+        if (response.success) {
+          setFormulas(prev => prev.map(f => 
+            f.id === selectedFormula.id ? { ...f, ...formulaData } : f
+          ));
+          toast.success('Formula updated successfully!');
+        } else {
+          toast.error('Failed to update formula');
+        }
+      } else {
+        // Add new formula
+        const response = await formulaApi.create(formulaData);
+        if (response.success && response.data) {
+          setFormulas(prev => [...prev, response.data]);
+          toast.success('Formula created successfully!');
+        } else {
+          toast.error('Failed to create formula');
+        }
+      }
+      setIsEditorOpen(false);
+    } catch (error) {
+      console.error('Error saving formula:', error);
+      toast.error('Failed to save formula');
     }
-    setIsEditorOpen(false);
   };
+
+  if (isLoading) {
+    return (
+      <div className={`min-h-screen ${themeClasses.bg} flex items-center justify-center`}>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className={isDarkMode ? 'text-dark-text-secondary' : 'text-gray-500'}>Loading formulas...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`min-h-screen ${themeClasses.bg} flex flex-col`}>

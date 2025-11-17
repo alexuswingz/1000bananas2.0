@@ -1,13 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 
 const EssentialInfo = ({ data }) => {
   const { isDarkMode } = useTheme();
-  const variations = data.variations || ['8oz', 'Quart', 'Gallon'];
+  const allVariations = Array.isArray(data.allVariations) ? data.allVariations : [];
+  const sizeOptions = useMemo(() => {
+    if (Array.isArray(data.variations) && data.variations.length > 0) {
+      return data.variations;
+    }
+    if (data.variationsData && Object.keys(data.variationsData).length > 0) {
+      return Object.keys(data.variationsData);
+    }
+    if (allVariations.length > 0) {
+      const uniqueSizes = allVariations.map(v => v.size || `Variant ${v.id}`);
+      return [...new Set(uniqueSizes)];
+    }
+    return ['Default'];
+  }, [data.variations, data.variationsData, allVariations]);
+  
+  const parseList = (value) => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.map(item => (typeof item === 'string' ? item.trim() : item)).filter(Boolean);
+    if (typeof value === 'string') {
+      return value
+        .split(/[\n,]+/)
+        .map(item => item.trim())
+        .filter(Boolean);
+    }
+    return [];
+  };
+  
+  const marketingCoreAsins = parseList(data.core_competitor_asins || data.coreCompetitorAsins);
+  const marketingOtherAsins = parseList(data.other_competitor_asins || data.otherCompetitorAsins);
+  const marketingCoreKeywords = parseList(data.core_keywords || data.coreKeywords);
+  const marketingOtherKeywords = parseList(data.other_keywords || data.otherKeywords);
+
   const [isEditing, setIsEditing] = useState(false);
-  const [activePackagingTab, setActivePackagingTab] = useState(variations[0] || '8oz');
-  const [activeNotesTab, setActiveNotesTab] = useState(variations[0] || '8oz');
+  const [activePackagingTab, setActivePackagingTab] = useState(() => sizeOptions[0] || 'Default');
+  const [activeNotesTab, setActiveNotesTab] = useState(() => sizeOptions[0] || 'Default');
   const [editData, setEditData] = useState({});
+
+  useEffect(() => {
+    if (!sizeOptions.includes(activePackagingTab)) {
+      setActivePackagingTab(sizeOptions[0] || 'Default');
+    }
+    if (!sizeOptions.includes(activeNotesTab)) {
+      setActiveNotesTab(sizeOptions[0] || 'Default');
+    }
+  }, [sizeOptions, activePackagingTab, activeNotesTab]);
 
   const themeClasses = {
     bg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -18,18 +58,64 @@ const EssentialInfo = ({ data }) => {
   };
 
   // Get variation-specific data for 1000 Bananas imports
+  const buildVariantFromRaw = (variant, fallbackSize) => ({
+    sizeLabel: variant.size || fallbackSize,
+    childAsin: variant.child_asin,
+    parentAsin: variant.parent_asin,
+    childSku: variant.child_sku_final,
+    parentSku: variant.parent_sku_final,
+    upc: variant.upc,
+    fullProductName: variant.title || variant.product_name,
+    packagingName: variant.packaging_name,
+    closureName: variant.closure_name,
+    labelSize: variant.label_size,
+    labelLocation: variant.label_location,
+    caseSize: variant.case_size,
+    unitsPerCase: variant.units_per_case,
+    filter: variant.filter,
+    productImage: variant.product_image_url || variant.basic_wrap_url || variant.tri_bottle_wrap_url,
+    unitsSold30Days: variant.units_sold_30_days,
+    notes: variant.notes,
+    dimensions: {
+      length: variant.product_dimensions_length_in,
+      width: variant.product_dimensions_width_in,
+      height: variant.product_dimensions_height_in,
+      weight: variant.product_dimensions_weight_lbs
+    },
+    formula: {
+      guaranteedAnalysis: variant.var_tps_guaranteed_analysis || variant.var_guaranteed_analysis,
+      npk: variant.var_tps_npk || variant.var_npk,
+      derivedFrom: variant.var_tps_derived_from || variant.var_derived_from,
+      storageWarranty: variant.var_tps_storage_warranty || variant.var_storage_warranty
+    }
+  });
+
   const getVariationData = (size) => {
     if (data.source === '1000bananas-import' && data.variationsData && data.variationsData[size]) {
       return data.variationsData[size];
     }
-    return data;
+    if (data.variationsData && data.variationsData[size]) {
+      return data.variationsData[size];
+    }
+    const fallbackVariant = allVariations.find(
+      variant => (variant.size || `Variant ${variant.id}`) === size
+    );
+    return fallbackVariant ? buildVariantFromRaw(fallbackVariant, size) : {};
   };
-
-  // Use actual product images from Amazon sync
+  
+  // Use actual product images per variation
   const productImages = {};
-  variations.forEach(v => {
-    productImages[v] = data.mainImage || data.images?.[0] || '/assets/product-placeholder.png';
+  sizeOptions.forEach((size) => {
+    const variantData = getVariationData(size);
+    productImages[size] = variantData.productImage
+      || data.mainImage
+      || data.images?.[0]
+      || '/assets/product-placeholder.png';
   });
+  
+  const packagingData = getVariationData(activePackagingTab) || {};
+  const notesVariationData = getVariationData(activeNotesTab) || {};
+  const packagingFormula = packagingData.formula || {};
 
   return (
     <div 
@@ -58,7 +144,7 @@ const EssentialInfo = ({ data }) => {
               Product Images {data.images && data.images.length > 0 && <span className="text-xs font-normal text-green-600">({data.images.length} images synced from Amazon)</span>}
             </h3>
             <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
-              {variations.map((size) => (
+              {sizeOptions.map((size) => (
                 <div key={size} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
                   <div style={{
                     width: '80px',
@@ -197,13 +283,13 @@ const EssentialInfo = ({ data }) => {
                   <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm9.707 5.707a1 1 0 00-1.414-1.414L9 12.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
                 1000 Bananas Database (Imported)
-                <span className="text-xs font-normal text-purple-600">({variations.length} variations)</span>
+                <span className="text-xs font-normal text-purple-600">({sizeOptions.length} variations)</span>
               </h3>
               
               {/* Variation Tabs */}
-              {variations.length > 0 && (
+              {sizeOptions.length > 0 && (
                 <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', borderBottom: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}` }}>
-                  {variations.map((size) => (
+                  {sizeOptions.map((size) => (
                     <button
                       key={size}
                       onClick={() => setActivePackagingTab(size)}
@@ -456,26 +542,43 @@ const EssentialInfo = ({ data }) => {
               )}
 
               {/* Marketing Information */}
-              {(data.coreKeywords || data.coreCompetitorAsins) && (
+              {(marketingCoreKeywords.length > 0 ||
+                marketingCoreAsins.length > 0 ||
+                marketingOtherAsins.length > 0 ||
+                marketingOtherKeywords.length > 0) && (
                 <div className="mb-4">
                   <h4 className={`text-xs font-semibold ${themeClasses.text} mb-2 uppercase tracking-wide`}>Marketing</h4>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '0.75rem', fontSize: '0.875rem' }}>
-                    {data.coreKeywords && (
+                    {marketingCoreKeywords.length > 0 && (
                       <div style={{ gridColumn: '1 / -1' }}>
                         <span className={themeClasses.textSecondary}>Core Keywords:</span>
-                        <p className={themeClasses.text} style={{ marginTop: '0.25rem', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{data.coreKeywords}</p>
+                        <p className={themeClasses.text} style={{ marginTop: '0.25rem', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
+                          {marketingCoreKeywords.join(', ')}
+                        </p>
                       </div>
                     )}
-                    {data.coreCompetitorAsins && (
+                    {marketingCoreAsins.length > 0 && (
                       <div>
                         <span className={themeClasses.textSecondary}>Core Competitor ASINs:</span>
-                        <p className={themeClasses.text} style={{ marginTop: '0.25rem', lineHeight: '1.5' }}>{data.coreCompetitorAsins}</p>
+                        <p className={themeClasses.text} style={{ marginTop: '0.25rem', lineHeight: '1.5' }}>
+                          {marketingCoreAsins.join(', ')}
+                        </p>
                       </div>
                     )}
-                    {data.otherCompetitorAsins && (
+                    {marketingOtherAsins.length > 0 && (
                       <div>
                         <span className={themeClasses.textSecondary}>Other Competitor ASINs:</span>
-                        <p className={themeClasses.text} style={{ marginTop: '0.25rem', lineHeight: '1.5' }}>{data.otherCompetitorAsins}</p>
+                        <p className={themeClasses.text} style={{ marginTop: '0.25rem', lineHeight: '1.5' }}>
+                          {marketingOtherAsins.join(', ')}
+                        </p>
+                      </div>
+                    )}
+                    {marketingOtherKeywords.length > 0 && (
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <span className={themeClasses.textSecondary}>Other Keywords:</span>
+                        <p className={themeClasses.text} style={{ marginTop: '0.25rem', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
+                          {marketingOtherKeywords.join(', ')}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -652,7 +755,7 @@ const EssentialInfo = ({ data }) => {
             
             {/* Tabs */}
             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', borderBottom: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}` }}>
-              {variations.map((size) => (
+              {sizeOptions.map((size) => (
                 <button
                   key={size}
                   onClick={() => setActivePackagingTab(size)}
@@ -671,57 +774,61 @@ const EssentialInfo = ({ data }) => {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
               <div>
                 <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Packaging Name</label>
-                <div className={`text-sm ${themeClasses.text}`}>8oz Bottle</div>
+                <div className={`text-sm ${themeClasses.text}`}>{packagingData.packagingName || data.packaging_name || 'N/A'}</div>
               </div>
               <div>
                 <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Closure Name</label>
-                <div className={`text-sm ${themeClasses.text}`}>Aglar Pour Cap</div>
+                <div className={`text-sm ${themeClasses.text}`}>{packagingData.closureName || data.closure_name || 'N/A'}</div>
               </div>
               <div>
                 <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Label Size</label>
-                <div className={`text-sm ${themeClasses.text}`}>3" x 8"</div>
+                <div className={`text-sm ${themeClasses.text}`}>{packagingData.labelSize || data.label_size || 'N/A'}</div>
               </div>
               <div>
                 <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Label Location</label>
-                <div className={`text-sm ${themeClasses.text}`}>LBL-PLANT-053</div>
+                <div className={`text-sm ${themeClasses.text}`}>{packagingData.labelLocation || data.label_location || 'N/A'}</div>
               </div>
               <div>
                 <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Case Size</label>
-                <div className={`text-sm ${themeClasses.text}`}>12 x 10 x 12</div>
+                <div className={`text-sm ${themeClasses.text}`}>{packagingData.caseSize || data.case_size || 'N/A'}</div>
               </div>
               <div>
                 <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Units per Case</label>
-                <div className={`text-sm ${themeClasses.text}`}>80</div>
+                <div className={`text-sm ${themeClasses.text}`}>{packagingData.unitsPerCase || data.units_per_case || 'N/A'}</div>
               </div>
               <div>
                 <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Filter</label>
-                <div className={`text-sm ${themeClasses.text}`}>75</div>
+                <div className={`text-sm ${themeClasses.text}`}>{packagingData.filter || data.filter || 'N/A'}</div>
               </div>
               <div>
                 <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>UPC Code</label>
-                <div className={`text-sm ${themeClasses.text}`}>810519195520</div>
+                <div className={`text-sm ${themeClasses.text}`}>{packagingData.upc || data.upc || 'N/A'}</div>
               </div>
               <div>
                 <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>UPC comm file</label>
-                <a href="https://drive.google.com/file/d/WTDE" target="_blank" rel="noopener noreferrer" className="text-sm text-blue-500 hover:text-blue-600">
-                  https://drive.google.com/...
-                </a>
+                {packagingData.raw?.upc_image_file ? (
+                  <a href={packagingData.raw.upc_image_file} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-500 hover:text-blue-600">
+                    View UPC Asset
+                  </a>
+                ) : (
+                  <div className={`text-sm ${themeClasses.text}`}>N/A</div>
+                )}
               </div>
               <div>
                 <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Parent ASIN</label>
-                <div className={`text-sm ${themeClasses.text}`}>B0FKM2QYTR4</div>
+                <div className={`text-sm ${themeClasses.text}`}>{packagingData.parentAsin || data.parent_asin || 'N/A'}</div>
               </div>
               <div>
-                <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Child GTIN</label>
-                <div className={`text-sm ${themeClasses.text}`}>B073IHK4XS</div>
+                <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Child ASIN</label>
+                <div className={`text-sm ${themeClasses.text}`}>{packagingData.childAsin || data.child_asin || 'N/A'}</div>
               </div>
               <div>
                 <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>PARENT SKU</label>
-                <div className={`text-sm ${themeClasses.text}`}>TPS-CHERRYTREEFERT-8OZ</div>
+                <div className={`text-sm ${themeClasses.text}`}>{packagingData.parentSku || data.parent_sku_final || data.parent_sku || 'N/A'}</div>
               </div>
               <div>
                 <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Child SKU</label>
-                <div className={`text-sm ${themeClasses.text}`}>TPS-CHERRYTREEFERT-8OZ</div>
+                <div className={`text-sm ${themeClasses.text}`}>{packagingData.childSku || data.child_sku_final || data.child_sku || 'N/A'}</div>
               </div>
             </div>
           </div>
@@ -737,8 +844,62 @@ const EssentialInfo = ({ data }) => {
                 Edit Info
               </button>
             </div>
-            <div className={`${themeClasses.inputBg} rounded-lg p-3`}>
-              <div className={`text-sm ${themeClasses.text}`}>F Ultra Grow</div>
+            <div className={`${themeClasses.inputBg} rounded-lg p-4`}>
+              {packagingFormula.guaranteedAnalysis || packagingFormula.npk || data.formulaName ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                  {(data.formulaName || data.formula) && (
+                    <div>
+                      <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Formula Name</label>
+                      <div className={`text-sm ${themeClasses.text}`}>{data.formulaName || data.formula}</div>
+                    </div>
+                  )}
+                  {(packagingFormula.npk || data.formula_npk) && (
+                    <div>
+                      <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>NPK</label>
+                      <div className={`text-sm ${themeClasses.text}`}>{packagingFormula.npk || data.formula_npk}</div>
+                    </div>
+                  )}
+                  {(packagingFormula.guaranteedAnalysis || data.formula_guaranteed_analysis) && (
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Guaranteed Analysis</label>
+                      <div className={`text-sm ${themeClasses.text}`} style={{ whiteSpace: 'pre-wrap' }}>
+                        {packagingFormula.guaranteedAnalysis || data.formula_guaranteed_analysis}
+                      </div>
+                    </div>
+                  )}
+                  {(packagingFormula.derivedFrom || data.formula_derived_from) && (
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Derived From</label>
+                      <div className={`text-sm ${themeClasses.text}`} style={{ whiteSpace: 'pre-wrap' }}>
+                        {packagingFormula.derivedFrom || data.formula_derived_from}
+                      </div>
+                    </div>
+                  )}
+                  {(packagingFormula.storageWarranty || data.formula_storage_warranty) && (
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Storage / Warranty</label>
+                      <div className={`text-sm ${themeClasses.text}`} style={{ whiteSpace: 'pre-wrap' }}>
+                        {packagingFormula.storageWarranty || data.formula_storage_warranty}
+                      </div>
+                    </div>
+                  )}
+                  {(packagingData.msds || data.formula_msds) && (
+                    <div>
+                      <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>MSDS</label>
+                      <a 
+                        href={packagingData.msds || data.formula_msds} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-500 hover:text-blue-600"
+                      >
+                        View MSDS
+                      </a>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className={`text-sm ${themeClasses.textSecondary}`}>No formula details available for this variation yet.</div>
+              )}
             </div>
           </div>
 
@@ -755,37 +916,108 @@ const EssentialInfo = ({ data }) => {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
               <div>
-                <label className={`text-xs ${themeClasses.textSecondary} block mb-2`}>Core Competitor ASINs (3)</label>
+                <label className={`text-xs ${themeClasses.textSecondary} block mb-2`}>
+                  Core Competitor ASINs ({marketingCoreAsins.length})
+                </label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <div className={`${themeClasses.inputBg} rounded px-3 py-2 text-sm ${themeClasses.text}`}>B0X01H1RY1</div>
-                  <div className={`${themeClasses.inputBg} rounded px-3 py-2 text-sm ${themeClasses.text}`}>B0X01H1RY3</div>
-                  <div className={`${themeClasses.inputBg} rounded px-3 py-2 text-sm ${themeClasses.text}`}>B0X01H1RY5</div>
+                  {marketingCoreAsins.length > 0 ? (
+                    marketingCoreAsins.map((asin, idx) => (
+                      <div key={idx} className={`${themeClasses.inputBg} rounded px-3 py-2 text-sm ${themeClasses.text}`}>
+                        {asin}
+                      </div>
+                    ))
+                  ) : (
+                    <div className={`${themeClasses.inputBg} rounded px-3 py-2 text-sm ${themeClasses.textSecondary}`}>
+                      No core competitor ASINs yet
+                    </div>
+                  )}
                 </div>
               </div>
               <div>
-                <label className={`text-xs ${themeClasses.textSecondary} block mb-2`}>Other Competitor ASINs (3)</label>
+                <label className={`text-xs ${themeClasses.textSecondary} block mb-2`}>
+                  Other Competitor ASINs ({marketingOtherAsins.length})
+                </label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <div className={`${themeClasses.inputBg} rounded px-3 py-2 text-sm ${themeClasses.text}`}>No Other Competitor ASINs</div>
+                  {marketingOtherAsins.length > 0 ? (
+                    marketingOtherAsins.map((asin, idx) => (
+                      <div key={idx} className={`${themeClasses.inputBg} rounded px-3 py-2 text-sm ${themeClasses.text}`}>
+                        {asin}
+                      </div>
+                    ))
+                  ) : (
+                    <div className={`${themeClasses.inputBg} rounded px-3 py-2 text-sm ${themeClasses.textSecondary}`}>
+                      No other competitor ASINs yet
+                    </div>
+                  )}
                 </div>
               </div>
               <div>
-                <label className={`text-xs ${themeClasses.textSecondary} block mb-2`}>Competitor Keywords (3)</label>
+                <label className={`text-xs ${themeClasses.textSecondary} block mb-2`}>Competitor Keywords</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <div className={`${themeClasses.inputBg} rounded px-3 py-2 text-sm ${themeClasses.text}`}>Cherry Tree Fertilizer</div>
-                  <div className={`${themeClasses.inputBg} rounded px-3 py-2 text-sm ${themeClasses.text}`}>Cherry Tree Plant Food</div>
-                  <div className={`${themeClasses.inputBg} rounded px-3 py-2 text-sm ${themeClasses.text}`}>Fertilizer for Cherry Trees</div>
+                  {marketingCoreKeywords.length > 0 ? (
+                    marketingCoreKeywords.map((keyword, idx) => (
+                      <div key={idx} className={`${themeClasses.inputBg} rounded px-3 py-2 text-sm ${themeClasses.text}`}>
+                        {keyword}
+                      </div>
+                    ))
+                  ) : (
+                    <div className={`${themeClasses.inputBg} rounded px-3 py-2 text-sm ${themeClasses.textSecondary}`}>
+                      No keywords yet
+                    </div>
+                  )}
                 </div>
               </div>
               <div>
-                <label className={`text-xs ${themeClasses.textSecondary} block mb-2`}>Other Keywords (3)</label>
+                <label className={`text-xs ${themeClasses.textSecondary} block mb-2`}>Other Keywords</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <div className={`${themeClasses.inputBg} rounded px-3 py-2 text-sm ${themeClasses.text}`}>Cherry Tree Food</div>
-                  <div className={`${themeClasses.inputBg} rounded px-3 py-2 text-sm ${themeClasses.text}`}>Cherry Nutrients</div>
-                  <div className={`${themeClasses.inputBg} rounded px-3 py-2 text-sm ${themeClasses.text}`}>Feed for Cherry Trees</div>
+                  {marketingOtherKeywords.length > 0 ? (
+                    marketingOtherKeywords.map((keyword, idx) => (
+                      <div key={idx} className={`${themeClasses.inputBg} rounded px-3 py-2 text-sm ${themeClasses.text}`}>
+                        {keyword}
+                      </div>
+                    ))
+                  ) : (
+                    <div className={`${themeClasses.inputBg} rounded px-3 py-2 text-sm ${themeClasses.textSecondary}`}>
+                      No keywords yet
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           </div>
+
+          {/* All Variations Table */}
+          {data?.allVariations && data.allVariations.length > 1 && (
+            <div style={{ marginBottom: '2rem' }}>
+              <h3 className={`text-sm font-semibold ${themeClasses.text} mb-3`}>
+                All Variants ({data.allVariations.length})
+              </h3>
+              <div className={`${themeClasses.inputBg} rounded-lg overflow-hidden`}>
+                <table style={{ width: '100%' }}>
+                  <thead className={isDarkMode ? 'bg-[#2C3544]' : 'bg-gray-800'}>
+                    <tr>
+                      <th className="text-left text-xs font-bold text-white uppercase tracking-wider px-4 py-2">Size</th>
+                      <th className="text-left text-xs font-bold text-white uppercase tracking-wider px-4 py-2">Formula</th>
+                      <th className="text-left text-xs font-bold text-white uppercase tracking-wider px-4 py-2">ASIN</th>
+                      <th className="text-left text-xs font-bold text-white uppercase tracking-wider px-4 py-2">SKU</th>
+                      <th className="text-left text-xs font-bold text-white uppercase tracking-wider px-4 py-2">UPC</th>
+                    </tr>
+                  </thead>
+                  <tbody className={isDarkMode ? 'divide-y divide-gray-700' : 'divide-y divide-gray-200'}>
+                    {data.allVariations.map((variant, index) => (
+                      <tr key={index} className={isDarkMode ? 'hover:bg-dark-bg-tertiary' : 'hover:bg-gray-50'}>
+                        <td className={`px-4 py-3 text-sm font-medium ${themeClasses.text}`}>{variant.size || 'N/A'}</td>
+                        <td className={`px-4 py-3 text-sm ${themeClasses.text}`}>{variant.formula_name || 'N/A'}</td>
+                        <td className={`px-4 py-3 text-sm ${themeClasses.text}`}>{variant.child_asin || 'N/A'}</td>
+                        <td className={`px-4 py-3 text-sm ${themeClasses.text}`}>{variant.child_sku_final || 'N/A'}</td>
+                        <td className={`px-4 py-3 text-sm ${themeClasses.text}`}>{variant.upc || 'N/A'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Notes */}
           <div>
@@ -801,7 +1033,7 @@ const EssentialInfo = ({ data }) => {
             
             {/* Tabs */}
             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', borderBottom: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}` }}>
-              {variations.map((size) => (
+              {sizeOptions.map((size) => (
                 <button
                   key={size}
                   onClick={() => setActiveNotesTab(size)}
@@ -814,33 +1046,28 @@ const EssentialInfo = ({ data }) => {
                   {size}
                 </button>
               ))}
-              <button
-                onClick={() => setActiveNotesTab('Gallon')}
-                className={`px-4 py-2 text-sm font-medium transition-colors ${
-                  activeNotesTab === 'Gallon'
-                    ? 'text-blue-600 border-b-2 border-blue-600'
-                    : `${themeClasses.textSecondary} hover:${themeClasses.text}`
-                }`}
-              >
-                Gallon
-              </button>
             </div>
 
             {/* Notes Content */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div className={`${themeClasses.inputBg} rounded-lg p-4`}>
-                <div className={`text-xs ${themeClasses.textSecondary} mb-2`}>
-                  Recent note by Christian R. on August 15, 2025 at 1:27 PM
+              {notesVariationData.notes && Object.keys(notesVariationData.notes).length > 0 ? (
+                Object.entries(notesVariationData.notes).map(([key, value]) => (
+                  <div key={key} className={`${themeClasses.inputBg} rounded-lg p-4`}>
+                    <div className={`text-xs ${themeClasses.textSecondary} mb-2`}>
+                      {key}
+                    </div>
+                    <div className={`text-sm ${themeClasses.text}`}>
+                      {value}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className={`${themeClasses.inputBg} rounded-lg p-4`}>
+                  <div className={`text-sm ${themeClasses.textSecondary}`}>
+                    No notes captured for this variation yet.
+                  </div>
                 </div>
-                <div className={`text-sm ${themeClasses.text}`}>
-                  Design: Make sure the label is Green
-                </div>
-              </div>
-              <div className={`${themeClasses.inputBg} rounded-lg p-4`}>
-                <div className={`text-sm ${themeClasses.text}`}>
-                  Manufacturing: Mix the formula really well
-                </div>
-              </div>
+              )}
             </div>
           </div>
       </div>

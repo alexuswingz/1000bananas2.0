@@ -2,50 +2,77 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTheme } from '../../context/ThemeContext';
-import { useProducts } from '../../context/ProductsContext';
 import CatalogHeader from './catalog/components/CatalogHeader';
 import CatalogTable from './catalog/components/CatalogTable';
 
 const Catalog = () => {
   const { isDarkMode } = useTheme();
   const navigate = useNavigate();
-  const { products } = useProducts();
 
   const themeClasses = {
     bg: isDarkMode ? 'bg-dark-bg-primary' : 'bg-light-bg-primary',
   };
 
-  // Get catalog products from ProductsContext
-  const catalogProducts = useMemo(() => {
-    return products
-      .filter(p => p.module === 'catalog')
-      .map(p => {
-        // Shorten product name for table display
-        const fullProductName = p.product || p.productName || 'Unknown Product';
-        const shortName = fullProductName.split(',')[0].trim(); // Take text before first comma
-        
-        return {
-          id: p.id,
-          marketplace: p.marketplace || 'Amazon',
-          account: p.account || 'Amazon US',
-          brand: p.brand || 'TPS Nutrients',
-          product: shortName, // Shortened for table
-          fullProduct: fullProductName, // Keep full name
-          asin: p.asin || '',
-          sku: p.sku || '',
-          images: p.images || [],
-          mainImage: p.mainImage || '',
-          description: p.description || '',
-          price: p.price || '',
-          quantity: p.quantity || p.totalQuantity || '',
-          // Pass all additional details
-          ...p
-        };
-      });
-  }, [products]);
+  const [catalogData, setCatalogData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('parent');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-  // Sample data for Parent tab
-  const parentData = catalogProducts.length > 0 ? catalogProducts : [
+  // Fetch catalog data from API based on active tab
+  useEffect(() => {
+    const fetchCatalogData = async () => {
+      try {
+        setLoading(true);
+        const apiUrl = process.env.REACT_APP_API_URL || 'YOUR_API_GATEWAY_URL';
+        
+        // Fetch parent or child data based on active tab
+        const endpoint = activeTab === 'parent' 
+          ? `${apiUrl}/products/catalog`
+          : `${apiUrl}/products/catalog/children`;
+        
+        const response = await fetch(endpoint, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to fetch catalog data');
+        }
+
+        // Transform API data to match table format
+        const transformedData = (result.data || []).map(item => ({
+          id: item.id,
+          marketplace: item.marketplace || 'Amazon',
+          account: item.account || 'TPS Nutrients',
+          brand: item.brand || 'TPS Plant Foods',
+          product: item.product || 'Unknown Product',
+        }));
+
+        setCatalogData(transformedData);
+      } catch (error) {
+        console.error('Error fetching catalog data:', error);
+        toast.error('Failed to load catalog data', {
+          description: error.message,
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCatalogData();
+  }, [activeTab]);
+
+  // Use API data or fallback to sample data
+  const displayData = catalogData.length > 0 ? catalogData : [];
+  
+  // Sample data for Parent tab (fallback if API fails)
+  const sampleParentData = [
     {
       id: '1',
       marketplace: 'Amazon',
@@ -132,8 +159,8 @@ const Catalog = () => {
     },
   ];
 
-  // Sample data for Child tab
-  const childData = [
+  // Sample data for Child tab (fallback if API fails)
+  const sampleChildData = [
     {
       id: '1',
       marketplace: 'Amazon',
@@ -192,13 +219,10 @@ const Catalog = () => {
     },
   ];
 
-  const [activeTab, setActiveTab] = useState('parent');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-
-  // Get data based on active tab
-  const currentData = activeTab === 'parent' ? parentData : childData;
+  // Use real data from API, or fall back to sample data if API hasn't loaded yet
+  const currentData = displayData.length > 0 
+    ? displayData 
+    : (activeTab === 'parent' ? sampleParentData : sampleChildData);
 
   // Filter data based on search
   const filteredData = useMemo(() => {
@@ -245,8 +269,9 @@ const Catalog = () => {
     navigate('/dashboard/products/catalog/detail', {
       state: { 
         product,
-        returnPath: '/dashboard/products/catalog', // Return to Catalog page when back button is clicked
-        allowedTabs: ['essential', 'stock', 'slides', 'label-copy', 'label', 'images', 'aplus', 'pdpSetup', 'website', 'listing', 'vine', 'formula'] // Exclude finishedGoods
+        productId: product.id, // Pass product ID for API calls
+        returnPath: '/dashboard/products/catalog'
+        // No allowedTabs restriction - show all tabs
       }
     });
   };
@@ -261,16 +286,22 @@ const Catalog = () => {
         />
       </div>
       <div style={{ flex: 1, padding: '0 2rem 2rem 2rem' }}>
-        <CatalogTable 
-          data={paginatedData}
-          totalItems={filteredData.length}
-          currentPage={currentPage}
-          totalPages={totalPages}
-          pageSize={pageSize}
-          onPageChange={handlePageChange}
-          onPageSizeChange={handlePageSizeChange}
-          onProductClick={handleProductClick}
-        />
+        {loading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-lg">Loading catalog data...</div>
+          </div>
+        ) : (
+          <CatalogTable 
+            data={paginatedData}
+            totalItems={filteredData.length}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+            onProductClick={handleProductClick}
+          />
+        )}
       </div>
     </div>
   );

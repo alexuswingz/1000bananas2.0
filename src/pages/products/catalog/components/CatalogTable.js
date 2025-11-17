@@ -83,52 +83,12 @@ const CatalogTable = ({
                 <td style={{ padding: '0.5rem 1rem', verticalAlign: 'middle' }}>
                   <button
                     onClick={() => onProductClick && onProductClick(row)}
-                    className="text-blue-500 hover:text-blue-600 cursor-pointer transition-colors"
-                    style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', textAlign: 'left' }}
+                    className="text-blue-500 hover:text-blue-600 hover:underline cursor-pointer transition-colors"
+                    style={{ textAlign: 'left', background: 'none', border: 'none', padding: 0 }}
                   >
-                    {/* Product Image */}
-                    {row.mainImage || row.images?.[0] ? (
-                      <img
-                        src={row.mainImage || row.images[0]}
-                        alt={row.product}
-                        style={{
-                          width: '40px',
-                          height: '40px',
-                          objectFit: 'contain',
-                          borderRadius: '0.375rem',
-                          border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
-                          backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
-                          flexShrink: 0
-                        }}
-                      />
-                    ) : (
-                      <div style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '0.375rem',
-                        border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
-                        backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0
-                      }}>
-                        <svg style={{ width: '1.25rem', height: '1.25rem' }} className={themeClasses.textSecondary} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                      </div>
-                    )}
-                    {/* Product Name */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
-                      <span style={{ fontSize: '0.8125rem', fontWeight: '500' }}>
-                        {row.product}
-                      </span>
-                      {row.asin && (
-                        <span style={{ fontSize: '0.6875rem', color: isDarkMode ? '#9ca3af' : '#6b7280' }}>
-                          ASIN: {row.asin}
-                        </span>
-                      )}
-                    </div>
+                    <span style={{ fontSize: '0.8125rem', fontWeight: '500' }}>
+                      {row.product}
+                    </span>
                   </button>
                 </td>
               </tr>

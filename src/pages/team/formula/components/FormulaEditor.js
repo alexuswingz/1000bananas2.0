@@ -3,14 +3,44 @@ import { useTheme } from '../../../../context/ThemeContext';
 
 const FormulaEditor = ({ isOpen, onClose, onSave, formula }) => {
   const { isDarkMode } = useTheme();
-  const [activeTab, setActiveTab] = useState('TPS Plant Foods');
+  
+  // Determine which brand tab to show initially based on existing data
+  const getInitialTab = () => {
+    if (!formula) return 'TPS Plant Foods';
+    if (formula.brand_1) return formula.brand_1;
+    if (formula.brand_2) return formula.brand_2;
+    if (formula.brand_3) return formula.brand_3;
+    if (formula.brand_4) return formula.brand_4;
+    return 'TPS Plant Foods';
+  };
+
+  const [activeTab, setActiveTab] = useState(getInitialTab());
   const [formulaData, setFormulaData] = useState({
-    formulaName: formula?.formulaName || 'F.Ultra Grow',
-    account: formula?.account || 'TPS Nutrients',
-    guaranteedAnalysis: 'Total Nitrogen (N) 3.6%, Available Phosphate (P2O5) 3.6%, Soluble Potash (K2O) 5.1%, Calcium (Ca) 2.1%, Magnesium (Mg) 0.75%, Iron (Fe) 0.1%, Manganese (Mn) 0.05%, Zinc (Zn) 0.05%, Boron (B) 0.02%, Copper (Cu) 0.05%',
-    npk: '3-6 - 3 - 5-1',
-    derivedFrom: 'ascophyllum nodosum, potassium phosphate, potassium nitrate, calcium nitrate, magnesium nitrate, boric acid, copper sulfate, ferric sulfate, manganese sulfate, zinc sulfate',
-    storage: 'Storage: Store in a cool and dark place (50°F - 80°F). Keep out of direct sunlight. Warranty: We guarantee all TPS products for 12 months from date of purchase. However, useful life is up to 2 years when properly stored. This product is suitable for its intended use as a plant nutrient, not for human or animal consumption. Buyer and user accept all liability associated with handling, use, and disposal of this product. Precautionary Statement: Avoid contact with skin and eyes. If contact occurs, thoroughly rinse affected area for several minutes. If irritation occurs, seek medical attention.'
+    formula: formula?.formula || '',
+    category: formula?.category || 'Plant',
+    type: formula?.type || 'Liquid',
+    filter: formula?.filter || '75',
+    brand_1: formula?.brand_1 || '',
+    brand_2: formula?.brand_2 || null,
+    brand_3: formula?.brand_3 || null,
+    brand_4: formula?.brand_4 || null,
+    // TPS Plant Foods fields
+    tps_guaranteed_analysis: formula?.tps_guaranteed_analysis || '',
+    tps_npk: formula?.tps_npk || '',
+    tps_derived_from: formula?.tps_derived_from || '',
+    tps_storage___warranty___precautionary___metals: formula?.tps_storage___warranty___precautionary___metals || '',
+    // TPS Nutrients fields
+    tps_nutrients_guaranteed_analysis: formula?.tps_nutrients_guaranteed_analysis || '',
+    tps_nutrients_npk: formula?.tps_nutrients_npk || '',
+    tps_nutrients_derived_from: formula?.tps_nutrients_derived_from || '',
+    tps_nutrients_storage___warranty___precautionary___metals: formula?.tps_nutrients_storage___warranty___precautionary___metals || '',
+    // Bloom City fields
+    bloom_city_npk: formula?.bloom_city_npk || '',
+    bloom_city_ingredients: formula?.bloom_city_ingredients || '',
+    bloom_city_guaranteed_analysis: formula?.bloom_city_guaranteed_analysis || '',
+    bloom_city_derived_from: formula?.bloom_city_derived_from || '',
+    bloom_city_storage: formula?.bloom_city_storage || '',
+    bloom_city_metals: formula?.bloom_city_metals || '',
   });
 
   const themeClasses = {
@@ -23,14 +53,69 @@ const FormulaEditor = ({ isOpen, onClose, onSave, formula }) => {
     headerBg: isDarkMode ? 'bg-[#1e293b]' : 'bg-[#2c3e50]',
   };
 
-  const tabs = ['TPS Plant Foods', 'Bloom City', 'HomeJungle'];
+  const tabs = ['TPS Plant Foods', 'TPS Nutrients', 'Bloom City'];
 
   const handleSave = () => {
-    onSave({
-      formulaName: formulaData.formulaName,
-      account: formulaData.account,
-    });
+    onSave(formulaData);
   };
+
+  // Get fields based on active tab
+  const getTabFields = () => {
+    switch(activeTab) {
+      case 'TPS Plant Foods':
+        return {
+          guaranteedAnalysis: formulaData.tps_guaranteed_analysis,
+          npk: formulaData.tps_npk,
+          derivedFrom: formulaData.tps_derived_from,
+          storage: formulaData.tps_storage___warranty___precautionary___metals,
+        };
+      case 'TPS Nutrients':
+        return {
+          guaranteedAnalysis: formulaData.tps_nutrients_guaranteed_analysis,
+          npk: formulaData.tps_nutrients_npk,
+          derivedFrom: formulaData.tps_nutrients_derived_from,
+          storage: formulaData.tps_nutrients_storage___warranty___precautionary___metals,
+        };
+      case 'Bloom City':
+        return {
+          guaranteedAnalysis: formulaData.bloom_city_guaranteed_analysis,
+          npk: formulaData.bloom_city_npk,
+          derivedFrom: formulaData.bloom_city_derived_from,
+          storage: formulaData.bloom_city_storage,
+          ingredients: formulaData.bloom_city_ingredients,
+          metals: formulaData.bloom_city_metals,
+        };
+      default:
+        return {};
+    }
+  };
+
+  const updateTabFields = (field, value) => {
+    switch(activeTab) {
+      case 'TPS Plant Foods':
+        if (field === 'guaranteedAnalysis') setFormulaData({ ...formulaData, tps_guaranteed_analysis: value });
+        if (field === 'npk') setFormulaData({ ...formulaData, tps_npk: value });
+        if (field === 'derivedFrom') setFormulaData({ ...formulaData, tps_derived_from: value });
+        if (field === 'storage') setFormulaData({ ...formulaData, tps_storage___warranty___precautionary___metals: value });
+        break;
+      case 'TPS Nutrients':
+        if (field === 'guaranteedAnalysis') setFormulaData({ ...formulaData, tps_nutrients_guaranteed_analysis: value });
+        if (field === 'npk') setFormulaData({ ...formulaData, tps_nutrients_npk: value });
+        if (field === 'derivedFrom') setFormulaData({ ...formulaData, tps_nutrients_derived_from: value });
+        if (field === 'storage') setFormulaData({ ...formulaData, tps_nutrients_storage___warranty___precautionary___metals: value });
+        break;
+      case 'Bloom City':
+        if (field === 'guaranteedAnalysis') setFormulaData({ ...formulaData, bloom_city_guaranteed_analysis: value });
+        if (field === 'npk') setFormulaData({ ...formulaData, bloom_city_npk: value });
+        if (field === 'derivedFrom') setFormulaData({ ...formulaData, bloom_city_derived_from: value });
+        if (field === 'storage') setFormulaData({ ...formulaData, bloom_city_storage: value });
+        if (field === 'ingredients') setFormulaData({ ...formulaData, bloom_city_ingredients: value });
+        if (field === 'metals') setFormulaData({ ...formulaData, bloom_city_metals: value });
+        break;
+    }
+  };
+
+  const tabFields = getTabFields();
 
   if (!isOpen) return null;
 
@@ -168,8 +253,8 @@ const FormulaEditor = ({ isOpen, onClose, onSave, formula }) => {
 
         {/* Content */}
         <div style={{ padding: '2.5rem' }}>
-          {/* Two-column layout for first row */}
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
+          {/* Three-column layout for first row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
             {/* Formula Name */}
             <div>
               <label className={`text-sm font-semibold ${themeClasses.text} block mb-3 flex items-center gap-2`}>
@@ -180,29 +265,66 @@ const FormulaEditor = ({ isOpen, onClose, onSave, formula }) => {
               </label>
               <input
                 type="text"
-                value={formulaData.formulaName}
-                onChange={(e) => setFormulaData({ ...formulaData, formulaName: e.target.value })}
+                value={formulaData.formula}
+                onChange={(e) => setFormulaData({ ...formulaData, formula: e.target.value })}
                 className={`w-full px-4 py-3 border-2 ${themeClasses.border} rounded-xl ${themeClasses.inputBg} ${themeClasses.text} focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all shadow-sm`}
-                placeholder="Enter formula name"
+                placeholder="e.g., F.Ultra Grow"
               />
             </div>
 
-            {/* NPK */}
+            {/* Category */}
             <div>
               <label className={`text-sm font-semibold ${themeClasses.text} block mb-3 flex items-center gap-2`}>
                 <svg style={{ width: '1rem', height: '1rem', color: '#3b82f6' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                 </svg>
-                NPK Ratio
+                Category
               </label>
-              <input
-                type="text"
-                value={formulaData.npk}
-                onChange={(e) => setFormulaData({ ...formulaData, npk: e.target.value })}
+              <select
+                value={formulaData.category}
+                onChange={(e) => setFormulaData({ ...formulaData, category: e.target.value })}
                 className={`w-full px-4 py-3 border-2 ${themeClasses.border} rounded-xl ${themeClasses.inputBg} ${themeClasses.text} focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all shadow-sm`}
-                placeholder="e.g., 3-6-3-5-1"
-              />
+              >
+                <option value="Plant">Plant</option>
+                <option value="Cleaner">Cleaner</option>
+                <option value="Pest">Pest</option>
+              </select>
             </div>
+
+            {/* Type */}
+            <div>
+              <label className={`text-sm font-semibold ${themeClasses.text} block mb-3 flex items-center gap-2`}>
+                <svg style={{ width: '1rem', height: '1rem', color: '#3b82f6' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+                Type
+              </label>
+              <select
+                value={formulaData.type}
+                onChange={(e) => setFormulaData({ ...formulaData, type: e.target.value })}
+                className={`w-full px-4 py-3 border-2 ${themeClasses.border} rounded-xl ${themeClasses.inputBg} ${themeClasses.text} focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all shadow-sm`}
+              >
+                <option value="Liquid">Liquid</option>
+                <option value="Dry">Dry</option>
+              </select>
+            </div>
+          </div>
+
+          {/* NPK */}
+          <div style={{ marginBottom: '2rem' }}>
+            <label className={`text-sm font-semibold ${themeClasses.text} block mb-3 flex items-center gap-2`}>
+              <svg style={{ width: '1rem', height: '1rem', color: '#3b82f6' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              NPK Ratio
+            </label>
+            <input
+              type="text"
+              value={tabFields.npk || ''}
+              onChange={(e) => updateTabFields('npk', e.target.value)}
+              className={`w-full px-4 py-3 border-2 ${themeClasses.border} rounded-xl ${themeClasses.inputBg} ${themeClasses.text} focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all shadow-sm`}
+              placeholder="e.g., 3 - 6 - 5.1"
+            />
           </div>
 
           {/* Guaranteed Analysis */}
@@ -214,8 +336,8 @@ const FormulaEditor = ({ isOpen, onClose, onSave, formula }) => {
               Guaranteed Analysis
             </label>
             <textarea
-              value={formulaData.guaranteedAnalysis}
-              onChange={(e) => setFormulaData({ ...formulaData, guaranteedAnalysis: e.target.value })}
+              value={tabFields.guaranteedAnalysis || ''}
+              onChange={(e) => updateTabFields('guaranteedAnalysis', e.target.value)}
               className={`w-full px-4 py-3 border-2 ${themeClasses.border} rounded-xl ${themeClasses.inputBg} ${themeClasses.text} focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all shadow-sm`}
               rows={4}
               style={{ resize: 'vertical', lineHeight: '1.6' }}
@@ -223,41 +345,61 @@ const FormulaEditor = ({ isOpen, onClose, onSave, formula }) => {
             />
           </div>
 
-          {/* Derived From */}
+          {/* Derived From / Ingredients */}
           <div style={{ marginBottom: '2rem' }}>
             <label className={`text-sm font-semibold ${themeClasses.text} block mb-3 flex items-center gap-2`}>
               <svg style={{ width: '1rem', height: '1rem', color: '#3b82f6' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
               </svg>
-              Derived From
+              {activeTab === 'Bloom City' ? 'Ingredients' : 'Derived From'}
             </label>
             <textarea
-              value={formulaData.derivedFrom}
-              onChange={(e) => setFormulaData({ ...formulaData, derivedFrom: e.target.value })}
+              value={activeTab === 'Bloom City' ? (tabFields.ingredients || '') : (tabFields.derivedFrom || '')}
+              onChange={(e) => updateTabFields(activeTab === 'Bloom City' ? 'ingredients' : 'derivedFrom', e.target.value)}
               className={`w-full px-4 py-3 border-2 ${themeClasses.border} rounded-xl ${themeClasses.inputBg} ${themeClasses.text} focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all shadow-sm`}
               rows={3}
               style={{ resize: 'vertical', lineHeight: '1.6' }}
-              placeholder="Enter ingredients"
+              placeholder="Enter ingredients or derived from"
             />
           </div>
 
-          {/* Storage / Warranty / Precautionary / Metals */}
+          {/* Storage / Warranty / Precautionary */}
           <div style={{ marginBottom: '2rem' }}>
             <label className={`text-sm font-semibold ${themeClasses.text} block mb-3 flex items-center gap-2`}>
               <svg style={{ width: '1rem', height: '1rem', color: '#3b82f6' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              Storage / Warranty / Precautionary / Metals
+              Storage / Warranty / Precautionary
             </label>
             <textarea
-              value={formulaData.storage}
-              onChange={(e) => setFormulaData({ ...formulaData, storage: e.target.value })}
+              value={tabFields.storage || ''}
+              onChange={(e) => updateTabFields('storage', e.target.value)}
               className={`w-full px-4 py-3 border-2 ${themeClasses.border} rounded-xl ${themeClasses.inputBg} ${themeClasses.text} focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all shadow-sm`}
               rows={7}
               style={{ resize: 'vertical', lineHeight: '1.6' }}
               placeholder="Enter storage instructions, warranty, and precautionary statements"
             />
           </div>
+
+          {/* Metals (Bloom City only) */}
+          {activeTab === 'Bloom City' && (
+            <div style={{ marginBottom: '2rem' }}>
+              <label className={`text-sm font-semibold ${themeClasses.text} block mb-3 flex items-center gap-2`}>
+                <svg style={{ width: '1rem', height: '1rem', color: '#3b82f6' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Metals Information
+              </label>
+              <textarea
+                value={tabFields.metals || ''}
+                onChange={(e) => updateTabFields('metals', e.target.value)}
+                className={`w-full px-4 py-3 border-2 ${themeClasses.border} rounded-xl ${themeClasses.inputBg} ${themeClasses.text} focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all shadow-sm`}
+                rows={3}
+                style={{ resize: 'vertical', lineHeight: '1.6' }}
+                placeholder="Enter metals information"
+              />
+            </div>
+          )}
 
           {/* Warning Note - Modern design */}
           <div 

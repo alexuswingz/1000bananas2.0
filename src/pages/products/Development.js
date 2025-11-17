@@ -1,15 +1,71 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useTheme } from '../../context/ThemeContext';
-import { useDialog } from '../../context/DialogContext';
 import DevelopmentHeader from './development/components/DevelopmentHeader';
 import DevelopmentTable from './development/components/DevelopmentTable';
 import FilterDrawer from './development/components/FilterDrawer';
 import DevelopmentAPI from '../../services/developmentApi';
 
+// Loading skeleton component
+const LoadingTable = () => {
+  const { isDarkMode } = useTheme();
+  
+  const themeClasses = {
+    bg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
+    border: isDarkMode ? 'border-dark-border-primary' : 'border-gray-200',
+    headerBg: isDarkMode ? 'bg-[#2C3544]' : 'bg-[#2C3544]',
+    skeletonBg: isDarkMode ? 'bg-dark-bg-tertiary' : 'bg-gray-200',
+  };
+
+  const stages = ['ESSENT.\nINFO', 'FORM.', 'DESIGN', 'LISTING', 'PROD.', 'PACK.', 'LABELS', 'ADS'];
+
+  return (
+    <div className={`${themeClasses.bg} rounded-xl border ${themeClasses.border} shadow-lg`} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, overflowX: 'auto', overflowY: 'auto' }}>
+        <table style={{ width: '100%', minWidth: '1200px' }}>
+          <thead className={themeClasses.headerBg} style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+            <tr>
+              <th className="text-left text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0.5rem 1rem', width: '180px' }}>ACCOUNT</th>
+              <th className="text-left text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0.5rem 1rem', width: '180px' }}>BRAND</th>
+              <th className="text-left text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0.5rem 1rem', width: '250px' }}>PRODUCT</th>
+              {stages.map((stage, idx) => (
+                <th key={idx} className="text-center text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0.5rem 0.75rem', width: '90px', whiteSpace: 'pre-line', lineHeight: '1.2' }}>
+                  {stage}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {[...Array(8)].map((_, rowIdx) => (
+              <tr key={rowIdx}>
+                <td style={{ padding: '0.375rem 1rem' }}>
+                  <div className={`${themeClasses.skeletonBg} h-4 rounded animate-pulse`} style={{ width: '120px' }}></div>
+                </td>
+                <td style={{ padding: '0.375rem 1rem' }}>
+                  <div className={`${themeClasses.skeletonBg} h-4 rounded animate-pulse`} style={{ width: '100px' }}></div>
+                </td>
+                <td style={{ padding: '0.375rem 1rem' }}>
+                  <div className={`${themeClasses.skeletonBg} h-4 rounded animate-pulse`} style={{ width: '180px' }}></div>
+                </td>
+                {stages.map((_, stageIdx) => (
+                  <td key={stageIdx} style={{ padding: '0.375rem 0.75rem', textAlign: 'center' }}>
+                    <div className={`${themeClasses.skeletonBg} h-3 w-3 rounded-full mx-auto animate-pulse`}></div>
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ padding: '1.5rem', textAlign: 'center' }}>
+        <p className="text-sm text-gray-500">Loading development data...</p>
+      </div>
+    </div>
+  );
+};
+
 const Development = () => {
   const { isDarkMode } = useTheme();
-  const { showDialog } = useDialog();
 
   const themeClasses = {
     bg: isDarkMode ? 'bg-dark-bg-primary' : 'bg-light-bg-primary',
@@ -210,14 +266,6 @@ const Development = () => {
     },
   ];
 
-  const [developmentData, setDevelopmentData] = useState(initialData);
-
-  // Update developmentData when tableData loads
-  useEffect(() => {
-    if (tableData.length > 0) {
-      setDevelopmentData(tableData);
-    }
-  }, [tableData]);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -233,9 +281,12 @@ const Development = () => {
   });
   const filterButtonRef = useRef(null);
 
+  // Only use initial data if not loading and no data fetched
+  const dataToUse = loading ? [] : (tableData.length > 0 ? tableData : initialData);
+
   // Filter data based on search and filters
   const filteredData = useMemo(() => {
-    return developmentData.filter((item) => {
+    return dataToUse.filter((item) => {
       // Search filter
       const searchLower = searchTerm.toLowerCase();
       const matchesSearch = searchTerm === '' || 
@@ -250,7 +301,7 @@ const Development = () => {
 
       return matchesSearch && matchesSellerAccount && matchesBrandName;
     });
-  }, [developmentData, searchTerm, filters]);
+  }, [dataToUse, searchTerm, filters]);
 
   // Paginate data
   const paginatedData = useMemo(() => {
@@ -287,47 +338,6 @@ const Development = () => {
     setCurrentPage(1); // Reset to first page when filters are applied
   };
 
-  const handleStatusClick = (rowId, stage, currentStatus) => {
-    const statusOptions = ['pending', 'inProgress', 'completed'];
-    const currentIndex = statusOptions.indexOf(currentStatus);
-    const nextStatus = statusOptions[(currentIndex + 1) % statusOptions.length];
-
-    const statusLabels = {
-      pending: 'Pending',
-      inProgress: 'In Progress',
-      completed: 'Completed',
-    };
-
-    const stageLabels = {
-      essentialInfo: 'Essential Info',
-      form: 'Form',
-      design: 'Design',
-      listing: 'Listing',
-      prod: 'Production',
-      pack: 'Packaging',
-      labels: 'Labels',
-      ads: 'Ads',
-    };
-
-    showDialog({
-      title: `Update ${stageLabels[stage]} Status`,
-      message: `Change status from "${statusLabels[currentStatus]}" to "${statusLabels[nextStatus]}"?`,
-      confirmText: 'Update',
-      cancelText: 'Cancel',
-      type: 'info',
-      onConfirm: () => {
-        setDevelopmentData((prevData) =>
-          prevData.map((item) =>
-            item.id === rowId ? { ...item, [stage]: nextStatus } : item
-          )
-        );
-        toast.success('Status updated!', {
-          description: `${stageLabels[stage]} is now ${statusLabels[nextStatus]}.`,
-        });
-      },
-    });
-  };
-
   return (
     <div className={`min-h-screen ${themeClasses.bg} flex flex-col`}>
       <div style={{ padding: '2rem 2rem 0 2rem' }}>
@@ -339,16 +349,19 @@ const Development = () => {
         />
       </div>
       <div style={{ flex: 1, padding: '0 2rem 2rem 2rem' }}>
-        <DevelopmentTable 
-          data={paginatedData}
-          totalItems={filteredData.length}
-          currentPage={currentPage}
-          totalPages={totalPages}
-          pageSize={pageSize}
-          onPageChange={handlePageChange}
-          onPageSizeChange={handlePageSizeChange}
-          onStatusClick={handleStatusClick}
-        />
+        {loading ? (
+          <LoadingTable />
+        ) : (
+          <DevelopmentTable 
+            data={paginatedData}
+            totalItems={filteredData.length}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+          />
+        )}
       </div>
 
       {/* Filter Drawer */}

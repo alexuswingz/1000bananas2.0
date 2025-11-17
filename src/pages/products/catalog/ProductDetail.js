@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTheme } from '../../../context/ThemeContext';
 import { useProducts } from '../../../context/ProductsContext';
 import { useCompany } from '../../../context/CompanyContext';
+import CatalogAPI from '../../../services/catalogApi';
 import EssentialInfo from './detail/EssentialInfo';
 import StockImage from './detail/StockImage';
 import Slides from './detail/Slides';
@@ -18,23 +19,68 @@ import Formula from './detail/Formula';
 import FinishedGoods from './detail/FinishedGoods';
 import PDPSetup from './detail/PDPSetup';
 
+// Utility function to handle Google Drive image URLs
+const getImageUrl = (url) => {
+  if (!url) return null;
+  
+  // Check if URL is from Google Drive
+  if (typeof url === 'string' && url.includes('drive.google.com')) {
+    // Return a placeholder for private Google Drive images
+    return 'https://via.placeholder.com/800x800/e5e7eb/6b7280?text=Private+Google+Drive+Image';
+  }
+  
+  return url;
+};
+
 const ProductDetail = () => {
   const { isDarkMode } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const { getProductConfig, setProductVariations, setProductTabs, setActiveTemplate } = useProducts();
   const { productTemplates, getProductTemplate } = useCompany();
-  const { product, returnPath, allowedTabs } = location.state || {};
+  const { product, returnPath, allowedTabs, productId } = location.state || {};
 
   const [activeTab, setActiveTab] = useState('essential');
   const [showTemplateMenu, setShowTemplateMenu] = useState(false);
   const [configVersion, setConfigVersion] = useState(0); // Force re-render when template changes
+  const [apiProductData, setApiProductData] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   // Ref and state for grab-to-scroll behavior on tabs header
   const tabsContainerRef = useRef(null);
   const isDraggingRef = useRef(false);
   const startXRef = useRef(0);
   const scrollLeftRef = useRef(0);
+
+  // Fetch product data from API
+  useEffect(() => {
+    const fetchProductData = async () => {
+      const idToFetch = productId || product?.id;
+      
+      if (!idToFetch) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const data = await CatalogAPI.getById(idToFetch);
+        
+        if (data && Object.keys(data).length > 0) {
+          setApiProductData(data);
+        }
+      } catch (error) {
+        console.error('Error fetching product details:', error);
+        toast.error('Failed to load product details', {
+          description: error.message,
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProductData();
+  }, [productId, product?.id]);
   
   // Get product configuration (re-fetch when configVersion changes)
   const productConfig = useMemo(() => {
@@ -63,20 +109,222 @@ const ProductDetail = () => {
     }
   }, [product?.id, productConfig]);
 
-  // Build product data from passed product or defaults (re-compute when productConfig changes)
-  const productData = useMemo(() => ({
-    ...product,
-    brand: product?.brand || '',
-    brandFull: product?.brand || '',
-    product: product?.product || 'Product Name',
-    dateAdded: product?.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0],
-    marketplace: 'Amazon',
-    salesAccount: product?.account || '',
-    country: 'U.S.',
-    type: product?.type || 'Product',
-    variations: productConfig.variations.length > 0 ? productConfig.variations : ['Default'],
-    variationType: productConfig.variationType || 'size'
-  }), [product, productConfig]);
+  // Build product data from API or passed product (re-compute when apiProductData or productConfig changes)
+  const productData = useMemo(() => {
+    // If we have API data, use it
+    if (apiProductData) {
+      // Extract variations from API data
+      const variations = apiProductData.variations || [];
+      const variationSizes = variations
+        .map(v => v.size || `Variant ${v.id}`)
+        .filter(Boolean);
+
+      const variationsDataMap = {};
+      variations.forEach((variant) => {
+        const key = variant.size || `Variant ${variant.id}`;
+        variationsDataMap[key] = {
+          sizeLabel: variant.size || key,
+          childAsin: variant.child_asin,
+          parentAsin: variant.parent_asin,
+          childSku: variant.child_sku_final,
+          parentSku: variant.parent_sku_final,
+          upc: variant.upc,
+          fullProductName: variant.title || variant.product_name,
+          packagingName: variant.packaging_name,
+          closureName: variant.closure_name,
+          labelSize: variant.label_size,
+          labelLocation: variant.label_location,
+          caseSize: variant.case_size,
+          unitsPerCase: variant.units_per_case,
+          filter: variant.filter,
+          productImage: getImageUrl(variant.product_image_url || variant.basic_wrap_url || variant.tri_bottle_wrap_url),
+          msds: variant.msds,
+          notes: variant.notes,
+          unitsSold30Days: variant.units_sold_30_days,
+          dimensions: {
+            length: variant.product_dimensions_length_in,
+            width: variant.product_dimensions_width_in,
+            height: variant.product_dimensions_height_in,
+            weight: variant.product_dimensions_weight_lbs
+          },
+          formula: {
+            guaranteedAnalysis: variant.var_tps_guaranteed_analysis || variant.var_guaranteed_analysis,
+            npk: variant.var_tps_npk || variant.var_npk,
+            derivedFrom: variant.var_tps_derived_from || variant.var_derived_from,
+            storageWarranty: variant.var_tps_storage_warranty || variant.var_storage_warranty
+          },
+          raw: variant
+        };
+      });
+      
+      // Flatten the structured API response
+      const essentialInfo = apiProductData.essentialInfo || {};
+      const slides = apiProductData.slides || {};
+      const aplus = apiProductData.aplus || {};
+      const finishedGoods = apiProductData.finishedGoods || {};
+      const pdpSetup = apiProductData.pdpSetup || {};
+      const vine = apiProductData.vine || {};
+      const stockImage = apiProductData.stockImage || {};
+      const label = apiProductData.label || {};
+      const labelCopy = apiProductData.labelCopy || {};
+      const website = apiProductData.website || {};
+      const formula = apiProductData.formula || {};
+      const productImages = apiProductData.productImages || {};
+      
+      return {
+        ...apiProductData,
+        ...product, // Overlay with any passed product data
+        
+        // Basic info
+        brand: apiProductData.brandName || essentialInfo.brandName || product?.brand || '',
+        brandFull: apiProductData.brandName || essentialInfo.brandName || product?.brand || '',
+        product: apiProductData.productName || essentialInfo.productName || product?.product || 'Product Name',
+        marketplace: essentialInfo.marketplace || 'Amazon',
+        salesAccount: apiProductData.sellerAccount || product?.account || '',
+        country: essentialInfo.country || 'U.S.',
+        type: essentialInfo.type || product?.type || 'Liquid',
+        dateAdded: apiProductData.createdAt?.split('T')[0] || product?.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0],
+        
+        // Essential Info tab data
+        formula_name: essentialInfo.formulaName || formula.formulaName || '',
+        parent_asin: essentialInfo.parentAsin || '',
+        child_asin: essentialInfo.childAsin || '',
+        parent_sku_final: essentialInfo.parentSku || '',
+        child_sku_final: essentialInfo.childSku || '',
+        upc: essentialInfo.upc || '',
+        
+        // Product Images tab data
+        images: [
+          getImageUrl(productImages.productImageUrl),
+          getImageUrl(productImages.basicWrapUrl),
+          getImageUrl(productImages.plantBehindProductUrl),
+          getImageUrl(productImages.triBottleWrapUrl)
+        ].filter(Boolean),
+        product_images: [
+          getImageUrl(productImages.productImageUrl),
+          getImageUrl(productImages.basicWrapUrl),
+          getImageUrl(productImages.plantBehindProductUrl),
+          getImageUrl(productImages.triBottleWrapUrl)
+        ].filter(Boolean),
+        mainImage: getImageUrl(productImages.productImageUrl || slides.productImage),
+        
+        // Slides tab data (6-sided + Amazon slides)
+        product_image_url: getImageUrl(slides.productImage) || '',
+        six_sided_image_front: getImageUrl(slides.front) || '',
+        six_sided_image_back: getImageUrl(slides.back) || '',
+        six_sided_image_left: getImageUrl(slides.left) || '',
+        six_sided_image_right: getImageUrl(slides.right) || '',
+        six_sided_image_top: getImageUrl(slides.top) || '',
+        six_sided_image_bottom: getImageUrl(slides.bottom) || '',
+        amazon_slide_1: getImageUrl(slides.amazonSlide1) || '',
+        amazon_slide_2: getImageUrl(slides.amazonSlide2) || '',
+        amazon_slide_3: getImageUrl(slides.amazonSlide3) || '',
+        amazon_slide_4: getImageUrl(slides.amazonSlide4) || '',
+        amazon_slide_5: getImageUrl(slides.amazonSlide5) || '',
+        amazon_slide_6: getImageUrl(slides.amazonSlide6) || '',
+        amazon_slide_7: getImageUrl(slides.amazonSlide7) || '',
+        
+        // A+ Content tab data
+        aplus_module_1: getImageUrl(aplus.module1) || '',
+        aplus_module_2: getImageUrl(aplus.module2) || '',
+        aplus_module_3: getImageUrl(aplus.module3) || '',
+        aplus_module_4: getImageUrl(aplus.module4) || '',
+        aplus_module_5: getImageUrl(aplus.module5) || '',
+        aplus_module_6: getImageUrl(aplus.module6) || '',
+        
+        // Finished Goods tab data
+        packaging_name: finishedGoods.packagingName || '',
+        closure_name: finishedGoods.closureName || '',
+        label_size: finishedGoods.labelSize || '',
+        label_location: finishedGoods.labelLocation || '',
+        case_size: finishedGoods.caseSize || '',
+        units_per_case: finishedGoods.unitsPerCase || '',
+        product_dimensions_length_in: finishedGoods.productDimensions?.length || '',
+        product_dimensions_width_in: finishedGoods.productDimensions?.width || '',
+        product_dimensions_height_in: finishedGoods.productDimensions?.height || '',
+        product_dimensions_weight_lbs: finishedGoods.productDimensions?.weight || '',
+        units_sold_30_days: finishedGoods.unitsSold30Days || '',
+        guaranteed_analysis: finishedGoods.formula?.guaranteedAnalysis || formula.guaranteedAnalysis || '',
+        npk: finishedGoods.formula?.npk || formula.npk || '',
+        derived_from: finishedGoods.formula?.derivedFrom || formula.derivedFrom || '',
+        msds: finishedGoods.formula?.msds || formula.msds || '',
+        
+        // PDP Setup tab data
+        title: pdpSetup.title || '',
+        bullets: pdpSetup.bullets || '',
+        bullet_points: pdpSetup.bullets || '',
+        description: pdpSetup.description || '',
+        search_terms: pdpSetup.searchTerms || '',
+        core_keywords: pdpSetup.coreKeywords || '',
+        other_keywords: pdpSetup.otherKeywords || '',
+        core_competitor_asins: pdpSetup.coreCompetitorAsins || '',
+        other_competitor_asins: pdpSetup.otherCompetitorAsins || '',
+        
+        // Stock Image tab data
+        stock_image: getImageUrl(stockImage.stockImage || label.labelImage) || '',
+        
+        // Label tab data
+        label_image: getImageUrl(label.labelImage) || '',
+        label_ai_file: getImageUrl(label.labelAiFile) || '',
+        label_print_ready_pdf: getImageUrl(label.labelPrintReadyPdf) || '',
+        
+        // Label Copy tab data
+        label_copy: labelCopy.directions || labelCopy.productTitle || '',
+        tps_left_side_benefit_graphic: labelCopy.leftSideBenefitGraphic || '',
+        tps_directions: labelCopy.directions || '',
+        tps_growing_recommendations: labelCopy.growingRecommendations || '',
+        qr_code_section: labelCopy.qrCodeSection || '',
+        product_title: labelCopy.productTitle || '',
+        center_benefit_statement: labelCopy.centerBenefitStatement || '',
+        
+        // Website tab data
+        website_url: website.websiteUrl || labelCopy.website || '',
+        website: website.websiteUrl || labelCopy.website || '',
+        
+        // Formula tab data (consolidated)
+        formula_guaranteed_analysis: formula.guaranteedAnalysis || '',
+        formula_npk: formula.npk || '',
+        formula_derived_from: formula.derivedFrom || '',
+        formula_msds: formula.msds || '',
+        
+        // Vine tab data
+        vine_enrolled: vine.vineEnrolled || false,
+        vine_status: vine.vineStatus || '',
+        vine_notes: vine.vineNotes || '',
+        vine_date: vine.vineDate || '',
+        units_enrolled: vine.unitsEnrolled || '',
+        vine_reviews: vine.vineReviews || '',
+        star_rating: vine.starRating || '',
+        
+        // Variations (with all variation data)
+        variations: variationSizes.length > 0 ? variationSizes : (productConfig.variations.length > 0 ? productConfig.variations : ['Default']),
+        variationType: productConfig.variationType || 'size',
+        allVariations: variations,
+        variationsData: Object.keys(variationsDataMap).length > 0 
+          ? variationsDataMap 
+          : (apiProductData.variationsData || {})
+      };
+    }
+    
+    // Fallback to passed product data
+    return {
+      ...product,
+      brand: product?.brand || '',
+      brandFull: product?.brand || '',
+      product: product?.product || 'Product Name',
+      title: product?.title || `${product?.brand || ''} ${product?.product || ''}`.trim(),
+      description: product?.description || '',
+      bullets: product?.bullets || product?.bullet_points || '',
+      bullet_points: product?.bullet_points || product?.bullets || '',
+      dateAdded: product?.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0],
+      marketplace: 'Amazon',
+      salesAccount: product?.account || '',
+      country: 'U.S.',
+      type: product?.type || 'Product',
+      variations: productConfig.variations.length > 0 ? productConfig.variations : ['Default'],
+      variationType: productConfig.variationType || 'size'
+    };
+  }, [apiProductData, product, productConfig]);
 
   const handleBack = () => {
     // Navigate back to the page that opened this detail (Design, Catalog, etc.)
@@ -131,6 +379,59 @@ const ProductDetail = () => {
     { id: 'formula', label: 'Formula', icon: 'M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z', component: Formula },
   ];
 
+  // Check if a tab has data available
+  const hasTabData = useCallback((tabId) => {
+    if (!apiProductData) return true; // Show all tabs if no API data yet
+    
+    switch(tabId) {
+      case 'slides':
+        return !!(apiProductData.slides?.productImage || 
+                 apiProductData.slides?.front || 
+                 apiProductData.slides?.back || 
+                 apiProductData.slides?.left || 
+                 apiProductData.slides?.right || 
+                 apiProductData.slides?.top || 
+                 apiProductData.slides?.bottom);
+      
+      case 'aplus':
+        return !!(apiProductData.aplus?.module1 || 
+                 apiProductData.aplus?.module2 || 
+                 apiProductData.aplus?.module3 || 
+                 apiProductData.aplus?.module4);
+      
+      case 'finishedGoods':
+        const fg = apiProductData.finishedGoods;
+        return !!(fg?.packagingName || fg?.closureName || fg?.labelSize || 
+                 fg?.unitsSold30Days || fg?.formula?.guaranteedAnalysis);
+      
+      case 'pdpSetup':
+        const pdp = apiProductData.pdpSetup;
+        return !!(pdp?.title || pdp?.bullets || pdp?.description || 
+                 pdp?.searchTerms || pdp?.coreKeywords);
+      
+      case 'vine':
+        return !!(apiProductData.vine?.vineEnrolled || apiProductData.vine?.vineNotes);
+      
+      case 'stock':
+      case 'label-copy':
+      case 'label':
+      case 'images':
+      case 'website':
+      case 'listing':
+      case 'formula':
+        // These tabs may not have structured data in API response yet
+        // Show them for now
+        return true;
+      
+      case 'essential':
+        // Always show essential info
+        return true;
+      
+      default:
+        return true;
+    }
+  }, [apiProductData]);
+
   // Filter tabs based on priority: product-specific template tabs > module tabs > all tabs
   const tabs = useMemo(() => {
     let filteredTabs = allTabs;
@@ -150,8 +451,11 @@ const ProductDetail = () => {
       console.log('📌 Showing all tabs (no restrictions)');
     }
     
+    // Filter out tabs without data
+    filteredTabs = filteredTabs.filter(tab => hasTabData(tab.id));
+    
     return filteredTabs;
-  }, [productConfig.enabledTabs, allowedTabs, configVersion]); // Add configVersion to deps
+  }, [productConfig.enabledTabs, allowedTabs, configVersion, hasTabData]); // Add configVersion to deps
   
   // Set active tab to the first available tab if current active tab is not in the list
   useEffect(() => {
@@ -171,6 +475,30 @@ const ProductDetail = () => {
     activeTab: isDarkMode ? 'border-blue-500 text-blue-500 bg-blue-500/10' : 'border-blue-600 text-blue-600 bg-blue-50',
     inactiveTab: isDarkMode ? 'border-transparent text-dark-text-secondary hover:text-dark-text-primary hover:border-dark-border-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300',
   };
+
+  // Show loading state while fetching data
+  if (loading) {
+    return (
+      <div 
+        className={themeClasses.bg}
+        style={{
+          height: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+      >
+        <div style={{ textAlign: 'center' }}>
+          <div className={themeClasses.text} style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>
+            Loading product details...
+          </div>
+          <div className={themeClasses.textSecondary} style={{ fontSize: '0.875rem' }}>
+            Please wait
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div 

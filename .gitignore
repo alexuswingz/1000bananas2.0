@@ -30,3 +30,6 @@ Thumbs.db
 # Database files (optional - remove if you want to include your CSV)
 # *.csv
 # *.xlsx
+
+# Cursor/AI generated files with sensitive data
+cursor_install_tailwind_css_version_3_4.md

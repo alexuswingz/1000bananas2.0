@@ -7,7 +7,57 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'YOUR_API_GATEWAY_URL';
 
 class CatalogAPI {
   /**
-   * GET /products/catalog/{id} - Get single product
+   * GET /products/catalog - Fetch parent products
+   */
+  static async getParents() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/products/catalog`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch catalog products');
+      }
+
+      return data.data || [];
+    } catch (error) {
+      console.error('Error fetching catalog products:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * GET /products/catalog/children - Fetch child products (all variations)
+   */
+  static async getChildren() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/products/catalog/children`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch catalog children');
+      }
+
+      return data.data || [];
+    } catch (error) {
+      console.error('Error fetching catalog children:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * GET /products/catalog/{id} - Get product details with all tabs data
    */
   static async getById(id) {
     try {
@@ -33,16 +83,16 @@ class CatalogAPI {
   }
 
   /**
-   * PUT /products/catalog/{id} - Update full product details
+   * PUT /products/catalog/{id} - Update product details (supports partial updates)
    */
-  static async updateFull(id, productData) {
+  static async update(id, updates) {
     try {
       const response = await fetch(`${API_BASE_URL}/products/catalog/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(productData),
+        body: JSON.stringify(updates),
       });
 
       const data = await response.json();
@@ -56,6 +106,13 @@ class CatalogAPI {
       console.error('Error updating product:', error);
       throw error;
     }
+  }
+
+  /**
+   * Alias for backward compatibility
+   */
+  static async updateFull(id, productData) {
+    return this.update(id, productData);
   }
 }
 
