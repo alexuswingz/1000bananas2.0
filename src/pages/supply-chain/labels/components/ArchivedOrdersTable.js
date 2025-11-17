@@ -4,10 +4,10 @@ import { useTheme } from '../../../../context/ThemeContext';
 const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
   const { isDarkMode } = useTheme();
 
-  // Archived orders data - moved from Bottles.js
+  // Archived orders data - moved from Labels.js
   const [archivedOrders, setArchivedOrders] = useState(() => {
     try {
-      const stored = window.localStorage.getItem('bottleArchivedOrders');
+      const stored = window.localStorage.getItem('labelArchivedOrders');
       if (stored) {
         return JSON.parse(stored);
       }
@@ -18,7 +18,7 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
   // Persist archived orders to localStorage
   useEffect(() => {
     try {
-      window.localStorage.setItem('bottleArchivedOrders', JSON.stringify(archivedOrders));
+      window.localStorage.setItem('labelArchivedOrders', JSON.stringify(archivedOrders));
     } catch {}
   }, [archivedOrders]);
 
@@ -32,7 +32,7 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
         }
         const updated = [...prev, { ...order, status: order.status || 'Received' }];
         try {
-          window.localStorage.setItem('bottleArchivedOrders', JSON.stringify(updated));
+          window.localStorage.setItem('labelArchivedOrders', JSON.stringify(updated));
         } catch {}
         return updated;
       });
@@ -89,13 +89,13 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
           }}
         >
           <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center">
-            Status
+            STATUS
           </div>
           <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center">
-            Bottle Order #
+            LABEL ORDER #
           </div>
           <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider text-center">
-            Supplier
+            SUPPLIER
           </div>
         </div>
       </div>

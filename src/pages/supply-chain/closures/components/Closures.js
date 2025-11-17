@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 import ClosuresHeader from './ClosuresHeader';
@@ -19,23 +19,10 @@ const Closures = () => {
   const [orderNumber, setOrderNumber] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState(null);
   const [orders, setOrders] = useState([]);
-  const [archivedOrders, setArchivedOrders] = useState(() => {
-    try {
-      const stored = window.localStorage.getItem('closureArchivedOrders');
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
+  
+  // Ref for archived orders table
+  const archivedOrdersTableRef = useRef(null);
 
-  // Inline inventory editing (single row)
-  const [editingClosureId, setEditingClosureId] = useState(null);
-  const [editWarehouseInv, setEditWarehouseInv] = useState('');
-  const [editSupplierInv, setEditSupplierInv] = useState('');
-
-  // Bulk inventory editing (multiple rows)
-  const [isBulkEditing, setIsBulkEditing] = useState(false);
-  const [bulkEdits, setBulkEdits] = useState({}); // { [id]: { warehouseInventory, supplierInventory } }
 
   const themeClasses = {
     pageBg: isDarkMode ? 'bg-dark-bg-primary' : 'bg-light-bg-primary',
@@ -48,16 +35,6 @@ const Closures = () => {
     inputBg: isDarkMode ? 'bg-dark-bg-tertiary' : 'bg-white',
   };
 
-  const [closures, setClosures] = useState(() => [
-    { id: 1, type: 'Cap', name: 'Reliable', warehouseInventory: 1000, supplierInventory: 1000 },
-    { id: 2, type: 'Cap', name: 'VENTED Berry', warehouseInventory: 1000, supplierInventory: 1000 },
-    { id: 3, type: 'Cap', name: 'Berry Unvented', warehouseInventory: 1000, supplierInventory: 1000 },
-    { id: 4, type: 'Cap', name: 'Aptar Pour', warehouseInventory: 1000, supplierInventory: 1000 },
-    { id: 5, type: 'Sprayer', name: '3oz Sprayer Top Down', warehouseInventory: 1000, supplierInventory: 1000 },
-    { id: 6, type: 'Sprayer', name: '6oz Sprayer Top Top Down', warehouseInventory: 1000, supplierInventory: 1000 },
-    { id: 7, type: 'Sprayer', name: '16oz Sprayer Trigger Foam', warehouseInventory: 1000, supplierInventory: 1000 },
-    { id: 8, type: 'Sprayer', name: '16oz Spray Trigger No-Foam', warehouseInventory: 1000, supplierInventory: 1000 },
-  ]);
 
   const suppliers = [
     {
@@ -81,7 +58,15 @@ const Closures = () => {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
-          setOrders(parsed);
+          // Filter out the two sample orders: "514413413" and "43145"
+          const cleaned = parsed.filter((order) => 
+            order.orderNumber !== '514413413' && order.orderNumber !== '43145'
+          );
+          // Update localStorage with cleaned data if any were removed
+          if (cleaned.length !== parsed.length) {
+            window.localStorage.setItem('closureOrders', JSON.stringify(cleaned));
+          }
+          setOrders(cleaned);
         }
       }
     } catch (err) {
@@ -93,13 +78,14 @@ const Closures = () => {
   useEffect(() => {
     const newOrderState = location.state && location.state.newClosureOrder;
     if (newOrderState) {
-      const { orderNumber: newOrderNumber, supplierName } = newOrderState;
+      const { orderNumber: newOrderNumber, supplierName, lines } = newOrderState;
 
       const newOrder = {
         id: Date.now(),
         status: 'In Progress',
         orderNumber: newOrderNumber,
         supplier: supplierName,
+        lines: lines || [], // Save only the selected items
       };
 
       setOrders((prev) => {
@@ -166,19 +152,9 @@ const Closures = () => {
           
           // Add to archived orders with "Received" status
           const archivedOrder = { ...orderToArchive, status: 'Received' };
-          setArchivedOrders((archivedPrev) => {
-            // Check if order already exists to prevent duplicates (React StrictMode can run effects twice)
-            if (archivedPrev.some((o) => o.id === receivedOrderId)) {
-              return archivedPrev;
-            }
-            const updated = [archivedOrder, ...archivedPrev];
-            try {
-              window.localStorage.setItem('closureArchivedOrders', JSON.stringify(updated));
-            } catch (err) {
-              console.error('Failed to update archived orders in localStorage', err);
-            }
-            return updated;
-          });
+          if (archivedOrdersTableRef && archivedOrdersTableRef.current) {
+            archivedOrdersTableRef.current.addArchivedOrder(archivedOrder);
+          }
           
           return remaining;
         });
@@ -190,6 +166,18 @@ const Closures = () => {
     }
   }, [location.state, location.pathname, navigate]);
 
+  const handleStatusChange = (orderId, newStatus) => {
+    setOrders((prev) => {
+      const updated = prev.map((o) =>
+        o.id === orderId ? { ...o, status: newStatus } : o
+      );
+      try {
+        window.localStorage.setItem('closureOrders', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  };
+
   const archiveOrder = (order) => {
     setOrders((prev) => {
       const remaining = prev.filter((o) => o.id !== order.id);
@@ -199,31 +187,14 @@ const Closures = () => {
       return remaining;
     });
 
-    setArchivedOrders((prev) => {
-      // Check if order already exists to prevent duplicates
-      if (prev.some((o) => o.id === order.id)) {
-        return prev;
-      }
-      const archivedOrder = { ...order, status: 'Draft' };
-      const updated = [archivedOrder, ...prev];
-      try {
-        window.localStorage.setItem('closureArchivedOrders', JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
+    // Add to archived orders
+    if (archivedOrdersTableRef && archivedOrdersTableRef.current) {
+      archivedOrdersTableRef.current.addArchivedOrder({ ...order, status: order.status || 'Draft' });
+    }
 
     setActiveTab('archive');
   };
 
-  const filteredData = useMemo(() => {
-    if (!search.trim()) return closures;
-    const query = search.toLowerCase();
-    return closures.filter(
-      (closure) =>
-        closure.name.toLowerCase().includes(query) ||
-        closure.type.toLowerCase().includes(query)
-    );
-  }, [closures, search]);
 
   const filteredOrders = useMemo(() => {
     if (!search.trim()) return orders;
@@ -235,90 +206,8 @@ const Closures = () => {
     );
   }, [orders, search]);
 
-  const bulkUnsavedCount = useMemo(() => {
-    if (!isBulkEditing) return 0;
-    let count = 0;
-
-    Object.entries(bulkEdits).forEach(([id, values]) => {
-      const original = closures.find((c) => c.id === Number(id));
-      if (!original) return;
-      const w = values.warehouseInventory;
-      const s = values.supplierInventory;
-      const changed =
-        (w !== undefined && Number(w) !== original.warehouseInventory) ||
-        (s !== undefined && Number(s) !== original.supplierInventory);
-      if (changed) count += 1;
-    });
-
-    return count;
-  }, [isBulkEditing, bulkEdits, closures]);
-
-  const handleStartEdit = (closure) => {
-    setEditingClosureId(closure.id);
-    setEditWarehouseInv(closure.warehouseInventory.toString());
-    setEditSupplierInv(closure.supplierInventory.toString());
-  };
-
-  const handleSaveEdit = (id) => {
-    const warehouse = Number(editWarehouseInv) || 0;
-    const supplier = Number(editSupplierInv) || 0;
-
-    setClosures((prev) =>
-      prev.map((c) =>
-        c.id === id
-          ? { ...c, warehouseInventory: warehouse, supplierInventory: supplier }
-          : c
-      )
-    );
-
-    setEditingClosureId(null);
-    setEditWarehouseInv('');
-    setEditSupplierInv('');
-  };
-
-  const handleCancelEdit = () => {
-    setEditingClosureId(null);
-    setEditWarehouseInv('');
-    setEditSupplierInv('');
-  };
-
-  const handleBulkEditChange = (id, field, value) => {
-    setBulkEdits((prev) => ({
-      ...prev,
-      [id]: {
-        ...prev[id],
-        [field]: value,
-      },
-    }));
-  };
-
-  const handleSaveBulkEdits = () => {
-    setClosures((prev) =>
-      prev.map((c) => {
-        const edits = bulkEdits[c.id];
-        if (!edits) return c;
-        return {
-          ...c,
-          warehouseInventory:
-            edits.warehouseInventory !== undefined
-              ? Number(edits.warehouseInventory) || 0
-              : c.warehouseInventory,
-          supplierInventory:
-            edits.supplierInventory !== undefined
-              ? Number(edits.supplierInventory) || 0
-              : c.supplierInventory,
-        };
-      })
-    );
-
-    setBulkEdits({});
-    setIsBulkEditing(false);
-  };
-
-  const handleDiscardBulkEdits = () => {
-    setBulkEdits({});
-    setIsBulkEditing(false);
-  };
+  // Ref for inventory table to trigger bulk edit
+  const inventoryTableRef = useRef(null);
 
   const handleCreateOrder = () => {
     if (!orderNumber.trim() || !selectedSupplier) {
@@ -356,12 +245,16 @@ const Closures = () => {
         logoAlt: order.supplier,
       };
 
+    // If order is from archive or has 'Received' status, use 'view' mode, otherwise 'receive'
+    const mode = order.fromArchive || order.status === 'Received' ? 'view' : 'receive';
+
     navigate('/dashboard/supply-chain/closures/order', {
       state: {
         orderNumber: order.orderNumber,
         supplier: supplierMeta,
-        mode: 'receive',
+        mode,
         orderId: order.id,
+        lines: order.lines || [],
       },
     });
   };
@@ -381,43 +274,10 @@ const Closures = () => {
         {/* Content */}
         <div className={`rounded-lg shadow-sm ${themeClasses.cardBg} overflow-hidden`}>
           {activeTab === 'inventory' && (
-            <>
-              <InventoryTable
-                data={filteredData}
-                isBulkEditing={isBulkEditing}
-                bulkEdits={bulkEdits}
-                editingClosureId={editingClosureId}
-                editWarehouseInv={editWarehouseInv}
-                editSupplierInv={editSupplierInv}
-                onBulkEditChange={handleBulkEditChange}
-                onStartEdit={handleStartEdit}
-                onSaveEdit={handleSaveEdit}
-                onCancelEdit={handleCancelEdit}
-                onEditWarehouseInvChange={setEditWarehouseInv}
-                onEditSupplierInvChange={setEditSupplierInv}
-              />
-              {isBulkEditing && (
-                <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-center gap-4">
-                  <span className="text-sm text-gray-600">
-                    {bulkUnsavedCount} Unsaved Changes
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleDiscardBulkEdits}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                  >
-                    Discard
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveBulkEdits}
-                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-                  >
-                    Save
-                  </button>
-                </div>
-              )}
-            </>
+            <InventoryTable
+              ref={inventoryTableRef}
+              searchQuery={search}
+            />
           )}
 
           {activeTab === 'ordering' && (
@@ -425,11 +285,12 @@ const Closures = () => {
               orders={filteredOrders}
               onViewOrder={handleViewOrder}
               onArchiveOrder={archiveOrder}
+              onStatusChange={handleStatusChange}
             />
           )}
 
           {activeTab === 'archive' && (
-            <ArchivedOrdersTable archivedOrders={archivedOrders} themeClasses={themeClasses} />
+            <ArchivedOrdersTable ref={archivedOrdersTableRef} themeClasses={themeClasses} onViewOrder={handleViewOrder} />
           )}
         </div>
       </div>

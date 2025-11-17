@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { showSuccessToast } from '../../../../utils/notifications';
 import { useTheme } from '../../../../context/ThemeContext';
 import OrdersTable from './OrdersTable';
 import ArchivedOrdersTable from './ArchivedOrdersTable';
+import InventoryTable from './InventoryTable';
 
 const Bottles = () => {
   const { isDarkMode } = useTheme();
@@ -12,23 +13,23 @@ const Bottles = () => {
   const [activeTab, setActiveTab] = useState('inventory');
   const [search, setSearch] = useState('');
 
-  // New order / orders state
+  // New order state
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
   const [orderNumber, setOrderNumber] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState(null);
-  const [orders, setOrders] = useState([]);
 
   // Bottle details modal state
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [activeDetailsTab, setActiveDetailsTab] = useState('core');
   const [selectedBottle, setSelectedBottle] = useState(null);
+  const [isEditingCoreInfo, setIsEditingCoreInfo] = useState(false);
+  const [editedCoreInfo, setEditedCoreInfo] = useState({});
 
   // Delete confirmation modal state
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [bottleToDelete, setBottleToDelete] = useState(null);
 
   // Row actions & settings
-  const [actionMenuBottleId, setActionMenuBottleId] = useState(null);
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
 
   // Create bottle modal
@@ -40,27 +41,13 @@ const Bottles = () => {
   const [createBottleTab, setCreateBottleTab] = useState('core');
   const [createBottleSearch, setCreateBottleSearch] = useState('');
 
-  // Inline inventory editing (single row)
-  const [editingBottleId, setEditingBottleId] = useState(null);
-  const [editWarehouseInv, setEditWarehouseInv] = useState('');
-  const [editSupplierInv, setEditSupplierInv] = useState('');
-
-  // Bulk inventory editing (multiple rows)
-  const [isBulkEditing, setIsBulkEditing] = useState(false);
-  const [bulkEdits, setBulkEdits] = useState({}); // { [id]: { warehouseInventory, supplierInventory } }
 
   // Bottle details search
   const [detailsSearch, setDetailsSearch] = useState('');
 
-  // Archived orders
-  const [archivedOrders, setArchivedOrders] = useState(() => {
-    try {
-      const stored = window.localStorage.getItem('bottleArchivedOrders');
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
+  // Refs for table components
+  const inventoryTableRef = React.useRef(null);
+  const archivedOrdersTableRef = React.useRef(null);
 
   const getDetailsHighlightClass = (value) => {
     if (!detailsSearch) return '';
@@ -87,72 +74,6 @@ const Bottles = () => {
     inputBg: isDarkMode ? 'bg-dark-bg-tertiary' : 'bg-white',
   };
 
-  const [bottles, setBottles] = useState(() => [
-      
-    { id: 2, name: 'Quart', warehouseInventory: 1000, supplierInventory: 1000 },
-    { id: 3, name: 'Gallon', warehouseInventory: 1000, supplierInventory: 1000 },
-    { id: 4, name: '3oz Spray Bottle', warehouseInventory: 1000, supplierInventory: 1000 },
-    { id: 5, name: '6oz Spray Bottle', warehouseInventory: 1000, supplierInventory: 1000 },
-    { id: 6, name: '16oz Square Cylinder Clear', warehouseInventory: 1000, supplierInventory: 1000 },
-    { id: 7, name: '16oz Square Cylinder Spray White', warehouseInventory: 1000, supplierInventory: 1000 },
-    { id: 8, name: '16oz Round Cylinder Spray Clear', warehouseInventory: 1000, supplierInventory: 1000 },
-    { id: 9, name: '16oz Round Cylinder Spray White', warehouseInventory: 1000, supplierInventory: 1000 },
-  ]);
-
-  const filteredData = useMemo(() => {
-    if (!search.trim()) return bottles;
-    const query = search.toLowerCase();
-    return bottles.filter((bottle) => bottle.name.toLowerCase().includes(query));
-  }, [bottles, search]);
-
-  const filteredOrders = useMemo(() => {
-    if (!search.trim()) return orders;
-    const query = search.toLowerCase();
-    return orders.filter(
-      (order) =>
-        order.orderNumber.toLowerCase().includes(query) ||
-        order.supplier.toLowerCase().includes(query)
-    );
-  }, [orders, search]);
-
-  const bulkUnsavedCount = useMemo(() => {
-    if (!isBulkEditing) return 0;
-    let count = 0;
-
-    Object.entries(bulkEdits).forEach(([id, values]) => {
-      const original = bottles.find((b) => b.id === Number(id));
-      if (!original) return;
-      const w = values.warehouseInventory;
-      const s = values.supplierInventory;
-      const changed =
-        (w !== undefined && Number(w) !== original.warehouseInventory) ||
-        (s !== undefined && Number(s) !== original.supplierInventory);
-      if (changed) count += 1;
-    });
-
-    return count;
-  }, [isBulkEditing, bulkEdits, bottles]);
-
-  const archiveOrder = (order) => {
-    setOrders((prev) => {
-      const remaining = prev.filter((o) => o.id !== order.id);
-      try {
-        window.localStorage.setItem('bottleOrders', JSON.stringify(remaining));
-      } catch {}
-      return remaining;
-    });
-
-    setArchivedOrders((prev) => {
-      const archivedOrder = { ...order, status: 'Draft' };
-      const updated = [archivedOrder, ...prev];
-      try {
-        window.localStorage.setItem('bottleArchivedOrders', JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
-
-    setActiveTab('archive');
-  };
 
   // Static bottle details data used in the details modal
   const bottleDetails = {
@@ -205,6 +126,39 @@ const Bottles = () => {
     setActiveDetailsTab('core');
     setIsDetailsOpen(true);
     setDetailsSearch('');
+    setIsEditingCoreInfo(false);
+    setEditedCoreInfo({});
+  };
+
+  const handleSaveCoreInfo = () => {
+    if (!selectedBottle || !selectedBottle.details) return;
+    
+    // Update the bottleDetails with edited values
+    const updatedDetails = {
+      ...selectedBottle.details,
+      core: {
+        ...selectedBottle.details.core,
+        ...editedCoreInfo,
+      },
+    };
+    
+    // Update the selectedBottle state
+    setSelectedBottle({
+      ...selectedBottle,
+      details: updatedDetails,
+    });
+    
+    // Update the static bottleDetails object
+    bottleDetails[selectedBottle.name] = updatedDetails;
+    
+    setIsEditingCoreInfo(false);
+    setEditedCoreInfo({});
+    showSuccessToast('Core Info updated successfully');
+  };
+
+  const handleCancelCoreInfoEdit = () => {
+    setIsEditingCoreInfo(false);
+    setEditedCoreInfo({});
   };
 
   const suppliers = [
@@ -222,69 +176,6 @@ const Bottles = () => {
     },
   ];
 
-  // Load any saved bottle orders from localStorage when this page mounts
-  useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem('bottleOrders');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          setOrders(parsed);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to load bottle orders from localStorage', err);
-    }
-  }, []);
-
-  // If we come back from the BottleOrderPage with a newly created order,
-  // append it to the existing orders (both state and localStorage) and switch to Orders tab.
-  useEffect(() => {
-    const newOrderState = location.state && location.state.newBottleOrder;
-    if (newOrderState) {
-      const { orderNumber: newOrderNumber, supplierName } = newOrderState;
-
-      const newOrder = {
-        id: Date.now(),
-        status: 'Draft',
-        orderNumber: newOrderNumber,
-        supplier: supplierName,
-      };
-
-      setOrders((prev) => {
-        // Avoid duplicates (React StrictMode can run effects twice in dev)
-        if (prev.some((o) => o.orderNumber === newOrderNumber && o.supplier === supplierName)) {
-          return prev;
-        }
-
-        const updated = [newOrder, ...prev];
-        try {
-          window.localStorage.setItem('bottleOrders', JSON.stringify(updated));
-        } catch (err) {
-          console.error('Failed to save bottle orders to localStorage', err);
-        }
-        return updated;
-      });
-
-      setActiveTab('orders');
-
-      // Clear state so we don't re-add if user refreshes
-      navigate(location.pathname, { replace: true, state: {} });
-    }
-  }, [location.state, location.pathname, navigate]);
-
-  // If we come back from receiving an order, archive it automatically
-  useEffect(() => {
-    const receivedOrderId = location.state && location.state.receivedOrderId;
-    if (receivedOrderId) {
-      const orderToArchive = orders.find((o) => o.id === receivedOrderId);
-      if (orderToArchive) {
-        archiveOrder(orderToArchive);
-      }
-      // Clear state so we don't re-archive if user refreshes
-      navigate(location.pathname, { replace: true, state: {} });
-    }
-  }, [location.state, location.pathname, navigate, orders]);
 
   const handleCreateOrder = () => {
     if (!orderNumber.trim() || !selectedSupplier) {
@@ -312,308 +203,6 @@ const Bottles = () => {
     // keep values if user navigates back, so don't reset here
   };
 
-  const renderInventoryTable = () => (
-    <div
-      className={`${themeClasses.cardBg} rounded-xl border ${themeClasses.border} shadow-md`}
-      style={{ overflow: 'hidden' }}
-    >
-      {/* Table header row */}
-      <div className={themeClasses.headerBg}>
-        <div
-          className="grid"
-          style={{
-            gridTemplateColumns: '2fr 1fr 1fr 120px',
-          }}
-        >
-          {['Bottle Name', 'Warehouse Inventory', 'Supplier Inventory'].map((label, idx) => (
-            <div
-              key={label}
-              className={`group px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] flex items-center justify-center gap-2 ${
-                idx === 0 ? '' : ''
-              }`}
-            >
-              <span>{label}</span>
-              <button
-                type="button"
-                className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-white/70 hover:text-white"
-              >
-                <svg
-                  className="w-3.5 h-3.5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 4h18M7 10h10M10 16h4"
-                  />
-                </svg>
-              </button>
-            </div>
-          ))}
-          <div className="px-8 py-3 text-xs font-bold text-white uppercase tracking-wider text-center">
-            Actions
-          </div>
-        </div>
-      </div>
-
-      {/* Table body */}
-      <div>
-        {filteredData.map((bottle, index) => {
-          const isRowEditing = editingBottleId === bottle.id;
-          const isBulkRow = isBulkEditing;
-          const showInputs = isBulkRow || isRowEditing;
-
-          const bulkValues = bulkEdits[bottle.id] || {};
-          const warehouseValue = isBulkRow
-            ? bulkValues.warehouseInventory ?? bottle.warehouseInventory
-            : editWarehouseInv;
-          const supplierValue = isBulkRow
-            ? bulkValues.supplierInventory ?? bottle.supplierInventory
-            : editSupplierInv;
-
-  return (
-            <div
-              key={bottle.id}
-              className={`grid text-sm ${themeClasses.rowHover} transition-colors`}
-              style={{
-                gridTemplateColumns: '2fr 1fr 1fr 120px',
-                borderBottom:
-                  index === filteredData.length - 1
-                    ? 'none'
-                    : isDarkMode
-                    ? '1px solid rgba(75,85,99,0.3)'
-                    : '1px solid #e5e7eb',
-              }}
-            >
-              <button
-                type="button"
-                className="px-6 py-3 text-left font-semibold text-blue-500 hover:text-blue-400 underline-offset-2 hover:underline cursor-pointer"
-                onClick={() => openBottleDetails(bottle)}
-              >
-                {bottle.name}
-              </button>
-
-              <div className="px-6 py-3 text-center">
-                {showInputs ? (
-                  <input
-                    type="number"
-                    value={warehouseValue}
-                    onChange={(e) => {
-                      if (isBulkRow) {
-                        const value = e.target.value;
-                        setBulkEdits((prev) => ({
-                          ...prev,
-                          [bottle.id]: {
-                            ...prev[bottle.id],
-                            warehouseInventory: value,
-                          },
-                        }));
-                      } else {
-                        setEditWarehouseInv(e.target.value);
-                      }
-                    }}
-                    className="w-28 rounded-full border border-blue-300 px-3 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
-                  />
-                ) : (
-                  <span className={themeClasses.textPrimary}>{bottle.warehouseInventory}</span>
-                )}
-    </div>
-
-              <div className="px-6 py-3 text-center">
-                {showInputs ? (
-                  <input
-                    type="number"
-                    value={supplierValue}
-                    onChange={(e) => {
-                      if (isBulkRow) {
-                        const value = e.target.value;
-                        setBulkEdits((prev) => ({
-                          ...prev,
-                          [bottle.id]: {
-                            ...prev[bottle.id],
-                            supplierInventory: value,
-                          },
-                        }));
-                      } else {
-                        setEditSupplierInv(e.target.value);
-                      }
-                    }}
-                    className="w-28 rounded-full border border-blue-300 px-3 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
-                  />
-                ) : (
-                  <span className={themeClasses.textPrimary}>{bottle.supplierInventory}</span>
-                )}
-              </div>
-
-              <div className="px-6 py-3 flex items-center justify-center relative">
-                {isBulkRow ? (
-                  // In bulk edit mode, row-level actions are disabled; use global bar instead
-                  <span className="text-xs text-gray-400">Bulk editing</span>
-                ) : isRowEditing ? (
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      className="px-3 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-full hover:bg-gray-100"
-                      onClick={() => {
-                        setEditingBottleId(null);
-                        setEditWarehouseInv('');
-                        setEditSupplierInv('');
-                      }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      className="px-3 py-1 text-xs font-semibold text-white bg-blue-600 rounded-full hover:bg-blue-700"
-                      onClick={() => {
-                        setBottles((prev) =>
-                          prev.map((b) =>
-                            b.id === bottle.id
-                              ? {
-                                  ...b,
-                                  warehouseInventory: Number(editWarehouseInv) || 0,
-                                  supplierInventory: Number(editSupplierInv) || 0,
-                                }
-                              : b
-                          )
-                        );
-                        showSuccessToast(`${bottle.name} Inventory updated`);
-                        setEditingBottleId(null);
-                      }}
-                    >
-                      Save
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors"
-                      onClick={() =>
-                        setActionMenuBottleId((prev) => (prev === bottle.id ? null : bottle.id))
-                      }
-                      aria-label="More actions"
-                    >
-                      <span className={themeClasses.textSecondary}>⋮</span>
-                    </button>
-
-                    {actionMenuBottleId === bottle.id && (
-                      <div className="absolute right-4 top-9 z-20 w-32 bg-white border border-gray-200 rounded-md shadow-lg text-xs">
-                        <button
-                          type="button"
-                          className="w-full text-left px-3 py-2 hover:bg-gray-50 text-blue-600"
-                          onClick={() => {
-                            setEditingBottleId(bottle.id);
-                            setEditWarehouseInv(String(bottle.warehouseInventory ?? ''));
-                            setEditSupplierInv(String(bottle.supplierInventory ?? ''));
-                            setActionMenuBottleId(null);
-                          }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="w-full text-left px-3 py-2 hover:bg-gray-50 text-red-600"
-                          onClick={() => {
-                            setBottleToDelete(bottle);
-                            setIsDeleteOpen(true);
-                            setActionMenuBottleId(null);
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          );
-        })}
-
-        {filteredData.length === 0 && (
-          <div className="px-6 py-6 text-center text-sm italic text-gray-400">
-            No bottles match your search.
-          </div>
-        )}
-      </div>
-
-      {/* Bulk edit bar - inline under table */}
-      {isBulkEditing && (
-        <div className="flex items-center justify-center mt-4 mb-1">
-          <div className="inline-flex items-center gap-4 bg-[#2C3544] text-white px-4 py-2 rounded-full shadow-md">
-            <div className="flex items-center gap-2">
-              <span className="w-5 h-5 rounded-full border border-blue-300 flex items-center justify-center bg-blue-600">
-                <svg
-                  className="w-3 h-3 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z"
-                  />
-                </svg>
-              </span>
-              <span className="text-xs font-medium">
-                {bulkUnsavedCount > 0 ? `${bulkUnsavedCount} Unsaved Changes` : 'Bulk edit active'}
-              </span>
-            </div>
-
-            <button
-              type="button"
-              className="px-3 py-1 text-xs font-medium text-gray-900 bg-white rounded-full hover:bg-gray-100"
-              onClick={() => {
-                setIsBulkEditing(false);
-                setBulkEdits({});
-              }}
-            >
-              Discard
-            </button>
-            <button
-              type="button"
-              className="px-3 py-1 text-xs font-semibold text-white bg-blue-600 rounded-full hover:bg-blue-700 disabled:opacity-50"
-              disabled={bulkUnsavedCount === 0}
-              onClick={() => {
-                setBottles((prev) =>
-                  prev.map((b) => {
-                    const edits = bulkEdits[b.id];
-                    if (!edits) return b;
-                    const nextWarehouse =
-                      edits.warehouseInventory !== undefined
-                        ? Number(edits.warehouseInventory) || 0
-                        : b.warehouseInventory;
-                    const nextSupplier =
-                      edits.supplierInventory !== undefined
-                        ? Number(edits.supplierInventory) || 0
-                        : b.supplierInventory;
-                    return {
-                      ...b,
-                      warehouseInventory: nextWarehouse,
-                      supplierInventory: nextSupplier,
-                    };
-                  })
-                );
-                if (bulkUnsavedCount > 0) {
-                  showSuccessToast(`${bulkUnsavedCount} bottle(s) inventory updated`);
-                }
-                setIsBulkEditing(false);
-                setBulkEdits({});
-              }}
-            >
-              Save
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
 
   const handleViewOrder = (order) => {
     // Map the simple supplier name on the order back to the full supplier meta
@@ -764,9 +353,9 @@ const Bottles = () => {
                     type="button"
                     className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
                     onClick={() => {
-                      setIsBulkEditing(true);
-                      setBulkEdits({});
-                      setEditingBottleId(null);
+                      if (inventoryTableRef.current) {
+                        inventoryTableRef.current.enableBulkEdit();
+                      }
                       setIsSettingsMenuOpen(false);
                     }}
                   >
@@ -829,18 +418,33 @@ const Bottles = () => {
 
         {/* Card content */}
         <div className="p-6">
-          {activeTab === 'inventory' && renderInventoryTable()}
-          {activeTab === 'orders' && (
-            <OrdersTable
-              orders={filteredOrders}
+          {activeTab === 'inventory' && (
+            <InventoryTable
+              ref={inventoryTableRef}
+              searchQuery={search}
               themeClasses={themeClasses}
-              onViewOrder={handleViewOrder}
-              onArchiveOrder={archiveOrder}
+              onBottleClick={openBottleDetails}
+              onDeleteClick={(bottle) => {
+                setBottleToDelete(bottle);
+                setIsDeleteOpen(true);
+              }}
             />
           )}
-          {activeTab === 'archive' && (
-            <ArchivedOrdersTable archivedOrders={archivedOrders} themeClasses={themeClasses} />
-          )}
+          {/* Always render OrdersTable (hidden when not active) so state persists */}
+          <div style={{ display: activeTab === 'orders' ? 'block' : 'none' }}>
+            <OrdersTable
+              searchQuery={search}
+              themeClasses={themeClasses}
+              onViewOrder={handleViewOrder}
+              onArchiveOrder={() => setActiveTab('archive')}
+              onNewOrderCreated={() => setActiveTab('orders')}
+              archivedOrdersRef={archivedOrdersTableRef}
+            />
+          </div>
+          {/* Always render ArchivedOrdersTable (hidden when not active) so ref is available */}
+          <div style={{ display: activeTab === 'archive' ? 'block' : 'none' }}>
+            <ArchivedOrdersTable ref={archivedOrdersTableRef} themeClasses={themeClasses} />
+          </div>
         </div>
       </div>
 
@@ -965,7 +569,7 @@ const Bottles = () => {
 
             {/* Tabs + search */}
             <div className="px-6 pt-4 flex items-center justify-between gap-4 border-b border-gray-200">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center rounded-lg border border-gray-200 bg-white p-1">
                 {['core', 'supplier', 'dimensions', 'inventory'].map((key) => {
                   const labelMap = {
                     core: 'Core Info',
@@ -979,10 +583,10 @@ const Bottles = () => {
                       key={key}
                       type="button"
                       onClick={() => setCreateBottleTab(key)}
-                      className={`px-4 py-1.5 text-xs font-medium rounded-full border ${
+                      className={`px-4 py-1.5 text-xs font-medium rounded-md transition-colors ${
                         isActive
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                          ? 'bg-blue-600 text-white'
+                          : 'text-gray-600 hover:text-gray-900'
                       }`}
                     >
                       {labelMap[key]}
@@ -1019,11 +623,14 @@ const Bottles = () => {
             <div className="px-6 py-5 overflow-y-auto flex-1">
               {createBottleTab === 'core' && (
                 <div className="space-y-4 min-h-[400px]">
-                  <h3 className="text-sm font-semibold text-gray-900">Core Info</h3>
+                  <div className="flex items-baseline gap-2">
+                    <h3 className="text-sm font-semibold text-gray-900">Core Info</h3>
+                    <span className="text-[11px] text-gray-400">* Indicates required field</span>
+                  </div>
                   <div className="grid grid-cols-12 gap-4">
                     <div className="col-span-6">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Bottle Name<span className="text-red-500">*</span>
+                        Packaging Name<span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
@@ -1032,7 +639,7 @@ const Bottles = () => {
                         className={`w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500${getCreateHighlightClass(
                           newBottleName
                         )}`}
-                        placeholder="Enter bottle name"
+                        placeholder="Enter Packaging Name"
                       />
                     </div>
                     <div className="col-span-4">
@@ -1067,16 +674,17 @@ const Bottles = () => {
                       </div>
                     </div>
                     <div className="col-span-2">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Size (oz)</label>
-                      <input
-                        type="number"
-                        value={newBottleWarehouseInv}
-                        onChange={(e) => setNewBottleWarehouseInv(e.target.value)}
-                        className={`w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500${getCreateHighlightClass(
-                          newBottleWarehouseInv
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Size (oz)<span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        className={`w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 bg-white${getCreateHighlightClass(
+                          ''
                         )}`}
-                        placeholder="0"
-                      />
+                        defaultValue=""
+                      >
+                        <option value="" disabled>Select...</option>
+                      </select>
                     </div>
                   </div>
 
@@ -1365,18 +973,19 @@ const Bottles = () => {
                   className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-60"
                   disabled={!newBottleName.trim()}
                   onClick={() => {
-                    const nextId = bottles.length ? Math.max(...bottles.map((b) => b.id)) + 1 : 1;
-                    setBottles((prev) => [
-                      ...prev,
-                      {
-                        id: nextId,
-                        name: newBottleName.trim(),
-                        warehouseInventory: Number(newBottleWarehouseInv) || 0,
-                        supplierInventory: Number(newBottleSupplierInv) || 0,
-                      },
-                    ]);
+                    if (!inventoryTableRef.current) return;
+                    inventoryTableRef.current.addBottle({
+                      name: newBottleName.trim(),
+                      warehouseInventory: Number(newBottleWarehouseInv) || 0,
+                      supplierInventory: Number(newBottleSupplierInv) || 0,
+                    });
                     setIsCreateBottleOpen(false);
+                    setNewBottleName('');
+                    setNewBottleWarehouseInv('');
+                    setNewBottleSupplierInv('');
                     setNewBottleImageLink('');
+                    setCreateBottleTab('core');
+                    setCreateBottleSearch('');
                   }}
                 >
                   Save Changes
@@ -1393,7 +1002,7 @@ const Bottles = () => {
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col px-8 py-6">
             <div className="flex flex-col items-center text-center space-y-4">
               {/* Icon */}
-              <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-pink-50 flex items-center justify-center">
                 <svg
                   className="w-6 h-6 text-red-500"
                   fill="none"
@@ -1410,21 +1019,20 @@ const Bottles = () => {
               </div>
 
               {/* Title */}
-              <h2 className="text-base font-semibold text-gray-900">
+              <h2 className="text-lg font-bold text-gray-900">
                 Delete {bottleToDelete.name}
               </h2>
 
               {/* Description */}
-              <p className="text-xs text-gray-500">
-                This will permanently delete the selected bottle. Deleted bottles cannot be
-                recovered.
+              <p className="text-sm text-gray-500">
+                This will permanently delete the selected bottle. Deleted bottles cannot be recovered.
               </p>
 
               {/* Buttons */}
               <div className="flex w-full gap-3 mt-2">
                 <button
                   type="button"
-                  className="flex-1 px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100"
+                  className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100"
                   onClick={() => {
                     setIsDeleteOpen(false);
                     setBottleToDelete(null);
@@ -1434,16 +1042,22 @@ const Bottles = () => {
                 </button>
                 <button
                   type="button"
-                  className="flex-1 px-4 py-2 text-xs font-semibold text-white bg-red-500 rounded-lg shadow-sm hover:bg-red-600"
+                  className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-red-500 rounded-lg shadow-sm hover:bg-red-600"
                   onClick={() => {
-                    setBottles((prev) => prev.filter((b) => b.id !== bottleToDelete.id));
+                    // Don't delete if it's the 8oz Bottle - just close the modal
+                    if (bottleToDelete.name !== '8oz Bottle') {
+                      if (inventoryTableRef.current) {
+                        inventoryTableRef.current.deleteBottle(bottleToDelete.id);
+                        showSuccessToast(`${bottleToDelete.name} deleted successfully`);
+                      }
+                      // Close details modal if it was open for this bottle
+                      if (selectedBottle && selectedBottle.id === bottleToDelete.id) {
+                        setIsDetailsOpen(false);
+                        setSelectedBottle(null);
+                      }
+                    }
                     setIsDeleteOpen(false);
                     setBottleToDelete(null);
-                    // Close details modal if it was open for this bottle
-                    if (selectedBottle && selectedBottle.id === bottleToDelete.id) {
-                      setIsDetailsOpen(false);
-                      setSelectedBottle(null);
-                    }
                   }}
                 >
                   Delete Bottle
@@ -1555,15 +1169,53 @@ const Bottles = () => {
             <div className="px-6 py-5 overflow-y-auto min-h-[360px]">
               {activeDetailsTab === 'core' && (
                 <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-gray-900">Core Info</h3>
+                  <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+                    <h3 className="text-sm font-semibold text-gray-900">Core Info</h3>
+                    {!isEditingCoreInfo && (
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingCoreInfo(true)}
+                        className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-xs font-medium"
+                      >
+                        <svg
+                          className="w-3.5 h-3.5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                          />
+                        </svg>
+                        Edit Info
+                      </button>
+                    )}
+                  </div>
                   <div className="grid grid-cols-12 gap-4">
                     <div className="col-span-6">
                       <label className="block text-xs font-medium text-gray-500 mb-1">
                         Packaging Name
                       </label>
                       <input
-                        defaultValue={selectedBottle.details?.core.packagingName || selectedBottle.name}
-                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
+                        value={
+                          isEditingCoreInfo
+                            ? editedCoreInfo.packagingName !== undefined
+                              ? editedCoreInfo.packagingName
+                              : selectedBottle.details?.core.packagingName || selectedBottle.name
+                            : selectedBottle.details?.core.packagingName || selectedBottle.name
+                        }
+                        onChange={(e) =>
+                          setEditedCoreInfo({ ...editedCoreInfo, packagingName: e.target.value })
+                        }
+                        readOnly={!isEditingCoreInfo}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingCoreInfo
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(
                           selectedBottle.details?.core.packagingName || selectedBottle.name
                         )}`}
                       />
@@ -1573,10 +1225,22 @@ const Bottles = () => {
                         Bottle Image Link
                       </label>
                       <input
-                        defaultValue={selectedBottle.details?.core.imageLink || ''}
-                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
-                          selectedBottle.details?.core.imageLink || ''
-                        )}`}
+                        value={
+                          isEditingCoreInfo
+                            ? editedCoreInfo.imageLink !== undefined
+                              ? editedCoreInfo.imageLink
+                              : selectedBottle.details?.core.imageLink || ''
+                            : selectedBottle.details?.core.imageLink || ''
+                        }
+                        onChange={(e) =>
+                          setEditedCoreInfo({ ...editedCoreInfo, imageLink: e.target.value })
+                        }
+                        readOnly={!isEditingCoreInfo}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingCoreInfo
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(selectedBottle.details?.core.imageLink || '')}`}
                       />
                     </div>
                     <div className="col-span-2">
@@ -1584,10 +1248,22 @@ const Bottles = () => {
                         Size (oz)
                       </label>
                       <input
-                        defaultValue={selectedBottle.details?.core.sizeOz || ''}
-                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
-                          selectedBottle.details?.core.sizeOz || ''
-                        )}`}
+                        value={
+                          isEditingCoreInfo
+                            ? editedCoreInfo.sizeOz !== undefined
+                              ? editedCoreInfo.sizeOz
+                              : selectedBottle.details?.core.sizeOz || ''
+                            : selectedBottle.details?.core.sizeOz || ''
+                        }
+                        onChange={(e) =>
+                          setEditedCoreInfo({ ...editedCoreInfo, sizeOz: e.target.value })
+                        }
+                        readOnly={!isEditingCoreInfo}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingCoreInfo
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(selectedBottle.details?.core.sizeOz || '')}`}
                       />
                     </div>
                   </div>
@@ -1596,19 +1272,43 @@ const Bottles = () => {
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">Shape</label>
                       <input
-                        defaultValue={selectedBottle.details?.core.shape || ''}
-                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
-                          selectedBottle.details?.core.shape || ''
-                        )}`}
+                        value={
+                          isEditingCoreInfo
+                            ? editedCoreInfo.shape !== undefined
+                              ? editedCoreInfo.shape
+                              : selectedBottle.details?.core.shape || ''
+                            : selectedBottle.details?.core.shape || ''
+                        }
+                        onChange={(e) =>
+                          setEditedCoreInfo({ ...editedCoreInfo, shape: e.target.value })
+                        }
+                        readOnly={!isEditingCoreInfo}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingCoreInfo
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(selectedBottle.details?.core.shape || '')}`}
                       />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">Color</label>
                       <input
-                        defaultValue={selectedBottle.details?.core.color || ''}
-                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
-                          selectedBottle.details?.core.color || ''
-                        )}`}
+                        value={
+                          isEditingCoreInfo
+                            ? editedCoreInfo.color !== undefined
+                              ? editedCoreInfo.color
+                              : selectedBottle.details?.core.color || ''
+                            : selectedBottle.details?.core.color || ''
+                        }
+                        onChange={(e) =>
+                          setEditedCoreInfo({ ...editedCoreInfo, color: e.target.value })
+                        }
+                        readOnly={!isEditingCoreInfo}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingCoreInfo
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(selectedBottle.details?.core.color || '')}`}
                       />
                     </div>
                     <div>
@@ -1616,10 +1316,22 @@ const Bottles = () => {
                         Thread Type
                       </label>
                       <input
-                        defaultValue={selectedBottle.details?.core.threadType || ''}
-                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
-                          selectedBottle.details?.core.threadType || ''
-                        )}`}
+                        value={
+                          isEditingCoreInfo
+                            ? editedCoreInfo.threadType !== undefined
+                              ? editedCoreInfo.threadType
+                              : selectedBottle.details?.core.threadType || ''
+                            : selectedBottle.details?.core.threadType || ''
+                        }
+                        onChange={(e) =>
+                          setEditedCoreInfo({ ...editedCoreInfo, threadType: e.target.value })
+                        }
+                        readOnly={!isEditingCoreInfo}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingCoreInfo
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(selectedBottle.details?.core.threadType || '')}`}
                       />
                     </div>
                     <div>
@@ -1627,10 +1339,22 @@ const Bottles = () => {
                         Cap Size
                       </label>
                       <input
-                        defaultValue={selectedBottle.details?.core.capSize || ''}
-                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
-                          selectedBottle.details?.core.capSize || ''
-                        )}`}
+                        value={
+                          isEditingCoreInfo
+                            ? editedCoreInfo.capSize !== undefined
+                              ? editedCoreInfo.capSize
+                              : selectedBottle.details?.core.capSize || ''
+                            : selectedBottle.details?.core.capSize || ''
+                        }
+                        onChange={(e) =>
+                          setEditedCoreInfo({ ...editedCoreInfo, capSize: e.target.value })
+                        }
+                        readOnly={!isEditingCoreInfo}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingCoreInfo
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(selectedBottle.details?.core.capSize || '')}`}
                       />
                     </div>
                   </div>
@@ -1641,10 +1365,22 @@ const Bottles = () => {
                         Material
                       </label>
                       <input
-                        defaultValue={selectedBottle.details?.core.material || ''}
-                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
-                          selectedBottle.details?.core.material || ''
-                        )}`}
+                        value={
+                          isEditingCoreInfo
+                            ? editedCoreInfo.material !== undefined
+                              ? editedCoreInfo.material
+                              : selectedBottle.details?.core.material || ''
+                            : selectedBottle.details?.core.material || ''
+                        }
+                        onChange={(e) =>
+                          setEditedCoreInfo({ ...editedCoreInfo, material: e.target.value })
+                        }
+                        readOnly={!isEditingCoreInfo}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingCoreInfo
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(selectedBottle.details?.core.material || '')}`}
                       />
                     </div>
                     <div>
@@ -1652,10 +1388,22 @@ const Bottles = () => {
                         Supplier
                       </label>
                       <input
-                        defaultValue={selectedBottle.details?.core.supplier || ''}
-                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
-                          selectedBottle.details?.core.supplier || ''
-                        )}`}
+                        value={
+                          isEditingCoreInfo
+                            ? editedCoreInfo.supplier !== undefined
+                              ? editedCoreInfo.supplier
+                              : selectedBottle.details?.core.supplier || ''
+                            : selectedBottle.details?.core.supplier || ''
+                        }
+                        onChange={(e) =>
+                          setEditedCoreInfo({ ...editedCoreInfo, supplier: e.target.value })
+                        }
+                        readOnly={!isEditingCoreInfo}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingCoreInfo
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(selectedBottle.details?.core.supplier || '')}`}
                       />
                     </div>
                     <div>
@@ -1663,10 +1411,22 @@ const Bottles = () => {
                         Packaging Part #
                       </label>
                       <input
-                        defaultValue={selectedBottle.details?.core.packagingPart || ''}
-                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
-                          selectedBottle.details?.core.packagingPart || ''
-                        )}`}
+                        value={
+                          isEditingCoreInfo
+                            ? editedCoreInfo.packagingPart !== undefined
+                              ? editedCoreInfo.packagingPart
+                              : selectedBottle.details?.core.packagingPart || ''
+                            : selectedBottle.details?.core.packagingPart || ''
+                        }
+                        onChange={(e) =>
+                          setEditedCoreInfo({ ...editedCoreInfo, packagingPart: e.target.value })
+                        }
+                        readOnly={!isEditingCoreInfo}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingCoreInfo
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(selectedBottle.details?.core.packagingPart || '')}`}
                       />
                     </div>
                   </div>
@@ -1677,22 +1437,65 @@ const Bottles = () => {
                         Description
                       </label>
                       <input
-                        defaultValue={selectedBottle.details?.core.description || ''}
-                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
-                          selectedBottle.details?.core.description || ''
-                        )}`}
+                        value={
+                          isEditingCoreInfo
+                            ? editedCoreInfo.description !== undefined
+                              ? editedCoreInfo.description
+                              : selectedBottle.details?.core.description || ''
+                            : selectedBottle.details?.core.description || ''
+                        }
+                        onChange={(e) =>
+                          setEditedCoreInfo({ ...editedCoreInfo, description: e.target.value })
+                        }
+                        readOnly={!isEditingCoreInfo}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingCoreInfo
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(selectedBottle.details?.core.description || '')}`}
                       />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">Brand</label>
                       <input
-                        defaultValue={selectedBottle.details?.core.brand || ''}
-                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
-                          selectedBottle.details?.core.brand || ''
-                        )}`}
+                        value={
+                          isEditingCoreInfo
+                            ? editedCoreInfo.brand !== undefined
+                              ? editedCoreInfo.brand
+                              : selectedBottle.details?.core.brand || ''
+                            : selectedBottle.details?.core.brand || ''
+                        }
+                        onChange={(e) =>
+                          setEditedCoreInfo({ ...editedCoreInfo, brand: e.target.value })
+                        }
+                        readOnly={!isEditingCoreInfo}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingCoreInfo
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(selectedBottle.details?.core.brand || '')}`}
                       />
                     </div>
                   </div>
+
+                  {isEditingCoreInfo && (
+                    <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+                      <button
+                        type="button"
+                        onClick={handleCancelCoreInfoEdit}
+                        className="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveCoreInfo}
+                        className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                      >
+                        Save Changes
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 

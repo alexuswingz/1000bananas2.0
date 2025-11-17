@@ -20,7 +20,9 @@ import BottleOrderPage from './supply-chain/bottles/components/BottleOrderPage';
 import Closures from './supply-chain/closures/index';
 import ClosureOrderPage from './supply-chain/closures/components/ClosureOrderPage';
 import Boxes from './supply-chain/boxes/index';
+import BoxOrderPage from './supply-chain/boxes/components/BoxOrderPage';
 import Labels from './supply-chain/labels/index';
+import LabelOrderPage from './supply-chain/labels/components/LabelOrderPage';
 import RawMaterials from './supply-chain/rawMaterials/index';
 import Planning from './production/planning';
 import Manufacturing from './production/Manufacturing';
@@ -57,7 +59,9 @@ const Landing = () => {
           <Route path="/supply-chain/closures" element={<Closures />} />
           <Route path="/supply-chain/closures/order" element={<ClosureOrderPage />} />
           <Route path="/supply-chain/boxes" element={<Boxes />} />
+          <Route path="/supply-chain/boxes/order" element={<BoxOrderPage />} />
           <Route path="/supply-chain/labels" element={<Labels />} />
+          <Route path="/supply-chain/labels/order" element={<LabelOrderPage />} />
           <Route path="/supply-chain/raw-materials" element={<RawMaterials />} />
           <Route path="/production/planning" element={<Planning />} />
           <Route path="/production/manufacturing" element={<Manufacturing />} />

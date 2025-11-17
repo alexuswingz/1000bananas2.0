@@ -47,12 +47,14 @@ const BottleOrderPage = () => {
     });
   };
 
-  const handleReceiveComplete = () => {
-    // Archive the order after receiving
+  const handleReceiveComplete = (isPartial = false) => {
+    // If partial receive, update status and keep in orders
+    // If full receive, archive the order
     if (isReceiveMode && orderId) {
       navigate('/dashboard/supply-chain/bottles', {
         state: {
           receivedOrderId: orderId,
+          isPartial: isPartial,
         },
       });
     } else {
@@ -126,8 +128,8 @@ const BottleOrderPage = () => {
               onClick={() => {
                 const allChecked = orderLines.every((line) => line.selected);
                 if (allChecked) {
-                  // Full receive – no partial popup
-                  handleReceiveComplete();
+                  // Full receive – archive the order
+                  handleReceiveComplete(false);
                 } else {
                   // Partial receive – show confirmation popup
                   setIsReceiveConfirmOpen(true);
@@ -151,14 +153,12 @@ const BottleOrderPage = () => {
             <div className="bg-[#1f2937] text-white text-[11px] font-semibold uppercase tracking-wide">
               <div
                 className="grid items-center"
-                style={{ gridTemplateColumns: '40px 2fr 2fr 1.5fr 1.2fr 1.2fr' }}
+                style={{ gridTemplateColumns: '2fr 1.2fr 1.2fr 40px' }}
               >
-                <div className="px-4 py-2 border-r border-gray-700 text-center"></div>
                 <div className="px-4 py-2 border-r border-gray-700 text-center">Packaging Name</div>
-                <div className="px-4 py-2 border-r border-gray-700 text-center">Supplier Inventory</div>
-                <div className="px-4 py-2 border-r border-gray-700 text-center">Units Needed</div>
                 <div className="px-4 py-2 border-r border-gray-700 text-center">Qty</div>
-                <div className="px-4 py-2 text-center">Pallets</div>
+                <div className="px-4 py-2 border-r border-gray-700 text-center">Pallets</div>
+                <div className="px-4 py-2 text-center"></div>
               </div>
             </div>
 
@@ -168,31 +168,13 @@ const BottleOrderPage = () => {
                 <div
                   key={line.id}
                   className="grid items-center text-sm border-t border-gray-100"
-                  style={{ gridTemplateColumns: '40px 2fr 2fr 1.5fr 1.2fr 1.2fr' }}
+                  style={{ gridTemplateColumns: '2fr 1.2fr 1.2fr 40px' }}
                 >
-                  <div className="px-4 py-2 flex items-center justify-center">
-                    <input
-                      type="checkbox"
-                      className="form-checkbox h-3.5 w-3.5 rounded border-gray-400"
-                      checked={line.selected}
-                      onChange={(e) =>
-                        setOrderLines((prev) =>
-                          prev.map((l) =>
-                            l.id === line.id ? { ...l, selected: e.target.checked } : l
-                          )
-                        )
-                      }
-                    />
-                  </div>
                   <div className="px-4 py-2 text-sm text-gray-900">{line.name}</div>
-                  <div className="px-4 py-2 text-xs text-gray-500">{line.supplierInventory}</div>
-                  <div className="px-4 py-2 text-sm text-gray-900">
-                    {line.unitsNeeded.toLocaleString()}
-                  </div>
                   <div className="px-4 py-2">
                     <input
                       type="number"
-                      className="w-full text-sm rounded-lg px-2 py-1 text-right bg-white shadow-inner border border-gray-200"
+                      className="w-full text-sm px-2 py-1 text-center bg-white shadow-inner border border-gray-200 rounded-none"
                       value={line.qty}
                       onChange={(e) => {
                         const val = Number(e.target.value) || 0;
@@ -205,7 +187,7 @@ const BottleOrderPage = () => {
                   <div className="px-4 py-2">
                     <input
                       type="number"
-                      className="w-full text-sm rounded-lg px-2 py-1 text-right bg-white shadow-inner border border-gray-200"
+                      className="w-full text-sm px-2 py-1 text-right bg-white shadow-inner border border-gray-200 rounded-none"
                       value={line.pallets}
                       onChange={(e) => {
                         const val = Number(e.target.value) || 0;
@@ -213,6 +195,20 @@ const BottleOrderPage = () => {
                           prev.map((l) => (l.id === line.id ? { ...l, pallets: val } : l))
                         );
                       }}
+                    />
+                  </div>
+                  <div className="px-4 py-2 flex items-center justify-center">
+                    <input
+                      type="checkbox"
+                      className="form-checkbox h-3.5 w-3.5 rounded border-gray-400"
+                      checked={line.selected}
+                      onChange={(e) =>
+                        setOrderLines((prev) =>
+                          prev.map((l) =>
+                            l.id === line.id ? { ...l, selected: e.target.checked } : l
+                          )
+                        )
+                      }
                     />
                   </div>
                 </div>
@@ -243,7 +239,7 @@ const BottleOrderPage = () => {
                 className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
                 onClick={() => {
                   setIsReceiveConfirmOpen(false);
-                  handleReceiveComplete();
+                  handleReceiveComplete(true);
                 }}
               >
                 Complete Partial

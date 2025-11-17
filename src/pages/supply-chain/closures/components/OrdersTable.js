@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 
-const OrdersTable = ({ orders, onViewOrder, onArchiveOrder }) => {
+const OrdersTable = ({ orders, onViewOrder, onArchiveOrder, onStatusChange }) => {
   const { isDarkMode } = useTheme();
   const [orderActionMenuId, setOrderActionMenuId] = useState(null);
+  const [editingStatusId, setEditingStatusId] = useState(null);
   const menuRefs = useRef({});
   const buttonRefs = useRef({});
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
@@ -17,10 +18,16 @@ const OrdersTable = ({ orders, onViewOrder, onArchiveOrder }) => {
     textSecondary: isDarkMode ? 'text-dark-text-secondary' : 'text-gray-500',
   };
 
+  const statusOptions = ['In Progress', 'Partial', 'Draft', 'Submitted', 'Received', 'Partially Received'];
+
   const statusStyles = {
-    'In Progress': { bg: 'bg-blue-100', text: 'text-blue-700', icon: '●' },
-    'Partial': { bg: 'bg-orange-100', text: 'text-orange-700', icon: '◐' },
-    'Received': { bg: 'bg-green-100', text: 'text-green-700', icon: '✓' },
+    Draft: { bg: 'bg-blue-100', text: 'text-blue-700' },
+    Submitted: { bg: 'bg-purple-100', text: 'text-purple-700' },
+    Received: { bg: 'bg-green-50', text: 'text-green-600' },
+    'Partially Received': { bg: 'bg-blue-100', text: 'text-blue-700' },
+    // Legacy statuses for backward compatibility
+    'In Progress': { bg: 'bg-blue-100', text: 'text-blue-700' },
+    'Partial': { bg: 'bg-blue-100', text: 'text-blue-700' },
   };
 
   // Calculate dropdown position and handle click outside
@@ -54,20 +61,112 @@ const OrdersTable = ({ orders, onViewOrder, onArchiveOrder }) => {
     };
   }, [orderActionMenuId]);
 
-  const renderStatusPill = (status) => {
+  const renderStatusIcon = (status) => {
+    switch (status) {
+      case 'In Progress':
+        // Blue loading/spinning icon (starburst pattern with 8 radiating lines)
+        return (
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <g stroke="#3B82F6" strokeWidth="2" strokeLinecap="round">
+              <line x1="12" y1="2" x2="12" y2="4"/>
+              <line x1="12" y1="20" x2="12" y2="22"/>
+              <line x1="2" y1="12" x2="4" y2="12"/>
+              <line x1="20" y1="12" x2="22" y2="12"/>
+              <line x1="5.66" y1="5.66" x2="6.83" y2="6.83"/>
+              <line x1="17.17" y1="17.17" x2="18.34" y2="18.34"/>
+              <line x1="18.34" y1="5.66" x2="17.17" y2="6.83"/>
+              <line x1="6.83" y1="17.17" x2="5.66" y2="18.34"/>
+            </g>
+          </svg>
+        );
+      case 'Partial':
+        // Blue half-filled circle
+        return (
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="10" stroke="#3B82F6" strokeWidth="1.5" fill="none"/>
+            <path d="M 2 12 A 10 10 0 0 1 22 12 L 12 12 Z" fill="#3B82F6"/>
+          </svg>
+        );
+      case 'Draft':
+        return (
+          <svg className="w-3.5 h-3.5" fill="#3B82F6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" fill="#3B82F6"/>
+            <path d="M14 2v6h6" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+            <line x1="9" y1="13" x2="15" y2="13" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+            <line x1="9" y1="17" x2="15" y2="17" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+        );
+      case 'Submitted':
+        return (
+          <svg className="w-3.5 h-3.5" fill="#9333EA" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <rect x="6" y="6" width="12" height="12" rx="2" fill="#9333EA"/>
+            <path d="M12 16l-3-3m0 0l3-3m-3 3h6" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        );
+      case 'Received':
+        return (
+          <svg className="w-3.5 h-3.5" fill="#10B981" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="#10B981"/>
+          </svg>
+        );
+      case 'Partially Received':
+        return (
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="10" stroke="#3B82F6" strokeWidth="1.5" fill="none"/>
+            <path d="M 2 12 A 10 10 0 0 1 22 12 L 12 12 Z" fill="#3B82F6"/>
+          </svg>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const renderStatusPill = (order) => {
+    const status = order.status || 'In Progress';
     const style = statusStyles[status] || {
       bg: 'bg-gray-100',
       text: 'text-gray-700',
-      icon: '•',
     };
+    const isEditing = editingStatusId === order.id;
+
+    if (isEditing && onStatusChange) {
+      return (
+        <div className="relative">
+          <select
+            autoFocus
+            value={status}
+            onChange={(e) => {
+              onStatusChange(order.id, e.target.value);
+              setEditingStatusId(null);
+            }}
+            onBlur={() => setEditingStatusId(null)}
+            className={`${style.bg} ${style.text} border-2 border-blue-500 rounded-full text-xs font-semibold px-3 py-1 pr-8 appearance-none cursor-pointer`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {statusOptions.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+        </div>
+      );
+    }
 
     return (
-      <span
-        className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${style.bg} ${style.text}`}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (onStatusChange) {
+            setEditingStatusId(order.id);
+          }
+        }}
+        className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${style.bg} ${style.text} hover:opacity-80 transition-opacity cursor-pointer`}
       >
-        <span aria-hidden="true">{style.icon}</span>
+        {renderStatusIcon(status)}
         {status}
-      </span>
+      </button>
     );
   };
 
@@ -121,7 +220,7 @@ const OrdersTable = ({ orders, onViewOrder, onArchiveOrder }) => {
               }}
             >
               <div className="px-6 py-3 flex items-center justify-center">
-                {renderStatusPill(order.status || 'In Progress')}
+                {renderStatusPill(order)}
               </div>
               <div className="px-6 py-3 flex items-center gap-2">
                 <span className="text-xs font-medium text-gray-900">{order.orderNumber}</span>

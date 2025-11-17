@@ -12,16 +12,21 @@ const ClosureOrderPage = () => {
   const supplier = state.supplier || null;
   const mode = state.mode || 'create';
   const isReceiveMode = mode === 'receive';
+  const isViewMode = mode === 'view';
   const orderId = state.orderId || null;
+  
+  // If viewing an existing order, use the lines from state (which are already filtered to selected items)
+  // If creating a new order, show all available items
   const initialLines =
-    state.lines ||
-    [
-      { id: 1, type: 'Cap', name: 'Aptar Pour', supplierInventory: 'Auto Replenishment', unitsNeeded: 61120, qty: 61120, pallets: 1, selected: false },
-      { id: 2, type: 'Sprayer', name: '3oz Sprayer Top Down', supplierInventory: 'Auto Replenishment', unitsNeeded: 10000, qty: 10000, pallets: 1, selected: false },
-      { id: 3, type: 'Sprayer', name: '6oz Sprayer Top Top Down', supplierInventory: 'Auto Replenishment', unitsNeeded: 10000, qty: 10000, pallets: 1, selected: false },
-      { id: 4, type: 'Sprayer', name: '16oz Sprayer Trigger Foam', supplierInventory: 'Auto Replenishment', unitsNeeded: 8160, qty: 8160, pallets: 1, selected: false },
-      { id: 5, type: 'Sprayer', name: '16oz Spray Trigger No-Foam', supplierInventory: 'Auto Replenishment', unitsNeeded: 8160, qty: 8160, pallets: 1, selected: false },
-    ];
+    state.lines && (isReceiveMode || isViewMode)
+      ? state.lines // When viewing/receiving, only show the selected items that were saved
+      : [
+          { id: 1, type: 'Cap', name: 'Aptar Pour', supplierInventory: 'Auto Replenishment', unitsNeeded: 61120, qty: 61120, pallets: 1, selected: false },
+          { id: 2, type: 'Sprayer', name: '3oz Sprayer Top Down', supplierInventory: 'Auto Replenishment', unitsNeeded: 10000, qty: 10000, pallets: 1, selected: false },
+          { id: 3, type: 'Sprayer', name: '6oz Sprayer Top Top Down', supplierInventory: 'Auto Replenishment', unitsNeeded: 10000, qty: 10000, pallets: 1, selected: false },
+          { id: 4, type: 'Sprayer', name: '16oz Sprayer Trigger Foam', supplierInventory: 'Auto Replenishment', unitsNeeded: 8160, qty: 8160, pallets: 1, selected: false },
+          { id: 5, type: 'Sprayer', name: '16oz Spray Trigger No-Foam', supplierInventory: 'Auto Replenishment', unitsNeeded: 8160, qty: 8160, pallets: 1, selected: false },
+        ];
 
   const [orderLines, setOrderLines] = useState(initialLines);
   const [isReceiveConfirmOpen, setIsReceiveConfirmOpen] = useState(false);
@@ -38,12 +43,16 @@ const ClosureOrderPage = () => {
   };
 
   const handleCreateOrder = () => {
+    // Filter to only include selected items
+    const selectedLines = orderLines.filter((line) => line.selected);
+    
     // Send newly created order back to Closures page via navigation state
     navigate('/dashboard/supply-chain/closures', {
       state: {
         newClosureOrder: {
           orderNumber,
           supplierName: supplier.name,
+          lines: selectedLines, // Only save selected items
         },
       },
     });
@@ -230,17 +239,17 @@ const ClosureOrderPage = () => {
             <div className="bg-[#1f2937] text-white text-[11px] font-semibold uppercase tracking-wide">
               <div
                 className="grid items-center"
-                style={{ gridTemplateColumns: '40px 1fr 2fr 2fr 1.5fr 1.2fr 1.2fr' }}
+                style={{ gridTemplateColumns: '1fr 2fr 2fr 1.5fr 1.2fr 1.2fr 40px' }}
               >
-                <div className="px-4 py-2 border-r border-gray-700 flex items-center justify-center">
-                  <input type="checkbox" className="form-checkbox h-3 w-3 rounded border-gray-400" />
-                </div>
                 <div className="px-4 py-2 border-r border-gray-700 text-center">Type</div>
                 <div className="px-4 py-2 border-r border-gray-700 text-center">Packaging Name</div>
                 <div className="px-4 py-2 border-r border-gray-700 text-center">Supplier Inventory</div>
                 <div className="px-4 py-2 border-r border-gray-700 text-center">Units Needed</div>
                 <div className="px-4 py-2 border-r border-gray-700 text-center">Qty</div>
-                <div className="px-4 py-2 text-center">Pallets</div>
+                <div className="px-4 py-2 border-r border-gray-700 text-center">Pallets</div>
+                <div className="px-4 py-2 flex items-center justify-center">
+                  <input type="checkbox" className="form-checkbox h-3 w-3 rounded border-gray-400" />
+                </div>
               </div>
             </div>
 
@@ -250,22 +259,8 @@ const ClosureOrderPage = () => {
                 <div
                   key={line.id}
                   className="grid items-center text-sm border-t border-gray-100"
-                  style={{ gridTemplateColumns: '40px 1fr 2fr 2fr 1.5fr 1.2fr 1.2fr' }}
+                  style={{ gridTemplateColumns: '1fr 2fr 2fr 1.5fr 1.2fr 1.2fr 40px' }}
                 >
-                  <div className="px-4 py-2 flex items-center justify-center">
-                    <input
-                      type="checkbox"
-                      className="form-checkbox h-3.5 w-3.5 rounded border-gray-400"
-                      checked={line.selected}
-                      onChange={(e) =>
-                        setOrderLines((prev) =>
-                          prev.map((l) =>
-                            l.id === line.id ? { ...l, selected: e.target.checked } : l
-                          )
-                        )
-                      }
-                    />
-                  </div>
                   <div className="px-4 py-2 text-sm text-gray-900">{line.type}</div>
                   <div className="px-4 py-2 text-sm text-gray-900">{line.name}</div>
                   <div className="px-4 py-2 text-xs text-gray-500">{line.supplierInventory}</div>
@@ -337,6 +332,20 @@ const ClosureOrderPage = () => {
                         </svg>
                       </button>
                     </div>
+                  </div>
+                  <div className="px-4 py-2 flex items-center justify-center">
+                    <input
+                      type="checkbox"
+                      className="form-checkbox h-3.5 w-3.5 rounded border-gray-400"
+                      checked={line.selected}
+                      onChange={(e) =>
+                        setOrderLines((prev) =>
+                          prev.map((l) =>
+                            l.id === line.id ? { ...l, selected: e.target.checked } : l
+                          )
+                        )
+                      }
+                    />
                   </div>
                 </div>
               ))}

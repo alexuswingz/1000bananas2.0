@@ -1,10 +1,64 @@
-import React from 'react';
+import React, { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
-const ArchivedOrdersTable = ({ archivedOrders }) => {
+const ArchivedOrdersTable = forwardRef(({ themeClasses, onViewOrder }, ref) => {
   const { isDarkMode } = useTheme();
+  const navigate = useNavigate();
 
-  const themeClasses = {
+  // Archived orders data - moved from Closures.js
+  const [archivedOrders, setArchivedOrders] = useState(() => {
+    try {
+      const stored = window.localStorage.getItem('closureArchivedOrders');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          // Filter out the two sample orders: "514413413" and "43145"
+          const cleaned = parsed.filter((order) => 
+            order.orderNumber !== '514413413' && order.orderNumber !== '43145'
+          );
+          // Update localStorage with cleaned data if any were removed
+          if (cleaned.length !== parsed.length) {
+            window.localStorage.setItem('closureArchivedOrders', JSON.stringify(cleaned));
+          }
+          return cleaned;
+        }
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Persist archived orders to localStorage
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('closureArchivedOrders', JSON.stringify(archivedOrders));
+    } catch (err) {
+      console.error('Failed to save archived orders to localStorage', err);
+    }
+  }, [archivedOrders]);
+
+  // Expose function to add archived order (called from Closures.js and OrdersTable)
+  useImperativeHandle(ref, () => ({
+    addArchivedOrder: (order) => {
+      setArchivedOrders((prev) => {
+        // Avoid duplicates
+        if (prev.some((o) => o.id === order.id)) {
+          return prev;
+        }
+        const updated = [...prev, { ...order, status: order.status || 'Received' }];
+        try {
+          window.localStorage.setItem('closureArchivedOrders', JSON.stringify(updated));
+        } catch (err) {
+          console.error('Failed to save archived orders to localStorage', err);
+        }
+        return updated;
+      });
+    },
+  }));
+
+  const computedThemeClasses = themeClasses ? themeClasses : {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
     headerBg: isDarkMode ? 'bg-[#2C3544]' : 'bg-[#2C3544]',
     border: isDarkMode ? 'border-dark-border-primary' : 'border-gray-200',
@@ -16,8 +70,10 @@ const ArchivedOrdersTable = ({ archivedOrders }) => {
   const renderStatusPill = (status) => {
     if (status === 'Received') {
       return (
-        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-          <span aria-hidden="true">✓</span>
+        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-600">
+          <svg className="w-3.5 h-3.5" fill="#10B981" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="#10B981"/>
+          </svg>
           Received
         </span>
       );
@@ -39,11 +95,11 @@ const ArchivedOrdersTable = ({ archivedOrders }) => {
 
   return (
     <div
-      className={`${themeClasses.cardBg} rounded-xl border ${themeClasses.border} shadow-md`}
+      className={`${computedThemeClasses.cardBg} rounded-xl border ${computedThemeClasses.border} shadow-md`}
       style={{ overflow: 'hidden' }}
     >
       {/* Table header row */}
-      <div className={themeClasses.headerBg}>
+      <div className={computedThemeClasses.headerBg}>
         <div
           className="grid"
           style={{
@@ -72,7 +128,7 @@ const ArchivedOrdersTable = ({ archivedOrders }) => {
           archivedOrders.map((order, index) => (
             <div
               key={order.id}
-              className={`grid text-sm ${themeClasses.rowHover} transition-colors`}
+              className={`grid text-sm ${computedThemeClasses.rowHover} transition-colors`}
               style={{
                 gridTemplateColumns: '140px 2fr 2fr',
                 borderBottom:
@@ -90,14 +146,40 @@ const ArchivedOrdersTable = ({ archivedOrders }) => {
                 <span className="text-xs font-medium text-blue-600">{order.orderNumber}</span>
               </div>
               <div className="px-6 py-3 flex items-center justify-between">
-                <span className={themeClasses.textPrimary}>{order.supplier}</span>
-                <button
-                  type="button"
-                  className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors ml-2"
-                  aria-label="Archived order actions"
-                >
-                  <span className={themeClasses.textSecondary}>⋮</span>
-                </button>
+                <span className={computedThemeClasses.textPrimary}>{order.supplier}</span>
+                {order.status === 'Received' ? (
+                  <button
+                    type="button"
+                    className="px-3 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
+                    onClick={() => {
+                      if (onViewOrder) {
+                        // Pass a flag to indicate this is from archive
+                        onViewOrder({ ...order, fromArchive: true });
+                      } else {
+                        // Fallback navigation
+                        navigate('/dashboard/supply-chain/closures/order', {
+                          state: {
+                            orderNumber: order.orderNumber,
+                            supplier: { name: order.supplier },
+                            mode: 'view',
+                            orderId: order.id,
+                            lines: order.lines || [],
+                          },
+                        });
+                      }
+                    }}
+                  >
+                    View
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors ml-2"
+                    aria-label="Archived order actions"
+                  >
+                    <span className={computedThemeClasses.textSecondary}>⋮</span>
+                  </button>
+                )}
               </div>
             </div>
           ))
@@ -105,7 +187,9 @@ const ArchivedOrdersTable = ({ archivedOrders }) => {
       </div>
     </div>
   );
-};
+});
+
+ArchivedOrdersTable.displayName = 'ArchivedOrdersTable';
 
 export default ArchivedOrdersTable;
 

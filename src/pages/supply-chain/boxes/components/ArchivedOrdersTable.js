@@ -4,10 +4,10 @@ import { useTheme } from '../../../../context/ThemeContext';
 const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
   const { isDarkMode } = useTheme();
 
-  // Archived orders data - moved from Bottles.js
+  // Archived orders data - moved from Boxes.js
   const [archivedOrders, setArchivedOrders] = useState(() => {
     try {
-      const stored = window.localStorage.getItem('bottleArchivedOrders');
+      const stored = window.localStorage.getItem('boxArchivedOrders');
       if (stored) {
         return JSON.parse(stored);
       }
@@ -18,7 +18,7 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
   // Persist archived orders to localStorage
   useEffect(() => {
     try {
-      window.localStorage.setItem('bottleArchivedOrders', JSON.stringify(archivedOrders));
+      window.localStorage.setItem('boxArchivedOrders', JSON.stringify(archivedOrders));
     } catch {}
   }, [archivedOrders]);
 
@@ -32,7 +32,7 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
         }
         const updated = [...prev, { ...order, status: order.status || 'Received' }];
         try {
-          window.localStorage.setItem('bottleArchivedOrders', JSON.stringify(updated));
+          window.localStorage.setItem('boxArchivedOrders', JSON.stringify(updated));
         } catch {}
         return updated;
       });
@@ -92,7 +92,7 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
             Status
           </div>
           <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center">
-            Bottle Order #
+            Box Order #
           </div>
           <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider text-center">
             Supplier
