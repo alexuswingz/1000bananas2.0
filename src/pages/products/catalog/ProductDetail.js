@@ -18,6 +18,7 @@ import Vine from './detail/Vine';
 import Formula from './detail/Formula';
 import FinishedGoods from './detail/FinishedGoods';
 import PDPSetup from './detail/PDPSetup';
+import Ngoos from './detail/Ngoos';
 
 // Utility function to handle Google Drive image URLs
 const getImageUrl = (url) => {
@@ -365,6 +366,7 @@ const ProductDetail = () => {
 
   const allTabs = [
     { id: 'essential', label: 'Essential Info', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z', component: EssentialInfo },
+    { id: 'ngoos', label: 'N-GOOS', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4', component: Ngoos },
     { id: 'stock', label: 'Stock Image', icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z', component: StockImage },
     { id: 'slides', label: 'Slides', icon: 'M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z', component: Slides },
     { id: 'label-copy', label: 'Label Copy', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', component: LabelCopy },
@@ -384,6 +386,10 @@ const ProductDetail = () => {
     if (!apiProductData) return true; // Show all tabs if no API data yet
     
     switch(tabId) {
+      case 'ngoos':
+        // Only show N-GOOS for child products with ASIN
+        return !!(apiProductData.essentialInfo?.childAsin || productData?.child_asin || productData?.childAsin);
+      
       case 'slides':
         return !!(apiProductData.slides?.productImage || 
                  apiProductData.slides?.front || 
