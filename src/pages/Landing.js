@@ -21,11 +21,11 @@ import Closures from './supply-chain/Closures';
 import Boxes from './supply-chain/Boxes';
 import Labels from './supply-chain/Labels';
 import RawMaterials from './supply-chain/RawMaterials';
-import Planning from './production/Planning';
+import Planning from './production/planning';
 import Manufacturing from './production/Manufacturing';
 import Packaging from './production/Packaging';
 import Inventory from './production/Inventory';
-import NewShipment from './production/NewShipment';
+import NewShipment from './production/new-shipment';
 import Notifications from './Notifications';
 import Settings from './Settings';
 
