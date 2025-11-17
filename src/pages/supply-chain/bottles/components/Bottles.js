@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { showSuccessToast } from '../../utils/notifications';
-import { useTheme } from '../../context/ThemeContext';
+import { showSuccessToast } from '../../../../utils/notifications';
+import { useTheme } from '../../../../context/ThemeContext';
+import OrdersTable from './OrdersTable';
+import ArchivedOrdersTable from './ArchivedOrdersTable';
 
 const Bottles = () => {
   const { isDarkMode } = useTheme();
@@ -86,7 +88,7 @@ const Bottles = () => {
   };
 
   const [bottles, setBottles] = useState(() => [
-    { id: 1, name: '8oz Bottle', warehouseInventory: 1000, supplierInventory: 1000 },
+      
     { id: 2, name: 'Quart', warehouseInventory: 1000, supplierInventory: 1000 },
     { id: 3, name: 'Gallon', warehouseInventory: 1000, supplierInventory: 1000 },
     { id: 4, name: '3oz Spray Bottle', warehouseInventory: 1000, supplierInventory: 1000 },
@@ -102,6 +104,16 @@ const Bottles = () => {
     const query = search.toLowerCase();
     return bottles.filter((bottle) => bottle.name.toLowerCase().includes(query));
   }, [bottles, search]);
+
+  const filteredOrders = useMemo(() => {
+    if (!search.trim()) return orders;
+    const query = search.toLowerCase();
+    return orders.filter(
+      (order) =>
+        order.orderNumber.toLowerCase().includes(query) ||
+        order.supplier.toLowerCase().includes(query)
+    );
+  }, [orders, search]);
 
   const bulkUnsavedCount = useMemo(() => {
     if (!isBulkEditing) return 0;
@@ -603,8 +615,6 @@ const Bottles = () => {
     </div>
   );
 
-  const [orderActionMenuId, setOrderActionMenuId] = useState(null);
-
   const handleViewOrder = (order) => {
     // Map the simple supplier name on the order back to the full supplier meta
     const supplierMeta =
@@ -625,172 +635,6 @@ const Bottles = () => {
         // Existing orders don't persist custom lines yet; BottleOrderPage falls back to defaults.
       },
     });
-  };
-
-  const renderOrdersTable = () => {
-    const statusStyles = {
-      Draft: { bg: 'bg-blue-100', text: 'text-blue-700', icon: '📝' },
-      Submitted: { bg: 'bg-purple-100', text: 'text-purple-700', icon: '⬇️' },
-      Received: { bg: 'bg-green-100', text: 'text-green-700', icon: '✔️' },
-      'Partially Received': { bg: 'bg-orange-100', text: 'text-orange-700', icon: '⦿' },
-    };
-
-    const renderStatusPill = (status) => {
-      const style = statusStyles[status] || {
-        bg: 'bg-gray-100',
-        text: 'text-gray-700',
-        icon: '•',
-      };
-
-      return (
-        <span
-          className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${style.bg} ${style.text}`}
-        >
-          <span aria-hidden="true">{style.icon}</span>
-          {status}
-        </span>
-      );
-    };
-
-    return (
-      <div
-        className={`${themeClasses.cardBg} rounded-xl border ${themeClasses.border} shadow-md`}
-        style={{ overflow: 'hidden' }}
-      >
-        {/* Table header row */}
-        <div className={themeClasses.headerBg}>
-          <div
-            className="grid"
-            style={{
-              gridTemplateColumns: '140px 2fr 2fr',
-            }}
-          >
-            <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center">
-              Status
-            </div>
-            <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center">
-              Bottle Order #
-            </div>
-            <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider text-center">
-              Supplier
-            </div>
-          </div>
-        </div>
-
-        {/* Table body */}
-        <div>
-          {orders.map((order, index) => (
-            <div
-              key={order.id}
-              className={`grid text-sm ${themeClasses.rowHover} transition-colors`}
-              style={{
-                gridTemplateColumns: '140px 2fr 2fr',
-                borderBottom:
-                  index === orders.length - 1
-                    ? 'none'
-                    : isDarkMode
-                    ? '1px solid rgba(75,85,99,0.3)'
-                    : '1px solid #e5e7eb',
-              }}
-            >
-              <div className="px-6 py-3 flex items-center justify-center">
-                {renderStatusPill(order.status || 'Draft')}
-              </div>
-              <div className="px-6 py-3 flex items-center">
-                <button
-                  type="button"
-                  className="text-xs font-medium text-blue-600 hover:text-blue-700 underline-offset-2 hover:underline"
-                  onClick={() => handleViewOrder(order)}
-                >
-                  {order.orderNumber}
-                </button>
-              </div>
-              <div className="px-6 py-3 flex items-center justify-between relative">
-                <span className={themeClasses.textPrimary}>{order.supplier}</span>
-
-                <button
-                  type="button"
-                  className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors ml-2"
-                  onClick={() =>
-                    setOrderActionMenuId((prev) => (prev === order.id ? null : order.id))
-                  }
-                  aria-label="Order actions"
-                >
-                  <span className={themeClasses.textSecondary}>⋮</span>
-                </button>
-
-                {orderActionMenuId === order.id && (
-                  <div className="absolute right-4 top-9 z-20 w-28 bg-white border border-gray-200 rounded-md shadow-lg text-xs">
-                    <button
-                      type="button"
-                      className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
-                      onClick={() => {
-                        handleViewOrder(order);
-                        setOrderActionMenuId(null);
-                      }}
-                    >
-                      <span className="text-gray-400">
-                        <svg
-                          className="w-3.5 h-3.5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                          />
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                          />
-                        </svg>
-                      </span>
-                      <span>View</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700 border-t border-gray-100"
-                      onClick={() => {
-                        archiveOrder(order);
-                        setOrderActionMenuId(null);
-                      }}
-                    >
-                      <span className="text-gray-400">
-                        <svg
-                          className="w-3.5 h-3.5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M4 4h16v4H4zM6 8v10a2 2 0 002 2h8a2 2 0 002-2V8"
-                          />
-                        </svg>
-                      </span>
-                      <span>Archive</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-
-          {orders.length === 0 && (
-            <div className="px-6 py-6 text-center text-sm italic text-gray-400">
-              No bottle orders yet. Click &quot;New Order&quot; to create one.
-            </div>
-          )}
-        </div>
-      </div>
-    );
   };
 
   // Order details page is now a separate route; no in-tab rendering here.
@@ -986,82 +830,16 @@ const Bottles = () => {
         {/* Card content */}
         <div className="p-6">
           {activeTab === 'inventory' && renderInventoryTable()}
-          {activeTab === 'orders' && renderOrdersTable()}
+          {activeTab === 'orders' && (
+            <OrdersTable
+              orders={filteredOrders}
+              themeClasses={themeClasses}
+              onViewOrder={handleViewOrder}
+              onArchiveOrder={archiveOrder}
+            />
+          )}
           {activeTab === 'archive' && (
-            <div>
-              {archivedOrders.length === 0 ? (
-                <div className={`text-sm ${themeClasses.textSecondary} italic`}>
-                  No archived orders yet.
-                </div>
-              ) : (
-                <div
-                  className={`${themeClasses.cardBg} rounded-xl border ${themeClasses.border} shadow-md`}
-                  style={{ overflow: 'hidden' }}
-                >
-                  <div className={themeClasses.headerBg}>
-                    <div
-                      className="grid"
-                      style={{
-                        gridTemplateColumns: '140px 2fr 2fr',
-                      }}
-                    >
-                      <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center">
-                        Status
-                      </div>
-                      <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center">
-                        Bottle Order #
-                      </div>
-                      <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider text-center">
-                        Supplier
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    {archivedOrders.map((order, index) => (
-                      <div
-                        key={order.id}
-                        className={`grid text-sm ${themeClasses.rowHover} transition-colors`}
-                        style={{
-                          gridTemplateColumns: '140px 2fr 2fr',
-                          borderBottom:
-                            index === archivedOrders.length - 1
-                              ? 'none'
-                              : isDarkMode
-                              ? '1px solid rgba(75,85,99,0.3)'
-                              : '1px solid #e5e7eb',
-                        }}
-                      >
-                        <div className="px-6 py-3 flex items-center justify-center">
-                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">
-                            <svg className="w-3.5 h-3.5" fill="#3B82F6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" fill="#3B82F6"/>
-                              <path d="M14 2v6h6" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-                              <line x1="9" y1="13" x2="15" y2="13" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-                              <line x1="9" y1="17" x2="15" y2="17" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-                            </svg>
-                            Draft
-                          </span>
-                        </div>
-                        <div className="px-6 py-3 flex items-center">
-                          <span className="text-xs font-medium text-blue-600">{order.orderNumber}</span>
-                        </div>
-                        <div className="px-6 py-3 flex items-center justify-between">
-                          <span className={themeClasses.textPrimary}>{order.supplier}</span>
-                          <button
-                            type="button"
-                            className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors ml-2"
-                            aria-label="Archived order actions"
-                          >
-                            <span className={themeClasses.textSecondary}>⋮</span>
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            <ArchivedOrdersTable archivedOrders={archivedOrders} themeClasses={themeClasses} />
           )}
         </div>
       </div>

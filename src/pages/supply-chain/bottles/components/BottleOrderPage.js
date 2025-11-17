@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useTheme } from '../../context/ThemeContext';
+import { useTheme } from '../../../../context/ThemeContext';
 
 const BottleOrderPage = () => {
   const { isDarkMode } = useTheme();
@@ -153,9 +153,7 @@ const BottleOrderPage = () => {
                 className="grid items-center"
                 style={{ gridTemplateColumns: '40px 2fr 2fr 1.5fr 1.2fr 1.2fr' }}
               >
-                <div className="px-4 py-2 border-r border-gray-700 flex items-center justify-center">
-                  <input type="checkbox" className="form-checkbox h-3 w-3 rounded border-gray-400" />
-                </div>
+                <div className="px-4 py-2 border-r border-gray-700 text-center"></div>
                 <div className="px-4 py-2 border-r border-gray-700 text-center">Packaging Name</div>
                 <div className="px-4 py-2 border-r border-gray-700 text-center">Supplier Inventory</div>
                 <div className="px-4 py-2 border-r border-gray-700 text-center">Units Needed</div>
