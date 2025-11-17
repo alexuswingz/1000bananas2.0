@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1000 Bananas API Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            background: #0f172a;
+            color: #e2e8f0;
+        }
+        h1 { color: #60a5fa; margin-bottom: 2rem; }
+        .endpoint {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .endpoint h2 {
+            color: #38bdf8;
+            margin-top: 0;
+            font-size: 1.1rem;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 0.5rem 1.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            margin-right: 1rem;
+        }
+        button:hover { background: #1d4ed8; }
+        button:disabled {
+            background: #475569;
+            cursor: not-allowed;
+        }
+        .status {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-left: 1rem;
+        }
+        .status.loading {
+            background: #fbbf24;
+            color: #78350f;
+        }
+        .status.success {
+            background: #10b981;
+            color: #064e3b;
+        }
+        .status.error {
+            background: #ef4444;
+            color: #7f1d1d;
+        }
+        pre {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 1rem;
+            overflow-x: auto;
+            font-size: 0.875rem;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .url {
+            color: #94a3b8;
+            font-size: 0.875rem;
+            font-family: monospace;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <h1>🍌 1000 Bananas API Test</h1>
+    <p style="color: #94a3b8; margin-bottom: 2rem;">
+        Test your Lambda function endpoints to verify they're working correctly.
+    </p>
+
+    <!-- GET /products -->
+    <div class="endpoint">
+        <h2>GET /products</h2>
+        <div class="url">https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com/products</div>
+        <button onclick="testProducts()">Test Endpoint</button>
+        <span id="products-status"></span>
+        <pre id="products-result" style="display:none; margin-top: 1rem;"></pre>
+    </div>
+
+    <!-- GET /product/{asin} -->
+    <div class="endpoint">
+        <h2>GET /product/B0BRTK1P8Z (Monstera)</h2>
+        <div class="url">https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com/product/B0BRTK1P8Z</div>
+        <button onclick="testProduct()">Test Endpoint</button>
+        <span id="product-status"></span>
+        <pre id="product-result" style="display:none; margin-top: 1rem;"></pre>
+    </div>
+
+    <!-- GET /forecast/{asin} -->
+    <div class="endpoint">
+        <h2>GET /forecast/B0BRTK1P8Z (Monstera Forecast)</h2>
+        <div class="url">https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com/forecast/B0BRTK1P8Z</div>
+        <button onclick="testForecast()">Test Endpoint</button>
+        <span id="forecast-status"></span>
+        <pre id="forecast-result" style="display:none; margin-top: 1rem;"></pre>
+    </div>
+
+    <!-- GET /chart/{asin} -->
+    <div class="endpoint">
+        <h2>GET /chart/B0BRTK1P8Z (Monstera Chart Data)</h2>
+        <div class="url">https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com/chart/B0BRTK1P8Z</div>
+        <button onclick="testChart()">Test Endpoint</button>
+        <span id="chart-status"></span>
+        <pre id="chart-result" style="display:none; margin-top: 1rem;"></pre>
+    </div>
+
+    <script>
+        const API_BASE = 'https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com';
+
+        async function testEndpoint(endpoint, resultId, statusId) {
+            const statusEl = document.getElementById(statusId);
+            const resultEl = document.getElementById(resultId);
+            
+            statusEl.innerHTML = '<span class="status loading">Loading...</span>';
+            resultEl.style.display = 'none';
+
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    statusEl.innerHTML = '<span class="status success">✓ Success</span>';
+                    resultEl.textContent = JSON.stringify(data, null, 2);
+                } else {
+                    statusEl.innerHTML = '<span class="status error">✗ Error ' + response.status + '</span>';
+                    resultEl.textContent = JSON.stringify(data, null, 2);
+                }
+                resultEl.style.display = 'block';
+            } catch (error) {
+                statusEl.innerHTML = '<span class="status error">✗ Network Error</span>';
+                resultEl.textContent = error.message;
+                resultEl.style.display = 'block';
+            }
+        }
+
+        function testProducts() {
+            testEndpoint('/products', 'products-result', 'products-status');
+        }
+
+        function testProduct() {
+            testEndpoint('/product/B0BRTK1P8Z', 'product-result', 'product-status');
+        }
+
+        function testForecast() {
+            testEndpoint('/forecast/B0BRTK1P8Z', 'forecast-result', 'forecast-status');
+        }
+
+        function testChart() {
+            testEndpoint('/chart/B0BRTK1P8Z', 'chart-result', 'chart-status');
+        }
+
+        // Auto-test on load
+        window.addEventListener('load', () => {
+            console.log('🍌 API Test Page Loaded');
+        });
+    </script>
+</body>
+</html>
+

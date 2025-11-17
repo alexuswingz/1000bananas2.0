@@ -1,10 +1,11 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useTheme } from '../../context/ThemeContext';
 import { useDialog } from '../../context/DialogContext';
 import DevelopmentHeader from './development/components/DevelopmentHeader';
 import DevelopmentTable from './development/components/DevelopmentTable';
 import FilterDrawer from './development/components/FilterDrawer';
+import DevelopmentAPI from '../../services/developmentApi';
 
 const Development = () => {
   const { isDarkMode } = useTheme();
@@ -14,7 +15,30 @@ const Development = () => {
     bg: isDarkMode ? 'bg-dark-bg-primary' : 'bg-light-bg-primary',
   };
 
-  // Sample data
+  const [tableData, setTableData] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  // Load development data from backend
+  useEffect(() => {
+    loadDevelopmentData();
+  }, []);
+
+  const loadDevelopmentData = async () => {
+    try {
+      setLoading(true);
+      const data = await DevelopmentAPI.getAll();
+      setTableData(data);
+    } catch (error) {
+      console.error('Error loading development data:', error);
+      toast.error('Failed to load development data', {
+        description: error.message
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Sample data (fallback)
   const initialData = [
     {
       id: '1',
@@ -187,6 +211,13 @@ const Development = () => {
   ];
 
   const [developmentData, setDevelopmentData] = useState(initialData);
+
+  // Update developmentData when tableData loads
+  useEffect(() => {
+    if (tableData.length > 0) {
+      setDevelopmentData(tableData);
+    }
+  }, [tableData]);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);

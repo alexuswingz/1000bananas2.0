@@ -9,6 +9,7 @@ import SelectionFilters from './selection/components/SelectionFilters';
 import SelectionTable from './selection/components/SelectionTable';
 import BulkUpload from '../../components/BulkUpload';
 import TemplateSelector from '../../components/TemplateSelector';
+import SelectionAPI from '../../services/selectionApi';
 
 const Selection = () => {
   const { isDarkMode } = useTheme();
@@ -27,27 +28,42 @@ const Selection = () => {
   const [newRow, setNewRow] = useState(null);
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  // Load products for this module
+  // Load products from backend
   useEffect(() => {
-    const selectionProducts = products.filter(p => p.module === 'selection');
-    const formatted = selectionProducts.map(p => ({
-      id: p.id,
-      status: p.status || 'contender',
-      account: p.account || '',
-      brand: p.brand || '',
-      product: p.product || '',
-      searchVol: p.searchVol || 0,
-      actionType: p.actionType || 'launch',
-    }));
-    
-    // Add new row if it exists
-    if (newRow) {
-      setTableData([newRow, ...formatted]);
-    } else {
-      setTableData(formatted);
+    loadProducts();
+  }, []);
+
+  const loadProducts = async () => {
+    try {
+      setLoading(true);
+      const data = await SelectionAPI.getAll();
+      const formatted = data.map(p => ({
+        id: p.id,
+        status: p.status || 'contender',
+        account: p.account || '',
+        brand: p.brand || '',
+        product: p.product || '',
+        searchVol: p.searchVol || 0,
+        actionType: p.actionType || 'launch',
+      }));
+      
+      // Add new row if it exists
+      if (newRow) {
+        setTableData([newRow, ...formatted]);
+      } else {
+        setTableData(formatted);
+      }
+    } catch (error) {
+      console.error('Error loading products:', error);
+      toast.error('Failed to load products', {
+        description: error.message
+      });
+    } finally {
+      setLoading(false);
     }
-  }, [products, newRow]);
+  };
 
   // Filter data based on search
   const filteredData = useMemo(() => {
@@ -99,94 +115,131 @@ const Selection = () => {
     setNewRow(row);
   };
 
-  const handleActionClick = (row) => {
-    if (row.actionType === 'launch') {
-      // Navigate to product form with data
-      navigate('/dashboard/products/form', {
-        state: {
-          productData: {
-            account: row.account,
-            brand: row.brand,
-            product: row.product,
-            searchVol: row.searchVol,
-            status: row.status,
-          }
+  const handleActionClick = async (row) => {
+    // Just navigate to form - don't update database yet
+    // The form will handle marking as launched when user submits
+    console.log('Launching product with row data:', row);
+    console.log('Variations being passed:', row.variations);
+    
+    navigate('/dashboard/products/form', {
+      state: {
+        productId: row.id,
+        productData: {
+          id: row.id,
+          account: row.account,
+          brand: row.brand,
+          product: row.product,
+          searchVol: row.searchVol,
+          status: row.status,
+          variations: row.variations || [], // Pass variations data
+          variationCount: row.variationCount || 0
         }
-      });
-    } else {
-      // For completed or in progress, show dialog
-      const actionMessages = {
-        completed: {
-          title: 'View Product Details',
-          message: `Would you like to view the details for "${row.product}"?`,
-          type: 'info',
-        },
-        inProgress: {
-          title: 'Continue Product',
-          message: `Would you like to continue working on "${row.product}"?`,
-          type: 'info',
-        },
-      };
-
-      const action = actionMessages[row.actionType] || actionMessages.completed;
-
-      showDialog({
-        title: action.title,
-        message: action.message,
-        confirmText: 'Continue',
-        cancelText: 'Cancel',
-        type: action.type,
-        onConfirm: () => {
-          toast.info('Opening product details...', {
-            description: `Loading ${row.product}`,
-          });
-        },
-      });
-    }
+      }
+    });
   };
 
-  const handleStatusChange = (rowId, newStatus) => {
+  const handleStatusChange = async (rowId, newStatus) => {
     if (newRow && newRow.id === rowId) {
       setNewRow({ ...newRow, status: newStatus });
     } else {
-      // Update existing product in context
-      updateProduct(rowId, { status: newStatus });
+      // Update in local state immediately for responsiveness
+      setTableData(prev => prev.map(item => 
+        item.id === rowId ? { ...item, status: newStatus } : item
+      ));
+      
+      try {
+        const existingRow = tableData.find(item => item.id === rowId);
+        await SelectionAPI.update(rowId, { ...existingRow, status: newStatus });
+        updateProduct(rowId, { status: newStatus });
+      } catch (error) {
+        console.error('Error updating status:', error);
+        toast.error('Failed to update status');
+        loadProducts(); // Reload on error
+      }
     }
   };
 
-  const handleAccountChange = (rowId, newAccount) => {
+  const handleAccountChange = async (rowId, newAccount) => {
     if (newRow && newRow.id === rowId) {
       setNewRow({ ...newRow, account: newAccount });
     } else {
-      updateProduct(rowId, { account: newAccount });
+      setTableData(prev => prev.map(item => 
+        item.id === rowId ? { ...item, account: newAccount } : item
+      ));
+      
+      try {
+        const existingRow = tableData.find(item => item.id === rowId);
+        await SelectionAPI.update(rowId, { ...existingRow, account: newAccount });
+        updateProduct(rowId, { account: newAccount });
+      } catch (error) {
+        console.error('Error updating account:', error);
+        toast.error('Failed to update account');
+        loadProducts();
+      }
     }
   };
 
-  const handleBrandChange = (rowId, newBrand) => {
+  const handleBrandChange = async (rowId, newBrand) => {
     if (newRow && newRow.id === rowId) {
       setNewRow({ ...newRow, brand: newBrand });
     } else {
-      updateProduct(rowId, { brand: newBrand });
+      setTableData(prev => prev.map(item => 
+        item.id === rowId ? { ...item, brand: newBrand } : item
+      ));
+      
+      try {
+        const existingRow = tableData.find(item => item.id === rowId);
+        await SelectionAPI.update(rowId, { ...existingRow, brand: newBrand });
+        updateProduct(rowId, { brand: newBrand });
+      } catch (error) {
+        console.error('Error updating brand:', error);
+        toast.error('Failed to update brand');
+        loadProducts();
+      }
     }
   };
 
-  const handleProductChange = (rowId, newProduct) => {
+  const handleProductChange = async (rowId, newProductName) => {
     if (newRow && newRow.id === rowId) {
-      setNewRow({ ...newRow, product: newProduct });
+      setNewRow({ ...newRow, product: newProductName });
     } else {
-      updateProduct(rowId, { product: newProduct });
+      setTableData(prev => prev.map(item => 
+        item.id === rowId ? { ...item, product: newProductName } : item
+      ));
+      
+      try {
+        const existingRow = tableData.find(item => item.id === rowId);
+        await SelectionAPI.update(rowId, { ...existingRow, product: newProductName });
+        updateProduct(rowId, { product: newProductName });
+      } catch (error) {
+        console.error('Error updating product name:', error);
+        toast.error('Failed to update product name');
+        loadProducts();
+      }
     }
   };
 
-  const handleSearchVolChange = (rowId, newSearchVol) => {
+  const handleSearchVolChange = async (rowId, newSearchVol) => {
     if (newRow && newRow.id === rowId) {
       setNewRow({ ...newRow, searchVol: Number(newSearchVol) || 0 });
     } else {
-      updateProduct(rowId, { searchVol: Number(newSearchVol) || 0 });
+      setTableData(prev => prev.map(item => 
+        item.id === rowId ? { ...item, searchVol: Number(newSearchVol) || 0 } : item
+      ));
+      
+      try {
+        const existingRow = tableData.find(item => item.id === rowId);
+        await SelectionAPI.update(rowId, { ...existingRow, searchVol: Number(newSearchVol) || 0 });
+        updateProduct(rowId, { searchVol: Number(newSearchVol) || 0 });
+      } catch (error) {
+        console.error('Error updating search volume:', error);
+        toast.error('Failed to update search volume');
+        loadProducts();
+      }
     }
   };
 
-  const handleSaveNewRow = (rowId) => {
+  const handleSaveNewRow = async (rowId) => {
     const row = newRow || tableData.find((item) => item.id === rowId);
     
     // Validate required fields
@@ -203,47 +256,70 @@ const Selection = () => {
       confirmText: 'Save Product',
       cancelText: 'Cancel',
       type: 'success',
-      onConfirm: () => {
-        // Add to products context
-        const newProduct = addProduct({
-          ...row,
-          module: 'selection',
-          isNew: false
-        });
-        
-        // Apply template configuration if template was selected
-        if (row.templateId && selectedTemplate) {
-          const template = getProductTemplate(row.templateId) || selectedTemplate;
-          if (template) {
-            console.log('📝 Applying template config to product:', {
-              productId: newProduct.id,
-              templateName: template.name,
-              variations: template.defaultVariations,
-              variationType: template.variationType,
-              enabledTabs: template.enabledTabs
-            });
-            
-            // Set active template
-            setActiveTemplate(newProduct.id, template.id);
-            
-            // Apply variations
-            setProductVariations(newProduct.id, template.defaultVariations, template.variationType);
-            
-            // Apply enabled tabs (if any)
-            if (template.enabledTabs && template.enabledTabs.length > 0) {
-              console.log('✅ Setting product tabs:', template.enabledTabs);
-              setProductTabs(newProduct.id, template.enabledTabs);
-            } else {
-              console.log('⚠️ No tabs configured in template - will show all tabs');
+      onConfirm: async () => {
+        try {
+          // Save to backend
+          const savedProduct = await SelectionAPI.create({
+            status: row.status,
+            account: row.account,
+            brand: row.brand,
+            product: row.product,
+            searchVol: row.searchVol,
+            actionType: row.actionType,
+            templateId: row.templateId
+          });
+          
+          // Also add to local context for other modules
+          const newProduct = addProduct({
+            ...row,
+            id: savedProduct.id,
+            module: 'selection',
+            isNew: false
+          });
+          
+          // Apply template configuration if template was selected
+          if (row.templateId && selectedTemplate) {
+            const template = getProductTemplate(row.templateId) || selectedTemplate;
+            if (template) {
+              console.log('📝 Applying template config to product:', {
+                productId: newProduct.id,
+                templateName: template.name,
+                variations: template.defaultVariations,
+                variationType: template.variationType,
+                enabledTabs: template.enabledTabs
+              });
+              
+              // Set active template
+              setActiveTemplate(newProduct.id, template.id);
+              
+              // Apply variations
+              setProductVariations(newProduct.id, template.defaultVariations, template.variationType);
+              
+              // Apply enabled tabs (if any)
+              if (template.enabledTabs && template.enabledTabs.length > 0) {
+                console.log('✅ Setting product tabs:', template.enabledTabs);
+                setProductTabs(newProduct.id, template.enabledTabs);
+              } else {
+                console.log('⚠️ No tabs configured in template - will show all tabs');
+              }
             }
           }
+          
+          setNewRow(null);
+          setSelectedTemplate(null);
+          
+          // Reload from backend
+          await loadProducts();
+          
+          toast.success('Product saved successfully!', {
+            description: `${row.product} has been added with ${selectedTemplate ? `"${selectedTemplate.name}" template` : 'default configuration'}.`,
+          });
+        } catch (error) {
+          console.error('Error saving product:', error);
+          toast.error('Failed to save product', {
+            description: error.message
+          });
         }
-        
-        setNewRow(null);
-        setSelectedTemplate(null);
-        toast.success('Product saved successfully!', {
-          description: `${row.product} has been added with ${selectedTemplate ? `"${selectedTemplate.name}" template` : 'default configuration'}.`,
-        });
       },
     });
   };

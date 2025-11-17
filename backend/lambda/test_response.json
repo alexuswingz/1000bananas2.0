@@ -1,0 +1,64 @@
+{
+  "success": true,
+  "data": {
+    "id": 708,
+    "marketplace": "Amazon",
+    "seller_account": "TPS Nutrients",
+    "country": "US",
+    "brand_name": "TPS Plant Foods",
+    "product_name": "10-10-10 Fertilizer",
+    "size": "8oz",
+    "type": "Liquid",
+    "packaging_name": "8oz Tall Cylinder Bottle",
+    "closure_name": "Aptar Pour Cap",
+    "label_size": "5x8",
+    "parent_asin": "B0D4JVGQ2M",
+    "child_asin": "B0D4JHN9KK",
+    "parent_sku_final": "TPS-10-10-10FERTILIZER-PARENT",
+    "child_sku_final": "TRIPLE10GEN8OZ",
+    "upc": "810151951546",
+    "price": 11.99,
+    "all_variations": [
+      {
+        "id": 708,
+        "size": "8oz",
+        "packaging_name": "8oz Tall Cylinder Bottle",
+        "closure_name": "Aptar Pour Cap",
+        "label_size": "5x8",
+        "parent_asin": "B0D4JVGQ2M",
+        "child_asin": "B0D4JHN9KK",
+        "parent_sku_final": "TPS-10-10-10FERTILIZER-PARENT",
+        "child_sku_final": "TRIPLE10GEN8OZ",
+        "upc": "810151951546",
+        "price": 11.99
+      },
+      {
+        "id": 709,
+        "size": "Quart",
+        "packaging_name": "Quart Tall Cylinder Bottle",
+        "closure_name": "Aptar Pour Cap",
+        "label_size": "5x8",
+        "parent_asin": "B0D4JVGQ2M",
+        "child_asin": "B0D4JHN9KM",
+        "parent_sku_final": "TPS-10-10-10FERTILIZER-PARENT",
+        "child_sku_final": "TRIPLE10GENQUART",
+        "upc": "810151951547",
+        "price": 24.99
+      },
+      {
+        "id": 710,
+        "size": "Gallon",
+        "packaging_name": "Gallon Jug",
+        "closure_name": "Gallon Cap",
+        "label_size": "8x10",
+        "parent_asin": "B0D4JVGQ2M",
+        "child_asin": "B0D4JHN9KN",
+        "parent_sku_final": "TPS-10-10-10FERTILIZER-PARENT",
+        "child_sku_final": "TRIPLE10GENGALLON",
+        "upc": "810151951548",
+        "price": 49.99
+      }
+    ]
+  }
+}
+

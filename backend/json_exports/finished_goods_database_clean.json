@@ -1,0 +1,172 @@
+[
+  {
+    "id": 1,
+    "category": "Bottle",
+    "packaging_name": "8oz",
+    "length_in": 2.0,
+    "width_in": 2.0,
+    "height_in": 6.0,
+    "weight_lbs": 0.73,
+    "label_size": "5\" x 8\""
+  },
+  {
+    "category": "Bottle",
+    "packaging_name": "Quart",
+    "length_in": 3.25,
+    "width_in": 3.25,
+    "height_in": 9.0,
+    "weight_lbs": 2.5,
+    "label_size": "5\" x 8\"",
+    "id": 2
+  },
+  {
+    "category": "Bottle",
+    "packaging_name": "Gallon",
+    "length_in": 6.0,
+    "width_in": 6.0,
+    "height_in": 12.0,
+    "weight_lbs": 9.75,
+    "label_size": "5\" x 8\"",
+    "id": 3
+  },
+  {
+    "category": "Bottle",
+    "packaging_name": "3oz Spray",
+    "length_in": 1.5,
+    "width_in": 1.5,
+    "height_in": 6.1,
+    "weight_lbs": 0.29,
+    "label_size": "4.5\" x 3.375\"",
+    "id": 4
+  },
+  {
+    "category": "Bottle",
+    "packaging_name": "6oz Spray",
+    "length_in": 1.75,
+    "width_in": 1.75,
+    "height_in": 7.5,
+    "weight_lbs": 0.49,
+    "label_size": "5.375 x 4.5",
+    "id": 5
+  },
+  {
+    "category": "Bottle",
+    "packaging_name": "16oz Square Cylinder Clear Spray",
+    "length_in": 2.5,
+    "width_in": 2.5,
+    "height_in": 9.4,
+    "weight_lbs": 1.23,
+    "label_size": "7.5\" x 6\"",
+    "id": 6
+  },
+  {
+    "category": "Bottle",
+    "packaging_name": "16oz Square Cylinder White Spray",
+    "length_in": 2.5,
+    "width_in": 2.5,
+    "height_in": 9.4,
+    "weight_lbs": 1.23,
+    "label_size": "7.5\" x 6\"",
+    "id": 7
+  },
+  {
+    "category": "Bottle",
+    "packaging_name": "16oz Round Cylinder Clear Spray",
+    "length_in": 2.5,
+    "width_in": 2.5,
+    "height_in": 9.4,
+    "weight_lbs": 1.23,
+    "label_size": "5\" x 8\"",
+    "id": 8
+  },
+  {
+    "category": "Bottle",
+    "packaging_name": "16oz Round Cylinder White Spray",
+    "length_in": 2.5,
+    "width_in": 2.5,
+    "height_in": 9.4,
+    "weight_lbs": 1.23,
+    "label_size": "5\" x 8\"",
+    "id": 9
+  },
+  {
+    "category": "Bag",
+    "packaging_name": "6oz Bag",
+    "length_in": 6.0,
+    "width_in": 7.0,
+    "height_in": 3.0,
+    "weight_lbs": 0.375,
+    "label_size": null,
+    "id": 10
+  },
+  {
+    "category": "Bag",
+    "packaging_name": "1/2lb Bag",
+    "length_in": 6.0,
+    "width_in": 7.0,
+    "height_in": 3.0,
+    "weight_lbs": 0.5,
+    "label_size": null,
+    "id": 11
+  },
+  {
+    "category": "Bag",
+    "packaging_name": "1lb Bag",
+    "length_in": 6.5,
+    "width_in": 8.75,
+    "height_in": 2.5,
+    "weight_lbs": 1.0,
+    "label_size": null,
+    "id": 12
+  },
+  {
+    "category": "Bag",
+    "packaging_name": "5lb Bag",
+    "length_in": 9.0,
+    "width_in": 13.0,
+    "height_in": 4.0,
+    "weight_lbs": 5.0,
+    "label_size": null,
+    "id": 13
+  },
+  {
+    "category": "Bag",
+    "packaging_name": "25lb Bag",
+    "length_in": 10.0,
+    "width_in": 10.0,
+    "height_in": 10.0,
+    "weight_lbs": 25.0,
+    "label_size": null,
+    "id": 14
+  },
+  {
+    "category": "Kit",
+    "packaging_name": "8oz Kit",
+    "length_in": 2.0,
+    "width_in": 4.0,
+    "height_in": 5.5,
+    "weight_lbs": 1.5,
+    "label_size": null,
+    "id": 15
+  },
+  {
+    "category": "Kit",
+    "packaging_name": "Quart Kit",
+    "length_in": 3.25,
+    "width_in": 6.5,
+    "height_in": 9.0,
+    "weight_lbs": 4.0,
+    "label_size": null,
+    "id": 16
+  },
+  {
+    "category": "Kit",
+    "packaging_name": "1 Gallon Kit",
+    "length_in": 6.25,
+    "width_in": 13.0,
+    "height_in": 12.0,
+    "weight_lbs": 16.0,
+    "label_size": null,
+    "id": 17
+  }
+]

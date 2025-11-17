@@ -15,15 +15,6 @@ import Formula from './team/Formula';
 import Design from './team/Design';
 import Listing from './team/Listing';
 import Ads from './team/Ads';
-<<<<<<< Updated upstream
-import Bottles from './supply-chain/Bottles';
-import BottleOrderPage from './supply-chain/BottleOrderPage';
-import Closures from './supply-chain/Closures';
-import Boxes from './supply-chain/Boxes';
-import Labels from './supply-chain/Labels';
-import RawMaterials from './supply-chain/RawMaterials';
-import Planning from './production/planning';
-=======
 import Bottles from './supply-chain/bottles/index';
 import BottleOrderPage from './supply-chain/bottles/components/BottleOrderPage';
 import Closures from './supply-chain/closures/index';
@@ -31,8 +22,7 @@ import ClosureOrderPage from './supply-chain/closures/components/ClosureOrderPag
 import Boxes from './supply-chain/boxes/index';
 import Labels from './supply-chain/labels/index';
 import RawMaterials from './supply-chain/rawMaterials/index';
-import Planning from './production/Planning';
->>>>>>> Stashed changes
+import Planning from './production/planning';
 import Manufacturing from './production/Manufacturing';
 import Packaging from './production/Packaging';
 import Inventory from './production/Inventory';

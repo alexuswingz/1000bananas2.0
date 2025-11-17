@@ -1,0 +1,416 @@
+[
+  {
+    "id": 1,
+    "core_data": {
+      "bottle_name": "8oz Tall Cylinder Bottle",
+      "bottle_image": null,
+      "size_oz": 8,
+      "shape": "Tall Cylinder",
+      "color": "White",
+      "thread_type": "Non-Ratchet",
+      "cap_size": "38-400",
+      "material": "HDPE",
+      "supplier": "Rhino Container",
+      "packaging_part_number": "53243",
+      "description": "PB-8CW-38-PCI | 8oz Wht Cyl HDPE 22g 38/400 364/cs, 20cs/pllt (08D38AD)",
+      "brand": "Plastirey Containers"
+    },
+    "supplier_info": {
+      "lead_time_weeks": 6,
+      "moq": null,
+      "units_per_pallet": 7280,
+      "units_per_case": 364,
+      "cases_per_pallet": 20
+    },
+    "finished_goods": {
+      "box_size": "12x10x12",
+      "units_per_case": 60,
+      "units_per_gallon": 16,
+      "box_weight_lbs": 42,
+      "boxes_per_pallet": 36,
+      "single_box_pallet_share": 0.028,
+      "replenishment_strategy": "Corral"
+    },
+    "dimensions": {
+      "length_in": 2,
+      "width_in": 2,
+      "height_in": 6,
+      "weight_lbs": 0.73,
+      "label_size": "5 x 8"
+    },
+    "inventory": {
+      "supplier_order_strategy": "Manual",
+      "supplier_inventory": 74620,
+      "warehouse_inventory": 7280,
+      "max_warehouse_inventory": 58240
+    }
+  },
+  {
+    "id": 2,
+    "core_data": {
+      "bottle_name": "Quart Tall Cylinder Bottle",
+      "bottle_image": null,
+      "size_oz": 32,
+      "shape": "Tall Cylinder",
+      "color": "White",
+      "thread_type": "Non-Ratchet",
+      "cap_size": "38-400",
+      "material": "HDPE",
+      "supplier": "Rhino Container",
+      "packaging_part_number": "53420",
+      "description": "PB-QCW-12XRW-AP | 32oz Wht Cylinder 12x1 38/400 - No Flame 56gr HDPE 720/tray, 1440/pllt *NOT FLAMED*",
+      "brand": null
+    },
+    "supplier_info": {
+      "lead_time_weeks": null,
+      "moq": null,
+      "units_per_pallet": 720,
+      "units_per_case": 12,
+      "cases_per_pallet": 60
+    },
+    "finished_goods": {
+      "box_size": "13x13x10",
+      "units_per_case": 12,
+      "units_per_gallon": 4,
+      "box_weight_lbs": 34,
+      "boxes_per_pallet": 46,
+      "single_box_pallet_share": 0.022,
+      "replenishment_strategy": "Corral"
+    },
+    "dimensions": {
+      "length_in": 3.25,
+      "width_in": 3.25,
+      "height_in": 9,
+      "weight_lbs": 2.5,
+      "label_size": "5 x 8"
+    },
+    "inventory": {
+      "supplier_order_strategy": "Auto",
+      "supplier_inventory": 43068,
+      "warehouse_inventory": 720,
+      "max_warehouse_inventory": 8640
+    }
+  },
+  {
+    "id": 3,
+    "core_data": {
+      "bottle_name": "Gallon Standard Handle Bottle",
+      "bottle_image": null,
+      "size_oz": 128,
+      "shape": "Standard Handle",
+      "color": "White",
+      "thread_type": "Non-Ratchet",
+      "cap_size": "38-400",
+      "material": null,
+      "supplier": "Rhino Container",
+      "packaging_part_number": "52955",
+      "description": "PB-1GRW-4K115 | Gal Rnd White 115gr, 4x1 Kraft (C.P.) Short Panel, NU/BS, 38/400, 192/tray, 384/skid",
+      "brand": null
+    },
+    "supplier_info": {
+      "lead_time_weeks": null,
+      "moq": null,
+      "units_per_pallet": 192,
+      "units_per_case": 4,
+      "cases_per_pallet": 48
+    },
+    "finished_goods": {
+      "box_size": "13x13x13",
+      "units_per_case": 4,
+      "units_per_gallon": 1,
+      "box_weight_lbs": 39,
+      "boxes_per_pallet": 36,
+      "single_box_pallet_share": 0.028,
+      "replenishment_strategy": "Corral"
+    },
+    "dimensions": {
+      "length_in": 6,
+      "width_in": 6,
+      "height_in": 12,
+      "weight_lbs": 9.75,
+      "label_size": "5 x 8"
+    },
+    "inventory": {
+      "supplier_order_strategy": "Auto",
+      "supplier_inventory": 5376,
+      "warehouse_inventory": 192,
+      "max_warehouse_inventory": 2304
+    }
+  },
+  {
+    "id": 4,
+    "core_data": {
+      "bottle_name": "3oz Rounded Tall Cylinder Bottle",
+      "bottle_image": null,
+      "size_oz": 3,
+      "shape": "Rounded Tall Cylinder",
+      "color": "White",
+      "thread_type": "Non-Ratchet",
+      "cap_size": "24-410",
+      "material": "HDPE",
+      "supplier": "TricorBraun",
+      "packaging_part_number": "337477",
+      "description": "3 oz HDPE White, Imperial Round, 24-410 13gr,",
+      "brand": null
+    },
+    "supplier_info": {
+      "lead_time_weeks": 9,
+      "moq": "25,000",
+      "units_per_pallet": 13950,
+      "units_per_case": 558,
+      "cases_per_pallet": 25
+    },
+    "finished_goods": {
+      "box_size": "12x9x12",
+      "units_per_case": 96,
+      "units_per_gallon": 42.67,
+      "box_weight_lbs": 13.9,
+      "boxes_per_pallet": 96,
+      "single_box_pallet_share": 0.01,
+      "replenishment_strategy": "Corral"
+    },
+    "dimensions": {
+      "length_in": 1.5,
+      "width_in": 1.5,
+      "height_in": 6.1,
+      "weight_lbs": 0.29,
+      "label_size": "4.5 x 3.375"
+    },
+    "inventory": {
+      "supplier_order_strategy": "Manual",
+      "supplier_inventory": 50000,
+      "warehouse_inventory": 13950,
+      "max_warehouse_inventory": 8370
+    }
+  },
+  {
+    "id": 5,
+    "core_data": {
+      "bottle_name": "6oz Rounded Tall Cylinder Bottle",
+      "bottle_image": null,
+      "size_oz": 6,
+      "shape": "Rounded Tall Cylinder",
+      "color": "White",
+      "thread_type": "Non-Ratchet",
+      "cap_size": "24-410",
+      "material": "HDPE",
+      "supplier": "TricorBraun",
+      "packaging_part_number": "337484",
+      "description": "6 oz HDPE White, Imperial Round, 24-410 17gr,",
+      "brand": null
+    },
+    "supplier_info": {
+      "lead_time_weeks": 7,
+      "moq": "25,000",
+      "units_per_pallet": 6768,
+      "units_per_case": 564,
+      "cases_per_pallet": 12
+    },
+    "finished_goods": {
+      "box_size": "14x14x8",
+      "units_per_case": 64,
+      "units_per_gallon": 21.33,
+      "box_weight_lbs": 31.6,
+      "boxes_per_pallet": 45,
+      "single_box_pallet_share": 0.022,
+      "replenishment_strategy": "Corral"
+    },
+    "dimensions": {
+      "length_in": 1.75,
+      "width_in": 1.75,
+      "height_in": 7.5,
+      "weight_lbs": 0.49,
+      "label_size": "5.375 x 4.5"
+    },
+    "inventory": {
+      "supplier_order_strategy": "Manual",
+      "supplier_inventory": 50000,
+      "warehouse_inventory": 6768,
+      "max_warehouse_inventory": 6768
+    }
+  },
+  {
+    "id": 6,
+    "core_data": {
+      "bottle_name": "16oz Square Cylinder Clear Bottle",
+      "bottle_image": null,
+      "size_oz": 16,
+      "shape": "Tall Cylinder",
+      "color": "Clear",
+      "thread_type": "Ratchet",
+      "cap_size": "28-410",
+      "material": "PET",
+      "supplier": "TricorBraun",
+      "packaging_part_number": "337476",
+      "description": "16 oz PET Cylinder, Clear, Round, 28-410, Ratchet 39gr, Bulk Packed",
+      "brand": null
+    },
+    "supplier_info": {
+      "lead_time_weeks": 7,
+      "moq": "225,000",
+      "units_per_pallet": 3300,
+      "units_per_case": 3300,
+      "cases_per_pallet": 1
+    },
+    "finished_goods": {
+      "box_size": "13x13x10",
+      "units_per_case": 25,
+      "units_per_gallon": 8,
+      "box_weight_lbs": 30.8,
+      "boxes_per_pallet": 45,
+      "single_box_pallet_share": 0.022,
+      "replenishment_strategy": "Corral"
+    },
+    "dimensions": {
+      "length_in": 2.5,
+      "width_in": 2.5,
+      "height_in": 9.4,
+      "weight_lbs": 1.23,
+      "label_size": "7.5 x 6"
+    },
+    "inventory": {
+      "supplier_order_strategy": "Manual",
+      "supplier_inventory": 50000,
+      "warehouse_inventory": 3300,
+      "max_warehouse_inventory": null
+    }
+  },
+  {
+    "id": 7,
+    "core_data": {
+      "bottle_name": "16oz Square Cylinder White Bottle",
+      "bottle_image": null,
+      "size_oz": 16,
+      "shape": "Tall Cylinder",
+      "color": "White",
+      "thread_type": "Ratchet",
+      "cap_size": "28-410",
+      "material": "PET",
+      "supplier": "TricorBraun",
+      "packaging_part_number": "337491",
+      "description": "16 oz PET Cylinder, White, Round, 28-410, Ratchet 39gr, Bulk Packed",
+      "brand": null
+    },
+    "supplier_info": {
+      "lead_time_weeks": 7,
+      "moq": "50,000",
+      "units_per_pallet": 3300,
+      "units_per_case": 3300,
+      "cases_per_pallet": 1
+    },
+    "finished_goods": {
+      "box_size": "13x13x10",
+      "units_per_case": 25,
+      "units_per_gallon": 8,
+      "box_weight_lbs": 30.8,
+      "boxes_per_pallet": 45,
+      "single_box_pallet_share": 0.022,
+      "replenishment_strategy": "Corral"
+    },
+    "dimensions": {
+      "length_in": 2.5,
+      "width_in": 2.5,
+      "height_in": 9.4,
+      "weight_lbs": 1.23,
+      "label_size": "7.5 x 6"
+    },
+    "inventory": {
+      "supplier_order_strategy": "Manual",
+      "supplier_inventory": 50000,
+      "warehouse_inventory": 3300,
+      "max_warehouse_inventory": 3300
+    }
+  },
+  {
+    "id": 8,
+    "core_data": {
+      "bottle_name": "16oz Round Cylinder Clear Bottle",
+      "bottle_image": null,
+      "size_oz": 16,
+      "shape": "Rounded Tall Cylinder",
+      "color": "Clear",
+      "thread_type": "Ratchet",
+      "cap_size": "28-410",
+      "material": "PETE",
+      "supplier": "TricorBraun",
+      "packaging_part_number": "337384",
+      "description": "16 oz PETE Modern Round, Clear, Round, 28-410 34gr, Madera,",
+      "brand": null
+    },
+    "supplier_info": {
+      "lead_time_weeks": 7,
+      "moq": "50,000",
+      "units_per_pallet": 3696,
+      "units_per_case": 231,
+      "cases_per_pallet": 16
+    },
+    "finished_goods": {
+      "box_size": "13x13x10",
+      "units_per_case": 25,
+      "units_per_gallon": 8,
+      "box_weight_lbs": 30.8,
+      "boxes_per_pallet": 45,
+      "single_box_pallet_share": 0.022,
+      "replenishment_strategy": "Corral"
+    },
+    "dimensions": {
+      "length_in": 2.5,
+      "width_in": 2.5,
+      "height_in": 9.4,
+      "weight_lbs": 1.23,
+      "label_size": "5 x 8"
+    },
+    "inventory": {
+      "supplier_order_strategy": "Manual",
+      "supplier_inventory": 50000,
+      "warehouse_inventory": 3696,
+      "max_warehouse_inventory": null
+    }
+  },
+  {
+    "id": 9,
+    "core_data": {
+      "bottle_name": "16oz Round Cylinder White Bottle",
+      "bottle_image": null,
+      "size_oz": 16,
+      "shape": "Rounded Tall Cylinder",
+      "color": "White",
+      "thread_type": "Ratchet",
+      "cap_size": "28-410",
+      "material": "PETE",
+      "supplier": "TricorBraun",
+      "packaging_part_number": "337475",
+      "description": "16 oz PETE Modern Round, White, Round, 28-410 34gr, Madera,",
+      "brand": null
+    },
+    "supplier_info": {
+      "lead_time_weeks": 7,
+      "moq": "50,000",
+      "units_per_pallet": 3696,
+      "units_per_case": 3300,
+      "cases_per_pallet": 16
+    },
+    "finished_goods": {
+      "box_size": "13x13x10",
+      "units_per_case": 25,
+      "units_per_gallon": 8,
+      "box_weight_lbs": 30.8,
+      "boxes_per_pallet": 45,
+      "single_box_pallet_share": 0.022,
+      "replenishment_strategy": "Corral"
+    },
+    "dimensions": {
+      "length_in": 2.5,
+      "width_in": 2.5,
+      "height_in": 9.4,
+      "weight_lbs": 1.23,
+      "label_size": "5 x 8"
+    },
+    "inventory": {
+      "supplier_order_strategy": "Manual",
+      "supplier_inventory": 50000,
+      "warehouse_inventory": 3696,
+      "max_warehouse_inventory": 3300
+    }
+  }
+]

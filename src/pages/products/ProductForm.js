@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTheme } from '../../context/ThemeContext';
 import { useDialog } from '../../context/DialogContext';
+import CatalogAPI from '../../services/catalogApi';
 
 const ProductForm = () => {
   const { isDarkMode } = useTheme();
@@ -10,6 +11,7 @@ const ProductForm = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const productData = location.state?.productData || {};
+  const productId = location.state?.productId;
 
   const themeClasses = {
     bg: isDarkMode ? 'bg-dark-bg-primary' : 'bg-light-bg-primary',
@@ -19,6 +21,33 @@ const ProductForm = () => {
     border: isDarkMode ? 'border-dark-border-primary' : 'border-gray-200',
     inputBg: isDarkMode ? 'bg-dark-bg-tertiary' : 'bg-white',
   };
+
+  // Initialize variations from productData if available
+  const initialVariations = useMemo(() => {
+    if (productData.variations && productData.variations.length > 0) {
+      return productData.variations.map((v, idx) => ({
+        id: v.id || idx + 1,
+        units: v.size || '',
+        bottleName: '',
+        closureName: '',
+        labelSize: '',
+        childAsin: v.childAsin || '',
+        parentAsin: v.parentAsin || '',
+        childSku: '',
+        parentSku: '',
+        upc: '',
+        price: '',
+        labelLocation: '',
+        caseSize: '',
+        unitsPerCase: ''
+      }));
+    }
+    return [{ 
+      id: 1, units: '', bottleName: '', closureName: '', labelSize: '', 
+      parentAsin: '', childAsin: '', childSku: '', parentSku: '', 
+      upc: '', price: '', labelLocation: '', caseSize: '', unitsPerCase: ''
+    }];
+  }, [productData.variations]);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -32,9 +61,7 @@ const ProductForm = () => {
     formula: '',
     
     // Product Variations
-    variations: [
-      { id: 1, units: '', bottleName: '', closureName: '', labelSize: '' }
-    ],
+    variations: initialVariations,
     
     // Marketing
     coreCompetitors: ['', '', ''],
@@ -56,6 +83,179 @@ const ProductForm = () => {
   });
 
   const [activeTab, setActiveTab] = useState('notes');
+  const [loading, setLoading] = useState(false);
+
+  // Helper function to map country codes to full names
+  const countryCodeToName = (code) => {
+    const mapping = {
+      'US': 'United States',
+      'CA': 'Canada',
+      'UK': 'United Kingdom',
+      'AU': 'Australia'
+    };
+    return mapping[code] || code;
+  };
+
+  // Helper function to map marketplace variations
+  const normalizeMarketplace = (marketplace) => {
+    if (!marketplace) return '';
+    // Handle both "Amazon" and "Amazon US" formats
+    if (marketplace === 'Amazon') return 'Amazon US';
+    return marketplace;
+  };
+
+  // Load existing product data if productId is provided
+  useEffect(() => {
+    const loadProductData = async () => {
+      if (!productId) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        console.log('Loading product with ID:', productId);
+        console.log('Product data from navigation:', productData);
+        
+        const product = await CatalogAPI.getById(productId);
+        console.log('Loaded product from API:', product);
+        
+        // Use all_variations from API if available, otherwise use productData variations
+        const apiVariations = product.all_variations || [];
+        const navVariations = productData.variations || [];
+        
+        console.log('===== VARIATION DEBUG =====');
+        console.log('Product from API:', product);
+        console.log('API Variations Count:', apiVariations.length);
+        console.log('API Variations:', apiVariations);
+        console.log('Navigation Variations Count:', navVariations.length);
+        console.log('Navigation Variations:', navVariations);
+        console.log('Product Data Variation Count:', productData.variationCount);
+        
+        // Build variations array for form - prefer API data
+        let formVariations = [];
+        
+        if (apiVariations.length > 0) {
+          // Use variations from API (most complete data)
+          console.log('✅ Using API variations (most complete)');
+          formVariations = apiVariations.map((v, idx) => {
+            const variation = {
+              id: v.id || idx + 1,
+              units: v.size || '',
+              bottleName: v.packaging_name || '',
+              closureName: v.closure_name || '',
+              labelSize: v.label_size || '',
+              childAsin: v.child_asin || '',
+              parentAsin: v.parent_asin || '',
+              childSku: v.child_sku_final || '',
+              parentSku: v.parent_sku_final || '',
+              upc: v.upc ? String(v.upc).replace('.0', '') : '',
+              price: v.price || '',
+              labelLocation: v.label_location || '',
+              caseSize: v.case_size || '',
+              unitsPerCase: v.units_per_case || ''
+            };
+            console.log(`Variation ${idx + 1} (${v.size || 'no size'}):`, variation);
+            return variation;
+          });
+        } else if (navVariations.length > 0) {
+          // Fallback to navigation data
+          console.log('⚠️ Using navigation variations (fallback)');
+          formVariations = navVariations.map((v, idx) => ({
+            id: v.id || idx + 1,
+            units: v.size || '',
+            bottleName: '',
+            closureName: '',
+            labelSize: '',
+            childAsin: v.childAsin || '',
+            parentAsin: v.parentAsin || ''
+          }));
+        } else {
+          // Default single variation
+          console.log('⚠️ Using single default variation');
+          formVariations = [{
+            id: 1,
+            units: product.size || '',
+            bottleName: product.packaging_name || '',
+            closureName: product.closure_name || '',
+            labelSize: product.label_size || '',
+            childAsin: product.child_asin || '',
+            parentAsin: product.parent_asin || ''
+          }];
+        }
+        
+        console.log('Final Form variations count:', formVariations.length);
+        console.log('Final Form variations:', formVariations);
+        
+        // Log each variation's dropdown values for debugging
+        formVariations.forEach((v, idx) => {
+          console.log(`Variation ${idx + 1} Dropdown Values:`, {
+            units: v.units,
+            bottleName: v.bottleName,
+            closureName: v.closureName,
+            parentAsin: v.parentAsin,
+            childAsin: v.childAsin
+          });
+        });
+        console.log('===========================');
+        
+        const updatedVariations = formVariations;
+        
+        // Populate form with existing data
+        setFormData(prev => ({
+          ...prev,
+          salesMarketplace: normalizeMarketplace(product.marketplace) || '',
+          sellerAccount: product.seller_account || productData.account || '',
+          country: countryCodeToName(product.country) || '',
+          brandName: product.brand_name || productData.brand || '',
+          productName: product.product_name || productData.product || '',
+          productType: product.type || '',
+          formula: product.formula_name || '',
+          upc: product.upc ? String(product.upc).replace('.0', '') : '',
+          parentMap: product.parent_sku_final || '',
+          childMap: product.child_sku_final || '',
+          variations: updatedVariations,
+          coreCompetitors: product.core_competitor_asins ? product.core_competitor_asins.split(', ').filter(c => c) : ['', '', ''],
+          otherCompetitors: product.other_competitor_asins ? product.other_competitor_asins.split(', ').filter(c => c) : [''],
+          otherKeywords: product.other_keywords ? product.other_keywords.split(', ').filter(k => k) : [''],
+          notes: typeof product.notes === 'string' ? product.notes : (product.notes?.text || ''),
+        }));
+        
+        console.log('Form populated successfully');
+      } catch (error) {
+        console.error('Error loading product:', error);
+        toast.error('Failed to load product data', {
+          description: error.message
+        });
+        
+        // If API fails, still populate from productData
+        const allVariations = productData.variations || [];
+        const formVariations = allVariations.length > 0 
+          ? allVariations.map((v, idx) => ({
+              id: v.id || idx + 1,
+              units: v.size || '',
+              bottleName: '',
+              closureName: '',
+              labelSize: '',
+              childAsin: v.childAsin || '',
+              parentAsin: v.parentAsin || ''
+            }))
+          : [{ id: 1, units: '', bottleName: '', closureName: '', labelSize: '', childAsin: '', parentAsin: '' }];
+        
+        setFormData(prev => ({
+          ...prev,
+          sellerAccount: productData.account || '',
+          brandName: productData.brand || '',
+          productName: productData.product || '',
+          variations: formVariations
+        }));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProductData();
+  }, [productId, productData]);
 
   // Marketplace options
   const marketplaces = ['Amazon US', 'Amazon CA', 'Amazon UK', 'Walmart', 'eBay'];
@@ -64,9 +264,33 @@ const ProductForm = () => {
   const brands = ['HomeJungle', 'TPS Plant Foods', 'Bloom City', 'NatureStop', "Burke's", 'Mint+', "Ms. Pixie's", 'Daily Shine', 'TASK-X', 'Steel & Saddle', 'PureGlossCo', 'WAX-X'];
   const productTypes = ['Formula', 'Powder', 'Liquid', 'Spray', 'Concentrate'];
   const formulas = ['Formula A', 'Formula B', 'Formula C'];
-  const units = ['8oz', '16oz', '32oz', '1 Gallon', '5 Gallon'];
-  const bottles = ['8oz Bottle', '16oz Bottle', '32oz Bottle', 'Gallon Jug'];
-  const closures = ['Aptar Pour Cap', 'Spray Trigger', 'Pump Cap', 'Flip Cap'];
+  
+  // Size/Units options - matching database values
+  const units = ['6oz', '8oz', '16oz', 'Pint', 'Quart', '32oz', 'Gallon', '5 Gallon'];
+  
+  // Bottle options - matching database values
+  const bottles = [
+    '6oz Tall Cylinder Bottle',
+    '8oz Tall Cylinder Bottle',
+    '16oz Tall Cylinder Bottle',
+    'Pint Tall Cylinder Bottle',
+    'Quart Tall Cylinder Bottle',
+    '32oz Tall Cylinder Bottle',
+    'Gallon Standard Handle Bottle',
+    'Gallon Tall Cylinder Bottle',
+    '5 Gallon Pail'
+  ];
+  
+  // Closure options - matching database values
+  const closures = [
+    'Aptar Pour Cap',
+    'Berry Unvented Cap',
+    'Spray Trigger',
+    'Pump Cap',
+    'Flip Cap',
+    'Gallon Cap',
+    'Pail Lid'
+  ];
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -81,7 +305,11 @@ const ProductForm = () => {
   const addVariation = () => {
     setFormData(prev => ({
       ...prev,
-      variations: [...prev.variations, { id: Date.now(), units: '', bottleName: '', closureName: '', labelSize: '' }]
+      variations: [...prev.variations, { 
+        id: Date.now(), units: '', bottleName: '', closureName: '', labelSize: '', 
+        parentAsin: '', childAsin: '', childSku: '', parentSku: '', 
+        upc: '', price: '', labelLocation: '', caseSize: '', unitsPerCase: ''
+      }]
     }));
   };
 
@@ -131,16 +359,57 @@ const ProductForm = () => {
 
     showDialog({
       title: 'Submit Product',
-      message: `Are you sure you want to submit "${formData.productName}"? This will create the product entry.`,
+      message: `Are you sure you want to submit "${formData.productName}"? This will save the complete product details.`,
       confirmText: 'Submit Product',
       cancelText: 'Cancel',
       type: 'success',
-      onConfirm: () => {
-        // Submit logic here
-        toast.success('Product submitted successfully!', {
-          description: `${formData.productName} has been created.`,
-        });
-        navigate('/dashboard/products/selection');
+      onConfirm: async () => {
+        try {
+          if (!productId) {
+            toast.error('Product ID missing', {
+              description: 'Cannot save product without ID.',
+            });
+            return;
+          }
+
+          // Prepare data for catalog API
+          const catalogData = {
+            product_name: formData.productName,
+            seller_account: formData.sellerAccount,
+            brand_name: formData.brandName,
+            marketplace: formData.salesMarketplace,
+            country: formData.country,
+            type: formData.productType,
+            formula_name: formData.formula,
+            upc: formData.upc,
+            parent_sku_final: formData.parentMap,
+            child_sku_final: formData.childMap,
+            core_competitor_asins: formData.coreCompetitors.filter(c => c).join(', '),
+            other_competitor_asins: formData.otherCompetitors.filter(c => c).join(', '),
+            core_keywords: formData.coreCompetitors
+              .map((_, i) => {
+                const keywords = formData.coreCompetitorKeywords[i];
+                return keywords ? Object.values(keywords).filter(k => k).join(', ') : '';
+              })
+              .filter(k => k)
+              .join(' | '),
+            other_keywords: formData.otherKeywords.filter(k => k).join(', '),
+            notes: formData.notes,
+          };
+
+          // Call API to update
+          await CatalogAPI.updateFull(productId, catalogData);
+
+          toast.success('Product submitted successfully!', {
+            description: `${formData.productName} has been saved to catalog.`,
+          });
+          navigate('/dashboard/products/selection');
+        } catch (error) {
+          console.error('Error saving product:', error);
+          toast.error('Failed to save product', {
+            description: error.message,
+          });
+        }
       },
     });
   };
@@ -157,6 +426,17 @@ const ProductForm = () => {
       },
     });
   };
+
+  if (loading) {
+    return (
+      <div className={`h-screen ${themeClasses.bg} flex items-center justify-center`}>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
+          <p className={themeClasses.text}>Loading product data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`h-screen ${themeClasses.bg} flex flex-col overflow-hidden`}>
@@ -326,7 +606,17 @@ const ProductForm = () => {
             {formData.variations.map((variation, index) => (
               <div key={variation.id} className={`border ${themeClasses.border} rounded-xl p-4 mb-4`}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                  <h3 className={`text-sm font-medium ${themeClasses.text}`}>Variation {index + 1}</h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <h3 className={`text-sm font-medium ${themeClasses.text}`}>
+                      Variation {index + 1}
+                      {variation.units && <span className="text-blue-600 ml-2">({variation.units})</span>}
+                    </h3>
+                    {variation.childAsin && (
+                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                        Loaded from DB
+                      </span>
+                    )}
+                  </div>
                   {formData.variations.length > 1 && (
                     <button
                       onClick={() => removeVariation(index)}
@@ -339,7 +629,7 @@ const ProductForm = () => {
                   )}
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
                   {/* Units */}
                   <div>
                     <label className={`block text-sm font-medium ${themeClasses.textSecondary} mb-2`}>Units</label>
@@ -384,7 +674,9 @@ const ProductForm = () => {
                       ))}
                     </select>
                   </div>
+                </div>
 
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
                   {/* Label Size */}
                   <div>
                     <label className={`block text-sm font-medium ${themeClasses.textSecondary} mb-2`}>Label Size</label>
@@ -394,6 +686,32 @@ const ProductForm = () => {
                       onChange={(e) => handleVariationChange(index, 'labelSize', e.target.value)}
                       placeholder='5" x 8"'
                       className={`w-full ${themeClasses.inputBg} ${themeClasses.text} ${themeClasses.border} border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                    />
+                  </div>
+
+                  {/* Parent ASIN */}
+                  <div>
+                    <label className={`block text-sm font-medium ${themeClasses.textSecondary} mb-2`}>Parent ASIN</label>
+                    <input
+                      type="text"
+                      value={variation.parentAsin || ''}
+                      onChange={(e) => handleVariationChange(index, 'parentAsin', e.target.value)}
+                      placeholder="B0XXXXXXXXXX"
+                      className={`w-full ${themeClasses.inputBg} ${themeClasses.text} ${themeClasses.border} border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                      readOnly={variation.parentAsin && variation.parentAsin.length > 0}
+                    />
+                  </div>
+
+                  {/* Child ASIN */}
+                  <div>
+                    <label className={`block text-sm font-medium ${themeClasses.textSecondary} mb-2`}>Child ASIN</label>
+                    <input
+                      type="text"
+                      value={variation.childAsin || ''}
+                      onChange={(e) => handleVariationChange(index, 'childAsin', e.target.value)}
+                      placeholder="B0XXXXXXXXXX"
+                      className={`w-full ${themeClasses.inputBg} ${themeClasses.text} ${themeClasses.border} border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                      readOnly={variation.childAsin && variation.childAsin.length > 0}
                     />
                   </div>
                 </div>

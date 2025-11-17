@@ -1,0 +1,41 @@
+[
+  {
+    "id": 1,
+    "category": "Kit",
+    "packaging_name": "8oz Kit",
+    "box_size": "12x10x12",
+    "units_per_case": 20.0,
+    "box_weight_lbs": 22.0,
+    "boxes_per_pallet": 48.0,
+    "length_in": 2.0,
+    "width_in": 4.0,
+    "height_in": 5.5,
+    "weight_lbs": 1.5
+  },
+  {
+    "category": "Kit",
+    "packaging_name": "Quart Kit",
+    "box_size": "13x13x10",
+    "units_per_case": 6.0,
+    "box_weight_lbs": 34.0,
+    "boxes_per_pallet": 46.0,
+    "length_in": 3.25,
+    "width_in": 6.5,
+    "height_in": 9.0,
+    "weight_lbs": 4.0,
+    "id": 2
+  },
+  {
+    "category": "Kit",
+    "packaging_name": "1 Gallon Kit",
+    "box_size": "13x13x13",
+    "units_per_case": 2.0,
+    "box_weight_lbs": 40.0,
+    "boxes_per_pallet": 36.0,
+    "length_in": 6.25,
+    "width_in": 13.0,
+    "height_in": 12.0,
+    "weight_lbs": 16.0,
+    "id": 3
+  }
+]
