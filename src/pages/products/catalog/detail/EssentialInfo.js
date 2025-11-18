@@ -352,41 +352,15 @@ const EssentialInfo = ({ data }) => {
                 </div>
               </div>
               
-              {/* Formula Information */}
-              {(data.formula || data.formulaName || data.guaranteedAnalysis) && (
+              {/* Formula Information - Name Only (details in Formula tab) */}
+              {(data.formula?.formulaName || data.formulaName || data.formula_name) && (
                 <div className="mb-4">
                   <h4 className={`text-xs font-semibold ${themeClasses.text} mb-2 uppercase tracking-wide`}>Formula</h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', fontSize: '0.875rem' }}>
-                    {data.formula && (
-                      <div>
-                        <span className={themeClasses.textSecondary}>Formula Code:</span>
-                        <p className={themeClasses.text} style={{ fontFamily: 'monospace' }}>{data.formula}</p>
-                      </div>
-                    )}
-                    {data.formulaName && (
-                      <div>
-                        <span className={themeClasses.textSecondary}>Formula Name:</span>
-                        <p className={themeClasses.text}>{data.formulaName}</p>
-                      </div>
-                    )}
-                    {data.npk && (
-                      <div>
-                        <span className={themeClasses.textSecondary}>NPK:</span>
-                        <p className={themeClasses.text}>{data.npk}</p>
-                      </div>
-                    )}
-                    {data.guaranteedAnalysis && (
-                      <div style={{ gridColumn: '1 / -1' }}>
-                        <span className={themeClasses.textSecondary}>Guaranteed Analysis:</span>
-                        <p className={themeClasses.text} style={{ marginTop: '0.25rem', lineHeight: '1.5' }}>{data.guaranteedAnalysis}</p>
-                      </div>
-                    )}
-                    {data.derivedFrom && (
-                      <div style={{ gridColumn: '1 / -1' }}>
-                        <span className={themeClasses.textSecondary}>Derived From:</span>
-                        <p className={themeClasses.text} style={{ marginTop: '0.25rem', lineHeight: '1.5' }}>{data.derivedFrom}</p>
-                      </div>
-                    )}
+                  <div style={{ fontSize: '0.875rem' }}>
+                    <div>
+                      <span className={themeClasses.textSecondary}>Formula Name:</span>
+                      <p className={themeClasses.text} style={{ fontFamily: 'monospace' }}>{data.formula?.formulaName || data.formulaName || data.formula_name}</p>
+                    </div>
                   </div>
                 </div>
               )}
@@ -833,7 +807,7 @@ const EssentialInfo = ({ data }) => {
             </div>
           </div>
 
-          {/* Formula */}
+          {/* Formula - Name Only (Full details in Formula tab) */}
           <div className="mb-6">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
               <h3 className={`text-sm font-semibold ${themeClasses.text}`}>Formula</h3>
@@ -845,60 +819,18 @@ const EssentialInfo = ({ data }) => {
               </button>
             </div>
             <div className={`${themeClasses.inputBg} rounded-lg p-4`}>
-              {packagingFormula.guaranteedAnalysis || packagingFormula.npk || data.formulaName ? (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-                  {(data.formulaName || data.formula) && (
-                    <div>
-                      <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Formula Name</label>
-                      <div className={`text-sm ${themeClasses.text}`}>{data.formulaName || data.formula}</div>
-                    </div>
-                  )}
-                  {(packagingFormula.npk || data.formula_npk) && (
-                    <div>
-                      <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>NPK</label>
-                      <div className={`text-sm ${themeClasses.text}`}>{packagingFormula.npk || data.formula_npk}</div>
-                    </div>
-                  )}
-                  {(packagingFormula.guaranteedAnalysis || data.formula_guaranteed_analysis) && (
-                    <div style={{ gridColumn: '1 / -1' }}>
-                      <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Guaranteed Analysis</label>
-                      <div className={`text-sm ${themeClasses.text}`} style={{ whiteSpace: 'pre-wrap' }}>
-                        {packagingFormula.guaranteedAnalysis || data.formula_guaranteed_analysis}
-                      </div>
-                    </div>
-                  )}
-                  {(packagingFormula.derivedFrom || data.formula_derived_from) && (
-                    <div style={{ gridColumn: '1 / -1' }}>
-                      <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Derived From</label>
-                      <div className={`text-sm ${themeClasses.text}`} style={{ whiteSpace: 'pre-wrap' }}>
-                        {packagingFormula.derivedFrom || data.formula_derived_from}
-                      </div>
-                    </div>
-                  )}
-                  {(packagingFormula.storageWarranty || data.formula_storage_warranty) && (
-                    <div style={{ gridColumn: '1 / -1' }}>
-                      <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Storage / Warranty</label>
-                      <div className={`text-sm ${themeClasses.text}`} style={{ whiteSpace: 'pre-wrap' }}>
-                        {packagingFormula.storageWarranty || data.formula_storage_warranty}
-                      </div>
-                    </div>
-                  )}
-                  {(packagingData.msds || data.formula_msds) && (
-                    <div>
-                      <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>MSDS</label>
-                      <a 
-                        href={packagingData.msds || data.formula_msds} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-sm text-blue-500 hover:text-blue-600"
-                      >
-                        View MSDS
-                      </a>
-                    </div>
-                  )}
+              {(data.formulaName || data.formula?.formulaName || data.formula_name) ? (
+                <div>
+                  <label className={`text-xs ${themeClasses.textSecondary} block mb-1`}>Formula Name</label>
+                  <div className={`text-sm ${themeClasses.text}`} style={{ fontFamily: 'monospace' }}>
+                    {data.formulaName || data.formula?.formulaName || data.formula_name}
+                  </div>
+                  <p className={`text-xs ${themeClasses.textSecondary} mt-2`}>
+                    View full formula details in the Formula tab
+                  </p>
                 </div>
               ) : (
-                <div className={`text-sm ${themeClasses.textSecondary}`}>No formula details available for this variation yet.</div>
+                <div className={`text-sm ${themeClasses.textSecondary}`}>No formula assigned to this variation yet.</div>
               )}
             </div>
           </div>

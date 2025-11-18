@@ -41,6 +41,14 @@ const Ngoos = ({ data }) => {
   const [showAIModal, setShowAIModal] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
+  const [salesVelocityWeight, setSalesVelocityWeight] = useState(25);
+  const [svVelocityWeight, setSvVelocityWeight] = useState(15);
+  const [tempSalesVelocityWeight, setTempSalesVelocityWeight] = useState(25);
+  const [tempSvVelocityWeight, setTempSvVelocityWeight] = useState(15);
+  const [currentProductAsin, setCurrentProductAsin] = useState(null);
+  const [visibleSalesMetrics, setVisibleSalesMetrics] = useState(['units_sold', 'sales']);
+  const [visibleAdsMetrics, setVisibleAdsMetrics] = useState(['total_sales', 'tacos']);
   const [selectedMetrics, setSelectedMetrics] = useState({
     sales: [
       'units_sold',
@@ -84,6 +92,25 @@ const Ngoos = ({ data }) => {
     }
   };
 
+  // Reset weights to default when product changes
+  useEffect(() => {
+    const childAsin = data?.child_asin || data?.childAsin;
+    
+    if (childAsin && childAsin !== currentProductAsin) {
+      // Product changed - reset to defaults
+      setSalesVelocityWeight(25);
+      setSvVelocityWeight(15);
+      setTempSalesVelocityWeight(25);
+      setTempSvVelocityWeight(15);
+      setCurrentProductAsin(childAsin);
+      
+      console.log('🔄 Product changed, resetting weights to default:', {
+        newAsin: childAsin,
+        previousAsin: currentProductAsin
+      });
+    }
+  }, [data?.child_asin, data?.childAsin, currentProductAsin]);
+
   // Fetch N-GOOS data from API
   useEffect(() => {
     const fetchNgoosData = async () => {
@@ -97,13 +124,13 @@ const Ngoos = ({ data }) => {
       try {
         setLoading(true);
         
-        const weeks = getWeeksForView(selectedView);
-        
+              const weeks = getWeeksForView(selectedView);
+              
               // Fetch all N-GOOS data in parallel
               const [details, forecast, chart, metricsData, salesChart, adsChart] = await Promise.all([
                 NgoosAPI.getProductDetails(childAsin),
                 NgoosAPI.getForecast(childAsin),
-                NgoosAPI.getChartData(childAsin, weeks),
+                NgoosAPI.getChartData(childAsin, weeks, salesVelocityWeight, svVelocityWeight),
                 NgoosAPI.getMetrics(childAsin, metricsDays),
                 NgoosAPI.getSalesChart(childAsin, metricsDays),
                 NgoosAPI.getAdsChart(childAsin, metricsDays)
@@ -129,8 +156,8 @@ const Ngoos = ({ data }) => {
       }
     };
 
-    fetchNgoosData();
-  }, [data?.child_asin, data?.childAsin, selectedView, metricsDays]);
+      fetchNgoosData();
+    }, [data?.child_asin, data?.childAsin, selectedView, metricsDays, salesVelocityWeight, svVelocityWeight]);
 
   // Extract inventory data from API response or use fallback
   const inventoryData = productDetails?.inventory || {
@@ -276,6 +303,150 @@ const Ngoos = ({ data }) => {
   };
 
   // Available metrics configuration
+  // Sales Metrics Configuration
+  const SALES_METRICS = [
+    {
+      id: 'units_sold',
+      label: 'Units Sold',
+      color: '#4169E1',
+      valueKey: 'units_sold',
+      formatType: 'number',
+      defaultVisible: true
+    },
+    {
+      id: 'sales',
+      label: 'Sales',
+      color: '#FF8C00',
+      valueKey: 'sales',
+      formatType: 'currency',
+      defaultVisible: true
+    },
+    {
+      id: 'sessions',
+      label: 'Sessions',
+      color: '#32CD32',
+      valueKey: 'sessions',
+      formatType: 'number',
+      defaultVisible: false
+    },
+    {
+      id: 'conversion_rate',
+      label: 'Conversion Rate',
+      color: '#9370DB',
+      valueKey: 'conversion_rate',
+      formatType: 'percentage',
+      defaultVisible: false
+    },
+    {
+      id: 'price',
+      label: 'Price',
+      color: '#FFD700',
+      valueKey: 'price',
+      formatType: 'currency',
+      defaultVisible: false
+    },
+    {
+      id: 'profit',
+      label: 'Profit',
+      color: '#228B22',
+      valueKey: 'profit',
+      formatType: 'currency',
+      defaultVisible: false
+    },
+    {
+      id: 'profit_margin',
+      label: 'Profit %',
+      color: '#20B2AA',
+      valueKey: 'profit_margin',
+      formatType: 'percentage',
+      defaultVisible: false
+    },
+    {
+      id: 'profit_total',
+      label: 'Profit Total',
+      color: '#3CB371',
+      valueKey: 'profit_total',
+      formatType: 'currency',
+      defaultVisible: false
+    }
+  ];
+
+  // Ads Metrics Configuration
+  const ADS_METRICS = [
+    {
+      id: 'total_sales',
+      label: 'Total Sales',
+      color: '#4169E1',
+      valueKey: 'total_sales',
+      formatType: 'currency',
+      defaultVisible: true
+    },
+    {
+      id: 'tacos',
+      label: 'TACOS',
+      color: '#FF8C00',
+      valueKey: 'tacos',
+      formatType: 'percentage',
+      defaultVisible: true
+    },
+    {
+      id: 'ad_spend',
+      label: 'Ad Spend',
+      color: '#DC143C',
+      valueKey: 'ad_spend',
+      formatType: 'currency',
+      defaultVisible: false
+    },
+    {
+      id: 'ad_sales',
+      label: 'Ad Sales',
+      color: '#32CD32',
+      valueKey: 'ad_sales',
+      formatType: 'currency',
+      defaultVisible: false
+    },
+    {
+      id: 'ad_units',
+      label: 'Ad Units',
+      color: '#9370DB',
+      valueKey: 'ad_units',
+      formatType: 'number',
+      defaultVisible: false
+    },
+    {
+      id: 'acos',
+      label: 'ACOS',
+      color: '#FF69B4',
+      valueKey: 'acos',
+      formatType: 'percentage',
+      defaultVisible: false
+    },
+    {
+      id: 'cpc',
+      label: 'CPC',
+      color: '#FFD700',
+      valueKey: 'cpc',
+      formatType: 'currency',
+      defaultVisible: false
+    },
+    {
+      id: 'ad_clicks',
+      label: 'Ad Clicks',
+      color: '#20B2AA',
+      valueKey: 'ad_clicks',
+      formatType: 'number',
+      defaultVisible: false
+    },
+    {
+      id: 'ad_impressions',
+      label: 'Impressions',
+      color: '#778899',
+      valueKey: 'ad_impressions',
+      formatType: 'number',
+      defaultVisible: false
+    }
+  ];
+
   const availableMetrics = [
     { id: 'units_sold', label: 'Units Sold', border: '2px solid #3b82f6' },
     { id: 'sales', label: 'Sales', border: '2px solid #f97316' },
@@ -364,6 +535,66 @@ const Ngoos = ({ data }) => {
 
     const response = await OpenAIService.askFollowUp([contextMessage, ...messages], question);
     return response;
+  };
+
+  const handleOpenAdjustmentModal = () => {
+    setTempSalesVelocityWeight(salesVelocityWeight);
+    setTempSvVelocityWeight(svVelocityWeight);
+    setShowAdjustmentModal(true);
+  };
+
+  const handleApplyAdjustments = () => {
+    setSalesVelocityWeight(tempSalesVelocityWeight);
+    setSvVelocityWeight(tempSvVelocityWeight);
+    setShowAdjustmentModal(false);
+    toast.success('Forecast adjusted', {
+      description: `Sales Velocity: ${tempSalesVelocityWeight}%, Search Volume: ${tempSvVelocityWeight}%`
+    });
+  };
+
+  const handleCancelAdjustments = () => {
+    setTempSalesVelocityWeight(salesVelocityWeight);
+    setTempSvVelocityWeight(svVelocityWeight);
+    setShowAdjustmentModal(false);
+  };
+
+  const toggleSalesMetric = (metricId) => {
+    setVisibleSalesMetrics(prev => {
+      if (prev.includes(metricId)) {
+        // Don't allow hiding all metrics
+        if (prev.length === 1) return prev;
+        return prev.filter(id => id !== metricId);
+      } else {
+        return [...prev, metricId];
+      }
+    });
+  };
+
+  const toggleAdsMetric = (metricId) => {
+    setVisibleAdsMetrics(prev => {
+      if (prev.includes(metricId)) {
+        // Don't allow hiding all metrics
+        if (prev.length === 1) return prev;
+        return prev.filter(id => id !== metricId);
+      } else {
+        return [...prev, metricId];
+      }
+    });
+  };
+
+  const formatChartValue = (value, formatType) => {
+    if (value === null || value === undefined) return '0';
+    
+    switch (formatType) {
+      case 'currency':
+        return `$${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      case 'percentage':
+        return `${Number(value).toFixed(1)}%`;
+      case 'number':
+        return Number(value).toLocaleString();
+      default:
+        return String(value);
+    }
   };
 
   const getMetricValue = (metricId) => {
@@ -907,7 +1138,27 @@ const Ngoos = ({ data }) => {
                   </span>
                 </label>
               </div>
-              <button style={{ padding: '0.375rem', color: '#94a3b8', backgroundColor: 'transparent', border: 'none', cursor: 'pointer' }}>
+              <button 
+                onClick={handleOpenAdjustmentModal}
+                title="Adjustment Weights"
+                style={{ 
+                  padding: '0.5rem', 
+                  color: '#94a3b8', 
+                  backgroundColor: 'rgba(59, 130, 246, 0.1)', 
+                  border: '1px solid rgba(59, 130, 246, 0.3)', 
+                  borderRadius: '0.375rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+                  e.currentTarget.style.color = '#3b82f6';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+                  e.currentTarget.style.color = '#94a3b8';
+                }}
+              >
                 <svg style={{ width: '20px', height: '20px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -1243,43 +1494,93 @@ const Ngoos = ({ data }) => {
       {activeTab === 'sales' && (
           <div>
             {/* Header with Controls */}
-            <div className="px-6 pt-6" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', paddingBottom: '1rem' }}>
-              <select 
-                value={metricsDays}
-                onChange={(e) => setMetricsDays(Number(e.target.value))}
-                style={{ 
-                  padding: '0.5rem 1rem', 
-                  borderRadius: '0.5rem', 
-                  backgroundColor: '#1e293b', 
-                  color: '#fff',
-                  border: '1px solid #334155',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  minWidth: '100px'
-                }}
-              >
-                <option value={7}>7 Days</option>
-                <option value={30}>30 Days</option>
-                <option value={60}>60 Days</option>
-                <option value={90}>90 Days</option>
-              </select>
-              
-              <select 
-                style={{ 
-                  padding: '0.5rem 1rem', 
-                  borderRadius: '0.5rem', 
-                  backgroundColor: '#1e293b', 
-                  color: '#fff',
-                  border: '1px solid #334155',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  minWidth: '120px'
-                }}
-              >
-                <option value="prior">Prior Period</option>
-              </select>
+            <div className="px-6 pt-6" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1rem', gap: '1rem' }}>
+              {/* Metric Controller */}
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', flex: 1 }}>
+                <span style={{ fontSize: '0.75rem', color: '#94a3b8', alignSelf: 'center', marginRight: '0.5rem', fontWeight: '600', textTransform: 'uppercase' }}>
+                  Metrics:
+                </span>
+                {SALES_METRICS.map(metric => {
+                  const isVisible = visibleSalesMetrics.includes(metric.id);
+                  return (
+                    <button
+                      key={metric.id}
+                      onClick={() => toggleSalesMetric(metric.id)}
+                      style={{
+                        padding: '0.375rem 0.75rem',
+                        borderRadius: '0.375rem',
+                        backgroundColor: isVisible ? metric.color + '20' : 'transparent',
+                        border: `2px solid ${isVisible ? metric.color : '#475569'}`,
+                        color: isVisible ? metric.color : '#94a3b8',
+                        fontSize: '0.75rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.375rem',
+                        opacity: isVisible ? 1 : 0.6
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.opacity = '1';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.opacity = isVisible ? '1' : '0.6';
+                      }}
+                    >
+                      <div style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: isVisible ? metric.color : '#475569'
+                      }} />
+                      {metric.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Period Selectors */}
+              <div style={{ display: 'flex', gap: '0.75rem', flexShrink: 0 }}>
+                <select 
+                  value={metricsDays}
+                  onChange={(e) => setMetricsDays(Number(e.target.value))}
+                  style={{ 
+                    padding: '0.5rem 1rem', 
+                    borderRadius: '0.5rem', 
+                    backgroundColor: '#1e293b', 
+                    color: '#fff',
+                    border: '1px solid #334155',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    minWidth: '100px'
+                  }}
+                >
+                  <option value={7}>7 Days</option>
+                  <option value={30}>30 Days</option>
+                  <option value={60}>60 Days</option>
+                  <option value={90}>90 Days</option>
+                </select>
+                
+                <select 
+                  style={{ 
+                    padding: '0.5rem 1rem', 
+                    borderRadius: '0.5rem', 
+                    backgroundColor: '#1e293b', 
+                    color: '#fff',
+                    border: '1px solid #334155',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    minWidth: '120px'
+                  }}
+                >
+                  <option value="prior">Prior Period</option>
+                </select>
+              </div>
             </div>
 
             {/* Graph Section: 70% Graph + 30% Banana Factors */}
@@ -1288,34 +1589,19 @@ const Ngoos = ({ data }) => {
               <div className={themeClasses.cardBg} style={{ borderRadius: '0.75rem', padding: '1.5rem' }}>
                 <ResponsiveContainer width="100%" height={300}>
                   <ComposedChart data={salesChartData?.chart_data || []}>
-                    <defs>
-                      <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
-                      </linearGradient>
-                      <linearGradient id="unitsGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                     <XAxis 
                       dataKey="date" 
                       stroke="#64748b"
                       style={{ fontSize: '0.75rem' }}
                       tickLine={false}
+                      tickFormatter={(value) => {
+                        const date = new Date(value);
+                        return `${date.getMonth() + 1}/${date.getDate()}`;
+                      }}
                     />
                     <YAxis 
-                      yAxisId="left"
-                      stroke="#3b82f6"
-                      style={{ fontSize: '0.75rem' }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis 
-                      yAxisId="right"
-                      orientation="right"
-                      stroke="#f97316"
+                      stroke="#64748b"
                       style={{ fontSize: '0.75rem' }}
                       tickLine={false}
                       axisLine={false}
@@ -1328,27 +1614,32 @@ const Ngoos = ({ data }) => {
                         color: '#fff',
                         fontSize: '0.875rem'
                       }}
+                      formatter={(value, name) => {
+                        const metric = SALES_METRICS.find(m => m.label === name);
+                        if (metric) {
+                          return [formatChartValue(value, metric.formatType), name];
+                        }
+                        return [value, name];
+                      }}
                     />
-                    <Line 
-                      yAxisId="left"
-                      type="monotone" 
-                      dataKey="units_sold" 
-                      stroke="#3b82f6" 
-                      strokeWidth={3}
-                      name="Units Sold"
-                      dot={false}
-                      fill="url(#unitsGradient)"
-                    />
-                    <Line 
-                      yAxisId="right"
-                      type="monotone" 
-                      dataKey="sales" 
-                      stroke="#f97316" 
-                      strokeWidth={3}
-                      name="Sales"
-                      dot={false}
-                      fill="url(#salesGradient)"
-                    />
+                    {/* Dynamically render visible metrics */}
+                    {visibleSalesMetrics.length > 0 && SALES_METRICS
+                      .filter(metric => visibleSalesMetrics.includes(metric.id))
+                      .map((metric) => {
+                        console.log('Rendering Sales metric:', metric.id, metric.valueKey, 'Sample data:', salesChartData?.chart_data?.[0]?.[metric.valueKey]);
+                        return (
+                          <Line 
+                            key={metric.id}
+                            type="monotone" 
+                            dataKey={metric.valueKey} 
+                            stroke={metric.color} 
+                            strokeWidth={2.5}
+                            name={metric.label}
+                            dot={false}
+                            connectNulls
+                          />
+                        );
+                      })}
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
@@ -1424,8 +1715,51 @@ const Ngoos = ({ data }) => {
                       ? (metricData.change >= 0 ? '#ef4444' : '#22c55e')
                       : (metricData.change >= 0 ? '#22c55e' : '#ef4444');
                     
+                    // Determine chart metric visibility
+                    const chartMetric = (activeTab === 'sales' ? SALES_METRICS : ADS_METRICS).find(m => m.id === metricId);
+                    const isVisibleOnChart = chartMetric && (activeTab === 'sales' ? visibleSalesMetrics : visibleAdsMetrics).includes(metricId);
+                    const borderColor = isVisibleOnChart ? chartMetric.color : '#334155';
+                    const toggleMetric = activeTab === 'sales' ? toggleSalesMetric : toggleAdsMetric;
+                    
                     return (
-                      <div key={metricId} style={{ padding: '1.5rem', backgroundColor: '#0f1729', borderRadius: '0.75rem', border: metric.border, textAlign: 'center' }}>
+                      <div 
+                        key={metricId} 
+                        onClick={() => chartMetric && toggleMetric(metricId)}
+                        style={{ 
+                          padding: '1.5rem', 
+                          backgroundColor: '#0f1729', 
+                          borderRadius: '0.75rem', 
+                          border: `2px solid ${borderColor}`, 
+                          textAlign: 'center',
+                          cursor: chartMetric ? 'pointer' : 'default',
+                          transition: 'all 0.2s',
+                          position: 'relative'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (chartMetric) {
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = `0 4px 12px ${borderColor}40`;
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (chartMetric) {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }
+                        }}
+                      >
+                        {isVisibleOnChart && (
+                          <div style={{
+                            position: 'absolute',
+                            top: '0.5rem',
+                            right: '0.5rem',
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            backgroundColor: chartMetric.color,
+                            boxShadow: `0 0 8px ${chartMetric.color}`
+                          }} />
+                        )}
                         <div style={{ fontSize: '2rem', fontWeight: '700', color: '#fff', marginBottom: '0.25rem' }}>
                           {metricData.prefix}{metricData.value}
                         </div>
@@ -1437,6 +1771,11 @@ const Ngoos = ({ data }) => {
                             </span>
                           )}
                         </div>
+                        {chartMetric && (
+                          <div style={{ fontSize: '0.625rem', color: '#64748b', marginTop: '0.5rem' }}>
+                            {isVisibleOnChart ? '📊 On chart' : 'Click to show'}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -1592,86 +1931,117 @@ const Ngoos = ({ data }) => {
       {activeTab === 'ads' && (
           <div>
             {/* Header with Controls */}
-            <div className="px-6 pt-6" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', paddingBottom: '1rem' }}>
-              <select 
-                value={metricsDays}
-                onChange={(e) => setMetricsDays(Number(e.target.value))}
-                style={{ 
-                  padding: '0.5rem 1rem', 
-                  borderRadius: '0.5rem', 
-                  backgroundColor: '#1e293b', 
-                  color: '#fff',
-                  border: '1px solid #334155',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  minWidth: '100px'
-                }}
-              >
-                <option value={7}>7 Days</option>
-                <option value={30}>30 Days</option>
-                <option value={60}>60 Days</option>
-                <option value={90}>90 Days</option>
-              </select>
-              
-              <select 
-                style={{ 
-                  padding: '0.5rem 1rem', 
-                  borderRadius: '0.5rem', 
-                  backgroundColor: '#1e293b', 
-                  color: '#fff',
-                  border: '1px solid #334155',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  minWidth: '120px'
-                }}
-              >
-                <option value="prior">Prior Period</option>
-              </select>
+            <div className="px-6 pt-6" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1rem', gap: '1rem' }}>
+              {/* Metric Controller */}
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', flex: 1 }}>
+                <span style={{ fontSize: '0.75rem', color: '#94a3b8', alignSelf: 'center', marginRight: '0.5rem', fontWeight: '600', textTransform: 'uppercase' }}>
+                  Metrics:
+                </span>
+                {ADS_METRICS.map(metric => {
+                  const isVisible = visibleAdsMetrics.includes(metric.id);
+                  return (
+                    <button
+                      key={metric.id}
+                      onClick={() => toggleAdsMetric(metric.id)}
+                      style={{
+                        padding: '0.375rem 0.75rem',
+                        borderRadius: '0.375rem',
+                        backgroundColor: isVisible ? metric.color + '20' : 'transparent',
+                        border: `2px solid ${isVisible ? metric.color : '#475569'}`,
+                        color: isVisible ? metric.color : '#94a3b8',
+                        fontSize: '0.75rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.375rem',
+                        opacity: isVisible ? 1 : 0.6
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.opacity = '1';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.opacity = isVisible ? '1' : '0.6';
+                      }}
+                    >
+                      <div style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: isVisible ? metric.color : '#475569'
+                      }} />
+                      {metric.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Period Selectors */}
+              <div style={{ display: 'flex', gap: '0.75rem', flexShrink: 0 }}>
+                <select 
+                  value={metricsDays}
+                  onChange={(e) => setMetricsDays(Number(e.target.value))}
+                  style={{ 
+                    padding: '0.5rem 1rem', 
+                    borderRadius: '0.5rem', 
+                    backgroundColor: '#1e293b', 
+                    color: '#fff',
+                    border: '1px solid #334155',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    minWidth: '100px'
+                  }}
+                >
+                  <option value={7}>7 Days</option>
+                  <option value={30}>30 Days</option>
+                  <option value={60}>60 Days</option>
+                  <option value={90}>90 Days</option>
+                </select>
+                
+                <select 
+                  style={{ 
+                    padding: '0.5rem 1rem', 
+                    borderRadius: '0.5rem', 
+                    backgroundColor: '#1e293b', 
+                    color: '#fff',
+                    border: '1px solid #334155',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    minWidth: '120px'
+                  }}
+                >
+                  <option value="prior">Prior Period</option>
+                </select>
+              </div>
             </div>
 
             {/* Graph Section: 70% Graph + 30% Banana Factors */}
             <div className="px-6" style={{ display: 'grid', gridTemplateColumns: '70% 30%', gap: '1.5rem', marginBottom: '1.5rem' }}>
               {/* Left: Graph (70%) */}
               <div className={themeClasses.cardBg} style={{ borderRadius: '0.75rem', padding: '1.5rem' }}>
-                {/* Debug: Log chart data */}
-                {console.log('Ads Chart Data:', adsChartData?.chart_data)}
                 <ResponsiveContainer width="100%" height={300}>
                   <ComposedChart data={adsChartData?.chart_data || []}>
-                    <defs>
-                      <linearGradient id="adsTacosGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
-                      </linearGradient>
-                      <linearGradient id="adsUnitsGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                     <XAxis 
                       dataKey="date" 
                       stroke="#64748b"
                       style={{ fontSize: '0.75rem' }}
                       tickLine={false}
+                      tickFormatter={(value) => {
+                        const date = new Date(value);
+                        return `${date.getMonth() + 1}/${date.getDate()}`;
+                      }}
                     />
                     <YAxis 
-                      yAxisId="left"
-                      stroke="#3b82f6"
+                      stroke="#64748b"
                       style={{ fontSize: '0.75rem' }}
                       tickLine={false}
                       axisLine={false}
-                      label={{ value: 'Total Sales ($)', angle: -90, position: 'insideLeft', style: { fill: '#3b82f6', fontSize: '0.75rem' } }}
-                    />
-                    <YAxis 
-                      yAxisId="right"
-                      orientation="right"
-                      stroke="#f97316"
-                      style={{ fontSize: '0.75rem' }}
-                      tickLine={false}
-                      axisLine={false}
-                      label={{ value: 'TACOS (%)', angle: 90, position: 'insideRight', style: { fill: '#f97316', fontSize: '0.75rem' } }}
                     />
                     <Tooltip 
                       contentStyle={{ 
@@ -1681,27 +2051,32 @@ const Ngoos = ({ data }) => {
                         color: '#fff',
                         fontSize: '0.875rem'
                       }}
+                      formatter={(value, name) => {
+                        const metric = ADS_METRICS.find(m => m.label === name);
+                        if (metric) {
+                          return [formatChartValue(value, metric.formatType), name];
+                        }
+                        return [value, name];
+                      }}
                     />
-                    <Line 
-                      yAxisId="left"
-                      type="monotone" 
-                      dataKey="total_sales" 
-                      stroke="#3b82f6" 
-                      strokeWidth={3}
-                      name="Total Sales"
-                      dot={false}
-                      fill="url(#adsUnitsGradient)"
-                    />
-                    <Line 
-                      yAxisId="right"
-                      type="monotone" 
-                      dataKey="tacos" 
-                      stroke="#f97316" 
-                      strokeWidth={3}
-                      name="TACOS"
-                      dot={false}
-                      fill="url(#adsTacosGradient)"
-                    />
+                    {/* Dynamically render visible metrics */}
+                    {visibleAdsMetrics.length > 0 && ADS_METRICS
+                      .filter(metric => visibleAdsMetrics.includes(metric.id))
+                      .map((metric) => {
+                        console.log('Rendering Ads metric:', metric.id, metric.valueKey, 'Sample data:', adsChartData?.chart_data?.[0]?.[metric.valueKey]);
+                        return (
+                          <Line 
+                            key={metric.id}
+                            type="monotone" 
+                            dataKey={metric.valueKey} 
+                            stroke={metric.color} 
+                            strokeWidth={2.5}
+                            name={metric.label}
+                            dot={false}
+                            connectNulls
+                          />
+                        );
+                      })}
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
@@ -1777,8 +2152,51 @@ const Ngoos = ({ data }) => {
                       ? (metricData.change >= 0 ? '#ef4444' : '#22c55e')
                       : (metricData.change >= 0 ? '#22c55e' : '#ef4444');
                     
+                    // Determine chart metric visibility
+                    const chartMetric = (activeTab === 'sales' ? SALES_METRICS : ADS_METRICS).find(m => m.id === metricId);
+                    const isVisibleOnChart = chartMetric && (activeTab === 'sales' ? visibleSalesMetrics : visibleAdsMetrics).includes(metricId);
+                    const borderColor = isVisibleOnChart ? chartMetric.color : '#334155';
+                    const toggleMetric = activeTab === 'sales' ? toggleSalesMetric : toggleAdsMetric;
+                    
                     return (
-                      <div key={metricId} style={{ padding: '1.5rem', backgroundColor: '#0f1729', borderRadius: '0.75rem', border: metric.border, textAlign: 'center' }}>
+                      <div 
+                        key={metricId} 
+                        onClick={() => chartMetric && toggleMetric(metricId)}
+                        style={{ 
+                          padding: '1.5rem', 
+                          backgroundColor: '#0f1729', 
+                          borderRadius: '0.75rem', 
+                          border: `2px solid ${borderColor}`, 
+                          textAlign: 'center',
+                          cursor: chartMetric ? 'pointer' : 'default',
+                          transition: 'all 0.2s',
+                          position: 'relative'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (chartMetric) {
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = `0 4px 12px ${borderColor}40`;
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (chartMetric) {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }
+                        }}
+                      >
+                        {isVisibleOnChart && (
+                          <div style={{
+                            position: 'absolute',
+                            top: '0.5rem',
+                            right: '0.5rem',
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            backgroundColor: chartMetric.color,
+                            boxShadow: `0 0 8px ${chartMetric.color}`
+                          }} />
+                        )}
                         <div style={{ fontSize: '2rem', fontWeight: '700', color: '#fff', marginBottom: '0.25rem' }}>
                           {metricData.prefix}{metricData.value}
                         </div>
@@ -1790,6 +2208,11 @@ const Ngoos = ({ data }) => {
                             </span>
                           )}
                         </div>
+                        {chartMetric && (
+                          <div style={{ fontSize: '0.625rem', color: '#64748b', marginTop: '0.5rem' }}>
+                            {isVisibleOnChart ? '📊 On chart' : 'Click to show'}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -1949,6 +2372,227 @@ const Ngoos = ({ data }) => {
         onAskQuestion={handleAskFollowUp}
         isLoading={isAnalyzing}
       />
+
+      {/* Adjustment Weights Modal */}
+      {showAdjustmentModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            animation: 'fadeIn 0.2s ease-out'
+          }}
+          onClick={handleCancelAdjustments}
+        >
+          <div
+            style={{
+              backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+              borderRadius: '1rem',
+              padding: '2rem',
+              width: 'min(90vw, 450px)',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)',
+              border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
+              animation: 'slideUp 0.3s ease-out'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div style={{
+                width: '2.5rem',
+                height: '2.5rem',
+                backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                borderRadius: '0.75rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginRight: '1rem'
+              }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <path d="M12 1v6m0 6v6m-9-9h6m6 0h6"></path>
+                </svg>
+              </div>
+              <h3 style={{
+                fontSize: '1.25rem',
+                fontWeight: '700',
+                color: isDarkMode ? '#fff' : '#1f2937',
+                margin: 0
+              }}>
+                Adjustment Weights
+              </h3>
+            </div>
+
+            {/* Sales Velocity Slider */}
+            <div style={{ marginBottom: '2rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <label style={{
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: isDarkMode ? '#e2e8f0' : '#374151'
+                }}>
+                  Sales Velocity
+                </label>
+                <div style={{
+                  backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+                  padding: '0.375rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
+                  minWidth: '60px',
+                  textAlign: 'center',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: isDarkMode ? '#fff' : '#1f2937'
+                }}>
+                  {tempSalesVelocityWeight}%
+                </div>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={tempSalesVelocityWeight}
+                onChange={(e) => setTempSalesVelocityWeight(Number(e.target.value))}
+                style={{
+                  width: '100%',
+                  height: '6px',
+                  borderRadius: '3px',
+                  background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${tempSalesVelocityWeight}%, ${isDarkMode ? '#334155' : '#cbd5e1'} ${tempSalesVelocityWeight}%, ${isDarkMode ? '#334155' : '#cbd5e1'} 100%)`,
+                  outline: 'none',
+                  cursor: 'pointer',
+                  WebkitAppearance: 'none',
+                  appearance: 'none'
+                }}
+              />
+              <style>
+                {`
+                  input[type="range"]::-webkit-slider-thumb {
+                    -webkit-appearance: none;
+                    appearance: none;
+                    width: 18px;
+                    height: 18px;
+                    border-radius: 50%;
+                    background: #3b82f6;
+                    cursor: pointer;
+                    border: 3px solid #ffffff;
+                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                  }
+                  input[type="range"]::-moz-range-thumb {
+                    width: 18px;
+                    height: 18px;
+                    border-radius: 50%;
+                    background: #3b82f6;
+                    cursor: pointer;
+                    border: 3px solid #ffffff;
+                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                  }
+                `}
+              </style>
+            </div>
+
+            {/* Search Volume Velocity Slider */}
+            <div style={{ marginBottom: '2rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <label style={{
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: isDarkMode ? '#e2e8f0' : '#374151'
+                }}>
+                  Search Volume Velocity
+                </label>
+                <div style={{
+                  backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+                  padding: '0.375rem 0.75rem',
+                  borderRadius: '0.5rem',
+                  border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
+                  minWidth: '60px',
+                  textAlign: 'center',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: isDarkMode ? '#fff' : '#1f2937'
+                }}>
+                  {tempSvVelocityWeight}%
+                </div>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={tempSvVelocityWeight}
+                onChange={(e) => setTempSvVelocityWeight(Number(e.target.value))}
+                style={{
+                  width: '100%',
+                  height: '6px',
+                  borderRadius: '3px',
+                  background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${tempSvVelocityWeight}%, ${isDarkMode ? '#334155' : '#cbd5e1'} ${tempSvVelocityWeight}%, ${isDarkMode ? '#334155' : '#cbd5e1'} 100%)`,
+                  outline: 'none',
+                  cursor: 'pointer',
+                  WebkitAppearance: 'none',
+                  appearance: 'none'
+                }}
+              />
+            </div>
+
+            {/* Buttons */}
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+              <button
+                onClick={handleCancelAdjustments}
+                style={{
+                  padding: '0.625rem 1.25rem',
+                  backgroundColor: isDarkMode ? '#334155' : '#e2e8f0',
+                  color: isDarkMode ? '#e2e8f0' : '#475569',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = isDarkMode ? '#475569' : '#cbd5e1';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = isDarkMode ? '#334155' : '#e2e8f0';
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleApplyAdjustments}
+                style={{
+                  padding: '0.625rem 1.25rem',
+                  backgroundColor: '#3b82f6',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#2563eb';
+                  e.target.style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = '#3b82f6';
+                  e.target.style.transform = 'translateY(0)';
+                }}
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

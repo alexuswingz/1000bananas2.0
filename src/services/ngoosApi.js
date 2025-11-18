@@ -84,9 +84,19 @@ class NgoosAPI {
   /**
    * GET /chart/{asin} - Get chart data (historical + forecast)
    */
-  static async getChartData(asin, weeks = 52) {
+  static async getChartData(asin, weeks = 52, salesVelocityWeight = null, svVelocityWeight = null) {
     try {
-      const response = await fetch(`${API_BASE_URL}/chart/${asin}?weeks=${weeks}`, {
+      let url = `${API_BASE_URL}/chart/${asin}?weeks=${weeks}`;
+      
+      // Add weight parameters if provided
+      if (salesVelocityWeight !== null && salesVelocityWeight !== 25) {
+        url += `&sales_velocity_weight=${salesVelocityWeight}`;
+      }
+      if (svVelocityWeight !== null && svVelocityWeight !== 15) {
+        url += `&sv_velocity_weight=${svVelocityWeight}`;
+      }
+      
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -200,6 +210,31 @@ class NgoosAPI {
       return data;
     } catch (error) {
       console.error(`Error fetching ads chart for ${asin}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * GET /weekly-metrics/{asin} - Get weekly metrics data
+   */
+  static async getWeeklyMetrics(asin, year = new Date().getFullYear()) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/weekly-metrics/${asin}?year=${year}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch weekly metrics');
+      }
+
+      return data;
+    } catch (error) {
+      console.error(`Error fetching weekly metrics for ${asin}:`, error);
       throw error;
     }
   }

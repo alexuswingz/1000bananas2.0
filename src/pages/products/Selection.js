@@ -49,9 +49,19 @@ const Selection = () => {
         actionType: p.actionType || 'launch',
       }));
       
-      // Add new row if it exists
+      // If there's a new row, preserve it at the top
       if (newRow) {
-        setTableData([newRow, ...formatted]);
+        // Check if new row is already in tableData
+        const hasNewRow = tableData.some(item => item.id === newRow.id);
+        if (hasNewRow) {
+          // Replace tableData but keep new row at top
+          setTableData(prev => {
+            const withoutNewRow = prev.filter(item => item.id !== newRow.id);
+            return [newRow, ...formatted.filter(item => !withoutNewRow.some(existing => existing.id === item.id))];
+          });
+        } else {
+          setTableData([newRow, ...formatted]);
+        }
       } else {
         setTableData(formatted);
       }
@@ -112,7 +122,16 @@ const Selection = () => {
       isNew: true,
       templateId: template?.id || null
     };
+    
     setNewRow(row);
+    
+    // Add new row to table data immediately
+    setTableData(prev => [row, ...prev]);
+    
+    // Close template selector
+    setShowTemplateSelector(false);
+    
+    console.log('New row created:', row);
   };
 
   const handleActionClick = async (row) => {
@@ -338,6 +357,8 @@ const Selection = () => {
         onConfirm: () => {
           setNewRow(null);
           setSelectedTemplate(null);
+          // Remove the new row from table data
+          setTableData(prev => prev.filter(item => item.id !== rowId));
           toast.info('Changes discarded', {
             description: 'The product was not saved.',
           });
@@ -346,6 +367,8 @@ const Selection = () => {
     } else {
       setNewRow(null);
       setSelectedTemplate(null);
+      // Remove the new row from table data
+      setTableData(prev => prev.filter(item => item.id !== rowId));
     }
   };
 

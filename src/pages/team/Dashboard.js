@@ -357,15 +357,15 @@ const Dashboard = () => {
         {loading ? (
           <LoadingTable />
         ) : (
-          <DashboardTable 
-            data={paginatedData}
-            totalItems={filteredData.length}
-            currentPage={currentPage}
-            totalPages={totalPages}
-            pageSize={pageSize}
-            onPageChange={handlePageChange}
-            onPageSizeChange={handlePageSizeChange}
-          />
+        <DashboardTable 
+          data={paginatedData}
+          totalItems={filteredData.length}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+        />
         )}
       </div>
 

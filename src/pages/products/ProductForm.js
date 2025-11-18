@@ -120,12 +120,18 @@ const ProductForm = () => {
         const product = await CatalogAPI.getById(productId);
         console.log('Loaded product from API:', product);
         
-        // Use all_variations from API if available, otherwise use productData variations
-        const apiVariations = product.all_variations || [];
+        // Extract essential info from nested structure
+        const essentialInfo = product.essentialInfo || {};
+        const finishedGoods = product.finishedGoods || {};
+        const pdpSetup = product.pdpSetup || {};
+        
+        // Use variations from API if available, otherwise use productData variations
+        const apiVariations = product.variations || [];
         const navVariations = productData.variations || [];
         
         console.log('===== VARIATION DEBUG =====');
         console.log('Product from API:', product);
+        console.log('Essential Info:', essentialInfo);
         console.log('API Variations Count:', apiVariations.length);
         console.log('API Variations:', apiVariations);
         console.log('Navigation Variations Count:', navVariations.length);
@@ -167,20 +173,20 @@ const ProductForm = () => {
             bottleName: '',
             closureName: '',
             labelSize: '',
-            childAsin: v.childAsin || '',
-            parentAsin: v.parentAsin || ''
+            childAsin: v.childAsin || v.child_asin || '',
+            parentAsin: v.parentAsin || v.parent_asin || ''
           }));
         } else {
           // Default single variation
           console.log('⚠️ Using single default variation');
           formVariations = [{
             id: 1,
-            units: product.size || '',
-            bottleName: product.packaging_name || '',
-            closureName: product.closure_name || '',
-            labelSize: product.label_size || '',
-            childAsin: product.child_asin || '',
-            parentAsin: product.parent_asin || ''
+            units: essentialInfo.size || '',
+            bottleName: finishedGoods.packagingName || '',
+            closureName: finishedGoods.closureName || '',
+            labelSize: finishedGoods.labelSize || '',
+            childAsin: essentialInfo.childAsin || '',
+            parentAsin: essentialInfo.parentAsin || ''
           }];
         }
         
@@ -201,23 +207,23 @@ const ProductForm = () => {
         
         const updatedVariations = formVariations;
         
-        // Populate form with existing data
+        // Populate form with existing data from nested structure
         setFormData(prev => ({
           ...prev,
-          salesMarketplace: normalizeMarketplace(product.marketplace) || '',
-          sellerAccount: product.seller_account || productData.account || '',
-          country: countryCodeToName(product.country) || '',
-          brandName: product.brand_name || productData.brand || '',
-          productName: product.product_name || productData.product || '',
-          productType: product.type || '',
-          formula: product.formula_name || '',
-          upc: product.upc ? String(product.upc).replace('.0', '') : '',
-          parentMap: product.parent_sku_final || '',
-          childMap: product.child_sku_final || '',
+          salesMarketplace: normalizeMarketplace(essentialInfo.marketplace) || '',
+          sellerAccount: product.sellerAccount || essentialInfo.sellerAccount || productData.account || '',
+          country: countryCodeToName(essentialInfo.country) || '',
+          brandName: product.brandName || essentialInfo.brandName || productData.brand || '',
+          productName: product.productName || essentialInfo.productName || productData.product || '',
+          productType: essentialInfo.type || '',
+          formula: essentialInfo.formulaName || '',
+          upc: essentialInfo.upc ? String(essentialInfo.upc).replace('.0', '') : '',
+          parentMap: essentialInfo.parentSku || '',
+          childMap: essentialInfo.childSku || '',
           variations: updatedVariations,
-          coreCompetitors: product.core_competitor_asins ? product.core_competitor_asins.split(', ').filter(c => c) : ['', '', ''],
-          otherCompetitors: product.other_competitor_asins ? product.other_competitor_asins.split(', ').filter(c => c) : [''],
-          otherKeywords: product.other_keywords ? product.other_keywords.split(', ').filter(k => k) : [''],
+          coreCompetitors: pdpSetup.coreCompetitorAsins ? pdpSetup.coreCompetitorAsins.split(', ').filter(c => c) : ['', '', ''],
+          otherCompetitors: pdpSetup.otherCompetitorAsins ? pdpSetup.otherCompetitorAsins.split(', ').filter(c => c) : [''],
+          otherKeywords: pdpSetup.otherKeywords ? pdpSetup.otherKeywords.split(', ').filter(k => k) : [''],
           notes: typeof product.notes === 'string' ? product.notes : (product.notes?.text || ''),
         }));
         

@@ -397,7 +397,7 @@ def get_development(event):
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
     try:
-        # Fetch all catalog products
+        # Fetch all catalog products INCLUDING status from notes
         cursor.execute("""
             SELECT 
                 id,
@@ -405,6 +405,7 @@ def get_development(event):
                 brand_name,
                 seller_account,
                 size,
+                notes->>'status' as status,
                 
                 -- Essential Info fields
                 marketplace, country, type, formula_name, upc,
@@ -495,6 +496,7 @@ def get_development(event):
                 
                 grouped[product_name] = {
                     'id': product.get('id'),
+                    'status': product.get('status'),  # ADD STATUS HERE
                     'account': product.get('seller_account') or '',
                     'brand': product.get('brand_name') or '',
                     'product': product_name,

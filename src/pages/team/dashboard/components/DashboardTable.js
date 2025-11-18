@@ -101,12 +101,12 @@ const DashboardTable = ({
                     style={{ padding: '0.375rem 0.75rem', verticalAlign: 'middle', textAlign: 'center' }}
                   >
                     {onStatusClick ? (
-                      <button
+                    <button
                         onClick={() => onStatusClick(row.id, stage.key, row[stage.key])}
-                        className="inline-flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
-                      >
-                        <StatusIndicator status={row[stage.key]} />
-                      </button>
+                      className="inline-flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
+                    >
+                      <StatusIndicator status={row[stage.key]} />
+                    </button>
                     ) : (
                       <div className="inline-flex items-center justify-center">
                         <StatusIndicator status={row[stage.key]} />

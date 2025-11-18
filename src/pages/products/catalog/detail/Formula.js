@@ -12,16 +12,23 @@ const Formula = ({ data }) => {
     inputBg: isDarkMode ? 'bg-dark-bg-tertiary' : 'bg-gray-50',
   };
 
+  // Get formula data - can be at data level or data.formula level
+  const formulaData = data?.formula || data;
+  const formulaName = formulaData?.formulaName || data?.formula_name || data?.formulaName;
+  
   // Determine which brand data to display (first available)
-  const brandData = data?.tps?.guaranteedAnalysis ? data.tps :
+  const brandData = formulaData?.tps?.guaranteedAnalysis ? formulaData.tps :
+                    formulaData?.tpsNutrients?.guaranteedAnalysis ? formulaData.tpsNutrients :
+                    formulaData?.bloomCity?.guaranteedAnalysis ? formulaData.bloomCity :
+                    data?.tps?.guaranteedAnalysis ? data.tps :
                     data?.tpsNutrients?.guaranteedAnalysis ? data.tpsNutrients :
                     data?.bloomCity?.guaranteedAnalysis ? data.bloomCity : null;
 
-  const activeBrand = data?.tps?.guaranteedAnalysis ? 'TPS Plant Foods' :
-                      data?.tpsNutrients?.guaranteedAnalysis ? 'TPS Nutrients' :
-                      data?.bloomCity?.guaranteedAnalysis ? 'Bloom City' : null;
+  const activeBrand = (formulaData?.tps?.guaranteedAnalysis || data?.tps?.guaranteedAnalysis) ? 'TPS Plant Foods' :
+                      (formulaData?.tpsNutrients?.guaranteedAnalysis || data?.tpsNutrients?.guaranteedAnalysis) ? 'TPS Nutrients' :
+                      (formulaData?.bloomCity?.guaranteedAnalysis || data?.bloomCity?.guaranteedAnalysis) ? 'Bloom City' : null;
 
-  const hasContent = !!(data?.formulaName || brandData);
+  const hasContent = !!(formulaName || brandData);
 
   return (
     <div className={`${themeClasses.bg} rounded-xl border ${themeClasses.border} shadow-sm`}>
@@ -46,10 +53,10 @@ const Formula = ({ data }) => {
       <div className="px-6 pb-6" style={{ paddingTop: '1.5rem' }}>
         {hasContent ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
-            {data?.formulaName && (
+            {formulaName && (
               <div>
                 <label className={`text-xs ${themeClasses.textSecondary} block mb-2`}>Formula Name</label>
-                <div className={`text-sm font-medium ${themeClasses.text}`}>{data.formulaName}</div>
+                <div className={`text-sm font-medium ${themeClasses.text}`} style={{ fontFamily: 'monospace' }}>{formulaName}</div>
               </div>
             )}
             {activeBrand && (
@@ -58,16 +65,16 @@ const Formula = ({ data }) => {
                 <div className={`text-sm font-medium ${themeClasses.text}`}>{activeBrand}</div>
               </div>
             )}
-            {data?.category && (
+            {formulaData?.category && (
               <div>
                 <label className={`text-xs ${themeClasses.textSecondary} block mb-2`}>Category</label>
-                <div className={`text-sm ${themeClasses.text}`}>{data.category}</div>
+                <div className={`text-sm ${themeClasses.text}`}>{formulaData.category}</div>
               </div>
             )}
-            {data?.type && (
+            {formulaData?.type && (
               <div>
                 <label className={`text-xs ${themeClasses.textSecondary} block mb-2`}>Type</label>
-                <div className={`text-sm ${themeClasses.text}`}>{data.type}</div>
+                <div className={`text-sm ${themeClasses.text}`}>{formulaData.type}</div>
               </div>
             )}
             {brandData?.npk && (
@@ -110,11 +117,11 @@ const Formula = ({ data }) => {
                 </div>
               </div>
             )}
-            {data?.msds && (
+            {(formulaData?.msds || data?.msds) && (
               <div>
                 <label className={`text-xs ${themeClasses.textSecondary} block mb-2`}>MSDS Document</label>
                 <a 
-                  href={data.msds} 
+                  href={formulaData?.msds || data?.msds} 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="text-sm text-blue-500 hover:text-blue-600 flex items-center gap-1"

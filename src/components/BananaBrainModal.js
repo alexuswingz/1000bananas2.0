@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
+import OpenAIService from '../services/openaiService';
 
 const BananaBrainModal = ({ isOpen, onClose, analysis, onAskQuestion, isLoading }) => {
   const { isDarkMode } = useTheme();
@@ -7,6 +8,8 @@ const BananaBrainModal = ({ isOpen, onClose, analysis, onAskQuestion, isLoading 
   const [isAsking, setIsAsking] = useState(false);
   const [conversation, setConversation] = useState([]);
   const [isClosing, setIsClosing] = useState(false);
+  const [suggestedQuestions, setSuggestedQuestions] = useState([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const chatEndRef = useRef(null);
 
   useEffect(() => {
@@ -24,6 +27,36 @@ const BananaBrainModal = ({ isOpen, onClose, analysis, onAskQuestion, isLoading 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [conversation]);
+
+  // Generate suggested questions only once after initial analysis
+  useEffect(() => {
+    const generateSuggestions = async () => {
+      // Only generate suggestions once after the initial analysis
+      // conversation.length === 1 means we just got the first assistant response
+      if (conversation.length === 1 && !isAsking && !loadingSuggestions && suggestedQuestions.length === 0) {
+        // Small delay to ensure conversation is stable
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        setLoadingSuggestions(true);
+        try {
+          const suggestions = await OpenAIService.generateSuggestedQuestions(conversation);
+          setSuggestedQuestions(suggestions);
+        } catch (error) {
+          console.error('Error generating suggestions:', error);
+          // Use fallback suggestions on error
+          setSuggestedQuestions([
+            "What specific actions should I take first?",
+            "How can I improve my conversion rate?",
+            "What's the best way to optimize my ad spend?"
+          ]);
+        } finally {
+          setLoadingSuggestions(false);
+        }
+      }
+    };
+
+    generateSuggestions();
+  }, [conversation, isAsking, loadingSuggestions, suggestedQuestions.length]);
 
   const handleAskQuestion = async () => {
     if (!question.trim() || isAsking) return;
@@ -56,6 +89,10 @@ const BananaBrainModal = ({ isOpen, onClose, analysis, onAskQuestion, isLoading 
     } finally {
       setIsAsking(false);
     }
+  };
+
+  const handleSuggestionClick = (suggestion) => {
+    setQuestion(suggestion);
   };
 
   const handleKeyPress = (e) => {
@@ -127,6 +164,9 @@ const BananaBrainModal = ({ isOpen, onClose, analysis, onAskQuestion, isLoading 
     setIsClosing(true);
     setTimeout(() => {
       setIsClosing(false);
+      setConversation([]);
+      setSuggestedQuestions([]);
+      setQuestion('');
       onClose();
     }, 200);
   };
@@ -150,49 +190,63 @@ const BananaBrainModal = ({ isOpen, onClose, analysis, onAskQuestion, isLoading 
           @keyframes slideUp {
             from { 
               opacity: 0;
-              transform: translateY(30px) scale(0.95);
+              transform: translateY(20px);
             }
             to { 
               opacity: 1;
-              transform: translateY(0) scale(1);
+              transform: translateY(0);
             }
           }
           @keyframes slideDown {
             from { 
               opacity: 1;
-              transform: translateY(0) scale(1);
+              transform: translateY(0);
             }
             to { 
               opacity: 0;
-              transform: translateY(30px) scale(0.95);
+              transform: translateY(20px);
             }
           }
           @keyframes pulse {
             0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+            50% { opacity: 0.6; }
           }
-          @keyframes shimmer {
-            0% { background-position: -1000px 0; }
-            100% { background-position: 1000px 0; }
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
           }
-          @keyframes glow {
-            0%, 100% { box-shadow: 0 0 20px rgba(251, 191, 36, 0.3), 0 0 40px rgba(251, 191, 36, 0.1); }
-            50% { box-shadow: 0 0 30px rgba(251, 191, 36, 0.5), 0 0 60px rgba(251, 191, 36, 0.2); }
+          @keyframes subtleGlow {
+            0%, 100% { 
+              box-shadow: 0 0 15px rgba(251, 191, 36, 0.2);
+            }
+            50% { 
+              box-shadow: 0 0 25px rgba(251, 191, 36, 0.3);
+            }
           }
           .modal-backdrop {
             animation: ${isClosing ? 'fadeOut' : 'fadeIn'} 0.2s ease-out;
           }
           .modal-content {
-            animation: ${isClosing ? 'slideDown' : 'slideUp'} 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            animation: ${isClosing ? 'slideDown' : 'slideUp'} 0.25s ease-out;
           }
           .gradient-text {
-            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            background: linear-gradient(120deg, #fbbf24 0%, #f59e0b 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
           }
           .message-fade-in {
             animation: slideUp 0.3s ease-out;
+          }
+          @keyframes bubbleFloat {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-3px); }
+          }
+          .suggestion-bubble {
+            animation: slideUp 0.3s ease-out;
+          }
+          .suggestion-bubble:hover {
+            animation: bubbleFloat 0.6s ease-in-out;
           }
         `}
       </style>
@@ -204,8 +258,8 @@ const BananaBrainModal = ({ isOpen, onClose, analysis, onAskQuestion, isLoading 
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.85) 0%, rgba(15, 23, 42, 0.9) 100%)',
-          backdropFilter: 'blur(8px)',
+          background: 'rgba(0, 0, 0, 0.75)',
+          backdropFilter: 'blur(12px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -223,73 +277,72 @@ const BananaBrainModal = ({ isOpen, onClose, analysis, onAskQuestion, isLoading 
         <div 
           className="modal-content"
           style={{
-            background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-            borderRadius: '1.5rem',
+            background: 'linear-gradient(145deg, #0f172a 0%, #1e293b 100%)',
+            borderRadius: '1.25rem',
             width: '100%',
-            maxWidth: '800px',
-            maxHeight: '85vh',
+            maxWidth: '850px',
+            maxHeight: '88vh',
             display: 'flex',
             flexDirection: 'column',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(251, 191, 36, 0.1)',
-            border: '1px solid rgba(251, 191, 36, 0.2)',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 1px rgba(251, 191, 36, 0.3)',
+            border: '1px solid rgba(251, 191, 36, 0.15)',
             overflow: 'hidden',
             position: 'relative'
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Decorative gradient overlay */}
+          {/* Subtle gradient accent */}
           <div style={{
             position: 'absolute',
             top: 0,
             left: 0,
             right: 0,
-            height: '200px',
-            background: 'radial-gradient(ellipse at top, rgba(251, 191, 36, 0.15) 0%, transparent 60%)',
+            height: '1px',
+            background: 'linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.5), transparent)',
             pointerEvents: 'none'
           }} />
           {/* Header */}
           <div style={{
-            padding: '2rem 2rem 1.5rem',
-            borderBottom: '1px solid rgba(251, 191, 36, 0.2)',
+            padding: '1.75rem 2rem',
+            borderBottom: '1px solid rgba(251, 191, 36, 0.1)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             position: 'relative',
-            zIndex: 1
+            zIndex: 1,
+            background: 'rgba(15, 23, 42, 0.5)'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
               <div style={{
-                width: '3.5rem',
-                height: '3.5rem',
+                width: '3rem',
+                height: '3rem',
                 background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
-                borderRadius: '1rem',
+                borderRadius: '0.75rem',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '2rem',
-                boxShadow: '0 10px 30px rgba(251, 191, 36, 0.3)',
-                animation: 'glow 3s ease-in-out infinite'
+                fontSize: '1.5rem',
+                boxShadow: '0 4px 12px rgba(251, 191, 36, 0.25)'
               }}>
                 🍌
               </div>
               <div>
                 <h2 className="gradient-text" style={{
-                  fontSize: '1.75rem',
-                  fontWeight: '800',
+                  fontSize: '1.5rem',
+                  fontWeight: '700',
                   margin: 0,
-                  letterSpacing: '-0.025em'
+                  letterSpacing: '-0.02em'
                 }}>
                   Banana Brain AI
                 </h2>
                 <p style={{
-                  fontSize: '0.75rem',
+                  fontSize: '0.6875rem',
                   color: '#94a3b8',
-                  margin: '0.25rem 0 0',
+                  margin: '0.125rem 0 0',
                   fontWeight: '500',
-                  letterSpacing: '0.05em',
-                  textTransform: 'uppercase'
+                  letterSpacing: '0.025em'
                 }}>
-                  Advanced Product Intelligence
+                  Product Intelligence
                 </p>
               </div>
             </div>
@@ -300,30 +353,30 @@ const BananaBrainModal = ({ isOpen, onClose, analysis, onAskQuestion, isLoading 
                   <button
                     onClick={() => setShowExportMenu(!showExportMenu)}
                     style={{
-                      background: 'rgba(251, 191, 36, 0.1)',
-                      border: '1px solid rgba(251, 191, 36, 0.3)',
+                      background: 'rgba(251, 191, 36, 0.08)',
+                      border: '1px solid rgba(251, 191, 36, 0.2)',
                       color: '#fbbf24',
                       cursor: 'pointer',
-                      padding: '0.5rem 1rem',
-                      borderRadius: '0.75rem',
+                      padding: '0.5rem 0.875rem',
+                      borderRadius: '0.5rem',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       transition: 'all 0.2s',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      gap: '0.5rem'
+                      fontSize: '0.8125rem',
+                      fontWeight: '500',
+                      gap: '0.375rem'
                     }}
                     onMouseEnter={(e) => {
-                      e.target.style.background = 'rgba(251, 191, 36, 0.2)';
-                      e.target.style.borderColor = 'rgba(251, 191, 36, 0.5)';
+                      e.currentTarget.style.background = 'rgba(251, 191, 36, 0.15)';
+                      e.currentTarget.style.borderColor = 'rgba(251, 191, 36, 0.4)';
                     }}
                     onMouseLeave={(e) => {
-                      e.target.style.background = 'rgba(251, 191, 36, 0.1)';
-                      e.target.style.borderColor = 'rgba(251, 191, 36, 0.3)';
+                      e.currentTarget.style.background = 'rgba(251, 191, 36, 0.08)';
+                      e.currentTarget.style.borderColor = 'rgba(251, 191, 36, 0.2)';
                     }}
                   >
-                    <svg style={{ width: '1rem', height: '1rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg style={{ width: '0.875rem', height: '0.875rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                     Export
@@ -335,12 +388,12 @@ const BananaBrainModal = ({ isOpen, onClose, analysis, onAskQuestion, isLoading 
                       position: 'absolute',
                       top: 'calc(100% + 0.5rem)',
                       right: 0,
-                      background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-                      border: '1px solid rgba(251, 191, 36, 0.3)',
-                      borderRadius: '0.75rem',
-                      boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
-                      padding: '0.5rem',
-                      minWidth: '180px',
+                      background: '#0f172a',
+                      border: '1px solid rgba(251, 191, 36, 0.2)',
+                      borderRadius: '0.5rem',
+                      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
+                      padding: '0.375rem',
+                      minWidth: '160px',
                       zIndex: 9999
                     }}>
                       <button
@@ -442,29 +495,29 @@ const BananaBrainModal = ({ isOpen, onClose, analysis, onAskQuestion, isLoading 
               <button
                 onClick={handleClose}
                 style={{
-                  background: 'rgba(148, 163, 184, 0.1)',
-                  border: '1px solid rgba(148, 163, 184, 0.2)',
+                  background: 'rgba(148, 163, 184, 0.08)',
+                  border: '1px solid rgba(148, 163, 184, 0.15)',
                   color: '#94a3b8',
                   cursor: 'pointer',
-                  fontSize: '1.25rem',
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  borderRadius: '0.75rem',
+                  fontSize: '1.125rem',
+                  width: '2.25rem',
+                  height: '2.25rem',
+                  borderRadius: '0.5rem',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   transition: 'all 0.2s',
-                  fontWeight: '300'
+                  fontWeight: '400'
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.background = 'rgba(239, 68, 68, 0.2)';
-                  e.target.style.borderColor = 'rgba(239, 68, 68, 0.4)';
-                  e.target.style.color = '#ef4444';
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+                  e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+                  e.currentTarget.style.color = '#ef4444';
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.background = 'rgba(148, 163, 184, 0.1)';
-                  e.target.style.borderColor = 'rgba(148, 163, 184, 0.2)';
-                  e.target.style.color = '#94a3b8';
+                  e.currentTarget.style.background = 'rgba(148, 163, 184, 0.08)';
+                  e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.15)';
+                  e.currentTarget.style.color = '#94a3b8';
                 }}
               >
                 ×
@@ -477,7 +530,7 @@ const BananaBrainModal = ({ isOpen, onClose, analysis, onAskQuestion, isLoading 
             flex: 1,
             overflowY: 'auto',
             padding: '2rem',
-            background: 'linear-gradient(180deg, rgba(15, 23, 42, 0.5) 0%, rgba(15, 23, 42, 0.8) 100%)',
+            background: '#0f172a',
             position: 'relative',
             zIndex: 1
           }}>
@@ -488,21 +541,21 @@ const BananaBrainModal = ({ isOpen, onClose, analysis, onAskQuestion, isLoading 
                 alignItems: 'center',
                 justifyContent: 'center',
                 padding: '4rem',
-                gap: '1.5rem'
+                gap: '1.25rem'
               }}>
-                {/* Animated Brain Icon */}
+                {/* Animated Banana Icon */}
                 <div style={{
                   position: 'relative',
-                  width: '4rem',
-                  height: '4rem'
+                  width: '3.5rem',
+                  height: '3.5rem'
                 }}>
                   <div style={{
                     position: 'absolute',
                     width: '100%',
                     height: '100%',
-                    border: '3px solid transparent',
-                    borderTop: '3px solid #fbbf24',
-                    borderRight: '3px solid #fbbf24',
+                    border: '2px solid transparent',
+                    borderTop: '2px solid #fbbf24',
+                    borderRight: '2px solid #fbbf24',
                     borderRadius: '50%',
                     animation: 'spin 1s linear infinite'
                   }} />
@@ -513,35 +566,27 @@ const BananaBrainModal = ({ isOpen, onClose, analysis, onAskQuestion, isLoading 
                     transform: 'translate(-50%, -50%)',
                     fontSize: '1.5rem'
                   }}>
-                    🧠
+                    🍌
                   </div>
                 </div>
                 <div style={{ textAlign: 'center' }}>
                   <p style={{ 
                     color: '#fbbf24', 
-                    fontSize: '1.125rem',
+                    fontSize: '1rem',
                     fontWeight: '600',
-                    margin: '0 0 0.5rem',
-                    letterSpacing: '-0.025em'
+                    margin: '0 0 0.375rem',
+                    letterSpacing: '-0.02em'
                   }}>
                     Analyzing Your Metrics
                   </p>
                   <p style={{ 
                     color: '#64748b', 
-                    fontSize: '0.875rem',
+                    fontSize: '0.8125rem',
                     margin: 0
                   }}>
                     AI is processing performance data...
                   </p>
                 </div>
-                <style>
-                  {`
-                    @keyframes spin {
-                      0% { transform: rotate(0deg); }
-                      100% { transform: rotate(360deg); }
-                    }
-                  `}
-                </style>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -558,21 +603,20 @@ const BananaBrainModal = ({ isOpen, onClose, analysis, onAskQuestion, isLoading 
                   >
                     {/* Avatar */}
                     <div style={{
-                      width: '2.5rem',
-                      height: '2.5rem',
+                      width: '2.25rem',
+                      height: '2.25rem',
                       background: message.role === 'user' 
                         ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' 
                         : 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
-                      borderRadius: '0.75rem',
+                      borderRadius: '0.5rem',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       flexShrink: 0,
-                      fontSize: '1.125rem',
+                      fontSize: '1rem',
                       boxShadow: message.role === 'user'
-                        ? '0 4px 12px rgba(59, 130, 246, 0.3)'
-                        : '0 4px 12px rgba(251, 191, 36, 0.3)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                        ? '0 2px 8px rgba(59, 130, 246, 0.2)'
+                        : '0 2px 8px rgba(251, 191, 36, 0.2)'
                     }}>
                       {message.role === 'user' ? '👤' : '🍌'}
                     </div>
@@ -581,21 +625,21 @@ const BananaBrainModal = ({ isOpen, onClose, analysis, onAskQuestion, isLoading 
                     <div style={{
                       background: message.role === 'user' 
                         ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' 
-                        : 'rgba(30, 41, 59, 0.8)',
+                        : 'rgba(30, 41, 59, 0.6)',
                       backdropFilter: 'blur(10px)',
                       color: '#fff',
-                      padding: '1.25rem',
-                      borderRadius: '1rem',
+                      padding: '1rem 1.25rem',
+                      borderRadius: '0.75rem',
                       maxWidth: '75%',
                       boxShadow: message.role === 'user'
-                        ? '0 4px 20px rgba(59, 130, 246, 0.2)'
-                        : '0 4px 20px rgba(0, 0, 0, 0.3)',
+                        ? '0 2px 12px rgba(59, 130, 246, 0.15)'
+                        : '0 2px 12px rgba(0, 0, 0, 0.2)',
                       border: message.role === 'user'
-                        ? '1px solid rgba(255, 255, 255, 0.2)'
-                        : '1px solid rgba(251, 191, 36, 0.2)',
+                        ? '1px solid rgba(255, 255, 255, 0.15)'
+                        : '1px solid rgba(251, 191, 36, 0.15)',
                       whiteSpace: 'pre-wrap',
                       wordBreak: 'break-word',
-                      fontSize: '0.9375rem',
+                      fontSize: '0.9rem',
                       lineHeight: '1.6',
                       letterSpacing: '-0.01em'
                     }}>
@@ -610,26 +654,25 @@ const BananaBrainModal = ({ isOpen, onClose, analysis, onAskQuestion, isLoading 
                     alignItems: 'flex-start'
                   }}>
                     <div style={{
-                      width: '2.5rem',
-                      height: '2.5rem',
+                      width: '2.25rem',
+                      height: '2.25rem',
                       background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
-                      borderRadius: '0.75rem',
+                      borderRadius: '0.5rem',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '1.125rem',
-                      boxShadow: '0 4px 12px rgba(251, 191, 36, 0.3)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)'
+                      fontSize: '1rem',
+                      boxShadow: '0 2px 8px rgba(251, 191, 36, 0.2)'
                     }}>
                       🍌
                     </div>
                     <div style={{
-                      background: 'rgba(30, 41, 59, 0.8)',
+                      background: 'rgba(30, 41, 59, 0.6)',
                       backdropFilter: 'blur(10px)',
-                      padding: '1.25rem 1.5rem',
-                      borderRadius: '1rem',
-                      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
-                      border: '1px solid rgba(251, 191, 36, 0.2)'
+                      padding: '1rem 1.25rem',
+                      borderRadius: '0.75rem',
+                      boxShadow: '0 2px 12px rgba(0, 0, 0, 0.2)',
+                      border: '1px solid rgba(251, 191, 36, 0.15)'
                     }}>
                       <div style={{ display: 'flex', gap: '0.375rem', alignItems: 'center' }}>
                         <div style={{
@@ -677,19 +720,93 @@ const BananaBrainModal = ({ isOpen, onClose, analysis, onAskQuestion, isLoading 
             )}
           </div>
 
+          {/* Suggested Questions Area */}
+          {!isLoading && suggestedQuestions.length > 0 && !isAsking && (
+            <div style={{
+              padding: '1rem 2rem',
+              background: 'rgba(15, 23, 42, 0.5)',
+              borderTop: '1px solid rgba(251, 191, 36, 0.08)',
+              position: 'relative',
+              zIndex: 1
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                marginBottom: '0.75rem'
+              }}>
+                <svg style={{ width: '0.875rem', height: '0.875rem', color: '#fbbf24' }} fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                </svg>
+                <span style={{
+                  fontSize: '0.6875rem',
+                  color: '#fbbf24',
+                  fontWeight: '600',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em'
+                }}>
+                  Suggested Questions
+                </span>
+              </div>
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '0.75rem'
+              }}>
+                {suggestedQuestions.map((suggestion, index) => (
+                  <button
+                    key={index}
+                    className="suggestion-bubble"
+                    onClick={() => handleSuggestionClick(suggestion)}
+                    style={{
+                      background: 'rgba(251, 191, 36, 0.08)',
+                      border: '1px solid rgba(251, 191, 36, 0.2)',
+                      color: '#fbbf24',
+                      padding: '0.5rem 0.875rem',
+                      borderRadius: '1rem',
+                      fontSize: '0.8125rem',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      maxWidth: '100%',
+                      textAlign: 'left',
+                      lineHeight: '1.4',
+                      backdropFilter: 'blur(10px)',
+                      boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(251, 191, 36, 0.15)';
+                      e.currentTarget.style.borderColor = 'rgba(251, 191, 36, 0.4)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 4px 10px rgba(251, 191, 36, 0.15)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(251, 191, 36, 0.08)';
+                      e.currentTarget.style.borderColor = 'rgba(251, 191, 36, 0.2)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.1)';
+                    }}
+                  >
+                    💡 {suggestion}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Input Area */}
           {!isLoading && (
             <div style={{
-              padding: '1.5rem 2rem 2rem',
-              borderTop: '1px solid rgba(251, 191, 36, 0.2)',
-              background: 'rgba(15, 23, 42, 0.95)',
+              padding: '1.5rem 2rem',
+              borderTop: '1px solid rgba(251, 191, 36, 0.08)',
+              background: 'rgba(15, 23, 42, 0.8)',
               backdropFilter: 'blur(10px)',
               position: 'relative',
               zIndex: 1
             }}>
               <div style={{
                 display: 'flex',
-                gap: '1rem',
+                gap: '0.75rem',
                 alignItems: 'flex-end'
               }}>
                 <div style={{ 
@@ -704,27 +821,27 @@ const BananaBrainModal = ({ isOpen, onClose, analysis, onAskQuestion, isLoading 
                     disabled={isAsking}
                     style={{
                       width: '100%',
-                      padding: '1rem 1.25rem',
-                      background: 'rgba(30, 41, 59, 0.6)',
+                      padding: '0.875rem 1rem',
+                      background: 'rgba(30, 41, 59, 0.5)',
                       backdropFilter: 'blur(10px)',
-                      border: '1px solid rgba(251, 191, 36, 0.3)',
-                      borderRadius: '1rem',
+                      border: '1px solid rgba(251, 191, 36, 0.15)',
+                      borderRadius: '0.75rem',
                       color: '#fff',
-                      fontSize: '0.9375rem',
+                      fontSize: '0.875rem',
                       resize: 'none',
-                      minHeight: '3rem',
-                      maxHeight: '8rem',
+                      minHeight: '2.75rem',
+                      maxHeight: '7rem',
                       fontFamily: 'inherit',
                       transition: 'all 0.2s',
                       outline: 'none'
                     }}
                     onFocus={(e) => {
-                      e.target.style.borderColor = 'rgba(251, 191, 36, 0.6)';
-                      e.target.style.boxShadow = '0 0 0 3px rgba(251, 191, 36, 0.1)';
+                      e.target.style.borderColor = 'rgba(251, 191, 36, 0.4)';
+                      e.target.style.background = 'rgba(30, 41, 59, 0.7)';
                     }}
                     onBlur={(e) => {
-                      e.target.style.borderColor = 'rgba(251, 191, 36, 0.3)';
-                      e.target.style.boxShadow = 'none';
+                      e.target.style.borderColor = 'rgba(251, 191, 36, 0.15)';
+                      e.target.style.background = 'rgba(30, 41, 59, 0.5)';
                     }}
                     rows={1}
                   />
@@ -733,42 +850,42 @@ const BananaBrainModal = ({ isOpen, onClose, analysis, onAskQuestion, isLoading 
                   onClick={handleAskQuestion}
                   disabled={!question.trim() || isAsking}
                   style={{
-                    padding: '1rem 2rem',
+                    padding: '0.875rem 1.5rem',
                     background: question.trim() && !isAsking 
                       ? 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)' 
-                      : 'rgba(100, 116, 139, 0.3)',
-                    color: '#000',
+                      : 'rgba(100, 116, 139, 0.25)',
+                    color: question.trim() && !isAsking ? '#000' : '#64748b',
                     border: 'none',
-                    borderRadius: '1rem',
-                    fontSize: '0.9375rem',
-                    fontWeight: '700',
+                    borderRadius: '0.75rem',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
                     cursor: question.trim() && !isAsking ? 'pointer' : 'not-allowed',
                     whiteSpace: 'nowrap',
                     transition: 'all 0.2s',
                     boxShadow: question.trim() && !isAsking 
-                      ? '0 4px 16px rgba(251, 191, 36, 0.4)' 
+                      ? '0 2px 8px rgba(251, 191, 36, 0.3)' 
                       : 'none',
-                    letterSpacing: '-0.025em'
+                    letterSpacing: '-0.01em'
                   }}
                   onMouseEnter={(e) => {
                     if (question.trim() && !isAsking) {
-                      e.target.style.transform = 'translateY(-2px)';
-                      e.target.style.boxShadow = '0 6px 20px rgba(251, 191, 36, 0.5)';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(251, 191, 36, 0.4)';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    e.target.style.transform = 'translateY(0)';
+                    e.currentTarget.style.transform = 'translateY(0)';
                     if (question.trim() && !isAsking) {
-                      e.target.style.boxShadow = '0 4px 16px rgba(251, 191, 36, 0.4)';
+                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(251, 191, 36, 0.3)';
                     }
                   }}
                 >
                   {isAsking ? (
                     <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <div style={{
-                        width: '1rem',
-                        height: '1rem',
-                        border: '2px solid rgba(0, 0, 0, 0.3)',
+                        width: '0.875rem',
+                        height: '0.875rem',
+                        border: '2px solid rgba(0, 0, 0, 0.2)',
                         borderTop: '2px solid #000',
                         borderRadius: '50%',
                         animation: 'spin 0.6s linear infinite'
@@ -781,19 +898,19 @@ const BananaBrainModal = ({ isOpen, onClose, analysis, onAskQuestion, isLoading 
                 </button>
               </div>
               <div style={{
-                marginTop: '1rem',
-                fontSize: '0.75rem',
-                color: '#475569',
+                marginTop: '0.875rem',
+                fontSize: '0.6875rem',
+                color: '#64748b',
                 textAlign: 'center',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '0.5rem'
+                gap: '0.375rem'
               }}>
                 <span style={{
-                  width: '0.375rem',
-                  height: '0.375rem',
-                  background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+                  width: '0.25rem',
+                  height: '0.25rem',
+                  background: '#fbbf24',
                   borderRadius: '50%',
                   animation: 'pulse 2s ease-in-out infinite'
                 }} />

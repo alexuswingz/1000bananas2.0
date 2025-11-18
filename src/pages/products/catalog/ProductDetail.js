@@ -292,11 +292,18 @@ const ProductDetail = () => {
         website_url: website.websiteUrl || labelCopy.website || '',
         website: website.websiteUrl || labelCopy.website || '',
         
-        // Formula tab data (consolidated)
-        formula_guaranteed_analysis: formula.guaranteedAnalysis || '',
-        formula_npk: formula.npk || '',
-        formula_derived_from: formula.derivedFrom || '',
-        formula_msds: formula.msds || '',
+        // Formula tab data (complete formula object from API)
+        formula: {
+          formulaName: formula.formulaName || essentialInfo.formulaName || '',
+          category: formula.category || '',
+          type: formula.type || '',
+          filter: formula.filter || '',
+          brands: formula.brands || {},
+          tps: formula.tps || {},
+          tpsNutrients: formula.tpsNutrients || {},
+          bloomCity: formula.bloomCity || {},
+          msds: formula.msds || finishedGoods.formula?.msds || ''
+        },
         
         // Vine tab data
         vine_enrolled: vine.vineEnrolled || false,
@@ -333,7 +340,24 @@ const ProductDetail = () => {
       country: 'U.S.',
       type: product?.type || 'Product',
       variations: productConfig.variations.length > 0 ? productConfig.variations : ['Default'],
-      variationType: productConfig.variationType || 'size'
+      variationType: productConfig.variationType || 'size',
+      // Formula data for fallback
+      formula: {
+        formulaName: product?.formula_name || '',
+        category: '',
+        type: '',
+        filter: '',
+        brands: {},
+        tps: {
+          guaranteedAnalysis: product?.guaranteed_analysis || '',
+          npk: product?.npk || '',
+          derivedFrom: product?.derived_from || '',
+          storageWarranty: product?.storage_warranty || ''
+        },
+        tpsNutrients: {},
+        bloomCity: {},
+        msds: product?.msds || ''
+      }
     };
   }, [apiProductData, product, productConfig, isChildView, specificChildId]);
 

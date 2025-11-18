@@ -64,6 +64,45 @@ const LoadingTable = () => {
   );
 };
 
+// Empty state component
+const EmptyState = () => {
+  const { isDarkMode } = useTheme();
+  
+  const themeClasses = {
+    bg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
+    border: isDarkMode ? 'border-dark-border-primary' : 'border-gray-200',
+    text: isDarkMode ? 'text-dark-text-primary' : 'text-gray-900',
+    textSecondary: isDarkMode ? 'text-dark-text-secondary' : 'text-gray-500',
+  };
+
+  return (
+    <div className={`${themeClasses.bg} rounded-xl border ${themeClasses.border} shadow-lg`} 
+      style={{ 
+        height: '100%', 
+        display: 'flex', 
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '4rem 2rem',
+        minHeight: '400px'
+      }}
+    >
+      <div style={{ textAlign: 'center', maxWidth: '400px' }}>
+        <div style={{ fontSize: '4rem', marginBottom: '1.5rem', opacity: 0.3 }}>
+          📦
+        </div>
+        <h3 className={`text-lg font-semibold ${themeClasses.text} mb-2`}>
+          No Data Available
+        </h3>
+        <p className={`text-sm ${themeClasses.textSecondary}`}>
+          There are no products in development at the moment.
+          All products may have been launched or no data has been added yet.
+        </p>
+      </div>
+    </div>
+  );
+};
+
 const Development = () => {
   const { isDarkMode } = useTheme();
 
@@ -287,6 +326,11 @@ const Development = () => {
   // Filter data based on search and filters
   const filteredData = useMemo(() => {
     return dataToUse.filter((item) => {
+      // Exclude products with "Launched" or "launched" status (case-insensitive)
+      if (item.status && item.status.toLowerCase() === 'launched') {
+        return false;
+      }
+
       // Search filter
       const searchLower = searchTerm.toLowerCase();
       const matchesSearch = searchTerm === '' || 
@@ -351,6 +395,8 @@ const Development = () => {
       <div style={{ flex: 1, padding: '0 2rem 2rem 2rem' }}>
         {loading ? (
           <LoadingTable />
+        ) : filteredData.length === 0 ? (
+          <EmptyState />
         ) : (
           <DevelopmentTable 
             data={paginatedData}
