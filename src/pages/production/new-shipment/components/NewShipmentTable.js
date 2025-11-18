@@ -137,8 +137,8 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
     return (
       <>
         <div
-          className={`${themeClasses.cardBg} ${themeClasses.border} border rounded-xl shadow-sm`}
-          style={{ marginTop: '1.25rem' }}
+          className={`${themeClasses.cardBg} ${themeClasses.border} border shadow-sm`}
+          style={{ marginTop: '1.25rem', borderRadius: '6px', overflow: 'hidden' }}
         >
           <div style={{ overflowX: 'auto' }}>
             <table
@@ -149,7 +149,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
               }}
             >
               <thead className={themeClasses.headerBg}>
-                <tr style={{ height: '40px' }}>
+                <tr style={{ height: '40px', maxHeight: '40px' }}>
                   {['Brand', 'Product', 'Size', 'Add', 'Qty'].map((col, idx) => (
                     <th
                       key={col}
@@ -157,8 +157,11 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                       style={{
                         padding: '0 1rem',
                         height: '40px',
+                        maxHeight: '40px',
                         lineHeight: '40px',
+                        boxSizing: 'border-box',
                         textAlign: idx === 3 || idx === 4 ? 'center' : 'left',
+                        borderRight: '1px solid #FFFFFF',
                         width:
                           idx === 0
                             ? 160
@@ -179,8 +182,12 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                     style={{
                       padding: '0 1rem',
                       height: '40px',
+                      maxHeight: '40px',
+                      boxSizing: 'border-box',
                       textAlign: 'left',
                       verticalAlign: 'middle',
+                      overflow: 'hidden',
+                      borderRight: '1px solid #FFFFFF',
                     }}
                   >
                     <div
@@ -190,6 +197,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                         fontSize: '0.6rem',
                         marginBottom: '2px',
                         paddingRight: '24px',
+                        lineHeight: '1.2',
                       }}
                     >
                       <div style={{ marginLeft: '20px' }}>
@@ -204,8 +212,8 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                     <div
                       style={{
                         position: 'relative',
-                        height: '22px',
-                        marginTop: '-6px',
+                        height: '18px',
+                        marginTop: '-4px',
                       }}
                     >
                       {[
@@ -260,11 +268,11 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
               </thead>
               <tbody>
                 {rows.map((row, index) => (
-                  <tr key={row.id} className="border-t border-gray-200">
-                    <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem' }} className={themeClasses.text}>
+                  <tr key={row.id} className="border-t border-gray-200" style={{ height: '40px', maxHeight: '40px' }}>
+                    <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }} className={themeClasses.text}>
                       {row.brand}
                     </td>
-                    <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem' }}>
+                    <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }}>
                       <button
                         type="button"
                         onClick={() => onProductClick(row)}
@@ -274,10 +282,10 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                         {row.product}...
                       </button>
                     </td>
-                    <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem' }} className={themeClasses.textSecondary}>
+                    <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }} className={themeClasses.textSecondary}>
                       {row.size}
                     </td>
-                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center' }}>
+                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }}>
                       <button
                         type="button"
                         style={{
@@ -316,7 +324,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                         <span>Add</span>
                       </button>
                     </td>
-                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center' }}>
+                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }}>
                       <input
                         type="number"
                         value={row.qty}
@@ -329,7 +337,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                         }}
                       />
                     </td>
-                    <td style={{ padding: '0.65rem 1rem', minWidth: '380px' }}>
+                    <td style={{ padding: '0.65rem 1rem', minWidth: '380px', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }}>
                       <div
                         style={{
                           width: '86%',
@@ -469,7 +477,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
       `}</style>
       <div
       className={`${themeClasses.cardBg} ${themeClasses.border} border shadow-sm`}
-      style={{ marginTop: '1.25rem', borderRadius: '12px', overflow: 'hidden' }}
+      style={{ marginTop: '1.25rem', borderRadius: '6px', overflow: 'hidden' }}
     >
       <div style={{ 
         overflowX: 'auto', 
@@ -488,7 +496,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
           }}
         >
           <thead className={themeClasses.headerBg}>
-            <tr style={{ height: '40px' }}>
+            <tr style={{ height: '40px', maxHeight: '40px' }}>
               {/* Sticky columns */}
               <th style={{ 
                 padding: '0 0.75rem', 
@@ -496,13 +504,16 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                 minWidth: '40px',
                 maxWidth: '40px',
                 height: '40px',
+                maxHeight: '40px',
+                boxSizing: 'border-box',
                 textAlign: 'center',
                 position: 'sticky',
                 left: 0,
                 zIndex: 20,
                 backgroundColor: '#1C2634',
                 boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
-                borderTopLeftRadius: '12px',
+                borderTopLeftRadius: '6px',
+                borderRight: '1px solid #FFFFFF',
               }}>
                 <input 
                   type="checkbox" 
@@ -525,6 +536,8 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   minWidth: '150px',
                   maxWidth: '150px',
                   height: '40px',
+                  maxHeight: '40px',
+                  boxSizing: 'border-box',
                   boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
                   fontFamily: 'Inter, sans-serif',
                   fontWeight: 600,
@@ -559,6 +572,8 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   minWidth: '200px',
                   maxWidth: '200px',
                   height: '40px',
+                  maxHeight: '40px',
+                  boxSizing: 'border-box',
                   boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
                   fontFamily: 'Inter, sans-serif',
                   fontWeight: 600,
@@ -593,6 +608,8 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   minWidth: '120px',
                   maxWidth: '120px',
                   height: '40px',
+                  maxHeight: '40px',
+                  boxSizing: 'border-box',
                   boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
                   fontFamily: 'Inter, sans-serif',
                   fontWeight: 600,
@@ -622,6 +639,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   textAlign: 'center', 
                   width: '143px',
                   height: '40px',
+                  maxHeight: '40px',
                   borderRight: '1px solid #FFFFFF',
                   boxSizing: 'border-box',
                   fontFamily: 'Inter, sans-serif',
@@ -651,6 +669,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   textAlign: 'center', 
                   width: '143px',
                   height: '40px',
+                  maxHeight: '40px',
                   borderRight: '1px solid #FFFFFF',
                   boxSizing: 'border-box',
                   backgroundColor: '#1C2634',
@@ -703,6 +722,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   textAlign: 'center', 
                   width: '143px',
                   height: '40px',
+                  maxHeight: '40px',
                   borderRight: '1px solid #FFFFFF',
                   boxSizing: 'border-box',
                   backgroundColor: '#1C2634',
@@ -755,6 +775,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   textAlign: 'center', 
                   width: '143px',
                   height: '40px',
+                  maxHeight: '40px',
                   borderRight: '1px solid #FFFFFF',
                   boxSizing: 'border-box',
                   fontFamily: 'Inter, sans-serif',
@@ -784,6 +805,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   textAlign: 'center', 
                   width: '143px',
                   height: '40px',
+                  maxHeight: '40px',
                   borderRight: '1px solid #FFFFFF',
                   boxSizing: 'border-box',
                   fontFamily: 'Inter, sans-serif',
@@ -813,6 +835,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   textAlign: 'center', 
                   width: '143px',
                   height: '40px',
+                  maxHeight: '40px',
                   borderRight: '1px solid #FFFFFF',
                   boxSizing: 'border-box',
                   fontFamily: 'Inter, sans-serif',
@@ -842,6 +865,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   textAlign: 'center', 
                   width: '143px',
                   height: '40px',
+                  maxHeight: '40px',
                   borderRight: '1px solid #FFFFFF',
                   boxSizing: 'border-box',
                   fontFamily: 'Inter, sans-serif',
@@ -871,6 +895,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   textAlign: 'center', 
                   width: '143px',
                   height: '40px',
+                  maxHeight: '40px',
                   borderRight: '1px solid #FFFFFF',
                   boxSizing: 'border-box',
                   fontFamily: 'Inter, sans-serif',
@@ -898,6 +923,8 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                 padding: '0 1rem', 
                 width: '40px',
                 height: '40px',
+                maxHeight: '40px',
+                boxSizing: 'border-box',
                 textAlign: 'center',
                 position: 'sticky',
                 right: 0,
@@ -905,7 +932,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                 backgroundColor: '#1C2634',
                 boxShadow: '-2px 0 4px rgba(0,0,0,0.1)',
                 borderRight: '1px solid #FFFFFF',
-                borderTopRightRadius: '12px',
+                borderTopRightRadius: '6px',
               }}>
                 <span style={{ color: '#FFFFFF', fontSize: '1rem' }}>⋮</span>
               </th>
@@ -913,7 +940,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
           </thead>
           <tbody>
             {rows.map((row, index) => (
-              <tr key={row.id} style={{ height: '40px' }}>
+              <tr key={row.id} style={{ height: '40px', maxHeight: '40px' }}>
                 {/* Sticky columns */}
                 <td style={{ 
                   padding: '0.65rem 0.75rem', 
@@ -925,6 +952,8 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   width: '40px',
                   minWidth: '40px',
                   maxWidth: '40px',
+                  height: '40px',
+                  verticalAlign: 'middle',
                   boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
                   borderTop: '1px solid #E5E7EB',
                 }}>
@@ -946,6 +975,8 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   width: '150px',
                   minWidth: '150px',
                   maxWidth: '150px',
+                  height: '40px',
+                  verticalAlign: 'middle',
                   boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
                   borderTop: '1px solid #E5E7EB',
                 }} className={themeClasses.text}>
@@ -959,6 +990,8 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   left: '190px',
                   zIndex: 15,
                   backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                  height: '40px',
+                  verticalAlign: 'middle',
                   width: '200px',
                   minWidth: '200px',
                   maxWidth: '200px',
@@ -985,6 +1018,8 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   width: '120px',
                   minWidth: '120px',
                   maxWidth: '120px',
+                  height: '40px',
+                  verticalAlign: 'middle',
                   boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
                   borderTop: '1px solid #E5E7EB',
                 }} className={themeClasses.textSecondary}>
@@ -995,6 +1030,8 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   padding: '12px 16px', 
                   textAlign: 'center', 
                   width: '143px',
+                  height: '40px',
+                  verticalAlign: 'middle',
                   boxSizing: 'border-box',
                   borderTop: '1px solid #E5E7EB',
                 }}>
@@ -1396,6 +1433,8 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   fontSize: '0.85rem', 
                   textAlign: 'center', 
                   width: '143px',
+                  height: '40px',
+                  verticalAlign: 'middle',
                   boxSizing: 'border-box',
                   borderTop: '1px solid #E5E7EB',
                 }} className={themeClasses.text}>
@@ -1406,6 +1445,8 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   fontSize: '0.85rem', 
                   textAlign: 'center', 
                   width: '143px',
+                  height: '40px',
+                  verticalAlign: 'middle',
                   boxSizing: 'border-box',
                   borderTop: '1px solid #E5E7EB',
                 }} className={themeClasses.text}>
@@ -1416,6 +1457,8 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   fontSize: '0.85rem', 
                   textAlign: 'center', 
                   width: '143px',
+                  height: '40px',
+                  verticalAlign: 'middle',
                   boxSizing: 'border-box',
                   borderTop: '1px solid #E5E7EB',
                 }} className={themeClasses.text}>
@@ -1426,6 +1469,8 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   fontSize: '0.85rem', 
                   textAlign: 'center', 
                   width: '143px',
+                  height: '40px',
+                  verticalAlign: 'middle',
                   boxSizing: 'border-box',
                   borderTop: '1px solid #E5E7EB',
                 }} className={themeClasses.text}>
@@ -1436,6 +1481,8 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   fontSize: '0.85rem', 
                   textAlign: 'center', 
                   width: '143px',
+                  height: '40px',
+                  verticalAlign: 'middle',
                   boxSizing: 'border-box',
                   borderTop: '1px solid #E5E7EB',
                 }} className={themeClasses.text}>
@@ -1446,6 +1493,8 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   fontSize: '0.85rem', 
                   textAlign: 'center', 
                   width: '143px',
+                  height: '40px',
+                  verticalAlign: 'middle',
                   boxSizing: 'border-box',
                   borderTop: '1px solid #E5E7EB',
                 }} className={themeClasses.text}>
@@ -1456,6 +1505,8 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   fontSize: '0.85rem', 
                   textAlign: 'center', 
                   width: '143px',
+                  height: '40px',
+                  verticalAlign: 'middle',
                   boxSizing: 'border-box',
                   borderTop: '1px solid #E5E7EB',
                 }} className={themeClasses.text}>
@@ -1469,6 +1520,8 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   right: 0,
                   zIndex: 15,
                   backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                  height: '40px',
+                  verticalAlign: 'middle',
                   boxShadow: '-2px 0 4px rgba(0,0,0,0.1)',
                   borderTop: '1px solid #E5E7EB',
                 }}>

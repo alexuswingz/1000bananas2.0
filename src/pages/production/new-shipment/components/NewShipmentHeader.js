@@ -102,11 +102,19 @@ const NewShipmentHeader = ({ tableMode, onTableModeToggle, onReviewShipmentClick
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
                 <p style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '0.25rem', fontWeight: 600 }}>Marketplace</p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <img
-                    src="https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg"
-                    alt="Amazon"
-                    style={{ height: '0.95rem', objectFit: 'contain' }}
-                  />
+                  {shipmentData?.supplier === 'walmart' ? (
+                    <img
+                      src="/assets/Walmart_logo_(2008).svg 1.png"
+                      alt="Walmart"
+                      style={{ height: '0.95rem', objectFit: 'contain' }}
+                    />
+                  ) : (
+                    <img
+                      src="https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg"
+                      alt="Amazon"
+                      style={{ height: '0.95rem', objectFit: 'contain' }}
+                    />
+                  )}
                 </div>
               </div>
               <div>

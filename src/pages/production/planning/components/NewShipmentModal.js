@@ -1,10 +1,36 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
 const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
   const { isDarkMode } = useTheme();
   const navigate = useNavigate();
+  
+  // Dropdown states
+  const [shipmentTypeOpen, setShipmentTypeOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const shipmentTypeRef = useRef(null);
+  const accountRef = useRef(null);
+  
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (shipmentTypeRef.current && !shipmentTypeRef.current.contains(event.target)) {
+        setShipmentTypeOpen(false);
+      }
+      if (accountRef.current && !accountRef.current.contains(event.target)) {
+        setAccountOpen(false);
+      }
+    };
+
+    if (shipmentTypeOpen || accountOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [shipmentTypeOpen, accountOpen]);
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -49,7 +75,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
         >
           <h2
             className={themeClasses.text}
-            style={{ fontSize: '1rem', fontWeight: 600 }}
+            style={{ fontSize: '1rem', fontWeight: 600, color: isDarkMode ? '#FFFFFF' : '#151515' }}
           >
             New Shipment
           </h2>
@@ -106,7 +132,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
             <div>
               <label
                 className={themeClasses.textSecondary}
-                style={{ fontSize: '0.75rem', fontWeight: 500, display: 'block', marginBottom: '0.25rem' }}
+                style={{ fontSize: '0.75rem', fontWeight: 500, display: 'block', marginBottom: '0.25rem', color: isDarkMode ? '#FFFFFF' : '#151515' }}
               >
                 Shipment # <span style={{ color: '#EF4444' }}>*</span>
               </label>
@@ -124,6 +150,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                 style={{
                   width: '100%',
                   padding: '0.55rem 0.75rem',
+                  color: isDarkMode ? '#FFFFFF' : '#151515',
                 }}
               />
             </div>
@@ -132,53 +159,103 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
             <div>
               <label
                 className={themeClasses.textSecondary}
-                style={{ fontSize: '0.75rem', fontWeight: 500, display: 'block', marginBottom: '0.25rem' }}
+                style={{ fontSize: '0.75rem', fontWeight: 500, display: 'block', marginBottom: '0.25rem', color: isDarkMode ? '#FFFFFF' : '#151515' }}
               >
                 Shipment Type <span style={{ color: '#EF4444' }}>*</span>
               </label>
-              <div
-                className={`${themeClasses.inputBg} ${themeClasses.border} border rounded-lg`}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '0.2rem 0.5rem 0.2rem 0.75rem',
-                }}
-              >
-                <select
-                  value={newShipment.shipmentType}
-                  onChange={(e) =>
-                    setNewShipment((prev) => ({
-                      ...prev,
-                      shipmentType: e.target.value,
-                    }))
-                  }
-                  className={`${themeClasses.inputBg} ${themeClasses.text} text-sm focus:outline-none flex-1`}
+              <div ref={shipmentTypeRef} style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  onClick={() => setShipmentTypeOpen(!shipmentTypeOpen)}
+                  className={`${themeClasses.inputBg} ${themeClasses.border} border rounded-lg hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500`}
                   style={{
-                    border: 'none',
-                    padding: '0.35rem 0',
-                    background: 'transparent',
-                    WebkitAppearance: 'none',
-                    MozAppearance: 'none',
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '0.55rem 0.75rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    minHeight: '38px',
+                    textAlign: 'left',
                   }}
                 >
-                  <option value="">Select Shipment Type</option>
-                  <option value="AWD">AWD</option>
-                  <option value="Direct">Direct</option>
-                </select>
-                <svg
-                  style={{ width: '1rem', height: '1rem', marginLeft: '0.25rem' }}
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M19 9L12 16L5 9"
-                    stroke={isDarkMode ? '#9CA3AF' : '#6B7280'}
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+                  <span
+                    style={{
+                      fontSize: '0.875rem',
+                      color: newShipment.shipmentType ? (isDarkMode ? '#FFFFFF' : '#151515') : (isDarkMode ? '#9CA3AF' : '#9CA3AF'),
+                      fontWeight: 400,
+                    }}
+                  >
+                    {newShipment.shipmentType || 'Select Shipment Type'}
+                  </span>
+                  <svg
+                    className={`transition-transform ${shipmentTypeOpen ? 'rotate-180' : ''}`}
+                    style={{ 
+                      width: '1rem', 
+                      height: '1rem', 
+                      color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                      flexShrink: 0,
+                    }}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M19 9L12 16L5 9"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+                
+                {shipmentTypeOpen && (
+                  <div
+                    className={`fixed ${themeClasses.inputBg} ${themeClasses.border} border rounded-lg shadow-xl overflow-hidden z-50`}
+                    style={{
+                      top: shipmentTypeRef.current?.getBoundingClientRect().bottom + 4 + 'px',
+                      left: shipmentTypeRef.current?.getBoundingClientRect().left + 'px',
+                      width: shipmentTypeRef.current?.offsetWidth + 'px',
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                    }}
+                  >
+                    {['', 'AWD', 'Direct'].map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => {
+                          setNewShipment((prev) => ({ ...prev, shipmentType: option }));
+                          setShipmentTypeOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-2.5 text-sm transition-colors ${
+                          newShipment.shipmentType === option
+                            ? isDarkMode ? 'bg-dark-bg-primary' : 'bg-blue-50'
+                            : isDarkMode ? 'hover:bg-dark-bg-primary' : 'hover:bg-gray-50'
+                        }`}
+                        style={{
+                          color: option ? (isDarkMode ? '#FFFFFF' : '#151515') : (isDarkMode ? '#9CA3AF' : '#9CA3AF'),
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <span>{option || 'Select Shipment Type'}</span>
+                        {newShipment.shipmentType === option && (
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path
+                              fillRule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -186,53 +263,109 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
             <div>
               <label
                 className={themeClasses.textSecondary}
-                style={{ fontSize: '0.75rem', fontWeight: 500, display: 'block', marginBottom: '0.25rem' }}
+                style={{ fontSize: '0.75rem', fontWeight: 500, display: 'block', marginBottom: '0.25rem', color: isDarkMode ? '#FFFFFF' : '#151515' }}
               >
                 Account <span style={{ color: '#EF4444' }}>*</span>
               </label>
-              <div
-                className={`${themeClasses.inputBg} ${themeClasses.border} border rounded-lg`}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '0.2rem 0.5rem 0.2rem 0.75rem',
-                }}
-              >
-                <select
-                  value={newShipment.account}
-                  onChange={(e) =>
-                    setNewShipment((prev) => ({
-                      ...prev,
-                      account: e.target.value,
-                    }))
-                  }
-                  className={`${themeClasses.inputBg} ${themeClasses.text} text-sm focus:outline-none flex-1`}
+              <div ref={accountRef} style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  onClick={() => setAccountOpen(!accountOpen)}
+                  className={`${themeClasses.inputBg} ${themeClasses.border} border rounded-lg hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500`}
                   style={{
-                    border: 'none',
-                    padding: '0.35rem 0',
-                    background: 'transparent',
-                    WebkitAppearance: 'none',
-                    MozAppearance: 'none',
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '0.55rem 0.75rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    minHeight: '38px',
+                    textAlign: 'left',
                   }}
                 >
-                  <option value="">Select Account</option>
-                  <option value="tps-nutrients">TPS Nutrients</option>
-                  <option value="green-earth">Green Earth Co</option>
-                </select>
-                <svg
-                  style={{ width: '1rem', height: '1rem', marginLeft: '0.25rem' }}
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M19 9L12 16L5 9"
-                    stroke={isDarkMode ? '#9CA3AF' : '#6B7280'}
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+                  <span
+                    style={{
+                      fontSize: '0.875rem',
+                      color: newShipment.account ? (isDarkMode ? '#FFFFFF' : '#151515') : (isDarkMode ? '#9CA3AF' : '#9CA3AF'),
+                      fontWeight: 400,
+                    }}
+                  >
+                    {newShipment.account === 'tps-nutrients' ? 'TPS Nutrients' : 
+                     newShipment.account === 'green-earth' ? 'Green Earth Co' : 
+                     'Select Account'}
+                  </span>
+                  <svg
+                    className={`transition-transform ${accountOpen ? 'rotate-180' : ''}`}
+                    style={{ 
+                      width: '1rem', 
+                      height: '1rem', 
+                      color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                      flexShrink: 0,
+                    }}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M19 9L12 16L5 9"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+                
+                {accountOpen && (
+                  <div
+                    className={`fixed ${themeClasses.inputBg} ${themeClasses.border} border rounded-lg shadow-xl overflow-hidden z-50`}
+                    style={{
+                      top: accountRef.current?.getBoundingClientRect().bottom + 4 + 'px',
+                      left: accountRef.current?.getBoundingClientRect().left + 'px',
+                      width: accountRef.current?.offsetWidth + 'px',
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                    }}
+                  >
+                    {[
+                      { value: '', label: 'Select Account' },
+                      { value: 'tps-nutrients', label: 'TPS Nutrients' },
+                      { value: 'green-earth', label: 'Green Earth Co' },
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          setNewShipment((prev) => ({ ...prev, account: option.value }));
+                          setAccountOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-2.5 text-sm transition-colors ${
+                          newShipment.account === option.value
+                            ? isDarkMode ? 'bg-dark-bg-primary' : 'bg-blue-50'
+                            : isDarkMode ? 'hover:bg-dark-bg-primary' : 'hover:bg-gray-50'
+                        }`}
+                        style={{
+                          color: option.value ? (isDarkMode ? '#FFFFFF' : '#151515') : (isDarkMode ? '#9CA3AF' : '#9CA3AF'),
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <span>{option.label}</span>
+                        {newShipment.account === option.value && (
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path
+                              fillRule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -240,7 +373,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
             <div>
               <label
                 className={themeClasses.textSecondary}
-                style={{ fontSize: '0.75rem', fontWeight: 500, display: 'block', marginBottom: '0.25rem' }}
+                style={{ fontSize: '0.75rem', fontWeight: 500, display: 'block', marginBottom: '0.25rem', color: isDarkMode ? '#FFFFFF' : '#151515' }}
               >
                 Location <span style={{ color: '#EF4444' }}>*</span>
               </label>
@@ -258,6 +391,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                 style={{
                   width: '100%',
                   padding: '0.55rem 0.75rem',
+                  color: isDarkMode ? '#FFFFFF' : '#151515',
                 }}
               />
             </div>
@@ -267,7 +401,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
           <div>
             <p
               className={themeClasses.textSecondary}
-              style={{ fontSize: '0.75rem', fontWeight: 500, marginBottom: '0.75rem' }}
+              style={{ fontSize: '0.75rem', fontWeight: 500, marginBottom: '0.75rem', color: isDarkMode ? '#FFFFFF' : '#151515' }}
             >
               Supplier (Select one) <span style={{ color: '#EF4444' }}>*</span>
             </p>
@@ -343,7 +477,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                     </div>
                     <span
                       className={themeClasses.textSecondary}
-                      style={{ fontSize: '0.8rem' }}
+                      style={{ fontSize: '0.8rem', color: isDarkMode ? '#FFFFFF' : '#151515' }}
                     >
                       {supplier.label}
                     </span>
@@ -375,6 +509,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
               backgroundColor: isDarkMode ? '#020617' : '#FFFFFF',
               fontSize: '0.8rem',
               fontWeight: 500,
+              color: isDarkMode ? '#FFFFFF' : '#151515',
             }}
           >
             Cancel
