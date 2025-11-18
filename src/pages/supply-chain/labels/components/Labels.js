@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
-import { showSuccessToast } from '../../../../utils/notifications';
 import InventoryTable from './InventoryTable';
 import OrdersTable from './OrdersTable';
 import ArchivedOrdersTable from './ArchivedOrdersTable';
@@ -100,8 +99,16 @@ const Labels = () => {
     if (newOrderState) {
       const { orderNumber: newOrderNumber } = newOrderState;
       
-      // Show success notification
-      showSuccessToast(`${newOrderNumber} label order submitted`);
+      // Show green banner notification (matching received order style)
+      setNotification({
+        message: `${newOrderNumber} label order submitted`,
+        type: 'success',
+      });
+
+      // Auto-dismiss notification after 5 seconds
+      const timer = setTimeout(() => {
+        setNotification(null);
+      }, 5000);
       
       // Switch to orders tab
       setActiveTab('orders');
@@ -110,6 +117,8 @@ const Labels = () => {
       if (window.history && window.history.replaceState) {
         window.history.replaceState({ ...location.state, newLabelOrder: null }, '');
       }
+
+      return () => clearTimeout(timer);
     }
   }, [location.state]);
 
@@ -119,7 +128,7 @@ const Labels = () => {
     const receivedOrderNumber = location.state && location.state.receivedOrderNumber;
     
     if (receivedOrderId && receivedOrderNumber) {
-      // Show green banner notification
+      // Show green banner notification (matching the image style)
       setNotification({
         message: `${receivedOrderNumber} label order received`,
         type: 'success',
@@ -159,13 +168,14 @@ const Labels = () => {
         supplier: supplierMeta,
         mode: 'view',
         orderId: order.id,
+        lines: order.lines || [], // Pass the saved lines data
       },
     });
   };
 
   return (
     <div className={`p-8 ${themeClasses.pageBg}`}>
-      {/* Green notification banner */}
+      {/* Green notification banner - for create new order and receive order */}
       {notification && (
         <div className="mb-4 bg-green-50 border border-green-200 rounded-lg px-4 py-3 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-2">
@@ -219,7 +229,7 @@ const Labels = () => {
             <div className="flex items-center space-x-5">
               <h1 className={`text-xl font-semibold ${themeClasses.textPrimary}`}>Labels</h1>
 
-              {/* Tabs as pill group */}
+              {/* Tabs as pill group - matching bottles header */}
               <div className={`flex items-center rounded-full border ${themeClasses.border} bg-white/70 dark:bg-dark-bg-tertiary`}>
                 {['inventory', 'orders', 'archive'].map((tabKey, index) => {
                   const labelMap = {

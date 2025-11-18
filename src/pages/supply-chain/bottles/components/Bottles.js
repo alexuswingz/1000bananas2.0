@@ -440,11 +440,11 @@ const Bottles = () => {
               onNewOrderCreated={() => setActiveTab('orders')}
               archivedOrdersRef={archivedOrdersTableRef}
             />
-          </div>
+                </div>
           {/* Always render ArchivedOrdersTable (hidden when not active) so ref is available */}
           <div style={{ display: activeTab === 'archive' ? 'block' : 'none' }}>
             <ArchivedOrdersTable ref={archivedOrdersTableRef} themeClasses={themeClasses} />
-          </div>
+                      </div>
         </div>
       </div>
 
@@ -624,7 +624,7 @@ const Bottles = () => {
               {createBottleTab === 'core' && (
                 <div className="space-y-4 min-h-[400px]">
                   <div className="flex items-baseline gap-2">
-                    <h3 className="text-sm font-semibold text-gray-900">Core Info</h3>
+                  <h3 className="text-sm font-semibold text-gray-900">Core Info</h3>
                     <span className="text-[11px] text-gray-400">* Indicates required field</span>
                   </div>
                   <div className="grid grid-cols-12 gap-4">
@@ -975,9 +975,9 @@ const Bottles = () => {
                   onClick={() => {
                     if (!inventoryTableRef.current) return;
                     inventoryTableRef.current.addBottle({
-                      name: newBottleName.trim(),
-                      warehouseInventory: Number(newBottleWarehouseInv) || 0,
-                      supplierInventory: Number(newBottleSupplierInv) || 0,
+                        name: newBottleName.trim(),
+                        warehouseInventory: Number(newBottleWarehouseInv) || 0,
+                        supplierInventory: Number(newBottleSupplierInv) || 0,
                     });
                     setIsCreateBottleOpen(false);
                     setNewBottleName('');
@@ -1050,11 +1050,11 @@ const Bottles = () => {
                         inventoryTableRef.current.deleteBottle(bottleToDelete.id);
                         showSuccessToast(`${bottleToDelete.name} deleted successfully`);
                       }
-                      // Close details modal if it was open for this bottle
-                      if (selectedBottle && selectedBottle.id === bottleToDelete.id) {
-                        setIsDetailsOpen(false);
-                        setSelectedBottle(null);
-                      }
+                    // Close details modal if it was open for this bottle
+                    if (selectedBottle && selectedBottle.id === bottleToDelete.id) {
+                      setIsDetailsOpen(false);
+                      setSelectedBottle(null);
+                    }
                     }
                     setIsDeleteOpen(false);
                     setBottleToDelete(null);
@@ -1170,7 +1170,7 @@ const Bottles = () => {
               {activeDetailsTab === 'core' && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between border-b border-gray-200 pb-3">
-                    <h3 className="text-sm font-semibold text-gray-900">Core Info</h3>
+                  <h3 className="text-sm font-semibold text-gray-900">Core Info</h3>
                     {!isEditingCoreInfo && (
                       <button
                         type="button"

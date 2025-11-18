@@ -17,18 +17,25 @@ const ClosureOrderPage = () => {
   
   // If viewing an existing order, use the lines from state (which are already filtered to selected items)
   // If creating a new order, show all available items
-  const initialLines =
-    state.lines && (isReceiveMode || isViewMode)
-      ? state.lines // When viewing/receiving, only show the selected items that were saved
-      : [
-          { id: 1, type: 'Cap', name: 'Aptar Pour', supplierInventory: 'Auto Replenishment', unitsNeeded: 61120, qty: 61120, pallets: 1, selected: false },
-          { id: 2, type: 'Sprayer', name: '3oz Sprayer Top Down', supplierInventory: 'Auto Replenishment', unitsNeeded: 10000, qty: 10000, pallets: 1, selected: false },
-          { id: 3, type: 'Sprayer', name: '6oz Sprayer Top Top Down', supplierInventory: 'Auto Replenishment', unitsNeeded: 10000, qty: 10000, pallets: 1, selected: false },
-          { id: 4, type: 'Sprayer', name: '16oz Sprayer Trigger Foam', supplierInventory: 'Auto Replenishment', unitsNeeded: 8160, qty: 8160, pallets: 1, selected: false },
-          { id: 5, type: 'Sprayer', name: '16oz Spray Trigger No-Foam', supplierInventory: 'Auto Replenishment', unitsNeeded: 8160, qty: 8160, pallets: 1, selected: false },
-        ];
+  const getInitialLines = () => {
+    if (state.lines && (isReceiveMode || isViewMode)) {
+      // When viewing/receiving, show the selected items that were saved
+      // In receive mode, check all boxes by default; in view mode, keep them checked but disabled
+      return state.lines.map(line => ({
+        ...line,
+        selected: isReceiveMode ? true : (line.selected !== undefined ? line.selected : true)
+      }));
+    }
+    return [
+      { id: 1, type: 'Cap', name: 'Aptar Pour', supplierInventory: 'Auto Replenishment', unitsNeeded: 61120, qty: 61120, pallets: 1, selected: false },
+      { id: 2, type: 'Sprayer', name: '3oz Sprayer Top Down', supplierInventory: 'Auto Replenishment', unitsNeeded: 10000, qty: 10000, pallets: 1, selected: false },
+      { id: 3, type: 'Sprayer', name: '6oz Sprayer Top Top Down', supplierInventory: 'Auto Replenishment', unitsNeeded: 10000, qty: 10000, pallets: 1, selected: false },
+      { id: 4, type: 'Sprayer', name: '16oz Sprayer Trigger Foam', supplierInventory: 'Auto Replenishment', unitsNeeded: 8160, qty: 8160, pallets: 1, selected: false },
+      { id: 5, type: 'Sprayer', name: '16oz Spray Trigger No-Foam', supplierInventory: 'Auto Replenishment', unitsNeeded: 8160, qty: 8160, pallets: 1, selected: false },
+    ];
+  };
 
-  const [orderLines, setOrderLines] = useState(initialLines);
+  const [orderLines, setOrderLines] = useState(getInitialLines());
   const [isReceiveConfirmOpen, setIsReceiveConfirmOpen] = useState(false);
 
   const themeClasses = {
@@ -59,12 +66,22 @@ const ClosureOrderPage = () => {
   };
 
   const handleReceiveComplete = (isPartial = false) => {
-    // Update order status after receiving
+    // Navigate back with received order info (similar to labels pattern)
     if (isReceiveMode && orderId) {
+      // Determine if it's actually partial based on checked items
+      const checkedCount = orderLines.filter((line) => line.selected).length;
+      const totalCount = orderLines.length;
+      const allChecked = checkedCount === totalCount && totalCount > 0;
+      
+      // If all items are checked, it's a full receive (not partial)
+      // If isPartial is explicitly passed as true (from popup), respect it
+      const finalIsPartial = isPartial === true ? true : !allChecked;
+      
       navigate('/dashboard/supply-chain/closures', {
         state: {
           receivedOrderId: orderId,
-          isPartial: isPartial,
+          receivedOrderNumber: orderNumber,
+          isPartial: finalIsPartial,
         },
       });
     } else {

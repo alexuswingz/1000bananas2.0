@@ -27,11 +27,11 @@ const ClosuresHeader = ({ activeTab, onTabChange, search, onSearchChange, onNewO
             />
           </svg>
         </button>
-        <h1 className="text-2xl font-bold text-gray-900">Closures</h1>
+        <h1 className="text-xl font-semibold text-gray-900">Closures</h1>
         
-        {/* Tabs */}
-        <div className="flex items-center gap-2 ml-4">
-          {['inventory', 'ordering', 'archive'].map((tab) => {
+        {/* Tabs as pill group - matching bottles header */}
+        <div className="flex items-center rounded-full border border-gray-200 bg-white/70 dark:bg-dark-bg-tertiary ml-4">
+          {['inventory', 'ordering', 'archive'].map((tab, index) => {
             const labelMap = {
               inventory: 'Inventory',
               ordering: 'Ordering',
@@ -43,11 +43,11 @@ const ClosuresHeader = ({ activeTab, onTabChange, search, onSearchChange, onNewO
                 key={tab}
                 type="button"
                 onClick={() => onTabChange(tab)}
-                className={`px-4 py-2 text-sm font-medium rounded ${
+                className={`px-3 py-1 text-xs rounded-full transition-colors ${
                   isActive
-                    ? 'bg-gray-200 text-gray-900'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
+                    ? 'bg-gray-900 text-white font-semibold shadow-sm'
+                    : 'text-gray-600 hover:bg-gray-100 font-medium'
+                } ${index === 0 ? 'ml-1' : ''} ${index === 2 ? 'mr-1' : ''}`}
               >
                 {labelMap[tab]}
               </button>

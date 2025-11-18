@@ -15,7 +15,7 @@ const LabelOrderPage = () => {
   const isViewMode = mode === 'view' || mode === 'receive';
   const orderId = state.orderId || null;
   
-  // Default label order lines - matching the image data (6 items, 4 selected)
+  // Get lines from state (saved order lines when viewing, or all inventory when creating)
   const allLines = state.lines || [
     { id: 1, brand: 'Total Pest Spray', product: 'Cherry Tree Fertilizer', size: 'Gallon', qty: 25000, status: 'Completed', inventory: 25000, toOrder: 25000, daysOfInv: 25000 },
     { id: 2, brand: 'Total Pest Spray', product: 'Cherry Tree Fertilizer', size: 'Gallon', qty: 25000, status: 'Completed', inventory: 25000, toOrder: 25000, daysOfInv: 25000 },
@@ -25,32 +25,32 @@ const LabelOrderPage = () => {
     { id: 6, brand: 'Total Pest Spray', product: 'Cherry Tree Fertilizer', size: 'Gallon', qty: 25000, status: 'Completed', inventory: 25000, toOrder: 25000, daysOfInv: 25000 },
   ];
 
-  // Initialize with first 4 items selected (matching the image - 4 checked, 2 unchecked)
-  const [orderLines, setOrderLines] = useState(
-    allLines.map((line, index) => ({ ...line, selected: index < 4 }))
-  );
-
-  // Filter to show only selected items in the table (for create mode)
-  // In view mode, show all items
-  const selectedLines = useMemo(() => {
-    if (isViewMode) {
-      // When viewing, show all items (they're all part of the order)
-      return orderLines;
+  // Initialize order lines
+  // When viewing an existing order, all items are already selected (they're part of the order)
+  // When creating a new order, all items start unselected
+  const [orderLines, setOrderLines] = useState(() => {
+    if (isViewMode && allLines.length > 0) {
+      // When viewing, all items are part of the order (all selected)
+      return allLines.map((line) => ({ ...line, selected: true }));
     }
-    // When creating, only show selected items
-    return orderLines.filter((line) => line.selected);
-  }, [orderLines, isViewMode]);
+    // When creating, all items start unselected
+    return allLines.map((line) => ({ ...line, selected: false }));
+  });
 
-  // Calculate summary
+  // Get selected items for summary and order creation
+  const selectedLines = useMemo(() => {
+    return orderLines.filter((line) => line.selected);
+  }, [orderLines]);
+
+  // Calculate summary based on selected items
   const summary = useMemo(() => {
-    const itemsToCount = isViewMode ? orderLines : selectedLines;
-    const totalLabels = itemsToCount.reduce((sum, line) => sum + (line.toOrder || line.qty || 0), 0);
+    const totalLabels = selectedLines.reduce((sum, line) => sum + (line.toOrder || line.qty || 0), 0);
     return {
-      products: itemsToCount.length,
+      products: selectedLines.length,
       totalLabels,
       estCost: 0, // Can be calculated if cost data is available
     };
-  }, [selectedLines, orderLines, isViewMode]);
+  }, [selectedLines]);
 
   const themeClasses = {
     pageBg: isDarkMode ? 'bg-dark-bg-primary' : 'bg-light-bg-primary',
@@ -250,7 +250,7 @@ const LabelOrderPage = () => {
               <div className="px-6 py-3 flex items-center justify-center">
                 <input
                   type="checkbox"
-                  checked={isViewMode ? true : (selectedLines.length > 0 && selectedLines.every((line) => line.selected))}
+                  checked={isViewMode ? true : (orderLines.length > 0 && orderLines.every((line) => line.selected))}
                   onChange={handleSelectAll}
                   disabled={isViewMode}
                   className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"

@@ -43,7 +43,7 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
   useEffect(() => {
     const newOrderState = location.state && location.state.newLabelOrder;
     if (newOrderState) {
-      const { orderNumber: newOrderNumber, supplierName } = newOrderState;
+      const { orderNumber: newOrderNumber, supplierName, lines } = newOrderState;
       setOrders((prev) => {
         // Check for duplicates in the current state
         const existing = prev.find(
@@ -58,6 +58,7 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
           status: 'Submitted',
           orderNumber: newOrderNumber,
           supplier: supplierName,
+          lines: lines || [], // Save the lines data with the order
         };
 
         const updated = [newOrder, ...prev];

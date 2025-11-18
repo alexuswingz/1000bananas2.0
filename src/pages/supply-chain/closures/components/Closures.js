@@ -18,8 +18,6 @@ const Closures = () => {
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
   const [orderNumber, setOrderNumber] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState(null);
-  const [orders, setOrders] = useState([]);
-  
   // Ref for archived orders table
   const archivedOrdersTableRef = useRef(null);
 
@@ -51,160 +49,10 @@ const Closures = () => {
     },
   ];
 
-  // Load orders from localStorage
-  useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem('closureOrders');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          // Filter out the two sample orders: "514413413" and "43145"
-          const cleaned = parsed.filter((order) => 
-            order.orderNumber !== '514413413' && order.orderNumber !== '43145'
-          );
-          // Update localStorage with cleaned data if any were removed
-          if (cleaned.length !== parsed.length) {
-            window.localStorage.setItem('closureOrders', JSON.stringify(cleaned));
-          }
-          setOrders(cleaned);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to load closure orders from localStorage', err);
-    }
-  }, []);
-
-  // Handle new order from order page
-  useEffect(() => {
-    const newOrderState = location.state && location.state.newClosureOrder;
-    if (newOrderState) {
-      const { orderNumber: newOrderNumber, supplierName, lines } = newOrderState;
-
-      const newOrder = {
-        id: Date.now(),
-        status: 'In Progress',
-        orderNumber: newOrderNumber,
-        supplier: supplierName,
-        lines: lines || [], // Save only the selected items
-      };
-
-      setOrders((prev) => {
-        // Avoid duplicates
-        if (prev.some((o) => o.orderNumber === newOrderNumber && o.supplier === supplierName)) {
-          return prev;
-        }
-
-        const updated = [newOrder, ...prev];
-        try {
-          window.localStorage.setItem('closureOrders', JSON.stringify(updated));
-        } catch (err) {
-          console.error('Failed to save closure orders to localStorage', err);
-        }
-        return updated;
-      });
-
-      setActiveTab('ordering');
-      navigate(location.pathname, { replace: true, state: {} });
-    }
-  }, [location.state, location.pathname, navigate]);
-
-  // Handle received order (partial or full)
-  useEffect(() => {
-    const receivedOrderId = location.state && location.state.receivedOrderId;
-    const isPartial = location.state && location.state.isPartial;
-    
-    if (receivedOrderId) {
-      if (isPartial) {
-        // Partial receive - update status and keep in ordering
-        setOrders((prev) => {
-          const updated = prev.map((order) => {
-            if (order.id === receivedOrderId) {
-              return {
-                ...order,
-                status: 'Partial',
-              };
-            }
-            return order;
-          });
-          
-          try {
-            window.localStorage.setItem('closureOrders', JSON.stringify(updated));
-          } catch (err) {
-            console.error('Failed to update closure orders in localStorage', err);
-          }
-          
-          return updated;
-        });
-        
-        setActiveTab('ordering');
-      } else {
-        // Full receive - move to archive
-        setOrders((prev) => {
-          const orderToArchive = prev.find((o) => o.id === receivedOrderId);
-          if (!orderToArchive) return prev;
-          
-          const remaining = prev.filter((o) => o.id !== receivedOrderId);
-          try {
-            window.localStorage.setItem('closureOrders', JSON.stringify(remaining));
-          } catch (err) {
-            console.error('Failed to update closure orders in localStorage', err);
-          }
-          
-          // Add to archived orders with "Received" status
-          const archivedOrder = { ...orderToArchive, status: 'Received' };
-          if (archivedOrdersTableRef && archivedOrdersTableRef.current) {
-            archivedOrdersTableRef.current.addArchivedOrder(archivedOrder);
-          }
-          
-          return remaining;
-        });
-        
-        setActiveTab('archive');
-      }
-      
-      navigate(location.pathname, { replace: true, state: {} });
-    }
-  }, [location.state, location.pathname, navigate]);
 
   const handleStatusChange = (orderId, newStatus) => {
-    setOrders((prev) => {
-      const updated = prev.map((o) =>
-        o.id === orderId ? { ...o, status: newStatus } : o
-      );
-      try {
-        window.localStorage.setItem('closureOrders', JSON.stringify(updated));
-      } catch {}
-      return updated;
-    });
+    // This is handled by OrdersTable now, but keeping for compatibility
   };
-
-  const archiveOrder = (order) => {
-    setOrders((prev) => {
-      const remaining = prev.filter((o) => o.id !== order.id);
-      try {
-        window.localStorage.setItem('closureOrders', JSON.stringify(remaining));
-      } catch {}
-      return remaining;
-    });
-
-    // Add to archived orders
-    if (archivedOrdersTableRef && archivedOrdersTableRef.current) {
-      archivedOrdersTableRef.current.addArchivedOrder({ ...order, status: order.status || 'Draft' });
-    }
-
-    setActiveTab('archive');
-  };
-
-
-  const filteredOrders = useMemo(() => {
-    if (!search.trim()) return orders;
-    const query = search.toLowerCase();
-    return orders.filter(
-      (order) =>
-        order.orderNumber.toLowerCase().includes(query) ||
-        order.supplier.toLowerCase().includes(query)
-    );
-  }, [orders, search]);
 
   // Ref for inventory table to trigger bulk edit
   const inventoryTableRef = useRef(null);
@@ -282,10 +130,13 @@ const Closures = () => {
 
           {activeTab === 'ordering' && (
             <OrdersTable
-              orders={filteredOrders}
+              searchQuery={search}
+              themeClasses={themeClasses}
               onViewOrder={handleViewOrder}
-              onArchiveOrder={archiveOrder}
+              onArchiveOrder={() => setActiveTab('archive')}
               onStatusChange={handleStatusChange}
+              archivedOrdersRef={archivedOrdersTableRef}
+              onNewOrderCreated={() => setActiveTab('ordering')}
             />
           )}
 

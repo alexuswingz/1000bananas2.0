@@ -1,15 +1,172 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
+import { useLocation } from 'react-router-dom';
 
-const OrdersTable = ({ orders, onViewOrder, onArchiveOrder, onStatusChange }) => {
+const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrder, onStatusChange, archivedOrdersRef, onNewOrderCreated }) => {
   const { isDarkMode } = useTheme();
+  const location = useLocation();
   const [orderActionMenuId, setOrderActionMenuId] = useState(null);
   const [editingStatusId, setEditingStatusId] = useState(null);
   const menuRefs = useRef({});
   const buttonRefs = useRef({});
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
 
-  const themeClasses = {
+  // Orders data - manage own state like labels
+  const [orders, setOrders] = useState(() => {
+    try {
+      const stored = window.localStorage.getItem('closureOrders');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          // Filter out the two sample orders: "514413413" and "43145"
+          const cleaned = parsed.filter((order) => 
+            order.orderNumber !== '514413413' && order.orderNumber !== '43145'
+          );
+          // Update localStorage with cleaned data if any were removed
+          if (cleaned.length !== parsed.length) {
+            window.localStorage.setItem('closureOrders', JSON.stringify(cleaned));
+          }
+          return cleaned;
+        }
+      }
+    } catch {}
+    return [];
+  });
+
+  // Persist orders to localStorage
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('closureOrders', JSON.stringify(orders));
+    } catch {}
+  }, [orders]);
+
+  // Filter orders based on search query
+  const filteredOrders = useMemo(() => {
+    if (!searchQuery.trim()) return orders;
+    const query = searchQuery.toLowerCase();
+    return orders.filter(
+      (order) =>
+        order.orderNumber.toLowerCase().includes(query) ||
+        order.supplier.toLowerCase().includes(query)
+    );
+  }, [orders, searchQuery]);
+
+  // Handle new order from navigation state
+  useEffect(() => {
+    const newOrderState = location.state && location.state.newClosureOrder;
+    if (newOrderState) {
+      const { orderNumber: newOrderNumber, supplierName, lines } = newOrderState;
+
+      setOrders((prev) => {
+        // Check for duplicates
+        const existing = prev.find(
+          (o) => o.orderNumber === newOrderNumber && o.supplier === supplierName
+        );
+        if (existing) {
+          return prev;
+        }
+
+        const newOrder = {
+          id: Date.now(),
+          status: 'In Progress',
+          orderNumber: newOrderNumber,
+          supplier: supplierName,
+          lines: lines || [],
+        };
+
+        const updated = [newOrder, ...prev];
+        try {
+          window.localStorage.setItem('closureOrders', JSON.stringify(updated));
+        } catch {}
+        
+        // Clear navigation state to prevent re-processing
+        if (window.history && window.history.replaceState) {
+          window.history.replaceState({ ...location.state, newClosureOrder: null }, '');
+        }
+        
+        if (onNewOrderCreated) {
+          onNewOrderCreated();
+        }
+        
+        return updated;
+      });
+    }
+  }, [location.state, onNewOrderCreated]);
+
+  // Handle received order from navigation state (following labels pattern)
+  useEffect(() => {
+    const receivedOrderId = location.state?.receivedOrderId;
+    const isPartial = location.state?.isPartial === true;
+    
+    if (receivedOrderId) {
+      if (isPartial) {
+        // Partial receive - update status and keep in ordering
+        setOrders((prev) => {
+          const updated = prev.map((order) => {
+            if (Number(order.id) === Number(receivedOrderId)) {
+              return {
+                ...order,
+                status: 'Partial',
+              };
+            }
+            return order;
+          });
+          
+          try {
+            window.localStorage.setItem('closureOrders', JSON.stringify(updated));
+          } catch (err) {
+            console.error('Failed to update closure orders in localStorage', err);
+          }
+          
+          // Clear navigation state
+          if (window.history && window.history.replaceState) {
+            window.history.replaceState(
+              { ...location.state, receivedOrderId: null, receivedOrderNumber: null, isPartial: null },
+              ''
+            );
+          }
+          
+          return updated;
+        });
+      } else {
+        // Full receive - move to archive (following labels pattern)
+        setOrders((prev) => {
+          const orderToArchive = prev.find((o) => Number(o.id) === Number(receivedOrderId));
+          if (!orderToArchive) return prev;
+          
+          const remaining = prev.filter((o) => Number(o.id) !== Number(receivedOrderId));
+          try {
+            window.localStorage.setItem('closureOrders', JSON.stringify(remaining));
+          } catch (err) {
+            console.error('Failed to update closure orders in localStorage', err);
+          }
+          
+          // Add to archived orders with "Received" status
+          const archivedOrder = { ...orderToArchive, status: 'Received' };
+          if (archivedOrdersRef && archivedOrdersRef.current) {
+            archivedOrdersRef.current.addArchivedOrder(archivedOrder);
+          }
+          
+          // Clear navigation state
+          if (window.history && window.history.replaceState) {
+            window.history.replaceState(
+              { ...location.state, receivedOrderId: null, receivedOrderNumber: null, isPartial: null },
+              ''
+            );
+          }
+          
+          // Switch to archive tab
+          if (onArchiveOrder) {
+            onArchiveOrder();
+          }
+          
+          return remaining;
+        });
+      }
+    }
+  }, [location.state, archivedOrdersRef, onArchiveOrder]);
+
+  const computedThemeClasses = themeClasses ? themeClasses : {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
     headerBg: isDarkMode ? 'bg-[#2C3544]' : 'bg-[#2C3544]',
     border: isDarkMode ? 'border-dark-border-primary' : 'border-gray-200',
@@ -129,14 +286,22 @@ const OrdersTable = ({ orders, onViewOrder, onArchiveOrder, onStatusChange }) =>
     };
     const isEditing = editingStatusId === order.id;
 
-    if (isEditing && onStatusChange) {
+    if (isEditing) {
       return (
         <div className="relative">
           <select
             autoFocus
             value={status}
             onChange={(e) => {
-              onStatusChange(order.id, e.target.value);
+              setOrders((prev) => {
+                const updated = prev.map((o) =>
+                  o.id === order.id ? { ...o, status: e.target.value } : o
+                );
+                try {
+                  window.localStorage.setItem('closureOrders', JSON.stringify(updated));
+                } catch {}
+                return updated;
+              });
               setEditingStatusId(null);
             }}
             onBlur={() => setEditingStatusId(null)}
@@ -158,9 +323,7 @@ const OrdersTable = ({ orders, onViewOrder, onArchiveOrder, onStatusChange }) =>
         type="button"
         onClick={(e) => {
           e.stopPropagation();
-          if (onStatusChange) {
-            setEditingStatusId(order.id);
-          }
+          setEditingStatusId(order.id);
         }}
         className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${style.bg} ${style.text} hover:opacity-80 transition-opacity cursor-pointer`}
       >
@@ -172,11 +335,11 @@ const OrdersTable = ({ orders, onViewOrder, onArchiveOrder, onStatusChange }) =>
 
   return (
     <div
-      className={`${themeClasses.cardBg} rounded-xl border ${themeClasses.border} shadow-md`}
+      className={`${computedThemeClasses.cardBg} rounded-xl border ${computedThemeClasses.border} shadow-md`}
       style={{ overflow: 'hidden' }}
     >
       {/* Table header row */}
-      <div className={themeClasses.headerBg}>
+      <div className={computedThemeClasses.headerBg}>
         <div
           className="grid"
           style={{
@@ -200,19 +363,19 @@ const OrdersTable = ({ orders, onViewOrder, onArchiveOrder, onStatusChange }) =>
 
       {/* Table body */}
       <div>
-        {orders.length === 0 ? (
+        {filteredOrders.length === 0 ? (
           <div className="px-6 py-6 text-center text-sm italic text-gray-400">
             No closure orders yet. Click &quot;New Order&quot; to create one.
           </div>
         ) : (
-          orders.map((order, index) => (
+          filteredOrders.map((order, index) => (
             <div
               key={order.id}
-              className={`grid text-sm ${themeClasses.rowHover} transition-colors`}
+              className={`grid text-sm ${computedThemeClasses.rowHover} transition-colors`}
               style={{
                 gridTemplateColumns: '140px 2fr 2fr 120px',
                 borderBottom:
-                  index === orders.length - 1
+                  index === filteredOrders.length - 1
                     ? 'none'
                     : isDarkMode
                     ? '1px solid rgba(75,85,99,0.3)'
@@ -227,7 +390,29 @@ const OrdersTable = ({ orders, onViewOrder, onArchiveOrder, onStatusChange }) =>
                 {order.status === 'Partial' && (
                   <button
                     type="button"
-                    onClick={() => onArchiveOrder(order)}
+                    onClick={() => {
+                      // Remove from active orders
+                      setOrders((prev) => {
+                        const remaining = prev.filter((o) => o.id !== order.id);
+                        try {
+                          window.localStorage.setItem('closureOrders', JSON.stringify(remaining));
+                        } catch {}
+                        return remaining;
+                      });
+                      
+                      // Add to archived orders
+                      if (archivedOrdersRef && archivedOrdersRef.current) {
+                        archivedOrdersRef.current.addArchivedOrder({
+                          ...order,
+                          status: order.status || 'Draft'
+                        });
+                      }
+                      
+                      // Switch to archive tab
+                      if (onArchiveOrder) {
+                        onArchiveOrder();
+                      }
+                    }}
                     className="px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded-full hover:bg-blue-700"
                   >
                     Archive
@@ -235,7 +420,7 @@ const OrdersTable = ({ orders, onViewOrder, onArchiveOrder, onStatusChange }) =>
                 )}
               </div>
               <div className="px-6 py-3 flex items-center justify-between relative">
-                <span className={themeClasses.textPrimary}>{order.supplier}</span>
+                <span className={computedThemeClasses.textPrimary}>{order.supplier}</span>
 
                 <div className="relative">
                   <button
@@ -249,7 +434,7 @@ const OrdersTable = ({ orders, onViewOrder, onArchiveOrder, onStatusChange }) =>
                     }}
                     aria-label="Order actions"
                   >
-                    <span className={themeClasses.textSecondary}>⋮</span>
+                    <span className={computedThemeClasses.textSecondary}>⋮</span>
                   </button>
                 </div>
               </div>
@@ -271,7 +456,7 @@ const OrdersTable = ({ orders, onViewOrder, onArchiveOrder, onStatusChange }) =>
       {orderActionMenuId && (
         <div
           ref={(el) => (menuRefs.current[orderActionMenuId] = el)}
-          className={`fixed z-[9999] w-32 ${themeClasses.cardBg} ${themeClasses.border} border rounded-md shadow-xl text-xs`}
+          className={`fixed z-[9999] w-32 ${computedThemeClasses.cardBg} ${computedThemeClasses.border} border rounded-md shadow-xl text-xs`}
           style={{
             top: `${menuPosition.top}px`,
             right: `${menuPosition.right}px`,
@@ -284,13 +469,13 @@ const OrdersTable = ({ orders, onViewOrder, onArchiveOrder, onStatusChange }) =>
               <button
                 key={order.id}
                 type="button"
-                className={`w-full flex items-center gap-2 px-3 py-2.5 ${themeClasses.rowHover} ${themeClasses.textPrimary} transition-colors`}
+                className={`w-full flex items-center gap-2 px-3 py-2.5 ${computedThemeClasses.rowHover} ${computedThemeClasses.textPrimary} transition-colors`}
                 onClick={() => {
                   onViewOrder(order);
                   setOrderActionMenuId(null);
                 }}
               >
-                <span className={themeClasses.textSecondary}>
+                <span className={computedThemeClasses.textSecondary}>
                   <svg
                     className="w-3.5 h-3.5"
                     fill="none"
