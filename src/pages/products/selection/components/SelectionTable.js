@@ -32,6 +32,23 @@ const SelectionTable = ({
     dataRef.current = data;
   }, [data]);
 
+  // Calculate dynamic page size based on screen height
+  useEffect(() => {
+    const calculatePageSize = () => {
+      // Viewport height minus header (approx 220px) minus pagination (approx 80px)
+      const availableHeight = window.innerHeight - 300;
+      // Row height is approximately 48px
+      const rowHeight = 48;
+      const calculatedPageSize = Math.max(5, Math.floor(availableHeight / rowHeight));
+      setPageSize(calculatedPageSize);
+      setCurrentPage(1); // Reset to first page when page size changes
+    };
+
+    calculatePageSize();
+    window.addEventListener('resize', calculatePageSize);
+    return () => window.removeEventListener('resize', calculatePageSize);
+  }, []);
+
   const themeClasses = {
     bg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
     text: isDarkMode ? 'text-dark-text-primary' : 'text-gray-900',
@@ -397,9 +414,9 @@ const SelectionTable = ({
   });
 
   return (
-    <div className={`${themeClasses.bg} rounded-xl border ${themeClasses.border} shadow-lg`} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div className={`${themeClasses.bg} rounded-xl border ${themeClasses.border} shadow-lg`} style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       {/* Table - Scrollable Area */}
-      <div style={{ flex: 1, overflowX: 'auto', overflowY: 'auto' }}>
+      <div style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', minHeight: 0 }}>
         <table style={{ width: '100%', minWidth: '800px' }}>
         {/* Header */}
         <thead className={themeClasses.headerBg} style={{ position: 'sticky', top: 0, zIndex: 10 }}>

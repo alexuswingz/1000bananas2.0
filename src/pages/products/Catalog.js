@@ -20,6 +20,23 @@ const Catalog = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  // Calculate dynamic page size based on screen height
+  useEffect(() => {
+    const calculatePageSize = () => {
+      // Viewport height minus header (approx 220px) minus pagination (approx 80px)
+      const availableHeight = window.innerHeight - 300;
+      // Row height is approximately 48px
+      const rowHeight = 48;
+      const calculatedPageSize = Math.max(5, Math.floor(availableHeight / rowHeight));
+      setPageSize(calculatedPageSize);
+      setCurrentPage(1); // Reset to first page when page size changes
+    };
+
+    calculatePageSize();
+    window.addEventListener('resize', calculatePageSize);
+    return () => window.removeEventListener('resize', calculatePageSize);
+  }, []);
+
   // Fetch catalog data from API based on active tab
   useEffect(() => {
     const fetchCatalogData = async () => {
@@ -279,17 +296,17 @@ const Catalog = () => {
   };
 
   return (
-    <div className={`min-h-screen ${themeClasses.bg} flex flex-col`}>
-      <div style={{ padding: '2rem 2rem 0 2rem' }}>
+    <div className={`${themeClasses.bg}`} style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ padding: '2rem 2rem 0 2rem', flexShrink: 0 }}>
         <CatalogHeader 
           onSearch={handleSearch}
           activeTab={activeTab}
           onTabChange={handleTabChange}
         />
       </div>
-      <div style={{ flex: 1, padding: '0 2rem 2rem 2rem' }}>
+      <div style={{ flex: 1, padding: '0 2rem 2rem 2rem', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {loading ? (
-          <div className="flex items-center justify-center h-64">
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 0 }}>
             <div className="text-lg">Loading catalog data...</div>
           </div>
         ) : (

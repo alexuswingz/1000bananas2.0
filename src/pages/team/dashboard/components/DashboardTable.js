@@ -36,9 +36,9 @@ const DashboardTable = ({
   ];
 
   return (
-    <div className={`${themeClasses.bg} rounded-xl border ${themeClasses.border} shadow-lg`} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div className={`${themeClasses.bg} rounded-xl border ${themeClasses.border} shadow-lg`} style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       {/* Table */}
-      <div style={{ flex: 1, overflowX: 'auto', overflowY: 'auto' }}>
+      <div style={{ flex: 1, overflowX: 'auto', overflowY: 'auto', minHeight: 0 }}>
         <table style={{ width: '100%', minWidth: '1200px' }}>
           {/* Header */}
           <thead className={themeClasses.headerBg} style={{ position: 'sticky', top: 0, zIndex: 10 }}>

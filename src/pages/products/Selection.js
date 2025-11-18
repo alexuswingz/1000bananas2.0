@@ -375,8 +375,8 @@ const Selection = () => {
   const hasUnsavedRow = !!newRow;
 
   return (
-    <div className={`min-h-screen ${themeClasses.bg} flex flex-col`}>
-      <div style={{ padding: '2rem 2rem 0 2rem' }}>
+    <div className={`${themeClasses.bg}`} style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ padding: '2rem 2rem 0 2rem', flexShrink: 0 }}>
         <SelectionFilters 
           onSearch={handleSearch} 
           onNewProduct={handleNewProduct}
@@ -384,7 +384,7 @@ const Selection = () => {
           hasUnsavedRow={hasUnsavedRow}
         />
       </div>
-      <div style={{ flex: 1, padding: '0 2rem 2rem 2rem' }}>
+      <div style={{ flex: 1, padding: '0 2rem 2rem 2rem', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <SelectionTable 
           data={filteredData} 
           onActionClick={handleActionClick}

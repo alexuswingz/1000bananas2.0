@@ -7,14 +7,18 @@ const Pagination = ({ currentPage, totalPages, pageSize, totalItems, onPageChang
   const themeClasses = {
     bg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
     text: isDarkMode ? 'text-dark-text-primary' : 'text-gray-900',
-    textSecondary: isDarkMode ? 'text-dark-text-secondary' : 'text-gray-500',
+    textSecondary: isDarkMode ? 'text-dark-text-secondary' : 'text-gray-600',
     border: isDarkMode ? 'border-dark-border-primary' : 'border-gray-200',
-    hoverBg: isDarkMode ? 'hover:bg-dark-bg-tertiary' : 'hover:bg-gray-50',
-    activeBg: isDarkMode ? 'bg-blue-600' : 'bg-blue-500',
-    disabledText: isDarkMode ? 'text-gray-600' : 'text-gray-400',
+    hoverBg: isDarkMode ? 'hover:bg-dark-bg-tertiary' : 'hover:bg-gray-100',
+    activeBg: isDarkMode ? 'bg-blue-500' : 'bg-blue-600',
+    activeHoverBg: isDarkMode ? 'hover:bg-blue-600' : 'hover:bg-blue-700',
+    disabledText: isDarkMode ? 'text-gray-700' : 'text-gray-300',
+    buttonBg: isDarkMode ? 'bg-dark-bg-tertiary' : 'bg-gray-50',
+    buttonBorder: isDarkMode ? 'border-dark-border-primary' : 'border-gray-200',
   };
 
-  const pageSizes = [10, 20, 50, 100];
+  // Don't show dropdown - page size is dynamic
+  const pageSizes = [];
 
   const getPageNumbers = () => {
     const pages = [];
@@ -52,59 +56,50 @@ const Pagination = ({ currentPage, totalPages, pageSize, totalItems, onPageChang
 
   return (
     <div 
-      className={`${themeClasses.bg} px-6 py-4`}
+      className={`${themeClasses.bg} border-t ${themeClasses.border}`}
       style={{ 
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '1rem'
+        padding: '1rem 1.5rem',
+        flexShrink: 0,
       }}
     >
-      {/* Left side - Items per page */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-        <span className={`text-sm ${themeClasses.textSecondary}`}>Rows per page:</span>
-        <select
-          value={pageSize}
-          onChange={(e) => onPageSizeChange(Number(e.target.value))}
-          className={`${themeClasses.bg} ${themeClasses.text} ${themeClasses.border} border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50`}
-        >
-          {pageSizes.map((size) => (
-            <option key={size} value={size}>
-              {size}
-            </option>
-          ))}
-        </select>
+      {/* Left side - Items info */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <span className={`text-sm font-medium ${themeClasses.text}`} style={{ whiteSpace: 'nowrap' }}>
+          {startItem}-{endItem}
+        </span>
         <span className={`text-sm ${themeClasses.textSecondary}`} style={{ whiteSpace: 'nowrap' }}>
-          {startItem}-{endItem} of {totalItems}
+          of {totalItems}
         </span>
       </div>
 
-      {/* Right side - Pagination controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      {/* Center - Pagination controls */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
         {/* Previous button */}
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className={`p-2 rounded-lg transition-colors ${
+          className={`px-3 py-2 rounded-lg text-sm font-medium transition-all border ${
             currentPage === 1
-              ? `cursor-not-allowed ${themeClasses.disabledText}`
-              : `${themeClasses.text} ${themeClasses.hoverBg}`
+              ? `cursor-not-allowed ${themeClasses.disabledText} ${themeClasses.border} opacity-50`
+              : `${themeClasses.text} ${themeClasses.buttonBorder} ${themeClasses.hoverBg} hover:border-blue-400`
           }`}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
 
         {/* Page numbers */}
-        <div style={{ display: 'flex', gap: '0.25rem' }}>
+        <div style={{ display: 'flex', gap: '0.25rem', marginLeft: '0.5rem', marginRight: '0.5rem' }}>
           {getPageNumbers().map((page, index) => (
             page === '...' ? (
               <span
                 key={`ellipsis-${index}`}
-                className={`px-3 py-1.5 text-sm ${themeClasses.textSecondary}`}
+                className={`px-3 py-2 text-sm font-medium ${themeClasses.textSecondary}`}
               >
                 ...
               </span>
@@ -112,12 +107,12 @@ const Pagination = ({ currentPage, totalPages, pageSize, totalItems, onPageChang
               <button
                 key={page}
                 onClick={() => onPageChange(page)}
-                className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all border ${
                   currentPage === page
-                    ? `${themeClasses.activeBg} text-white`
-                    : `${themeClasses.text} ${themeClasses.hoverBg}`
+                    ? `${themeClasses.activeBg} text-white border-transparent ${themeClasses.activeHoverBg} shadow-md`
+                    : `${themeClasses.text} ${themeClasses.buttonBorder} ${themeClasses.hoverBg} hover:border-blue-400`
                 }`}
-                style={{ minWidth: '2.5rem' }}
+                style={{ minWidth: '2.75rem' }}
               >
                 {page}
               </button>
@@ -129,17 +124,29 @@ const Pagination = ({ currentPage, totalPages, pageSize, totalItems, onPageChang
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className={`p-2 rounded-lg transition-colors ${
+          className={`px-3 py-2 rounded-lg text-sm font-medium transition-all border ${
             currentPage === totalPages
-              ? `cursor-not-allowed ${themeClasses.disabledText}`
-              : `${themeClasses.text} ${themeClasses.hoverBg}`
+              ? `cursor-not-allowed ${themeClasses.disabledText} ${themeClasses.border} opacity-50`
+              : `${themeClasses.text} ${themeClasses.buttonBorder} ${themeClasses.hoverBg} hover:border-blue-400`
           }`}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
           </svg>
         </button>
+      </div>
+
+      {/* Right side - Page info */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <span className={`text-sm ${themeClasses.textSecondary}`}>Page</span>
+        <span className={`text-sm font-medium ${themeClasses.text}`}>
+          {currentPage}
+        </span>
+        <span className={`text-sm ${themeClasses.textSecondary}`}>of</span>
+        <span className={`text-sm font-medium ${themeClasses.text}`}>
+          {totalPages}
+        </span>
       </div>
     </div>
   );

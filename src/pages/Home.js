@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import NgoosAPI from '../services/ngoosApi';
 import OpenAIService from '../services/openaiService';
 import BananaBrainModal from '../components/BananaBrainModal';
+import SearchableDropdown from '../components/SearchableDropdown';
 
 // Combined Sales & Ads Metrics Configuration (matching N-GOOS)
 const ALL_METRICS = [
@@ -779,34 +780,14 @@ const Home = () => {
 
               {/* Parent */}
               <div style={{ flex: '1', minWidth: '180px' }}>
-                <label 
-                  className={`text-xs font-semibold ${themeClasses.textSecondary} mb-2`} 
-                  style={{ display: 'block', textTransform: 'uppercase' }}
-                >
-                  Parent
-                </label>
-                <select
+                <SearchableDropdown
+                  label="Parent"
                   value={selectedParent}
                   onChange={handleParentChange}
+                  options={parents}
+                  placeholder="Select Parent"
                   disabled={!selectedBrand || parents.length === 0}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem 1rem',
-                    borderRadius: '0.5rem',
-                    backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc',
-                    color: isDarkMode ? '#fff' : '#000',
-                    border: `2px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    cursor: selectedBrand && parents.length > 0 ? 'pointer' : 'not-allowed',
-                    opacity: selectedBrand && parents.length > 0 ? 1 : 0.5
-                  }}
-                >
-                  <option value="">Select Parent</option>
-                  {parents.map(parent => (
-                    <option key={parent} value={parent}>{parent}</option>
-                  ))}
-                </select>
+                />
               </div>
 
               {/* Child */}
