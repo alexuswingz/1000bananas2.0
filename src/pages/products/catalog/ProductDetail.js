@@ -39,7 +39,7 @@ const ProductDetail = () => {
   const location = useLocation();
   const { getProductConfig, setProductVariations, setProductTabs, setActiveTemplate } = useProducts();
   const { productTemplates, getProductTemplate } = useCompany();
-  const { product, returnPath, allowedTabs, productId } = location.state || {};
+  const { product, returnPath, allowedTabs, productId, isChildView, specificChildId } = location.state || {};
 
   const [activeTab, setActiveTab] = useState('essential');
   const [showTemplateMenu, setShowTemplateMenu] = useState(false);
@@ -115,7 +115,17 @@ const ProductDetail = () => {
     // If we have API data, use it
     if (apiProductData) {
       // Extract variations from API data
-      const variations = apiProductData.variations || [];
+      let variations = apiProductData.variations || [];
+      
+      // If opened from child view, filter to show only that specific child
+      if (isChildView && specificChildId) {
+        variations = variations.filter(v => v.id === specificChildId);
+        console.log('🔍 Child view mode - Filtered to specific child:', {
+          specificChildId,
+          filteredVariations: variations.length,
+          totalVariations: apiProductData.variations?.length
+        });
+      }
       const variationSizes = variations
         .map(v => v.size || `Variant ${v.id}`)
         .filter(Boolean);
@@ -325,7 +335,7 @@ const ProductDetail = () => {
       variations: productConfig.variations.length > 0 ? productConfig.variations : ['Default'],
       variationType: productConfig.variationType || 'size'
     };
-  }, [apiProductData, product, productConfig]);
+  }, [apiProductData, product, productConfig, isChildView, specificChildId]);
 
   const handleBack = () => {
     // Navigate back to the page that opened this detail (Design, Catalog, etc.)

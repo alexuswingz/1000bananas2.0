@@ -340,46 +340,8 @@ const Dashboard = () => {
     setCurrentPage(1); // Reset to first page when filters are applied
   };
 
-  const handleStatusClick = (rowId, stage, currentStatus) => {
-    const statusOptions = ['pending', 'inProgress', 'completed'];
-    const currentIndex = statusOptions.indexOf(currentStatus);
-    const nextStatus = statusOptions[(currentIndex + 1) % statusOptions.length];
-
-    const statusLabels = {
-      pending: 'Pending',
-      inProgress: 'In Progress',
-      completed: 'Completed',
-    };
-
-    const stageLabels = {
-      essentialInfo: 'Essential Info',
-      form: 'Form',
-      design: 'Design',
-      listing: 'Listing',
-      prod: 'Production',
-      pack: 'Packaging',
-      labels: 'Labels',
-      ads: 'Ads',
-    };
-
-    showDialog({
-      title: `Update ${stageLabels[stage]} Status`,
-      message: `Change status from "${statusLabels[currentStatus]}" to "${statusLabels[nextStatus]}"?`,
-      confirmText: 'Update',
-      cancelText: 'Cancel',
-      type: 'info',
-      onConfirm: () => {
-        setDashboardData((prevData) =>
-          prevData.map((item) =>
-            item.id === rowId ? { ...item, [stage]: nextStatus } : item
-          )
-        );
-        toast.success('Status updated!', {
-          description: `${stageLabels[stage]} is now ${statusLabels[nextStatus]}.`,
-        });
-      },
-    });
-  };
+  // Status is read-only - no manual updates allowed
+  // Status should only reflect what comes from the backend
 
   return (
     <div className={`min-h-screen ${themeClasses.bg} flex flex-col`}>
@@ -403,7 +365,6 @@ const Dashboard = () => {
             pageSize={pageSize}
             onPageChange={handlePageChange}
             onPageSizeChange={handlePageSizeChange}
-            onStatusClick={handleStatusClick}
           />
         )}
       </div>

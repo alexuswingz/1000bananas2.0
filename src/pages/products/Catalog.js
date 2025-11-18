@@ -270,7 +270,9 @@ const Catalog = () => {
       state: { 
         product,
         productId: product.id, // Pass product ID for API calls
-        returnPath: '/dashboard/products/catalog'
+        returnPath: '/dashboard/products/catalog',
+        isChildView: activeTab === 'child', // Pass whether this is from child tab
+        specificChildId: activeTab === 'child' ? product.id : null // If child, pass the specific child ID
         // No allowedTabs restriction - show all tabs
       }
     });

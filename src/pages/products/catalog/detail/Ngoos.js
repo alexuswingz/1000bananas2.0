@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 import { toast } from 'sonner';
 import NgoosAPI from '../../../../services/ngoosApi';
+import OpenAIService from '../../../../services/openaiService';
+import BananaBrainModal from '../../../../components/BananaBrainModal';
 import { 
   LineChart, 
   Line, 
@@ -26,12 +28,42 @@ const Ngoos = ({ data }) => {
   const [productDetails, setProductDetails] = useState(null);
   const [forecastData, setForecastData] = useState(null);
   const [chartData, setChartData] = useState(null);
-  const [salesMetrics, setSalesMetrics] = useState(null);
+  const [metrics, setMetrics] = useState(null);
+  const [salesChartData, setSalesChartData] = useState(null);
+  const [adsChartData, setAdsChartData] = useState(null);
   const [zoomDomain, setZoomDomain] = useState({ left: null, right: null });
   const [isZooming, setIsZooming] = useState(false);
   const [lastClickTime, setLastClickTime] = useState(0);
   const [activeTab, setActiveTab] = useState('forecast');
-  const [salesDays, setSalesDays] = useState(30);
+  const [metricsDays, setMetricsDays] = useState(30);
+  const [showMetricSelector, setShowMetricSelector] = useState(false);
+  const [metricSearch, setMetricSearch] = useState('');
+  const [showAIModal, setShowAIModal] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [selectedMetrics, setSelectedMetrics] = useState({
+    sales: [
+      'units_sold',
+      'sales',
+      'sessions',
+      'conversion_rate',
+      'tacos',
+      'price',
+      'profit_margin',
+      'profit_total',
+      'organic_sales_pct'
+    ],
+    ads: [
+      'units_sold',
+      'sales',
+      'sessions',
+      'conversion_rate',
+      'tacos',
+      'ad_spend',
+      'ad_cpc',
+      'organic_sales_pct'
+    ]
+  });
 
   const themeClasses = {
     bg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -67,18 +99,26 @@ const Ngoos = ({ data }) => {
         
         const weeks = getWeeksForView(selectedView);
         
-        // Fetch all N-GOOS data in parallel
-        const [details, forecast, chart, salesData] = await Promise.all([
-          NgoosAPI.getProductDetails(childAsin),
-          NgoosAPI.getForecast(childAsin),
-          NgoosAPI.getChartData(childAsin, weeks),
-          NgoosAPI.getSalesMetrics(childAsin, salesDays)
-        ]);
+              // Fetch all N-GOOS data in parallel
+              const [details, forecast, chart, metricsData, salesChart, adsChart] = await Promise.all([
+                NgoosAPI.getProductDetails(childAsin),
+                NgoosAPI.getForecast(childAsin),
+                NgoosAPI.getChartData(childAsin, weeks),
+                NgoosAPI.getMetrics(childAsin, metricsDays),
+                NgoosAPI.getSalesChart(childAsin, metricsDays),
+                NgoosAPI.getAdsChart(childAsin, metricsDays)
+              ]);
 
-        setProductDetails(details);
-        setForecastData(forecast);
-        setChartData(chart);
-        setSalesMetrics(salesData);
+              setProductDetails(details);
+              setForecastData(forecast);
+              setChartData(chart);
+              setMetrics(metricsData);
+              setSalesChartData(salesChart);
+              setAdsChartData(adsChart);
+              
+              // Debug logging
+              console.log('Ads Chart Response:', adsChart);
+              console.log('Chart Data Array:', adsChart?.chart_data);
       } catch (error) {
         console.error('Error fetching N-GOOS data:', error);
         toast.error('Failed to load N-GOOS data', {
@@ -90,7 +130,7 @@ const Ngoos = ({ data }) => {
     };
 
     fetchNgoosData();
-  }, [data?.child_asin, data?.childAsin, selectedView, salesDays]);
+  }, [data?.child_asin, data?.childAsin, selectedView, metricsDays]);
 
   // Extract inventory data from API response or use fallback
   const inventoryData = productDetails?.inventory || {
@@ -233,6 +273,204 @@ const Ngoos = ({ data }) => {
   // Handle zoom reset
   const handleZoomReset = () => {
     setZoomDomain({ left: null, right: null });
+  };
+
+  // Available metrics configuration
+  const availableMetrics = [
+    { id: 'units_sold', label: 'Units Sold', border: '2px solid #3b82f6' },
+    { id: 'sales', label: 'Sales', border: '2px solid #f97316' },
+    { id: 'sessions', label: 'Sessions', border: '1px solid #334155' },
+    { id: 'conversion_rate', label: 'Conversion Rate', border: '1px solid #334155' },
+    { id: 'tacos', label: 'TACOS', border: '1px solid #334155' },
+    { id: 'price', label: 'Price', border: '1px solid #334155' },
+    { id: 'profit_margin', label: 'Profit %', border: '1px solid #334155' },
+    { id: 'profit_total', label: 'Profit Total', border: '1px solid #334155' },
+    { id: 'organic_sales_pct', label: 'Organic Sales %', border: '1px solid #334155' },
+    { id: 'ad_spend', label: 'Ad Spend', border: '1px solid #334155' },
+    { id: 'ad_sales', label: 'Ad Sales', border: '1px solid #334155' },
+    { id: 'ad_clicks', label: 'Ad Clicks', border: '1px solid #334155' },
+    { id: 'ad_impressions', label: 'Ad Impressions', border: '1px solid #334155' },
+    { id: 'ad_cpc', label: 'Ad CPC', border: '1px solid #334155' },
+    { id: 'ad_orders', label: 'Ad Orders', border: '1px solid #334155' },
+    { id: 'page_views', label: 'Page Views', border: '1px solid #334155' }
+  ];
+
+  const filteredMetrics = availableMetrics.filter(metric =>
+    metric.label.toLowerCase().includes(metricSearch.toLowerCase())
+  );
+
+  const toggleMetric = (metricId) => {
+    setSelectedMetrics(prev => {
+      const currentTab = activeTab === 'sales' ? 'sales' : 'ads';
+      const currentMetrics = prev[currentTab];
+      
+      if (currentMetrics.includes(metricId)) {
+        return {
+          ...prev,
+          [currentTab]: currentMetrics.filter(id => id !== metricId)
+        };
+      } else {
+        return {
+          ...prev,
+          [currentTab]: [...currentMetrics, metricId]
+        };
+      }
+    });
+  };
+
+  const clearAllMetrics = () => {
+    const currentTab = activeTab === 'sales' ? 'sales' : 'ads';
+    setSelectedMetrics(prev => ({
+      ...prev,
+      [currentTab]: []
+    }));
+  };
+
+  const getCurrentMetrics = () => {
+    return activeTab === 'sales' ? selectedMetrics.sales : selectedMetrics.ads;
+  };
+
+  const handlePerformAnalysis = async () => {
+    setShowAIModal(true);
+    setIsAnalyzing(true);
+    setAiAnalysis('');
+
+    try {
+      const currentTab = activeTab === 'forecast' ? 'sales' : activeTab;
+      const analysis = await OpenAIService.analyzeMetrics(data, metrics, currentTab);
+      setAiAnalysis(analysis);
+    } catch (error) {
+      console.error('Error analyzing metrics:', error);
+      toast.error('Failed to analyze metrics', {
+        description: error.message
+      });
+      setShowAIModal(false);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleAskFollowUp = async (question, conversationHistory) => {
+    const messages = conversationHistory.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    }));
+
+    // Add context about the product and metrics
+    const contextMessage = {
+      role: 'system',
+      content: `Context: You are analyzing ${metrics?.product?.name || data?.product || 'a product'} (ASIN: ${metrics?.product?.asin || data?.child_asin || 'N/A'}). Current tab: ${activeTab}`
+    };
+
+    const response = await OpenAIService.askFollowUp([contextMessage, ...messages], question);
+    return response;
+  };
+
+  const getMetricValue = (metricId) => {
+    const current = metrics?.current_period;
+    const changes = metrics?.changes;
+    
+    switch(metricId) {
+      case 'units_sold':
+        return {
+          value: current?.units_sold?.toLocaleString() || '0',
+          change: changes?.units_sold,
+          prefix: ''
+        };
+      case 'sales':
+        return {
+          value: current?.sales?.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) || '0',
+          change: changes?.sales,
+          prefix: '$'
+        };
+      case 'sessions':
+        return {
+          value: current?.sessions?.toLocaleString() || '0',
+          change: changes?.sessions,
+          prefix: ''
+        };
+      case 'conversion_rate':
+        return {
+          value: (current?.conversion_rate?.toFixed(1) || '0.0') + '%',
+          change: changes?.conversion_rate,
+          prefix: ''
+        };
+      case 'tacos':
+        return {
+          value: (current?.tacos?.toFixed(1) || '0.0') + '%',
+          change: changes?.tacos,
+          prefix: '',
+          invertColor: true
+        };
+      case 'price':
+        return {
+          value: current?.price?.toFixed(2) || '0.00',
+          change: changes?.price,
+          prefix: '$'
+        };
+      case 'profit_margin':
+        return {
+          value: (current?.profit_margin?.toFixed(1) || '0.0') + '%',
+          change: changes?.profit_margin,
+          prefix: ''
+        };
+      case 'profit_total':
+        return {
+          value: current?.profit_total?.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) || '0',
+          change: changes?.profit_total,
+          prefix: '$'
+        };
+      case 'organic_sales_pct':
+        return {
+          value: (current?.organic_sales_pct?.toFixed(0) || '0') + '%',
+          change: null,
+          prefix: ''
+        };
+      case 'ad_spend':
+        return {
+          value: current?.ad_spend?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00',
+          change: null,
+          prefix: '$'
+        };
+      case 'ad_sales':
+        return {
+          value: current?.ad_sales?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00',
+          change: null,
+          prefix: '$'
+        };
+      case 'ad_clicks':
+        return {
+          value: current?.ad_clicks?.toLocaleString() || '0',
+          change: null,
+          prefix: ''
+        };
+      case 'ad_impressions':
+        return {
+          value: current?.ad_impressions?.toLocaleString() || '0',
+          change: null,
+          prefix: ''
+        };
+      case 'ad_cpc':
+        return {
+          value: ((current?.ad_spend || 0) / (current?.ad_clicks || 1)).toFixed(2),
+          change: null,
+          prefix: '$'
+        };
+      case 'ad_orders':
+        return {
+          value: current?.ad_orders?.toLocaleString() || '0',
+          change: null,
+          prefix: ''
+        };
+      case 'page_views':
+        return {
+          value: current?.page_views?.toLocaleString() || '0',
+          change: null,
+          prefix: ''
+        };
+      default:
+        return { value: '0', change: null, prefix: '' };
+    }
   };
 
   // Handle double-click zoom
@@ -1005,245 +1243,712 @@ const Ngoos = ({ data }) => {
       {activeTab === 'sales' && (
           <div>
             {/* Header with Controls */}
-            <div className={`px-6 py-4 border-b ${themeClasses.border}`}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <select 
-                    value={salesDays}
-                    onChange={(e) => setSalesDays(Number(e.target.value))}
-                    style={{ 
-                      padding: '0.5rem 1rem', 
-                      borderRadius: '0.5rem', 
-                      backgroundColor: '#3b82f6', 
-                      color: '#fff',
-                      border: 'none',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <option value={7}>7 Days</option>
-                    <option value={30}>30 Days</option>
-                    <option value={60}>60 Days</option>
-                    <option value={90}>90 Days</option>
-                  </select>
+            <div className="px-6 pt-6" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', paddingBottom: '1rem' }}>
+              <select 
+                value={metricsDays}
+                onChange={(e) => setMetricsDays(Number(e.target.value))}
+                style={{ 
+                  padding: '0.5rem 1rem', 
+                  borderRadius: '0.5rem', 
+                  backgroundColor: '#1e293b', 
+                  color: '#fff',
+                  border: '1px solid #334155',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  minWidth: '100px'
+                }}
+              >
+                <option value={7}>7 Days</option>
+                <option value={30}>30 Days</option>
+                <option value={60}>60 Days</option>
+                <option value={90}>90 Days</option>
+              </select>
+              
+              <select 
+                style={{ 
+                  padding: '0.5rem 1rem', 
+                  borderRadius: '0.5rem', 
+                  backgroundColor: '#1e293b', 
+                  color: '#fff',
+                  border: '1px solid #334155',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  minWidth: '120px'
+                }}
+              >
+                <option value="prior">Prior Period</option>
+              </select>
+            </div>
+
+            {/* Graph Section: 70% Graph + 30% Banana Factors */}
+            <div className="px-6" style={{ display: 'grid', gridTemplateColumns: '70% 30%', gap: '1.5rem', marginBottom: '1.5rem' }}>
+              {/* Left: Graph (70%) */}
+              <div className={themeClasses.cardBg} style={{ borderRadius: '0.75rem', padding: '1.5rem' }}>
+                <ResponsiveContainer width="100%" height={300}>
+                  <ComposedChart data={salesChartData?.chart_data || []}>
+                    <defs>
+                      <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="unitsGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                    <XAxis 
+                      dataKey="date" 
+                      stroke="#64748b"
+                      style={{ fontSize: '0.75rem' }}
+                      tickLine={false}
+                    />
+                    <YAxis 
+                      yAxisId="left"
+                      stroke="#3b82f6"
+                      style={{ fontSize: '0.75rem' }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis 
+                      yAxisId="right"
+                      orientation="right"
+                      stroke="#f97316"
+                      style={{ fontSize: '0.75rem' }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#0f172a', 
+                        border: '1px solid #334155',
+                        borderRadius: '0.5rem',
+                        color: '#fff',
+                        fontSize: '0.875rem'
+                      }}
+                    />
+                    <Line 
+                      yAxisId="left"
+                      type="monotone" 
+                      dataKey="units_sold" 
+                      stroke="#3b82f6" 
+                      strokeWidth={3}
+                      name="Units Sold"
+                      dot={false}
+                      fill="url(#unitsGradient)"
+                    />
+                    <Line 
+                      yAxisId="right"
+                      type="monotone" 
+                      dataKey="sales" 
+                      stroke="#f97316" 
+                      strokeWidth={3}
+                      name="Sales"
+                      dot={false}
+                      fill="url(#salesGradient)"
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Right: Banana Factors (30%) */}
+              <div className={themeClasses.cardBg} style={{ borderRadius: '0.75rem', padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#fff', marginBottom: '1.5rem' }}>Banana Factors</h3>
+                
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {/* Sessions */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid #334155' }}>
+                    <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Sessions</span>
+                    <span style={{ fontSize: '0.875rem', fontWeight: '600', color: metrics?.changes?.sessions >= 0 ? '#22c55e' : '#ef4444' }}>
+                      {metrics?.current_period?.sessions?.toLocaleString() || '0'}
+                    </span>
+                  </div>
+
+                  {/* Conversion Rate */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid #334155' }}>
+                    <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Conversion Rate</span>
+                    <span style={{ fontSize: '0.875rem', fontWeight: '600', color: metrics?.changes?.conversion_rate >= 0 ? '#22c55e' : '#ef4444' }}>
+                      {metrics?.current_period?.conversion_rate?.toFixed(2) || '0.00'}%
+                    </span>
+                  </div>
+
+                  {/* TACOS */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid #334155' }}>
+                    <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>TACOS</span>
+                    <span style={{ fontSize: '0.875rem', fontWeight: '600', color: metrics?.changes?.tacos <= 0 ? '#22c55e' : '#ef4444' }}>
+                      {metrics?.current_period?.tacos?.toFixed(2) || '0.00'}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Perform Analysis Button */}
+                <button 
+                  onClick={handlePerformAnalysis}
+                  style={{
+                    marginTop: 'auto',
+                    padding: '0.75rem',
+                    backgroundColor: '#3b82f6',
+                    color: '#fff',
+                    borderRadius: '0.5rem',
+                    border: 'none',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <svg style={{ width: '1rem', height: '1rem' }} fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/>
+                  </svg>
+                  Perform Analysis
+                </button>
+                <div style={{ fontSize: '0.625rem', color: '#64748b', textAlign: 'center', marginTop: '0.5rem' }}>
+                  Powered by Banana Brain AI
                 </div>
               </div>
             </div>
 
-            {/* Content */}
-            <div className="px-6 pb-6" style={{ paddingTop: '1.5rem' }}>
-              {/* Main Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem', marginBottom: '2rem' }}>
-                {/* Left: Product Info */}
-                <div className={themeClasses.cardBg} style={{ borderRadius: '0.75rem', padding: '1.5rem' }}>
-                  <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
-                    <div style={{ width: '80px', height: '120px', backgroundColor: '#fff', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                      {data?.mainImage ? (
-                        <img src={data.mainImage} alt={salesMetrics?.product?.name || 'Product'} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-                      ) : (
-                        <svg style={{ width: '3rem', height: '3rem', color: '#9ca3af' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                      )}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#fff', marginBottom: '0.5rem' }}>
-                        {salesMetrics?.product?.name || data?.product || 'Product Name'}
-                      </h3>
-                      <div style={{ fontSize: '0.875rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
-                        SIZE: {salesMetrics?.product?.size || data?.variations?.[0] || 'N/A'}
+            {/* Bottom Section: Metrics Grid */}
+            <div className="px-6 pb-6" style={{ position: 'relative' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem' }}>
+                  {getCurrentMetrics().map(metricId => {
+                    const metric = availableMetrics.find(m => m.id === metricId);
+                    if (!metric) return null;
+                    const metricData = getMetricValue(metricId);
+                    const changeColor = metricData.invertColor 
+                      ? (metricData.change >= 0 ? '#ef4444' : '#22c55e')
+                      : (metricData.change >= 0 ? '#22c55e' : '#ef4444');
+                    
+                    return (
+                      <div key={metricId} style={{ padding: '1.5rem', backgroundColor: '#0f1729', borderRadius: '0.75rem', border: metric.border, textAlign: 'center' }}>
+                        <div style={{ fontSize: '2rem', fontWeight: '700', color: '#fff', marginBottom: '0.25rem' }}>
+                          {metricData.prefix}{metricData.value}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                          {metric.label} 
+                          {metricData.change !== null && (
+                            <span style={{ color: changeColor, fontWeight: '600' }}>
+                              {' '}{metricData.change >= 0 ? '+' : ''}{metricData.change?.toFixed(1)}%
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div style={{ fontSize: '0.875rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
-                        ASIN: {salesMetrics?.product?.asin || data?.child_asin || 'N/A'}
-                      </div>
-                      <div style={{ fontSize: '0.875rem', color: '#94a3b8' }}>
-                        BRAND: {salesMetrics?.product?.brand || data?.brand || 'N/A'}
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Organic Sales % */}
-                  <div style={{ marginTop: '2rem', textAlign: 'center', padding: '1.5rem', backgroundColor: '#0f172a', borderRadius: '0.5rem' }}>
-                    <div style={{ fontSize: '3rem', fontWeight: '700', color: '#fff', marginBottom: '0.5rem' }}>
-                      {salesMetrics?.current_period?.organic_sales_pct?.toFixed(0) || '0'}%
-                    </div>
-                    <div style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Organic Sales %</div>
-                  </div>
+                    );
+                  })}
 
                   {/* Add Metric Button */}
-                  <button style={{ 
-                    width: '100%',
-                    marginTop: '1rem',
-                    padding: '0.75rem',
-                    backgroundColor: 'transparent',
-                    border: '1px dashed #475569',
-                    borderRadius: '0.5rem',
-                    color: '#94a3b8',
-                    fontSize: '0.875rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.5rem',
-                    cursor: 'pointer'
-                  }}>
-                    <span style={{ fontSize: '1.25rem' }}>+</span>
-                    Add Metric
-                  </button>
-                </div>
-
-                {/* Right: Chart */}
-                <div className={themeClasses.cardBg} style={{ borderRadius: '0.75rem', padding: '1.5rem' }}>
-                  <div style={{ height: '280px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed #475569', borderRadius: '0.5rem' }}>
-                    <div style={{ textAlign: 'center', color: '#64748b' }}>
-                      <svg style={{ width: '48px', height: '48px', margin: '0 auto', marginBottom: '0.5rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                      </svg>
-                      <p style={{ fontSize: '0.875rem' }}>Sales chart coming soon</p>
+                  <div 
+                    onClick={() => setShowMetricSelector(true)}
+                    style={{ 
+                      padding: '1.5rem',
+                      backgroundColor: 'transparent',
+                      borderRadius: '0.75rem',
+                      border: '1px dashed #475569',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '2rem', color: '#94a3b8', marginBottom: '0.25rem' }}>+</div>
+                      <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Add Metric</div>
                     </div>
                   </div>
-                </div>
               </div>
 
-              {/* Metrics Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
-                {/* Units Sold */}
-                <div style={{ padding: '1.5rem', backgroundColor: '#1e293b', borderRadius: '0.75rem', border: '2px solid #3b82f6' }}>
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.75rem' }}>Units Sold</div>
-                  <div style={{ fontSize: '1.75rem', fontWeight: '700', color: '#fff', marginBottom: '0.5rem' }}>
-                    {salesMetrics?.current_period?.units_sold?.toLocaleString() || '0'}
-                  </div>
-                  <div style={{ fontSize: '0.875rem', color: salesMetrics?.changes?.units_sold >= 0 ? '#22c55e' : '#ef4444' }}>
-                    {salesMetrics?.changes?.units_sold >= 0 ? '+' : ''}{salesMetrics?.changes?.units_sold?.toFixed(0) || '0'}%
-                  </div>
-                </div>
+              {/* Metric Selector Modal */}
+              {showMetricSelector && (
+                <div style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 1000
+                }}
+                onClick={() => setShowMetricSelector(false)}
+                >
+                  <div style={{
+                    backgroundColor: '#1e293b',
+                    borderRadius: '0.75rem',
+                    padding: '1.5rem',
+                    width: '400px',
+                    maxHeight: '600px',
+                    display: 'flex',
+                    flexDirection: 'column'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  >
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#fff', marginBottom: '1rem' }}>Metrics</h3>
+                    
+                    {/* Search Input */}
+                    <div style={{ position: 'relative', marginBottom: '1rem' }}>
+                      <input
+                        type="text"
+                        placeholder="Search metrics..."
+                        value={metricSearch}
+                        onChange={(e) => setMetricSearch(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem 2.5rem 0.75rem 1rem',
+                          backgroundColor: '#334155',
+                          border: 'none',
+                          borderRadius: '0.5rem',
+                          color: '#fff',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                      <svg style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', width: '1.25rem', height: '1.25rem', color: '#94a3b8' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
 
-                {/* Sales */}
-                <div style={{ padding: '1.5rem', backgroundColor: '#1e293b', borderRadius: '0.75rem', border: '2px solid #f97316' }}>
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.75rem' }}>Sales</div>
-                  <div style={{ fontSize: '1.75rem', fontWeight: '700', color: '#fff', marginBottom: '0.5rem' }}>
-                    ${salesMetrics?.current_period?.sales?.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) || '0'}
-                  </div>
-                  <div style={{ fontSize: '0.875rem', color: salesMetrics?.changes?.sales >= 0 ? '#22c55e' : '#ef4444' }}>
-                    {salesMetrics?.changes?.sales >= 0 ? '+' : ''}{salesMetrics?.changes?.sales?.toFixed(0) || '0'}%
-                  </div>
-                </div>
+                    {/* Results and Clear */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                      <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>
+                        {filteredMetrics.length} results
+                      </span>
+                      <div>
+                        <span style={{ fontSize: '0.875rem', color: '#3b82f6', marginRight: '0.5rem' }}>
+                          {getCurrentMetrics().length} selected
+                        </span>
+                        <button onClick={clearAllMetrics} style={{ fontSize: '0.875rem', color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                          Clear all
+                        </button>
+                      </div>
+                    </div>
 
-                {/* Sessions */}
-                <div style={{ padding: '1.5rem', backgroundColor: '#1e293b', borderRadius: '0.75rem', border: '1px solid #334155' }}>
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.75rem' }}>Sessions</div>
-                  <div style={{ fontSize: '1.75rem', fontWeight: '700', color: '#fff', marginBottom: '0.5rem' }}>
-                    {salesMetrics?.current_period?.sessions?.toLocaleString() || '0'}
-                  </div>
-                  <div style={{ fontSize: '0.875rem', color: salesMetrics?.changes?.sessions >= 0 ? '#22c55e' : '#ef4444' }}>
-                    {salesMetrics?.changes?.sessions >= 0 ? '+' : ''}{salesMetrics?.changes?.sessions?.toFixed(0) || '0'}%
-                  </div>
-                </div>
+                    {/* Metric List */}
+                    <div style={{ flex: 1, overflowY: 'auto', marginBottom: '1rem' }}>
+                      {filteredMetrics.map(metric => (
+                        <div
+                          key={metric.id}
+                          onClick={() => toggleMetric(metric.id)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '0.75rem',
+                            marginBottom: '0.5rem',
+                            borderRadius: '0.5rem',
+                            cursor: 'pointer',
+                            backgroundColor: getCurrentMetrics().includes(metric.id) ? '#334155' : 'transparent'
+                          }}
+                        >
+                          <div style={{
+                            width: '1.25rem',
+                            height: '1.25rem',
+                            borderRadius: '50%',
+                            border: `2px solid ${getCurrentMetrics().includes(metric.id) ? '#3b82f6' : '#64748b'}`,
+                            backgroundColor: getCurrentMetrics().includes(metric.id) ? '#3b82f6' : 'transparent',
+                            marginRight: '0.75rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            {getCurrentMetrics().includes(metric.id) && (
+                              <div style={{ width: '0.5rem', height: '0.5rem', borderRadius: '50%', backgroundColor: '#fff' }} />
+                            )}
+                          </div>
+                          <span style={{ fontSize: '0.875rem', color: '#fff' }}>{metric.label}</span>
+                        </div>
+                      ))}
+                    </div>
 
-                {/* Conversion Rate */}
-                <div style={{ padding: '1.5rem', backgroundColor: '#1e293b', borderRadius: '0.75rem', border: '1px solid #334155' }}>
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.75rem' }}>Conversion Rate</div>
-                  <div style={{ fontSize: '1.75rem', fontWeight: '700', color: '#fff', marginBottom: '0.5rem' }}>
-                    {salesMetrics?.current_period?.conversion_rate?.toFixed(1) || '0.0'}%
-                  </div>
-                  <div style={{ fontSize: '0.875rem', color: salesMetrics?.changes?.conversion_rate >= 0 ? '#22c55e' : '#ef4444' }}>
-                    {salesMetrics?.changes?.conversion_rate >= 0 ? '+' : ''}{salesMetrics?.changes?.conversion_rate?.toFixed(0) || '0'}%
-                  </div>
-                </div>
-
-                {/* TACOS */}
-                <div style={{ padding: '1.5rem', backgroundColor: '#1e293b', borderRadius: '0.75rem', border: '2px solid #ef4444' }}>
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.75rem' }}>Tacos</div>
-                  <div style={{ fontSize: '1.75rem', fontWeight: '700', color: '#fff', marginBottom: '0.5rem' }}>
-                    {salesMetrics?.current_period?.tacos?.toFixed(1) || '0.0'}%
-                  </div>
-                  <div style={{ fontSize: '0.875rem', color: salesMetrics?.changes?.tacos >= 0 ? '#ef4444' : '#22c55e' }}>
-                    {salesMetrics?.changes?.tacos >= 0 ? '+' : ''}{salesMetrics?.changes?.tacos?.toFixed(0) || '0'}%
+                    {/* Close Button */}
+                    <button
+                      onClick={() => setShowMetricSelector(false)}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        backgroundColor: '#3b82f6',
+                        color: '#fff',
+                        borderRadius: '0.5rem',
+                        border: 'none',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Done
+                    </button>
                   </div>
                 </div>
-
-                {/* Price */}
-                <div style={{ padding: '1.5rem', backgroundColor: '#1e293b', borderRadius: '0.75rem', border: '1px solid #334155' }}>
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.75rem' }}>Price</div>
-                  <div style={{ fontSize: '1.75rem', fontWeight: '700', color: '#fff', marginBottom: '0.5rem' }}>
-                    ${salesMetrics?.current_period?.price?.toFixed(2) || '0.00'}
-                  </div>
-                  <div style={{ fontSize: '0.875rem', color: salesMetrics?.changes?.price >= 0 ? '#22c55e' : '#ef4444' }}>
-                    {salesMetrics?.changes?.price >= 0 ? '+' : ''}{salesMetrics?.changes?.price?.toFixed(0) || '0'}%
-                  </div>
-                </div>
-
-                {/* Profit % */}
-                <div style={{ padding: '1.5rem', backgroundColor: '#1e293b', borderRadius: '0.75rem', border: '1px solid #334155' }}>
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.75rem' }}>Profit %</div>
-                  <div style={{ fontSize: '1.75rem', fontWeight: '700', color: '#fff', marginBottom: '0.5rem' }}>
-                    {salesMetrics?.current_period?.profit_margin?.toFixed(1) || '0.0'}%
-                  </div>
-                  <div style={{ fontSize: '0.875rem', color: salesMetrics?.changes?.profit_margin >= 0 ? '#22c55e' : '#ef4444' }}>
-                    {salesMetrics?.changes?.profit_margin >= 0 ? '+' : ''}{salesMetrics?.changes?.profit_margin?.toFixed(0) || '0'}%
-                  </div>
-                </div>
-
-                {/* Profit Total */}
-                <div style={{ padding: '1.5rem', backgroundColor: '#1e293b', borderRadius: '0.75rem', border: '1px solid #334155' }}>
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.75rem' }}>Profit Total</div>
-                  <div style={{ fontSize: '1.75rem', fontWeight: '700', color: '#fff', marginBottom: '0.5rem' }}>
-                    ${salesMetrics?.current_period?.profit_total?.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) || '0'}
-                  </div>
-                  <div style={{ fontSize: '0.875rem', color: salesMetrics?.changes?.profit_total >= 0 ? '#22c55e' : '#ef4444' }}>
-                    {salesMetrics?.changes?.profit_total >= 0 ? '+' : ''}{salesMetrics?.changes?.profit_total?.toFixed(0) || '0'}%
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
           </div>
       )}
 
       {/* Ads Tab Content */}
       {activeTab === 'ads' && (
-          <div style={{ padding: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                <div>
-                  <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#fff', marginBottom: '0.25rem' }}>Advertising Performance</h3>
-                  <p style={{ fontSize: '0.875rem', color: '#94a3b8' }}>
-                    {productDetails?.product?.size || data?.variations?.[0] || '8oz'} Ad Metrics
-                  </p>
-                </div>
+          <div>
+            {/* Header with Controls */}
+            <div className="px-6 pt-6" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', paddingBottom: '1rem' }}>
+              <select 
+                value={metricsDays}
+                onChange={(e) => setMetricsDays(Number(e.target.value))}
+                style={{ 
+                  padding: '0.5rem 1rem', 
+                  borderRadius: '0.5rem', 
+                  backgroundColor: '#1e293b', 
+                  color: '#fff',
+                  border: '1px solid #334155',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  minWidth: '100px'
+                }}
+              >
+                <option value={7}>7 Days</option>
+                <option value={30}>30 Days</option>
+                <option value={60}>60 Days</option>
+                <option value={90}>90 Days</option>
+              </select>
+              
+              <select 
+                style={{ 
+                  padding: '0.5rem 1rem', 
+                  borderRadius: '0.5rem', 
+                  backgroundColor: '#1e293b', 
+                  color: '#fff',
+                  border: '1px solid #334155',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  minWidth: '120px'
+                }}
+              >
+                <option value="prior">Prior Period</option>
+              </select>
+            </div>
+
+            {/* Graph Section: 70% Graph + 30% Banana Factors */}
+            <div className="px-6" style={{ display: 'grid', gridTemplateColumns: '70% 30%', gap: '1.5rem', marginBottom: '1.5rem' }}>
+              {/* Left: Graph (70%) */}
+              <div className={themeClasses.cardBg} style={{ borderRadius: '0.75rem', padding: '1.5rem' }}>
+                {/* Debug: Log chart data */}
+                {console.log('Ads Chart Data:', adsChartData?.chart_data)}
+                <ResponsiveContainer width="100%" height={300}>
+                  <ComposedChart data={adsChartData?.chart_data || []}>
+                    <defs>
+                      <linearGradient id="adsTacosGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="adsUnitsGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                    <XAxis 
+                      dataKey="date" 
+                      stroke="#64748b"
+                      style={{ fontSize: '0.75rem' }}
+                      tickLine={false}
+                    />
+                    <YAxis 
+                      yAxisId="left"
+                      stroke="#3b82f6"
+                      style={{ fontSize: '0.75rem' }}
+                      tickLine={false}
+                      axisLine={false}
+                      label={{ value: 'Total Sales ($)', angle: -90, position: 'insideLeft', style: { fill: '#3b82f6', fontSize: '0.75rem' } }}
+                    />
+                    <YAxis 
+                      yAxisId="right"
+                      orientation="right"
+                      stroke="#f97316"
+                      style={{ fontSize: '0.75rem' }}
+                      tickLine={false}
+                      axisLine={false}
+                      label={{ value: 'TACOS (%)', angle: 90, position: 'insideRight', style: { fill: '#f97316', fontSize: '0.75rem' } }}
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#0f172a', 
+                        border: '1px solid #334155',
+                        borderRadius: '0.5rem',
+                        color: '#fff',
+                        fontSize: '0.875rem'
+                      }}
+                    />
+                    <Line 
+                      yAxisId="left"
+                      type="monotone" 
+                      dataKey="total_sales" 
+                      stroke="#3b82f6" 
+                      strokeWidth={3}
+                      name="Total Sales"
+                      dot={false}
+                      fill="url(#adsUnitsGradient)"
+                    />
+                    <Line 
+                      yAxisId="right"
+                      type="monotone" 
+                      dataKey="tacos" 
+                      stroke="#f97316" 
+                      strokeWidth={3}
+                      name="TACOS"
+                      dot={false}
+                      fill="url(#adsTacosGradient)"
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
               </div>
 
-              {/* Ads Chart Placeholder */}
-              <div style={{ height: '400px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed #475569', borderRadius: '0.5rem' }}>
-                <div style={{ textAlign: 'center', color: '#64748b' }}>
-                  <svg style={{ width: '64px', height: '64px', margin: '0 auto', marginBottom: '1rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+              {/* Right: Banana Factors (30%) */}
+              <div className={themeClasses.cardBg} style={{ borderRadius: '0.75rem', padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#fff', marginBottom: '1.5rem' }}>Banana Factors</h3>
+                
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {/* Sessions */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid #334155' }}>
+                    <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Sessions</span>
+                    <span style={{ fontSize: '0.875rem', fontWeight: '600', color: metrics?.changes?.sessions >= 0 ? '#22c55e' : '#ef4444' }}>
+                      {metrics?.changes?.sessions >= 0 ? '+' : ''}{metrics?.changes?.sessions?.toFixed(1) || '0.0'}%
+                    </span>
+                  </div>
+
+                  {/* Conversion Rate */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid #334155' }}>
+                    <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Conversion Rate</span>
+                    <span style={{ fontSize: '0.875rem', fontWeight: '600', color: metrics?.changes?.conversion_rate >= 0 ? '#22c55e' : '#ef4444' }}>
+                      {metrics?.changes?.conversion_rate >= 0 ? '+' : ''}{metrics?.changes?.conversion_rate?.toFixed(1) || '0.0'}%
+                    </span>
+                  </div>
+
+                  {/* TACOS */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid #334155' }}>
+                    <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>TACOS</span>
+                    <span style={{ fontSize: '0.875rem', fontWeight: '600', color: metrics?.changes?.tacos <= 0 ? '#22c55e' : '#ef4444' }}>
+                      {metrics?.changes?.tacos >= 0 ? '+' : ''}{metrics?.changes?.tacos?.toFixed(1) || '0.0'}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Perform Analysis Button */}
+                <button 
+                  onClick={handlePerformAnalysis}
+                  style={{
+                    marginTop: 'auto',
+                    padding: '0.75rem',
+                    backgroundColor: '#3b82f6',
+                    color: '#fff',
+                    borderRadius: '0.5rem',
+                    border: 'none',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  <svg style={{ width: '1rem', height: '1rem' }} fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/>
                   </svg>
-                  <p style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.5rem' }}>Ad Data Coming Soon</p>
-                  <p style={{ fontSize: '0.875rem' }}>Advertising metrics and performance will be displayed here</p>
+                  Perform Analysis
+                </button>
+                <div style={{ fontSize: '0.625rem', color: '#64748b', textAlign: 'center', marginTop: '0.5rem' }}>
+                  Powered by Banana Brain AI
                 </div>
+              </div>
+            </div>
+
+            {/* Bottom Section: Metrics Grid */}
+            <div className="px-6 pb-6" style={{ position: 'relative' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem' }}>
+                  {getCurrentMetrics().map(metricId => {
+                    const metric = availableMetrics.find(m => m.id === metricId);
+                    if (!metric) return null;
+                    const metricData = getMetricValue(metricId);
+                    const changeColor = metricData.invertColor 
+                      ? (metricData.change >= 0 ? '#ef4444' : '#22c55e')
+                      : (metricData.change >= 0 ? '#22c55e' : '#ef4444');
+                    
+                    return (
+                      <div key={metricId} style={{ padding: '1.5rem', backgroundColor: '#0f1729', borderRadius: '0.75rem', border: metric.border, textAlign: 'center' }}>
+                        <div style={{ fontSize: '2rem', fontWeight: '700', color: '#fff', marginBottom: '0.25rem' }}>
+                          {metricData.prefix}{metricData.value}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                          {metric.label} 
+                          {metricData.change !== null && (
+                            <span style={{ color: changeColor, fontWeight: '600' }}>
+                              {' '}{metricData.change >= 0 ? '+' : ''}{metricData.change?.toFixed(1)}%
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Add Metric Button */}
+                  <div 
+                    onClick={() => setShowMetricSelector(true)}
+                    style={{ 
+                      padding: '1.5rem',
+                      backgroundColor: 'transparent',
+                      borderRadius: '0.75rem',
+                      border: '1px dashed #475569',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '2rem', color: '#94a3b8', marginBottom: '0.25rem' }}>+</div>
+                      <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Add Metric</div>
+                    </div>
+                  </div>
               </div>
 
-              {/* Ads Metrics Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginTop: '1.5rem' }}>
-                <div style={{ padding: '1rem', backgroundColor: '#0f172a', borderRadius: '0.5rem' }}>
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.5rem' }}>Ad Spend</div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#fff' }}>-</div>
+              {/* Metric Selector Modal */}
+              {showMetricSelector && (
+                <div style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 1000
+                }}
+                onClick={() => setShowMetricSelector(false)}
+                >
+                  <div style={{
+                    backgroundColor: '#1e293b',
+                    borderRadius: '0.75rem',
+                    padding: '1.5rem',
+                    width: '400px',
+                    maxHeight: '600px',
+                    display: 'flex',
+                    flexDirection: 'column'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  >
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#fff', marginBottom: '1rem' }}>Metrics</h3>
+                    
+                    {/* Search Input */}
+                    <div style={{ position: 'relative', marginBottom: '1rem' }}>
+                      <input
+                        type="text"
+                        placeholder="Search metrics..."
+                        value={metricSearch}
+                        onChange={(e) => setMetricSearch(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem 2.5rem 0.75rem 1rem',
+                          backgroundColor: '#334155',
+                          border: 'none',
+                          borderRadius: '0.5rem',
+                          color: '#fff',
+                          fontSize: '0.875rem'
+                        }}
+                      />
+                      <svg style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', width: '1.25rem', height: '1.25rem', color: '#94a3b8' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+
+                    {/* Results and Clear */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                      <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>
+                        {filteredMetrics.length} results
+                      </span>
+                      <div>
+                        <span style={{ fontSize: '0.875rem', color: '#3b82f6', marginRight: '0.5rem' }}>
+                          {getCurrentMetrics().length} selected
+                        </span>
+                        <button onClick={clearAllMetrics} style={{ fontSize: '0.875rem', color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                          Clear all
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Metric List */}
+                    <div style={{ flex: 1, overflowY: 'auto', marginBottom: '1rem' }}>
+                      {filteredMetrics.map(metric => (
+                        <div
+                          key={metric.id}
+                          onClick={() => toggleMetric(metric.id)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '0.75rem',
+                            marginBottom: '0.5rem',
+                            borderRadius: '0.5rem',
+                            cursor: 'pointer',
+                            backgroundColor: getCurrentMetrics().includes(metric.id) ? '#334155' : 'transparent'
+                          }}
+                        >
+                          <div style={{
+                            width: '1.25rem',
+                            height: '1.25rem',
+                            borderRadius: '50%',
+                            border: `2px solid ${getCurrentMetrics().includes(metric.id) ? '#3b82f6' : '#64748b'}`,
+                            backgroundColor: getCurrentMetrics().includes(metric.id) ? '#3b82f6' : 'transparent',
+                            marginRight: '0.75rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            {getCurrentMetrics().includes(metric.id) && (
+                              <div style={{ width: '0.5rem', height: '0.5rem', borderRadius: '50%', backgroundColor: '#fff' }} />
+                            )}
+                          </div>
+                          <span style={{ fontSize: '0.875rem', color: '#fff' }}>{metric.label}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Close Button */}
+                    <button
+                      onClick={() => setShowMetricSelector(false)}
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        backgroundColor: '#3b82f6',
+                        color: '#fff',
+                        borderRadius: '0.5rem',
+                        border: 'none',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Done
+                    </button>
+                  </div>
                 </div>
-                <div style={{ padding: '1rem', backgroundColor: '#0f172a', borderRadius: '0.5rem' }}>
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.5rem' }}>Ad Sales</div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#fff' }}>-</div>
-                </div>
-                <div style={{ padding: '1rem', backgroundColor: '#0f172a', borderRadius: '0.5rem' }}>
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.5rem' }}>ACOS</div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#fff' }}>-</div>
-                </div>
-                <div style={{ padding: '1rem', backgroundColor: '#0f172a', borderRadius: '0.5rem' }}>
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.5rem' }}>ROAS</div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#fff' }}>-</div>
-                </div>
-              </div>
+              )}
+            </div>
           </div>
       )}
+
+      {/* AI Analysis Modal */}
+      <BananaBrainModal
+        isOpen={showAIModal}
+        onClose={() => setShowAIModal(false)}
+        analysis={aiAnalysis}
+        onAskQuestion={handleAskFollowUp}
+        isLoading={isAnalyzing}
+      />
     </div>
   );
 };
