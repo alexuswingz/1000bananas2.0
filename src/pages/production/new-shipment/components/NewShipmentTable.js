@@ -1,8 +1,128 @@
-import React from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 
-const NewShipmentTable = ({ rows, tableMode, onProductClick }) => {
+const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyChange }) => {
   const { isDarkMode } = useTheme();
+  const [selectedRows, setSelectedRows] = useState(new Set());
+  const selectAllCheckboxRef = useRef(null);
+  const [clickedQtyIndex, setClickedQtyIndex] = useState(null);
+  const [hoveredQtyIndex, setHoveredQtyIndex] = useState(null);
+  const qtyContainerRefs = useRef({});
+  const popupRefs = useRef({});
+  const qtyInputRefs = useRef({});
+
+  // Use local state if props not provided (for backward compatibility)
+  const [internalQtyValues, setInternalQtyValues] = useState(() => {
+    if (qtyValues) return null; // Use props if provided
+    const initialValues = {};
+    rows.forEach((row, index) => {
+      initialValues[index] = 0; // Default to 0
+    });
+    return initialValues;
+  });
+
+  const effectiveQtyValues = qtyValues || internalQtyValues || {};
+  const effectiveSetQtyValues = onQtyChange || setInternalQtyValues;
+
+  // Update qtyValues when rows change (only if using internal state)
+  useEffect(() => {
+    if (!qtyValues && !onQtyChange && internalQtyValues) {
+      const newValues = {};
+      rows.forEach((row, index) => {
+        newValues[index] = internalQtyValues[index] ?? 0; // Default to 0
+      });
+      setInternalQtyValues(newValues);
+    }
+  }, [rows.length]);
+
+  // Check if all rows are selected
+  const allSelected = useMemo(() => {
+    return rows.length > 0 && selectedRows.size === rows.length;
+  }, [rows.length, selectedRows.size]);
+
+  // Check if some rows are selected (for indeterminate state)
+  const someSelected = useMemo(() => {
+    return selectedRows.size > 0 && selectedRows.size < rows.length;
+  }, [selectedRows.size, rows.length]);
+
+  // Set indeterminate state for select all checkbox
+  useEffect(() => {
+    if (selectAllCheckboxRef.current) {
+      selectAllCheckboxRef.current.indeterminate = someSelected;
+    }
+  }, [someSelected]);
+
+  // Position popup when it appears
+  useEffect(() => {
+    if (clickedQtyIndex !== null) {
+      const qtyContainer = qtyContainerRefs.current[clickedQtyIndex];
+      const popup = popupRefs.current[clickedQtyIndex];
+      
+      if (qtyContainer && popup) {
+        const rect = qtyContainer.getBoundingClientRect();
+        const popupHeight = popup.offsetHeight || 200;
+        const top = rect.top - popupHeight - 12;
+        const left = rect.left + rect.width / 2;
+        
+        popup.style.top = `${top}px`;
+        popup.style.left = `${left}px`;
+        popup.style.transform = 'translateX(-50%)';
+      }
+    }
+  }, [clickedQtyIndex]);
+
+  // Close popup when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (clickedQtyIndex !== null) {
+        const qtyContainer = qtyContainerRefs.current[clickedQtyIndex];
+        const popup = popupRefs.current[clickedQtyIndex];
+        
+        // Check if click is outside both the QTY container and the popup
+        if (qtyContainer && popup) {
+          const isClickInsideQty = qtyContainer.contains(event.target);
+          const isClickInsidePopup = popup.contains(event.target);
+          
+          // Only close if click is truly outside
+          if (!isClickInsideQty && !isClickInsidePopup) {
+            setClickedQtyIndex(null);
+          }
+        }
+      }
+    };
+
+    if (clickedQtyIndex !== null) {
+      // Use a timeout to add listener after current event cycle completes
+      const timeoutId = setTimeout(() => {
+        document.addEventListener('click', handleClickOutside);
+      }, 0);
+      
+      return () => {
+        clearTimeout(timeoutId);
+        document.removeEventListener('click', handleClickOutside);
+      };
+    }
+  }, [clickedQtyIndex]);
+
+  // Handle select all checkbox
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedRows(new Set(rows.map(row => row.id)));
+    } else {
+      setSelectedRows(new Set());
+    }
+  };
+
+  // Handle individual row checkbox
+  const handleRowSelect = (rowId, e) => {
+    const newSelected = new Set(selectedRows);
+    if (e.target.checked) {
+      newSelected.add(rowId);
+    } else {
+      newSelected.delete(rowId);
+    }
+    setSelectedRows(newSelected);
+  };
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -149,8 +269,9 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick }) => {
                         type="button"
                         onClick={() => onProductClick(row)}
                         className="text-xs text-blue-500 hover:text-blue-600"
+                        style={{ cursor: 'pointer' }}
                       >
-                        Cherry Tree Fertilizer...
+                        {row.product}...
                       </button>
                     </td>
                     <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem' }} className={themeClasses.textSecondary}>
@@ -162,33 +283,37 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick }) => {
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '0.25rem',
-                          padding: '0.25rem 0.9rem',
-                          borderRadius: '0.5rem',
+                          justifyContent: 'center',
+                          gap: '10px',
+                          width: '72px',
+                          height: '24px',
+                          borderRadius: '6px',
                           border: 'none',
                           backgroundColor: '#2563EB',
                           color: '#FFFFFF',
-                          fontSize: '0.75rem',
+                          fontSize: '0.875rem',
                           fontWeight: 500,
+                          fontFamily: 'sans-serif',
+                          cursor: 'pointer',
+                          padding: 0,
                         }}
                       >
                         <span
                           style={{
-                            width: '0.7rem',
-                            height: '0.7rem',
-                            borderRadius: '9999px',
-                            backgroundColor: '#FFFFFF',
                             display: 'inline-flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            color: '#2563EB',
-                            fontSize: '0.7rem',
-                            fontWeight: 700,
+                            width: '9.33px',
+                            height: '9.33px',
+                            color: '#FFFFFF',
+                            fontSize: '0.875rem',
+                            fontWeight: 600,
+                            lineHeight: 1,
                           }}
                         >
                           +
                         </span>
-                        Add
+                        <span>Add</span>
                       </button>
                     </td>
                     <td style={{ padding: '0.65rem 1rem', textAlign: 'center' }}>
@@ -238,13 +363,16 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick }) => {
                           }}
                         >
                           <div
+                            onDoubleClick={() => onProductClick(row)}
                             style={{
                               borderRadius: '9999px',
                               backgroundColor: isDarkMode ? '#020617' : '#F3F4F6',
                               overflow: 'hidden',
                               height: '18px',
                               display: 'flex',
+                              cursor: 'pointer',
                             }}
+                            title="Double-click to view N-GOOS details"
                           >
                             <div style={{ flex: 2, backgroundColor: '#A855F7' }} />
                             <div style={{ flex: 3, backgroundColor: '#22C55E' }} />
@@ -328,121 +456,1022 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick }) => {
 
   // Table mode view
   return (
-    <div
-      className={`${themeClasses.cardBg} ${themeClasses.border} border rounded-xl shadow-sm`}
-      style={{ marginTop: '1.25rem' }}
+    <>
+      <style>{`
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        input[type="number"] {
+          -moz-appearance: textfield;
+        }
+      `}</style>
+      <div
+      className={`${themeClasses.cardBg} ${themeClasses.border} border shadow-sm`}
+      style={{ marginTop: '1.25rem', borderRadius: '12px', overflow: 'hidden' }}
     >
-      <div style={{ overflowX: 'auto' }}>
+      <div style={{ 
+        overflowX: 'auto', 
+        overflowY: 'visible',
+        width: '100%',
+        WebkitOverflowScrolling: 'touch',
+        position: 'relative',
+      }}>
         <table
           style={{
-            width: '100%',
+            width: 'max-content',
+            minWidth: '100%',
             borderCollapse: 'separate',
             borderSpacing: 0,
+            tableLayout: 'fixed',
           }}
         >
           <thead className={themeClasses.headerBg}>
             <tr style={{ height: '40px' }}>
-              <th style={{ padding: '0 1rem', width: '40px', textAlign: 'center' }}>
-                <input type="checkbox" style={{ cursor: 'pointer' }} />
+              {/* Sticky columns */}
+              <th style={{ 
+                padding: '0 0.75rem', 
+                width: '40px', 
+                minWidth: '40px',
+                maxWidth: '40px',
+                height: '40px',
+                textAlign: 'center',
+                position: 'sticky',
+                left: 0,
+                zIndex: 20,
+                backgroundColor: '#1C2634',
+                boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
+                borderTopLeftRadius: '12px',
+              }}>
+                <input 
+                  type="checkbox" 
+                  style={{ cursor: 'pointer' }}
+                  checked={allSelected}
+                  ref={selectAllCheckboxRef}
+                  onChange={handleSelectAll}
+                />
               </th>
-              <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', textAlign: 'left' }}>
-                BRAND
+              <th 
+                className="group"
+                style={{ 
+                  padding: '0 0.75rem', 
+                  textAlign: 'center',
+                  position: 'sticky',
+                  left: '40px',
+                  zIndex: 20,
+                  backgroundColor: '#1C2634',
+                  width: '150px',
+                  minWidth: '150px',
+                  maxWidth: '150px',
+                  height: '40px',
+                  boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  lineHeight: '100%',
+                  letterSpacing: '0%',
+                  textTransform: 'uppercase',
+                  color: '#FFFFFF',
+                  borderRight: '1px solid #FFFFFF',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                  <span>BRAND</span>
+                  <img
+                    src="/assets/Vector (1).png"
+                    alt="Filter"
+                    className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
+                    style={{ width: '12px', height: '12px' }}
+                  />
+                </div>
               </th>
-              <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', textAlign: 'left' }}>
-                PRODUCT
+              <th 
+                className="group"
+                style={{ 
+                  padding: '0 0.75rem', 
+                  textAlign: 'center',
+                  position: 'sticky',
+                  left: '190px',
+                  zIndex: 20,
+                  backgroundColor: '#1C2634',
+                  width: '200px',
+                  minWidth: '200px',
+                  maxWidth: '200px',
+                  height: '40px',
+                  boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  lineHeight: '100%',
+                  letterSpacing: '0%',
+                  textTransform: 'uppercase',
+                  color: '#FFFFFF',
+                  borderRight: '1px solid #FFFFFF',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                  <span>PRODUCT</span>
+                  <img
+                    src="/assets/Vector (1).png"
+                    alt="Filter"
+                    className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
+                    style={{ width: '12px', height: '12px' }}
+                  />
+                </div>
               </th>
-              <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', textAlign: 'left' }}>
-                SIZE
+              <th 
+                className="group"
+                style={{ 
+                  padding: '0 0.75rem', 
+                  textAlign: 'center',
+                  position: 'sticky',
+                  left: '390px',
+                  zIndex: 20,
+                  backgroundColor: '#1C2634',
+                  width: '120px',
+                  minWidth: '120px',
+                  maxWidth: '120px',
+                  height: '40px',
+                  boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  lineHeight: '100%',
+                  letterSpacing: '0%',
+                  textTransform: 'uppercase',
+                  color: '#FFFFFF',
+                  borderRight: '1px solid #FFFFFF',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                  <span>SIZE</span>
+                  <img
+                    src="/assets/Vector (1).png"
+                    alt="Filter"
+                    className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
+                    style={{ width: '12px', height: '12px' }}
+                  />
+                </div>
               </th>
-              <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', textAlign: 'left' }}>
-                QTY
+              {/* Scrollable columns */}
+              <th 
+                className="group"
+                style={{ 
+                  padding: '12px 16px', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  borderRight: '1px solid #FFFFFF',
+                  boxSizing: 'border-box',
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  lineHeight: '100%',
+                  letterSpacing: '0%',
+                  textTransform: 'uppercase',
+                  color: '#FFFFFF',
+                  backgroundColor: '#1C2634',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                  <span>QTY</span>
+                  <img
+                    src="/assets/Vector (1).png"
+                    alt="Filter"
+                    className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
+                    style={{ width: '12px', height: '12px' }}
+                  />
+                </div>
               </th>
-              <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', textAlign: 'left' }}>
-                INVENTORY FBA AVAILABLE (DAYS)
+              <th 
+                className="group"
+                style={{ 
+                  padding: '12px 16px', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  borderRight: '1px solid #FFFFFF',
+                  boxSizing: 'border-box',
+                  backgroundColor: '#1C2634',
+                }}
+              >
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '2px',
+                  }}>
+                    <span style={{ 
+                      fontSize: '0.75rem', 
+                      fontWeight: 700, 
+                      lineHeight: 1.1, 
+                      color: '#FFFFFF',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                    }}>INVENTORY</span>
+                    <span style={{ 
+                      fontSize: '0.6rem', 
+                      fontWeight: 400, 
+                      lineHeight: 1.1, 
+                      color: '#FFFFFF',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                    }}>FBA AVAILABLE (DAYS)</span>
+                  </div>
+                  <img
+                    src="/assets/Vector (1).png"
+                    alt="Filter"
+                    className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
+                    style={{ 
+                      width: '12px', 
+                      height: '12px',
+                      position: 'absolute',
+                      right: '0',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                    }}
+                  />
+                </div>
               </th>
-              <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', textAlign: 'left' }}>
-                INVENTORY TOTAL (DAYS)
+              <th 
+                className="group"
+                style={{ 
+                  padding: '12px 16px', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  borderRight: '1px solid #FFFFFF',
+                  boxSizing: 'border-box',
+                  backgroundColor: '#1C2634',
+                }}
+              >
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '2px',
+                  }}>
+                    <span style={{ 
+                      fontSize: '0.75rem', 
+                      fontWeight: 700, 
+                      lineHeight: 1.1, 
+                      color: '#FFFFFF',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                    }}>INVENTORY</span>
+                    <span style={{ 
+                      fontSize: '0.6rem', 
+                      fontWeight: 400, 
+                      lineHeight: 1.1, 
+                      color: '#FFFFFF',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                    }}>TOTAL (DAYS)</span>
+                  </div>
+                  <img
+                    src="/assets/Vector (1).png"
+                    alt="Filter"
+                    className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
+                    style={{ 
+                      width: '12px', 
+                      height: '12px',
+                      position: 'absolute',
+                      right: '0',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                    }}
+                  />
+                </div>
               </th>
-              <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', textAlign: 'left' }}>
-                FORECAST
+              <th 
+                className="group"
+                style={{ 
+                  padding: '12px 16px', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  borderRight: '1px solid #FFFFFF',
+                  boxSizing: 'border-box',
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  lineHeight: '100%',
+                  letterSpacing: '0%',
+                  textTransform: 'uppercase',
+                  color: '#FFFFFF',
+                  backgroundColor: '#1C2634',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                  <span>FORECAST</span>
+                  <img
+                    src="/assets/Vector (1).png"
+                    alt="Filter"
+                    className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
+                    style={{ width: '12px', height: '12px' }}
+                  />
+                </div>
               </th>
-              <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', textAlign: 'left' }}>
-                7 DAY SALES
+              <th 
+                className="group"
+                style={{ 
+                  padding: '12px 16px', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  borderRight: '1px solid #FFFFFF',
+                  boxSizing: 'border-box',
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  lineHeight: '100%',
+                  letterSpacing: '0%',
+                  textTransform: 'uppercase',
+                  color: '#FFFFFF',
+                  backgroundColor: '#1C2634',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                  <span>7 DAY SALES</span>
+                  <img
+                    src="/assets/Vector (1).png"
+                    alt="Filter"
+                    className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
+                    style={{ width: '12px', height: '12px' }}
+                  />
+                </div>
               </th>
-              <th style={{ padding: '0 1rem', width: '40px', textAlign: 'center' }}>
+              <th 
+                className="group"
+                style={{ 
+                  padding: '12px 16px', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  borderRight: '1px solid #FFFFFF',
+                  boxSizing: 'border-box',
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  lineHeight: '100%',
+                  letterSpacing: '0%',
+                  textTransform: 'uppercase',
+                  color: '#FFFFFF',
+                  backgroundColor: '#1C2634',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                  <span>30 DAY SALES</span>
+                  <img
+                    src="/assets/Vector (1).png"
+                    alt="Filter"
+                    className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
+                    style={{ width: '12px', height: '12px' }}
+                  />
+                </div>
+              </th>
+              <th 
+                className="group"
+                style={{ 
+                  padding: '12px 16px', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  borderRight: '1px solid #FFFFFF',
+                  boxSizing: 'border-box',
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  lineHeight: '100%',
+                  letterSpacing: '0%',
+                  textTransform: 'uppercase',
+                  color: '#FFFFFF',
+                  backgroundColor: '#1C2634',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                  <span>4 MONTH SALES</span>
+                  <img
+                    src="/assets/Vector (1).png"
+                    alt="Filter"
+                    className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
+                    style={{ width: '12px', height: '12px' }}
+                  />
+                </div>
+              </th>
+              <th 
+                className="group"
+                style={{ 
+                  padding: '12px 16px', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  borderRight: '1px solid #FFFFFF',
+                  boxSizing: 'border-box',
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  lineHeight: '100%',
+                  letterSpacing: '0%',
+                  textTransform: 'uppercase',
+                  color: '#FFFFFF',
+                  backgroundColor: '#1C2634',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                  <span>FORMULA</span>
+                  <img
+                    src="/assets/Vector (1).png"
+                    alt="Filter"
+                    className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
+                    style={{ width: '12px', height: '12px' }}
+                  />
+                </div>
+              </th>
+              {/* Sticky three dots */}
+              <th style={{ 
+                padding: '0 1rem', 
+                width: '40px',
+                height: '40px',
+                textAlign: 'center',
+                position: 'sticky',
+                right: 0,
+                zIndex: 20,
+                backgroundColor: '#1C2634',
+                boxShadow: '-2px 0 4px rgba(0,0,0,0.1)',
+                borderRight: '1px solid #FFFFFF',
+                borderTopRightRadius: '12px',
+              }}>
                 <span style={{ color: '#FFFFFF', fontSize: '1rem' }}>⋮</span>
               </th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row, index) => (
-              <tr key={row.id} className="border-t border-gray-200">
-                <td style={{ padding: '0.65rem 1rem', textAlign: 'center' }}>
-                  <input type="checkbox" style={{ cursor: 'pointer' }} />
+              <tr key={row.id} style={{ height: '40px' }}>
+                {/* Sticky columns */}
+                <td style={{ 
+                  padding: '0.65rem 0.75rem', 
+                  textAlign: 'center',
+                  position: 'sticky',
+                  left: 0,
+                  zIndex: 15,
+                  backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                  width: '40px',
+                  minWidth: '40px',
+                  maxWidth: '40px',
+                  boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
+                  borderTop: '1px solid #E5E7EB',
+                }}>
+                  <input 
+                    type="checkbox" 
+                    style={{ cursor: 'pointer' }}
+                    checked={selectedRows.has(row.id)}
+                    onChange={(e) => handleRowSelect(row.id, e)}
+                  />
                 </td>
-                <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem' }} className={themeClasses.text}>
+                <td style={{ 
+                  padding: '0.65rem 0.75rem', 
+                  fontSize: '0.85rem',
+                  textAlign: 'center',
+                  position: 'sticky',
+                  left: '40px',
+                  zIndex: 15,
+                  backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                  width: '150px',
+                  minWidth: '150px',
+                  maxWidth: '150px',
+                  boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
+                  borderTop: '1px solid #E5E7EB',
+                }} className={themeClasses.text}>
                   {row.brand}
                 </td>
-                <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem' }}>
+                <td style={{ 
+                  padding: '0.65rem 0.75rem', 
+                  fontSize: '0.85rem',
+                  textAlign: 'center',
+                  position: 'sticky',
+                  left: '190px',
+                  zIndex: 15,
+                  backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                  width: '200px',
+                  minWidth: '200px',
+                  maxWidth: '200px',
+                  boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
+                  borderTop: '1px solid #E5E7EB',
+                }}>
                   <button
                     type="button"
                     onClick={() => onProductClick(row)}
                     className="text-xs text-blue-500 hover:text-blue-600"
-                    style={{ textDecoration: 'underline' }}
+                    style={{ textDecoration: 'underline', cursor: 'pointer', margin: '0 auto', display: 'block' }}
                   >
-                    Cherry Tree Fer...
+                    {row.product.length > 18 ? `${row.product.substring(0, 18)}...` : row.product}
                   </button>
                 </td>
-                <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem' }} className={themeClasses.textSecondary}>
+                <td style={{ 
+                  padding: '0.65rem 0.75rem', 
+                  fontSize: '0.85rem',
+                  textAlign: 'center',
+                  position: 'sticky',
+                  left: '390px',
+                  zIndex: 15,
+                  backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                  width: '120px',
+                  minWidth: '120px',
+                  maxWidth: '120px',
+                  boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
+                  borderTop: '1px solid #E5E7EB',
+                }} className={themeClasses.textSecondary}>
                   {row.size}
                 </td>
-                <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem' }}>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <span
+                {/* Scrollable columns */}
+                <td style={{ 
+                  padding: '12px 16px', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  boxSizing: 'border-box',
+                  borderTop: '1px solid #E5E7EB',
+                }}>
+                  <div style={{ position: 'relative', display: 'inline-block' }}>
+                    <div
+                      ref={(el) => {
+                        if (el) qtyContainerRefs.current[index] = el;
+                      }}
+                      onMouseEnter={() => setHoveredQtyIndex(index)}
+                      onMouseLeave={() => setHoveredQtyIndex(null)}
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
-                        padding: '0.15rem 0.5rem',
-                        borderRadius: '9999px',
-                        backgroundColor: isDarkMode ? '#1F2937' : '#F3F4F6',
-                        fontSize: '0.75rem',
-                        fontWeight: 500,
+                        justifyContent: 'center',
+                        gap: '4px',
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: '8px',
+                        border: '1px solid #E5E7EB',
+                        padding: '4px 6px',
+                        width: '107px',
+                        height: '24px',
+                        boxSizing: 'border-box',
+                        position: 'relative',
+                        overflow: 'hidden',
                       }}
-                      className={themeClasses.text}
                     >
-                      {row.qty}
-                    </span>
-                    {index === 0 && (
-                      <span
+                      <input
+                        key={`qty-input-${index}`}
+                        ref={(el) => {
+                          if (el) qtyInputRefs.current[index] = el;
+                        }}
+                        type="number"
+                        data-row-index={index}
+                        value={effectiveQtyValues[index] !== undefined && effectiveQtyValues[index] !== null && effectiveQtyValues[index] !== '' ? String(effectiveQtyValues[index]) : (effectiveQtyValues[index] === '' ? '' : '0')}
+                        onChange={(e) => {
+                          const inputValue = e.target.value;
+                          // Allow empty string while typing, or parse the number
+                          if (inputValue === '' || inputValue === '-') {
+                            effectiveSetQtyValues(prev => ({
+                              ...prev,
+                              [index]: ''
+                            }));
+                          } else {
+                            const newValue = parseInt(inputValue, 10);
+                            if (!isNaN(newValue)) {
+                              effectiveSetQtyValues(prev => ({
+                                ...prev,
+                                [index]: newValue
+                              }));
+                            }
+                          }
+                        }}
+                        onBlur={(e) => {
+                          // Set default value if empty on blur
+                          if (effectiveQtyValues[index] === '' || effectiveQtyValues[index] === null || effectiveQtyValues[index] === undefined) {
+                            effectiveSetQtyValues(prev => ({
+                              ...prev,
+                              [index]: 0
+                            }));
+                          }
+                          // Close popup if open when blurring
+                          if (clickedQtyIndex === index) {
+                            setClickedQtyIndex(null);
+                          }
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const labelsAvailable = row.labelsAvailable || 180;
+                          const labelsNeeded = effectiveQtyValues[index] ?? 0;
+                          // Only show popup if labels needed exceed available
+                          if (labelsNeeded > labelsAvailable) {
+                            // Toggle popup: close if already open, open if closed
+                            setClickedQtyIndex(clickedQtyIndex === index ? null : index);
+                          }
+                        }}
                         style={{
-                          width: '16px',
-                          height: '16px',
-                          borderRadius: '9999px',
-                          backgroundColor: '#DC2626',
+                          position: 'absolute',
+                          left: 0,
+                          right: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: '100%',
+                          height: '100%',
+                          border: 'none',
+                          outline: 'none',
+                          backgroundColor: 'transparent',
+                          fontSize: '0.875rem',
+                          fontWeight: 500,
+                          color: '#111827',
+                          textAlign: 'center',
+                          padding: 0,
+                          margin: 0,
+                          MozAppearance: 'textfield',
+                          WebkitAppearance: 'none',
+                        }}
+                        onFocus={(e) => {
+                          e.target.select();
+                        }}
+                        onWheel={(e) => {
+                          e.target.blur();
+                        }}
+                      />
+                      {hoveredQtyIndex === index && (
+                        <div style={{
+                          position: 'absolute',
+                          right: '2px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
                           display: 'flex',
+                          flexDirection: 'column',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          flexShrink: 0,
+                          gap: '0',
+                          height: '20px',
+                          width: '14px',
+                        }}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            const currentQty = effectiveQtyValues[index] ?? 0;
+                            const numQty = typeof currentQty === 'number' ? currentQty : (currentQty === '' || currentQty === null || currentQty === undefined ? 0 : parseInt(currentQty, 10) || 0);
+                            
+                            // Determine increment based on size
+                            let increment = 0;
+                            const size = row.size?.toLowerCase() || '';
+                            if (size.includes('8oz')) {
+                              increment = 60;
+                            } else if (size.includes('quart')) {
+                              increment = 12;
+                            } else if (size.includes('gallon')) {
+                              increment = 4;
+                            }
+                            
+                            const newQty = Math.max(0, numQty + increment);
+                            effectiveSetQtyValues(prev => ({
+                              ...prev,
+                              [index]: newQty
+                            }));
+                          }}
+                          style={{
+                            width: '100%',
+                            height: '50%',
+                            border: 'none',
+                            backgroundColor: 'transparent',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: 0,
+                            margin: 0,
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#F3F4F6';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
+                        >
+                          <svg
+                            width="8"
+                            height="8"
+                            viewBox="0 0 8 8"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              d="M4 2L6 5H2L4 2Z"
+                              fill="#6B7280"
+                            />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            const currentQty = effectiveQtyValues[index] ?? 0;
+                            const numQty = typeof currentQty === 'number' ? currentQty : (currentQty === '' || currentQty === null || currentQty === undefined ? 0 : parseInt(currentQty, 10) || 0);
+                            
+                            // Determine increment based on size
+                            let increment = 0;
+                            const size = row.size?.toLowerCase() || '';
+                            if (size.includes('8oz')) {
+                              increment = 60;
+                            } else if (size.includes('quart')) {
+                              increment = 12;
+                            } else if (size.includes('gallon')) {
+                              increment = 4;
+                            }
+                            
+                            const newQty = Math.max(0, numQty - increment);
+                            effectiveSetQtyValues(prev => ({
+                              ...prev,
+                              [index]: newQty
+                            }));
+                          }}
+                          style={{
+                            width: '100%',
+                            height: '50%',
+                            border: 'none',
+                            backgroundColor: 'transparent',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: 0,
+                            margin: 0,
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#F3F4F6';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
+                        >
+                          <svg
+                            width="8"
+                            height="8"
+                            viewBox="0 0 8 8"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              d="M4 6L2 3H6L4 6Z"
+                              fill="#6B7280"
+                            />
+                          </svg>
+                        </button>
+                        </div>
+                      )}
+                      {(() => {
+                        const labelsAvailable = row.labelsAvailable || 180;
+                        const labelsNeeded = effectiveQtyValues[index] ?? 0;
+                        // Only show exclamation if labels needed exceed available
+                        if (labelsNeeded > labelsAvailable) {
+                          return (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '16px',
+                                height: '16px',
+                                borderRadius: '50%',
+                                backgroundColor: '#EF4444',
+                                color: '#FFFFFF',
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                flexShrink: 0,
+                                position: 'absolute',
+                                right: '6px',
+                              }}
+                            >
+                              !
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
+                    {clickedQtyIndex === index && (() => {
+                      const labelsAvailable = row.labelsAvailable || 180;
+                      const labelsNeeded = effectiveQtyValues[index] ?? 0;
+                      return labelsNeeded > labelsAvailable;
+                    })() && (
+                      <div
+                        ref={(el) => {
+                          if (el) popupRefs.current[index] = el;
+                        }}
+                        style={{
+                          position: 'fixed',
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: '12px',
+                          padding: '16px',
+                          minWidth: '280px',
+                          maxWidth: '320px',
+                          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                          zIndex: 9999,
+                          border: '1px solid #E5E7EB',
+                          pointerEvents: 'auto',
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          // Keep popup open when clicking inside it
+                        }}
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          // Prevent closing when clicking inside popup
+                        }}
+                        onMouseUp={(e) => {
+                          e.stopPropagation();
+                          // Prevent closing when clicking inside popup
                         }}
                       >
-                        <span style={{ color: '#FFFFFF', fontSize: '10px', fontWeight: 700 }}>!</span>
-                      </span>
+                        <div style={{ marginBottom: '12px' }}>
+                          <h3 style={{
+                            fontSize: '20px',
+                            fontWeight: 700,
+                            color: '#111827',
+                            marginBottom: '8px',
+                            lineHeight: '1.2',
+                          }}>
+                            Order exceeds available labels
+                          </h3>
+                          <p style={{
+                            fontSize: '14px',
+                            fontWeight: 400,
+                            color: '#6B7280',
+                            lineHeight: '1.4',
+                          }}>
+                            Labels Available: {row.labelsAvailable || 180}
+                          </p>
+                          <p style={{
+                            fontSize: '14px',
+                            fontWeight: 400,
+                            color: '#6B7280',
+                            lineHeight: '1.4',
+                            marginTop: '4px',
+                          }}>
+                            Labels Needed: {effectiveQtyValues[index] ?? 0}
+                          </p>
+                        </div>
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                        }}>
+                          <button
+                            style={{
+                              width: '175px',
+                              height: '23px',
+                              backgroundColor: '#3B82F6',
+                              color: '#FFFFFF',
+                              fontSize: '14px',
+                              fontWeight: 600,
+                              padding: 0,
+                              borderRadius: '4px',
+                              border: 'none',
+                              cursor: 'pointer',
+                              transition: 'background-color 0.2s',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              boxSizing: 'border-box',
+                            }}
+                            onMouseEnter={(e) => e.target.style.backgroundColor = '#2563EB'}
+                            onMouseLeave={(e) => e.target.style.backgroundColor = '#3B82F6'}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              // Set QTY to available labels only (removes excess units)
+                              const labelsAvailable = row.labelsAvailable || 180;
+                              
+                              // Update state - React will re-render with new value
+                              effectiveSetQtyValues(prev => {
+                                const updated = { ...prev };
+                                updated[index] = labelsAvailable;
+                                return updated;
+                              });
+                              
+                              // Close the popup after updating (with small delay to prevent immediate outside click detection)
+                              setTimeout(() => {
+                                setClickedQtyIndex(null);
+                              }, 200);
+                            }}
+                            onMouseDown={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              // Prevent the click outside handler from firing
+                            }}
+                            onMouseUp={(e) => {
+                              e.stopPropagation();
+                              // Prevent the click outside handler from firing
+                            }}
+                          >
+                            Use Available
+                          </button>
+                        </div>
+                        <div style={{
+                          position: 'absolute',
+                          bottom: '-8px',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          width: '0',
+                          height: '0',
+                          borderLeft: '8px solid transparent',
+                          borderRight: '8px solid transparent',
+                          borderTop: '8px solid #FFFFFF',
+                        }} />
+                      </div>
                     )}
                   </div>
                 </td>
-                <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem' }} className={themeClasses.text}>
-                  12
+                <td style={{ 
+                  padding: '12px 16px', 
+                  fontSize: '0.85rem', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  boxSizing: 'border-box',
+                  borderTop: '1px solid #E5E7EB',
+                }} className={themeClasses.text}>
+                  {index === 0 ? '12' : index === 1 ? '8' : '5'}
                 </td>
-                <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem' }} className={themeClasses.text}>
+                <td style={{ 
+                  padding: '12px 16px', 
+                  fontSize: '0.85rem', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  boxSizing: 'border-box',
+                  borderTop: '1px solid #E5E7EB',
+                }} className={themeClasses.text}>
                   {index === 0 ? '32' : index === 1 ? '24' : '12'}
                 </td>
-                <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem' }} className={themeClasses.text}>
-                  {row.qty}
+                <td style={{ 
+                  padding: '12px 16px', 
+                  fontSize: '0.85rem', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  boxSizing: 'border-box',
+                  borderTop: '1px solid #E5E7EB',
+                }} className={themeClasses.text}>
+                  {index === 0 ? '240' : index === 1 ? '96' : '28'}
                 </td>
-                <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem' }} className={themeClasses.text}>
+                <td style={{ 
+                  padding: '12px 16px', 
+                  fontSize: '0.85rem', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  boxSizing: 'border-box',
+                  borderTop: '1px solid #E5E7EB',
+                }} className={themeClasses.text}>
                   {index === 0 ? '34' : index === 1 ? '12' : '5'}
                 </td>
-                <td style={{ padding: '0.65rem 1rem', textAlign: 'center' }}>
+                <td style={{ 
+                  padding: '12px 16px', 
+                  fontSize: '0.85rem', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  boxSizing: 'border-box',
+                  borderTop: '1px solid #E5E7EB',
+                }} className={themeClasses.text}>
+                  {index === 0 ? '145' : index === 1 ? '48' : '20'}
+                </td>
+                <td style={{ 
+                  padding: '12px 16px', 
+                  fontSize: '0.85rem', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  boxSizing: 'border-box',
+                  borderTop: '1px solid #E5E7EB',
+                }} className={themeClasses.text}>
+                  {index === 0 ? '580' : index === 1 ? '192' : '80'}
+                </td>
+                <td style={{ 
+                  padding: '12px 16px', 
+                  fontSize: '0.85rem', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  boxSizing: 'border-box',
+                  borderTop: '1px solid #E5E7EB',
+                }} className={themeClasses.text}>
+                  {index === 0 ? 'F.Ultra Bloom' : index === 1 ? 'F.Ultra Grow' : 'F.Fabric Heavy'}
+                </td>
+                {/* Sticky three dots */}
+                <td style={{ 
+                  padding: '0.65rem 1rem', 
+                  textAlign: 'center',
+                  position: 'sticky',
+                  right: 0,
+                  zIndex: 15,
+                  backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                  boxShadow: '-2px 0 4px rgba(0,0,0,0.1)',
+                  borderTop: '1px solid #E5E7EB',
+                }}>
                   <button
                     type="button"
                     style={{
@@ -462,6 +1491,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick }) => {
         </table>
       </div>
     </div>
+    </>
   );
 };
 

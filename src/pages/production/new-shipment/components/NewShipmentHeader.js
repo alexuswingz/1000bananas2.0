@@ -2,9 +2,15 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
-const NewShipmentHeader = ({ tableMode, onTableModeToggle, onReviewShipmentClick }) => {
+const NewShipmentHeader = ({ tableMode, onTableModeToggle, onReviewShipmentClick, shipmentData, totalUnits = 0, totalBoxes = 0 }) => {
   const navigate = useNavigate();
   const { isDarkMode } = useTheme();
+  
+  // Default values if shipmentData is not provided
+  const shipmentNumber = shipmentData?.shipmentNumber || '2025-09-23';
+  const shipmentType = shipmentData?.shipmentType || 'AWD';
+  const location = shipmentData?.location || '-';
+  const account = shipmentData?.account || 'TPS';
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -21,6 +27,7 @@ const NewShipmentHeader = ({ tableMode, onTableModeToggle, onReviewShipmentClick
         display: 'flex',
         flexDirection: 'column',
         gap: '0.75rem',
+        borderRadius: '0.75rem',
       }}
     >
       {/* First row: back + shipment summary + review button */}
@@ -38,17 +45,27 @@ const NewShipmentHeader = ({ tableMode, onTableModeToggle, onReviewShipmentClick
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: '0.4rem',
               padding: '0.4rem 0.7rem',
-              borderRadius: '9999px',
-              border: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`,
-              backgroundColor: 'transparent',
+              borderRadius: '6px',
+              border: '1px solid #E5E7EB',
+              backgroundColor: '#FFFFFF',
               fontSize: '0.8rem',
               fontWeight: 500,
+              color: '#374151',
+              boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#F9FAFB';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#FFFFFF';
             }}
           >
             <svg
@@ -59,40 +76,44 @@ const NewShipmentHeader = ({ tableMode, onTableModeToggle, onReviewShipmentClick
             >
               <path
                 d="M15 19L8 12L15 5"
-                stroke={isDarkMode ? '#E5E7EB' : '#111827'}
+                stroke="#374151"
                 strokeWidth="1.8"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
             </svg>
-            <span>Back</span>
+            <span style={{ color: '#374151' }}>Back</span>
           </button>
 
           {/* Shipment meta */}
-          <div style={{ display: 'flex', gap: '2.5rem', flexWrap: 'wrap' }}>
-            <div>
-              <p className="text-[0.7rem] uppercase tracking-wide text-gray-400">Shipment #</p>
-              <p className={`${themeClasses.text} text-sm font-semibold`}>2025-09-23</p>
-            </div>
-            <div>
-              <p className="text-[0.7rem] uppercase tracking-wide text-gray-400">Shipment Type</p>
-              <p className={`${themeClasses.text} text-sm font-semibold`}>AWD</p>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-              <p className="text-[0.7rem] uppercase tracking-wide text-gray-400">Marketplace</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <img
-                  src="https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg"
-                  alt="Amazon"
-                  style={{ height: '0.95rem', objectFit: 'contain' }}
-                />
+            <div style={{ display: 'flex', gap: '2.5rem', flexWrap: 'wrap' }}>
+              <div>
+                <p style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '0.25rem', fontWeight: 600 }}>Shipment #</p>
+                <p style={{ fontSize: '0.875rem', fontWeight: 700, color: isDarkMode ? '#E5E7EB' : '#111827' }}>{shipmentNumber}</p>
+              </div>
+              <div>
+                <p style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '0.25rem', fontWeight: 600 }}>Shipment Type</p>
+                <p style={{ fontSize: '0.875rem', fontWeight: 700, color: isDarkMode ? '#E5E7EB' : '#111827' }}>{shipmentType}</p>
+              </div>
+              <div>
+                <p style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '0.25rem', fontWeight: 600 }}>Location</p>
+                <p style={{ fontSize: '0.875rem', fontWeight: 700, color: isDarkMode ? '#E5E7EB' : '#111827' }}>{location}</p>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                <p style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '0.25rem', fontWeight: 600 }}>Marketplace</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <img
+                    src="https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg"
+                    alt="Amazon"
+                    style={{ height: '0.95rem', objectFit: 'contain' }}
+                  />
+                </div>
+              </div>
+              <div>
+                <p style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '0.25rem', fontWeight: 600 }}>Account</p>
+                <p style={{ fontSize: '0.875rem', fontWeight: 700, color: isDarkMode ? '#E5E7EB' : '#111827' }}>{account}</p>
               </div>
             </div>
-            <div>
-              <p className="text-[0.7rem] uppercase tracking-wide text-gray-400">Account</p>
-              <p className={`${themeClasses.text} text-sm font-semibold`}>TPS</p>
-            </div>
-          </div>
         </div>
 
         {/* Right controls */}
@@ -184,14 +205,14 @@ const NewShipmentHeader = ({ tableMode, onTableModeToggle, onReviewShipmentClick
         >
           {[
             { label: 'Palettes', value: 0 },
-            { label: 'Total Boxes', value: 0 },
-            { label: 'Units', value: 0 },
+            { label: 'Total Boxes', value: totalBoxes },
+            { label: 'Units', value: totalUnits },
             { label: 'Time (Hrs)', value: 0 },
             { label: 'Weight (Lbs)', value: 0 },
           ].map((stat) => (
-            <div key={stat.label} style={{ fontSize: '0.75rem' }}>
-              <span style={{ textTransform: 'uppercase', marginRight: '0.4rem' }}>{stat.label}</span>
-              <span className="font-semibold">{stat.value}</span>
+            <div key={stat.label} style={{ fontSize: '0.875rem', fontWeight: 500, color: isDarkMode ? '#E5E7EB' : '#111827' }}>
+              <span style={{ textTransform: 'uppercase', marginRight: '0.4rem', fontWeight: 600 }}>{stat.label}</span>
+              <span style={{ fontWeight: 700 }}>{stat.value}</span>
             </div>
           ))}
         </div>

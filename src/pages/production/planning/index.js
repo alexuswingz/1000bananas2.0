@@ -14,6 +14,7 @@ const Planning = () => {
     shipmentNumber: '',
     shipmentType: '',
     account: '',
+    location: '',
     supplier: 'amazon',
   });
 

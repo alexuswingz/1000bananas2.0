@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 
-const ShipmentDetailsModal = ({ isOpen, onClose }) => {
+const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, totalBoxes = 0 }) => {
   const { isDarkMode } = useTheme();
   const [expandedFormula, setExpandedFormula] = useState(null);
 
@@ -125,49 +125,6 @@ const ShipmentDetailsModal = ({ isOpen, onClose }) => {
           }}
           className="hide-scrollbar"
         >
-          {/* Summary Card */}
-          <div
-            className={themeClasses.cardBg}
-            style={{
-              borderRadius: '0.75rem',
-              border: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`,
-              padding: '1.25rem',
-              marginBottom: '1.5rem',
-            }}
-          >
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(5, 1fr)',
-                gap: '1rem',
-              }}
-            >
-              {[
-                { label: 'PALETTES', value: '2/24' },
-                { label: 'TOTAL BOXES', value: '10/6' },
-                { label: 'UNITS', value: '1,040' },
-                { label: 'TIME', value: '42 HRS' },
-                { label: 'WEIGHT', value: '3,200 LBS' },
-              ].map((stat) => (
-                <div key={stat.label}>
-                  <div
-                    style={{
-                      fontSize: '0.7rem',
-                      textTransform: 'uppercase',
-                      color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                      marginBottom: '0.25rem',
-                    }}
-                  >
-                    {stat.label}
-                  </div>
-                  <div className={themeClasses.text} style={{ fontSize: '1rem', fontWeight: 600 }}>
-                    {stat.value}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* Formula Requirements */}
           <div style={{ marginBottom: '1.5rem' }}>
             <div
@@ -202,49 +159,15 @@ const ShipmentDetailsModal = ({ isOpen, onClose }) => {
                   marginBottom: '0.75rem',
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                  <div>
-                    <div className={themeClasses.text} style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.25rem' }}>
-                      {formula.name} ({formula.productCount})
-                    </div>
-                    <div
-                      style={{
-                        height: '8px',
-                        borderRadius: '4px',
-                        backgroundColor: isDarkMode ? '#1F2937' : '#E5E7EB',
-                        overflow: 'hidden',
-                        marginTop: '0.5rem',
-                        width: '200px',
-                      }}
-                    >
-                      <div
-                        style={{
-                          height: '100%',
-                          width: formula.status === 'insufficient' ? '20%' : '100%',
-                          backgroundColor: formula.status === 'insufficient' ? '#DC2626' : '#22C55E',
-                        }}
-                      />
-                    </div>
-                    <div
-                      style={{
-                        fontSize: '0.75rem',
-                        color: formula.status === 'insufficient' ? '#DC2626' : '#22C55E',
-                        marginTop: '0.25rem',
-                      }}
-                    >
-                      {formula.message}
-                    </div>
+                {/* Top row: Formula name (left) and "X gal needed" with dropdown (right) */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                  <div className={themeClasses.text} style={{ fontSize: '0.9rem', fontWeight: 600 }}>
+                    {formula.name} <span style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: 400 }}>({formula.productCount})</span>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div
-                      style={{
-                        fontSize: '0.75rem',
-                        color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                        marginBottom: '0.25rem',
-                      }}
-                    >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 600, color: isDarkMode ? '#E5E7EB' : '#111827' }}>
                       {formula.needed}
-                    </div>
+                    </span>
                     {formula.products && (
                       <button
                         type="button"
@@ -255,6 +178,10 @@ const ShipmentDetailsModal = ({ isOpen, onClose }) => {
                           color: isDarkMode ? '#9CA3AF' : '#6B7280',
                           cursor: 'pointer',
                           fontSize: '0.75rem',
+                          padding: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
                         }}
                       >
                         {expandedFormula === idx ? '▲' : '▼'}
@@ -262,14 +189,50 @@ const ShipmentDetailsModal = ({ isOpen, onClose }) => {
                     )}
                   </div>
                 </div>
+
+                {/* Progress bar */}
                 <div
                   style={{
-                    fontSize: '0.75rem',
-                    color: formula.status === 'insufficient' ? '#DC2626' : '#22C55E',
+                    height: '8px',
+                    borderRadius: '4px',
+                    backgroundColor: isDarkMode ? '#1F2937' : '#FEE2E2',
+                    overflow: 'hidden',
+                    marginBottom: '0.75rem',
+                    width: '100%',
                   }}
                 >
-                  {formula.inventory}
+                  <div
+                    style={{
+                      height: '100%',
+                      width: formula.status === 'insufficient' ? '20%' : '100%',
+                      backgroundColor: formula.status === 'insufficient' ? '#DC2626' : '#22C55E',
+                    }}
+                  />
                 </div>
+
+                {/* Bottom row: Status message (left) and Inventory (right) */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div
+                    style={{
+                      fontSize: '0.75rem',
+                      color: formula.status === 'insufficient' ? '#DC2626' : '#22C55E',
+                      fontWeight: 500,
+                    }}
+                  >
+                    {formula.message}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '0.75rem',
+                      color: formula.status === 'insufficient' ? '#DC2626' : '#22C55E',
+                      fontWeight: 500,
+                    }}
+                  >
+                    {formula.inventory}
+                  </div>
+                </div>
+
+                {/* Expanded products list */}
                 {expandedFormula === idx && formula.products && (
                   <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}` }}>
                     {formula.products.map((product, pIdx) => (

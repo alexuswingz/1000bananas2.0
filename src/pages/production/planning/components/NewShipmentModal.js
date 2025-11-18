@@ -94,11 +94,11 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
             gap: '1.5rem',
           }}
         >
-          {/* Top form row */}
+          {/* Form fields in 2x2 grid */}
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+              gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
               gap: '1rem',
             }}
           >
@@ -235,6 +235,32 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                 </svg>
               </div>
             </div>
+
+            {/* Location */}
+            <div>
+              <label
+                className={themeClasses.textSecondary}
+                style={{ fontSize: '0.75rem', fontWeight: 500, display: 'block', marginBottom: '0.25rem' }}
+              >
+                Location <span style={{ color: '#EF4444' }}>*</span>
+              </label>
+              <input
+                type="text"
+                value={newShipment.location || ''}
+                onChange={(e) =>
+                  setNewShipment((prev) => ({
+                    ...prev,
+                    location: e.target.value,
+                  }))
+                }
+                placeholder="Enter location here..."
+                className={`${themeClasses.inputBg} ${themeClasses.text} ${themeClasses.border} border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500`}
+                style={{
+                  width: '100%',
+                  padding: '0.55rem 0.75rem',
+                }}
+              />
+            </div>
           </div>
 
           {/* Supplier selector */}
@@ -358,7 +384,8 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
             disabled={
               !newShipment.shipmentNumber ||
               !newShipment.shipmentType ||
-              !newShipment.account
+              !newShipment.account ||
+              !newShipment.location
             }
             style={{
               padding: '0.5rem 1.1rem',
@@ -369,19 +396,22 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
               backgroundColor:
                 !newShipment.shipmentNumber ||
                 !newShipment.shipmentType ||
-                !newShipment.account
+                !newShipment.account ||
+                !newShipment.location
                   ? '#D1D5DB'
                   : '#111827',
               color:
                 !newShipment.shipmentNumber ||
                 !newShipment.shipmentType ||
-                !newShipment.account
+                !newShipment.account ||
+                !newShipment.location
                   ? '#9CA3AF'
                   : '#FFFFFF',
               cursor:
                 !newShipment.shipmentNumber ||
                 !newShipment.shipmentType ||
-                !newShipment.account
+                !newShipment.account ||
+                !newShipment.location
                   ? 'not-allowed'
                   : 'pointer',
             }}
@@ -389,12 +419,17 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
               if (
                 !newShipment.shipmentNumber ||
                 !newShipment.shipmentType ||
-                !newShipment.account
+                !newShipment.account ||
+                !newShipment.location
               ) {
                 return;
               }
               onClose();
-              navigate('/dashboard/production/shipment/new');
+              navigate('/dashboard/production/shipment/new', {
+                state: {
+                  shipmentData: newShipment
+                }
+              });
             }}
           >
             Create New Shipment
