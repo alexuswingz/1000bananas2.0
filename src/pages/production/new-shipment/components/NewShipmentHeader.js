@@ -287,3 +287,174 @@ const NewShipmentHeader = ({ tableMode, onTableModeToggle, onReviewShipmentClick
 
 export default NewShipmentHeader;
 
+
+      {/* Second row: stats */}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+
+        <div
+
+          style={{
+
+            display: 'flex',
+
+            gap: '2.5rem',
+
+            paddingBottom: '0.05rem',
+
+            paddingLeft: '0.25rem',
+
+          }}
+
+          className={themeClasses.textSecondary}
+
+        >
+
+          {[
+
+            { label: 'Palettes', value: 0 },
+
+            { label: 'Total Boxes', value: totalBoxes },
+            { label: 'Units', value: totalUnits },
+            { label: 'Time (Hrs)', value: 0 },
+
+            { label: 'Weight (Lbs)', value: 0 },
+
+          ].map((stat) => (
+
+            <div key={stat.label} style={{ fontSize: '0.875rem', fontWeight: 500, color: isDarkMode ? '#E5E7EB' : '#111827' }}>
+              <span style={{ textTransform: 'uppercase', marginRight: '0.4rem', fontWeight: 600 }}>{stat.label}</span>
+              <span style={{ fontWeight: 700 }}>{stat.value}</span>
+            </div>
+
+          ))}
+
+        </div>
+
+
+
+        {/* Search bar */}
+
+        <div
+
+          style={{
+
+            display: 'flex',
+
+            justifyContent: 'flex-end',
+
+            paddingRight: '0.25rem',
+
+            paddingBottom: '0',
+
+            marginTop: '-4px',
+
+          }}
+
+        >
+
+          <div
+
+            style={{
+
+              maxWidth: '420px',
+
+              width: '100%',
+
+              height: '36px',
+
+              borderRadius: '9999px',
+
+              border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+
+              backgroundColor: isDarkMode ? '#020617' : '#FFFFFF',
+
+              display: 'flex',
+
+              alignItems: 'center',
+
+              padding: '0 0.9rem',
+
+              boxShadow: isDarkMode ? 'none' : '0 0 0 1px rgba(229,231,235,0.7)',
+
+            }}
+
+          >
+
+            {/* Search icon */}
+
+            <svg
+
+              viewBox="0 0 24 24"
+
+              aria-hidden="true"
+
+              style={{
+
+                width: '16px',
+
+                height: '16px',
+
+                marginRight: '0.5rem',
+
+                flexShrink: 0,
+
+              }}
+
+            >
+
+              <path
+
+                d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79L19 20.49 20.49 19 15.5 14zm-6 0C8.01 14 6 11.99 6 9.5S8.01 5 10.5 5 15 7.01 15 9.5 12.99 14 10.5 14z"
+
+                fill={isDarkMode ? '#6B7280' : '#D1D5DB'}
+
+              />
+
+            </svg>
+
+            {/* Input */}
+
+            <input
+
+              type="text"
+
+              placeholder="Search..."
+
+              style={{
+
+                flex: 1,
+
+                border: 'none',
+
+                outline: 'none',
+
+                backgroundColor: 'transparent',
+
+                fontSize: '0.85rem',
+
+                color: isDarkMode ? '#E5E7EB' : '#111827',
+
+              }}
+
+            />
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  );
+
+};
+
+
+
+export default NewShipmentHeader;
+
+
+
+
