@@ -17,12 +17,12 @@ const LabelOrderPage = () => {
   
   // Get lines from state (saved order lines when viewing, or all inventory when creating)
   const allLines = state.lines || [
-    { id: 1, brand: 'Total Pest Spray', product: 'Cherry Tree Fertilizer', size: 'Gallon', qty: 25000, status: 'Completed', inventory: 25000, toOrder: 25000, daysOfInv: 25000 },
-    { id: 2, brand: 'Total Pest Spray', product: 'Cherry Tree Fertilizer', size: 'Gallon', qty: 25000, status: 'Completed', inventory: 25000, toOrder: 25000, daysOfInv: 25000 },
-    { id: 3, brand: 'Total Pest Spray', product: 'Cherry Tree Fertilizer', size: 'Gallon', qty: 25000, status: 'Completed', inventory: 25000, toOrder: 25000, daysOfInv: 25000 },
-    { id: 4, brand: 'Total Pest Spray', product: 'Cherry Tree Fertilizer', size: 'Gallon', qty: 25000, status: 'Completed', inventory: 25000, toOrder: 25000, daysOfInv: 25000 },
-    { id: 5, brand: 'Total Pest Spray', product: 'Cherry Tree Fertilizer', size: 'Gallon', qty: 25000, status: 'Completed', inventory: 25000, toOrder: 25000, daysOfInv: 25000 },
-    { id: 6, brand: 'Total Pest Spray', product: 'Cherry Tree Fertilizer', size: 'Gallon', qty: 25000, status: 'Completed', inventory: 25000, toOrder: 25000, daysOfInv: 25000 },
+    { id: 1, brand: 'Total Pest Spray', product: 'Cherry Tree Fertilizer', size: 'Gallon', qty: 25000, status: 'Completed', inventory: 25000, toOrder: 25000, daysOfInv: 25000, sales7Day: 1200, sales30Day: 5000, sales4Month: 20000, lblSize: '5.375" x 4.5"', label: 'Label Link' },
+    { id: 2, brand: 'Total Pest Spray', product: 'Cherry Tree Fertilizer', size: 'Gallon', qty: 25000, status: 'Completed', inventory: 25000, toOrder: 25000, daysOfInv: 25000, sales7Day: 1200, sales30Day: 5000, sales4Month: 20000, lblSize: '5.375" x 4.5"', label: 'Label Link' },
+    { id: 3, brand: 'Total Pest Spray', product: 'Cherry Tree Fertilizer', size: 'Gallon', qty: 25000, status: 'Completed', inventory: 25000, toOrder: 25000, daysOfInv: 25000, sales7Day: 1200, sales30Day: 5000, sales4Month: 20000, lblSize: '5.375" x 4.5"', label: 'Label Link' },
+    { id: 4, brand: 'Total Pest Spray', product: 'Cherry Tree Fertilizer', size: 'Gallon', qty: 25000, status: 'Completed', inventory: 25000, toOrder: 25000, daysOfInv: 25000, sales7Day: 1200, sales30Day: 5000, sales4Month: 20000, lblSize: '5.375" x 4.5"', label: 'Label Link' },
+    { id: 5, brand: 'Total Pest Spray', product: 'Cherry Tree Fertilizer', size: 'Gallon', qty: 25000, status: 'Completed', inventory: 25000, toOrder: 25000, daysOfInv: 25000, sales7Day: 1200, sales30Day: 5000, sales4Month: 20000, lblSize: '5.375" x 4.5"', label: 'Label Link' },
+    { id: 6, brand: 'Total Pest Spray', product: 'Cherry Tree Fertilizer', size: 'Gallon', qty: 25000, status: 'Completed', inventory: 25000, toOrder: 25000, daysOfInv: 25000, sales7Day: 1200, sales30Day: 5000, sales4Month: 20000, lblSize: '5.375" x 4.5"', label: 'Label Link' },
   ];
 
   // Initialize order lines
@@ -111,9 +111,8 @@ const LabelOrderPage = () => {
 
   return (
     <div className={`min-h-screen p-8 ${themeClasses.pageBg}`}>
-      <div className={`${themeClasses.cardBg} rounded-xl border ${themeClasses.border} shadow-lg`}>
-        {/* Header row */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+      {/* Header row */}
+      <div className="flex items-center justify-between px-6 py-4" style={{ marginBottom: '24px' }}>
           <div className="flex items-center gap-4">
             <button
               type="button"
@@ -130,9 +129,9 @@ const LabelOrderPage = () => {
 
             <div className="flex flex-col gap-1 text-xs text-gray-500">
               <div className="flex items-center gap-8">
-                <div>
+                <div style={{ width: '95px', height: 'fit-content', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <div className="uppercase tracking-wide text-[10px] text-gray-400">LABEL ORDER #</div>
-                  <div className="text-sm font-semibold text-gray-900">{orderNumber}</div>
+                  <div className="text-sm font-semibold text-gray-900" style={{ height: '35px', display: 'flex', alignItems: 'center' }}>{orderNumber}</div>
                 </div>
                 <div className="flex flex-col items-start gap-1">
                   <div className="uppercase tracking-wide text-[10px] text-gray-400">SUPPLIER</div>
@@ -218,9 +217,9 @@ const LabelOrderPage = () => {
           </div>
         </div>
 
-
-        {/* Summary Bar */}
-        <div className="px-6 py-3 border-b border-gray-200 bg-gray-50">
+      {/* Summary Bar */}
+      <div className="px-6 py-3" style={{ marginTop: '24px', marginBottom: '16px' }}>
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-8 text-sm">
             <div>
               <span className="text-gray-600 font-medium">PRODUCTS </span>
@@ -235,19 +234,78 @@ const LabelOrderPage = () => {
               <span className="text-gray-900 font-semibold">${summary.estCost.toLocaleString()}</span>
             </div>
           </div>
+          {/* Search bar - show in create mode */}
+          {isCreateMode && (
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Find a shipment..."
+                  className="pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  style={{ width: '336px' }}
+                />
+                <svg
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+              </div>
+              <div className="flex flex-col">
+                <button
+                  type="button"
+                  className="p-1 hover:bg-gray-50 transition-colors"
+                  aria-label="Move up"
+                >
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  className="p-1 hover:bg-gray-50 transition-colors"
+                  aria-label="Move down"
+                >
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
+      </div>
 
-        {/* Table - Show only selected items */}
+      {/* Table - Show only selected items */}
+      <div className={`${themeClasses.cardBg} rounded-xl border ${themeClasses.border} shadow-lg`} style={{ marginTop: '16px' }}>
         <div className="overflow-x-auto">
           {/* Table header */}
-          <div className={themeClasses.headerBg}>
+          <div className={themeClasses.headerBg} style={{ position: 'relative' }}>
             <div
               className="grid"
               style={{
-                gridTemplateColumns: '40px 1.5fr 1.5fr 1fr 1fr 1.2fr 1.2fr 1.2fr 1.2fr',
+                gridTemplateColumns: '40px 200px 200px 120px 120px 150px 120px 120px 120px 120px 120px 120px 120px 120px',
+                minWidth: '1790px',
               }}
             >
-              <div className="px-6 py-3 flex items-center justify-center">
+              {/* Checkbox - Sticky */}
+              <div 
+                className="px-6 py-3 flex items-center justify-center"
+                style={{
+                  position: 'sticky',
+                  left: 0,
+                  zIndex: 20,
+                  backgroundColor: '#2C3544',
+                  boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={isViewMode ? true : (orderLines.length > 0 && orderLines.every((line) => line.selected))}
@@ -256,29 +314,84 @@ const LabelOrderPage = () => {
                   className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
-              <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]">
+              {/* BRAND - Sticky */}
+              <div 
+                className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]"
+                style={{
+                  position: 'sticky',
+                  left: '40px',
+                  zIndex: 19,
+                  backgroundColor: '#2C3544',
+                  boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
+                }}
+              >
                 BRAND
               </div>
-              <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]">
+              {/* PRODUCT - Sticky */}
+              <div 
+                className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]"
+                style={{
+                  position: 'sticky',
+                  left: '240px',
+                  zIndex: 19,
+                  backgroundColor: '#2C3544',
+                  boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
+                }}
+              >
                 PRODUCT
               </div>
-              <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]">
+              {/* SIZE - Sticky */}
+              <div 
+                className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]"
+                style={{
+                  position: 'sticky',
+                  left: '440px',
+                  zIndex: 19,
+                  backgroundColor: '#2C3544',
+                  boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
+                }}
+              >
                 SIZE
               </div>
+              {/* QTY - Scrollable */}
               <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]">
                 QTY
               </div>
+              {/* STATUS - Scrollable */}
               <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]">
                 STATUS
               </div>
+              {/* INVENTORY - Scrollable */}
               <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]">
                 INVENTORY
               </div>
+              {/* # TO ORDER - Scrollable */}
               <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]">
                 # TO ORDER
               </div>
-              <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider">
+              {/* DAYS OF INV - Scrollable */}
+              <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]">
                 DAYS OF INV
+              </div>
+              {/* 7 DAY SALES - Scrollable */}
+              <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]">
+                7 DAY SALES
+              </div>
+              {/* 30 DAY SALES - Scrollable */}
+              <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]">
+                30 DAY SALES
+              </div>
+              {/* 4 MONTH SALES - Scrollable */}
+              <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]">
+                4 MONTH SALES
+              </div>
+              {/* LBL SIZE - Scrollable */}
+              <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]">
+                LBL SIZE
+              </div>
+              {/* LABEL - Scrollable */}
+              <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider">
+                LABEL
               </div>
             </div>
           </div>
@@ -290,77 +403,169 @@ const LabelOrderPage = () => {
                 No items available.
               </div>
             ) : (
-              orderLines.map((line, index) => (
-                <div
-                  key={line.id}
-                  className={`grid text-sm ${themeClasses.rowHover} transition-colors`}
-                  style={{
-                    gridTemplateColumns: '40px 1.5fr 1.5fr 1fr 1fr 1.2fr 1.2fr 1.2fr 1.2fr',
-                    borderBottom:
-                      index === orderLines.length - 1
-                        ? 'none'
-                        : isDarkMode
-                        ? '1px solid rgba(75,85,99,0.3)'
-                        : '1px solid #e5e7eb',
-                  }}
-                >
-                      {/* Checkbox */}
-                      <div className="px-6 py-3 flex items-center justify-center">
-                        <input
-                          type="checkbox"
-                          checked={isViewMode ? true : (line.selected || false)}
-                          onChange={() => handleCheckboxChange(line.id)}
-                          disabled={isViewMode}
-                          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                        />
-                      </div>
+              orderLines.map((line, index) => {
+                const rowBg = isDarkMode ? '#111827' : '#FFFFFF';
+                return (
+                  <div
+                    key={line.id}
+                    className={`grid text-sm ${themeClasses.rowHover} transition-colors`}
+                    style={{
+                      gridTemplateColumns: '40px 200px 200px 120px 120px 150px 120px 120px 120px 120px 120px 120px 120px 120px',
+                      minWidth: '1790px',
+                      borderBottom:
+                        index === orderLines.length - 1
+                          ? 'none'
+                          : isDarkMode
+                          ? '1px solid rgba(75,85,99,0.3)'
+                          : '1px solid #e5e7eb',
+                    }}
+                  >
+                    {/* Checkbox - Sticky */}
+                    <div 
+                      className="px-6 py-3 flex items-center justify-center"
+                      style={{
+                        position: 'sticky',
+                        left: 0,
+                        zIndex: 15,
+                        backgroundColor: rowBg,
+                        boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isViewMode ? true : (line.selected || false)}
+                        onChange={() => handleCheckboxChange(line.id)}
+                        disabled={isViewMode}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                    </div>
 
-                  {/* BRAND */}
-                  <div className="px-6 py-3 flex items-center">
-                    <span className={themeClasses.textPrimary}>{line.brand}</span>
-                  </div>
+                    {/* BRAND - Sticky */}
+                    <div 
+                      className="px-6 py-3 flex items-center"
+                      style={{
+                        position: 'sticky',
+                        left: '40px',
+                        zIndex: 14,
+                        backgroundColor: rowBg,
+                        boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
+                      }}
+                    >
+                      <span className={themeClasses.textPrimary}>{line.brand}</span>
+                    </div>
 
-                  {/* PRODUCT */}
-                  <div className="px-6 py-3 flex items-center">
-                    <span className={themeClasses.textPrimary}>{line.product}</span>
-                  </div>
+                    {/* PRODUCT - Sticky */}
+                    <div 
+                      className="px-6 py-3 flex items-center"
+                      style={{
+                        position: 'sticky',
+                        left: '240px',
+                        zIndex: 14,
+                        backgroundColor: rowBg,
+                        boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
+                      }}
+                    >
+                      <span className={themeClasses.textPrimary}>{line.product}</span>
+                    </div>
 
-                  {/* SIZE */}
-                  <div className="px-6 py-3 flex items-center">
-                    <span className={themeClasses.textPrimary}>{line.size}</span>
-                  </div>
+                    {/* SIZE - Sticky */}
+                    <div 
+                      className="px-6 py-3 flex items-center"
+                      style={{
+                        position: 'sticky',
+                        left: '440px',
+                        zIndex: 14,
+                        backgroundColor: rowBg,
+                        boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
+                      }}
+                    >
+                      <span className={themeClasses.textPrimary}>{line.size}</span>
+                    </div>
 
-                  {/* QTY */}
-                  <div className="px-6 py-3 flex items-center">
-                    <span className={themeClasses.textPrimary}>{line.qty.toLocaleString()}</span>
-                  </div>
+                    {/* QTY - Scrollable */}
+                    <div className="px-6 py-3 flex items-center">
+                      <span 
+                        className="inline-flex items-center justify-center"
+                        style={{
+                          backgroundColor: '#FFFFFF',
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '4px',
+                          padding: '4px 8px',
+                          height: '24px',
+                          minWidth: '70px',
+                          fontSize: '0.875rem',
+                          color: '#000000',
+                          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+                        }}
+                      >
+                        {line.qty.toLocaleString()}
+                      </span>
+                    </div>
 
-                  {/* STATUS */}
-                  <div className="px-6 py-3 flex items-center">
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-green-50 text-green-700">
-                      <svg className="w-3 h-3" fill="#10B981" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="#10B981"/>
-                      </svg>
-                      Completed
-                    </span>
-                  </div>
+                    {/* STATUS - Scrollable */}
+                    <div className="px-6 py-3 flex items-center">
+                      <span 
+                        className="inline-flex items-center justify-center gap-2"
+                        style={{
+                          backgroundColor: '#FFFFFF',
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '4px',
+                          padding: '4px 12px',
+                          height: '24px',
+                          fontSize: '0.875rem',
+                          color: '#374151',
+                          fontWeight: 500,
+                        }}
+                      >
+                        <svg className="w-3.5 h-3.5" fill="#10B981" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="#10B981"/>
+                        </svg>
+                        Completed
+                      </span>
+                    </div>
 
-                  {/* INVENTORY */}
-                  <div className="px-6 py-3 flex items-center">
-                    <span className={themeClasses.textPrimary}>{line.inventory.toLocaleString()}</span>
-                  </div>
+                    {/* INVENTORY - Scrollable */}
+                    <div className="px-6 py-3 flex items-center">
+                      <span className={themeClasses.textPrimary}>{line.inventory.toLocaleString()}</span>
+                    </div>
 
-                  {/* # TO ORDER */}
-                  <div className="px-6 py-3 flex items-center">
-                    <span className={themeClasses.textPrimary}>{line.toOrder.toLocaleString()}</span>
-                  </div>
+                    {/* # TO ORDER - Scrollable */}
+                    <div className="px-6 py-3 flex items-center">
+                      <span className={themeClasses.textPrimary}>{line.toOrder.toLocaleString()}</span>
+                    </div>
 
-                  {/* DAYS OF INV */}
-                  <div className="px-6 py-3 flex items-center">
-                    <span className={themeClasses.textPrimary}>{line.daysOfInv.toLocaleString()}</span>
+                    {/* DAYS OF INV - Scrollable */}
+                    <div className="px-6 py-3 flex items-center">
+                      <span className={themeClasses.textPrimary}>{line.daysOfInv.toLocaleString()}</span>
+                    </div>
+
+                    {/* 7 DAY SALES - Scrollable */}
+                    <div className="px-6 py-3 flex items-center">
+                      <span className={themeClasses.textPrimary}>{(line.sales7Day || 0).toLocaleString()}</span>
+                    </div>
+
+                    {/* 30 DAY SALES - Scrollable */}
+                    <div className="px-6 py-3 flex items-center">
+                      <span className={themeClasses.textPrimary}>{(line.sales30Day || 0).toLocaleString()}</span>
+                    </div>
+
+                    {/* 4 MONTH SALES - Scrollable */}
+                    <div className="px-6 py-3 flex items-center">
+                      <span className={themeClasses.textPrimary}>{(line.sales4Month || 0).toLocaleString()}</span>
+                    </div>
+
+                    {/* LBL SIZE - Scrollable */}
+                    <div className="px-6 py-3 flex items-center">
+                      <span className={themeClasses.textPrimary}>{line.lblSize || '-'}</span>
+                    </div>
+
+                    {/* LABEL - Scrollable */}
+                    <div className="px-6 py-3 flex items-center">
+                      <span className={themeClasses.textPrimary}>{line.label || '-'}</span>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
