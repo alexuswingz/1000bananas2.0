@@ -20,6 +20,144 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
 
   const isFilterActive = (key) => activeFilters.includes(key);
 
+  // Render status icon based on status
+  const renderStatusIcon = (status) => {
+    const statusLower = (status || 'Packaging').toLowerCase();
+    switch (statusLower) {
+      case 'packaging':
+        // Planning icon image (reusing for Packaging)
+        return (
+          <img
+            src="/assets/Planning icon.png"
+            alt="Packaging"
+            style={{
+              width: '16px',
+              height: '16px',
+              objectFit: 'contain',
+            }}
+            onError={(e) => {
+              // Fallback if image doesn't load - try URL encoded version
+              e.target.src = '/assets/Planning%20icon.png';
+            }}
+          />
+        );
+      case 'ready for pickup':
+        // Green box icon
+        return (
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <rect
+              x="6"
+              y="6"
+              width="12"
+              height="12"
+              rx="2"
+              fill="#10B981"
+            />
+          </svg>
+        );
+      case 'shipped':
+        // Purple truck icon
+        return (
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M1 3h15v13H1z"
+              fill="#9333EA"
+            />
+            <path
+              d="M16 8h4l3 4v5h-7V8z"
+              fill="#9333EA"
+            />
+            <circle
+              cx="6"
+              cy="19"
+              r="2.5"
+              fill="#9333EA"
+            />
+            <circle
+              cx="18"
+              cy="19"
+              r="2.5"
+              fill="#9333EA"
+            />
+          </svg>
+        );
+      case 'received':
+        // Green checkmark icon
+        return (
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <circle
+              cx="12"
+              cy="12"
+              r="10"
+              fill="#10B981"
+            />
+            <path
+              d="M9 12l2 2 4-4"
+              stroke="white"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        );
+      default:
+        return null;
+    }
+  };
+
+  // Render status circle based on status
+  const renderStatusCircle = (status) => {
+    let circleColor;
+    let borderStyle = 'none';
+    
+    switch (status?.toLowerCase()) {
+      case 'pending':
+        circleColor = '#FFFFFF'; // White/transparent
+        borderStyle = '1px solid #D1D5DB'; // Light gray outline
+        break;
+      case 'in progress':
+        circleColor = '#3B82F6'; // Blue
+        break;
+      case 'completed':
+        circleColor = '#10B981'; // Green
+        break;
+      default:
+        circleColor = '#FFFFFF'; // Default to white (Pending)
+        borderStyle = '1px solid #D1D5DB'; // Light gray outline
+    }
+
+    return (
+      <div
+        style={{
+          width: '20px',
+          height: '20px',
+          borderRadius: '20px',
+          backgroundColor: circleColor,
+          border: borderStyle,
+          display: 'inline-block',
+        }}
+      />
+    );
+  };
+
   // Close filter dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -57,25 +195,24 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
   };
 
   return (
-    <div
-      className={`${themeClasses.cardBg} ${themeClasses.border} border rounded-xl shadow-sm`}
-      style={{ overflowX: 'auto', position: 'relative' }}
-    >
-      {/* Use max-content so table matches exact column widths without extra empty space */}
-      <table style={{ width: 'max-content', borderCollapse: 'separate', borderSpacing: 0 }}>
+    <>
+      <div
+        className={`${themeClasses.cardBg} ${themeClasses.border} border rounded-xl`}
+        style={{ overflowX: 'hidden', position: 'relative' }}
+      >
+        {/* Table with 100% width to fit container */}
+        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
         <thead className={themeClasses.headerBg}>
           <tr>
             <th
               className="text-left text-xs font-bold text-white uppercase tracking-wider group cursor-pointer"
               style={{
                 padding: '0.75rem 1rem',
-                width: '180px',
+                width: '15%',
                 height: '40px',
-                position: 'sticky',
-                left: 0,
-                zIndex: 20,
                 backgroundColor: '#1C2634',
                 borderRight: `1px solid ${columnBorderColor}`,
+                boxSizing: 'border-box',
               }}
             >
               <div
@@ -86,21 +223,21 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
                   gap: '0.5rem',
                 }}
               >
-                <span style={{ color: (isFilterActive('brand') || openFilterColumn === 'brand') ? '#007AFF' : '#FFFFFF' }}>
-                  Brand
+                <span style={{ color: (isFilterActive('status') || openFilterColumn === 'status') ? '#007AFF' : '#FFFFFF' }}>
+                  STATUS
                 </span>
                 <img
-                  ref={(el) => { if (el) filterIconRefs.current['brand'] = el; }}
+                  ref={(el) => { if (el) filterIconRefs.current['status'] = el; }}
                   src="/assets/Vector (1).png"
                   alt="Filter"
                   className={`w-3 h-3 transition-opacity cursor-pointer ${
-                    (isFilterActive('brand') || openFilterColumn === 'brand')
+                    (isFilterActive('status') || openFilterColumn === 'status')
                       ? 'opacity-100'
                       : 'opacity-0 group-hover:opacity-100'
                   }`}
-                  onClick={(e) => handleFilterClick('brand', e)}
+                  onClick={(e) => handleFilterClick('status', e)}
                   style={
-                    (isFilterActive('brand') || openFilterColumn === 'brand')
+                    (isFilterActive('status') || openFilterColumn === 'status')
                       ? {
                           filter:
                             'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
@@ -114,13 +251,11 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
               className="text-left text-xs font-bold text-white uppercase tracking-wider group cursor-pointer"
               style={{
                 padding: '0.75rem 1rem',
-                width: '220px',
+                width: '15%',
                 height: '40px',
-                position: 'sticky',
-                left: 180,
-                zIndex: 20,
                 backgroundColor: '#1C2634',
                 borderRight: `1px solid ${columnBorderColor}`,
+                boxSizing: 'border-box',
               }}
             >
               <div
@@ -131,21 +266,21 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
                   gap: '0.5rem',
                 }}
               >
-                <span style={{ color: (isFilterActive('product') || openFilterColumn === 'product') ? '#007AFF' : '#FFFFFF' }}>
-                  Product
+                <span style={{ color: (isFilterActive('shipment') || openFilterColumn === 'shipment') ? '#007AFF' : '#FFFFFF' }}>
+                  SHIPMENT
                 </span>
                 <img
-                  ref={(el) => { if (el) filterIconRefs.current['product'] = el; }}
+                  ref={(el) => { if (el) filterIconRefs.current['shipment'] = el; }}
                   src="/assets/Vector (1).png"
                   alt="Filter"
                   className={`w-3 h-3 transition-opacity cursor-pointer ${
-                    (isFilterActive('product') || openFilterColumn === 'product')
+                    (isFilterActive('shipment') || openFilterColumn === 'shipment')
                       ? 'opacity-100'
                       : 'opacity-0 group-hover:opacity-100'
                   }`}
-                  onClick={(e) => handleFilterClick('product', e)}
+                  onClick={(e) => handleFilterClick('shipment', e)}
                   style={
-                    (isFilterActive('product') || openFilterColumn === 'product')
+                    (isFilterActive('shipment') || openFilterColumn === 'shipment')
                       ? {
                           filter:
                             'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
@@ -159,14 +294,11 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
               className="text-left text-xs font-bold text-white uppercase tracking-wider group cursor-pointer"
               style={{
                 padding: '0.75rem 1rem',
-                width: '120px',
+                width: '12%',
                 height: '40px',
-                position: 'sticky',
-                left: 400,
-                zIndex: 20,
                 backgroundColor: '#1C2634',
                 borderRight: `1px solid ${columnBorderColor}`,
-                boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
+                boxSizing: 'border-box',
               }}
             >
               <div
@@ -177,21 +309,21 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
                   gap: '0.5rem',
                 }}
               >
-                <span style={{ color: (isFilterActive('size') || openFilterColumn === 'size') ? '#007AFF' : '#FFFFFF' }}>
-                  Size
+                <span style={{ color: (isFilterActive('marketplace') || openFilterColumn === 'marketplace') ? '#007AFF' : '#FFFFFF' }}>
+                  MARKETPLACE
                 </span>
                 <img
-                  ref={(el) => { if (el) filterIconRefs.current['size'] = el; }}
+                  ref={(el) => { if (el) filterIconRefs.current['marketplace'] = el; }}
                   src="/assets/Vector (1).png"
                   alt="Filter"
                   className={`w-3 h-3 transition-opacity cursor-pointer ${
-                    (isFilterActive('size') || openFilterColumn === 'size')
+                    (isFilterActive('marketplace') || openFilterColumn === 'marketplace')
                       ? 'opacity-100'
                       : 'opacity-0 group-hover:opacity-100'
                   }`}
-                  onClick={(e) => handleFilterClick('size', e)}
+                  onClick={(e) => handleFilterClick('marketplace', e)}
                   style={
-                    (isFilterActive('size') || openFilterColumn === 'size')
+                    (isFilterActive('marketplace') || openFilterColumn === 'marketplace')
                       ? {
                           filter:
                             'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
@@ -205,9 +337,10 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
               className="text-left text-xs font-bold text-white uppercase tracking-wider group cursor-pointer"
               style={{
                 padding: '0.75rem 1rem',
-                width: '150px',
+                width: '12%',
                 height: '40px',
                 borderRight: `1px solid ${columnBorderColor}`,
+                boxSizing: 'border-box',
               }}
             >
               <div
@@ -218,21 +351,21 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
                   gap: '0.5rem',
                 }}
               >
-                <span style={{ color: (isFilterActive('doiFba') || openFilterColumn === 'doiFba') ? '#007AFF' : '#FFFFFF' }}>
-                  DOI FBA
+                <span style={{ color: (isFilterActive('account') || openFilterColumn === 'account') ? '#007AFF' : '#FFFFFF' }}>
+                  ACCOUNT
                 </span>
                 <img
-                  ref={(el) => { if (el) filterIconRefs.current['doiFba'] = el; }}
+                  ref={(el) => { if (el) filterIconRefs.current['account'] = el; }}
                   src="/assets/Vector (1).png"
                   alt="Filter"
                   className={`w-3 h-3 transition-opacity cursor-pointer ${
-                    (isFilterActive('doiFba') || openFilterColumn === 'doiFba')
+                    (isFilterActive('account') || openFilterColumn === 'account')
                       ? 'opacity-100'
                       : 'opacity-0 group-hover:opacity-100'
                   }`}
-                  onClick={(e) => handleFilterClick('doiFba', e)}
+                  onClick={(e) => handleFilterClick('account', e)}
                   style={
-                    (isFilterActive('doiFba') || openFilterColumn === 'doiFba')
+                    (isFilterActive('account') || openFilterColumn === 'account')
                       ? {
                           filter:
                             'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
@@ -246,9 +379,10 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
               className="text-left text-xs font-bold text-white uppercase tracking-wider group cursor-pointer"
               style={{
                 padding: '0.75rem 1rem',
-                width: '150px',
+                width: '10%',
                 height: '40px',
                 borderRight: `1px solid ${columnBorderColor}`,
+                boxSizing: 'border-box',
               }}
             >
               <div
@@ -259,21 +393,21 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
                   gap: '0.5rem',
                 }}
               >
-                <span style={{ color: (isFilterActive('doiTotal') || openFilterColumn === 'doiTotal') ? '#007AFF' : '#FFFFFF' }}>
-                  DOI Total
+                <span style={{ color: (isFilterActive('rawmat') || openFilterColumn === 'rawmat') ? '#007AFF' : '#FFFFFF' }}>
+                  RAWMAT
                 </span>
                 <img
-                  ref={(el) => { if (el) filterIconRefs.current['doiTotal'] = el; }}
+                  ref={(el) => { if (el) filterIconRefs.current['rawmat'] = el; }}
                   src="/assets/Vector (1).png"
                   alt="Filter"
                   className={`w-3 h-3 transition-opacity cursor-pointer ${
-                    (isFilterActive('doiTotal') || openFilterColumn === 'doiTotal')
+                    (isFilterActive('rawmat') || openFilterColumn === 'rawmat')
                       ? 'opacity-100'
                       : 'opacity-0 group-hover:opacity-100'
                   }`}
-                  onClick={(e) => handleFilterClick('doiTotal', e)}
+                  onClick={(e) => handleFilterClick('rawmat', e)}
                   style={
-                    (isFilterActive('doiTotal') || openFilterColumn === 'doiTotal')
+                    (isFilterActive('rawmat') || openFilterColumn === 'rawmat')
                       ? {
                           filter:
                             'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
@@ -287,9 +421,10 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
               className="text-left text-xs font-bold text-white uppercase tracking-wider group cursor-pointer"
               style={{
                 padding: '0.75rem 1rem',
-                width: '150px',
+                width: '10%',
                 height: '40px',
                 borderRight: `1px solid ${columnBorderColor}`,
+                boxSizing: 'border-box',
               }}
             >
               <div
@@ -300,23 +435,21 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
                   gap: '0.5rem',
                 }}
               >
-                <span
-                  style={{ color: (isFilterActive('inventory') || openFilterColumn === 'inventory') ? '#007AFF' : '#FFFFFF' }}
-                >
-                  Inventory
+                <span style={{ color: (isFilterActive('labels') || openFilterColumn === 'labels') ? '#007AFF' : '#FFFFFF' }}>
+                  LABELS
                 </span>
                 <img
-                  ref={(el) => { if (el) filterIconRefs.current['inventory'] = el; }}
+                  ref={(el) => { if (el) filterIconRefs.current['labels'] = el; }}
                   src="/assets/Vector (1).png"
                   alt="Filter"
                   className={`w-3 h-3 transition-opacity cursor-pointer ${
-                    (isFilterActive('inventory') || openFilterColumn === 'inventory')
+                    (isFilterActive('labels') || openFilterColumn === 'labels')
                       ? 'opacity-100'
                       : 'opacity-0 group-hover:opacity-100'
                   }`}
-                  onClick={(e) => handleFilterClick('inventory', e)}
+                  onClick={(e) => handleFilterClick('labels', e)}
                   style={
-                    (isFilterActive('inventory') || openFilterColumn === 'inventory')
+                    (isFilterActive('labels') || openFilterColumn === 'labels')
                       ? {
                           filter:
                             'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
@@ -330,9 +463,10 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
               className="text-left text-xs font-bold text-white uppercase tracking-wider group cursor-pointer"
               style={{
                 padding: '0.75rem 1rem',
-                width: '150px',
+                width: '13%',
                 height: '40px',
                 borderRight: `1px solid ${columnBorderColor}`,
+                boxSizing: 'border-box',
               }}
             >
               <div
@@ -343,21 +477,21 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
                   gap: '0.5rem',
                 }}
               >
-                <span style={{ color: (isFilterActive('forecast') || openFilterColumn === 'forecast') ? '#007AFF' : '#FFFFFF' }}>
-                  Forecast
+                <span style={{ color: (isFilterActive('packagingOrder') || openFilterColumn === 'packagingOrder') ? '#007AFF' : '#FFFFFF' }}>
+                  PACKAGING ORDER
                 </span>
                 <img
-                  ref={(el) => { if (el) filterIconRefs.current['forecast'] = el; }}
+                  ref={(el) => { if (el) filterIconRefs.current['packagingOrder'] = el; }}
                   src="/assets/Vector (1).png"
                   alt="Filter"
                   className={`w-3 h-3 transition-opacity cursor-pointer ${
-                    (isFilterActive('forecast') || openFilterColumn === 'forecast')
+                    (isFilterActive('packagingOrder') || openFilterColumn === 'packagingOrder')
                       ? 'opacity-100'
                       : 'opacity-0 group-hover:opacity-100'
                   }`}
-                  onClick={(e) => handleFilterClick('forecast', e)}
+                  onClick={(e) => handleFilterClick('packagingOrder', e)}
                   style={
-                    (isFilterActive('forecast') || openFilterColumn === 'forecast')
+                    (isFilterActive('packagingOrder') || openFilterColumn === 'packagingOrder')
                       ? {
                           filter:
                             'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
@@ -371,9 +505,9 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
               className="text-left text-xs font-bold text-white uppercase tracking-wider group cursor-pointer"
               style={{
                 padding: '0.75rem 1rem',
-                width: '160px',
+                width: '13%',
                 height: '40px',
-                borderRight: `1px solid ${columnBorderColor}`,
+                boxSizing: 'border-box',
               }}
             >
               <div
@@ -384,102 +518,21 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
                   gap: '0.5rem',
                 }}
               >
-                <span style={{ color: (isFilterActive('sales7') || openFilterColumn === 'sales7') ? '#007AFF' : '#FFFFFF' }}>
-                  7 Day Sales
+                <span style={{ color: (isFilterActive('manOrder') || openFilterColumn === 'manOrder') ? '#007AFF' : '#FFFFFF' }}>
+                  MAN. ORDER
                 </span>
                 <img
-                  ref={(el) => { if (el) filterIconRefs.current['sales7'] = el; }}
+                  ref={(el) => { if (el) filterIconRefs.current['manOrder'] = el; }}
                   src="/assets/Vector (1).png"
                   alt="Filter"
                   className={`w-3 h-3 transition-opacity cursor-pointer ${
-                    (isFilterActive('sales7') || openFilterColumn === 'sales7')
+                    (isFilterActive('manOrder') || openFilterColumn === 'manOrder')
                       ? 'opacity-100'
                       : 'opacity-0 group-hover:opacity-100'
                   }`}
-                  onClick={(e) => handleFilterClick('sales7', e)}
+                  onClick={(e) => handleFilterClick('manOrder', e)}
                   style={
-                    (isFilterActive('sales7') || openFilterColumn === 'sales7')
-                      ? {
-                          filter:
-                            'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
-                        }
-                      : undefined
-                  }
-                />
-              </div>
-            </th>
-            <th
-              className="text-left text-xs font-bold text-white uppercase tracking-wider group cursor-pointer"
-              style={{
-                padding: '0.75rem 1rem',
-                width: '170px',
-                height: '40px',
-                borderRight: `1px solid ${columnBorderColor}`,
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '0.5rem',
-                }}
-              >
-                <span style={{ color: (isFilterActive('sales30') || openFilterColumn === 'sales30') ? '#007AFF' : '#FFFFFF' }}>
-                  30 Day Sales
-                </span>
-                <img
-                  ref={(el) => { if (el) filterIconRefs.current['sales30'] = el; }}
-                  src="/assets/Vector (1).png"
-                  alt="Filter"
-                  className={`w-3 h-3 transition-opacity cursor-pointer ${
-                    (isFilterActive('sales30') || openFilterColumn === 'sales30')
-                      ? 'opacity-100'
-                      : 'opacity-0 group-hover:opacity-100'
-                  }`}
-                  onClick={(e) => handleFilterClick('sales30', e)}
-                  style={
-                    (isFilterActive('sales30') || openFilterColumn === 'sales30')
-                      ? {
-                          filter:
-                            'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
-                        }
-                      : undefined
-                  }
-                />
-              </div>
-            </th>
-            <th
-              className="text-left text-xs font-bold text-white uppercase tracking-wider group cursor-pointer"
-              style={{
-                padding: '0.75rem 1rem',
-                width: '190px',
-                height: '40px',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '0.5rem',
-                }}
-              >
-                <span style={{ color: (isFilterActive('formula') || openFilterColumn === 'formula') ? '#007AFF' : '#FFFFFF' }}>
-                  Formula
-                </span>
-                <img
-                  ref={(el) => { if (el) filterIconRefs.current['formula'] = el; }}
-                  src="/assets/Vector (1).png"
-                  alt="Filter"
-                  className={`w-3 h-3 transition-opacity cursor-pointer ${
-                    (isFilterActive('formula') || openFilterColumn === 'formula')
-                      ? 'opacity-100'
-                      : 'opacity-0 group-hover:opacity-100'
-                  }`}
-                  onClick={(e) => handleFilterClick('formula', e)}
-                  style={
-                    (isFilterActive('formula') || openFilterColumn === 'formula')
+                    (isFilterActive('manOrder') || openFilterColumn === 'manOrder')
                       ? {
                           filter:
                             'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
@@ -498,127 +551,151 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
           {rows.map((row) => (
             <tr
               key={row.id}
-              className={`${themeClasses.rowHover} transition-colors duration-150`}
+              style={{
+                backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
+                height: '40px',
+              }}
             >
               <td
                 style={{
                   padding: '0.75rem 1rem',
                   verticalAlign: 'middle',
-                  position: 'sticky',
-                  left: 0,
                   backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
-                  zIndex: 10,
                   borderTop: '1px solid #E5E7EB',
+                  height: '40px',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '4px 12px',
+                    borderRadius: '4px',
+                    border: '1px solid #E5E7EB',
+                    backgroundColor: '#FFFFFF',
+                    minWidth: '137px',
+                    width: '100%',
+                    maxWidth: '171.5px',
+                    height: '24px',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  {renderStatusIcon(row.status)}
+                  <span
+                    style={{ 
+                      fontSize: '0.875rem', 
+                      fontWeight: 500, 
+                      color: '#151515',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {row.status || 'Packaging'}
+                  </span>
+                  <svg
+                    style={{ width: '0.85rem', height: '0.85rem', marginLeft: 'auto' }}
+                    fill="none"
+                    stroke="#9CA3AF"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                </div>
+              </td>
+              <td
+                style={{
+                  padding: '0.75rem 1rem',
+                  verticalAlign: 'middle',
+                  backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
+                  borderTop: '1px solid #E5E7EB',
+                  height: '40px',
                 }}
               >
                 <span
                   className={themeClasses.text}
                   style={{ fontSize: '0.875rem', fontWeight: 500, color: isDarkMode ? '#FFFFFF' : '#151515' }}
                 >
-                  {row.brand}
+                  {row.shipment || '2025.11.18 AWD'}
                 </span>
               </td>
               <td
                 style={{
                   padding: '0.75rem 1rem',
                   verticalAlign: 'middle',
-                  position: 'sticky',
-                  left: 180,
                   backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
-                  zIndex: 10,
                   borderTop: '1px solid #E5E7EB',
+                  height: '40px',
                 }}
               >
-                <button
-                  className="text-sm font-medium hover:text-blue-700 truncate"
-                  style={{ maxWidth: '220px', color: isDarkMode ? '#FFFFFF' : '#151515' }}
-                >
-                  {row.product}
-                </button>
+                <span className={themeClasses.textSecondary} style={{ fontSize: '0.875rem', color: isDarkMode ? '#FFFFFF' : '#151515' }}>
+                  {row.marketplace || 'Amazon'}
+                </span>
               </td>
               <td
                 style={{
                   padding: '0.75rem 1rem',
                   verticalAlign: 'middle',
-                  position: 'sticky',
-                  left: 400,
                   backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
-                  zIndex: 10,
-                  boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
                   borderTop: '1px solid #E5E7EB',
+                  height: '40px',
                 }}
               >
                 <span className={themeClasses.textSecondary} style={{ fontSize: '0.875rem', color: isDarkMode ? '#FFFFFF' : '#151515' }}>
-                  {row.size}
+                  {row.account || 'TPS Nutrients'}
                 </span>
               </td>
               <td
                 style={{
                   padding: '0.75rem 1rem',
                   verticalAlign: 'middle',
+                  textAlign: 'center',
+                  backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
                   borderTop: '1px solid #E5E7EB',
+                  height: '40px',
                 }}
               >
-                <span className={themeClasses.textSecondary} style={{ fontSize: '0.875rem', color: isDarkMode ? '#FFFFFF' : '#151515' }}>
-                  {row.doiFba}
-                </span>
+                {renderStatusCircle(row.rawmat)}
               </td>
               <td
                 style={{
                   padding: '0.75rem 1rem',
                   verticalAlign: 'middle',
+                  textAlign: 'center',
+                  backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
                   borderTop: '1px solid #E5E7EB',
+                  height: '40px',
                 }}
               >
-                <span className={themeClasses.textSecondary} style={{ fontSize: '0.875rem', color: isDarkMode ? '#FFFFFF' : '#151515' }}>
-                  {row.doiTotal}
-                </span>
+                {renderStatusCircle(row.labels)}
               </td>
               <td
                 style={{
                   padding: '0.75rem 1rem',
                   verticalAlign: 'middle',
+                  textAlign: 'center',
+                  backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
                   borderTop: '1px solid #E5E7EB',
+                  height: '40px',
                 }}
               >
-                <span className={themeClasses.textSecondary} style={{ fontSize: '0.875rem', color: isDarkMode ? '#FFFFFF' : '#151515' }}>
-                  {row.inventory}
-                </span>
+                {renderStatusCircle(row.packagingOrder)}
               </td>
               <td
                 style={{
                   padding: '0.75rem 1rem',
                   verticalAlign: 'middle',
+                  textAlign: 'center',
+                  backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
                   borderTop: '1px solid #E5E7EB',
+                  height: '40px',
                 }}
               >
-                <span className={themeClasses.textSecondary} style={{ fontSize: '0.875rem', color: isDarkMode ? '#FFFFFF' : '#151515' }}>
-                  {row.forecast}
-                </span>
-              </td>
-              <td
-                style={{
-                  padding: '0.75rem 1rem',
-                  verticalAlign: 'middle',
-                  borderTop: '1px solid #E5E7EB',
-                }}
-              >
-                <span className={themeClasses.textSecondary} style={{ fontSize: '0.875rem', color: isDarkMode ? '#FFFFFF' : '#151515' }}>
-                  {row.sales7}
-                </span>
-              </td>
-              <td style={{ padding: '0.75rem 1rem', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }}>
-                <span className={themeClasses.textSecondary} style={{ fontSize: '0.875rem', color: isDarkMode ? '#FFFFFF' : '#151515' }}>
-                  {row.sales30}
-                </span>
-              </td>
-              <td style={{ padding: '0.75rem 1rem', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }}>
-                <span className={themeClasses.textSecondary} style={{ fontSize: '0.875rem', color: isDarkMode ? '#FFFFFF' : '#151515' }}>
-                  {/* Approximate days of coverage based on 30-day sales */}
-                  {row.sales30 > 0
-                    ? `${Math.round((row.inventory / row.sales30) * 30)} days`
-                    : '—'}
-                </span>
+                {renderStatusCircle(row.manOrder)}
               </td>
             </tr>
           ))}
@@ -636,6 +713,102 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
         />
       )}
     </div>
+    
+    {/* Key/Legend - Outside table container */}
+    <div
+      style={{
+        padding: '1rem 1.5rem',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '1.5rem',
+        marginTop: '1rem',
+      }}
+      className={themeClasses.cardBg}
+    >
+      <span
+        style={{
+          fontSize: '0.875rem',
+          fontWeight: 500,
+          color: isDarkMode ? '#FFFFFF' : '#151515',
+        }}
+      >
+        Key:
+      </span>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+        }}
+      >
+        <div
+          style={{
+            width: '20px',
+            height: '20px',
+            borderRadius: '20px',
+            backgroundColor: '#FFFFFF',
+            border: '1px solid #D1D5DB',
+          }}
+        />
+        <span
+          style={{
+            fontSize: '0.875rem',
+            color: isDarkMode ? '#FFFFFF' : '#151515',
+          }}
+        >
+          Pending
+        </span>
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+        }}
+      >
+        <div
+          style={{
+            width: '20px',
+            height: '20px',
+            borderRadius: '20px',
+            backgroundColor: '#3B82F6',
+          }}
+        />
+        <span
+          style={{
+            fontSize: '0.875rem',
+            color: isDarkMode ? '#FFFFFF' : '#151515',
+          }}
+        >
+          In Progress
+        </span>
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+        }}
+      >
+        <div
+          style={{
+            width: '20px',
+            height: '20px',
+            borderRadius: '20px',
+            backgroundColor: '#10B981',
+          }}
+        />
+        <span
+          style={{
+            fontSize: '0.875rem',
+            color: isDarkMode ? '#FFFFFF' : '#151515',
+          }}
+        >
+          Completed
+        </span>
+      </div>
+    </div>
+    </>
   );
 };
 
@@ -702,12 +875,10 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, is
   };
 
   const sortFields = [
-    { value: 'doiFba', label: 'DOI FBA' },
-    { value: 'doiTotal', label: 'DOI Total' },
-    { value: 'inventory', label: 'Inventory' },
-    { value: 'forecast', label: 'Forecast' },
-    { value: 'sales7', label: '7 Day Sales' },
-    { value: 'sales30', label: '30 Day Sales' },
+    { value: 'status', label: 'Status' },
+    { value: 'shipment', label: 'Shipment' },
+    { value: 'marketplace', label: 'Marketplace' },
+    { value: 'account', label: 'Account' },
   ];
 
   const sortOrders = [
@@ -717,16 +888,14 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, is
 
   const filterFields = [
     { value: '', label: 'Select field' },
-    { value: 'brand', label: 'Brand' },
-    { value: 'product', label: 'Product' },
-    { value: 'size', label: 'Size' },
-    { value: 'doiFba', label: 'DOI FBA' },
-    { value: 'doiTotal', label: 'DOI Total' },
-    { value: 'inventory', label: 'Inventory' },
-    { value: 'forecast', label: 'Forecast' },
-    { value: 'sales7', label: '7 Day Sales' },
-    { value: 'sales30', label: '30 Day Sales' },
-    { value: 'formula', label: 'Formula' },
+    { value: 'status', label: 'Status' },
+    { value: 'shipment', label: 'Shipment' },
+    { value: 'marketplace', label: 'Marketplace' },
+    { value: 'account', label: 'Account' },
+    { value: 'rawmat', label: 'Raw Materials' },
+    { value: 'labels', label: 'Labels' },
+    { value: 'packagingOrder', label: 'Packaging Order' },
+    { value: 'manOrder', label: 'Manufacturing Order' },
   ];
 
   const filterConditions = [
@@ -932,4 +1101,3 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, is
 FilterDropdown.displayName = 'FilterDropdown';
 
 export default PlanningTable;
-
