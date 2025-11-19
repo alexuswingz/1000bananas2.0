@@ -10,6 +10,9 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
   const qtyContainerRefs = useRef({});
   const popupRefs = useRef({});
   const qtyInputRefs = useRef({});
+  const [openFilterIndex, setOpenFilterIndex] = useState(null);
+  const filterRefs = useRef({});
+  const filterModalRefs = useRef({});
 
   // Use local state if props not provided (for backward compatibility)
   const [internalQtyValues, setInternalQtyValues] = useState(() => {
@@ -104,6 +107,78 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
     }
   }, [clickedQtyIndex]);
 
+  // Position filter modal when it appears
+  useEffect(() => {
+    if (openFilterIndex !== null) {
+      const filterButton = filterRefs.current[openFilterIndex];
+      const filterModal = filterModalRefs.current[openFilterIndex];
+      
+      if (filterButton && filterModal) {
+        const rect = filterButton.getBoundingClientRect();
+        const dropdownWidth = 228;
+        const dropdownHeight = 265;
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        
+        let left = rect.left;
+        let top = rect.bottom + 8;
+        
+        // Adjust if dropdown goes off right edge
+        if (left + dropdownWidth > viewportWidth) {
+          left = viewportWidth - dropdownWidth - 16;
+        }
+        
+        // Adjust if dropdown goes off bottom
+        if (top + dropdownHeight > viewportHeight) {
+          top = rect.top - dropdownHeight - 8;
+        }
+        
+        // Don't go off left edge
+        if (left < 16) {
+          left = 16;
+        }
+        
+        // Don't go off top edge
+        if (top < 16) {
+          top = 16;
+        }
+        
+        filterModal.style.top = `${top}px`;
+        filterModal.style.left = `${left}px`;
+      }
+    }
+  }, [openFilterIndex]);
+
+  // Close filter modal when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (openFilterIndex !== null) {
+        const filterButton = filterRefs.current[openFilterIndex];
+        const filterModal = filterModalRefs.current[openFilterIndex];
+        
+        if (filterButton && filterModal) {
+          const isClickInsideButton = filterButton.contains(event.target);
+          const isClickInsideModal = filterModal.contains(event.target);
+          
+          if (!isClickInsideButton && !isClickInsideModal) {
+            setOpenFilterIndex(null);
+          }
+        }
+      }
+    };
+
+    if (openFilterIndex !== null) {
+      const timeoutId = setTimeout(() => {
+        document.addEventListener('click', handleClickOutside);
+      }, 0);
+      
+      return () => {
+        clearTimeout(timeoutId);
+        document.removeEventListener('click', handleClickOutside);
+      };
+    }
+  }, [openFilterIndex]);
+
   // Handle select all checkbox
   const handleSelectAll = (e) => {
     if (e.target.checked) {
@@ -137,8 +212,8 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
     return (
       <>
         <div
-          className={`${themeClasses.cardBg} ${themeClasses.border} border shadow-sm`}
-          style={{ marginTop: '1.25rem', borderRadius: '6px', overflow: 'hidden' }}
+          className={`${themeClasses.cardBg} ${themeClasses.border} border rounded-xl shadow-sm`}
+          style={{ marginTop: '1.25rem' }}
         >
           <div style={{ overflowX: 'auto' }}>
             <table
@@ -153,7 +228,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   {['Brand', 'Product', 'Size', 'Add', 'Qty'].map((col, idx) => (
                     <th
                       key={col}
-                      className="text-xs font-bold text-white uppercase tracking-wider"
+                      className="group text-xs font-bold text-white uppercase tracking-wider"
                       style={{
                         padding: '0 1rem',
                         height: '40px',
@@ -162,6 +237,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                         boxSizing: 'border-box',
                         textAlign: idx === 3 || idx === 4 ? 'center' : 'left',
                         borderRight: '1px solid #FFFFFF',
+                        position: 'relative',
                         width:
                           idx === 0
                             ? 160
@@ -174,11 +250,33 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                             : undefined,
                       }}
                     >
-                      {col}
+                      <span>{col}</span>
+                      <img
+                        ref={(el) => {
+                          if (el) filterRefs.current[`normal-${idx}`] = el;
+                        }}
+                        src="/assets/Vector (1).png"
+                        alt="Filter"
+                        className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
+                        style={{ 
+                          width: '12px', 
+                          height: '12px',
+                          position: 'absolute',
+                          right: '8px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          cursor: 'pointer',
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const filterKey = `normal-${idx}`;
+                          setOpenFilterIndex(openFilterIndex === filterKey ? null : filterKey);
+                        }}
+                      />
                     </th>
                   ))}
                   <th
-                    className="text-xs font-bold text-white tracking-wider"
+                    className="group text-xs font-bold text-white tracking-wider"
                     style={{
                       padding: '0 1rem',
                       height: '40px',
@@ -188,6 +286,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                       verticalAlign: 'middle',
                       overflow: 'hidden',
                       borderRight: '1px solid #FFFFFF',
+                      position: 'relative',
                     }}
                   >
                     <div
@@ -209,6 +308,27 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                         <div style={{ opacity: 0.85 }}>4/13/25</div>
                       </div>
                     </div>
+                    <img
+                      ref={(el) => {
+                        if (el) filterRefs.current['doi-goal'] = el;
+                      }}
+                      src="/assets/Vector (1).png"
+                      alt="Filter"
+                      className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
+                      style={{ 
+                        width: '12px', 
+                        height: '12px',
+                        position: 'absolute',
+                        right: '8px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        cursor: 'pointer',
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenFilterIndex(openFilterIndex === 'doi-goal' ? null : 'doi-goal');
+                      }}
+                    />
                     <div
                       style={{
                         position: 'relative',
@@ -285,7 +405,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                     <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }} className={themeClasses.textSecondary}>
                       {row.size}
                     </td>
-                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }}>
+                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB', boxShadow: 'inset 4px 0 8px -4px rgba(0, 0, 0, 0.15)' }}>
                       <button
                         type="button"
                         style={{
@@ -458,6 +578,193 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
             </div>
           ))}
         </div>
+
+        {/* Filter Modals */}
+        {['normal-0', 'normal-1', 'normal-2', 'normal-3', 'normal-4', 'doi-goal'].map((filterKey) => (
+          openFilterIndex === filterKey && (
+            <div
+              key={filterKey}
+              ref={(el) => {
+                if (el) filterModalRefs.current[filterKey] = el;
+              }}
+              style={{
+                position: 'fixed',
+                backgroundColor: '#FFFFFF',
+                borderRadius: '8px',
+                padding: '16px',
+                width: '228px',
+                boxSizing: 'border-box',
+                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                zIndex: 10000,
+                border: '1px solid #E5E7EB',
+                pointerEvents: 'auto',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Sort by section */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', textTransform: 'uppercase' }}>
+                    Sort by:
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setOpenFilterIndex(null)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#3B82F6',
+                      fontSize: '0.875rem',
+                      cursor: 'pointer',
+                      padding: 0,
+                    }}
+                  >
+                    Clear
+                  </button>
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <select
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      color: '#374151',
+                      backgroundColor: '#FFFFFF',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <option value="">Select field</option>
+                    <option value="fbaAvailable">FBA Available</option>
+                    <option value="totalInventory">Total Inventory</option>
+                    <option value="forecast">Forecast</option>
+                    <option value="sales7">7 Day Sales</option>
+                    <option value="sales30">30 Day Sales</option>
+                  </select>
+                  
+                  <select
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      color: '#374151',
+                      backgroundColor: '#FFFFFF',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <option value="">Select order</option>
+                    <option value="asc">A^Z Sort ascending (A to Z)</option>
+                    <option value="desc">Z^A Sort descending (Z to A)</option>
+                    <option value="numAsc">0^9 Sort ascending (0 to 9)</option>
+                    <option value="numDesc">9^0 Sort descending (9 to 0)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Filter by condition section */}
+              <div style={{ marginBottom: '16px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
+                <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', textTransform: 'uppercase', marginBottom: '12px', display: 'block' }}>
+                  Filter by condition:
+                </label>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <select
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      color: '#9CA3AF',
+                      backgroundColor: '#FFFFFF',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <option value="">Select field</option>
+                    <option value="brand">Brand</option>
+                    <option value="product">Product</option>
+                    <option value="size">Size</option>
+                    <option value="qty">Qty</option>
+                  </select>
+                  
+                  <select
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      color: '#9CA3AF',
+                      backgroundColor: '#FFFFFF',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <option value="">Select condition</option>
+                    <option value="equals">Equals</option>
+                    <option value="contains">Contains</option>
+                    <option value="greaterThan">Greater than</option>
+                    <option value="lessThan">Less than</option>
+                  </select>
+                  
+                  <input
+                    type="text"
+                    placeholder="Value here..."
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      color: '#374151',
+                      backgroundColor: '#FFFFFF',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
+                <button
+                  type="button"
+                  onClick={() => setOpenFilterIndex(null)}
+                  style={{
+                    padding: '8px 16px',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '6px',
+                    backgroundColor: '#FFFFFF',
+                    color: '#374151',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOpenFilterIndex(null)}
+                  style={{
+                    padding: '8px 16px',
+                    border: 'none',
+                    borderRadius: '6px',
+                    backgroundColor: '#3B82F6',
+                    color: '#FFFFFF',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          )
+        ))}
       </>
     );
   }
