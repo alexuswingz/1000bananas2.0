@@ -356,3 +356,5 @@ await updateProduct(1, {
 
 6. **CORS**: All endpoints support CORS with wildcard origin (`*`) for development purposes.
 
+
+
