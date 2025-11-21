@@ -101,7 +101,7 @@ const Labels = () => {
       
       // Show green banner notification (matching received order style)
       setNotification({
-        message: `${newOrderNumber} label order submitted`,
+        message: `${newOrderNumber} label order complete`,
         type: 'success',
       });
 
@@ -175,23 +175,86 @@ const Labels = () => {
 
   return (
     <div className={`p-8 ${themeClasses.pageBg}`}>
-      {/* Green notification banner - for create new order and receive order */}
+      {/* Green notification popup - for create new order and receive order */}
       {notification && (
-        <div className="mb-4 bg-green-50 border border-green-200 rounded-lg px-4 py-3 flex items-center justify-between shadow-sm">
-          <div className="flex items-center gap-2">
-            <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            <span className="text-sm font-medium text-green-800">{notification.message}</span>
+        <div
+          style={{
+            position: 'fixed',
+            top: '24px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 1000,
+            backgroundColor: '#F0FDF4', // Very light green background
+            borderRadius: '12px',
+            paddingTop: '8px',
+            paddingRight: '12px',
+            paddingBottom: '8px',
+            paddingLeft: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)', // Subtle drop shadow
+            gap: '24px',
+            maxWidth: '317px',
+            width: 'fit-content',
+            height: '36px',
+            boxSizing: 'border-box',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Circular green checkmark icon */}
+            <div
+              style={{
+                width: '20px',
+                height: '20px',
+                borderRadius: '50%',
+                backgroundColor: '#22C55E', // Vibrant green
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="#FFFFFF" />
+              </svg>
+            </div>
+            <span
+              style={{
+                fontSize: '14px',
+                fontWeight: 400,
+                color: '#16A34A', // Medium green text
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {notification.message}
+            </span>
           </div>
           <button
             type="button"
             onClick={() => setNotification(null)}
-            className="ml-4 inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-200 hover:bg-green-300 text-green-700 transition-colors"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#6B7280', // Dark gray
+              flexShrink: 0,
+            }}
             aria-label="Dismiss notification"
+            onMouseEnter={(e) => {
+              e.target.style.color = '#4B5563';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.color = '#6B7280';
+            }}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>

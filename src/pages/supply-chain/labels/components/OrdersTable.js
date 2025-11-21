@@ -204,33 +204,21 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
   }, [orderActionMenuId]);
 
   const renderStatusIcon = (status) => {
-    if (status === 'Received') {
+    if (status === 'Submitted') {
       return (
-        <svg className="w-3.5 h-3.5" fill="#10B981" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="#10B981"/>
-        </svg>
-      );
-    } else if (status === 'Partially Received') {
-      return (
-        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="12" cy="12" r="10" stroke="#F97316" strokeWidth="2" fill="none"/>
-          <path d="M12 2 A 10 10 0 0 1 12 22" fill="#F97316"/>
-        </svg>
-      );
-    } else if (status === 'Submitted') {
-      return (
-        <svg className="w-3.5 h-3.5" fill="#9333EA" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <rect x="6" y="6" width="12" height="12" rx="2" fill="#9333EA"/>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          {/* Document/screen icon with rounded corners */}
+          <rect x="6" y="4" width="12" height="16" rx="2" fill="#9333EA" stroke="none"/>
+          {/* Darker purple rectangle at bottom center */}
+          <rect x="9" y="16" width="6" height="2" rx="1" fill="#7C3AED"/>
         </svg>
       );
     } else {
       // Draft
       return (
-        <svg className="w-3.5 h-3.5" fill="#3B82F6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" fill="#3B82F6"/>
           <path d="M14 2v6h6" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-          <line x1="9" y1="13" x2="15" y2="13" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-          <line x1="9" y1="17" x2="15" y2="17" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
         </svg>
       );
     }
@@ -260,137 +248,310 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
     setEditingStatusId(null);
   };
 
+  // Helper function to determine step completion status
+  const getStepStatus = (order, step) => {
+    const status = order.status || 'Draft';
+    if (step === 'addProducts') {
+      return status !== 'Draft'; // Completed if not draft
+    } else if (step === 'submitPO') {
+      return status === 'Submitted' || status === 'Received' || status === 'Partially Received';
+    } else if (step === 'receivePO') {
+      return status === 'Received' || status === 'Partially Received';
+    }
+    return false;
+  };
+
   return (
     <div
       className={`${themeClasses.cardBg} rounded-xl border ${themeClasses.border} shadow-md`}
-      style={{ overflow: 'hidden' }}
+      style={{ overflow: 'visible', position: 'relative' }}
     >
-      {/* Table header row */}
-      <div className={themeClasses.headerBg}>
-        <div
-          className="grid"
-          style={{
-            gridTemplateColumns: '140px 2fr 2fr',
+      {/* Expanded underline on corners */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '40px',
+          left: '-12px',
+          right: '-12px',
+          height: '1px',
+          backgroundColor: 'rgba(255, 255, 255, 0.3)',
+          zIndex: 10,
+        }}
+      />
+      <table
+        style={{
+          width: '100%',
+          borderCollapse: 'separate',
+          borderSpacing: 0,
+        }}
+      >
+        {/* Table header */}
+        <thead 
+          className={themeClasses.headerBg} 
+          style={{ 
+            position: 'relative',
           }}
         >
-          <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center">
-            STATUS
-          </div>
-          <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center">
-            LABEL ORDER #
-          </div>
-          <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider text-center">
-            SUPPLIER
-          </div>
-        </div>
-      </div>
-
-      {/* Table body */}
-      <div>
-        {filteredOrders.length === 0 ? (
-          <div className="px-6 py-6 text-center text-sm italic text-gray-400">
-            No orders yet.
-          </div>
-        ) : (
-          filteredOrders.map((order, index) => (
-            <div
-              key={order.id}
-              className={`grid text-sm ${themeClasses.rowHover} transition-colors`}
+          <tr 
+            style={{ 
+              height: '40px',
+              position: 'relative',
+            }}
+          >
+            <th
+              className="text-xs font-bold text-white uppercase tracking-wider border-r border-white"
               style={{
-                gridTemplateColumns: '140px 2fr 2fr',
-                borderBottom:
-                  index === filteredOrders.length - 1
-                    ? 'none'
-                    : isDarkMode
-                    ? '1px solid rgba(75,85,99,0.3)'
-                    : '1px solid #e5e7eb',
+                padding: '0 1rem',
+                textAlign: 'left',
+                width: '140px',
               }}
             >
-              <div className="px-6 py-3 flex items-center justify-center">
-                {editingStatusId === order.id ? (
-                  <select
-                    value={order.status || 'Draft'}
-                    onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                    onBlur={() => setEditingStatusId(null)}
-                    className="text-xs border border-gray-300 rounded px-2 py-1 bg-white"
-                    autoFocus
-                  >
-                    {statusOptions.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setEditingStatusId(order.id)}
-                    className="w-full"
-                  >
-                    {renderStatusPill(order)}
-                  </button>
-                )}
-              </div>
-              <div className="px-6 py-3 flex items-center">
-                <button
-                  type="button"
-                  className="text-xs font-medium text-blue-600 hover:text-blue-700 underline-offset-2 hover:underline"
-                  onClick={() => onViewOrder(order)}
+              LABEL STATUS
+            </th>
+            <th
+              className="text-xs font-bold text-white uppercase tracking-wider border-r border-white"
+              style={{
+                padding: '0 1rem',
+                textAlign: 'left',
+                width: '150px',
+              }}
+            >
+              LABEL ORDER #
+            </th>
+            <th
+              className="text-xs font-bold text-white uppercase tracking-wider border-r border-white"
+              style={{
+                padding: '0 1rem',
+                textAlign: 'left',
+                width: '150px',
+              }}
+            >
+              SUPPLIER
+            </th>
+             <th
+               className="text-xs font-bold text-white uppercase tracking-wider border-r border-white"
+               style={{
+                 padding: '0 1rem',
+                 textAlign: 'center',
+                 width: '90px',
+               }}
+             >
+               ADD PRODUCTS
+             </th>
+             <th
+               className="text-xs font-bold text-white uppercase tracking-wider border-r border-white"
+               style={{
+                 padding: '0 1rem',
+                 textAlign: 'center',
+                 width: '90px',
+               }}
+             >
+               SUBMIT PO
+             </th>
+             <th
+               className="text-xs font-bold text-white uppercase tracking-wider border-r border-white"
+               style={{
+                 padding: '0 1rem',
+                 textAlign: 'center',
+                 width: '90px',
+               }}
+             >
+               RECEIVE PO
+             </th>
+             <th
+               className="text-xs font-bold text-white uppercase tracking-wider"
+               style={{
+                 padding: '0 1rem',
+                 textAlign: 'center',
+                 width: '40px',
+               }}
+             >
+             </th>
+          </tr>
+        </thead>
+
+        {/* Table body */}
+        <tbody>
+          {filteredOrders.length === 0 ? (
+            <tr>
+              <td colSpan="7" className="px-6 py-6 text-center text-sm italic text-gray-400">
+                No orders yet.
+              </td>
+            </tr>
+          ) : (
+            filteredOrders.map((order, index) => {
+              const status = order.status || 'Draft';
+              const isSubmitted = status === 'Submitted' || status === 'Received' || status === 'Partially Received';
+              const isDraft = status === 'Draft';
+              
+              return (
+                <tr
+                  key={order.id}
+                  className={`text-sm ${themeClasses.rowHover} transition-colors`}
+                  style={{
+                    height: '40px',
+                    borderTop: index === 0 ? 'none' : (isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid #e5e7eb'),
+                  }}
                 >
-                  {order.orderNumber}
-                </button>
-              </div>
-              <div className="px-6 py-3 flex items-center justify-between relative">
-                <span className={themeClasses.textPrimary}>{order.supplier}</span>
-
-                <div className="relative">
-                  <button
-                    ref={(el) => (buttonRefs.current[order.id] = el)}
-                    type="button"
-                    data-menu-button={order.id}
-                    className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors ml-2"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setOrderActionMenuId((prev) => (prev === order.id ? null : order.id));
-                    }}
-                    aria-label="Order actions"
-                  >
-                    <span className={themeClasses.textSecondary}>⋮</span>
-                  </button>
-
-                  {orderActionMenuId === order.id && (
+                  {/* LABEL STATUS */}
+                  <td style={{ padding: '0.65rem 1rem', verticalAlign: 'middle' }}>
                     <div
-                      ref={(el) => (menuRefs.current[order.id] = el)}
-                      className="fixed bg-white border border-gray-200 rounded-md shadow-lg text-xs z-50 min-w-[120px]"
                       style={{
-                        top: `${menuPosition.top}px`,
-                        right: `${menuPosition.right}px`,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        backgroundColor: '#FFFFFF',
+                        border: '1px solid #D1D5DB',
+                        borderRadius: '4px',
+                        paddingTop: '4px',
+                        paddingRight: '12px',
+                        paddingBottom: '4px',
+                        paddingLeft: '12px',
+                        width: '145px',
+                        height: '24px',
+                        boxSizing: 'border-box',
                       }}
                     >
+                      {renderStatusIcon(status)}
+                      <span style={{ fontSize: '14px', color: '#000000', fontWeight: 400, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                        {status}
+                      </span>
+                    </div>
+                  </td>
+
+                  {/* LABEL ORDER # */}
+                  <td style={{ padding: '0.65rem 1rem', verticalAlign: 'middle' }}>
+                    <button
+                      type="button"
+                      onClick={() => onViewOrder(order)}
+                      style={{
+                        color: '#3B82F6',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        textDecoration: 'none',
+                      }}
+                      onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
+                      onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
+                    >
+                      {order.orderNumber}
+                    </button>
+                  </td>
+
+                  {/* SUPPLIER */}
+                  <td style={{ padding: '0.65rem 1rem', verticalAlign: 'middle' }}>
+                    <span className={themeClasses.textPrimary} style={{ fontSize: '14px' }}>
+                      {order.supplier}
+                    </span>
+                  </td>
+
+                  {/* ADD PRODUCTS */}
+                  <td style={{ padding: '0.65rem 1rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                    <div
+                      style={{
+                        width: '20px',
+                        height: '20px',
+                        borderRadius: '50%',
+                        backgroundColor: getStepStatus(order, 'addProducts') ? (isDraft ? '#3B82F6' : '#10B981') : '#FFFFFF',
+                        border: getStepStatus(order, 'addProducts') ? 'none' : '2px solid #D1D5DB',
+                        margin: '0 auto',
+                      }}
+                    />
+                  </td>
+
+                  {/* SUBMIT PO */}
+                  <td style={{ padding: '0.65rem 1rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                    <div
+                      style={{
+                        width: '20px',
+                        height: '20px',
+                        borderRadius: '50%',
+                        backgroundColor: getStepStatus(order, 'submitPO') ? '#10B981' : '#FFFFFF',
+                        border: getStepStatus(order, 'submitPO') ? 'none' : '2px solid #D1D5DB',
+                        margin: '0 auto',
+                      }}
+                    />
+                  </td>
+
+                  {/* RECEIVE PO */}
+                  <td style={{ padding: '0.65rem 1rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                    <div
+                      style={{
+                        width: '20px',
+                        height: '20px',
+                        borderRadius: '50%',
+                        backgroundColor: getStepStatus(order, 'receivePO') ? '#10B981' : '#FFFFFF',
+                        border: getStepStatus(order, 'receivePO') ? 'none' : '2px solid #D1D5DB',
+                        margin: '0 auto',
+                      }}
+                    />
+                  </td>
+
+                  {/* Action Menu */}
+                  <td style={{ padding: '0.65rem 1rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                    <div className="relative">
                       <button
+                        ref={(el) => (buttonRefs.current[order.id] = el)}
                         type="button"
-                        className={`w-full flex items-center gap-2 px-3 py-2.5 ${themeClasses.rowHover} ${themeClasses.textPrimary} transition-colors`}
-                        onClick={() => {
-                          onViewOrder(order);
-                          setOrderActionMenuId(null);
+                        data-menu-button={order.id}
+                        className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOrderActionMenuId((prev) => (prev === order.id ? null : order.id));
+                        }}
+                        aria-label="Order actions"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
                         }}
                       >
-                        <span className={themeClasses.textSecondary}>
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                        </span>
-                        View
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <circle cx="12" cy="5" r="1" fill="#6B7280" />
+                          <circle cx="12" cy="12" r="1" fill="#6B7280" />
+                          <circle cx="12" cy="19" r="1" fill="#6B7280" />
+                        </svg>
                       </button>
+
+                      {orderActionMenuId === order.id && (
+                        <div
+                          ref={(el) => (menuRefs.current[order.id] = el)}
+                          className="fixed bg-white border border-gray-200 rounded-md shadow-lg text-xs z-50 min-w-[120px]"
+                          style={{
+                            top: `${menuPosition.top}px`,
+                            right: `${menuPosition.right}px`,
+                          }}
+                        >
+                          <button
+                            type="button"
+                            className={`w-full flex items-center gap-2 px-3 py-2.5 ${themeClasses.rowHover} ${themeClasses.textPrimary} transition-colors`}
+                            onClick={() => {
+                              onViewOrder(order);
+                              setOrderActionMenuId(null);
+                            }}
+                          >
+                            <span className={themeClasses.textSecondary}>
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            </span>
+                            View
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+                  </td>
+                </tr>
+              );
+            })
+          )}
+        </tbody>
+      </table>
     </div>
   );
 });
