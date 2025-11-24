@@ -20,14 +20,23 @@ import FinishedGoods from './detail/FinishedGoods';
 import PDPSetup from './detail/PDPSetup';
 import Ngoos from './detail/Ngoos';
 
+import { extractFileId, getDriveImageUrl } from '../../../services/googleDriveApi';
+
 // Utility function to handle Google Drive image URLs
 const getImageUrl = (url) => {
   if (!url) return null;
   
   // Check if URL is from Google Drive
   if (typeof url === 'string' && url.includes('drive.google.com')) {
-    // Return a placeholder for private Google Drive images
-    return 'https://via.placeholder.com/800x800/e5e7eb/6b7280?text=Private+Google+Drive+Image';
+    // Extract file ID and convert to direct image URL
+    const fileId = extractFileId(url);
+    if (fileId) {
+      // Use Google Drive's direct view URL (works for public files)
+      return getDriveImageUrl(fileId);
+    }
+    
+    // Fallback to placeholder if extraction fails
+    return 'https://via.placeholder.com/800x800/e5e7eb/6b7280?text=Invalid+Drive+URL';
   }
   
   return url;
