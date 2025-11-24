@@ -7,30 +7,30 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
   const navigate = useNavigate();
   
   // Dropdown states
-  const [shipmentTypeOpen, setShipmentTypeOpen] = useState(false);
+  const [marketplaceOpen, setMarketplaceOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
-  const shipmentTypeRef = useRef(null);
+  const marketplaceRef = useRef(null);
   const accountRef = useRef(null);
   
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (shipmentTypeRef.current && !shipmentTypeRef.current.contains(event.target)) {
-        setShipmentTypeOpen(false);
+      if (marketplaceRef.current && !marketplaceRef.current.contains(event.target)) {
+        setMarketplaceOpen(false);
       }
       if (accountRef.current && !accountRef.current.contains(event.target)) {
         setAccountOpen(false);
       }
     };
 
-    if (shipmentTypeOpen || accountOpen) {
+    if (marketplaceOpen || accountOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [shipmentTypeOpen, accountOpen]);
+  }, [marketplaceOpen, accountOpen]);
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -47,35 +47,43 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.45)',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 50,
       }}
+      onClick={onClose}
     >
       <div
-        className={`${themeClasses.cardBg} ${themeClasses.border}`}
+        className={`${themeClasses.cardBg}`}
         style={{
-          width: 'min(900px, 92vw)',
-          borderRadius: '0.75rem',
-          boxShadow:
-            '0 20px 40px rgba(15,23,42,0.35), 0 0 0 1px rgba(15,23,42,0.08)',
+          width: '600px',
+          maxWidth: '90vw',
+          borderRadius: '12px',
+          border: '1px solid #E5E7EB',
+          boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
+          backgroundColor: '#FFFFFF',
         }}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Modal header */}
         <div
           style={{
-            padding: '1rem 1.5rem',
-            borderBottom: `1px solid ${isDarkMode ? '#111827' : '#E5E7EB'}`,
+            padding: '20px 24px',
+            borderBottom: '1px solid #E5E7EB',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
           }}
         >
           <h2
-            className={themeClasses.text}
-            style={{ fontSize: '1rem', fontWeight: 600, color: isDarkMode ? '#FFFFFF' : '#151515' }}
+            style={{ 
+              fontSize: '16px', 
+              fontWeight: 600, 
+              color: '#111827',
+              margin: 0,
+            }}
           >
             New Shipment
           </h2>
@@ -83,27 +91,27 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
             type="button"
             onClick={onClose}
             style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '9999px',
+              width: '24px',
+              height: '24px',
               border: 'none',
               backgroundColor: 'transparent',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
+              padding: 0,
             }}
           >
             <svg
-              style={{ width: '1.1rem', height: '1.1rem' }}
+              style={{ width: '16px', height: '16px' }}
               viewBox="0 0 24 24"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
             >
               <path
                 d="M6 6L18 18M18 6L6 18"
-                stroke={isDarkMode ? '#9CA3AF' : '#6B7280'}
-                strokeWidth="1.8"
+                stroke="#9CA3AF"
+                strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
@@ -114,376 +122,247 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
         {/* Modal body */}
         <div
           style={{
-            padding: '1.5rem',
+            padding: '24px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '1.5rem',
+            gap: '20px',
           }}
         >
-          {/* Form fields in 2x2 grid */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-              gap: '1rem',
-            }}
-          >
-            {/* Shipment # */}
-            <div>
-              <label
-                className={themeClasses.textSecondary}
-                style={{ fontSize: '0.75rem', fontWeight: 500, display: 'block', marginBottom: '0.25rem', color: isDarkMode ? '#FFFFFF' : '#151515' }}
-              >
-                Shipment # <span style={{ color: '#EF4444' }}>*</span>
-              </label>
-              <input
-                type="text"
-                value={newShipment.shipmentNumber}
-                onChange={(e) =>
-                  setNewShipment((prev) => ({
-                    ...prev,
-                    shipmentNumber: e.target.value,
-                  }))
-                }
-                placeholder="Enter shipment # here..."
-                className={`${themeClasses.inputBg} ${themeClasses.text} ${themeClasses.border} border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500`}
+          {/* Shipment Name */}
+          <div>
+            <label
+              style={{ 
+                fontSize: '13px', 
+                fontWeight: 500, 
+                display: 'block', 
+                marginBottom: '8px', 
+                color: '#374151' 
+              }}
+            >
+              Shipment Name<span style={{ color: '#EF4444' }}>*</span>
+            </label>
+            <input
+              type="text"
+              value={newShipment.shipmentName || ''}
+              onChange={(e) =>
+                setNewShipment((prev) => ({
+                  ...prev,
+                  shipmentName: e.target.value,
+                }))
+              }
+              placeholder="Enter shipment name here..."
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                border: '1px solid #D1D5DB',
+                borderRadius: '6px',
+                fontSize: '14px',
+                color: '#111827',
+                backgroundColor: '#FFFFFF',
+                outline: 'none',
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#3B82F6'}
+              onBlur={(e) => e.target.style.borderColor = '#D1D5DB'}
+            />
+          </div>
+
+          {/* Marketplace */}
+          <div>
+            <label
+              style={{ 
+                fontSize: '13px', 
+                fontWeight: 500, 
+                display: 'block', 
+                marginBottom: '8px', 
+                color: '#374151' 
+              }}
+            >
+              Marketplace<span style={{ color: '#EF4444' }}>*</span>
+            </label>
+            <div ref={marketplaceRef} style={{ position: 'relative' }}>
+              <button
+                type="button"
+                onClick={() => setMarketplaceOpen(!marketplaceOpen)}
                 style={{
                   width: '100%',
-                  padding: '0.55rem 0.75rem',
-                  color: isDarkMode ? '#FFFFFF' : '#151515',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 12px',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '6px',
+                  backgroundColor: '#FFFFFF',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  color: newShipment.marketplace ? '#111827' : '#9CA3AF',
+                  outline: 'none',
                 }}
-              />
-            </div>
-
-            {/* Shipment Type */}
-            <div>
-              <label
-                className={themeClasses.textSecondary}
-                style={{ fontSize: '0.75rem', fontWeight: 500, display: 'block', marginBottom: '0.25rem', color: isDarkMode ? '#FFFFFF' : '#151515' }}
               >
-                Shipment Type <span style={{ color: '#EF4444' }}>*</span>
-              </label>
-              <div ref={shipmentTypeRef} style={{ position: 'relative' }}>
-                <button
-                  type="button"
-                  onClick={() => setShipmentTypeOpen(!shipmentTypeOpen)}
-                  className={`${themeClasses.inputBg} ${themeClasses.border} border rounded-lg hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500`}
+                <span>{newShipment.marketplace || 'Select Marketplace'}</span>
+                <svg
+                  className={`transition-transform ${marketplaceOpen ? 'rotate-180' : ''}`}
+                  style={{ 
+                    width: '16px', 
+                    height: '16px', 
+                    color: '#9CA3AF',
+                    flexShrink: 0,
+                  }}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M19 9L12 16L5 9"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              
+              {marketplaceOpen && (
+                <div
                   style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '0.55rem 0.75rem',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    minHeight: '38px',
-                    textAlign: 'left',
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    marginTop: '4px',
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '6px',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                    overflow: 'hidden',
+                    zIndex: 100,
                   }}
                 >
-                  <span
-                    style={{
-                      fontSize: '0.875rem',
-                      color: newShipment.shipmentType ? (isDarkMode ? '#FFFFFF' : '#151515') : (isDarkMode ? '#9CA3AF' : '#9CA3AF'),
-                      fontWeight: 400,
-                    }}
-                  >
-                    {newShipment.shipmentType || 'Select Shipment Type'}
-                  </span>
-                  <svg
-                    className={`transition-transform ${shipmentTypeOpen ? 'rotate-180' : ''}`}
-                    style={{ 
-                      width: '1rem', 
-                      height: '1rem', 
-                      color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                      flexShrink: 0,
-                    }}
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M19 9L12 16L5 9"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
-                
-                {shipmentTypeOpen && (
-                  <div
-                    className={`fixed ${themeClasses.inputBg} ${themeClasses.border} border rounded-lg shadow-xl overflow-hidden z-50`}
-                    style={{
-                      top: shipmentTypeRef.current?.getBoundingClientRect().bottom + 4 + 'px',
-                      left: shipmentTypeRef.current?.getBoundingClientRect().left + 'px',
-                      width: shipmentTypeRef.current?.offsetWidth + 'px',
-                      maxHeight: '200px',
-                      overflowY: 'auto',
-                    }}
-                  >
-                    {['', 'AWD', 'Direct'].map((option) => (
-                      <button
-                        key={option}
-                        type="button"
-                        onClick={() => {
-                          setNewShipment((prev) => ({ ...prev, shipmentType: option }));
-                          setShipmentTypeOpen(false);
-                        }}
-                        className={`w-full text-left px-3 py-2.5 text-sm transition-colors ${
-                          newShipment.shipmentType === option
-                            ? isDarkMode ? 'bg-dark-bg-primary' : 'bg-blue-50'
-                            : isDarkMode ? 'hover:bg-dark-bg-primary' : 'hover:bg-gray-50'
-                        }`}
-                        style={{
-                          color: option ? (isDarkMode ? '#FFFFFF' : '#151515') : (isDarkMode ? '#9CA3AF' : '#9CA3AF'),
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                        }}
-                      >
-                        <span>{option || 'Select Shipment Type'}</span>
-                        {newShipment.shipmentType === option && (
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path
-                              fillRule="evenodd"
-                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Account */}
-            <div>
-              <label
-                className={themeClasses.textSecondary}
-                style={{ fontSize: '0.75rem', fontWeight: 500, display: 'block', marginBottom: '0.25rem', color: isDarkMode ? '#FFFFFF' : '#151515' }}
-              >
-                Account <span style={{ color: '#EF4444' }}>*</span>
-              </label>
-              <div ref={accountRef} style={{ position: 'relative' }}>
-                <button
-                  type="button"
-                  onClick={() => setAccountOpen(!accountOpen)}
-                  className={`${themeClasses.inputBg} ${themeClasses.border} border rounded-lg hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500`}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '0.55rem 0.75rem',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    minHeight: '38px',
-                    textAlign: 'left',
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: '0.875rem',
-                      color: newShipment.account ? (isDarkMode ? '#FFFFFF' : '#151515') : (isDarkMode ? '#9CA3AF' : '#9CA3AF'),
-                      fontWeight: 400,
-                    }}
-                  >
-                    {newShipment.account === 'tps-nutrients' ? 'TPS Nutrients' : 
-                     newShipment.account === 'green-earth' ? 'Green Earth Co' : 
-                     'Select Account'}
-                  </span>
-                  <svg
-                    className={`transition-transform ${accountOpen ? 'rotate-180' : ''}`}
-                    style={{ 
-                      width: '1rem', 
-                      height: '1rem', 
-                      color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                      flexShrink: 0,
-                    }}
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M19 9L12 16L5 9"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
-                
-                {accountOpen && (
-                  <div
-                    className={`fixed ${themeClasses.inputBg} ${themeClasses.border} border rounded-lg shadow-xl overflow-hidden z-50`}
-                    style={{
-                      top: accountRef.current?.getBoundingClientRect().bottom + 4 + 'px',
-                      left: accountRef.current?.getBoundingClientRect().left + 'px',
-                      width: accountRef.current?.offsetWidth + 'px',
-                      maxHeight: '200px',
-                      overflowY: 'auto',
-                    }}
-                  >
-                    {[
-                      { value: '', label: 'Select Account' },
-                      { value: 'tps-nutrients', label: 'TPS Nutrients' },
-                      { value: 'green-earth', label: 'Green Earth Co' },
-                    ].map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => {
-                          setNewShipment((prev) => ({ ...prev, account: option.value }));
-                          setAccountOpen(false);
-                        }}
-                        className={`w-full text-left px-3 py-2.5 text-sm transition-colors ${
-                          newShipment.account === option.value
-                            ? isDarkMode ? 'bg-dark-bg-primary' : 'bg-blue-50'
-                            : isDarkMode ? 'hover:bg-dark-bg-primary' : 'hover:bg-gray-50'
-                        }`}
-                        style={{
-                          color: option.value ? (isDarkMode ? '#FFFFFF' : '#151515') : (isDarkMode ? '#9CA3AF' : '#9CA3AF'),
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                        }}
-                      >
-                        <span>{option.label}</span>
-                        {newShipment.account === option.value && (
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path
-                              fillRule="evenodd"
-                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Location */}
-            <div>
-              <label
-                className={themeClasses.textSecondary}
-                style={{ fontSize: '0.75rem', fontWeight: 500, display: 'block', marginBottom: '0.25rem', color: isDarkMode ? '#FFFFFF' : '#151515' }}
-              >
-                Location <span style={{ color: '#EF4444' }}>*</span>
-              </label>
-              <input
-                type="text"
-                value={newShipment.location || ''}
-                onChange={(e) =>
-                  setNewShipment((prev) => ({
-                    ...prev,
-                    location: e.target.value,
-                  }))
-                }
-                placeholder="Enter location here..."
-                className={`${themeClasses.inputBg} ${themeClasses.text} ${themeClasses.border} border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/60 focus:border-blue-500`}
-                style={{
-                  width: '100%',
-                  padding: '0.55rem 0.75rem',
-                  color: isDarkMode ? '#FFFFFF' : '#151515',
-                }}
-              />
+                  {['Amazon', 'Walmart', 'eBay'].map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => {
+                        setNewShipment((prev) => ({ ...prev, marketplace: option }));
+                        setMarketplaceOpen(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '10px 12px',
+                        fontSize: '14px',
+                        color: '#111827',
+                        backgroundColor: newShipment.marketplace === option ? '#F3F4F6' : '#FFFFFF',
+                        border: 'none',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#F3F4F6'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = newShipment.marketplace === option ? '#F3F4F6' : '#FFFFFF'}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Supplier selector */}
+          {/* Account */}
           <div>
-            <p
-              className={themeClasses.textSecondary}
-              style={{ fontSize: '0.75rem', fontWeight: 500, marginBottom: '0.75rem', color: isDarkMode ? '#FFFFFF' : '#151515' }}
-            >
-              Supplier (Select one) <span style={{ color: '#EF4444' }}>*</span>
-            </p>
-            <div
-              style={{
-                display: 'flex',
-                gap: '1rem',
-                flexWrap: 'wrap',
+            <label
+              style={{ 
+                fontSize: '13px', 
+                fontWeight: 500, 
+                display: 'block', 
+                marginBottom: '8px', 
+                color: '#374151' 
               }}
             >
-              {[
-                {
-                  id: 'amazon',
-                  label: 'Amazon',
-                  logo: 'https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg',
-                },
-                {
-                  id: 'walmart',
-                  label: 'Walmart',
-                  logo: '/assets/Walmart_logo_(2008).svg 1.png',
-                },
-              ].map((supplier) => {
-                const isSelected = newShipment.supplier === supplier.id;
-                return (
-                  <button
-                    key={supplier.id}
-                    type="button"
-                    onClick={() =>
-                      setNewShipment((prev) => ({ ...prev, supplier: supplier.id }))
-                    }
-                    style={{
-                      flex: '0 0 220px',
-                      maxWidth: '220px',
-                      minHeight: '170px',
-                      borderRadius: '0.75rem',
-                      border: `1px solid ${
-                        isSelected
-                          ? '#3B82F6'
-                          : isDarkMode
-                          ? '#1F2937'
-                          : '#E5E7EB'
-                      }`,
-                      backgroundColor: isSelected
-                        ? (isDarkMode ? 'rgba(37, 99, 235, 0.12)' : '#EFF6FF')
-                        : (isDarkMode ? '#020617' : '#FFFFFF'),
-                      boxShadow: isSelected
-                        ? '0 0 0 1px rgba(59,130,246,0.4)'
-                        : '0 1px 2px rgba(15,23,42,0.08)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '1.5rem 1.25rem',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: '120px',
-                        height: '60px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginBottom: '0.75rem',
+              Account<span style={{ color: '#EF4444' }}>*</span>
+            </label>
+            <div ref={accountRef} style={{ position: 'relative' }}>
+              <button
+                type="button"
+                onClick={() => setAccountOpen(!accountOpen)}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 12px',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '6px',
+                  backgroundColor: '#FFFFFF',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  color: newShipment.account ? '#111827' : '#9CA3AF',
+                  outline: 'none',
+                }}
+              >
+                <span>{newShipment.account || 'Select Account'}</span>
+                <svg
+                  className={`transition-transform ${accountOpen ? 'rotate-180' : ''}`}
+                  style={{ 
+                    width: '16px', 
+                    height: '16px', 
+                    color: '#9CA3AF',
+                    flexShrink: 0,
+                  }}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M19 9L12 16L5 9"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              
+              {accountOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    marginTop: '4px',
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '6px',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                    overflow: 'hidden',
+                    zIndex: 100,
+                  }}
+                >
+                  {['TPS Nutrients', 'Green Earth Co', 'Total Pest Spray'].map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => {
+                        setNewShipment((prev) => ({ ...prev, account: option }));
+                        setAccountOpen(false);
                       }}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '10px 12px',
+                        fontSize: '14px',
+                        color: '#111827',
+                        backgroundColor: newShipment.account === option ? '#F3F4F6' : '#FFFFFF',
+                        border: 'none',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#F3F4F6'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = newShipment.account === option ? '#F3F4F6' : '#FFFFFF'}
                     >
-                      <img
-                        src={supplier.logo}
-                        alt={supplier.label}
-                        style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-                      />
-                    </div>
-                    <span
-                      className={themeClasses.textSecondary}
-                      style={{ fontSize: '0.8rem', color: isDarkMode ? '#FFFFFF' : '#151515' }}
-                    >
-                      {supplier.label}
-                    </span>
-                  </button>
-                );
-              })}
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -491,25 +370,25 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
         {/* Modal footer */}
         <div
           style={{
-            padding: '0.9rem 1.5rem',
-            borderTop: `1px solid ${isDarkMode ? '#111827' : '#E5E7EB'}`,
+            padding: '16px 24px',
+            borderTop: '1px solid #E5E7EB',
             display: 'flex',
             justifyContent: 'flex-end',
-            gap: '0.75rem',
+            gap: '12px',
           }}
         >
           <button
             type="button"
             onClick={onClose}
-            className={themeClasses.textSecondary}
             style={{
-              padding: '0.5rem 1rem',
-              borderRadius: '0.5rem',
-              border: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`,
-              backgroundColor: isDarkMode ? '#020617' : '#FFFFFF',
-              fontSize: '0.8rem',
+              padding: '10px 20px',
+              borderRadius: '6px',
+              border: '1px solid #D1D5DB',
+              backgroundColor: '#FFFFFF',
+              fontSize: '14px',
               fontWeight: 500,
-              color: isDarkMode ? '#FFFFFF' : '#151515',
+              color: '#374151',
+              cursor: 'pointer',
             }}
           >
             Cancel
@@ -517,45 +396,35 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
           <button
             type="button"
             disabled={
-              !newShipment.shipmentNumber ||
-              !newShipment.shipmentType ||
-              !newShipment.account ||
-              !newShipment.location
+              !newShipment.shipmentName ||
+              !newShipment.marketplace ||
+              !newShipment.account
             }
             style={{
-              padding: '0.5rem 1.1rem',
-              borderRadius: '0.5rem',
+              padding: '10px 20px',
+              borderRadius: '6px',
               border: 'none',
-              fontSize: '0.8rem',
+              fontSize: '14px',
               fontWeight: 500,
               backgroundColor:
-                !newShipment.shipmentNumber ||
-                !newShipment.shipmentType ||
-                !newShipment.account ||
-                !newShipment.location
-                  ? '#D1D5DB'
-                  : '#111827',
-              color:
-                !newShipment.shipmentNumber ||
-                !newShipment.shipmentType ||
-                !newShipment.account ||
-                !newShipment.location
+                !newShipment.shipmentName ||
+                !newShipment.marketplace ||
+                !newShipment.account
                   ? '#9CA3AF'
-                  : '#FFFFFF',
+                  : '#3B82F6',
+              color: '#FFFFFF',
               cursor:
-                !newShipment.shipmentNumber ||
-                !newShipment.shipmentType ||
-                !newShipment.account ||
-                !newShipment.location
+                !newShipment.shipmentName ||
+                !newShipment.marketplace ||
+                !newShipment.account
                   ? 'not-allowed'
                   : 'pointer',
             }}
             onClick={() => {
               if (
-                !newShipment.shipmentNumber ||
-                !newShipment.shipmentType ||
-                !newShipment.account ||
-                !newShipment.location
+                !newShipment.shipmentName ||
+                !newShipment.marketplace ||
+                !newShipment.account
               ) {
                 return;
               }

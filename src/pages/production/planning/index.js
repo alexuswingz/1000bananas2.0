@@ -8,15 +8,13 @@ import { getAllShipments, createShipment } from '../../../services/productionApi
 
 const Planning = () => {
   const { isDarkMode } = useTheme();
-  const [activeTab, setActiveTab] = useState('products');
+  const [activeTab, setActiveTab] = useState('shipments');
   const [activeFilters, setActiveFilters] = useState([]);
   const [showNewShipmentModal, setShowNewShipmentModal] = useState(false);
   const [newShipment, setNewShipment] = useState({
-    shipmentNumber: '',
-    shipmentType: '',
+    shipmentName: '',
+    marketplace: 'Amazon',
     account: '',
-    location: '',
-    supplier: 'amazon',
   });
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -89,22 +87,21 @@ const Planning = () => {
   const handleCreateShipment = async () => {
     try {
       const shipmentData = {
-        shipment_number: newShipment.shipmentNumber || `SHIP-${Date.now()}`,
+        shipment_number: newShipment.shipmentName || `SHIP-${Date.now()}`,
         shipment_date: new Date().toISOString().split('T')[0],
-        shipment_type: newShipment.shipmentType || 'AWD',
+        shipment_type: 'AWD',
         account: newShipment.account || 'TPS Nutrients',
-        location: newShipment.location || '',
+        marketplace: newShipment.marketplace || 'Amazon',
+        location: '',
         created_by: 'Current User', // TODO: Get from auth context
       };
 
       await createShipment(shipmentData);
       setShowNewShipmentModal(false);
       setNewShipment({
-        shipmentNumber: '',
-        shipmentType: '',
+        shipmentName: '',
+        marketplace: 'Amazon',
         account: '',
-        location: '',
-        supplier: 'amazon',
       });
       
       // Refresh shipments list
@@ -117,67 +114,67 @@ const Planning = () => {
     }
   };
 
-  // Dummy product data for products tab (to be replaced with real planning data)
+  // Dummy product data for shipments tab (to be replaced with real planning data)
   const rows = [
     {
       id: 1,
-      brand: 'Total Pest Spray',
-      product: 'Cherry Tree Fertilizer',
-      size: 'Gallon',
-      doiFba: 12,
-      doiTotal: 32,
-      inventory: 20,
-      forecast: 20,
-      sales7: 20,
-      sales30: 20,
+      status: 'Packaging',
+      shipment: '2025.11.18 AWD',
+      marketplace: 'Amazon',
+      account: 'TPS Nutrients',
+      addProducts: 'completed',
+      formulaCheck: 'completed',
+      labelCheck: 'in progress',
+      sortProducts: 'pending',
+      sortFormulas: 'pending',
     },
     {
       id: 2,
-      brand: 'Total Pest Spray',
-      product: 'Cherry Tree Fertilizer',
-      size: 'Gallon',
-      doiFba: 12,
-      doiTotal: 32,
-      inventory: 20,
-      forecast: 20,
-      sales7: 20,
-      sales30: 20,
+      status: 'Packaging',
+      shipment: '2025.11.19 FBA',
+      marketplace: 'Amazon',
+      account: 'TPS Nutrients',
+      addProducts: 'completed',
+      formulaCheck: 'pending',
+      labelCheck: 'pending',
+      sortProducts: 'pending',
+      sortFormulas: 'pending',
     },
     {
       id: 3,
-      brand: 'Total Pest Spray',
-      product: 'Cherry Tree Fertilizer',
-      size: 'Gallon',
-      doiFba: 12,
-      doiTotal: 32,
-      inventory: 20,
-      forecast: 20,
-      sales7: 20,
-      sales30: 20,
+      status: 'Shipped',
+      shipment: '2025.11.20 AWD',
+      marketplace: 'Amazon',
+      account: 'TPS Nutrients',
+      addProducts: 'completed',
+      formulaCheck: 'completed',
+      labelCheck: 'completed',
+      sortProducts: 'completed',
+      sortFormulas: 'completed',
     },
     {
       id: 4,
-      brand: 'Total Pest Spray',
-      product: 'Cherry Tree Fertilizer',
-      size: 'Gallon',
-      doiFba: 12,
-      doiTotal: 32,
-      inventory: 20,
-      forecast: 20,
-      sales7: 20,
-      sales30: 20,
+      status: 'Ready for Pickup',
+      shipment: '2025.11.21 AWD',
+      marketplace: 'Amazon',
+      account: 'TPS Nutrients',
+      addProducts: 'completed',
+      formulaCheck: 'completed',
+      labelCheck: 'completed',
+      sortProducts: 'completed',
+      sortFormulas: 'in progress',
     },
     {
       id: 5,
-      brand: 'Total Pest Spray',
-      product: 'Cherry Tree Fertilizer',
-      size: 'Gallon',
-      doiFba: 12,
-      doiTotal: 32,
-      inventory: 20,
-      forecast: 20,
-      sales7: 20,
-      sales30: 20,
+      status: 'Packaging',
+      shipment: '2025.11.22 FBA',
+      marketplace: 'Amazon',
+      account: 'TPS Nutrients',
+      addProducts: 'in progress',
+      formulaCheck: 'pending',
+      labelCheck: 'pending',
+      sortProducts: 'pending',
+      sortFormulas: 'pending',
     },
   ];
 
@@ -210,19 +207,10 @@ const Planning = () => {
 
       {/* Content */}
       <div style={{ padding: '1rem 2rem 2rem 2rem' }}>
-        {/* Products (Planning) tab */}
-        {activeTab === 'products' && (
-          <PlanningTable
-            rows={rows}
-            activeFilters={activeFilters}
-            onFilterToggle={toggleFilter}
-          />
-        )}
-
         {/* Shipments tab */}
         {activeTab === 'shipments' && (
-          <ShipmentsTable
-            shipments={shipments}
+          <PlanningTable
+            rows={rows}
             activeFilters={activeFilters}
             onFilterToggle={toggleFilter}
           />

@@ -376,171 +376,198 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
               </div>
             </th>
             <th
-              className="text-left text-xs font-bold text-white uppercase tracking-wider group cursor-pointer"
+              className="text-center text-white uppercase tracking-wider group cursor-pointer"
               style={{
-                padding: '0.75rem 1rem',
-                width: '10%',
+                padding: '0.5rem 1rem',
+                width: '12%',
                 height: '40px',
-                borderRight: `1px solid ${columnBorderColor}`,
+                backgroundColor: '#1C2634',
+                borderRight: `1px solid #FFFFFF`,
                 boxSizing: 'border-box',
+                position: 'relative',
               }}
             >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '0.5rem',
-                }}
-              >
-                <span style={{ color: (isFilterActive('rawmat') || openFilterColumn === 'rawmat') ? '#007AFF' : '#FFFFFF' }}>
-                  RAWMAT
-                </span>
-                <img
-                  ref={(el) => { if (el) filterIconRefs.current['rawmat'] = el; }}
-                  src="/assets/Vector (1).png"
-                  alt="Filter"
-                  className={`w-3 h-3 transition-opacity cursor-pointer ${
-                    (isFilterActive('rawmat') || openFilterColumn === 'rawmat')
-                      ? 'opacity-100'
-                      : 'opacity-0 group-hover:opacity-100'
-                  }`}
-                  onClick={(e) => handleFilterClick('rawmat', e)}
-                  style={
-                    (isFilterActive('rawmat') || openFilterColumn === 'rawmat')
-                      ? {
-                          filter:
-                            'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
-                        }
-                      : undefined
-                  }
-                />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.1', gap: '1px' }}>
+                <span style={{ fontSize: '9px', fontWeight: 600 }}>ADD</span>
+                <span style={{ fontSize: '9px', fontWeight: 600 }}>PRODUCTS</span>
               </div>
+              <img
+                ref={(el) => { if (el) filterIconRefs.current['addProducts'] = el; }}
+                src="/assets/Vector (1).png"
+                alt="Filter"
+                className={`w-3 h-3 transition-opacity cursor-pointer ${
+                  (isFilterActive('addProducts') || openFilterColumn === 'addProducts')
+                    ? 'opacity-100'
+                    : 'opacity-0 group-hover:opacity-100'
+                }`}
+                onClick={(e) => handleFilterClick('addProducts', e)}
+                style={{
+                  position: 'absolute',
+                  top: '4px',
+                  right: '8px',
+                  ...((isFilterActive('addProducts') || openFilterColumn === 'addProducts')
+                    ? {
+                        filter:
+                          'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
+                      }
+                    : undefined)
+                }}
+              />
             </th>
             <th
-              className="text-left text-xs font-bold text-white uppercase tracking-wider group cursor-pointer"
+              className="text-center text-white uppercase tracking-wider group cursor-pointer"
               style={{
-                padding: '0.75rem 1rem',
-                width: '10%',
+                padding: '0.5rem 1rem',
+                width: '12%',
                 height: '40px',
-                borderRight: `1px solid ${columnBorderColor}`,
+                backgroundColor: '#1C2634',
+                borderRight: `1px solid #FFFFFF`,
                 boxSizing: 'border-box',
+                position: 'relative',
               }}
             >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '0.5rem',
-                }}
-              >
-                <span style={{ color: (isFilterActive('labels') || openFilterColumn === 'labels') ? '#007AFF' : '#FFFFFF' }}>
-                  LABELS
-                </span>
-                <img
-                  ref={(el) => { if (el) filterIconRefs.current['labels'] = el; }}
-                  src="/assets/Vector (1).png"
-                  alt="Filter"
-                  className={`w-3 h-3 transition-opacity cursor-pointer ${
-                    (isFilterActive('labels') || openFilterColumn === 'labels')
-                      ? 'opacity-100'
-                      : 'opacity-0 group-hover:opacity-100'
-                  }`}
-                  onClick={(e) => handleFilterClick('labels', e)}
-                  style={
-                    (isFilterActive('labels') || openFilterColumn === 'labels')
-                      ? {
-                          filter:
-                            'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
-                        }
-                      : undefined
-                  }
-                />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.1', gap: '1px' }}>
+                <span style={{ fontSize: '9px', fontWeight: 600 }}>FORMULA</span>
+                <span style={{ fontSize: '9px', fontWeight: 600 }}>CHECK</span>
               </div>
+              <img
+                ref={(el) => { if (el) filterIconRefs.current['formulaCheck'] = el; }}
+                src="/assets/Vector (1).png"
+                alt="Filter"
+                className={`w-3 h-3 transition-opacity cursor-pointer ${
+                  (isFilterActive('formulaCheck') || openFilterColumn === 'formulaCheck')
+                    ? 'opacity-100'
+                    : 'opacity-0 group-hover:opacity-100'
+                }`}
+                onClick={(e) => handleFilterClick('formulaCheck', e)}
+                style={{
+                  position: 'absolute',
+                  top: '4px',
+                  right: '8px',
+                  ...((isFilterActive('formulaCheck') || openFilterColumn === 'formulaCheck')
+                    ? {
+                        filter:
+                          'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
+                      }
+                    : undefined)
+                }}
+              />
             </th>
             <th
-              className="text-left text-xs font-bold text-white uppercase tracking-wider group cursor-pointer"
+              className="text-center text-white uppercase tracking-wider group cursor-pointer"
               style={{
-                padding: '0.75rem 1rem',
-                width: '13%',
+                padding: '0.5rem 1rem',
+                width: '12%',
                 height: '40px',
-                borderRight: `1px solid ${columnBorderColor}`,
+                backgroundColor: '#1C2634',
+                borderRight: `1px solid #FFFFFF`,
                 boxSizing: 'border-box',
+                position: 'relative',
               }}
             >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '0.5rem',
-                }}
-              >
-                <span style={{ color: (isFilterActive('packagingOrder') || openFilterColumn === 'packagingOrder') ? '#007AFF' : '#FFFFFF' }}>
-                  PACKAGING ORDER
-                </span>
-                <img
-                  ref={(el) => { if (el) filterIconRefs.current['packagingOrder'] = el; }}
-                  src="/assets/Vector (1).png"
-                  alt="Filter"
-                  className={`w-3 h-3 transition-opacity cursor-pointer ${
-                    (isFilterActive('packagingOrder') || openFilterColumn === 'packagingOrder')
-                      ? 'opacity-100'
-                      : 'opacity-0 group-hover:opacity-100'
-                  }`}
-                  onClick={(e) => handleFilterClick('packagingOrder', e)}
-                  style={
-                    (isFilterActive('packagingOrder') || openFilterColumn === 'packagingOrder')
-                      ? {
-                          filter:
-                            'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
-                        }
-                      : undefined
-                  }
-                />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.1', gap: '1px' }}>
+                <span style={{ fontSize: '9px', fontWeight: 600 }}>LABEL</span>
+                <span style={{ fontSize: '9px', fontWeight: 600 }}>CHECK</span>
               </div>
+              <img
+                ref={(el) => { if (el) filterIconRefs.current['labelCheck'] = el; }}
+                src="/assets/Vector (1).png"
+                alt="Filter"
+                className={`w-3 h-3 transition-opacity cursor-pointer ${
+                  (isFilterActive('labelCheck') || openFilterColumn === 'labelCheck')
+                    ? 'opacity-100'
+                    : 'opacity-0 group-hover:opacity-100'
+                }`}
+                onClick={(e) => handleFilterClick('labelCheck', e)}
+                style={{
+                  position: 'absolute',
+                  top: '4px',
+                  right: '8px',
+                  ...((isFilterActive('labelCheck') || openFilterColumn === 'labelCheck')
+                    ? {
+                        filter:
+                          'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
+                      }
+                    : undefined)
+                }}
+              />
             </th>
             <th
-              className="text-left text-xs font-bold text-white uppercase tracking-wider group cursor-pointer"
+              className="text-center text-white uppercase tracking-wider group cursor-pointer"
               style={{
-                padding: '0.75rem 1rem',
-                width: '13%',
+                padding: '0.5rem 1rem',
+                width: '12%',
                 height: '40px',
+                backgroundColor: '#1C2634',
+                borderRight: `1px solid #FFFFFF`,
                 boxSizing: 'border-box',
+                position: 'relative',
               }}
             >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '0.5rem',
-                }}
-              >
-                <span style={{ color: (isFilterActive('manOrder') || openFilterColumn === 'manOrder') ? '#007AFF' : '#FFFFFF' }}>
-                  MAN. ORDER
-                </span>
-                <img
-                  ref={(el) => { if (el) filterIconRefs.current['manOrder'] = el; }}
-                  src="/assets/Vector (1).png"
-                  alt="Filter"
-                  className={`w-3 h-3 transition-opacity cursor-pointer ${
-                    (isFilterActive('manOrder') || openFilterColumn === 'manOrder')
-                      ? 'opacity-100'
-                      : 'opacity-0 group-hover:opacity-100'
-                  }`}
-                  onClick={(e) => handleFilterClick('manOrder', e)}
-                  style={
-                    (isFilterActive('manOrder') || openFilterColumn === 'manOrder')
-                      ? {
-                          filter:
-                            'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
-                        }
-                      : undefined
-                  }
-                />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.1', gap: '1px' }}>
+                <span style={{ fontSize: '9px', fontWeight: 600 }}>SORT</span>
+                <span style={{ fontSize: '9px', fontWeight: 600 }}>PRODUCTS</span>
               </div>
+              <img
+                ref={(el) => { if (el) filterIconRefs.current['sortProducts'] = el; }}
+                src="/assets/Vector (1).png"
+                alt="Filter"
+                className={`w-3 h-3 transition-opacity cursor-pointer ${
+                  (isFilterActive('sortProducts') || openFilterColumn === 'sortProducts')
+                    ? 'opacity-100'
+                    : 'opacity-0 group-hover:opacity-100'
+                }`}
+                onClick={(e) => handleFilterClick('sortProducts', e)}
+                style={{
+                  position: 'absolute',
+                  top: '4px',
+                  right: '8px',
+                  ...((isFilterActive('sortProducts') || openFilterColumn === 'sortProducts')
+                    ? {
+                        filter:
+                          'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
+                      }
+                    : undefined)
+                }}
+              />
+            </th>
+            <th
+              className="text-center text-white uppercase tracking-wider group cursor-pointer"
+              style={{
+                padding: '0.5rem 1rem',
+                width: '12%',
+                height: '40px',
+                backgroundColor: '#1C2634',
+                boxSizing: 'border-box',
+                position: 'relative',
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.1', gap: '1px' }}>
+                <span style={{ fontSize: '9px', fontWeight: 600 }}>SORT</span>
+                <span style={{ fontSize: '9px', fontWeight: 600 }}>FORMULAS</span>
+              </div>
+              <img
+                ref={(el) => { if (el) filterIconRefs.current['sortFormulas'] = el; }}
+                src="/assets/Vector (1).png"
+                alt="Filter"
+                className={`w-3 h-3 transition-opacity cursor-pointer ${
+                  (isFilterActive('sortFormulas') || openFilterColumn === 'sortFormulas')
+                    ? 'opacity-100'
+                    : 'opacity-0 group-hover:opacity-100'
+                }`}
+                onClick={(e) => handleFilterClick('sortFormulas', e)}
+                style={{
+                  position: 'absolute',
+                  top: '4px',
+                  right: '8px',
+                  ...((isFilterActive('sortFormulas') || openFilterColumn === 'sortFormulas')
+                    ? {
+                        filter:
+                          'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
+                      }
+                    : undefined)
+                }}
+              />
             </th>
           </tr>
         </thead>
@@ -659,7 +686,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
                   height: '40px',
                 }}
               >
-                {renderStatusCircle(row.rawmat)}
+                {renderStatusCircle(row.addProducts || 'pending')}
               </td>
               <td
                 style={{
@@ -671,7 +698,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
                   height: '40px',
                 }}
               >
-                {renderStatusCircle(row.labels)}
+                {renderStatusCircle(row.formulaCheck || 'pending')}
               </td>
               <td
                 style={{
@@ -683,7 +710,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
                   height: '40px',
                 }}
               >
-                {renderStatusCircle(row.packagingOrder)}
+                {renderStatusCircle(row.labelCheck || 'pending')}
               </td>
               <td
                 style={{
@@ -695,7 +722,19 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
                   height: '40px',
                 }}
               >
-                {renderStatusCircle(row.manOrder)}
+                {renderStatusCircle(row.sortProducts || 'pending')}
+              </td>
+              <td
+                style={{
+                  padding: '0.75rem 1rem',
+                  verticalAlign: 'middle',
+                  textAlign: 'center',
+                  backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
+                  borderTop: '1px solid #E5E7EB',
+                  height: '40px',
+                }}
+              >
+                {renderStatusCircle(row.sortFormulas || 'pending')}
               </td>
             </tr>
           ))}
@@ -892,10 +931,11 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, is
     { value: 'shipment', label: 'Shipment' },
     { value: 'marketplace', label: 'Marketplace' },
     { value: 'account', label: 'Account' },
-    { value: 'rawmat', label: 'Raw Materials' },
-    { value: 'labels', label: 'Labels' },
-    { value: 'packagingOrder', label: 'Packaging Order' },
-    { value: 'manOrder', label: 'Manufacturing Order' },
+    { value: 'addProducts', label: 'Add Products' },
+    { value: 'formulaCheck', label: 'Formula Check' },
+    { value: 'labelCheck', label: 'Label Check' },
+    { value: 'sortProducts', label: 'Sort Products' },
+    { value: 'sortFormulas', label: 'Sort Formulas' },
   ];
 
   const filterConditions = [

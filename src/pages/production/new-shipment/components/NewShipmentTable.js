@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 
-const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyChange }) => {
+const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyChange, onAddedRowsChange }) => {
   const { isDarkMode } = useTheme();
   const [selectedRows, setSelectedRows] = useState(new Set());
+  const [addedRows, setAddedRows] = useState(new Set());
   const selectAllCheckboxRef = useRef(null);
   const [clickedQtyIndex, setClickedQtyIndex] = useState(null);
   const [hoveredQtyIndex, setHoveredQtyIndex] = useState(null);
@@ -19,7 +20,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
     if (qtyValues) return null; // Use props if provided
     const initialValues = {};
     rows.forEach((row, index) => {
-      initialValues[index] = 0; // Default to 0
+      initialValues[index] = ''; // Default to empty
     });
     return initialValues;
   });
@@ -32,7 +33,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
     if (!qtyValues && !onQtyChange && internalQtyValues) {
       const newValues = {};
       rows.forEach((row, index) => {
-        newValues[index] = internalQtyValues[index] ?? 0; // Default to 0
+        newValues[index] = internalQtyValues[index] ?? ''; // Default to empty
       });
       setInternalQtyValues(newValues);
     }
@@ -197,6 +198,35 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
       newSelected.delete(rowId);
     }
     setSelectedRows(newSelected);
+  };
+
+  // Handle Add button click
+  const handleAddClick = (row, index) => {
+    const newAdded = new Set(addedRows);
+    
+    if (newAdded.has(row.id)) {
+      // Remove from added - clear qty
+      newAdded.delete(row.id);
+      effectiveSetQtyValues(prev => ({
+        ...prev,
+        [index]: ''
+      }));
+    } else {
+      // Add - don't auto-populate, let user type
+      newAdded.add(row.id);
+      // Only set if qtyValues[index] is undefined, otherwise keep existing value
+      if (effectiveQtyValues[index] === undefined || effectiveQtyValues[index] === null) {
+        effectiveSetQtyValues(prev => ({
+          ...prev,
+          [index]: ''
+        }));
+      }
+    }
+    setAddedRows(newAdded);
+    // Notify parent component of added rows change
+    if (onAddedRowsChange) {
+      onAddedRowsChange(newAdded);
+    }
   };
 
   const themeClasses = {
@@ -406,54 +436,81 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                       {row.size}
                     </td>
                     <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB', boxShadow: 'inset 4px 0 8px -4px rgba(0, 0, 0, 0.15)' }}>
-                      <button
-                        type="button"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '10px',
-                          width: '72px',
-                          height: '24px',
-                          borderRadius: '6px',
-                          border: 'none',
-                          backgroundColor: '#2563EB',
-                          color: '#FFFFFF',
-                          fontSize: '0.875rem',
-                          fontWeight: 500,
-                          fontFamily: 'sans-serif',
-                          cursor: 'pointer',
-                          padding: 0,
-                        }}
-                      >
-                        <span
+                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleAddClick(row, index)}
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            width: '9.33px',
-                            height: '9.33px',
+                            gap: addedRows.has(row.id) ? '0' : '10px',
+                            width: '80px',
+                            height: '24px',
+                            borderRadius: '9999px',
+                            border: 'none',
+                            backgroundColor: addedRows.has(row.id) ? '#10B981' : '#2563EB',
                             color: '#FFFFFF',
                             fontSize: '0.875rem',
-                            fontWeight: 600,
-                            lineHeight: 1,
+                            fontWeight: 500,
+                            fontFamily: 'sans-serif',
+                            cursor: 'pointer',
+                            padding: 0,
+                            transition: 'background-color 0.2s',
+                            position: 'relative',
                           }}
                         >
-                          +
-                        </span>
-                        <span>Add</span>
-                      </button>
+                          {!addedRows.has(row.id) && (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '9.33px',
+                                height: '9.33px',
+                                color: '#FFFFFF',
+                                fontSize: '0.875rem',
+                                fontWeight: 600,
+                                lineHeight: 1,
+                                flexShrink: 0,
+                              }}
+                            >
+                              +
+                            </span>
+                          )}
+                          <span style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>{addedRows.has(row.id) ? 'Added' : 'Add'}</span>
+                        </button>
+                      </div>
                     </td>
                     <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }}>
                       <input
                         type="number"
-                        value={row.qty}
-                        readOnly
+                        value={effectiveQtyValues[index] !== undefined && effectiveQtyValues[index] !== null && effectiveQtyValues[index] !== '' ? String(effectiveQtyValues[index]) : ''}
+                        onChange={(e) => {
+                          const inputValue = e.target.value;
+                          // Allow empty string while typing, or parse the number
+                          if (inputValue === '' || inputValue === '-') {
+                            effectiveSetQtyValues(prev => ({
+                              ...prev,
+                              [index]: ''
+                            }));
+                          } else {
+                            const numValue = parseInt(inputValue, 10);
+                            if (!isNaN(numValue) && numValue >= 0) {
+                              effectiveSetQtyValues(prev => ({
+                                ...prev,
+                                [index]: numValue
+                              }));
+                            }
+                          }
+                        }}
+                        placeholder="0"
                         className={`${themeClasses.cardBg} ${themeClasses.border} border rounded-md text-xs ${themeClasses.text}`}
                         style={{
                           padding: '0.25rem 0.5rem',
                           width: '90px',
                           textAlign: 'center',
+                          cursor: 'text',
                         }}
                       />
                     </td>

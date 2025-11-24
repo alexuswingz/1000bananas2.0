@@ -1,55 +1,109 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 
-const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, totalBoxes = 0 }) => {
+const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, totalBoxes = 0, onSave, onBookAndProceed }) => {
   const { isDarkMode } = useTheme();
-  const [expandedFormula, setExpandedFormula] = useState(null);
+  const [editableData, setEditableData] = useState({
+    shipmentName: '',
+    shipmentType: '',
+    amazonShipmentNumber: 'FBAXXXXXXXXX',
+    amazonRefId: 'XXXXXXXX',
+    shipping: 'UPS',
+    shipFrom: '',
+    shipTo: '',
+    carrier: '',
+  });
 
-  const themeClasses = {
-    cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
-    text: isDarkMode ? 'text-dark-text-primary' : 'text-gray-900',
-    textSecondary: isDarkMode ? 'text-dark-text-secondary' : 'text-gray-500',
-    border: isDarkMode ? 'border-dark-border-primary' : 'border-gray-200',
+  // Get Amazon Shipment # format based on shipment type
+  const getAmazonShipmentFormat = (type) => {
+    if (type === 'FBA' || type === 'Parcel') {
+      return 'FBAXXXXXXXXX';
+    } else if (type === 'AWD') {
+      return 'STAR-XXXXXXXXXXXXX';
+    }
+    return 'FBAXXXXXXXXX'; // Default
   };
+
+  // Update editable data when shipmentData changes
+  useEffect(() => {
+    if (shipmentData) {
+      const shipmentName = shipmentData.shipmentName || shipmentData.shipmentNumber || '2025.11.18';
+      const shipmentType = shipmentData.shipmentType || '';
+      const format = getAmazonShipmentFormat(shipmentType);
+      setEditableData({
+        shipmentName: `${shipmentName} ${shipmentType}`.trim(),
+        shipmentType: shipmentType || '',
+        amazonShipmentNumber: format,
+        amazonRefId: 'XXXXXXXX',
+        shipping: 'UPS',
+        shipFrom: '',
+        shipTo: '',
+        carrier: '',
+      });
+    }
+  }, [shipmentData]);
+
+  // Update Amazon Shipment # format when shipment type changes
+  useEffect(() => {
+    const format = getAmazonShipmentFormat(editableData.shipmentType);
+    if (editableData.amazonShipmentNumber !== format && editableData.shipmentType) {
+      setEditableData(prev => ({
+        ...prev,
+        amazonShipmentNumber: format,
+      }));
+    }
+  }, [editableData.shipmentType]);
 
   if (!isOpen) return null;
 
-  const formulas = [
-    {
-      name: 'F.Fabric Heavy',
-      productCount: '1 Product',
-      needed: '6.25 gal needed',
-      inventory: 'INV: 1.25/6.25',
-      status: 'insufficient',
-      message: 'Need to make 5 gal',
-    },
-    {
-      name: 'F.Ultra Bloom',
-      productCount: '5 Products',
-      needed: '225 gal needed',
-      inventory: 'INV: 300/225',
-      status: 'ready',
-      message: 'Ready',
-    },
-    {
-      name: 'F.Ultra Grow',
-      productCount: '3 Products',
-      needed: '225 gal needed',
-      inventory: 'INV: 300/225',
-      status: 'ready',
-      message: 'Ready',
-      products: [
-        { name: 'Cherry Tree Fertilizer', qty: '125 gal' },
-        { name: 'Apple Orchard Fertilizer', qty: '65 gal' },
-        { name: 'Peach Grove Fertilizer', qty: '35 gal' },
-      ],
-    },
-  ];
+  const handleSaveAndExit = () => {
+    if (onSave) {
+      // Parse shipment name back to separate name and type
+      const parts = editableData.shipmentName.split(' ');
+      const name = parts.slice(0, -1).join(' ') || parts[0];
+      const type = parts[parts.length - 1] || editableData.shipmentType;
+      
+      onSave({
+        shipmentName: name,
+        shipmentType: type || editableData.shipmentType,
+        marketplace: shipmentData?.marketplace || 'Amazon',
+        account: shipmentData?.account || 'TPS Nutrients',
+        amazonShipmentNumber: editableData.amazonShipmentNumber,
+        amazonRefId: editableData.amazonRefId,
+        shipping: editableData.shipping,
+        shipFrom: editableData.shipFrom,
+        shipTo: editableData.shipTo,
+        carrier: editableData.carrier,
+      });
+    }
+    onClose();
+  };
 
-  const labels = [
-    { name: 'Carpet Cleaner for Pets (16oz)', qty: '0/50', status: 'insufficient' },
-    { name: 'Petunia Fertilizer (1 Gallon)', qty: '110/100', status: 'ready' },
-  ];
+  const handleBookAndProceed = () => {
+    if (onSave) {
+      // Parse shipment name back to separate name and type
+      const parts = editableData.shipmentName.split(' ');
+      const name = parts.slice(0, -1).join(' ') || parts[0];
+      const type = parts[parts.length - 1] || editableData.shipmentType;
+      
+      onSave({
+        shipmentName: name,
+        shipmentType: type || editableData.shipmentType,
+        marketplace: shipmentData?.marketplace || 'Amazon',
+        account: shipmentData?.account || 'TPS Nutrients',
+        amazonShipmentNumber: editableData.amazonShipmentNumber,
+        amazonRefId: editableData.amazonRefId,
+        shipping: editableData.shipping,
+        shipFrom: editableData.shipFrom,
+        shipTo: editableData.shipTo,
+        carrier: editableData.carrier,
+      });
+    }
+    onClose();
+    if (onBookAndProceed) {
+      onBookAndProceed();
+    }
+  };
 
   return (
     <>
@@ -57,328 +111,492 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
       <div
         style={{
           position: 'fixed',
-          inset: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          zIndex: 50,
-        }}
-        onClick={onClose}
-      />
-      {/* Modal - slides from right */}
-      <div
-        style={{
-          position: 'fixed',
           top: 0,
+          left: 0,
           right: 0,
           bottom: 0,
-          width: '600px',
-          maxWidth: '90vw',
-          backgroundColor: isDarkMode ? '#0F172A' : '#F9FAFB',
-          zIndex: 51,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          zIndex: 9998,
           display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '-4px 0 24px rgba(0, 0, 0, 0.3)',
-          transform: 'translateX(0)',
-          transition: 'transform 0.3s ease-out',
+          alignItems: 'center',
+          justifyContent: 'center',
         }}
+        onClick={onClose}
       >
-        {/* Header */}
+        {/* Modal */}
         <div
           style={{
-            padding: '1.5rem',
-            borderBottom: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`,
+            backgroundColor: '#FFFFFF',
+            borderRadius: '12px',
+            width: '600px',
+            height: 'auto',
+            border: '1px solid #E5E7EB',
             display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
+            flexDirection: 'column',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            zIndex: 9999,
+            position: 'relative',
+            maxHeight: '90vh',
+            overflow: 'hidden',
           }}
+          onClick={(e) => e.stopPropagation()}
         >
-          <h2 className={themeClasses.text} style={{ fontSize: '1.25rem', fontWeight: 600, margin: 0 }}>
-            Shipment Details
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
+          {/* Header */}
+          <div
             style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '9999px',
-              border: 'none',
-              backgroundColor: 'transparent',
+              padding: '24px',
+              borderBottom: '1px solid #E5E7EB',
               display: 'flex',
+              justifyContent: 'space-between',
               alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              color: isDarkMode ? '#9CA3AF' : '#6B7280',
             }}
           >
-            <span style={{ fontSize: '1.5rem', lineHeight: 1 }}>×</span>
-          </button>
-        </div>
-
-        {/* Content - scrollable */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '1.5rem',
-            scrollbarWidth: 'none',
-            msOverflowStyle: 'none',
-          }}
-          className="hide-scrollbar"
-        >
-          {/* Formula Requirements */}
-          <div style={{ marginBottom: '1.5rem' }}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '1rem',
-              }}
-            >
-              <h3 className={themeClasses.text} style={{ fontSize: '1rem', fontWeight: 600, margin: 0 }}>
-                Formula Requirements
-              </h3>
-              <span
-                style={{
-                  fontSize: '0.75rem',
-                  color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                }}
-              >
-                3 Formulas
-              </span>
-            </div>
-
-            {formulas.map((formula, idx) => (
-              <div
-                key={idx}
-                className={themeClasses.cardBg}
-                style={{
-                  borderRadius: '0.75rem',
-                  border: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`,
-                  padding: '1rem',
-                  marginBottom: '0.75rem',
-                }}
-              >
-                {/* Top row: Formula name (left) and "X gal needed" with dropdown (right) */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                  <div className={themeClasses.text} style={{ fontSize: '0.9rem', fontWeight: 600 }}>
-                    {formula.name} <span style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: 400 }}>({formula.productCount})</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <span style={{ fontSize: '0.875rem', fontWeight: 600, color: isDarkMode ? '#E5E7EB' : '#111827' }}>
-                      {formula.needed}
-                    </span>
-                    {formula.products && (
-                      <button
-                        type="button"
-                        onClick={() => setExpandedFormula(expandedFormula === idx ? null : idx)}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                          cursor: 'pointer',
-                          fontSize: '0.75rem',
-                          padding: 0,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        {expandedFormula === idx ? '▲' : '▼'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Progress bar */}
-                <div
-                  style={{
-                    height: '8px',
-                    borderRadius: '4px',
-                    backgroundColor: isDarkMode ? '#1F2937' : '#FEE2E2',
-                    overflow: 'hidden',
-                    marginBottom: '0.75rem',
-                    width: '100%',
-                  }}
-                >
-                  <div
-                    style={{
-                      height: '100%',
-                      width: formula.status === 'insufficient' ? '20%' : '100%',
-                      backgroundColor: formula.status === 'insufficient' ? '#DC2626' : '#22C55E',
-                    }}
-                  />
-                </div>
-
-                {/* Bottom row: Status message (left) and Inventory (right) */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div
-                    style={{
-                      fontSize: '0.75rem',
-                      color: formula.status === 'insufficient' ? '#DC2626' : '#22C55E',
-                      fontWeight: 500,
-                    }}
-                  >
-                    {formula.message}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: '0.75rem',
-                      color: formula.status === 'insufficient' ? '#DC2626' : '#22C55E',
-                      fontWeight: 500,
-                    }}
-                  >
-                    {formula.inventory}
-                  </div>
-                </div>
-
-                {/* Expanded products list */}
-                {expandedFormula === idx && formula.products && (
-                  <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}` }}>
-                    {formula.products.map((product, pIdx) => (
-                      <div
-                        key={pIdx}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          padding: '0.5rem 0',
-                          fontSize: '0.75rem',
-                        }}
-                        className={themeClasses.text}
-                      >
-                        <span>{product.name}</span>
-                        <span style={{ fontWeight: 600 }}>{product.qty}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Label Requirements */}
-          <div>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '1rem',
-              }}
-            >
-              <h3 className={themeClasses.text} style={{ fontSize: '1rem', fontWeight: 600, margin: 0 }}>
-                Label Requirements
-              </h3>
-              <span
-                style={{
-                  fontSize: '0.75rem',
-                  color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                }}
-              >
-                3 Labels
-              </span>
-            </div>
-
-            {labels.map((label, idx) => (
-              <div
-                key={idx}
-                className={themeClasses.cardBg}
-                style={{
-                  borderRadius: '0.75rem',
-                  border: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`,
-                  padding: '1rem',
-                  marginBottom: '0.75rem',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <div className={themeClasses.text} style={{ fontSize: '0.9rem' }}>
-                  {label.name}
-                </div>
-                <div
-                  style={{
-                    fontSize: '0.9rem',
-                    fontWeight: 600,
-                    color: label.status === 'insufficient' ? '#DC2626' : '#22C55E',
-                  }}
-                >
-                  {label.qty}
-                </div>
-              </div>
-            ))}
-
+            <h2 style={{
+              fontSize: '20px',
+              fontWeight: 600,
+              color: '#111827',
+              margin: 0,
+            }}>
+              Shipment Details
+            </h2>
             <button
               type="button"
+              onClick={onClose}
               style={{
-                width: '100%',
-                padding: '0.75rem',
-                borderRadius: '0.5rem',
-                border: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`,
-                backgroundColor: 'transparent',
-                color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                fontSize: '0.875rem',
+                background: 'transparent',
+                border: 'none',
                 cursor: 'pointer',
-                marginTop: '0.5rem',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#6B7280',
               }}
             >
-              View all Labels (1) ▼
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           </div>
-        </div>
 
-        {/* Footer */}
-        <div
-          style={{
-            padding: '1.5rem',
-            borderTop: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`,
-            display: 'flex',
-            gap: '1rem',
-          }}
-        >
-          <button
-            type="button"
-            onClick={onClose}
+          {/* Content - scrollable */}
+          <div
             style={{
               flex: 1,
-              padding: '0.75rem',
-              borderRadius: '0.5rem',
-              border: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`,
-              backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-              color: isDarkMode ? '#E5E7EB' : '#111827',
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem',
+              overflowY: 'auto',
+              padding: '24px',
+              scrollbarWidth: 'thin',
             }}
           >
-            <span>✏️</span>
-            Edit Shipment
-          </button>
-          <button
-            type="button"
+            {/* Editable Shipment Details */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
+              {/* Shipment Name */}
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    color: '#374151',
+                    marginBottom: '8px',
+                  }}
+                >
+                  Shipment Name
+                </label>
+                <input
+                  type="text"
+                  value={editableData.shipmentName}
+                  onChange={(e) => setEditableData({ ...editableData, shipmentName: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #D1D5DB',
+                    backgroundColor: '#FFFFFF',
+                    color: '#111827',
+                    fontSize: '14px',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#3B82F6';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#D1D5DB';
+                  }}
+                />
+              </div>
+
+              {/* Shipment Type */}
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    color: '#374151',
+                    marginBottom: '8px',
+                  }}
+                >
+                  Shipment Type<span style={{ color: '#EF4444', marginLeft: '4px' }}>*</span>
+                </label>
+                <select
+                  value={editableData.shipmentType}
+                  onChange={(e) => setEditableData({ ...editableData, shipmentType: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #D1D5DB',
+                    backgroundColor: '#FFFFFF',
+                    color: editableData.shipmentType ? '#111827' : '#9CA3AF',
+                    fontSize: '14px',
+                    outline: 'none',
+                    cursor: 'pointer',
+                    boxSizing: 'border-box',
+                    appearance: 'none',
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%23374151' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 12px center',
+                    paddingRight: '36px',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#3B82F6';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#D1D5DB';
+                  }}
+                >
+                  <option value="">Select Shipment Type</option>
+                  <option value="FBA">FBA</option>
+                  <option value="AWD">AWD</option>
+                  <option value="Parcel">Parcel</option>
+                  <option value="Production Order">Production Order</option>
+                </select>
+              </div>
+
+              {/* Amazon Shipment # */}
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    color: '#374151',
+                    marginBottom: '8px',
+                  }}
+                >
+                  Amazon Shipment #<span style={{ color: '#EF4444', marginLeft: '4px' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  value={editableData.amazonShipmentNumber}
+                  onChange={(e) => setEditableData({ ...editableData, amazonShipmentNumber: e.target.value })}
+                  placeholder={getAmazonShipmentFormat(editableData.shipmentType)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #D1D5DB',
+                    backgroundColor: '#FFFFFF',
+                    color: '#111827',
+                    fontSize: '14px',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#3B82F6';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#D1D5DB';
+                  }}
+                />
+              </div>
+
+              {/* Amazon Ref ID */}
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    color: '#374151',
+                    marginBottom: '8px',
+                  }}
+                >
+                  Amazon Ref ID<span style={{ color: '#EF4444', marginLeft: '4px' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  value={editableData.amazonRefId}
+                  onChange={(e) => setEditableData({ ...editableData, amazonRefId: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #D1D5DB',
+                    backgroundColor: '#FFFFFF',
+                    color: '#111827',
+                    fontSize: '14px',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#3B82F6';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#D1D5DB';
+                  }}
+                />
+              </div>
+
+              {/* Shipping - Full Width */}
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    color: '#374151',
+                    marginBottom: '8px',
+                  }}
+                >
+                  Shipping
+                </label>
+                <select
+                  value={editableData.shipping}
+                  onChange={(e) => setEditableData({ ...editableData, shipping: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #D1D5DB',
+                    backgroundColor: '#FFFFFF',
+                    color: '#111827',
+                    fontSize: '14px',
+                    outline: 'none',
+                    cursor: 'pointer',
+                    boxSizing: 'border-box',
+                    appearance: 'none',
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%23374151' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 12px center',
+                    paddingRight: '36px',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#3B82F6';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#D1D5DB';
+                  }}
+                >
+                  <option value="UPS">UPS</option>
+                  <option value="FedEx">FedEx</option>
+                  <option value="DHL">DHL</option>
+                  <option value="USPS">USPS</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              {/* Ship From - Full Width */}
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    color: '#374151',
+                    marginBottom: '8px',
+                  }}
+                >
+                  Ship From
+                </label>
+                <input
+                  type="text"
+                  value={editableData.shipFrom}
+                  onChange={(e) => setEditableData({ ...editableData, shipFrom: e.target.value })}
+                  placeholder="Enter Shipment Location"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #D1D5DB',
+                    backgroundColor: '#FFFFFF',
+                    color: '#111827',
+                    fontSize: '14px',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#3B82F6';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#D1D5DB';
+                  }}
+                />
+              </div>
+
+              {/* Ship To - Full Width */}
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    color: '#374151',
+                    marginBottom: '8px',
+                  }}
+                >
+                  Ship To
+                </label>
+                <input
+                  type="text"
+                  value={editableData.shipTo}
+                  onChange={(e) => setEditableData({ ...editableData, shipTo: e.target.value })}
+                  placeholder="Enter Shipment Destination"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #D1D5DB',
+                    backgroundColor: '#FFFFFF',
+                    color: '#111827',
+                    fontSize: '14px',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#3B82F6';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#D1D5DB';
+                  }}
+                />
+              </div>
+
+              {/* Carrier - Full Width */}
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    color: '#374151',
+                    marginBottom: '8px',
+                  }}
+                >
+                  Carrier
+                </label>
+                <input
+                  type="text"
+                  value={editableData.carrier}
+                  onChange={(e) => setEditableData({ ...editableData, carrier: e.target.value })}
+                  placeholder="Enter Carrier"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #D1D5DB',
+                    backgroundColor: '#FFFFFF',
+                    color: '#111827',
+                    fontSize: '14px',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#3B82F6';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#D1D5DB';
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div
             style={{
-              flex: 1,
-              padding: '0.75rem',
-              borderRadius: '0.5rem',
-              border: 'none',
-              backgroundColor: '#2563EB',
-              color: '#FFFFFF',
-              fontSize: '0.875rem',
-              fontWeight: 500,
-              cursor: 'pointer',
+              padding: '24px',
+              borderTop: '1px solid #E5E7EB',
               display: 'flex',
+              justifyContent: 'space-between',
               alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem',
+              gap: '12px',
             }}
           >
-            <span>✓</span>
-            Book Shipment
-          </button>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                padding: '10px 24px',
+                borderRadius: '8px',
+                border: '1px solid #D1D5DB',
+                backgroundColor: '#FFFFFF',
+                color: '#374151',
+                fontSize: '14px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#F9FAFB';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#FFFFFF';
+              }}
+            >
+              Cancel
+            </button>
+            <div style={{ display: 'flex', gap: '12px', marginLeft: 'auto' }}>
+              <button
+                type="button"
+                onClick={handleSaveAndExit}
+                style={{
+                  padding: '10px 24px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  color: '#3B82F6',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                Save and Exit
+              </button>
+              <button
+                type="button"
+                onClick={handleBookAndProceed}
+                style={{
+                  padding: '10px 24px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: '#3B82F6',
+                  color: '#FFFFFF',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#2563EB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#3B82F6';
+                }}
+              >
+                Book and Proceed
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </>
@@ -386,4 +604,3 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
 };
 
 export default ShipmentDetailsModal;
-
