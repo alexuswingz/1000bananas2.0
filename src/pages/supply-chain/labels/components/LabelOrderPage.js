@@ -27,6 +27,8 @@ const LabelOrderPage = () => {
   const [tableMode, setTableMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showExportModal, setShowExportModal] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const [editingRowId, setEditingRowId] = useState(null);
   
   // Edit and change tracking state
   const [originalOrder, setOriginalOrder] = useState(null); // Store original order for comparison
@@ -94,6 +96,20 @@ const LabelOrderPage = () => {
       }
     }
   }, [isViewMode, orderId, orderNumber, state.lines]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (openMenuId !== null) {
+        setOpenMenuId(null);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [openMenuId]);
 
   // Detect changes between original and current order
   const detectChanges = useMemo(() => {
@@ -216,6 +232,19 @@ const LabelOrderPage = () => {
         line.id === id ? { ...line, qty: numQty } : line
       )
     );
+  };
+
+  const handleEditRow = (id) => {
+    setEditingRowId(id);
+    setOpenMenuId(null);
+  };
+
+  const handleDoneEditing = (id) => {
+    setEditingRowId(null);
+  };
+
+  const handleToggleMenu = (id) => {
+    setOpenMenuId(openMenuId === id ? null : id);
   };
 
   const handleCompleteOrder = () => {
@@ -505,224 +534,250 @@ const LabelOrderPage = () => {
   };
 
   return (
-    <div className={`min-h-screen p-8 ${themeClasses.pageBg}`} style={{ paddingBottom: '100px' }}>
-      {/* Header row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '1rem 2rem' }}>
-        {/* Left side - Back button and Order Info */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <button
-            type="button"
-            onClick={handleBack}
-            style={{
-              width: '48px',
-              height: '48px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: isDarkMode ? '#374151' : '#F3F4F6',
-              borderRadius: '12px',
-              border: 'none',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = isDarkMode ? '#4B5563' : '#E5E7EB';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
-            }}
-          >
-            <svg 
-              style={{ width: '28px', height: '28px' }} 
-              className={isDarkMode ? 'text-dark-text-primary' : 'text-gray-900'} 
-              fill="none" 
-              stroke="currentColor" 
-              viewBox="0 0 24 24"
+    <div className={`min-h-screen ${themeClasses.pageBg}`} style={{ paddingBottom: '100px' }}>
+      {/* Header Section */}
+      <div style={{ 
+        backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+        padding: '16px 24px',
+        borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+      }}>
+        {/* Top Row - Back button and Order Info */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          {/* Left side - Back button and Order Info */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+            <button
+              type="button"
+              onClick={handleBack}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                border: isDarkMode ? '1px solid #4B5563' : '1px solid #E5E7EB',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                padding: '8px 16px',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = isDarkMode ? '#4B5563' : '#F9FAFB';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#FFFFFF';
+              }}
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-          </button>
+              <svg 
+                style={{ width: '16px', height: '16px' }} 
+                className={isDarkMode ? 'text-white' : 'text-gray-900'}
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              <span style={{ 
+                fontSize: '14px', 
+                fontWeight: 400,
+                color: isDarkMode ? '#FFFFFF' : '#000000',
+              }}>
+                Back
+              </span>
+            </button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              <div className={`uppercase tracking-wide text-[10px] ${isDarkMode ? 'text-dark-text-secondary' : 'text-gray-400'}`}>
-                LABEL ORDER #
+            <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ 
+                  fontSize: '10px', 
+                  fontWeight: 400,
+                  letterSpacing: '0.05em',
+                  color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                }}>
+                  LABEL ORDER #
+                </div>
+                <div style={{ 
+                  fontSize: '16px', 
+                  fontWeight: 400,
+                  color: isDarkMode ? '#FFFFFF' : '#000000',
+                }}>
+                  {orderNumber}
+                </div>
               </div>
-              <div className={`text-sm font-semibold ${isDarkMode ? 'text-dark-text-primary' : 'text-gray-900'}`}>
-                {orderNumber}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ 
+                  fontSize: '10px', 
+                  fontWeight: 400,
+                  letterSpacing: '0.05em',
+                  color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                }}>
+                  SUPPLIER
+                </div>
+                <div style={{ 
+                  fontSize: '16px', 
+                  fontWeight: 400,
+                  color: isDarkMode ? '#FFFFFF' : '#000000',
+                }}>
+                  {supplier.name}
+                </div>
               </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              <div className={`uppercase tracking-wide text-[10px] ${isDarkMode ? 'text-dark-text-secondary' : 'text-gray-400'}`}>
-                SUPPLIER
-              </div>
-              <div className={`text-sm font-semibold ${isDarkMode ? 'text-dark-text-primary' : 'text-gray-900'}`}>
-                {supplier.name}
-              </div>
+          </div>
+
+          {/* Right side - Table Mode Toggle and Settings */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {/* Table Mode Toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ 
+                fontSize: '14px', 
+                fontWeight: 500, 
+                color: isDarkMode ? '#FFFFFF' : '#000000',
+              }}>
+                Table Mode
+              </span>
+              <button
+                type="button"
+                onClick={() => setTableMode(!tableMode)}
+                style={{
+                  width: '48px',
+                  height: '28px',
+                  borderRadius: '14px',
+                  backgroundColor: tableMode ? '#007AFF' : (isDarkMode ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.1)'),
+                  border: 'none',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  transition: 'background-color 0.2s',
+                  padding: 0,
+                }}
+                aria-label="Toggle Table Mode"
+              >
+                <div
+                  style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    backgroundColor: '#FFFFFF',
+                    position: 'absolute',
+                    top: '2px',
+                    left: tableMode ? '22px' : '2px',
+                    transition: 'left 0.2s',
+                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+                  }}
+                />
+              </button>
             </div>
+
+            {/* Settings Button */}
+            <button
+              type="button"
+              style={{
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+              aria-label="Settings"
+            >
+              <svg 
+                style={{ width: '20px', height: '20px' }} 
+                className={isDarkMode ? 'text-white' : 'text-gray-900'}
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
           </div>
         </div>
 
-        {/* Right side - Settings */}
-        <button
-          type="button"
-          style={{
-            width: '48px',
-            height: '48px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: isDarkMode ? '#374151' : '#F3F4F6',
-            borderRadius: '12px',
-            border: 'none',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = isDarkMode ? '#4B5563' : '#E5E7EB';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
-          }}
-          aria-label="Settings"
-        >
-          <svg 
-            style={{ width: '20px', height: '20px' }} 
-            className={isDarkMode ? 'text-dark-text-primary' : 'text-gray-900'} 
-            fill="none" 
-            stroke="currentColor" 
-            viewBox="0 0 24 24"
+        {/* Navigation Tabs */}
+        <div style={{ 
+          display: 'flex', 
+          gap: '0px',
+          borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+        }}>
+          <button
+            type="button"
+            onClick={() => setActiveTab('addProducts')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '12px 16px',
+              fontSize: '14px',
+              fontWeight: 500,
+              color: activeTab === 'addProducts' ? '#007AFF' : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+              backgroundColor: activeTab === 'addProducts' ? (isDarkMode ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.05)') : 'transparent',
+              border: 'none',
+              borderBottom: activeTab === 'addProducts' ? '2px solid #007AFF' : '2px solid transparent',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap',
+            }}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Separator */}
-      <div className="border-t border-gray-200 mx-6"></div>
-
-      {/* Navigation Tabs */}
-      <div className={`${themeClasses.cardBg} border-b ${themeClasses.border}`}>
-        <div className="flex items-center justify-between px-6">
-          <div className="flex items-center gap-0">
-            <button
-              type="button"
-              onClick={() => setActiveTab('addProducts')}
-              className="flex items-center gap-2 px-4 py-3 font-medium text-sm transition-all whitespace-nowrap"
-              style={{
-                color: activeTab === 'addProducts' ? '#3B82F6' : '#9CA3AF',
-                backgroundColor: activeTab === 'addProducts' ? '#EFF6FF' : 'transparent',
-                borderBottom: activeTab === 'addProducts' ? '2px solid #3B82F6' : 'none',
-              }}
-            >
-              {/* Green circle for completed steps */}
-              {isTabCompleted('addProducts') && (
-                <div
-                  style={{
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    backgroundColor: '#10B981',
-                    flexShrink: 0,
-                  }}
-                />
-              )}
-              {/* White circle with outline for active step */}
-              {activeTab === 'addProducts' && (
-                <div
-                  style={{
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid #6B7280',
-                    flexShrink: 0,
-                  }}
-                />
-              )}
-              <span>Add Products</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('submitPO')}
-              className="flex items-center gap-2 px-4 py-3 font-medium text-sm transition-all whitespace-nowrap"
-              style={{
-                color: activeTab === 'submitPO' ? '#3B82F6' : '#9CA3AF',
-                backgroundColor: activeTab === 'submitPO' ? '#EFF6FF' : 'transparent',
-                borderBottom: activeTab === 'submitPO' ? '2px solid #3B82F6' : 'none',
-              }}
-            >
-              {/* Green circle for completed steps */}
-              {isTabCompleted('submitPO') && (
-                <div
-                  style={{
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    backgroundColor: '#10B981',
-                    flexShrink: 0,
-                  }}
-                />
-              )}
-              {/* White circle with outline for active step */}
-              {activeTab === 'submitPO' && (
-                <div
-                  style={{
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid #6B7280',
-                    flexShrink: 0,
-                  }}
-                />
-              )}
-              <span>Submit PO</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('receivePO')}
-              className="flex items-center gap-2 px-4 py-3 font-medium text-sm transition-all whitespace-nowrap"
-              style={{
-                color: activeTab === 'receivePO' ? '#3B82F6' : '#9CA3AF',
-                backgroundColor: activeTab === 'receivePO' ? '#EFF6FF' : 'transparent',
-                borderBottom: activeTab === 'receivePO' ? '2px solid #3B82F6' : 'none',
-              }}
-            >
-              {/* Green circle for completed steps */}
-              {isTabCompleted('receivePO') && (
-                <div
-                  style={{
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    backgroundColor: '#10B981',
-                    flexShrink: 0,
-                  }}
-                />
-              )}
-              {/* White circle with outline for active step */}
-              {activeTab === 'receivePO' && (
-                <div
-                  style={{
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid #6B7280',
-                    flexShrink: 0,
-                  }}
-                />
-              )}
-              <span>Receive PO</span>
-            </button>
-          </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"/>
+            </svg>
+            <span>Add Products</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('submitPO')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '12px 16px',
+              fontSize: '14px',
+              fontWeight: 500,
+              color: activeTab === 'submitPO' ? '#007AFF' : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+              backgroundColor: activeTab === 'submitPO' ? (isDarkMode ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.05)') : 'transparent',
+              border: 'none',
+              borderBottom: activeTab === 'submitPO' ? '2px solid #007AFF' : '2px solid transparent',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"/>
+            </svg>
+            <span>Submit PO</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('receivePO')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '12px 16px',
+              fontSize: '14px',
+              fontWeight: 500,
+              color: activeTab === 'receivePO' ? '#007AFF' : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+              backgroundColor: activeTab === 'receivePO' ? (isDarkMode ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.05)') : 'transparent',
+              border: 'none',
+              borderBottom: activeTab === 'receivePO' ? '2px solid #007AFF' : '2px solid transparent',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"/>
+            </svg>
+            <span>Receive PO</span>
+          </button>
         </div>
       </div>
 
       {/* Search bar - above table */}
-      <div className="px-6 py-3 flex justify-end" style={{ marginTop: '16px' }}>
+      <div className="px-6 py-4 flex justify-end" style={{ marginTop: '0' }}>
         <div className="relative" style={{ maxWidth: '300px', width: '100%' }}>
           <input
             type="text"
@@ -730,6 +785,11 @@ const LabelOrderPage = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            style={{
+              backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+              color: isDarkMode ? '#F9FAFB' : '#000000',
+              borderColor: isDarkMode ? '#4B5563' : '#D1D5DB',
+            }}
           />
           <svg
             className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
@@ -748,7 +808,7 @@ const LabelOrderPage = () => {
       </div>
 
       {/* Table */}
-      <div className={`${themeClasses.cardBg} rounded-xl border ${themeClasses.border} shadow-lg`} style={{ marginTop: '16px' }}>
+      <div className={`${themeClasses.cardBg} rounded-xl border ${themeClasses.border} shadow-lg mx-6`} style={{ marginTop: '0' }}>
         <div className="overflow-x-auto">
           <table
             style={{
@@ -864,6 +924,7 @@ const LabelOrderPage = () => {
                   minWidth: 400,
                 }}
               >
+                {!isViewMode && (
                 <div className="absolute inset-0" style={{ height: '40px', maxHeight: '40px' }}>
                   {/* Today label (top left) */}
                   <div className="absolute" style={{ left: '24px', top: '2px' }}>
@@ -936,19 +997,33 @@ const LabelOrderPage = () => {
                     <div className="w-2.5 h-2.5 rounded-full bg-white"></div>
                   </div>
                 </div>
+                )}
+              </th>
+              <th
+                className="text-xs font-bold text-white uppercase tracking-wider"
+                style={{
+                  padding: '0 1rem',
+                  height: '40px',
+                  maxHeight: '40px',
+                  lineHeight: '40px',
+                  boxSizing: 'border-box',
+                  textAlign: 'center',
+                  width: 60,
+                }}
+              >
               </th>
             </tr>
           </thead>
           <tbody>
             {filteredLines.length === 0 ? (
               <tr>
-                <td colSpan="7" className="px-6 py-6 text-center text-sm italic text-gray-400">
+                <td colSpan="8" className="px-6 py-6 text-center text-sm italic text-gray-400">
                   No items available.
                 </td>
               </tr>
             ) : (
               filteredLines.slice(0, 3).map((line, index) => {
-                const timelineData = getTimelineData(line.inventory, line.toOrder);
+                const timelineData = !isViewMode ? getTimelineData(line.inventory, line.toOrder) : null;
                 const displayedRows = filteredLines.slice(0, 3);
                 
                 return (
@@ -1070,17 +1145,18 @@ const LabelOrderPage = () => {
                           display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          backgroundColor: '#ffffff',
-                          border: '1px solid #E5E7EB',
+                          backgroundColor: editingRowId === line.id ? '#FFFBEB' : '#ffffff',
+                          border: editingRowId === line.id ? '2px solid #F59E0B' : '1px solid #E5E7EB',
                           borderRadius: '8px',
-                          paddingTop: '4px',
+                          paddingTop: editingRowId === line.id ? '3px' : '4px',
                           paddingRight: '6px',
-                          paddingBottom: '4px',
+                          paddingBottom: editingRowId === line.id ? '3px' : '4px',
                           paddingLeft: '6px',
-                          boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                          boxShadow: editingRowId === line.id ? '0 0 0 3px rgba(245, 158, 11, 0.1)' : '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
                           width: '107px',
                           height: '24px',
                           boxSizing: 'border-box',
+                          transition: 'all 0.2s',
                         }}
                       >
                         <input
@@ -1091,10 +1167,11 @@ const LabelOrderPage = () => {
                             const value = parseInt(e.target.value) || 0;
                             handleQtyChange(line.id, value);
                           }}
+                          readOnly={!editingRowId || editingRowId !== line.id}
                           style={{ 
-                            color: '#000000', 
+                            color: editingRowId === line.id ? '#92400E' : '#000000', 
                             fontSize: '14px', 
-                            fontWeight: 400,
+                            fontWeight: editingRowId === line.id ? 500 : 400,
                             fontFamily: 'system-ui, -apple-system, sans-serif',
                             border: 'none',
                             background: 'transparent',
@@ -1104,6 +1181,7 @@ const LabelOrderPage = () => {
                             padding: 0,
                             margin: 0,
                             MozAppearance: 'textfield',
+                            cursor: editingRowId === line.id ? 'text' : 'default',
                           }}
                           className="[&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           min="0"
@@ -1113,6 +1191,7 @@ const LabelOrderPage = () => {
 
                     {/* Timeline */}
                     <td style={{ padding: '0.65rem 1rem', minWidth: '380px', height: '40px', maxHeight: '40px', minHeight: '40px', verticalAlign: 'middle', lineHeight: '1', boxSizing: 'border-box' }}>
+                      {!isViewMode && (
                       <div
                         style={{
                           width: '86%',
@@ -1171,6 +1250,140 @@ const LabelOrderPage = () => {
                           </div>
                         </div>
                       </div>
+                      )}
+                    </td>
+
+                    {/* Three Dots Menu / Done Button */}
+                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', maxHeight: '40px', minHeight: '40px', verticalAlign: 'middle', lineHeight: '1', boxSizing: 'border-box', position: 'relative', width: '60px' }}>
+                      {editingRowId === line.id ? (
+                        // Done Button
+                        <div style={{ display: 'inline-block', width: '55px', height: '23px' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleDoneEditing(line.id)}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              padding: 0,
+                              margin: 0,
+                              backgroundColor: '#10B981',
+                              color: '#FFFFFF',
+                              border: 'none',
+                              borderRadius: 6,
+                              cursor: 'pointer',
+                              fontSize: 12,
+                              fontWeight: 500,
+                              fontFamily: 'system-ui, -apple-system, sans-serif',
+                              transition: 'background-color 0.2s',
+                              lineHeight: '23px',
+                              textAlign: 'center',
+                              boxSizing: 'border-box',
+                              overflow: 'hidden',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#059669';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = '#10B981';
+                            }}
+                          >
+                            Done
+                          </button>
+                        </div>
+                      ) : (
+                        // Three Dots Menu
+                        <div style={{ position: 'relative', display: 'inline-block', width: '32px', height: '32px' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleMenu(line.id)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '100%',
+                              height: '100%',
+                              backgroundColor: openMenuId === line.id ? (isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)') : 'transparent',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              transition: 'background-color 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                              if (openMenuId !== line.id) {
+                                e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (openMenuId !== line.id) {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                              }
+                            }}
+                          >
+                            <svg 
+                              width="16" 
+                              height="16" 
+                              viewBox="0 0 16 16" 
+                              fill="none"
+                              style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280' }}
+                            >
+                              <circle cx="8" cy="3" r="1.5" fill="currentColor"/>
+                              <circle cx="8" cy="8" r="1.5" fill="currentColor"/>
+                              <circle cx="8" cy="13" r="1.5" fill="currentColor"/>
+                            </svg>
+                          </button>
+
+                          {/* Dropdown Menu */}
+                          {openMenuId === line.id && (
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              onMouseDown={(e) => e.stopPropagation()}
+                              style={{
+                                position: 'absolute',
+                                right: 0,
+                                top: '40px',
+                                backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                                border: isDarkMode ? '1px solid #4B5563' : '1px solid #E5E7EB',
+                                borderRadius: '8px',
+                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                                zIndex: 50,
+                                minWidth: '120px',
+                              }}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => handleEditRow(line.id)}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  width: '100%',
+                                  padding: '10px 16px',
+                                  backgroundColor: 'transparent',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  fontSize: '14px',
+                                  color: isDarkMode ? '#F9FAFB' : '#111827',
+                                  textAlign: 'left',
+                                  transition: 'background-color 0.2s',
+                                  borderRadius: '8px',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = isDarkMode ? '#4B5563' : '#F3F4F6';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                </svg>
+                                <span>Edit</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );
@@ -1182,6 +1395,7 @@ const LabelOrderPage = () => {
       </div>
 
       {/* Legend */}
+      {!isViewMode && (
       <div className="px-6 py-2 flex items-center gap-4 text-xs text-gray-600">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded" style={{ backgroundColor: '#10B981' }} />
@@ -1192,32 +1406,75 @@ const LabelOrderPage = () => {
           <span># to Order</span>
         </div>
       </div>
+      )}
 
       {/* Footer - Sticky */}
       <div 
-        className="fixed bottom-0 left-64 right-0 flex items-center justify-between bg-white border-t border-b border-gray-200 z-50"
+        className="fixed bottom-0 left-64 right-0 flex items-center justify-between z-50"
         style={{ 
           padding: '16px 24px',
+          backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+          borderTop: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+          borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
         }}
       >
         <div className="flex items-center gap-8">
           <div className="flex flex-col">
-            <span className="text-gray-600 font-medium text-xs uppercase tracking-wide">PRODUCTS</span>
-            <span className="text-gray-900 font-bold text-xl mt-1" style={{ color: '#1e293b' }}>{summary.products}</span>
+            <span 
+              className="font-medium text-xs uppercase tracking-wide"
+              style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280' }}
+            >
+              PRODUCTS
+            </span>
+            <span 
+              className="font-bold text-xl mt-1" 
+              style={{ color: isDarkMode ? '#F9FAFB' : '#1e293b' }}
+            >
+              {summary.products}
+            </span>
           </div>
           <div className="flex flex-col">
-            <span className="text-gray-600 font-medium text-xs uppercase tracking-wide">TOTAL LABELS</span>
-            <span className="text-gray-900 font-bold text-xl mt-1" style={{ color: '#1e293b' }}>{summary.totalLabels.toLocaleString()}</span>
+            <span 
+              className="font-medium text-xs uppercase tracking-wide"
+              style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280' }}
+            >
+              TOTAL LABELS
+            </span>
+            <span 
+              className="font-bold text-xl mt-1" 
+              style={{ color: isDarkMode ? '#F9FAFB' : '#1e293b' }}
+            >
+              {summary.totalLabels.toLocaleString()}
+            </span>
           </div>
           <div className="flex flex-col">
-            <span className="text-gray-600 font-medium text-xs uppercase tracking-wide">EST COST</span>
-            <span className="text-gray-900 font-bold text-xl mt-1" style={{ color: '#1e293b' }}>${summary.estCost.toLocaleString()}</span>
+            <span 
+              className="font-medium text-xs uppercase tracking-wide"
+              style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280' }}
+            >
+              EST COST
+            </span>
+            <span 
+              className="font-bold text-xl mt-1" 
+              style={{ color: isDarkMode ? '#F9FAFB' : '#1e293b' }}
+            >
+              ${summary.estCost.toLocaleString()}
+            </span>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <button
             type="button"
-            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg px-4 py-2 transition-colors"
+            className="inline-flex items-center gap-2 text-white text-xs font-semibold rounded-lg px-4 py-2 transition-colors"
+            style={{
+              backgroundColor: '#3B82F6',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#2563EB';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#3B82F6';
+            }}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -1230,21 +1487,21 @@ const LabelOrderPage = () => {
             disabled={addedLines.length === 0}
             className="inline-flex items-center gap-2 text-xs font-semibold rounded-lg px-4 py-2 transition-colors"
             style={{
-              backgroundColor: addedLines.length > 0 ? '#007AFF' : '#D1D5DB',
-              color: addedLines.length > 0 ? '#FFFFFF' : '#374151',
+              backgroundColor: addedLines.length > 0 ? '#007AFF' : (isDarkMode ? '#374151' : '#D1D5DB'),
+              color: addedLines.length > 0 ? '#FFFFFF' : (isDarkMode ? '#6B7280' : '#9CA3AF'),
               cursor: addedLines.length > 0 ? 'pointer' : 'not-allowed',
               opacity: addedLines.length > 0 ? 1 : 0.6,
             }}
             onMouseEnter={(e) => {
               if (addedLines.length > 0) {
-                e.target.style.backgroundColor = '#0056CC';
+                e.currentTarget.style.backgroundColor = '#0056CC';
               }
             }}
             onMouseLeave={(e) => {
               if (addedLines.length > 0) {
-                e.target.style.backgroundColor = '#007AFF';
+                e.currentTarget.style.backgroundColor = '#007AFF';
               } else {
-                e.target.style.backgroundColor = '#D1D5DB';
+                e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#D1D5DB';
               }
             }}
           >
