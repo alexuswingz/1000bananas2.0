@@ -41,16 +41,10 @@ const Labels = () => {
 
   const suppliers = [
     {
-      id: 'rhino',
-      name: 'Rhino Container',
-      logoSrc: '/assets/rhino.png',
-      logoAlt: 'Rhino Container logo',
-    },
-    {
-      id: 'tricorbraun',
-      name: 'TricorBraun',
-      logoSrc: '/assets/tricorbraun.png',
-      logoAlt: 'TricorBraun logo',
+      id: 'logo1',
+      name: 'Richmark Label',
+      logoSrc: '/assets/Logo1.png',
+      logoAlt: 'Richmark Label logo',
     },
   ];
 
@@ -512,30 +506,36 @@ const Labels = () => {
                       <button
                         key={supplier.id}
                         type="button"
-                        onClick={() => setSelectedSupplier(supplier)}
-                        className={`flex flex-col items-center justify-center rounded-xl border transition-all ${
-                          isActive
-                            ? 'border-blue-600 bg-blue-50'
-                            : 'border-gray-200 hover:border-gray-300 bg-white'
-                        }`}
+                        onClick={() => {
+                          setSelectedSupplier(supplier);
+                        }}
+                        className="flex flex-col items-center justify-center rounded-xl transition-all bg-white"
                         style={{
                           width: '176px',
                           height: '174px',
-                          padding: '32px',
-                          gap: '16px',
+                          padding: '8px',
+                          gap: '0px',
                           borderRadius: '12px',
-                          borderWidth: '1px'
+                          overflow: 'hidden',
+                          border: 'none',
+                          boxShadow: isActive ? '0 0 0 3px #2563eb' : '0 0 0 0px transparent'
                         }}
                       >
                         {supplier.logoSrc && (
                           <img
                             src={supplier.logoSrc}
                             alt={supplier.logoAlt}
-                            className="w-auto object-contain"
-                            style={{ maxHeight: '60px' }}
+                            style={{ 
+                              width: '100%', 
+                              height: '100%', 
+                              objectFit: 'contain',
+                              objectPosition: 'center'
+                            }}
                           />
                         )}
-                        <span className="text-sm font-medium text-gray-900 text-center">{supplier.name}</span>
+                        {supplier.name && (
+                          <span className="text-sm font-medium text-gray-900 text-center">{supplier.name}</span>
+                        )}
                       </button>
                     );
                   })}
