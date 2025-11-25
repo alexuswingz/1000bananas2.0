@@ -143,8 +143,15 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
     const isPartial = location.state && location.state.isPartial;
     
     if (receivedOrderId) {
+      console.log('🔍 Received order ID:', receivedOrderId, 'isPartial:', isPartial);
+      
       setOrders((prev) => {
+        console.log('🔎 Looking for order with ID:', receivedOrderId);
+        console.log('📋 Available orders:', prev.map(o => ({ id: o.id, orderNumber: o.orderNumber })));
+        
         const order = prev.find((o) => o.id === receivedOrderId);
+        console.log('✅ Found order:', order);
+        
         if (order) {
           if (isPartial) {
             // Partial receive - update status and keep in orders
@@ -156,9 +163,11 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
             try {
               window.localStorage.setItem('closureOrders', JSON.stringify(updated));
             } catch {}
+            console.log('📝 Updated to Partial status');
             return updated;
           } else {
             // Full receive - archive the order
+            console.log('🗄️ Archiving order:', order);
             // Remove from active orders
             const remaining = prev.filter((o) => o.id !== receivedOrderId);
             try {
@@ -168,12 +177,18 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
             const archivedOrder = { ...order, status: 'Received' };
             if (archivedOrdersRef && archivedOrdersRef.current) {
               archivedOrdersRef.current.addArchivedOrder(archivedOrder);
+              console.log('✅ Added to archived orders');
+            } else {
+              console.log('⚠️ archivedOrdersRef not available');
             }
             if (onArchiveOrder) {
               onArchiveOrder(archivedOrder);
+              console.log('✅ Called onArchiveOrder callback');
             }
             return remaining;
           }
+        } else {
+          console.log('❌ Order not found!');
         }
         return prev;
       });
