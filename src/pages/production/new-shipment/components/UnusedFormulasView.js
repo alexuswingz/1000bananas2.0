@@ -1,23 +1,21 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
-const ShinersView = () => {
+const UnusedFormulasView = () => {
   const { isDarkMode } = useTheme();
-  const [expandedFormulas, setExpandedFormulas] = useState(new Set(['F.ULTRAGROW', 'F.ULTRABLOOM']));
-  const [addedProducts, setAddedProducts] = useState(new Set(['F.ULTRAGROW-Cherry Tree Fer...']));
+  const [expandedFormulas, setExpandedFormulas] = useState(new Set());
+  const [addedProducts, setAddedProducts] = useState(new Set());
   const [openFilterIndex, setOpenFilterIndex] = useState(null);
   const filterRefs = useRef({});
   const filterModalRefs = useRef({});
 
-  // Sample data matching the image
+  // Sample data for unused formulas
   const formulas = [
     {
       id: 'F.ULTRAGROW',
       formula: 'F.ULTRAGROW',
-      size: '8oz',
-      unitsAvailable: 240,
-      unitsUsed: 240,
+      unusedGals: 65,
+      usedGals: 65,
       products: [
         {
           id: 'F.ULTRAGROW-Cherry Tree Fer...',
@@ -63,9 +61,8 @@ const ShinersView = () => {
     {
       id: 'F.ULTRABLOOM',
       formula: 'F.ULTRABLOOM',
-      size: 'Quart',
-      unitsAvailable: 48,
-      unitsUsed: 0,
+      unusedGals: 48,
+      usedGals: 0,
       products: [
         {
           id: 'F.ULTRABLOOM-Cherry Tree Fer...',
@@ -111,17 +108,15 @@ const ShinersView = () => {
     {
       id: 'F.WORMTEA',
       formula: 'F.WORMTEA',
-      size: 'Quart',
-      unitsAvailable: 240,
-      unitsUsed: 0,
+      unusedGals: 240,
+      usedGals: 0,
       products: [],
     },
     {
       id: 'F.SUCCULENT',
       formula: 'F.SUCCULENT',
-      size: 'Gallon',
-      unitsAvailable: 40,
-      unitsUsed: 0,
+      unusedGals: 40,
+      usedGals: 0,
       products: [],
     },
   ];
@@ -192,19 +187,15 @@ const ShinersView = () => {
         }
       };
 
-      // Use multiple attempts to ensure positioning works
-      const timeoutId1 = setTimeout(updatePosition, 0);
-      const timeoutId2 = setTimeout(updatePosition, 10);
-      const timeoutId3 = setTimeout(updatePosition, 50);
+      // Use setTimeout to ensure DOM is updated
+      const timeoutId = setTimeout(updatePosition, 0);
       
       // Also update on scroll/resize
       window.addEventListener('scroll', updatePosition, true);
       window.addEventListener('resize', updatePosition);
       
       return () => {
-        clearTimeout(timeoutId1);
-        clearTimeout(timeoutId2);
-        clearTimeout(timeoutId3);
+        clearTimeout(timeoutId);
         window.removeEventListener('scroll', updatePosition, true);
         window.removeEventListener('resize', updatePosition);
       };
@@ -315,7 +306,6 @@ const ShinersView = () => {
     );
   };
 
-
   return (
     <>
       <div style={{
@@ -378,42 +368,28 @@ const ShinersView = () => {
                   fontWeight: 400,
                   color: isDarkMode ? '#9CA3AF' : '#6B7280',
                 }}>
-                  SIZE
+                  UNUSED (GAL)
                 </div>
                 <div style={{
                   fontSize: '14px',
                   fontWeight: 700,
                   color: isDarkMode ? '#E5E7EB' : '#111827',
                 }}>
-                  {formula.size}
+                  {formula.unusedGals}
                 </div>
                 <div style={{
                   fontSize: '14px',
                   fontWeight: 400,
                   color: isDarkMode ? '#9CA3AF' : '#6B7280',
                 }}>
-                  UNITS AVAILABLE
+                  USED (GAL)
                 </div>
                 <div style={{
                   fontSize: '14px',
                   fontWeight: 700,
                   color: isDarkMode ? '#E5E7EB' : '#111827',
                 }}>
-                  {formula.unitsAvailable}
-                </div>
-                <div style={{
-                  fontSize: '14px',
-                  fontWeight: 400,
-                  color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                }}>
-                  UNITS USED
-                </div>
-                <div style={{
-                  fontSize: '14px',
-                  fontWeight: 700,
-                  color: isDarkMode ? '#E5E7EB' : '#111827',
-                }}>
-                  {formula.unitsUsed}
+                  {formula.usedGals}
                 </div>
               </div>
               <svg
@@ -921,7 +897,7 @@ const ShinersView = () => {
 
       {/* Filter Modals */}
       {['brand', 'product', 'size', 'add', 'qty', 'timeline'].map((filterKey) => (
-        openFilterIndex === filterKey && createPortal(
+        openFilterIndex === filterKey && (
           <div
             key={filterKey}
             ref={(el) => {
@@ -1104,12 +1080,12 @@ const ShinersView = () => {
                 Apply
               </button>
             </div>
-          </div>,
-          document.body
+          </div>
         )
       ))}
     </>
   );
 };
 
-export default ShinersView;
+export default UnusedFormulasView;
+

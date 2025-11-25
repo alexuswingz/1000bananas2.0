@@ -1,18 +1,25 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
 const LabelCheckTable = () => {
   const { isDarkMode } = useTheme();
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedRow, setSelectedRow] = useState(null);
+  const [selectedRowIndex, setSelectedRowIndex] = useState(null);
+  const [fullRolls, setFullRolls] = useState(['', '', '']);
+  const [partialWeights, setPartialWeights] = useState(['', '', '']);
 
   // Sample data matching the image
-  const [rows] = useState([
+  const [rows, setRows] = useState([
     {
       id: 1,
       brand: 'TPS Plant Foods',
       product: 'Lime Tree Fertilizer',
       size: '8oz',
       quantity: 1000,
-      lblCurrentInv: 11522,
+      lblCurrentInv: 1526,
       labelLocation: 'LBL-PLANT-567',
       totalCount: '',
     },
@@ -22,7 +29,7 @@ const LabelCheckTable = () => {
       product: 'Lime Tree Fertilizer',
       size: '8oz',
       quantity: 50,
-      lblCurrentInv: 11522,
+      lblCurrentInv: 1526,
       labelLocation: 'LBL-PLANT-567',
       totalCount: '',
     },
@@ -32,7 +39,7 @@ const LabelCheckTable = () => {
       product: 'Lime Tree Fertilizer',
       size: '8oz',
       quantity: 480,
-      lblCurrentInv: 11522,
+      lblCurrentInv: 1526,
       labelLocation: 'LBL-PLANT-567',
       totalCount: '',
     },
@@ -42,7 +49,7 @@ const LabelCheckTable = () => {
       product: 'Lime Tree Fertilizer',
       size: '8oz',
       quantity: 160,
-      lblCurrentInv: 11522,
+      lblCurrentInv: 1526,
       labelLocation: 'LBL-PLANT-567',
       totalCount: '',
     },
@@ -52,7 +59,7 @@ const LabelCheckTable = () => {
       product: 'Lime Tree Fertilizer',
       size: '8oz',
       quantity: 240,
-      lblCurrentInv: 11522,
+      lblCurrentInv: 1526,
       labelLocation: 'LBL-PLANT-567',
       totalCount: '',
     },
@@ -62,7 +69,7 @@ const LabelCheckTable = () => {
       product: 'Lime Tree Fertilizer',
       size: '8oz',
       quantity: 600,
-      lblCurrentInv: 11522,
+      lblCurrentInv: 1526,
       labelLocation: 'LBL-PLANT-567',
       totalCount: '',
     },
@@ -72,7 +79,7 @@ const LabelCheckTable = () => {
       product: 'Lime Tree Fertilizer',
       size: '8oz',
       quantity: 120,
-      lblCurrentInv: 11522,
+      lblCurrentInv: 1526,
       labelLocation: 'LBL-PLANT-567',
       totalCount: '',
     },
@@ -82,7 +89,7 @@ const LabelCheckTable = () => {
       product: 'Lime Tree Fertilizer',
       size: '8oz',
       quantity: 240,
-      lblCurrentInv: 11522,
+      lblCurrentInv: 1526,
       labelLocation: 'LBL-PLANT-567',
       totalCount: '',
     },
@@ -92,7 +99,7 @@ const LabelCheckTable = () => {
       product: 'Lime Tree Fertilizer',
       size: '8oz',
       quantity: 480,
-      lblCurrentInv: 11522,
+      lblCurrentInv: 1526,
       labelLocation: 'LBL-PLANT-567',
       totalCount: '',
     },
@@ -102,7 +109,7 @@ const LabelCheckTable = () => {
       product: 'Lime Tree Fertilizer',
       size: '8oz',
       quantity: 6480,
-      lblCurrentInv: 11522,
+      lblCurrentInv: 1526,
       labelLocation: 'LBL-PLANT-567',
       totalCount: '',
     },
@@ -112,7 +119,7 @@ const LabelCheckTable = () => {
       product: 'Lime Tree Fertilizer',
       size: '8oz',
       quantity: 300,
-      lblCurrentInv: 11522,
+      lblCurrentInv: 1526,
       labelLocation: 'LBL-PLANT-567',
       totalCount: '',
     },
@@ -122,7 +129,7 @@ const LabelCheckTable = () => {
       product: 'Lime Tree Fertilizer',
       size: '8oz',
       quantity: 240,
-      lblCurrentInv: 11522,
+      lblCurrentInv: 1526,
       labelLocation: 'LBL-PLANT-567',
       totalCount: '',
     },
@@ -132,7 +139,7 @@ const LabelCheckTable = () => {
       product: 'Lime Tree Fertilizer',
       size: '8oz',
       quantity: 120,
-      lblCurrentInv: 11522,
+      lblCurrentInv: 1526,
       labelLocation: 'LBL-PLANT-567',
       totalCount: '',
     },
@@ -142,7 +149,7 @@ const LabelCheckTable = () => {
       product: 'Lime Tree Fertilizer',
       size: '8oz',
       quantity: 300,
-      lblCurrentInv: 11522,
+      lblCurrentInv: 1526,
       labelLocation: 'LBL-PLANT-567',
       totalCount: '',
     },
@@ -164,23 +171,110 @@ const LabelCheckTable = () => {
     return num.toLocaleString();
   };
 
+  const handleStartClick = (row, index) => {
+    setSelectedRow(row);
+    setSelectedRowIndex(index);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedRow(null);
+    setSelectedRowIndex(null);
+    setFullRolls(['', '', '']);
+    setPartialWeights(['', '', '']);
+  };
+
+  const handleSave = () => {
+    if (selectedRowIndex !== null) {
+      const discrepancy = calculateDiscrepancy();
+      // Only save if there's a discrepancy (positive or negative)
+      if (discrepancy !== 0) {
+        const updatedRows = [...rows];
+        updatedRows[selectedRowIndex] = {
+          ...updatedRows[selectedRowIndex],
+          totalCount: discrepancy,
+        };
+        setRows(updatedRows);
+      }
+    }
+    handleCloseModal();
+  };
+
+  const handleAddRoll = () => {
+    setFullRolls([...fullRolls, '']);
+  };
+
+  const handleAddWeight = () => {
+    setPartialWeights([...partialWeights, '']);
+  };
+
+  const handleRollChange = (index, value) => {
+    const newRolls = [...fullRolls];
+    newRolls[index] = value;
+    setFullRolls(newRolls);
+  };
+
+  const handleWeightChange = (index, value) => {
+    const newWeights = [...partialWeights];
+    newWeights[index] = value;
+    setPartialWeights(newWeights);
+  };
+
+  const calculateTotalLabels = () => {
+    // Calculate based on full rolls and partial weights
+    const fullRollTotal = fullRolls.reduce((sum, roll) => {
+      const num = parseInt(roll) || 0;
+      return sum + num;
+    }, 0);
+    // Partial weights calculation would need conversion logic
+    // For now, assuming partial weights need to be converted to labels
+    const partialWeightTotal = partialWeights.reduce((sum, weight) => {
+      const num = parseFloat(weight) || 0;
+      // Placeholder: convert weight to labels (would need actual conversion formula)
+      return sum + Math.floor(num / 10); // Example: 10g per label
+    }, 0);
+    return fullRollTotal + partialWeightTotal;
+  };
+
+  const calculateDiscrepancy = () => {
+    if (!selectedRow) return 0;
+    const calculatedTotal = calculateTotalLabels();
+    const currentInventory = selectedRow.lblCurrentInv || 0;
+    return calculatedTotal - currentInventory;
+  };
+
   return (
-    <div>
-      {/* Header Section */}
-      <div style={{
-        backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-        borderRadius: '12px',
-        border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
-        padding: '16px 24px',
-        marginBottom: '16px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '32px',
-        flexWrap: 'wrap',
-      }}>
-        <button
-          type="button"
-          style={{
+    <div style={{
+      backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+      borderRadius: '12px',
+      border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+      overflow: 'hidden',
+      width: '100%',
+      marginBottom: '16px',
+    }}>
+      {/* Dropdown Header */}
+      <div
+        onClick={() => setIsExpanded(!isExpanded)}
+        style={{
+          padding: '16px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+          backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+          transition: 'background-color 0.2s',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#FFFFFF';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = isDarkMode ? '#1F2937' : '#FFFFFF';
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flex: 1 }}>
+          {/* Status Indicator */}
+          <div style={{
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
@@ -188,101 +282,114 @@ const LabelCheckTable = () => {
             borderRadius: '6px',
             border: '1px solid #D1D5DB',
             backgroundColor: '#FFFFFF',
-            color: '#374151',
             fontSize: '14px',
-            fontWeight: 500,
-            cursor: 'pointer',
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2">
-            <path d="M12 2v20M2 12h20" strokeLinecap="round"/>
-            <circle cx="12" cy="12" r="4" fill="#3B82F6"/>
-          </svg>
-          In Progress
-        </button>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <span style={{
-            fontSize: '10px',
+            fontWeight: 400,
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              {/* Radial spinner icon with 12 dashed lines */}
+              <g stroke="#3B82F6" strokeWidth="2" strokeLinecap="round">
+                {[...Array(12)].map((_, i) => {
+                  const angle = (i * 30) * (Math.PI / 180);
+                  const x1 = 12 + 4 * Math.cos(angle);
+                  const y1 = 12 + 4 * Math.sin(angle);
+                  const x2 = 12 + 6 * Math.cos(angle);
+                  const y2 = 12 + 6 * Math.sin(angle);
+                  return (
+                    <line
+                      key={i}
+                      x1={x1}
+                      y1={y1}
+                      x2={x2}
+                      y2={y2}
+                      strokeDasharray="2 2"
+                    />
+                  );
+                })}
+              </g>
+            </svg>
+            <span style={{ color: '#000000' }}>In Progress</span>
+          </div>
+
+          {/* COUNT ID */}
+          <div style={{
+            fontSize: '14px',
             fontWeight: 400,
             color: isDarkMode ? '#9CA3AF' : '#6B7280',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
           }}>
             COUNT ID
-          </span>
-          <span style={{
+          </div>
+          <div style={{
             fontSize: '14px',
-            fontWeight: 400,
-            color: isDarkMode ? '#FFFFFF' : '#000000',
+            fontWeight: 700,
+            color: isDarkMode ? '#E5E7EB' : '#111827',
           }}>
             CC-DC-1
-          </span>
-        </div>
+          </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <span style={{
-            fontSize: '10px',
-            fontWeight: 400,
-            color: isDarkMode ? '#9CA3AF' : '#6B7280',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-          }}>
-            COUNT TYPE
-          </span>
-          <span style={{
+          {/* COUNT TYPE */}
+          <div style={{
             fontSize: '14px',
             fontWeight: 400,
-            color: isDarkMode ? '#FFFFFF' : '#000000',
+            color: isDarkMode ? '#9CA3AF' : '#6B7280',
+          }}>
+            COUNT TYPE
+          </div>
+          <div style={{
+            fontSize: '14px',
+            fontWeight: 700,
+            color: isDarkMode ? '#E5E7EB' : '#111827',
           }}>
             Shipment Count
-          </span>
-        </div>
+          </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <span style={{
-            fontSize: '10px',
+          {/* DATE CREATED */}
+          <div style={{
+            fontSize: '14px',
             fontWeight: 400,
             color: isDarkMode ? '#9CA3AF' : '#6B7280',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
           }}>
             DATE CREATED
-          </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{
-              fontSize: '14px',
-              fontWeight: 400,
-              color: isDarkMode ? '#FFFFFF' : '#000000',
-            }}>
-              2025-11-20
-            </span>
-            <svg width="12" height="8" viewBox="0 0 12 8" fill="none" stroke={isDarkMode ? '#9CA3AF' : '#6B7280'} strokeWidth="2">
-              <path d="M1 1L6 6L11 1" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+          </div>
+          <div style={{
+            fontSize: '14px',
+            fontWeight: 700,
+            color: isDarkMode ? '#E5E7EB' : '#111827',
+          }}>
+            2025-11-20
           </div>
         </div>
+        
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          fill="none"
+          style={{
+            transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s',
+            color: '#3B82F6',
+          }}
+        >
+          <path
+            d="M4 6L8 10L12 6"
+            stroke="#3B82F6"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
       </div>
 
-      {/* Table */}
-      <div style={{
-        backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-        borderRadius: '12px',
-        border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
-        overflow: 'hidden',
-      }}>
+      {/* Expanded Table */}
+      {isExpanded && (
         <div style={{ overflowX: 'auto' }}>
           <table style={{
             width: '100%',
-            borderCollapse: 'collapse',
+            borderCollapse: 'separate',
+            borderSpacing: 0,
           }}>
-            {/* Header */}
-            <thead>
-              <tr style={{
-                backgroundColor: '#1C2634',
-                borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
-                height: '40px',
-              }}>
+            <thead style={{ backgroundColor: '#1C2634' }}>
+              <tr style={{ height: '40px', maxHeight: '40px' }}>
                 {columns.map((column) => (
                   <th
                     key={column.key}
@@ -306,7 +413,6 @@ const LabelCheckTable = () => {
               </tr>
             </thead>
 
-            {/* Body */}
             <tbody>
               {rows.map((row, index) => (
                 <tr
@@ -335,8 +441,10 @@ const LabelCheckTable = () => {
                   }}>
                     <button
                       type="button"
+                      onClick={() => handleStartClick(row, index)}
                       style={{
-                        padding: '6px 16px',
+                        height: '24px',
+                        padding: '0 12px',
                         borderRadius: '6px',
                         border: 'none',
                         backgroundColor: '#3B82F6',
@@ -345,6 +453,10 @@ const LabelCheckTable = () => {
                         fontWeight: 500,
                         cursor: 'pointer',
                         transition: 'background-color 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        whiteSpace: 'nowrap',
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.backgroundColor = '#2563EB';
@@ -417,19 +529,415 @@ const LabelCheckTable = () => {
                     color: isDarkMode ? '#E5E7EB' : '#374151',
                     height: '40px',
                   }}>
-                    {row.totalCount || ''}
+                    {row.totalCount !== undefined && row.totalCount !== null && row.totalCount !== '' ? (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                      }}>
+                        <span>{formatNumber(row.lblCurrentInv)}</span>
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          backgroundColor: row.totalCount < 0 ? '#FEE2E2' : '#D1FAE5',
+                          color: row.totalCount < 0 ? '#DC2626' : '#059669',
+                        }}>
+                          {row.totalCount > 0 ? '+' : ''}{row.totalCount}
+                        </span>
+                      </div>
+                    ) : ''}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </div>
+      )}
+
+      {/* Edit Label Inventory Modal */}
+      {isModalOpen && selectedRow && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+          onClick={handleCloseModal}
+        >
+          <div
+            style={{
+              backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+              borderRadius: '12px',
+              width: '90%',
+              maxWidth: '800px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              padding: '24px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: '#1C2634',
+              padding: '16px 24px',
+              margin: '-24px -24px 24px -24px',
+              borderRadius: '12px 12px 0 0',
+            }}>
+              <h2 style={{
+                fontSize: '20px',
+                fontWeight: 700,
+                color: '#E5E7EB',
+                margin: 0,
+              }}>
+                Edit Label Inventory
+              </h2>
+              <button
+                type="button"
+                onClick={handleCloseModal}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#9CA3AF',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = '#FFFFFF';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = '#9CA3AF';
+                }}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            </div>
+
+            {/* Product Information */}
+            <div style={{
+              backgroundColor: isDarkMode ? '#374151' : '#F9FAFB',
+              borderRadius: '8px',
+              border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+              padding: '16px',
+              marginBottom: '24px',
+              display: 'flex',
+              gap: '32px',
+            }}>
+              <div style={{ flex: 1 }}>
+                <div style={{
+                  fontSize: '12px',
+                  fontWeight: 400,
+                  color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                  marginBottom: '4px',
+                }}>
+                  Product Name
+                </div>
+                <div style={{
+                  fontSize: '16px',
+                  fontWeight: 700,
+                  color: isDarkMode ? '#E5E7EB' : '#111827',
+                }}>
+                  {selectedRow.product} ({selectedRow.size})
+                </div>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{
+                  fontSize: '12px',
+                  fontWeight: 400,
+                  color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                  marginBottom: '4px',
+                }}>
+                  Label Location
+                </div>
+                <div style={{
+                  fontSize: '16px',
+                  fontWeight: 700,
+                  color: isDarkMode ? '#E5E7EB' : '#111827',
+                }}>
+                  {selectedRow.labelLocation}
+                </div>
+              </div>
+            </div>
+
+            {/* Two Columns */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '24px',
+              marginBottom: '24px',
+            }}>
+              {/* Left Column: Full Roll Label Count */}
+              <div>
+                <h3 style={{
+                  fontSize: '16px',
+                  fontWeight: 700,
+                  color: isDarkMode ? '#E5E7EB' : '#111827',
+                  marginBottom: '8px',
+                }}>
+                  Full Roll Label Count
+                </h3>
+                <p style={{
+                  fontSize: '14px',
+                  fontWeight: 400,
+                  color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                  marginBottom: '16px',
+                }}>
+                  Enter the quantity of complete, unused label rolls.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {fullRolls.map((roll, index) => (
+                    <input
+                      key={index}
+                      type="text"
+                      placeholder="Enter roll quantity..."
+                      value={roll}
+                      onChange={(e) => handleRollChange(index, e.target.value)}
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        border: `1px solid ${isDarkMode ? '#374151' : '#D1D5DB'}`,
+                        backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                        color: isDarkMode ? '#E5E7EB' : '#111827',
+                        fontSize: '14px',
+                        outline: 'none',
+                      }}
+                    />
+                  ))}
+                  <button
+                    type="button"
+                    onClick={handleAddRoll}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#3B82F6',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      padding: '8px 0',
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2">
+                      <path d="M12 5v14M5 12h14" strokeLinecap="round"/>
+                    </svg>
+                    Add Another Roll
+                  </button>
+                </div>
+              </div>
+
+              {/* Right Column: Partial Roll Weight */}
+              <div>
+                <h3 style={{
+                  fontSize: '16px',
+                  fontWeight: 700,
+                  color: isDarkMode ? '#E5E7EB' : '#111827',
+                  marginBottom: '8px',
+                }}>
+                  Partial Roll Weight (g)
+                </h3>
+                <p style={{
+                  fontSize: '14px',
+                  fontWeight: 400,
+                  color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                  marginBottom: '16px',
+                }}>
+                  Enter the weight in grams for each partially used roll.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {partialWeights.map((weight, index) => (
+                    <input
+                      key={index}
+                      type="text"
+                      placeholder="Enter roll weight..."
+                      value={weight}
+                      onChange={(e) => handleWeightChange(index, e.target.value)}
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        border: `1px solid ${isDarkMode ? '#374151' : '#D1D5DB'}`,
+                        backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                        color: isDarkMode ? '#E5E7EB' : '#111827',
+                        fontSize: '14px',
+                        outline: 'none',
+                      }}
+                    />
+                  ))}
+                  <button
+                    type="button"
+                    onClick={handleAddWeight}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#3B82F6',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      padding: '8px 0',
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2">
+                      <path d="M12 5v14M5 12h14" strokeLinecap="round"/>
+                    </svg>
+                    Add Another Weight
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Calculated Total Labels */}
+            <div style={{
+              backgroundColor: isDarkMode ? '#374151' : '#F9FAFB',
+              borderRadius: '8px',
+              border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+              padding: '16px',
+              marginBottom: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}>
+              <div>
+                <h3 style={{
+                  fontSize: '16px',
+                  fontWeight: 700,
+                  color: isDarkMode ? '#E5E7EB' : '#111827',
+                  marginBottom: '4px',
+                }}>
+                  Calculated Total Labels
+                </h3>
+                <p style={{
+                  fontSize: '14px',
+                  fontWeight: 400,
+                  color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                  margin: 0,
+                }}>
+                  Current Label Inventory: {formatNumber(selectedRow.lblCurrentInv)}
+                </p>
+              </div>
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-end',
+                gap: '8px',
+              }}>
+                <div style={{
+                  fontSize: '32px',
+                  fontWeight: 700,
+                  color: isDarkMode ? '#E5E7EB' : '#111827',
+                }}>
+                  {calculateTotalLabels()}
+                </div>
+                {calculateDiscrepancy() !== 0 && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    color: calculateDiscrepancy() < 0 ? '#EF4444' : '#10B981',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                  }}>
+                    {calculateDiscrepancy() < 0 && (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M19 9l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                    {calculateDiscrepancy() > 0 && (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M5 15l7-7 7 7" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                    <span>
+                      {calculateDiscrepancy() > 0 ? '+' : ''}{calculateDiscrepancy()} Discrepancy
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '12px',
+              paddingTop: '24px',
+            }}>
+              <button
+                type="button"
+                onClick={handleCloseModal}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  border: `1px solid ${isDarkMode ? '#374151' : '#D1D5DB'}`,
+                  backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                  color: isDarkMode ? '#E5E7EB' : '#111827',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = isDarkMode ? '#4B5563' : '#F9FAFB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#FFFFFF';
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: '#3B82F6',
+                  color: '#FFFFFF',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#2563EB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#3B82F6';
+                }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };
 
 export default LabelCheckTable;
+
 
 
 

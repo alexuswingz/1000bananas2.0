@@ -8,6 +8,8 @@ import SortProductsTable from './components/SortProductsTable';
 import SortFormulasTable from './components/SortFormulasTable';
 import FormulaCheckTable from './components/FormulaCheckTable';
 import LabelCheckTable from './components/LabelCheckTable';
+import ShinersView from './components/ShinersView';
+import UnusedFormulasView from './components/UnusedFormulasView';
 import NgoosModal from './components/NgoosModal';
 import ShipmentDetailsModal from './components/ShipmentDetailsModal';
 import ExportTemplateModal from './components/ExportTemplateModal';
@@ -313,51 +315,53 @@ const NewShipment = () => {
                 )}
               </div>
 
-              {/* Middle: Status Indicators */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: 1, justifyContent: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <div
-                    style={{
-                      width: '12px',
-                      height: '12px',
-                      borderRadius: '2px',
-                      backgroundColor: '#9333EA',
-                    }}
-                  />
-                  <span style={{ fontSize: '13px', color: isDarkMode ? '#E5E7EB' : '#374151' }}>
-                    FBA Avail.
-                  </span>
+              {/* Right: Legend and Search Input */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                {/* Legend */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div
+                      style={{
+                        width: '12px',
+                        height: '12px',
+                        borderRadius: '2px',
+                        backgroundColor: '#A855F7',
+                      }}
+                    />
+                    <span style={{ fontSize: '13px', color: isDarkMode ? '#E5E7EB' : '#374151' }}>
+                      FBA Avail.
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div
+                      style={{
+                        width: '12px',
+                        height: '12px',
+                        borderRadius: '2px',
+                        backgroundColor: '#22C55E',
+                      }}
+                    />
+                    <span style={{ fontSize: '13px', color: isDarkMode ? '#E5E7EB' : '#374151' }}>
+                      Total Inv.
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div
+                      style={{
+                        width: '12px',
+                        height: '12px',
+                        borderRadius: '2px',
+                        backgroundColor: '#3B82F6',
+                      }}
+                    />
+                    <span style={{ fontSize: '13px', color: isDarkMode ? '#E5E7EB' : '#374151' }}>
+                      Forecast
+                    </span>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <div
-                    style={{
-                      width: '12px',
-                      height: '12px',
-                      borderRadius: '2px',
-                      backgroundColor: '#10B981',
-                    }}
-                  />
-                  <span style={{ fontSize: '13px', color: isDarkMode ? '#E5E7EB' : '#374151' }}>
-                    Total Inv.
-                  </span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <div
-                    style={{
-                      width: '12px',
-                      height: '12px',
-                      borderRadius: '2px',
-                      backgroundColor: '#3B82F6',
-                    }}
-                  />
-                  <span style={{ fontSize: '13px', color: isDarkMode ? '#E5E7EB' : '#374151' }}>
-                    Forecast
-                  </span>
-                </div>
-              </div>
 
-              {/* Right: Search Input */}
-              <div style={{ position: 'relative', width: '336px', height: '32px' }}>
+                {/* Search Input */}
+                <div style={{ position: 'relative', width: '336px', height: '32px' }}>
                 <svg
                   width="16"
                   height="16"
@@ -409,18 +413,35 @@ const NewShipment = () => {
                     e.target.style.borderColor = '#D1D5DB';
                   }}
                 />
+                </div>
               </div>
             </div>
 
-            <NewShipmentTable
-              rows={rows}
-              tableMode={tableMode}
-              onProductClick={handleProductClick}
-              qtyValues={qtyValues}
-              onQtyChange={setQtyValues}
-              onAddedRowsChange={setAddedRows}
-            />
+            {activeView === 'all-products' && (
+              <NewShipmentTable
+                rows={rows}
+                tableMode={tableMode}
+                onProductClick={handleProductClick}
+                qtyValues={qtyValues}
+                onQtyChange={setQtyValues}
+                onAddedRowsChange={setAddedRows}
+              />
+            )}
           </>
+        )}
+
+        {/* Separate container for Shiners View */}
+        {activeAction === 'add-products' && activeView === 'floor-inventory' && selectedFloorInventory === 'Shiners' && (
+          <div style={{ padding: '0 1.5rem' }}>
+            <ShinersView />
+          </div>
+        )}
+
+        {/* Separate container for Unused Formulas View */}
+        {activeAction === 'add-products' && activeView === 'floor-inventory' && selectedFloorInventory === 'Unused Formulas' && (
+          <div style={{ padding: '0 1.5rem' }}>
+            <UnusedFormulasView />
+          </div>
         )}
 
         {activeAction === 'sort-products' && (
