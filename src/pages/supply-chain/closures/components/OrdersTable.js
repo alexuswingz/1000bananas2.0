@@ -97,7 +97,7 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
   const handleArchiveOrder = (order) => {
     // Remove from active orders FIRST and save immediately to localStorage
     setOrders((prev) => {
-      const remaining = prev.filter((o) => o.id !== order.id);
+      const remaining = prev.filter((o) => Number(o.id) !== Number(order.id));
       // Save immediately to localStorage before component unmounts
       try {
         window.localStorage.setItem('closureOrders', JSON.stringify(remaining));
@@ -143,33 +143,26 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
     const isPartial = location.state && location.state.isPartial;
     
     if (receivedOrderId) {
-      console.log('🔍 Received order ID:', receivedOrderId, 'isPartial:', isPartial);
-      
       setOrders((prev) => {
-        console.log('🔎 Looking for order with ID:', receivedOrderId);
-        console.log('📋 Available orders:', prev.map(o => ({ id: o.id, orderNumber: o.orderNumber })));
-        
-        const order = prev.find((o) => o.id === receivedOrderId);
-        console.log('✅ Found order:', order);
+        // Use Number() comparison to handle type mismatches
+        const order = prev.find((o) => Number(o.id) === Number(receivedOrderId));
         
         if (order) {
-          if (isPartial) {
-            // Partial receive - update status and keep in orders
+          if (isPartial === true) {
+            // Partial receive - update status and keep in orders (DO NOT archive)
             const updated = prev.map((o) =>
-              o.id === receivedOrderId
+              Number(o.id) === Number(receivedOrderId)
                 ? { ...o, status: 'Partial' }
                 : o
             );
             try {
               window.localStorage.setItem('closureOrders', JSON.stringify(updated));
             } catch {}
-            console.log('📝 Updated to Partial status');
             return updated;
           } else {
             // Full receive - archive the order
-            console.log('🗄️ Archiving order:', order);
-            // Remove from active orders
-            const remaining = prev.filter((o) => o.id !== receivedOrderId);
+            // Remove from active orders FIRST
+            const remaining = prev.filter((o) => Number(o.id) !== Number(receivedOrderId));
             try {
               window.localStorage.setItem('closureOrders', JSON.stringify(remaining));
             } catch {}
@@ -177,18 +170,13 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
             const archivedOrder = { ...order, status: 'Received' };
             if (archivedOrdersRef && archivedOrdersRef.current) {
               archivedOrdersRef.current.addArchivedOrder(archivedOrder);
-              console.log('✅ Added to archived orders');
-            } else {
-              console.log('⚠️ archivedOrdersRef not available');
             }
+            // Call parent callback to switch to archive tab
             if (onArchiveOrder) {
               onArchiveOrder(archivedOrder);
-              console.log('✅ Called onArchiveOrder callback');
             }
             return remaining;
           }
-        } else {
-          console.log('❌ Order not found!');
         }
         return prev;
       });
