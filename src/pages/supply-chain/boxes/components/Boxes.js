@@ -60,13 +60,14 @@ const Boxes = () => {
       const stored = window.localStorage.getItem('boxInventory');
       const boxes = stored ? JSON.parse(stored) : [];
       
-      // Pre-populate line items for the order details page (NO PALLETS)
+      // Pre-populate line items for the order details page (WITH PALLETS)
       const defaultLines = boxes.map((box) => ({
         id: box.id,
         name: box.boxSize,
         supplierInventory: 'Auto',
         unitsNeeded: box.boxesNeeded,
         qty: box.boxesNeeded,
+        pallets: 4, // Default pallets value
         selected: false,
       }));
 

@@ -23,6 +23,8 @@ import Boxes from './supply-chain/boxes/index';
 import BoxOrderPage from './supply-chain/boxes/components/BoxOrderPage';
 import Labels from './supply-chain/labels/index';
 import LabelOrderPage from './supply-chain/labels/components/LabelOrderPage';
+import CycleCounts from './supply-chain/labels/components/CycleCounts';
+import CycleCountDetail from './supply-chain/labels/components/CycleCountDetail';
 import RawMaterials from './supply-chain/rawMaterials/index';
 import Planning from './production/planning';
 import Manufacturing from './production/Manufacturing';
@@ -62,6 +64,8 @@ const Landing = () => {
           <Route path="/supply-chain/boxes/order" element={<BoxOrderPage />} />
           <Route path="/supply-chain/labels" element={<Labels />} />
           <Route path="/supply-chain/labels/order" element={<LabelOrderPage />} />
+          <Route path="/supply-chain/labels/cycle-counts" element={<CycleCounts />} />
+          <Route path="/supply-chain/labels/cycle-counts/detail" element={<CycleCountDetail />} />
           <Route path="/supply-chain/raw-materials" element={<RawMaterials />} />
           <Route path="/production/planning" element={<Planning />} />
           <Route path="/production/manufacturing" element={<Manufacturing />} />

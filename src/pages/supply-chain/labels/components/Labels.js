@@ -16,9 +16,12 @@ const Labels = () => {
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
   const [orderNumber, setOrderNumber] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState(null);
-
+  
   // Row actions & settings
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
+  const [isLabelsSettingsModalOpen, setIsLabelsSettingsModalOpen] = useState(false);
+  const [doiGoal, setDoiGoal] = useState('196');
+  const [showDoiTooltip, setShowDoiTooltip] = useState(false);
 
   // Refs for table components
   const inventoryTableRef = React.useRef(null);
@@ -145,6 +148,44 @@ const Labels = () => {
     }
   }, [location.state]);
 
+  // Handle edited order from LabelOrderPage
+  useEffect(() => {
+    const editedOrderId = location.state && location.state.editedOrderId;
+    const editedOrderNumber = location.state && location.state.editedOrderNumber;
+    const editedLines = location.state && location.state.editedLines;
+    
+    if (editedOrderId && editedOrderNumber && editedLines) {
+      // Update the order in ordersTableRef and mark it as edited
+      if (ordersTableRef.current && ordersTableRef.current.updateOrder) {
+        ordersTableRef.current.updateOrder(editedOrderId, {
+          lines: editedLines,
+          isEdited: true, // Mark order as edited
+        });
+      }
+      
+      // Show green banner notification with edit icon
+      setNotification({
+        message: `${editedOrderNumber} label order edited`,
+        type: 'edit',
+      });
+
+      // Auto-dismiss notification after 5 seconds
+      const timer = setTimeout(() => {
+        setNotification(null);
+      }, 5000);
+
+      // Switch to orders tab
+      setActiveTab('orders');
+
+      // Clear navigation state
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState({ ...location.state, editedOrderId: null, editedOrderNumber: null, editedLines: null }, '');
+      }
+
+      return () => clearTimeout(timer);
+    }
+  }, [location.state]);
+
   const handleViewOrder = (order) => {
     // Map the simple supplier name on the order back to the full supplier meta
     const supplierMeta =
@@ -168,7 +209,8 @@ const Labels = () => {
   };
 
   return (
-    <div className={`p-8 ${themeClasses.pageBg}`}>
+    <div className={`min-h-screen ${themeClasses.pageBg}`}>
+      <div className="p-6">
       {/* Green notification popup - for create new order and receive order */}
       {notification && (
         <div
@@ -196,7 +238,7 @@ const Labels = () => {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {/* Circular green checkmark icon */}
+            {/* Circular icon - checkmark for success, pencil for edit */}
             <div
               style={{
                 width: '20px',
@@ -209,9 +251,15 @@ const Labels = () => {
                 flexShrink: 0,
               }}
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="#FFFFFF" />
-              </svg>
+              {notification.type === 'edit' ? (
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="#FFFFFF" />
+                </svg>
+              ) : (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="#FFFFFF" />
+                </svg>
+              )}
             </div>
             <span
               style={{
@@ -255,15 +303,17 @@ const Labels = () => {
       )}
 
       {/* Header: title + tabs + search + actions */}
-      <div
-        className="flex items-center justify-between px-6 py-4 mb-4"
-      >
-        {/* Left: Icon, title and tabs */}
-        <div className="flex items-center space-x-4">
-          {/* Home icon in dark pill */}
-          <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-[#1f2937] text-white shadow-sm">
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {/* Home icon - simple outlined */}
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard')}
+            className="text-gray-600 hover:text-gray-900"
+            aria-label="Home"
+          >
             <svg
-              className="w-4 h-4"
+              className="w-5 h-5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -272,42 +322,39 @@ const Labels = () => {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M3 10.5L12 4l9 6.5M5 10.5V20h5v-4h4v4h5v-9.5"
+                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
               />
             </svg>
-          </div>
+          </button>
+          
+          <h1 className="text-xl font-semibold text-gray-900">Labels</h1>
+          
+          {/* Tabs as pill group - matching closures header */}
+          <div className="flex items-center rounded-full border border-gray-200 bg-white/70 dark:bg-dark-bg-tertiary ml-4">
+            {['inventory', 'orders', 'archive'].map((tabKey, index) => {
+              const labelMap = {
+                inventory: 'Inventory',
+                orders: 'Orders',
+                archive: 'Archive',
+              };
+              const label = labelMap[tabKey];
+              const isActive = activeTab === tabKey;
 
-          {/* Title + tabs group */}
-          <div className="flex items-center space-x-5">
-            <h1 className={`text-xl font-semibold ${themeClasses.textPrimary}`}>Labels</h1>
-
-            {/* Tabs as pill group - matching bottles header */}
-            <div className={`flex items-center rounded-full border ${themeClasses.border} bg-white/70 dark:bg-dark-bg-tertiary`}>
-              {['inventory', 'orders', 'archive'].map((tabKey, index) => {
-                const labelMap = {
-                  inventory: 'Inventory',
-                  orders: 'Orders',
-                  archive: 'Archive',
-                };
-                const label = labelMap[tabKey];
-                const isActive = activeTab === tabKey;
-
-                return (
-                  <button
-                    key={tabKey}
-                    type="button"
-                    onClick={() => setActiveTab(tabKey)}
-                    className={`px-3 py-1 text-xs rounded-full transition-colors ${
-                      isActive
-                        ? 'bg-gray-900 text-white font-semibold shadow-sm'
-                        : 'text-gray-600 hover:bg-gray-100 font-medium'
-                    } ${index === 0 ? 'ml-1' : ''} ${index === 2 ? 'mr-1' : ''}`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
+              return (
+                <button
+                  key={tabKey}
+                  type="button"
+                  onClick={() => setActiveTab(tabKey)}
+                  className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                    isActive
+                      ? 'bg-gray-900 text-white font-semibold shadow-sm'
+                      : 'text-gray-600 hover:bg-gray-100 font-medium'
+                  } ${index === 0 ? 'ml-1' : ''} ${index === 2 ? 'mr-1' : ''}`}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -376,9 +423,7 @@ const Labels = () => {
                   type="button"
                   className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
                   onClick={() => {
-                    if (inventoryTableRef.current) {
-                      inventoryTableRef.current.enableBulkEdit();
-                    }
+                    setIsLabelsSettingsModalOpen(true);
                     setIsSettingsMenuOpen(false);
                   }}
                 >
@@ -388,22 +433,26 @@ const Labels = () => {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5"
+                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.757.426 1.757 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.757-2.924 1.757-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.757-.426-1.757-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.607 2.296.07 2.572-1.065z"
                       />
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z"
-                      />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
                   </span>
-                  Bulk edit
+                  Settings
                 </button>
               </div>
             )}
           </div>
 
+          {/* Cycle Counts button */}
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 bg-gray-900 hover:bg-black text-white text-sm font-medium rounded-lg px-5 py-2 shadow-md transition"
+            onClick={() => navigate('/dashboard/supply-chain/labels/cycle-counts')}
+          >
+            Cycle Counts
+          </button>
+          
           {/* New Order button */}
           <button
             type="button"
@@ -446,7 +495,7 @@ const Labels = () => {
       <div style={{ display: activeTab === 'archive' ? 'block' : 'none' }}>
         <ArchivedOrdersTable ref={archivedOrdersTableRef} themeClasses={themeClasses} />
       </div>
-
+      
       {/* New Label Order Modal */}
       {isNewOrderOpen && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
@@ -568,6 +617,145 @@ const Labels = () => {
           </div>
         </div>
       )}
+
+      {/* Labels Settings Modal */}
+      {isLabelsSettingsModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center" 
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.4)' }} 
+          onClick={() => setIsLabelsSettingsModalOpen(false)}
+        >
+          <div 
+            className="bg-white rounded-lg"
+            style={{ 
+              width: '420px',
+              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                Labels Settings
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsLabelsSettingsModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 transition"
+                aria-label="Close"
+                style={{ padding: '4px' }}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-5">
+              {/* DOI Goal Input - Two Column Layout */}
+              <div className="mb-5">
+                <div className="flex items-center justify-between gap-4">
+                  {/* Left Column: Label and Info Icon */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                      DOI Goal
+                    </label>
+                    <div 
+                      className="relative"
+                      onMouseEnter={() => setShowDoiTooltip(true)}
+                      onMouseLeave={() => setShowDoiTooltip(false)}
+                    >
+                      <svg 
+                        className="w-4 h-4 text-gray-600 cursor-help" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path 
+                          strokeLinecap="round" 
+                          strokeLinejoin="round" 
+                          strokeWidth={2} 
+                          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" 
+                        />
+                      </svg>
+                      
+                      {/* Tooltip */}
+                      {showDoiTooltip && (
+                        <div 
+                          className="absolute left-0 bottom-full mb-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-10"
+                          style={{ 
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                            fontFamily: 'system-ui, -apple-system, sans-serif'
+                          }}
+                        >
+                          <h3 className="text-sm font-semibold text-gray-900 mb-2">
+                            DOI Goal = Days of Inventory Goal
+                          </h3>
+                          <p className="text-sm text-gray-700 mb-2" style={{ lineHeight: '1.5' }}>
+                            Your total label DOI combines three pieces: days of finished goods at Amazon, days of raw labels in your warehouse, and the days covered by the labels you plan to order.
+                          </p>
+                          <p className="text-sm text-gray-700" style={{ lineHeight: '1.5' }}>
+                            Simply put: Total DOI = Amazon + warehouse + your next label order
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Right Column: Input Field */}
+                  <div className="flex-1" style={{ maxWidth: '180px' }}>
+                    <input
+                      type="number"
+                      value={doiGoal}
+                      onChange={(e) => setDoiGoal(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      style={{ 
+                        fontFamily: 'system-ui, -apple-system, sans-serif',
+                        borderRadius: '8px'
+                      }}
+                      placeholder="196"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Buttons */}
+              <div className="flex justify-end gap-3 mt-5">
+                <button
+                  type="button"
+                  onClick={() => setIsLabelsSettingsModalOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                  style={{ 
+                    fontFamily: 'system-ui, -apple-system, sans-serif',
+                    borderRadius: '8px'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // TODO: Save DOI Goal
+                    console.log('Save DOI Goal:', doiGoal);
+                    setIsLabelsSettingsModalOpen(false);
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-white rounded-lg transition"
+                  style={{ 
+                    backgroundColor: '#9CA3AF',
+                    borderRadius: '8px',
+                    fontFamily: 'system-ui, -apple-system, sans-serif'
+                  }}
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      </div>
     </div>
   );
 };

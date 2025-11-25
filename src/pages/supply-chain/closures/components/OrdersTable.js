@@ -40,16 +40,64 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
     } catch {}
   }, [orders]);
 
-  // Filter orders based on search query
+  // Get archived orders to exclude them from active orders
+  const [archivedOrders, setArchivedOrders] = useState(() => {
+    try {
+      const stored = window.localStorage.getItem('closureArchivedOrders');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return Array.isArray(parsed) ? parsed : [];
+      }
+    } catch {}
+    return [];
+  });
+
+  // Listen for changes to archived orders in localStorage
+  useEffect(() => {
+    const handleStorageChange = () => {
+      try {
+        const stored = window.localStorage.getItem('closureArchivedOrders');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          setArchivedOrders(Array.isArray(parsed) ? parsed : []);
+        } else {
+          setArchivedOrders([]);
+        }
+      } catch {}
+    };
+
+    // Check on mount and when component updates
+    handleStorageChange();
+
+    // Listen for storage events (when localStorage changes from other tabs/windows)
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also check periodically in case changes happen in same tab
+    const interval = setInterval(handleStorageChange, 500);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Filter orders based on search query and exclude archived orders
   const filteredOrders = useMemo(() => {
-    if (!searchQuery.trim()) return orders;
+    // Get archived order IDs to exclude
+    const archivedOrderIds = new Set(archivedOrders.map(order => String(order.id)));
+    
+    // Filter out archived orders
+    const activeOrders = orders.filter(order => !archivedOrderIds.has(String(order.id)));
+    
+    // Then filter by search query if provided
+    if (!searchQuery.trim()) return activeOrders;
     const query = searchQuery.toLowerCase();
-    return orders.filter(
+    return activeOrders.filter(
       (order) =>
         order.orderNumber.toLowerCase().includes(query) ||
         order.supplier.toLowerCase().includes(query)
     );
-  }, [orders, searchQuery]);
+  }, [orders, searchQuery, archivedOrders]);
 
   // Handle new order from navigation state
   useEffect(() => {
@@ -146,24 +194,41 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
   // Handle received orders (from navigation state) - matching bottles pattern
   useEffect(() => {
     const receivedOrderId = location.state && location.state.receivedOrderId;
+    const receivedOrderNumber = location.state && location.state.receivedOrderNumber;
+    const receivedSupplier = location.state && location.state.receivedSupplier;
     const isPartial = location.state && location.state.isPartial;
     
-    if (receivedOrderId) {
-      console.log('🔍 Processing receive:', { receivedOrderId, isPartial, type: typeof receivedOrderId });
+    if (receivedOrderId || receivedOrderNumber) {
+      console.log('🔍 Processing receive:', { receivedOrderId, receivedOrderNumber, receivedSupplier, isPartial, type: typeof receivedOrderId });
       
       setOrders((prev) => {
-        console.log('📦 Current orders before update:', prev.map(o => ({ id: o.id, type: typeof o.id, orderNumber: o.orderNumber })));
+        console.log('📦 Current orders before update:', prev.map(o => ({ id: o.id, type: typeof o.id, orderNumber: o.orderNumber, supplier: o.supplier })));
         
-        // Use Number() comparison to handle type mismatches
-        const order = prev.find((o) => Number(o.id) === Number(receivedOrderId));
+        // Try to find order by ID first, then by orderNumber and supplier
+        let order = null;
+        if (receivedOrderId) {
+          // Use Number() comparison to handle type mismatches
+          order = prev.find((o) => Number(o.id) === Number(receivedOrderId));
+        }
+        
+        // Fallback: find by orderNumber and supplier if ID not found
+        if (!order && receivedOrderNumber && receivedSupplier) {
+          order = prev.find((o) => 
+            o.orderNumber === receivedOrderNumber && o.supplier === receivedSupplier
+          );
+        }
+        
         console.log('✅ Found order:', order);
         
         if (order) {
+          // Use the found order's ID for all operations
+          const targetOrderId = order.id;
+          
           if (isPartial === true) {
             // Partial receive - update status and keep in orders (DO NOT archive)
             console.log('📝 Updating to Partial status');
             const updated = prev.map((o) =>
-              Number(o.id) === Number(receivedOrderId)
+              Number(o.id) === Number(targetOrderId)
                 ? { ...o, status: 'Partial' }
                 : o
             );
@@ -178,7 +243,7 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
             // Full receive - archive the order
             console.log('🗄️ Archiving order (full receive)');
             // Remove from active orders FIRST
-            const remaining = prev.filter((o) => Number(o.id) !== Number(receivedOrderId));
+            const remaining = prev.filter((o) => Number(o.id) !== Number(targetOrderId));
             console.log('📋 Remaining orders:', remaining.length);
             
             try {
@@ -189,14 +254,36 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
             }
             
             // Archive the order with Received status
-            const archivedOrder = { ...order, status: 'Received' };
+            const archivedOrder = { 
+              ...order, 
+              status: 'Received',
+              fromArchive: true 
+            };
             console.log('📦 Archiving order:', archivedOrder);
+            console.log('📦 Order details:', { id: archivedOrder.id, orderNumber: archivedOrder.orderNumber, supplier: archivedOrder.supplier });
             
             if (archivedOrdersRef && archivedOrdersRef.current) {
+              console.log('✅ archivedOrdersRef is available, calling addArchivedOrder');
               archivedOrdersRef.current.addArchivedOrder(archivedOrder);
-              console.log('✅ Added to archived orders');
+              console.log('✅ Called addArchivedOrder');
             } else {
-              console.log('⚠️ archivedOrdersRef not available');
+              console.log('⚠️ archivedOrdersRef not available, saving directly to localStorage');
+              // Fallback: save directly to localStorage if ref not available
+              try {
+                const stored = window.localStorage.getItem('closureArchivedOrders');
+                const existing = stored ? JSON.parse(stored) : [];
+                const isDuplicate = existing.some((o) => 
+                  Number(o.id) === Number(archivedOrder.id) || 
+                  (o.orderNumber === archivedOrder.orderNumber && o.supplier === archivedOrder.supplier)
+                );
+                if (!isDuplicate) {
+                  const updated = [...existing, archivedOrder];
+                  window.localStorage.setItem('closureArchivedOrders', JSON.stringify(updated));
+                  console.log('💾 Saved directly to localStorage');
+                }
+              } catch (err) {
+                console.error('❌ Failed to save to localStorage', err);
+              }
             }
             
             // Call parent callback to switch to archive tab
@@ -208,14 +295,20 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
             return remaining;
           }
         } else {
-          console.log('❌ Order not found! Looking for:', receivedOrderId);
+          console.log('❌ Order not found! Looking for:', { receivedOrderId, receivedOrderNumber, receivedSupplier });
         }
         return prev;
       });
       
       // Clear the navigation state to prevent re-processing
       if (window.history && window.history.replaceState) {
-        window.history.replaceState({ ...location.state, receivedOrderId: null, isPartial: null }, '');
+        window.history.replaceState({ 
+          ...location.state, 
+          receivedOrderId: null, 
+          receivedOrderNumber: null,
+          receivedSupplier: null,
+          isPartial: null 
+        }, '');
       }
     }
   }, [location.state, archivedOrdersRef, onArchiveOrder]);

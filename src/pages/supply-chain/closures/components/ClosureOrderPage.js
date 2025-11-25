@@ -68,16 +68,20 @@ const ClosureOrderPage = () => {
   const handleReceiveComplete = (isPartial = false) => {
     // If partial receive, update status and keep in orders
     // If full receive, archive the order
-    console.log('📤 Navigating with:', { orderId, isPartial, isReceiveMode });
-    if (isReceiveMode && orderId) {
+    console.log('📤 Navigating with:', { orderId, orderNumber, supplier: supplier?.name, isPartial, isReceiveMode });
+    
+    if (isReceiveMode) {
+      // Always pass orderNumber and supplier, and orderId if available
       navigate('/dashboard/supply-chain/closures', {
         state: {
-          receivedOrderId: orderId,
+          receivedOrderId: orderId || null,
+          receivedOrderNumber: orderNumber,
+          receivedSupplier: supplier?.name,
           isPartial: isPartial,
         },
       });
     } else {
-      console.log('⚠️ Cannot receive - missing orderId or not in receive mode');
+      console.log('⚠️ Cannot receive - not in receive mode');
       navigate('/dashboard/supply-chain/closures');
     }
   };

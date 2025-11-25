@@ -39,19 +39,65 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses, onViewOrder }, ref) => {
     }
   }, [archivedOrders]);
 
+  // Reload archived orders from localStorage when component mounts or when storage changes
+  useEffect(() => {
+    const handleStorageChange = () => {
+      try {
+        const stored = window.localStorage.getItem('closureArchivedOrders');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            const cleaned = parsed.filter((order) => 
+              order.orderNumber !== '514413413' && order.orderNumber !== '43145'
+            );
+            setArchivedOrders(cleaned);
+            console.log('🔄 Reloaded archived orders from localStorage:', cleaned.length);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to reload archived orders', err);
+      }
+    };
+
+    // Check on mount
+    handleStorageChange();
+
+    // Listen for storage events (when localStorage changes from other tabs/windows)
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also check periodically in case changes happen in same tab
+    const interval = setInterval(handleStorageChange, 1000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, []);
+
   // Expose function to add archived order (called from Closures.js and OrdersTable)
   useImperativeHandle(ref, () => ({
     addArchivedOrder: (order) => {
+      console.log('📦 Adding archived order:', order);
       setArchivedOrders((prev) => {
-        // Avoid duplicates
-        if (prev.some((o) => o.id === order.id)) {
+        // Avoid duplicates - check by ID (handle both number and string comparisons)
+        const isDuplicate = prev.some((o) => 
+          Number(o.id) === Number(order.id) || 
+          o.orderNumber === order.orderNumber && o.supplier === order.supplier
+        );
+        
+        if (isDuplicate) {
+          console.log('⚠️ Order already exists in archive, skipping');
           return prev;
         }
+        
         const updated = [...prev, { ...order, status: order.status || 'Received' }];
+        console.log('✅ Added to archive, total orders:', updated.length);
+        
         try {
           window.localStorage.setItem('closureArchivedOrders', JSON.stringify(updated));
+          console.log('💾 Saved archived orders to localStorage');
         } catch (err) {
-          console.error('Failed to save archived orders to localStorage', err);
+          console.error('❌ Failed to save archived orders to localStorage', err);
         }
         return updated;
       });

@@ -22,8 +22,8 @@ const LabelOrderPage = () => {
     { id: 3, brand: 'TPS Plant F...', product: 'Cherry Tree...', size: 'Gallon', qty: 250, labelStatus: 'Needs Proofing', inventory: 5000, toOrder: 2000 },
   ];
 
-  // Navigation tab state - default to 'receivePO' when viewing an existing order
-  const [activeTab, setActiveTab] = useState(isViewMode ? 'receivePO' : 'addProducts');
+  // Navigation tab state - default to 'addProducts' always (can view order items or edit)
+  const [activeTab, setActiveTab] = useState('addProducts');
   const [tableMode, setTableMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showExportModal, setShowExportModal] = useState(false);
@@ -47,8 +47,10 @@ const LabelOrderPage = () => {
   
   // Edit and change tracking state
   const [originalOrder, setOriginalOrder] = useState(null); // Store original order for comparison
+  const [originalOrderLines, setOriginalOrderLines] = useState([]); // Store original order lines with qty
   const [previousRecipients, setPreviousRecipients] = useState([]); // Store previous recipients
-  const [isEditMode, setIsEditMode] = useState(false); // Track if we're editing an existing order
+  const [isEditOrderMode, setIsEditOrderMode] = useState(false); // Track if we're editing an existing order
+  const [isEditMode, setIsEditMode] = useState(false); // Track if we're editing an existing order (legacy)
   const [selectedRecipients, setSelectedRecipients] = useState([]); // Selected recipients for update
   const [newRecipientEmail, setNewRecipientEmail] = useState(''); // New recipient email input
   const [currentRecipients, setCurrentRecipients] = useState([]); // Current recipients list
@@ -58,14 +60,17 @@ const LabelOrderPage = () => {
   const statusButtonRefs = useRef({});
   const statusMenuRefs = useRef({});
 
-  // Initialize order lines - all items are available for selection
+  // Initialize order lines - items in view mode are already "added", new orders start with all items not added
   const [orderLines, setOrderLines] = useState(() => {
     return allLines.map((line, index) => {
-      const updatedLine = { ...line, added: false };
-      // Ensure first 3 rows have correct sizes
-      if (index === 0) updatedLine.size = '8oz';
-      if (index === 1) updatedLine.size = 'Quart';
-      if (index === 2) updatedLine.size = 'Gallon';
+      // In view mode, all passed lines are part of the order (added = true)
+      const updatedLine = { ...line, added: isViewMode };
+      // Ensure first 3 rows have correct sizes (for default lines only)
+      if (!isViewMode) {
+        if (index === 0) updatedLine.size = '8oz';
+        if (index === 1) updatedLine.size = 'Quart';
+        if (index === 2) updatedLine.size = 'Gallon';
+      }
       return updatedLine;
     });
   });
@@ -77,25 +82,91 @@ const LabelOrderPage = () => {
 
   // Filter lines based on search
   const filteredLines = useMemo(() => {
-    if (!searchQuery.trim()) return orderLines;
+    // In edit mode on receivePO tab, show only added items (the order items)
+    // As users add more items, they will appear in receivePO
+    let linesToFilter = orderLines;
+    if (isEditOrderMode && activeTab === 'receivePO') {
+      // Show only added items in receivePO when editing
+      linesToFilter = orderLines.filter((line) => line.added);
+    }
+    
+    if (!searchQuery.trim()) return linesToFilter;
     const query = searchQuery.toLowerCase();
-    return orderLines.filter(
+    return linesToFilter.filter(
       (line) =>
         line.brand.toLowerCase().includes(query) ||
         line.product.toLowerCase().includes(query) ||
         line.size.toLowerCase().includes(query)
     );
-  }, [orderLines, searchQuery]);
+  }, [orderLines, searchQuery, isEditOrderMode, activeTab]);
 
-  // Calculate summary based on added items
+  // Calculate summary based on added items (or all lines in receivePO)
   const summary = useMemo(() => {
-    const totalLabels = addedLines.reduce((sum, line) => sum + (line.qty || 0), 0);
+    // In receivePO tab, use all orderLines (or only added if in edit mode); otherwise use only added lines
+    let linesToUse;
+    if (activeTab === 'receivePO') {
+      // In edit mode, show only added items; otherwise show all orderLines
+      linesToUse = isEditOrderMode ? addedLines : orderLines;
+    } else {
+      linesToUse = addedLines;
+    }
+    const totalLabels = linesToUse.reduce((sum, line) => sum + (line.qty || 0), 0);
+    
+    // Get inventory data to find labelSize if not in line
+    let inventoryData = [];
+    try {
+      const stored = window.localStorage.getItem('labelsInventory');
+      inventoryData = stored ? JSON.parse(stored) : [];
+    } catch {}
+    
+    // Calculate label size counts
+    const size5x8 = linesToUse.reduce((sum, line) => {
+      // Try to get labelSize from line, or find it in inventory by matching brand/product/size
+      let labelSize = line.labelSize;
+      if (!labelSize && inventoryData.length > 0) {
+        const inventoryItem = inventoryData.find(
+          inv => inv.brand === line.brand && 
+                 inv.product === line.product && 
+                 inv.size === line.size
+        );
+        labelSize = inventoryItem?.labelSize || '';
+      }
+      
+      if (labelSize && labelSize.includes('5"') && labelSize.includes('8"')) {
+        return sum + (line.qty || 0);
+      }
+      return sum;
+    }, 0);
+    
+    const size5375x45 = linesToUse.reduce((sum, line) => {
+      // Try to get labelSize from line, or find it in inventory by matching brand/product/size
+      let labelSize = line.labelSize;
+      if (!labelSize && inventoryData.length > 0) {
+        const inventoryItem = inventoryData.find(
+          inv => inv.brand === line.brand && 
+                 inv.product === line.product && 
+                 inv.size === line.size
+        );
+        labelSize = inventoryItem?.labelSize || '';
+      }
+      
+      if (labelSize && labelSize.includes('5.375') && labelSize.includes('4.5')) {
+        return sum + (line.qty || 0);
+      }
+      return sum;
+    }, 0);
+    
+    // Calculate estimated cost (assuming $0.2045 per label based on $562.25 / 2750 labels)
+    const estCost = totalLabels * 0.2045;
+    
     return {
-      products: addedLines.length,
+      products: linesToUse.length,
       totalLabels,
-      estCost: 0,
+      estCost,
+      size5x8,
+      size5375x45,
     };
-  }, [addedLines]);
+  }, [addedLines, orderLines, activeTab]);
 
   // Initialize edit mode and store original order
   useEffect(() => {
@@ -107,6 +178,12 @@ const LabelOrderPage = () => {
         orderNumber,
         lines: originalAdded,
       });
+      // Store original order lines with their quantities for edit tracking
+      setOriginalOrderLines(state.lines.map(line => ({
+        ...line,
+        originalQty: line.qty,
+        added: true, // Items in view mode are all "added" already
+      })));
       // Load previous recipients from localStorage or state
       const storedRecipients = localStorage.getItem(`labelOrder_${orderId}_recipients`);
       if (storedRecipients) {
@@ -116,6 +193,136 @@ const LabelOrderPage = () => {
       }
     }
   }, [isViewMode, orderId, orderNumber, state.lines]);
+
+  // Handle Edit Order - load all inventory items and mark existing order items
+  const handleEditOrder = () => {
+    // Get all inventory items from localStorage
+    let inventoryData = [];
+    try {
+      const stored = window.localStorage.getItem('labelsInventory');
+      inventoryData = stored ? JSON.parse(stored) : [];
+    } catch {}
+    
+    // If no inventory data, create default data (same as InventoryTable)
+    if (inventoryData.length === 0) {
+      inventoryData = Array.from({ length: 15 }, (_, i) => ({
+        id: i + 1,
+        status: i === 9 || i === 14 ? 'Needs Proofing' : 'Up to Date',
+        brand: 'Total Pest Spray',
+        product: 'Cherry Tree Fertilizer',
+        size: 'Gallon',
+        labelLink: 'https://drive.google.com/file/d/1a2b3c4d5e6f7g8h9i0j/view',
+        labelSize: '5.375" x 4.5"',
+        inventory: 25000,
+      }));
+    }
+    
+    // Get the original order items - use originalOrderLines if available, otherwise use state.lines
+    // When viewing an order, state.lines contains ONLY the items that were in the order (saved as addedLines)
+    // So all items in state.lines should be considered as "in the order"
+    const originalOrderItems = originalOrderLines.length > 0 
+      ? originalOrderLines.filter(line => line.added !== false) // Filter to only added items
+      : (state.lines || []); // state.lines already contains only order items when viewing
+    
+    console.log('📦 Edit Order - Inventory loaded:', inventoryData.length, 'items');
+    console.log('📋 Original order items (added only):', originalOrderItems.length, 'items');
+    
+    // Create a map of original order items by ID for quick lookup
+    // Only match items that have the exact same ID as items in the original order
+    const originalOrderItemsById = new Map();
+    originalOrderItems.forEach(item => {
+      if (item.id != null) {
+        originalOrderItemsById.set(item.id, item);
+      }
+    });
+    
+    console.log('📋 Original order item IDs:', Array.from(originalOrderItemsById.keys()));
+    
+    // Map inventory items and mark items already in the order
+    const allInventoryLines = inventoryData.map((inv) => {
+      // Only match by ID - this ensures we only mark the exact items that were in the order
+      const existingLine = originalOrderItemsById.get(inv.id);
+      
+      if (existingLine) {
+        // This item was in the original order (matched by ID) - mark it as added
+        return {
+          id: inv.id,
+          brand: inv.brand,
+          product: inv.product,
+          size: inv.size,
+          qty: existingLine.qty || existingLine.originalQty || 0,
+          labelStatus: inv.status,
+          inventory: inv.inventory,
+          toOrder: inv.inventory,
+          labelSize: inv.labelSize,
+          added: true, // Only items originally in the order are marked as added
+          originalQty: existingLine.qty || existingLine.originalQty || 0,
+          isOriginalItem: true,
+        };
+      }
+      
+      // This item was NOT in the original order - user must decide to add it
+      return {
+        id: inv.id,
+        brand: inv.brand,
+        product: inv.product,
+        size: inv.size,
+        qty: 2000, // Start with 2000 qty for new items in edit mode (user can adjust)
+        labelStatus: inv.status,
+        inventory: inv.inventory,
+        toOrder: inv.inventory,
+        labelSize: inv.labelSize,
+        added: false, // New items are NOT added by default - user decides
+        originalQty: 0,
+        isOriginalItem: false,
+      };
+    });
+    
+    console.log('✅ All inventory lines prepared:', allInventoryLines.length, 'items');
+    
+    setOrderLines(allInventoryLines);
+    setIsEditOrderMode(true);
+    setActiveTab('addProducts'); // Switch to addProducts tab when editing order
+  };
+
+  // Handle Cancel Edit - restore original order lines
+  const handleCancelEdit = () => {
+    // Restore original order lines
+    setOrderLines(originalOrderLines);
+    setIsEditOrderMode(false);
+    setActiveTab('addProducts'); // Stay on addProducts tab
+  };
+
+  // Handle Save Changes - show export modal for edited orders
+  const handleSaveChanges = () => {
+    // Get all added lines with their current quantities
+    const editedLines = orderLines.filter((line) => line.added).map((line) => ({
+      ...line,
+      added: true,
+    }));
+    
+    // Show export modal instead of directly navigating
+    setShowExportModal(true);
+  };
+
+  // Calculate qty difference for display
+  const getQtyDifference = (line) => {
+    if (!isEditOrderMode) return null;
+    
+    // For original items, show the difference from original qty
+    if (line.isOriginalItem) {
+      const diff = line.qty - (line.originalQty || 0);
+      if (diff === 0) return null;
+      return diff > 0 ? `+${diff.toLocaleString()}` : diff.toLocaleString();
+    }
+    
+    // For new items being added, show the quantity as "+qty"
+    if (line.added && line.qty > 0) {
+      return `+${line.qty.toLocaleString()}`;
+    }
+    
+    return null;
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -255,9 +462,15 @@ const LabelOrderPage = () => {
 
   const handleAddProduct = (id) => {
     setOrderLines((prev) =>
-      prev.map((line) =>
-        line.id === id ? { ...line, added: !line.added } : line
-      )
+      prev.map((line) => {
+        if (line.id === id) {
+          const newAdded = !line.added;
+          // When adding an item in edit mode, set qty to 2000 if it's 0
+          const newQty = (newAdded && isEditOrderMode && (line.qty === 0 || !line.qty)) ? 2000 : line.qty;
+          return { ...line, added: newAdded, qty: newQty };
+        }
+        return line;
+      })
     );
   };
 
@@ -377,16 +590,35 @@ const LabelOrderPage = () => {
     }
     
     setShowExportModal(false);
-    navigate('/dashboard/supply-chain/labels', {
-      state: {
-        newLabelOrder: {
-          orderNumber: orderNumber,
-          supplierName: supplier.name,
-          lines: addedLines,
+    
+    // If editing an order, navigate with edited order data
+    if (isEditOrderMode && orderId) {
+      const editedLines = orderLines.filter((line) => line.added).map((line) => ({
+        ...line,
+        added: true,
+      }));
+      
+      navigate('/dashboard/supply-chain/labels', {
+        state: {
+          editedOrderId: orderId,
+          editedOrderNumber: orderNumber,
+          editedLines: editedLines,
         },
-      },
-      replace: false,
-    });
+        replace: false,
+      });
+    } else {
+      // For new orders, navigate with new order data
+      navigate('/dashboard/supply-chain/labels', {
+        state: {
+          newLabelOrder: {
+            orderNumber: orderNumber,
+            supplierName: supplier.name,
+            lines: addedLines,
+          },
+        },
+        replace: false,
+      });
+    }
   };
 
   const generateCSV = (includeChanges = true) => {
@@ -614,12 +846,30 @@ const LabelOrderPage = () => {
                   SUPPLIER
             </div>
                 <div style={{ 
-                  fontSize: '16px', 
-                  fontWeight: 400,
-                  color: isDarkMode ? '#FFFFFF' : '#000000',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
                 }}>
-                  {supplier.name}
-            </div>
+                  {supplier.logoSrc && (
+                    <img
+                      src={supplier.logoSrc}
+                      alt={supplier.logoAlt || `${supplier.name} logo`}
+                      style={{
+                        width: '24px',
+                        height: '24px',
+                        objectFit: 'contain',
+                        objectPosition: 'center',
+                      }}
+                    />
+                  )}
+                  <div style={{ 
+                    fontSize: '16px', 
+                    fontWeight: 400,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                  }}>
+                    {supplier.name}
+                  </div>
+                </div>
             </div>
           </div>
           </div>
@@ -724,7 +974,7 @@ const LabelOrderPage = () => {
               whiteSpace: 'nowrap',
             }}
           >
-            {(isViewMode && orderId) || showExportModal ? (
+            {(isViewMode && orderId && !isEditOrderMode) || showExportModal ? (
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10B981' }} />
             ) : (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -754,7 +1004,7 @@ const LabelOrderPage = () => {
               whiteSpace: 'nowrap',
             }}
           >
-            {(isViewMode && orderId) || showExportModal ? (
+            {(isViewMode && orderId && !isEditOrderMode) || showExportModal ? (
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10B981' }} />
             ) : (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -782,7 +1032,7 @@ const LabelOrderPage = () => {
               whiteSpace: 'nowrap',
             }}
           >
-            {(isViewMode && orderId) ? (
+            {(isViewMode && orderId && !isEditOrderMode) ? (
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10B981' }} />
             ) : (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -959,8 +1209,8 @@ const LabelOrderPage = () => {
               >
                 QTY
               </th>
-              {/* TIMELINE column - only show in addProducts tab or when creating new order */}
-              {(activeTab === 'addProducts' || !isViewMode) && (
+              {/* TIMELINE column - show in addProducts tab when creating new order or editing order */}
+              {(activeTab === 'addProducts' && (!isViewMode || isEditOrderMode)) && (
               <th
                 className="text-xs font-bold text-white uppercase tracking-wider relative"
                 style={{
@@ -975,7 +1225,7 @@ const LabelOrderPage = () => {
                   minWidth: 400,
                 }}
               >
-                {!isViewMode && (
+                {(
                 <div className="absolute inset-0" style={{ height: '40px', maxHeight: '40px' }}>
                   {/* Today label (top left) */}
                   <div className="absolute" style={{ left: '24px', top: '2px' }}>
@@ -1093,9 +1343,9 @@ const LabelOrderPage = () => {
                 </td>
               </tr>
             ) : (
-              filteredLines.slice(0, 3).map((line, index) => {
-                const timelineData = !isViewMode ? getTimelineData(line.inventory, line.toOrder, index) : null;
-                const displayedRows = filteredLines.slice(0, 3);
+              filteredLines.map((line, index) => {
+                const timelineData = (!isViewMode || isEditOrderMode) ? getTimelineData(line.inventory, line.toOrder, index) : null;
+                const displayedRows = filteredLines;
                 
                 return (
                   <tr 
@@ -1145,12 +1395,17 @@ const LabelOrderPage = () => {
                       {line.size}
                     </td>
 
-                    {/* ADD - only show in addProducts tab or when creating new order */}
-                    {(activeTab === 'addProducts' || !isViewMode) && (
+                    {/* ADD - only show in addProducts tab or when creating new order or in edit order mode */}
+                    {(activeTab === 'addProducts' || !isViewMode || isEditOrderMode) && (
                     <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', maxHeight: '40px', minHeight: '40px', verticalAlign: 'middle', lineHeight: '1', boxShadow: 'inset 4px 0 8px -4px rgba(0, 0, 0, 0.15)', boxSizing: 'border-box' }}>
                       <button
                         type="button"
-                        onClick={() => handleAddProduct(line.id)}
+                        onClick={() => {
+                          // In view mode (not editing), don't allow toggling
+                          if (isViewMode && !isEditOrderMode) return;
+                          handleAddProduct(line.id);
+                        }}
+                        disabled={isViewMode && !isEditOrderMode}
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
@@ -1167,7 +1422,7 @@ const LabelOrderPage = () => {
                           fontSize: '14px',
                           fontWeight: 400,
                           fontFamily: 'system-ui, -apple-system, sans-serif',
-                          cursor: 'pointer',
+                          cursor: (isViewMode && !isEditOrderMode) ? 'default' : 'pointer',
                           transition: 'background-color 0.2s',
                           boxShadow: line.added ? '0 1px 2px 0 rgba(0, 0, 0, 0.1)' : 'none',
                           width: '72px',
@@ -1181,9 +1436,10 @@ const LabelOrderPage = () => {
                           overflow: 'hidden',
                           margin: 0,
                           verticalAlign: 'middle',
+                          opacity: (isViewMode && !isEditOrderMode) ? 1 : 1,
                         }}
                         onMouseEnter={(e) => {
-                          if (!line.added) {
+                          if (!line.added && !(isViewMode && !isEditOrderMode)) {
                             e.target.style.backgroundColor = '#2563EB';
                           }
                         }}
@@ -1323,6 +1579,7 @@ const LabelOrderPage = () => {
                     </div>
                         )
                       ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
                     <div 
                       style={{
                             display: 'inline-flex',
@@ -1350,7 +1607,7 @@ const LabelOrderPage = () => {
                               const value = parseInt(e.target.value) || 0;
                               handleQtyChange(line.id, value);
                             }}
-                            readOnly={!editingRowId || editingRowId !== line.id}
+                            readOnly={!isEditOrderMode}
                             style={{ 
                               color: editingRowId === line.id ? '#92400E' : '#000000', 
                               fontSize: '14px', 
@@ -1364,19 +1621,33 @@ const LabelOrderPage = () => {
                               padding: 0,
                               margin: 0,
                               MozAppearance: 'textfield',
-                              cursor: editingRowId === line.id ? 'text' : 'default',
+                              cursor: isEditOrderMode ? 'text' : 'default',
                             }}
                             className="[&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             min="0"
                           />
                     </div>
+                          {/* Show qty difference in edit order mode */}
+                          {isEditOrderMode && getQtyDifference(line) && (
+                            <span 
+                              style={{ 
+                                color: getQtyDifference(line).startsWith('+') ? '#22C55E' : '#EF4444',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {getQtyDifference(line)}
+                            </span>
+                          )}
+                        </div>
                       )}
                     </td>
 
-                    {/* Timeline - only show in addProducts tab or when creating new order */}
-                    {(activeTab === 'addProducts' || !isViewMode) && (
+                    {/* Timeline - show in addProducts tab when creating new order or editing order */}
+                    {(activeTab === 'addProducts' && (!isViewMode || isEditOrderMode)) && (
                     <td style={{ padding: '0.65rem 1rem', minWidth: '380px', height: '40px', maxHeight: '40px', minHeight: '40px', verticalAlign: 'middle', lineHeight: '1', boxSizing: 'border-box', position: 'relative' }}>
-                      {!isViewMode && timelineData && (
+                      {timelineData && (
                     <div 
                       style={{
                             position: 'relative',
@@ -1738,106 +2009,276 @@ const LabelOrderPage = () => {
 
       {/* Footer - Sticky */}
       <div 
-        className="fixed bottom-0 left-64 right-0 flex items-center justify-between z-50"
+        className="fixed bottom-0 left-64 right-0 z-50"
         style={{ 
-          padding: '16px 24px',
           backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
           borderTop: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
-          borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+          padding: '16px 24px',
         }}
       >
-        <div className="flex items-center gap-8">
-          <div className="flex flex-col">
-            <span 
-              className="font-medium text-xs uppercase tracking-wide"
-              style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280' }}
-            >
-              PRODUCTS
-            </span>
-            <span 
-              className="font-bold text-xl mt-1" 
-              style={{ color: isDarkMode ? '#F9FAFB' : '#1e293b' }}
-            >
-              {summary.products}
-            </span>
-          </div>
-          <div className="flex flex-col">
-            <span 
-              className="font-medium text-xs uppercase tracking-wide"
-              style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280' }}
-            >
-              TOTAL LABELS
-            </span>
-            <span 
-              className="font-bold text-xl mt-1" 
-              style={{ color: isDarkMode ? '#F9FAFB' : '#1e293b' }}
-            >
-              {summary.totalLabels.toLocaleString()}
-            </span>
-          </div>
-          <div className="flex flex-col">
-            <span 
-              className="font-medium text-xs uppercase tracking-wide"
-              style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280' }}
-            >
-              EST COST
-            </span>
-            <span 
-              className="font-bold text-xl mt-1" 
-              style={{ color: isDarkMode ? '#F9FAFB' : '#1e293b' }}
-            >
-              ${summary.estCost.toLocaleString()}
-            </span>
+        <div className="flex items-center justify-between gap-6">
+          {/* Summary Table - Show in addProducts, receivePO tabs, and edit mode */}
+          {(activeTab === 'addProducts' || activeTab === 'receivePO' || isEditOrderMode) && (
+            <div style={{ flex: 1 }}>
+              <table
+                style={{
+                  borderCollapse: 'separate',
+                  borderSpacing: 0,
+                  backgroundColor: 'transparent',
+                }}
+              >
+                <thead>
+                  <tr>
+                    <th
+                      style={{
+                        padding: '8px 16px',
+                        textAlign: 'left',
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                      }}
+                    >
+                      PRODUCTS
+                    </th>
+                    <th
+                      style={{
+                        padding: '8px 16px',
+                        textAlign: 'left',
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                      }}
+                    >
+                      TOTAL LABELS
+                    </th>
+                    <th
+                      style={{
+                        padding: '8px 16px',
+                        textAlign: 'left',
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                      }}
+                    >
+                      EST COST
+                    </th>
+                    <th
+                      style={{
+                        padding: '8px 16px',
+                        textAlign: 'left',
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                      }}
+                    >
+                      5" X 8"
+                    </th>
+                    <th
+                      style={{
+                        padding: '8px 16px',
+                        textAlign: 'left',
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                      }}
+                    >
+                      5.375" X 4.5"
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td
+                      style={{
+                        padding: '8px 16px',
+                        fontSize: '14px',
+                        fontWeight: 700,
+                        color: isDarkMode ? '#F9FAFB' : '#1F2937',
+                      }}
+                    >
+                      {summary.products}
+                    </td>
+                    <td
+                      style={{
+                        padding: '8px 16px',
+                        fontSize: '14px',
+                        fontWeight: 700,
+                        color: isDarkMode ? '#F9FAFB' : '#1F2937',
+                      }}
+                    >
+                      {summary.totalLabels.toLocaleString()}
+                    </td>
+                    <td
+                      style={{
+                        padding: '8px 16px',
+                        fontSize: '14px',
+                        fontWeight: 700,
+                        color: isDarkMode ? '#F9FAFB' : '#1F2937',
+                      }}
+                    >
+                      ${summary.estCost.toFixed(2)}
+                    </td>
+                    <td
+                      style={{
+                        padding: '8px 16px',
+                        fontSize: '14px',
+                        fontWeight: 700,
+                        color: isDarkMode ? '#F9FAFB' : '#1F2937',
+                      }}
+                    >
+                      {summary.size5x8.toLocaleString()}
+                    </td>
+                    <td
+                      style={{
+                        padding: '8px 16px',
+                        fontSize: '14px',
+                        fontWeight: 700,
+                        color: isDarkMode ? '#F9FAFB' : '#1F2937',
+                      }}
+                    >
+                      {summary.size5375x45.toLocaleString()}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+          
+          {/* Action Buttons */}
+          <div className="flex items-center gap-3">
+            {/* Edit Order Mode Buttons */}
+            {isEditOrderMode ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="inline-flex items-center gap-2 text-xs font-semibold transition-colors"
+                  style={{
+                    backgroundColor: 'transparent',
+                    color: '#6B7280',
+                    padding: '8px 12px',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.opacity = '0.8';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = '1';
+                  }}
+                >
+                  Cancel Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveChanges}
+                  className="inline-flex items-center gap-2 text-xs font-semibold rounded-lg px-4 py-2 transition-colors"
+                  style={{
+                    backgroundColor: '#007AFF',
+                    color: '#FFFFFF',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#0056CC';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#007AFF';
+                  }}
+                >
+                  Save Changes
+                </button>
+              </>
+            ) : (
+              <>
+                {/* View Mode - Edit Order button */}
+                {isViewMode && activeTab === 'addProducts' && !isEditOrderMode && (
+                  <button
+                    type="button"
+                    onClick={handleEditOrder}
+                    className="inline-flex items-center gap-2 text-xs font-semibold transition-colors"
+                    style={{
+                      backgroundColor: 'transparent',
+                      color: '#6B7280',
+                      padding: '8px 12px',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.opacity = '0.8';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.opacity = '1';
+                    }}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Edit Order
+                  </button>
+                )}
+                
+                {/* Export button */}
+                {!isViewMode && (
+                  <button
+                    type="button"
+                    onClick={handleOpenExportModal}
+                    className="inline-flex items-center gap-2 text-xs font-semibold transition-colors"
+                    style={{
+                      backgroundColor: 'transparent',
+                      color: '#3B82F6',
+                      padding: '8px 12px',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.opacity = '0.8';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.opacity = '1';
+                    }}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                    </svg>
+                    Export
+                  </button>
+                )}
+                
+                {/* Complete/Receive Order button */}
+                <button
+                  type="button"
+                  onClick={handleCompleteOrder}
+                  disabled={!isViewMode && addedLines.length === 0}
+                  className="inline-flex items-center gap-2 text-xs font-semibold rounded-lg px-4 py-2 transition-colors"
+                  style={{
+                    backgroundColor: (isViewMode || addedLines.length > 0) ? '#007AFF' : (isDarkMode ? '#374151' : '#D1D5DB'),
+                    color: (isViewMode || addedLines.length > 0) ? '#FFFFFF' : (isDarkMode ? '#6B7280' : '#9CA3AF'),
+                    cursor: (isViewMode || addedLines.length > 0) ? 'pointer' : 'not-allowed',
+                    opacity: (isViewMode || addedLines.length > 0) ? 1 : 0.6,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (isViewMode || addedLines.length > 0) {
+                      e.currentTarget.style.backgroundColor = '#0056CC';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (isViewMode || addedLines.length > 0) {
+                      e.currentTarget.style.backgroundColor = '#007AFF';
+                    } else {
+                      e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#D1D5DB';
+                    }
+                  }}
+                >
+                  {activeTab === 'receivePO' ? 'Receive Order' : 'Complete Order'}
+                </button>
+              </>
+            )}
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={handleOpenExportModal}
-            className="inline-flex items-center gap-2 text-white text-xs font-semibold rounded-lg px-4 py-2 transition-colors"
-            style={{
-              backgroundColor: '#3B82F6',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#2563EB';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#3B82F6';
-            }}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Export
-          </button>
-          <button
-            type="button"
-            onClick={handleCompleteOrder}
-            disabled={!isViewMode && addedLines.length === 0}
-            className="inline-flex items-center gap-2 text-xs font-semibold rounded-lg px-4 py-2 transition-colors"
-            style={{
-              backgroundColor: (isViewMode || addedLines.length > 0) ? '#007AFF' : (isDarkMode ? '#374151' : '#D1D5DB'),
-              color: (isViewMode || addedLines.length > 0) ? '#FFFFFF' : (isDarkMode ? '#6B7280' : '#9CA3AF'),
-              cursor: (isViewMode || addedLines.length > 0) ? 'pointer' : 'not-allowed',
-              opacity: (isViewMode || addedLines.length > 0) ? 1 : 0.6,
-            }}
-            onMouseEnter={(e) => {
-              if (isViewMode || addedLines.length > 0) {
-                e.currentTarget.style.backgroundColor = '#0056CC';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (isViewMode || addedLines.length > 0) {
-                e.currentTarget.style.backgroundColor = '#007AFF';
-              } else {
-                e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#D1D5DB';
-              }
-            }}
-          >
-            Complete Order
-          </button>
-        </div>
-                    </div>
+      </div>
 
       {/* Export Modal */}
       {showExportModal && (
@@ -1916,8 +2357,7 @@ const LabelOrderPage = () => {
                   alignItems: 'center',
                   gap: '12px',
                   padding: '12px 16px',
-                  backgroundColor: '#FFFFFF',
-                  border: '1px solid #007AFF',
+                  backgroundColor: '#E0F2FE', // Light blue background
                   borderRadius: '8px',
                 }}
               >
@@ -1937,8 +2377,8 @@ const LabelOrderPage = () => {
                 >
                   TPS_LabelOrder_{orderNumber}.csv
                 </span>
-          </div>
-        </div>
+              </div>
+            </div>
 
             {/* Buttons */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>

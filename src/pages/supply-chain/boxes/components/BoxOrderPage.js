@@ -15,15 +15,41 @@ const BoxOrderPage = () => {
   const isCreateMode = mode === 'create'; // Detailed view (second image)
   const orderId = state.orderId || null;
   
-  // Default box order lines based on inventory (NO PALLETS)
-  const initialLines = state.lines || [
-    { id: 1, name: '12 x 10 x 12', supplierInventory: 'Auto', unitsNeeded: 29120, qty: 29120, selected: false },
-    { id: 2, name: '14 x 14 x 8', supplierInventory: 'Auto', unitsNeeded: 5040, qty: 5040, selected: false },
-    { id: 3, name: '12 x 9 x 12', supplierInventory: 'Auto', unitsNeeded: 29120, qty: 29120, selected: false },
-    { id: 4, name: '13 x 10 x 10', supplierInventory: 'Auto', unitsNeeded: 29120, qty: 29120, selected: false },
-    { id: 5, name: '12 x 6 x 12', supplierInventory: 'Auto', unitsNeeded: 29120, qty: 29120, selected: false },
-    { id: 6, name: '10 x 10 x 10', supplierInventory: 'Auto', unitsNeeded: 29120, qty: 29120, selected: false },
-  ];
+  // Default box order lines with pallets - for receive mode
+  const getInitialLines = () => {
+    if (state.lines && state.lines.length > 0) {
+      // If lines are provided, use them but ensure they have pallets
+      // Transform box sizes to packaging names
+      // Limit to first 3 items only
+      const limitedLines = state.lines.slice(0, 3);
+      
+      return limitedLines.map((line, index) => {
+        // Map box sizes to packaging names for both receive and create mode
+        let packagingName = line.name;
+        // If it's a box size format (e.g., "12 x 10 x 12"), map to packaging name
+        if (line.name && line.name.includes('x')) {
+          // Use first 3 items as packaging names
+          const packagingNames = ['8oz', 'Quart', 'Gallon'];
+          packagingName = packagingNames[index] || line.name;
+        }
+        
+        return {
+          ...line,
+          name: packagingName,
+          pallets: line.pallets || 4,
+          selected: line.selected !== undefined ? line.selected : (index < 2), // First two checked by default
+        };
+      });
+    }
+    // Default data matching the second image - only 3 rows
+    return [
+      { id: 1, name: '8oz', qty: 29120, pallets: 4, selected: true },
+      { id: 2, name: 'Quart', qty: 5040, pallets: 4, selected: true },
+      { id: 3, name: 'Gallon', qty: 768, pallets: 4, selected: false },
+    ];
+  };
+
+  const initialLines = getInitialLines();
 
   const [orderLines, setOrderLines] = useState(initialLines);
 
@@ -54,10 +80,29 @@ const BoxOrderPage = () => {
   };
 
   const handleQtyInputChange = (id, value) => {
-    const numValue = Math.max(0, parseInt(value) || 0);
+    const numValue = Math.max(0, parseInt(value.replace(/,/g, '')) || 0);
     setOrderLines((prev) =>
       prev.map((line) =>
         line.id === id ? { ...line, qty: numValue } : line
+      )
+    );
+  };
+
+  const handlePalletsChange = (id, delta) => {
+    setOrderLines((prev) =>
+      prev.map((line) =>
+        line.id === id
+          ? { ...line, pallets: Math.max(0, (line.pallets || 0) + delta) }
+          : line
+      )
+    );
+  };
+
+  const handlePalletsInputChange = (id, value) => {
+    const numValue = Math.max(0, parseInt(value) || 0);
+    setOrderLines((prev) =>
+      prev.map((line) =>
+        line.id === id ? { ...line, pallets: numValue } : line
       )
     );
   };
@@ -132,10 +177,10 @@ const BoxOrderPage = () => {
             >
               <span className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-white/60">
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
               </span>
-              Receive
+              + Receive
             </button>
           )}
           
@@ -193,58 +238,74 @@ const BoxOrderPage = () => {
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto">
+        <div className="rounded-lg overflow-hidden">
           {/* Table header */}
           <div className={themeClasses.headerBg}>
             {isReceiveMode ? (
-              // Simple view: PACKAGING NAME, QTY, checkbox (NO PALLETS)
+              // Receive view: PACKAGING NAME, QTY, PALLETS, checkbox
               <div
                 className="grid"
                 style={{
-                  gridTemplateColumns: '2fr 1.2fr 40px',
+                  gridTemplateColumns: '2fr 1.2fr 1.2fr 40px',
                 }}
               >
-                <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]">
+                <div className="px-4 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]">
                   PACKAGING NAME
                 </div>
-                <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center">
+                <div className="px-4 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center">
                   QTY
                 </div>
-                <div className="px-6 py-3 flex items-center justify-center">
+                <div className="px-4 py-3 text-xs font-bold text-white uppercase tracking-wider text-center">
+                  PALLETS
+                </div>
+                <div className="px-4 py-3 flex items-center justify-center">
                   <input
                     type="checkbox"
                     checked={orderLines.length > 0 && orderLines.every((line) => line.selected)}
                     onChange={handleSelectAll}
                     className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    style={{
+                      accentColor: '#2563EB',
+                      borderColor: orderLines.length > 0 && orderLines.every((line) => line.selected) ? '#2563EB' : '#D1D5DB',
+                      backgroundColor: orderLines.length > 0 && orderLines.every((line) => line.selected) ? '#2563EB' : 'white',
+                    }}
                   />
                 </div>
               </div>
             ) : (
-              // Detailed view: PACKAGING NAME, SUPPLIER INVENTORY, UNITS NEEDED, QTY, checkbox (NO PALLETS)
+              // Create/Ordering view: PACKAGING NAME, SUPPLIER INVENTORY, UNITS NEEDED, QTY, PALLETS, checkbox
               <div
                 className="grid"
                 style={{
-                  gridTemplateColumns: '2fr 1.5fr 1.5fr 1.5fr 40px',
+                  gridTemplateColumns: '2fr 1.5fr 1.5fr 1.5fr 1.5fr 40px',
                 }}
               >
-                <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]">
+                <div className="px-4 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]">
                   PACKAGING NAME
                 </div>
-                <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]">
+                <div className="px-4 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]">
                   SUPPLIER INVENTORY
                 </div>
-                <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]">
+                <div className="px-4 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]">
                   UNITS NEEDED
                 </div>
-                <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]">
+                <div className="px-4 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center">
                   QTY
                 </div>
-                <div className="px-6 py-3 flex items-center justify-center">
+                <div className="px-4 py-3 text-xs font-bold text-white uppercase tracking-wider text-center">
+                  PALLETS
+                </div>
+                <div className="px-4 py-3 flex items-center justify-center">
                   <input
                     type="checkbox"
                     checked={orderLines.length > 0 && orderLines.every((line) => line.selected)}
                     onChange={handleSelectAll}
                     className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    style={{
+                      accentColor: '#2563EB',
+                      borderColor: orderLines.length > 0 && orderLines.every((line) => line.selected) ? '#2563EB' : '#D1D5DB',
+                      backgroundColor: orderLines.length > 0 && orderLines.every((line) => line.selected) ? '#2563EB' : 'white',
+                    }}
                   />
                 </div>
               </div>
@@ -252,76 +313,71 @@ const BoxOrderPage = () => {
           </div>
 
           {/* Table body */}
-          <div>
+          <div className="bg-white">
             {orderLines.map((line, index) => (
               <div
                 key={line.id}
-                className={`grid text-sm ${themeClasses.rowHover} transition-colors`}
+                className="grid text-sm bg-white"
                 style={{
-                  gridTemplateColumns: isReceiveMode ? '2fr 1.2fr 40px' : '2fr 1.5fr 1.5fr 1.5fr 40px',
+                  gridTemplateColumns: isReceiveMode ? '2fr 1.2fr 1.2fr 40px' : '2fr 1.5fr 1.5fr 1.5fr 1.5fr 40px',
                   borderBottom:
                     index === orderLines.length - 1
                       ? 'none'
-                      : isDarkMode
-                      ? '1px solid rgba(75,85,99,0.3)'
                       : '1px solid #e5e7eb',
                 }}
               >
                 {/* Packaging Name */}
-                <div className="px-6 py-3 flex items-center">
-                  <span className={themeClasses.textPrimary}>{line.name}</span>
+                <div className="px-4 py-3 flex items-center">
+                  <span className="text-gray-900">{line.name}</span>
                 </div>
 
                 {/* Supplier Inventory - only in create mode */}
                 {isCreateMode && (
-                  <div className="px-6 py-3 flex items-center">
-                    <span className={themeClasses.textPrimary}>{line.supplierInventory}</span>
+                  <div className="px-4 py-3 flex items-center">
+                    <span className="text-gray-900">{line.supplierInventory || 'Auto'}</span>
                   </div>
                 )}
 
                 {/* Units Needed - only in create mode */}
                 {isCreateMode && (
-                  <div className="px-6 py-3 flex items-center">
-                    <span className={themeClasses.textPrimary}>{line.unitsNeeded.toLocaleString()}</span>
+                  <div className="px-4 py-3 flex items-center">
+                    <span className="text-gray-900">{line.unitsNeeded?.toLocaleString() || '0'}</span>
                   </div>
                 )}
 
                 {/* QTY */}
-                <div className="px-6 py-3 flex items-center">
+                <div className="px-4 py-3 flex items-center justify-center">
                   {isReceiveMode ? (
-                    // Simple input in receive mode
-                    <input
-                      type="number"
-                      min="0"
-                      value={line.qty}
-                      onChange={(e) => handleQtyInputChange(line.id, e.target.value)}
-                      className={`w-full px-2 py-1 text-center border ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.inputText} rounded-none focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                    />
+                    // Plain text display in receive mode - no input box
+                    <span className="text-sm text-gray-900 text-center">
+                      {line.qty?.toLocaleString() || '0'}
+                    </span>
                   ) : (
-                    // Plus/minus buttons in create mode
-                    <div className="flex items-center gap-1">
+                    // Rounded rectangular control with +/- buttons in create mode - all in one container, compact, no borders
+                    <div className="flex items-center rounded-lg bg-gray-100 overflow-hidden" style={{ width: 'fit-content' }}>
                       <button
                         type="button"
                         onClick={() => handleQtyChange(line.id, -1)}
-                        className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-gray-600"
+                        className="px-2 py-1.5 text-gray-600 hover:bg-gray-200 transition-colors flex-shrink-0"
                       >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
                         </svg>
                       </button>
                       <input
                         type="number"
                         min="0"
-                        value={line.qty}
+                        value={line.qty || 0}
                         onChange={(e) => handleQtyInputChange(line.id, e.target.value)}
-                        className={`w-24 px-2 py-1 text-center border ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.inputText} rounded-none focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                        className="px-2 py-1.5 text-center border-0 bg-gray-100 text-gray-900 focus:outline-none focus:ring-0 text-sm"
+                        style={{ width: '70px', minWidth: '70px' }}
                       />
                       <button
                         type="button"
                         onClick={() => handleQtyChange(line.id, 1)}
-                        className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 text-gray-600"
+                        className="px-2 py-1.5 text-gray-600 hover:bg-gray-200 transition-colors flex-shrink-0"
                       >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                         </svg>
                       </button>
@@ -329,13 +385,61 @@ const BoxOrderPage = () => {
                   )}
                 </div>
 
+                {/* PALLETS - show in create mode with +/- buttons */}
+                {isCreateMode && (
+                  <div className="px-4 py-3 flex items-center justify-center">
+                    <div className="flex items-center rounded-lg bg-gray-100 overflow-hidden" style={{ width: 'fit-content' }}>
+                      <button
+                        type="button"
+                        onClick={() => handlePalletsChange(line.id, -1)}
+                        className="px-2 py-1.5 text-gray-600 hover:bg-gray-200 transition-colors flex-shrink-0"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                        </svg>
+                      </button>
+                      <input
+                        type="number"
+                        min="0"
+                        value={line.pallets || 0}
+                        onChange={(e) => handlePalletsInputChange(line.id, e.target.value)}
+                        className="px-2 py-1.5 text-center border-0 bg-gray-100 text-gray-900 focus:outline-none focus:ring-0 text-sm"
+                        style={{ width: '50px', minWidth: '50px' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handlePalletsChange(line.id, 1)}
+                        className="px-2 py-1.5 text-gray-600 hover:bg-gray-200 transition-colors flex-shrink-0"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* PALLETS - only in receive mode */}
+                {isReceiveMode && (
+                  <div className="px-4 py-3 flex items-center justify-center">
+                    <span className="text-sm text-gray-900 text-center">
+                      {line.pallets || '0'}
+                    </span>
+                  </div>
+                )}
+
                 {/* Checkbox */}
-                <div className="px-6 py-3 flex items-center justify-center">
+                <div className="px-4 py-3 flex items-center justify-center">
                   <input
                     type="checkbox"
                     checked={line.selected || false}
                     onChange={() => handleCheckboxChange(line.id)}
                     className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    style={{
+                      accentColor: '#2563EB',
+                      borderColor: line.selected ? '#2563EB' : '#D1D5DB',
+                      backgroundColor: line.selected ? '#2563EB' : 'white',
+                    }}
                   />
                 </div>
               </div>

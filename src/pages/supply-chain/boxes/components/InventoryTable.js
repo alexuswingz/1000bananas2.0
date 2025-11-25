@@ -108,13 +108,16 @@ const InventoryTable = ({ searchQuery = '' }) => {
       const stored = window.localStorage.getItem('boxInventory');
       const boxes = stored ? JSON.parse(stored) : [];
       
+      // Limit to first 3 boxes only
+      const limitedBoxes = boxes.slice(0, 3);
+      
       // Navigate to box order page with simple receive view
       navigate('/dashboard/supply-chain/boxes/order', {
         state: {
           orderNumber: new Date().toISOString().split('T')[0],
           supplier: { name: 'Rhino Container', logoSrc: '/assets/rhino.png' },
           mode: 'receive', // Simple view mode
-          lines: boxes.map((b) => ({
+          lines: limitedBoxes.map((b) => ({
             id: b.id,
             name: b.boxSize,
             supplierInventory: 'Auto',

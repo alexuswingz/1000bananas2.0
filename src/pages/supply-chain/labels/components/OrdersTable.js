@@ -126,6 +126,20 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
         return remaining;
       });
     },
+    updateOrder: (orderId, updates) => {
+      setOrders((prev) => {
+        const updated = prev.map((order) => {
+          if (order.id === orderId) {
+            return { ...order, ...updates };
+          }
+          return order;
+        });
+        try {
+          window.localStorage.setItem('labelOrders', JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+    },
   }));
 
   const handleArchiveOrder = (order) => {
@@ -421,22 +435,41 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
 
                   {/* LABEL ORDER # */}
                   <td style={{ padding: '0.65rem 1rem', verticalAlign: 'middle' }}>
-                    <button
-                      type="button"
-                      onClick={() => onViewOrder(order)}
-                      style={{
-                        color: '#3B82F6',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        textDecoration: 'none',
-                      }}
-                      onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
-                      onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
-                    >
-                      {order.orderNumber}
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => onViewOrder(order)}
+                        style={{
+                          color: '#3B82F6',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          textDecoration: 'none',
+                        }}
+                        onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
+                        onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
+                      >
+                        {order.orderNumber}
+                      </button>
+                      {/* Edited badge - only show if order was edited */}
+                      {order.isEdited && (
+                        <span
+                          style={{
+                            backgroundColor: '#FED7AA', // Light orange background
+                            color: '#C2410C', // Darker orange/brown text
+                            fontSize: '11px',
+                            fontWeight: 500,
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            fontFamily: 'system-ui, -apple-system, sans-serif',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          Edited
+                        </span>
+                      )}
+                    </div>
                   </td>
 
                   {/* SUPPLIER */}
