@@ -66,22 +66,13 @@ const ClosureOrderPage = () => {
   };
 
   const handleReceiveComplete = (isPartial = false) => {
-    // Navigate back with received order info (similar to labels pattern)
+    // If partial receive, update status and keep in orders
+    // If full receive, archive the order
     if (isReceiveMode && orderId) {
-      // Determine if it's actually partial based on checked items
-      const checkedCount = orderLines.filter((line) => line.selected).length;
-      const totalCount = orderLines.length;
-      const allChecked = checkedCount === totalCount && totalCount > 0;
-      
-      // If all items are checked, it's a full receive (not partial)
-      // If isPartial is explicitly passed as true (from popup), respect it
-      const finalIsPartial = isPartial === true ? true : !allChecked;
-      
       navigate('/dashboard/supply-chain/closures', {
         state: {
           receivedOrderId: orderId,
-          receivedOrderNumber: orderNumber,
-          isPartial: finalIsPartial,
+          isPartial: isPartial,
         },
       });
     } else {
@@ -230,8 +221,8 @@ const ClosureOrderPage = () => {
                 onClick={() => {
                   const allChecked = orderLines.every((line) => line.selected);
                   if (allChecked) {
-                    // Full receive – no partial popup
-                    handleReceiveComplete();
+                    // Full receive – archive the order
+                    handleReceiveComplete(false);
                   } else {
                     // Partial receive – show confirmation popup
                     setIsReceiveConfirmOpen(true);

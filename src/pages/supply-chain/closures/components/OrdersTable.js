@@ -93,75 +93,93 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
     }
   }, [location.state, onNewOrderCreated]);
 
-  // Handle received order from navigation state (following labels pattern)
+  // Archive order function (matching boxes/bottles pattern)
+  const handleArchiveOrder = (order) => {
+    // Remove from active orders FIRST and save immediately to localStorage
+    setOrders((prev) => {
+      const remaining = prev.filter((o) => o.id !== order.id);
+      // Save immediately to localStorage before component unmounts
+      try {
+        window.localStorage.setItem('closureOrders', JSON.stringify(remaining));
+      } catch (err) {
+        console.error('Failed to save to localStorage', err);
+      }
+      return remaining;
+    });
+    
+    // Add to archived orders
+    if (archivedOrdersRef && archivedOrdersRef.current) {
+      // Partial orders should become Received when archived
+      archivedOrdersRef.current.addArchivedOrder({
+        ...order,
+        status: order.status === 'Partial' ? 'Received' : (order.status || 'Draft')
+      });
+    } else {
+      // Fallback: save directly to localStorage if ref not available
+      try {
+        const stored = window.localStorage.getItem('closureArchivedOrders');
+        const existing = stored ? JSON.parse(stored) : [];
+        if (!existing.some((o) => o.id === order.id)) {
+          const updated = [...existing, { 
+            ...order, 
+            status: order.status === 'Partial' ? 'Received' : (order.status || 'Draft')
+          }];
+          window.localStorage.setItem('closureArchivedOrders', JSON.stringify(updated));
+        }
+      } catch (err) {
+        console.error('Failed to save to localStorage', err);
+      }
+    }
+    
+    // Call parent callback to switch to archive tab
+    if (onArchiveOrder) {
+      onArchiveOrder(order);
+    }
+  };
+
+  // Handle received orders (from navigation state) - matching bottles pattern
   useEffect(() => {
-    const receivedOrderId = location.state?.receivedOrderId;
-    const isPartial = location.state?.isPartial === true;
+    const receivedOrderId = location.state && location.state.receivedOrderId;
+    const isPartial = location.state && location.state.isPartial;
     
     if (receivedOrderId) {
-      if (isPartial) {
-        // Partial receive - update status and keep in ordering
-        setOrders((prev) => {
-          const updated = prev.map((order) => {
-            if (Number(order.id) === Number(receivedOrderId)) {
-              return {
-                ...order,
-                status: 'Partial',
-              };
+      setOrders((prev) => {
+        const order = prev.find((o) => o.id === receivedOrderId);
+        if (order) {
+          if (isPartial) {
+            // Partial receive - update status and keep in orders
+            const updated = prev.map((o) =>
+              o.id === receivedOrderId
+                ? { ...o, status: 'Partial' }
+                : o
+            );
+            try {
+              window.localStorage.setItem('closureOrders', JSON.stringify(updated));
+            } catch {}
+            return updated;
+          } else {
+            // Full receive - archive the order
+            // Remove from active orders
+            const remaining = prev.filter((o) => o.id !== receivedOrderId);
+            try {
+              window.localStorage.setItem('closureOrders', JSON.stringify(remaining));
+            } catch {}
+            // Archive the order with Received status
+            const archivedOrder = { ...order, status: 'Received' };
+            if (archivedOrdersRef && archivedOrdersRef.current) {
+              archivedOrdersRef.current.addArchivedOrder(archivedOrder);
             }
-            return order;
-          });
-          
-          try {
-            window.localStorage.setItem('closureOrders', JSON.stringify(updated));
-          } catch (err) {
-            console.error('Failed to update closure orders in localStorage', err);
+            if (onArchiveOrder) {
+              onArchiveOrder(archivedOrder);
+            }
+            return remaining;
           }
-          
-          // Clear navigation state
-          if (window.history && window.history.replaceState) {
-            window.history.replaceState(
-              { ...location.state, receivedOrderId: null, receivedOrderNumber: null, isPartial: null },
-              ''
-            );
-          }
-          
-          return updated;
-        });
-      } else {
-        // Full receive - move to archive (following labels pattern)
-        setOrders((prev) => {
-          const orderToArchive = prev.find((o) => Number(o.id) === Number(receivedOrderId));
-          if (!orderToArchive) return prev;
-          
-          const remaining = prev.filter((o) => Number(o.id) !== Number(receivedOrderId));
-          try {
-            window.localStorage.setItem('closureOrders', JSON.stringify(remaining));
-          } catch (err) {
-            console.error('Failed to update closure orders in localStorage', err);
-          }
-          
-          // Add to archived orders with "Received" status
-          const archivedOrder = { ...orderToArchive, status: 'Received' };
-          if (archivedOrdersRef && archivedOrdersRef.current) {
-            archivedOrdersRef.current.addArchivedOrder(archivedOrder);
-          }
-          
-          // Clear navigation state
-          if (window.history && window.history.replaceState) {
-            window.history.replaceState(
-              { ...location.state, receivedOrderId: null, receivedOrderNumber: null, isPartial: null },
-              ''
-            );
-          }
-          
-          // Switch to archive tab
-          if (onArchiveOrder) {
-            onArchiveOrder();
-          }
-          
-          return remaining;
-        });
+        }
+        return prev;
+      });
+      // Clear the navigation state to prevent re-processing
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState({ ...location.state, receivedOrderId: null, isPartial: null }, '');
       }
     }
   }, [location.state, archivedOrdersRef, onArchiveOrder]);
@@ -390,29 +408,7 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
                 {order.status === 'Partial' && (
                   <button
                     type="button"
-                    onClick={() => {
-                      // Remove from active orders
-                      setOrders((prev) => {
-                        const remaining = prev.filter((o) => o.id !== order.id);
-                        try {
-                          window.localStorage.setItem('closureOrders', JSON.stringify(remaining));
-                        } catch {}
-                        return remaining;
-                      });
-                      
-                      // Add to archived orders
-                      if (archivedOrdersRef && archivedOrdersRef.current) {
-                        archivedOrdersRef.current.addArchivedOrder({
-                          ...order,
-                          status: order.status || 'Draft'
-                        });
-                      }
-                      
-                      // Switch to archive tab
-                      if (onArchiveOrder) {
-                        onArchiveOrder();
-                      }
-                    }}
+                    onClick={() => handleArchiveOrder(order)}
                     className="px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded-full hover:bg-blue-700"
                   >
                     Archive

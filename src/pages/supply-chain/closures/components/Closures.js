@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 import ClosuresHeader from './ClosuresHeader';
@@ -53,6 +53,11 @@ const Closures = () => {
   const handleStatusChange = (orderId, newStatus) => {
     // This is handled by OrdersTable now, but keeping for compatibility
   };
+
+  // Callback to switch to archive tab when order is archived (matching boxes/bottles pattern)
+  const handleArchiveOrder = useCallback((order) => {
+    setActiveTab('archive');
+  }, []);
 
   // Ref for inventory table to trigger bulk edit
   const inventoryTableRef = useRef(null);
@@ -133,7 +138,7 @@ const Closures = () => {
               searchQuery={search}
               themeClasses={themeClasses}
               onViewOrder={handleViewOrder}
-              onArchiveOrder={() => setActiveTab('archive')}
+              onArchiveOrder={handleArchiveOrder}
               onStatusChange={handleStatusChange}
               archivedOrdersRef={archivedOrdersTableRef}
               onNewOrderCreated={() => setActiveTab('ordering')}
