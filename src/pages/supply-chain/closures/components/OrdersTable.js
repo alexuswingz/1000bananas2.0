@@ -95,14 +95,20 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
 
   // Archive order function (matching boxes/bottles pattern)
   const handleArchiveOrder = (order) => {
+    console.log('🗄️ Manual archive clicked for order:', order);
+    
     // Remove from active orders FIRST and save immediately to localStorage
     setOrders((prev) => {
+      console.log('📦 Orders before archive:', prev.length);
       const remaining = prev.filter((o) => Number(o.id) !== Number(order.id));
+      console.log('📋 Orders after archive:', remaining.length);
+      
       // Save immediately to localStorage before component unmounts
       try {
         window.localStorage.setItem('closureOrders', JSON.stringify(remaining));
+        console.log('💾 Saved to localStorage:', remaining.length, 'orders');
       } catch (err) {
-        console.error('Failed to save to localStorage', err);
+        console.error('❌ Failed to save to localStorage', err);
       }
       return remaining;
     });
@@ -143,13 +149,19 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
     const isPartial = location.state && location.state.isPartial;
     
     if (receivedOrderId) {
+      console.log('🔍 Processing receive:', { receivedOrderId, isPartial, type: typeof receivedOrderId });
+      
       setOrders((prev) => {
+        console.log('📦 Current orders before update:', prev.map(o => ({ id: o.id, type: typeof o.id, orderNumber: o.orderNumber })));
+        
         // Use Number() comparison to handle type mismatches
         const order = prev.find((o) => Number(o.id) === Number(receivedOrderId));
+        console.log('✅ Found order:', order);
         
         if (order) {
           if (isPartial === true) {
             // Partial receive - update status and keep in orders (DO NOT archive)
+            console.log('📝 Updating to Partial status');
             const updated = prev.map((o) =>
               Number(o.id) === Number(receivedOrderId)
                 ? { ...o, status: 'Partial' }
@@ -157,29 +169,50 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
             );
             try {
               window.localStorage.setItem('closureOrders', JSON.stringify(updated));
-            } catch {}
+              console.log('💾 Saved to localStorage:', updated.length, 'orders');
+            } catch (err) {
+              console.error('❌ Failed to save:', err);
+            }
             return updated;
           } else {
             // Full receive - archive the order
+            console.log('🗄️ Archiving order (full receive)');
             // Remove from active orders FIRST
             const remaining = prev.filter((o) => Number(o.id) !== Number(receivedOrderId));
+            console.log('📋 Remaining orders:', remaining.length);
+            
             try {
               window.localStorage.setItem('closureOrders', JSON.stringify(remaining));
-            } catch {}
+              console.log('💾 Saved remaining to localStorage');
+            } catch (err) {
+              console.error('❌ Failed to save:', err);
+            }
+            
             // Archive the order with Received status
             const archivedOrder = { ...order, status: 'Received' };
+            console.log('📦 Archiving order:', archivedOrder);
+            
             if (archivedOrdersRef && archivedOrdersRef.current) {
               archivedOrdersRef.current.addArchivedOrder(archivedOrder);
+              console.log('✅ Added to archived orders');
+            } else {
+              console.log('⚠️ archivedOrdersRef not available');
             }
+            
             // Call parent callback to switch to archive tab
             if (onArchiveOrder) {
               onArchiveOrder(archivedOrder);
+              console.log('✅ Called onArchiveOrder callback');
             }
+            
             return remaining;
           }
+        } else {
+          console.log('❌ Order not found! Looking for:', receivedOrderId);
         }
         return prev;
       });
+      
       // Clear the navigation state to prevent re-processing
       if (window.history && window.history.replaceState) {
         window.history.replaceState({ ...location.state, receivedOrderId: null, isPartial: null }, '');
