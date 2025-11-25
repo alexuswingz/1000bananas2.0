@@ -12,10 +12,10 @@ const SortProductsCompleteModal = ({ isOpen, onClose, onBeginSortFormulas }) => 
   };
 
   const handleBeginSortFormulas = () => {
-    onClose();
     if (onBeginSortFormulas) {
       onBeginSortFormulas();
     }
+    onClose();
   };
 
   return (

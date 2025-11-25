@@ -124,90 +124,90 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
         onClick={onClose}
       >
         {/* Modal */}
-        <div
-          style={{
+      <div
+        style={{
             backgroundColor: '#FFFFFF',
             borderRadius: '12px',
-            width: '600px',
+          width: '600px',
             height: 'auto',
             border: '1px solid #E5E7EB',
-            display: 'flex',
-            flexDirection: 'column',
+          display: 'flex',
+          flexDirection: 'column',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
             zIndex: 9999,
             position: 'relative',
             maxHeight: '90vh',
             overflow: 'hidden',
-          }}
+        }}
           onClick={(e) => e.stopPropagation()}
-        >
-          {/* Header */}
-          <div
-            style={{
+      >
+        {/* Header */}
+        <div
+          style={{
               padding: '24px',
               borderBottom: '1px solid #E5E7EB',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
             <h2 style={{
               fontSize: '20px',
               fontWeight: 600,
               color: '#111827',
               margin: 0,
             }}>
-              Shipment Details
-            </h2>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
+            Shipment Details
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
                 background: 'transparent',
-                border: 'none',
+              border: 'none',
                 cursor: 'pointer',
                 padding: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
                 color: '#6B7280',
-              }}
-            >
+            }}
+          >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
-            </button>
-          </div>
+          </button>
+        </div>
 
-          {/* Content - scrollable */}
-          <div
-            style={{
-              flex: 1,
-              overflowY: 'auto',
+        {/* Content - scrollable */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
               padding: '24px',
               scrollbarWidth: 'thin',
-            }}
-          >
+          }}
+        >
             {/* Editable Shipment Details */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
               {/* Shipment Name */}
               <div>
                 <label
-                  style={{
+              style={{
                     display: 'block',
                     fontSize: '14px',
                     fontWeight: 500,
                     color: '#374151',
                     marginBottom: '8px',
-                  }}
-                >
+              }}
+            >
                   Shipment Name
                 </label>
                 <input
                   type="text"
                   value={editableData.shipmentName}
                   onChange={(e) => setEditableData({ ...editableData, shipmentName: e.target.value })}
-                  style={{
+                style={{
                     width: '100%',
                     padding: '10px 12px',
                     borderRadius: '8px',
@@ -217,7 +217,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     fontSize: '14px',
                     outline: 'none',
                     boxSizing: 'border-box',
-                  }}
+                }}
                   onFocus={(e) => {
                     e.target.style.borderColor = '#3B82F6';
                   }}
@@ -225,12 +225,12 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     e.target.style.borderColor = '#D1D5DB';
                   }}
                 />
-              </div>
+            </div>
 
               {/* Shipment Type */}
               <div>
                 <label
-                  style={{
+                style={{
                     display: 'block',
                     fontSize: '14px',
                     fontWeight: 500,
@@ -243,7 +243,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                 <select
                   value={editableData.shipmentType}
                   onChange={(e) => setEditableData({ ...editableData, shipmentType: e.target.value })}
-                  style={{
+                        style={{
                     width: '100%',
                     padding: '10px 12px',
                     borderRadius: '8px',
@@ -252,7 +252,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     color: editableData.shipmentType ? '#111827' : '#9CA3AF',
                     fontSize: '14px',
                     outline: 'none',
-                    cursor: 'pointer',
+                          cursor: 'pointer',
                     boxSizing: 'border-box',
                     appearance: 'none',
                     backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%23374151' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
@@ -273,7 +273,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                   <option value="Parcel">Parcel</option>
                   <option value="Production Order">Production Order</option>
                 </select>
-              </div>
+                </div>
 
               {/* Amazon Shipment # */}
               <div>
@@ -293,7 +293,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                   value={editableData.amazonShipmentNumber}
                   onChange={(e) => setEditableData({ ...editableData, amazonShipmentNumber: e.target.value })}
                   placeholder={getAmazonShipmentFormat(editableData.shipmentType)}
-                  style={{
+                    style={{
                     width: '100%',
                     padding: '10px 12px',
                     borderRadius: '8px',
@@ -309,21 +309,21 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                   }}
                   onBlur={(e) => {
                     e.target.style.borderColor = '#D1D5DB';
-                  }}
-                />
-              </div>
+                    }}
+                  />
+                </div>
 
               {/* Amazon Ref ID */}
               <div>
                 <label
-                  style={{
+                    style={{
                     display: 'block',
                     fontSize: '14px',
-                    fontWeight: 500,
+                      fontWeight: 500,
                     color: '#374151',
                     marginBottom: '8px',
-                  }}
-                >
+                    }}
+                  >
                   Amazon Ref ID<span style={{ color: '#EF4444', marginLeft: '4px' }}>*</span>
                 </label>
                 <input
@@ -348,25 +348,25 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     e.target.style.borderColor = '#D1D5DB';
                   }}
                 />
-              </div>
+                  </div>
 
               {/* Shipping - Full Width */}
               <div style={{ gridColumn: '1 / -1' }}>
                 <label
-                  style={{
+                    style={{
                     display: 'block',
                     fontSize: '14px',
-                    fontWeight: 500,
+                      fontWeight: 500,
                     color: '#374151',
                     marginBottom: '8px',
-                  }}
-                >
+                    }}
+                  >
                   Shipping
                 </label>
                 <select
                   value={editableData.shipping}
                   onChange={(e) => setEditableData({ ...editableData, shipping: e.target.value })}
-                  style={{
+                        style={{
                     width: '100%',
                     padding: '10px 12px',
                     borderRadius: '8px',
@@ -382,33 +382,33 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     backgroundRepeat: 'no-repeat',
                     backgroundPosition: 'right 12px center',
                     paddingRight: '36px',
-                  }}
+                        }}
                   onFocus={(e) => {
                     e.target.style.borderColor = '#3B82F6';
                   }}
                   onBlur={(e) => {
                     e.target.style.borderColor = '#D1D5DB';
                   }}
-                >
+                      >
                   <option value="UPS">UPS</option>
                   <option value="FedEx">FedEx</option>
                   <option value="DHL">DHL</option>
                   <option value="USPS">USPS</option>
                   <option value="Other">Other</option>
                 </select>
-              </div>
+          </div>
 
               {/* Ship From - Full Width */}
               <div style={{ gridColumn: '1 / -1' }}>
                 <label
-                  style={{
+              style={{
                     display: 'block',
                     fontSize: '14px',
                     fontWeight: 500,
                     color: '#374151',
                     marginBottom: '8px',
-                  }}
-                >
+              }}
+            >
                   Ship From
                 </label>
                 <input
@@ -416,7 +416,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                   value={editableData.shipFrom}
                   onChange={(e) => setEditableData({ ...editableData, shipFrom: e.target.value })}
                   placeholder="Enter Shipment Location"
-                  style={{
+                style={{
                     width: '100%',
                     padding: '10px 12px',
                     borderRadius: '8px',
@@ -426,7 +426,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     fontSize: '14px',
                     outline: 'none',
                     boxSizing: 'border-box',
-                  }}
+                }}
                   onFocus={(e) => {
                     e.target.style.borderColor = '#3B82F6';
                   }}
@@ -434,12 +434,12 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     e.target.style.borderColor = '#D1D5DB';
                   }}
                 />
-              </div>
+            </div>
 
               {/* Ship To - Full Width */}
               <div style={{ gridColumn: '1 / -1' }}>
                 <label
-                  style={{
+                style={{
                     display: 'block',
                     fontSize: '14px',
                     fontWeight: 500,
@@ -464,7 +464,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     fontSize: '14px',
                     outline: 'none',
                     boxSizing: 'border-box',
-                  }}
+                }}
                   onFocus={(e) => {
                     e.target.style.borderColor = '#3B82F6';
                   }}
@@ -472,7 +472,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     e.target.style.borderColor = '#D1D5DB';
                   }}
                 />
-              </div>
+                </div>
 
               {/* Carrier - Full Width */}
               <div style={{ gridColumn: '1 / -1' }}>
@@ -487,21 +487,25 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                 >
                   Carrier
                 </label>
-                <input
-                  type="text"
+                <select
                   value={editableData.carrier}
                   onChange={(e) => setEditableData({ ...editableData, carrier: e.target.value })}
-                  placeholder="Enter Carrier"
                   style={{
                     width: '100%',
                     padding: '10px 12px',
                     borderRadius: '8px',
                     border: '1px solid #D1D5DB',
                     backgroundColor: '#FFFFFF',
-                    color: '#111827',
+                    color: editableData.carrier ? '#111827' : '#9CA3AF',
                     fontSize: '14px',
                     outline: 'none',
+                    cursor: 'pointer',
                     boxSizing: 'border-box',
+                    appearance: 'none',
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%23374151' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 12px center',
+                    paddingRight: '36px',
                   }}
                   onFocus={(e) => {
                     e.target.style.borderColor = '#3B82F6';
@@ -509,26 +513,34 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                   onBlur={(e) => {
                     e.target.style.borderColor = '#D1D5DB';
                   }}
-                />
+                >
+                  <option value="">Select Carrier</option>
+                  <option value="UPS">UPS</option>
+                  <option value="FedEx">FedEx</option>
+                  <option value="DHL">DHL</option>
+                  <option value="USPS">USPS</option>
+                  <option value="Amazon">Amazon</option>
+                  <option value="Other">Other</option>
+                </select>
               </div>
-            </div>
           </div>
+        </div>
 
-          {/* Footer */}
-          <div
-            style={{
+        {/* Footer */}
+        <div
+          style={{
               padding: '24px',
               borderTop: '1px solid #E5E7EB',
-              display: 'flex',
+            display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
               gap: '12px',
-            }}
-          >
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
+          }}
+        >
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
                 padding: '10px 24px',
                 borderRadius: '8px',
                 border: '1px solid #D1D5DB',
@@ -559,8 +571,8 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                   backgroundColor: 'transparent',
                   color: '#3B82F6',
                   fontSize: '14px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
+              fontWeight: 500,
+              cursor: 'pointer',
                   transition: 'all 0.2s',
                 }}
                 onMouseEnter={(e) => {
@@ -568,22 +580,22 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
+            }}
+          >
                 Save and Exit
-              </button>
-              <button
-                type="button"
+          </button>
+          <button
+            type="button"
                 onClick={handleBookAndProceed}
-                style={{
+            style={{
                   padding: '10px 24px',
                   borderRadius: '8px',
-                  border: 'none',
+              border: 'none',
                   backgroundColor: '#3B82F6',
-                  color: '#FFFFFF',
+              color: '#FFFFFF',
                   fontSize: '14px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
+              fontWeight: 500,
+              cursor: 'pointer',
                   transition: 'background-color 0.2s',
                 }}
                 onMouseEnter={(e) => {
@@ -591,10 +603,10 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = '#3B82F6';
-                }}
-              >
+            }}
+          >
                 Book and Proceed
-              </button>
+          </button>
             </div>
           </div>
         </div>

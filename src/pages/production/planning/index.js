@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../../context/ThemeContext';
 import PlanningHeader from './components/PlanningHeader';
 import PlanningTable from './components/PlanningTable';
+import ArchiveTable from './components/ArchiveTable';
 import ShipmentsTable from './components/ShipmentsTable';
 import NewShipmentModal from './components/NewShipmentModal';
 import { getAllShipments, createShipment } from '../../../services/productionApi';
@@ -218,14 +219,7 @@ const Planning = () => {
 
         {/* Archive tab */}
         {activeTab === 'archive' && (
-          <div
-            className={`${isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white'} ${isDarkMode ? 'border-dark-border-primary' : 'border-gray-200'} border rounded-xl shadow-sm`}
-            style={{ padding: '2rem', minHeight: '200px' }}
-          >
-            <p className={isDarkMode ? 'text-dark-text-secondary' : 'text-gray-500'} style={{ fontSize: '0.875rem' }}>
-              Archived shipments will appear here.
-            </p>
-          </div>
+          <ArchiveTable rows={rows} />
         )}
       </div>
     </div>

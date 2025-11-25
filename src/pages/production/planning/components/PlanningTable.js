@@ -201,7 +201,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
         style={{ overflowX: 'hidden', position: 'relative' }}
       >
         {/* Table with 100% width to fit container */}
-        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
+        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed' }}>
         <thead className={themeClasses.headerBg}>
           <tr>
             <th
@@ -403,8 +403,9 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
                 onClick={(e) => handleFilterClick('addProducts', e)}
                 style={{
                   position: 'absolute',
-                  top: '4px',
+                  top: '50%',
                   right: '8px',
+                  transform: 'translateY(-50%)',
                   ...((isFilterActive('addProducts') || openFilterColumn === 'addProducts')
                     ? {
                         filter:
@@ -430,28 +431,29 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
                 <span style={{ fontSize: '9px', fontWeight: 600 }}>FORMULA</span>
                 <span style={{ fontSize: '9px', fontWeight: 600 }}>CHECK</span>
               </div>
-              <img
+                <img
                 ref={(el) => { if (el) filterIconRefs.current['formulaCheck'] = el; }}
-                src="/assets/Vector (1).png"
-                alt="Filter"
-                className={`w-3 h-3 transition-opacity cursor-pointer ${
+                  src="/assets/Vector (1).png"
+                  alt="Filter"
+                  className={`w-3 h-3 transition-opacity cursor-pointer ${
                   (isFilterActive('formulaCheck') || openFilterColumn === 'formulaCheck')
-                    ? 'opacity-100'
-                    : 'opacity-0 group-hover:opacity-100'
-                }`}
+                      ? 'opacity-100'
+                      : 'opacity-0 group-hover:opacity-100'
+                  }`}
                 onClick={(e) => handleFilterClick('formulaCheck', e)}
                 style={{
                   position: 'absolute',
-                  top: '4px',
+                  top: '50%',
                   right: '8px',
+                  transform: 'translateY(-50%)',
                   ...((isFilterActive('formulaCheck') || openFilterColumn === 'formulaCheck')
-                    ? {
-                        filter:
-                          'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
-                      }
+                      ? {
+                          filter:
+                            'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
+                        }
                     : undefined)
                 }}
-              />
+                />
             </th>
             <th
               className="text-center text-white uppercase tracking-wider group cursor-pointer"
@@ -469,28 +471,29 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
                 <span style={{ fontSize: '9px', fontWeight: 600 }}>LABEL</span>
                 <span style={{ fontSize: '9px', fontWeight: 600 }}>CHECK</span>
               </div>
-              <img
+                <img
                 ref={(el) => { if (el) filterIconRefs.current['labelCheck'] = el; }}
-                src="/assets/Vector (1).png"
-                alt="Filter"
-                className={`w-3 h-3 transition-opacity cursor-pointer ${
+                  src="/assets/Vector (1).png"
+                  alt="Filter"
+                  className={`w-3 h-3 transition-opacity cursor-pointer ${
                   (isFilterActive('labelCheck') || openFilterColumn === 'labelCheck')
-                    ? 'opacity-100'
-                    : 'opacity-0 group-hover:opacity-100'
-                }`}
+                      ? 'opacity-100'
+                      : 'opacity-0 group-hover:opacity-100'
+                  }`}
                 onClick={(e) => handleFilterClick('labelCheck', e)}
                 style={{
                   position: 'absolute',
-                  top: '4px',
+                  top: '50%',
                   right: '8px',
+                  transform: 'translateY(-50%)',
                   ...((isFilterActive('labelCheck') || openFilterColumn === 'labelCheck')
-                    ? {
-                        filter:
-                          'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
-                      }
+                      ? {
+                          filter:
+                            'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
+                        }
                     : undefined)
                 }}
-              />
+                />
             </th>
             <th
               className="text-center text-white uppercase tracking-wider group cursor-pointer"
@@ -508,28 +511,29 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
                 <span style={{ fontSize: '9px', fontWeight: 600 }}>SORT</span>
                 <span style={{ fontSize: '9px', fontWeight: 600 }}>PRODUCTS</span>
               </div>
-              <img
+                <img
                 ref={(el) => { if (el) filterIconRefs.current['sortProducts'] = el; }}
-                src="/assets/Vector (1).png"
-                alt="Filter"
-                className={`w-3 h-3 transition-opacity cursor-pointer ${
+                  src="/assets/Vector (1).png"
+                  alt="Filter"
+                  className={`w-3 h-3 transition-opacity cursor-pointer ${
                   (isFilterActive('sortProducts') || openFilterColumn === 'sortProducts')
-                    ? 'opacity-100'
-                    : 'opacity-0 group-hover:opacity-100'
-                }`}
+                      ? 'opacity-100'
+                      : 'opacity-0 group-hover:opacity-100'
+                  }`}
                 onClick={(e) => handleFilterClick('sortProducts', e)}
                 style={{
                   position: 'absolute',
-                  top: '4px',
+                  top: '50%',
                   right: '8px',
+                  transform: 'translateY(-50%)',
                   ...((isFilterActive('sortProducts') || openFilterColumn === 'sortProducts')
-                    ? {
-                        filter:
-                          'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
-                      }
+                      ? {
+                          filter:
+                            'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
+                        }
                     : undefined)
                 }}
-              />
+                />
             </th>
             <th
               className="text-center text-white uppercase tracking-wider group cursor-pointer"
@@ -546,28 +550,40 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
                 <span style={{ fontSize: '9px', fontWeight: 600 }}>SORT</span>
                 <span style={{ fontSize: '9px', fontWeight: 600 }}>FORMULAS</span>
               </div>
-              <img
+                <img
                 ref={(el) => { if (el) filterIconRefs.current['sortFormulas'] = el; }}
-                src="/assets/Vector (1).png"
-                alt="Filter"
-                className={`w-3 h-3 transition-opacity cursor-pointer ${
+                  src="/assets/Vector (1).png"
+                  alt="Filter"
+                  className={`w-3 h-3 transition-opacity cursor-pointer ${
                   (isFilterActive('sortFormulas') || openFilterColumn === 'sortFormulas')
-                    ? 'opacity-100'
-                    : 'opacity-0 group-hover:opacity-100'
-                }`}
+                      ? 'opacity-100'
+                      : 'opacity-0 group-hover:opacity-100'
+                  }`}
                 onClick={(e) => handleFilterClick('sortFormulas', e)}
                 style={{
                   position: 'absolute',
-                  top: '4px',
+                  top: '50%',
                   right: '8px',
+                  transform: 'translateY(-50%)',
                   ...((isFilterActive('sortFormulas') || openFilterColumn === 'sortFormulas')
-                    ? {
-                        filter:
-                          'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
-                      }
+                      ? {
+                          filter:
+                            'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
+                        }
                     : undefined)
                 }}
-              />
+                />
+            </th>
+            <th
+              className="text-center text-white uppercase tracking-wider"
+              style={{
+                padding: '0.5rem 1rem',
+                width: '40px',
+                height: '40px',
+                backgroundColor: '#1C2634',
+                boxSizing: 'border-box',
+              }}
+            >
             </th>
           </tr>
         </thead>
@@ -736,6 +752,29 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
               >
                 {renderStatusCircle(row.sortFormulas || 'pending')}
               </td>
+              <td
+                style={{
+                  padding: '0.75rem 1rem',
+                  verticalAlign: 'middle',
+                  backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
+                  borderTop: '1px solid #E5E7EB',
+                  height: '40px',
+                }}
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={isDarkMode ? '#9CA3AF' : '#6B7280'}
+                  strokeWidth="2"
+                  style={{ cursor: 'pointer' }}
+                >
+                  <circle cx="12" cy="12" r="1" />
+                  <circle cx="12" cy="5" r="1" />
+                  <circle cx="12" cy="19" r="1" />
+                </svg>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -756,30 +795,22 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
     {/* Key/Legend - Outside table container */}
     <div
       style={{
-        padding: '1rem 1.5rem',
         display: 'flex',
         alignItems: 'center',
-        gap: '1.5rem',
-        marginTop: '1rem',
+        gap: '24px',
+        marginTop: '24px',
       }}
-      className={themeClasses.cardBg}
     >
       <span
         style={{
-          fontSize: '0.875rem',
+          fontSize: '14px',
           fontWeight: 500,
-          color: isDarkMode ? '#FFFFFF' : '#151515',
+          color: isDarkMode ? '#E5E7EB' : '#374151',
         }}
       >
         Key:
       </span>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-        }}
-      >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <div
           style={{
             width: '20px',
@@ -787,60 +818,53 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
             borderRadius: '20px',
             backgroundColor: '#FFFFFF',
             border: '1px solid #D1D5DB',
+            display: 'inline-block',
           }}
         />
         <span
           style={{
-            fontSize: '0.875rem',
-            color: isDarkMode ? '#FFFFFF' : '#151515',
+            fontSize: '14px',
+            color: isDarkMode ? '#9CA3AF' : '#6B7280',
           }}
         >
-          Pending
+          Not Started
         </span>
       </div>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-        }}
-      >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <div
           style={{
             width: '20px',
             height: '20px',
             borderRadius: '20px',
             backgroundColor: '#3B82F6',
+            border: 'none',
+            display: 'inline-block',
           }}
         />
         <span
           style={{
-            fontSize: '0.875rem',
-            color: isDarkMode ? '#FFFFFF' : '#151515',
+            fontSize: '14px',
+            color: isDarkMode ? '#9CA3AF' : '#6B7280',
           }}
         >
           In Progress
         </span>
       </div>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-        }}
-      >
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <div
           style={{
             width: '20px',
             height: '20px',
             borderRadius: '20px',
             backgroundColor: '#10B981',
+            border: 'none',
+            display: 'inline-block',
           }}
         />
         <span
           style={{
-            fontSize: '0.875rem',
-            color: isDarkMode ? '#FFFFFF' : '#151515',
+            fontSize: '14px',
+            color: isDarkMode ? '#9CA3AF' : '#6B7280',
           }}
         >
           Completed
