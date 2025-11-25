@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
 const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, totalBoxes = 0, onSave, onBookAndProceed }) => {
@@ -13,6 +14,13 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
     shipTo: '',
     carrier: '',
   });
+  const [isCarrierDropdownOpen, setIsCarrierDropdownOpen] = useState(false);
+  const [customCarrierInput, setCustomCarrierInput] = useState('');
+  const carrierDropdownRef = useRef(null);
+  const carrierInputRef = useRef(null);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+
+  const knownCarriers = ['WeShip', 'TopCarrier', 'Worldwide Express'];
 
   // Get Amazon Shipment # format based on shipment type
   const getAmazonShipmentFormat = (type) => {
@@ -53,6 +61,62 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
       }));
     }
   }, [editableData.shipmentType]);
+
+  // Calculate dropdown position and close when clicking outside
+  useEffect(() => {
+    const updateDropdownPosition = () => {
+      if (carrierInputRef.current && isCarrierDropdownOpen) {
+        const rect = carrierInputRef.current.getBoundingClientRect();
+        setDropdownPosition({
+          top: rect.bottom + 4,
+          left: rect.left,
+          width: rect.width,
+        });
+      }
+    };
+
+    const handleClickOutside = (event) => {
+      if (
+        carrierDropdownRef.current && 
+        !carrierDropdownRef.current.contains(event.target) &&
+        carrierInputRef.current &&
+        !carrierInputRef.current.contains(event.target)
+      ) {
+        setIsCarrierDropdownOpen(false);
+      }
+    };
+
+    if (isCarrierDropdownOpen) {
+      updateDropdownPosition();
+      window.addEventListener('resize', updateDropdownPosition);
+      window.addEventListener('scroll', updateDropdownPosition, true);
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        window.removeEventListener('resize', updateDropdownPosition);
+        window.removeEventListener('scroll', updateDropdownPosition, true);
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [isCarrierDropdownOpen]);
+
+  const handleCarrierSelect = (carrier) => {
+    setEditableData({ ...editableData, carrier });
+    setIsCarrierDropdownOpen(false);
+    setCustomCarrierInput('');
+  };
+
+  const handleUseCustomCarrier = () => {
+    if (customCarrierInput.trim()) {
+      handleCarrierSelect(customCarrierInput.trim());
+    }
+  };
+
+  const handleAddNewCarrier = () => {
+    // This would typically open a modal or navigate to add carrier page
+    // For now, we'll just close the dropdown
+    setIsCarrierDropdownOpen(false);
+    // You can add your logic here to add a new carrier to the system
+  };
 
   if (!isOpen) return null;
 
@@ -127,8 +191,8 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
       <div
         style={{
             backgroundColor: '#FFFFFF',
-            borderRadius: '12px',
-          width: '600px',
+            borderRadius: '8px',
+          width: '520px',
             height: 'auto',
             border: '1px solid #E5E7EB',
           display: 'flex',
@@ -144,7 +208,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
         {/* Header */}
         <div
           style={{
-              padding: '24px',
+              padding: '16px 20px',
               borderBottom: '1px solid #E5E7EB',
             display: 'flex',
             justifyContent: 'space-between',
@@ -152,7 +216,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
           }}
         >
             <h2 style={{
-              fontSize: '20px',
+              fontSize: '18px',
               fontWeight: 600,
               color: '#111827',
               margin: 0,
@@ -184,21 +248,21 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
           style={{
             flex: 1,
             overflowY: 'auto',
-              padding: '24px',
+              padding: '16px 20px',
               scrollbarWidth: 'thin',
           }}
         >
             {/* Editable Shipment Details */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
               {/* Shipment Name */}
               <div>
                 <label
               style={{
                     display: 'block',
-                    fontSize: '14px',
+                    fontSize: '12px',
                     fontWeight: 500,
                     color: '#374151',
-                    marginBottom: '8px',
+                    marginBottom: '4px',
               }}
             >
                   Shipment Name
@@ -209,12 +273,12 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                   onChange={(e) => setEditableData({ ...editableData, shipmentName: e.target.value })}
                 style={{
                     width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
+                    padding: '6px 10px',
+                    borderRadius: '6px',
                     border: '1px solid #D1D5DB',
                     backgroundColor: '#FFFFFF',
                     color: '#111827',
-                    fontSize: '14px',
+                    fontSize: '13px',
                     outline: 'none',
                     boxSizing: 'border-box',
                 }}
@@ -232,10 +296,10 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                 <label
                 style={{
                     display: 'block',
-                    fontSize: '14px',
+                    fontSize: '12px',
                     fontWeight: 500,
                     color: '#374151',
-                    marginBottom: '8px',
+                    marginBottom: '4px',
                   }}
                 >
                   Shipment Type<span style={{ color: '#EF4444', marginLeft: '4px' }}>*</span>
@@ -245,20 +309,20 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                   onChange={(e) => setEditableData({ ...editableData, shipmentType: e.target.value })}
                         style={{
                     width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
+                    padding: '6px 10px',
+                    borderRadius: '6px',
                     border: '1px solid #D1D5DB',
                     backgroundColor: '#FFFFFF',
                     color: editableData.shipmentType ? '#111827' : '#9CA3AF',
-                    fontSize: '14px',
+                    fontSize: '13px',
                     outline: 'none',
                           cursor: 'pointer',
                     boxSizing: 'border-box',
                     appearance: 'none',
                     backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%23374151' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
                     backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'right 12px center',
-                    paddingRight: '36px',
+                    backgroundPosition: 'right 10px center',
+                    paddingRight: '32px',
                   }}
                   onFocus={(e) => {
                     e.target.style.borderColor = '#3B82F6';
@@ -280,10 +344,10 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                 <label
                   style={{
                     display: 'block',
-                    fontSize: '14px',
+                    fontSize: '12px',
                     fontWeight: 500,
                     color: '#374151',
-                    marginBottom: '8px',
+                    marginBottom: '4px',
                   }}
                 >
                   Amazon Shipment #<span style={{ color: '#EF4444', marginLeft: '4px' }}>*</span>
@@ -295,12 +359,12 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                   placeholder={getAmazonShipmentFormat(editableData.shipmentType)}
                     style={{
                     width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
+                    padding: '6px 10px',
+                    borderRadius: '6px',
                     border: '1px solid #D1D5DB',
                     backgroundColor: '#FFFFFF',
                     color: '#111827',
-                    fontSize: '14px',
+                    fontSize: '13px',
                     outline: 'none',
                     boxSizing: 'border-box',
                   }}
@@ -318,10 +382,10 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                 <label
                     style={{
                     display: 'block',
-                    fontSize: '14px',
+                    fontSize: '12px',
                       fontWeight: 500,
                     color: '#374151',
-                    marginBottom: '8px',
+                    marginBottom: '4px',
                     }}
                   >
                   Amazon Ref ID<span style={{ color: '#EF4444', marginLeft: '4px' }}>*</span>
@@ -332,12 +396,12 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                   onChange={(e) => setEditableData({ ...editableData, amazonRefId: e.target.value })}
                   style={{
                     width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
+                    padding: '6px 10px',
+                    borderRadius: '6px',
                     border: '1px solid #D1D5DB',
                     backgroundColor: '#FFFFFF',
                     color: '#111827',
-                    fontSize: '14px',
+                    fontSize: '13px',
                     outline: 'none',
                     boxSizing: 'border-box',
                   }}
@@ -355,10 +419,10 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                 <label
                     style={{
                     display: 'block',
-                    fontSize: '14px',
+                    fontSize: '12px',
                       fontWeight: 500,
                     color: '#374151',
-                    marginBottom: '8px',
+                    marginBottom: '4px',
                     }}
                   >
                   Shipping
@@ -368,20 +432,20 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                   onChange={(e) => setEditableData({ ...editableData, shipping: e.target.value })}
                         style={{
                     width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
+                    padding: '6px 10px',
+                    borderRadius: '6px',
                     border: '1px solid #D1D5DB',
                     backgroundColor: '#FFFFFF',
                     color: '#111827',
-                    fontSize: '14px',
+                    fontSize: '13px',
                     outline: 'none',
                     cursor: 'pointer',
                     boxSizing: 'border-box',
                     appearance: 'none',
                     backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%23374151' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
                     backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'right 12px center',
-                    paddingRight: '36px',
+                    backgroundPosition: 'right 10px center',
+                    paddingRight: '32px',
                         }}
                   onFocus={(e) => {
                     e.target.style.borderColor = '#3B82F6';
@@ -403,10 +467,10 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                 <label
               style={{
                     display: 'block',
-                    fontSize: '14px',
+                    fontSize: '12px',
                     fontWeight: 500,
                     color: '#374151',
-                    marginBottom: '8px',
+                    marginBottom: '4px',
               }}
             >
                   Ship From
@@ -418,12 +482,12 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                   placeholder="Enter Shipment Location"
                 style={{
                     width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
+                    padding: '6px 10px',
+                    borderRadius: '6px',
                     border: '1px solid #D1D5DB',
                     backgroundColor: '#FFFFFF',
                     color: '#111827',
-                    fontSize: '14px',
+                    fontSize: '13px',
                     outline: 'none',
                     boxSizing: 'border-box',
                 }}
@@ -441,10 +505,10 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                 <label
                 style={{
                     display: 'block',
-                    fontSize: '14px',
+                    fontSize: '12px',
                     fontWeight: 500,
                     color: '#374151',
-                    marginBottom: '8px',
+                    marginBottom: '4px',
                   }}
                 >
                   Ship To
@@ -456,12 +520,12 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                   placeholder="Enter Shipment Destination"
                   style={{
                     width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
+                    padding: '6px 10px',
+                    borderRadius: '6px',
                     border: '1px solid #D1D5DB',
                     backgroundColor: '#FFFFFF',
                     color: '#111827',
-                    fontSize: '14px',
+                    fontSize: '13px',
                     outline: 'none',
                     boxSizing: 'border-box',
                 }}
@@ -475,53 +539,197 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                 </div>
 
               {/* Carrier - Full Width */}
-              <div style={{ gridColumn: '1 / -1' }}>
+              <div style={{ gridColumn: '1 / -1', position: 'relative' }} ref={carrierDropdownRef}>
                 <label
                   style={{
                     display: 'block',
-                    fontSize: '14px',
+                    fontSize: '12px',
                     fontWeight: 500,
                     color: '#374151',
-                    marginBottom: '8px',
+                    marginBottom: '4px',
                   }}
                 >
                   Carrier
                 </label>
-                <select
-                  value={editableData.carrier}
-                  onChange={(e) => setEditableData({ ...editableData, carrier: e.target.value })}
+                <div
+                  ref={carrierInputRef}
+                  onClick={() => setIsCarrierDropdownOpen(!isCarrierDropdownOpen)}
                   style={{
                     width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
+                    padding: '6px 10px',
+                    borderRadius: '6px',
                     border: '1px solid #D1D5DB',
                     backgroundColor: '#FFFFFF',
                     color: editableData.carrier ? '#111827' : '#9CA3AF',
-                    fontSize: '14px',
-                    outline: 'none',
+                    fontSize: '13px',
                     cursor: 'pointer',
                     boxSizing: 'border-box',
-                    appearance: 'none',
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%23374151' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'right 12px center',
-                    paddingRight: '36px',
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#3B82F6';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#D1D5DB';
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    minHeight: '28px',
                   }}
                 >
-                  <option value="">Select Carrier</option>
-                  <option value="UPS">UPS</option>
-                  <option value="FedEx">FedEx</option>
-                  <option value="DHL">DHL</option>
-                  <option value="USPS">USPS</option>
-                  <option value="Amazon">Amazon</option>
-                  <option value="Other">Other</option>
-                </select>
+                  <span>{editableData.carrier || 'Select Carrier'}</span>
+                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 1L6 6L11 1" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                
+                {isCarrierDropdownOpen && createPortal(
+                  <div
+                    ref={carrierDropdownRef}
+                    style={{
+                      position: 'fixed',
+                      top: `${dropdownPosition.top}px`,
+                      left: `${dropdownPosition.left}px`,
+                      width: `${dropdownPosition.width}px`,
+                      backgroundColor: '#FFFFFF',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '6px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                      zIndex: 10000,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {/* Known Carriers */}
+                    <div style={{ padding: '8px 10px', borderBottom: '1px solid #E5E7EB' }}>
+                      <div style={{
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        color: '#6B7280',
+                        marginBottom: '6px',
+                      }}>
+                        Known Carriers:
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        {knownCarriers.map((carrier) => (
+                          <div
+                            key={carrier}
+                            onClick={() => handleCarrierSelect(carrier)}
+                            style={{
+                              padding: '4px 6px',
+                              cursor: 'pointer',
+                              borderRadius: '4px',
+                              color: '#111827',
+                              fontSize: '12px',
+                              transition: 'background-color 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#F3F4F6';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
+                          >
+                            {carrier}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Custom Entry */}
+                    <div style={{ padding: '8px 10px', borderBottom: '1px solid #E5E7EB' }}>
+                      <div style={{
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        color: '#6B7280',
+                        marginBottom: '6px',
+                      }}>
+                        Custom Entry:
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <input
+                          type="text"
+                          value={customCarrierInput}
+                          onChange={(e) => setCustomCarrierInput(e.target.value)}
+                          placeholder="Enter custom carrier name here..."
+                          style={{
+                            flex: 1,
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            border: '1px solid #D1D5DB',
+                            backgroundColor: '#FFFFFF',
+                            color: '#111827',
+                            fontSize: '12px',
+                            outline: 'none',
+                            boxSizing: 'border-box',
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.borderColor = '#3B82F6';
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.borderColor = '#D1D5DB';
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleUseCustomCarrier();
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleUseCustomCarrier}
+                          style={{
+                            padding: '4px 12px',
+                            borderRadius: '4px',
+                            border: 'none',
+                            backgroundColor: '#9CA3AF',
+                            color: '#FFFFFF',
+                            fontSize: '12px',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            transition: 'background-color 0.2s',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#6B7280';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = '#9CA3AF';
+                          }}
+                        >
+                          Use
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Create a Carrier */}
+                    <div style={{ padding: '8px 10px' }}>
+                      <div style={{
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        color: '#6B7280',
+                        marginBottom: '6px',
+                      }}>
+                        Create a Carrier:
+                      </div>
+                      <div
+                        onClick={handleAddNewCarrier}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          cursor: 'pointer',
+                          color: '#3B82F6',
+                          fontSize: '12px',
+                          padding: '2px 0',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.opacity = '0.8';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.opacity = '1';
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M8 3V13M3 8H13" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        <span>Add new carrier to system</span>
+                      </div>
+                    </div>
+                  </div>,
+                  document.body
+                )}
               </div>
           </div>
         </div>
@@ -529,24 +737,24 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
         {/* Footer */}
         <div
           style={{
-              padding: '24px',
+              padding: '12px 20px',
               borderTop: '1px solid #E5E7EB',
             display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              gap: '12px',
+              gap: '8px',
           }}
         >
           <button
             type="button"
             onClick={onClose}
             style={{
-                padding: '10px 24px',
-                borderRadius: '8px',
+                padding: '6px 16px',
+                borderRadius: '6px',
                 border: '1px solid #D1D5DB',
                 backgroundColor: '#FFFFFF',
                 color: '#374151',
-                fontSize: '14px',
+                fontSize: '13px',
                 fontWeight: 500,
                 cursor: 'pointer',
                 transition: 'all 0.2s',
@@ -560,17 +768,17 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
             >
               Cancel
             </button>
-            <div style={{ display: 'flex', gap: '12px', marginLeft: 'auto' }}>
+            <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
               <button
                 type="button"
                 onClick={handleSaveAndExit}
                 style={{
-                  padding: '10px 24px',
-                  borderRadius: '8px',
+                  padding: '6px 16px',
+                  borderRadius: '6px',
                   border: 'none',
                   backgroundColor: 'transparent',
                   color: '#3B82F6',
-                  fontSize: '14px',
+                  fontSize: '13px',
               fontWeight: 500,
               cursor: 'pointer',
                   transition: 'all 0.2s',
@@ -588,12 +796,12 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
             type="button"
                 onClick={handleBookAndProceed}
             style={{
-                  padding: '10px 24px',
-                  borderRadius: '8px',
+                  padding: '6px 16px',
+                  borderRadius: '6px',
               border: 'none',
                   backgroundColor: '#3B82F6',
               color: '#FFFFFF',
-                  fontSize: '14px',
+                  fontSize: '13px',
               fontWeight: 500,
               cursor: 'pointer',
                   transition: 'background-color 0.2s',
