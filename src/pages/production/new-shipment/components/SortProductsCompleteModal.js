@@ -165,3 +165,4 @@ const SortProductsCompleteModal = ({ isOpen, onClose, onBeginSortFormulas }) => 
 
 export default SortProductsCompleteModal;
 
+
