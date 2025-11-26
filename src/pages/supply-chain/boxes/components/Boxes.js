@@ -360,20 +360,22 @@ const Boxes = () => {
                         key={supplier.id}
                         type="button"
                         onClick={() => setSelectedSupplier(supplier)}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-all ${
+                        className={`w-56 h-40 border rounded-xl flex flex-col items-center justify-center text-sm transition-all ${
                           isActive
-                            ? 'border-blue-600 bg-blue-50'
-                            : 'border-gray-200 hover:border-gray-300 bg-white'
+                            ? 'border-blue-500 shadow-md bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300 hover:shadow-sm bg-white'
                         }`}
                       >
-                        {supplier.logoSrc && (
-                          <img
-                            src={supplier.logoSrc}
-                            alt={supplier.logoAlt}
-                            className="h-8 w-auto object-contain"
-                          />
-                        )}
-                        <span className="text-sm font-medium text-gray-900">{supplier.name}</span>
+                        <div className="w-24 h-16 mb-3 flex items-center justify-center">
+                          {supplier.logoSrc && (
+                            <img
+                              src={supplier.logoSrc}
+                              alt={supplier.logoAlt}
+                              className="max-h-16 max-w-full object-contain"
+                            />
+                          )}
+                        </div>
+                        <span className="text-gray-800 font-medium">{supplier.name}</span>
                       </button>
                     );
                   })}

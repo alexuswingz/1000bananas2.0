@@ -53,7 +53,7 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
             id: Date.now(),
             orderNumber: newOrderNumber,
             supplier: supplierName,
-            status: 'Draft',
+            status: 'Submitted',
           };
           if (onNewOrderCreated) {
             onNewOrderCreated();
@@ -136,18 +136,19 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
             } catch {}
             return updated;
           } else {
-            // Full receive - archive the order (will be handled separately)
+            // Full receive - set status to "Received" and archive the order
+            const orderWithReceivedStatus = { ...order, status: 'Received' };
             // Remove from active orders
             const remaining = prev.filter((o) => o.id !== receivedOrderId);
             try {
               window.localStorage.setItem('bottleOrders', JSON.stringify(remaining));
             } catch {}
-            // Archive the order
+            // Archive the order with "Received" status
             if (archivedOrdersRef && archivedOrdersRef.current) {
-              archivedOrdersRef.current.addArchivedOrder(order);
+              archivedOrdersRef.current.addArchivedOrder(orderWithReceivedStatus);
             }
             if (onArchiveOrder) {
-              onArchiveOrder(order);
+              onArchiveOrder(orderWithReceivedStatus);
             }
             return remaining;
           }
@@ -165,7 +166,7 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
   const [editingStatusId, setEditingStatusId] = useState(null);
   const menuRefs = useRef({});
   const buttonRefs = useRef({});
-  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
 
   const statusOptions = ['Draft', 'Submitted', 'Received', 'Partially Received'];
 
@@ -195,8 +196,8 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
       if (buttonElement) {
         const rect = buttonElement.getBoundingClientRect();
         setMenuPosition({
-          top: rect.bottom + window.scrollY + 4,
-          right: window.innerWidth - rect.right - window.scrollX,
+          top: rect.bottom + 4,
+          left: rect.right - 100, // Position to the left of the button
         });
       }
       document.addEventListener('mousedown', handleClickOutside);
@@ -304,25 +305,77 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
 
   return (
     <div
-      className={`${themeClasses.cardBg} rounded-xl border ${themeClasses.border} shadow-md`}
-      style={{ overflow: 'hidden' }}
+      style={{ 
+        overflow: 'hidden',
+        borderRadius: '8px',
+        backgroundColor: '#FFFFFF',
+        border: '1px solid #E5E7EB',
+      }}
     >
       {/* Table header row */}
-      <div className={themeClasses.headerBg}>
+      <div style={{ backgroundColor: '#1F2937', borderRadius: '8px 8px 0 0' }}>
         <div
           className="grid"
           style={{
-            gridTemplateColumns: '140px 2fr 2fr',
+            gridTemplateColumns: '222px 222px 222px 120px 120px 120px 1fr',
+            gap: 0,
           }}
         >
-          <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center">
-            Status
+          <div className="text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]" style={{ 
+            textAlign: 'left', 
+            width: '222px',
+            height: '40px',
+            paddingTop: '12px',
+            paddingRight: '16px',
+            paddingBottom: '12px',
+            paddingLeft: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+          }}>
+            STATUS
           </div>
-          <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center">
-            Bottle Order #
+          <div className="text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]" style={{ 
+            textAlign: 'left', 
+            width: '222px',
+            height: '40px',
+            paddingTop: '12px',
+            paddingRight: '16px',
+            paddingBottom: '12px',
+            paddingLeft: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+          }}>
+            BOTTLE ORDER #
           </div>
-          <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider text-center">
-            Supplier
+          <div className="text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]" style={{ 
+            textAlign: 'left', 
+            width: '222px',
+            height: '40px',
+            paddingTop: '12px',
+            paddingRight: '16px',
+            paddingBottom: '12px',
+            paddingLeft: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+          }}>
+            SUPPLIER
+          </div>
+          <div className="text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]" style={{ textAlign: 'center', padding: '12px 8px', height: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.2' }}>
+            <div>ADD</div>
+            <div>PRODUCTS</div>
+          </div>
+          <div className="text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]" style={{ textAlign: 'center', padding: '12px 8px', height: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.2' }}>
+            <div>SUBMIT</div>
+            <div>PO</div>
+          </div>
+          <div className="text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]" style={{ textAlign: 'center', padding: '12px 8px', height: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.2' }}>
+            <div>RECEIVE</div>
+            <div>PO</div>
+          </div>
+          <div className="text-xs font-bold text-white uppercase tracking-wider" style={{ textAlign: 'right', position: 'relative', paddingRight: '16px', paddingLeft: '0px', paddingTop: '12px', paddingBottom: '12px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
           </div>
         </div>
       </div>
@@ -332,25 +385,44 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
         {filteredOrders.map((order, index) => (
           <div
             key={order.id}
-            className={`grid text-sm ${themeClasses.rowHover} transition-colors`}
+            className="grid text-sm"
             style={{
-              gridTemplateColumns: '140px 2fr 2fr',
-                borderBottom:
-                  index === filteredOrders.length - 1
-                    ? 'none'
-                    : isDarkMode
-                    ? '1px solid rgba(75,85,99,0.3)'
-                    : '1px solid #e5e7eb',
+              gridTemplateColumns: '222px 222px 222px 120px 120px 120px 1fr',
+              gap: 0,
+              backgroundColor: '#FFFFFF',
+              borderBottom:
+                index === filteredOrders.length - 1
+                  ? 'none'
+                  : '1px solid #e5e7eb',
             }}
           >
-            <div className="px-6 py-3 flex items-center justify-center">
+            <div className="flex items-center" style={{ 
+              textAlign: 'left', 
+              width: '222px',
+              height: '40px',
+              paddingTop: '12px',
+              paddingRight: '16px',
+              paddingBottom: '12px',
+              paddingLeft: '16px',
+              gap: '10px',
+            }}>
               {renderStatusPill(order)}
             </div>
-            <div className="px-6 py-3 flex items-center gap-2">
+            <div className="flex items-center gap-2" style={{ 
+              textAlign: 'left', 
+              width: '222px',
+              height: '40px',
+              paddingTop: '12px',
+              paddingRight: '16px',
+              paddingBottom: '12px',
+              paddingLeft: '16px',
+              gap: '10px',
+            }}>
               <button
                 type="button"
                 className="text-xs font-medium text-blue-600 hover:text-blue-700 underline-offset-2 hover:underline"
                 onClick={() => onViewOrder(order)}
+                style={{ textAlign: 'left' }}
               >
                 {order.orderNumber}
               </button>
@@ -364,24 +436,88 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
                 </button>
               )}
             </div>
-            <div className="px-6 py-3 flex items-center justify-between relative">
-              <span className={themeClasses.textPrimary}>{order.supplier}</span>
-
-              <div className="relative">
-                <button
-                  ref={(el) => (buttonRefs.current[order.id] = el)}
-                  type="button"
-                  data-menu-button={order.id}
-                  className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors ml-2"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setOrderActionMenuId((prev) => (prev === order.id ? null : order.id));
-                  }}
-                  aria-label="Order actions"
-                >
-                  <span className={themeClasses.textSecondary}>⋮</span>
-                </button>
-              </div>
+            <div className="flex items-center" style={{ 
+              textAlign: 'left', 
+              width: '222px',
+              height: '40px',
+              paddingTop: '12px',
+              paddingRight: '16px',
+              paddingBottom: '12px',
+              paddingLeft: '16px',
+              gap: '10px',
+            }}>
+              <span style={{ textAlign: 'left', fontSize: '14px', color: '#374151' }}>{order.supplier}</span>
+            </div>
+            {/* ADD PRODUCTS status */}
+            <div className="flex items-center justify-center" style={{ padding: '12px 8px', height: '40px' }}>
+              {(() => {
+                const isCompleted = order.status === 'Submitted' || order.status === 'Received' || order.status === 'Partially Received' || order.status === 'Draft';
+                return isCompleted ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="8" fill="#22C55E"/>
+                  </svg>
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="1.5" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="8"/>
+                  </svg>
+                );
+              })()}
+            </div>
+            {/* SUBMIT PO status */}
+            <div className="flex items-center justify-center" style={{ padding: '12px 8px', height: '40px' }}>
+              {(() => {
+                const isCompleted = order.status === 'Submitted' || order.status === 'Received' || order.status === 'Partially Received' || order.status === 'Draft';
+                return isCompleted ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="8" fill="#22C55E"/>
+                  </svg>
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="1.5" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="8"/>
+                  </svg>
+                );
+              })()}
+            </div>
+            {/* RECEIVE PO status */}
+            <div className="flex items-center justify-center" style={{ padding: '12px 8px', height: '40px' }}>
+              {(() => {
+                const isCompleted = order.status === 'Received' || order.status === 'Partially Received';
+                return isCompleted ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="8" fill="#22C55E"/>
+                  </svg>
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="1.5" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="8"/>
+                  </svg>
+                );
+              })()}
+            </div>
+            <div className="flex items-center justify-end relative" style={{ paddingRight: '16px', paddingLeft: '0px', paddingTop: '12px', paddingBottom: '12px', height: '40px', width: '100%', boxSizing: 'border-box' }}>
+              <button
+                ref={(el) => (buttonRefs.current[order.id] = el)}
+                type="button"
+                data-menu-button={order.id}
+                className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                style={{
+                  color: '#6B7280',
+                  backgroundColor: 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOrderActionMenuId((prev) => (prev === order.id ? null : order.id));
+                }}
+                aria-label="Order actions"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="6" r="1.5" fill="currentColor"/>
+                  <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+                  <circle cx="12" cy="18" r="1.5" fill="currentColor"/>
+                </svg>
+              </button>
             </div>
           </div>
         ))}
@@ -397,76 +533,45 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
       {orderActionMenuId && (
         <div
           ref={(el) => (menuRefs.current[orderActionMenuId] = el)}
-          className={`fixed z-[9999] w-32 ${themeClasses.cardBg} ${themeClasses.border} border rounded-md shadow-xl text-xs`}
+          className={`fixed z-[9999] ${themeClasses.cardBg} ${themeClasses.border} border rounded-lg shadow-xl text-xs`}
           style={{
             top: `${menuPosition.top}px`,
-            right: `${menuPosition.right}px`,
+            left: `${menuPosition.left}px`,
+            minWidth: '100px',
+            backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+            borderColor: isDarkMode ? '#374151' : '#E5E7EB',
           }}
           onClick={(e) => e.stopPropagation()}
         >
           {orders
             .filter((order) => order.id === orderActionMenuId)
             .map((order) => (
-              <React.Fragment key={order.id}>
-                <button
-                  type="button"
-                  className={`w-full flex items-center gap-2 px-3 py-2.5 ${themeClasses.rowHover} ${themeClasses.textPrimary} transition-colors`}
-                    onClick={() => {
-                      if (onViewOrder) {
-                        onViewOrder(order);
-                      }
-                      setOrderActionMenuId(null);
-                    }}
-                  >
-                    <span className={themeClasses.textSecondary}>
-                      <svg
-                        className="w-3.5 h-3.5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                        />
-                      </svg>
-                    </span>
-                    <span className="font-medium">View</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`w-full flex items-center gap-2 px-3 py-2.5 ${themeClasses.rowHover} ${themeClasses.textPrimary} border-t ${themeClasses.border} transition-colors`}
-                    onClick={() => {
-                      handleArchiveOrder(order);
-                      setOrderActionMenuId(null);
-                    }}
-                  >
-                  <span className={themeClasses.textSecondary}>
-                    <svg
-                      className="w-3.5 h-3.5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 4h16v4H4zM6 8v10a2 2 0 002 2h8a2 2 0 002-2V8"
-                      />
-                    </svg>
-                  </span>
-                  <span className="font-medium">Archive</span>
-                </button>
-              </React.Fragment>
+              <button
+                key={order.id}
+                type="button"
+                className={`w-full flex items-center gap-2 px-3 py-2.5 ${themeClasses.rowHover} ${themeClasses.textPrimary} transition-colors rounded-lg`}
+                onClick={() => {
+                  if (onViewOrder) {
+                    onViewOrder(order);
+                  }
+                  setOrderActionMenuId(null);
+                }}
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                  />
+                </svg>
+                <span className="font-medium">Edit</span>
+              </button>
             ))}
         </div>
       )}

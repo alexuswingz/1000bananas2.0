@@ -77,25 +77,77 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
 
   return (
     <div
-      className={`${themeClasses.cardBg} rounded-xl border ${themeClasses.border} shadow-md`}
-      style={{ overflow: 'hidden' }}
+      style={{ 
+        overflow: 'hidden',
+        borderRadius: '8px',
+        backgroundColor: '#FFFFFF',
+        border: '1px solid #E5E7EB',
+      }}
     >
       {/* Table header row */}
-      <div className={themeClasses.headerBg}>
+      <div style={{ backgroundColor: '#1F2937', borderRadius: '8px 8px 0 0' }}>
         <div
           className="grid"
           style={{
-            gridTemplateColumns: '140px 2fr 2fr',
+            gridTemplateColumns: '222px 222px 222px 120px 120px 120px 1fr',
+            gap: 0,
           }}
         >
-          <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center">
-            Status
+          <div className="text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]" style={{ 
+            textAlign: 'left', 
+            width: '222px',
+            height: '40px',
+            paddingTop: '12px',
+            paddingRight: '16px',
+            paddingBottom: '12px',
+            paddingLeft: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+          }}>
+            STATUS
           </div>
-          <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center">
-            Bottle Order #
+          <div className="text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]" style={{ 
+            textAlign: 'left', 
+            width: '222px',
+            height: '40px',
+            paddingTop: '12px',
+            paddingRight: '16px',
+            paddingBottom: '12px',
+            paddingLeft: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+          }}>
+            BOTTLE ORDER #
           </div>
-          <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider text-center">
-            Supplier
+          <div className="text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]" style={{ 
+            textAlign: 'left', 
+            width: '222px',
+            height: '40px',
+            paddingTop: '12px',
+            paddingRight: '16px',
+            paddingBottom: '12px',
+            paddingLeft: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+          }}>
+            SUPPLIER
+          </div>
+          <div className="text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]" style={{ textAlign: 'center', padding: '12px 8px', height: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.2' }}>
+            <div>ADD</div>
+            <div>PRODUCTS</div>
+          </div>
+          <div className="text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]" style={{ textAlign: 'center', padding: '12px 8px', height: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.2' }}>
+            <div>SUBMIT</div>
+            <div>PO</div>
+          </div>
+          <div className="text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]" style={{ textAlign: 'center', padding: '12px 8px', height: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.2' }}>
+            <div>RECEIVE</div>
+            <div>PO</div>
+          </div>
+          <div className="text-xs font-bold text-white uppercase tracking-wider" style={{ textAlign: 'right', position: 'relative', paddingRight: '16px', paddingLeft: '0px', paddingTop: '12px', paddingBottom: '12px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
           </div>
         </div>
       </div>
@@ -110,31 +162,91 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
           archivedOrders.map((order, index) => (
             <div
               key={order.id}
-              className={`grid text-sm ${themeClasses.rowHover} transition-colors`}
+              className="grid text-sm"
               style={{
-                gridTemplateColumns: '140px 2fr 2fr',
+                gridTemplateColumns: '222px 222px 222px 120px 120px 120px 1fr',
+                gap: 0,
+                backgroundColor: '#FFFFFF',
                 borderBottom:
                   index === archivedOrders.length - 1
                     ? 'none'
-                    : isDarkMode
-                    ? '1px solid rgba(75,85,99,0.3)'
                     : '1px solid #e5e7eb',
               }}
             >
-              <div className="px-6 py-3 flex items-center justify-center">
+              <div className="flex items-center" style={{ 
+                textAlign: 'left', 
+                width: '222px',
+                height: '40px',
+                paddingTop: '12px',
+                paddingRight: '16px',
+                paddingBottom: '12px',
+                paddingLeft: '16px',
+                gap: '10px',
+              }}>
                 {renderStatusPill(order.status || 'Draft')}
               </div>
-              <div className="px-6 py-3 flex items-center">
+              <div className="flex items-center" style={{ 
+                textAlign: 'left', 
+                width: '222px',
+                height: '40px',
+                paddingTop: '12px',
+                paddingRight: '16px',
+                paddingBottom: '12px',
+                paddingLeft: '16px',
+                gap: '10px',
+              }}>
                 <span className="text-xs font-medium text-blue-600">{order.orderNumber}</span>
               </div>
-              <div className="px-6 py-3 flex items-center justify-between">
-                <span className={themeClasses.textPrimary}>{order.supplier}</span>
+              <div className="flex items-center" style={{ 
+                textAlign: 'left', 
+                width: '222px',
+                height: '40px',
+                paddingTop: '12px',
+                paddingRight: '16px',
+                paddingBottom: '12px',
+                paddingLeft: '16px',
+                gap: '10px',
+              }}>
+                <span style={{ textAlign: 'left', fontSize: '14px', color: '#374151' }}>{order.supplier}</span>
+              </div>
+              {/* ADD PRODUCTS status - always green for archived orders */}
+              <div className="flex items-center justify-center" style={{ padding: '12px 8px', height: '40px' }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="8" fill="#22C55E"/>
+                </svg>
+              </div>
+              {/* SUBMIT PO status - always green for archived orders */}
+              <div className="flex items-center justify-center" style={{ padding: '12px 8px', height: '40px' }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="8" fill="#22C55E"/>
+                </svg>
+              </div>
+              {/* RECEIVE PO status - always green for archived orders */}
+              <div className="flex items-center justify-center" style={{ padding: '12px 8px', height: '40px' }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="8" fill="#22C55E"/>
+                </svg>
+              </div>
+              <div className="flex items-center justify-end relative" style={{ paddingRight: '16px', paddingLeft: '0px', paddingTop: '12px', paddingBottom: '12px', height: '40px', width: '100%', boxSizing: 'border-box' }}>
                 <button
                   type="button"
-                  className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors ml-2"
+                  className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                  style={{
+                    color: '#6B7280',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
                   aria-label="Archived order actions"
                 >
-                  <span className={themeClasses.textSecondary}>⋮</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="6" r="1.5" fill="currentColor"/>
+                    <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+                    <circle cx="12" cy="18" r="1.5" fill="currentColor"/>
+                  </svg>
                 </button>
               </div>
             </div>

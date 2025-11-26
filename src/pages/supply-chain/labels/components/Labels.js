@@ -148,6 +148,69 @@ const Labels = () => {
     }
   }, [location.state]);
 
+  // Handle partial order from LabelOrderPage
+  useEffect(() => {
+    const partialOrderId = location.state && location.state.partialOrderId;
+    const partialOrderNumber = location.state && location.state.partialOrderNumber;
+    const selectedCount = location.state && location.state.selectedCount;
+    const totalCount = location.state && location.state.totalCount;
+    
+    if (partialOrderId && partialOrderNumber) {
+      // Update order status to "Partially Received" in OrdersTable
+      if (ordersTableRef.current && ordersTableRef.current.updateOrder) {
+        ordersTableRef.current.updateOrder(partialOrderId, {
+          status: 'Partially Received',
+        });
+      }
+
+      // Show notification
+      setNotification({
+        message: `${partialOrderNumber} label order partially received (${selectedCount} of ${totalCount} items)`,
+        type: 'success',
+      });
+
+      // Auto-dismiss notification after 5 seconds
+      const timer = setTimeout(() => {
+        setNotification(null);
+      }, 5000);
+
+      // Clear navigation state
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState({ ...location.state, partialOrderId: null, partialOrderNumber: null, selectedCount: null, totalCount: null }, '');
+      }
+
+      return () => clearTimeout(timer);
+    }
+  }, [location.state]);
+
+  // Handle archive order from LabelOrderPage
+  useEffect(() => {
+    const archiveOrderId = location.state && location.state.archiveOrderId;
+    const archiveOrderNumber = location.state && location.state.archiveOrderNumber;
+    const archiveOrderStatus = location.state && location.state.archiveOrderStatus;
+    
+    if (archiveOrderId && archiveOrderNumber) {
+      // Archive the order
+      if (ordersTableRef.current && ordersTableRef.current.archiveOrder) {
+        const order = ordersTableRef.current.getOrderById(archiveOrderId);
+        if (order) {
+          ordersTableRef.current.archiveOrder({
+            ...order,
+            status: archiveOrderStatus || 'Partially Received',
+          });
+        }
+      }
+
+      // Switch to archive tab
+      setActiveTab('archive');
+
+      // Clear navigation state
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState({ ...location.state, archiveOrderId: null, archiveOrderNumber: null, archiveOrderStatus: null }, '');
+      }
+    }
+  }, [location.state]);
+
   // Handle edited order from LabelOrderPage
   useEffect(() => {
     const editedOrderId = location.state && location.state.editedOrderId;
@@ -204,6 +267,7 @@ const Labels = () => {
         mode: 'view',
         orderId: order.id,
         lines: order.lines || [], // Pass the saved lines data
+        status: order.status || 'Draft', // Pass the order status
       },
     });
   };

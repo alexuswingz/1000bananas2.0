@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
@@ -11,51 +11,345 @@ const BottleOrderPage = () => {
   const orderNumber = state.orderNumber || '';
   const supplier = state.supplier || null;
   const mode = state.mode || 'create';
-  const isReceiveMode = mode === 'receive';
+  const isCreateMode = mode === 'create';
+  const isViewMode = mode === 'view' || mode === 'receive';
   const orderId = state.orderId || null;
-  const initialLines =
-    state.lines ||
-    [
-      { id: 1, name: '8oz', supplierInventory: 'Auto Replenishment', unitsNeeded: 29120, qty: 29120, pallets: 4, selected: true },
-      { id: 2, name: 'Quart', supplierInventory: 'Auto Replenishment', unitsNeeded: 5040, qty: 5040, pallets: 4, selected: true },
-      { id: 3, name: 'Gallon', supplierInventory: 'Auto Replenishment', unitsNeeded: 768, qty: 768, pallets: 4, selected: true },
-    ];
 
-  const [orderLines, setOrderLines] = useState(initialLines);
-  const [isReceiveConfirmOpen, setIsReceiveConfirmOpen] = useState(false);
+  // Get lines from state or use default
+  const allLines = state.lines || [
+    { id: 1, name: '8oz', supplierInventory: 'Auto Replenishment', unitsNeeded: 29120, qty: 14560, pallets: 2.0, added: false, inventoryPercentage: 50 },
+    { id: 2, name: 'Quart', supplierInventory: 'Auto Replenishment', unitsNeeded: 5040, qty: 1080, pallets: 1.5, added: false, inventoryPercentage: 75 },
+    { id: 3, name: 'Gallon', supplierInventory: 'Auto Replenishment', unitsNeeded: 768, qty: 774, pallets: 4.0, added: false, inventoryPercentage: 100 },
+  ];
+
+  // Navigation tab state
+  const [activeTab, setActiveTab] = useState(() => {
+    // Automatically set to receivePO when viewing an order
+    return (mode === 'view' || mode === 'receive') ? 'receivePO' : 'addProducts';
+  });
+  const [searchQuery, setSearchQuery] = useState('');
+  // Initialize order lines - items in view mode are already "added", new orders start with all items not added
+  const [orderLines, setOrderLines] = useState(() => {
+    return allLines.map((line) => ({
+      ...line,
+      added: isViewMode, // In view mode, all passed lines are part of the order
+    }));
+  });
+  
+  // Ensure tab is set to receivePO when viewing an order
+  useEffect(() => {
+    if (isViewMode) {
+      setActiveTab('receivePO');
+    }
+  }, [isViewMode]);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showReceiveConfirmModal, setShowReceiveConfirmModal] = useState(false);
+  const [showPartialOrderModal, setShowPartialOrderModal] = useState(false);
+  
+  // Checkbox selection state for partial orders
+  const [selectedItems, setSelectedItems] = useState(new Set());
+  
+  // Edit mode state for individual rows
+  const [editingLineId, setEditingLineId] = useState(null);
+  const [originalValues, setOriginalValues] = useState({});
+  const [editedValues, setEditedValues] = useState({});
+  const [ellipsisMenuId, setEllipsisMenuId] = useState(null);
+  const ellipsisMenuRefs = useRef({});
+  const ellipsisButtonRefs = useRef({});
+  const [ellipsisMenuPosition, setEllipsisMenuPosition] = useState({ top: 0, left: 0 });
 
   const themeClasses = {
     pageBg: isDarkMode ? 'bg-dark-bg-primary' : 'bg-light-bg-primary',
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
-    border: isDarkMode ? 'border-dark-border-primary' : 'border-gray-200',
+    headerBg: isDarkMode ? 'bg-[#2C3544]' : 'bg-[#2C3544]',
     textPrimary: isDarkMode ? 'text-dark-text-primary' : 'text-gray-900',
+    textSecondary: isDarkMode ? 'text-dark-text-secondary' : 'text-gray-500',
+    border: isDarkMode ? 'border-dark-border-primary' : 'border-gray-200',
+    rowHover: isDarkMode ? 'hover:bg-dark-bg-tertiary' : 'hover:bg-gray-50',
+    inputBg: isDarkMode ? 'bg-dark-bg-tertiary' : 'bg-white',
   };
+
+  // Filter lines based on search query and active tab
+  const filteredLines = useMemo(() => {
+    let linesToFilter = orderLines;
+    
+    // In receivePO tab when viewing, show only added items
+    if (isViewMode && activeTab === 'receivePO') {
+      linesToFilter = orderLines.filter((line) => line.added);
+    }
+    
+    if (!searchQuery.trim()) return linesToFilter;
+    const query = searchQuery.toLowerCase();
+    return linesToFilter.filter((line) => 
+      line.name.toLowerCase().includes(query) ||
+      line.supplierInventory.toLowerCase().includes(query)
+    );
+  }, [orderLines, searchQuery, isViewMode, activeTab]);
+
+  // Get added lines
+  const addedLines = useMemo(() => {
+    return orderLines.filter((line) => line.added);
+  }, [orderLines]);
+
+  // Calculate summary
+  const summary = useMemo(() => {
+    const linesToUse = activeTab === 'receivePO' && isViewMode ? orderLines : addedLines;
+    const totalQty = linesToUse.reduce((sum, line) => sum + (line.qty || 0), 0);
+    const totalPallets = linesToUse.reduce((sum, line) => sum + (line.pallets || 0), 0);
+    const units = totalQty; // Units is the same as total qty
+    
+    return {
+      totalQty,
+      totalPallets,
+      units,
+    };
+  }, [addedLines, orderLines, activeTab, isViewMode]);
 
   const handleBack = () => {
     navigate('/dashboard/supply-chain/bottles');
   };
 
-  const handleCreateOrder = () => {
-    // Send newly created order back to Bottles page via navigation state
-    navigate('/dashboard/supply-chain/bottles', {
-      state: {
-        newBottleOrder: {
-          orderNumber,
-          supplierName: supplier.name,
-        },
-      },
+  const handleAddProduct = (lineId) => {
+    setOrderLines((prev) =>
+      prev.map((line) =>
+        line.id === lineId
+          ? { ...line, added: !line.added, qty: line.added ? 0 : (line.qty || 0) }
+          : line
+      )
+    );
+  };
+
+  const handleQtyChange = (lineId, value) => {
+    setOrderLines((prev) =>
+      prev.map((line) =>
+        line.id === lineId ? { ...line, qty: Number(value) || 0 } : line
+      )
+    );
+  };
+
+  const handlePalletsChange = (lineId, value) => {
+    setOrderLines((prev) =>
+      prev.map((line) =>
+        line.id === lineId ? { ...line, pallets: Number(value) || 0 } : line
+      )
+    );
+  };
+
+  // Handle edit mode for individual rows
+  const handleStartEdit = (lineId) => {
+    const line = orderLines.find(l => l.id === lineId);
+    if (line) {
+      setEditingLineId(lineId);
+      setOriginalValues({
+        qty: line.qty || 0,
+        pallets: line.pallets || 0,
+      });
+      setEditedValues({
+        qty: line.qty || 0,
+        pallets: line.pallets || 0,
+      });
+      setEllipsisMenuId(null);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingLineId(null);
+    setOriginalValues({});
+    setEditedValues({});
+  };
+
+  const handleDoneEdit = (lineId) => {
+    setOrderLines((prev) =>
+      prev.map((line) =>
+        line.id === lineId
+          ? {
+              ...line,
+              qty: editedValues.qty || 0,
+              pallets: editedValues.pallets || 0,
+            }
+          : line
+      )
+    );
+    setEditingLineId(null);
+    setOriginalValues({});
+    setEditedValues({});
+  };
+
+  const handleEditQtyChange = (lineId, delta) => {
+    setEditedValues((prev) => ({
+      ...prev,
+      qty: Math.max(0, (prev.qty || 0) + delta),
+    }));
+  };
+
+  const handleEditPalletsChange = (lineId, delta) => {
+    setEditedValues((prev) => ({
+      ...prev,
+      pallets: Math.max(0, (prev.pallets || 0) + delta),
+    }));
+  };
+
+  // Handle ellipsis menu positioning
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (ellipsisMenuId) {
+        const menuElement = ellipsisMenuRefs.current[ellipsisMenuId];
+        const buttonElement = event.target.closest('[data-ellipsis-button]');
+        
+        if (menuElement && !menuElement.contains(event.target) && buttonElement?.dataset.ellipsisButton !== ellipsisMenuId) {
+          setEllipsisMenuId(null);
+        }
+      }
+    };
+
+    if (ellipsisMenuId) {
+      const buttonElement = ellipsisButtonRefs.current[ellipsisMenuId];
+      if (buttonElement) {
+        const rect = buttonElement.getBoundingClientRect();
+        setEllipsisMenuPosition({
+          top: rect.bottom + 4,
+          left: rect.left,
+        });
+      }
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [ellipsisMenuId]);
+
+  // Handle checkbox selection
+  const handleCheckboxChange = (lineId, checked) => {
+    setSelectedItems((prev) => {
+      const newSet = new Set(prev);
+      if (checked) {
+        newSet.add(lineId);
+      } else {
+        newSet.delete(lineId);
+      }
+      return newSet;
     });
   };
 
-  const handleReceiveComplete = (isPartial = false) => {
-    // If partial receive, update status and keep in orders
-    // If full receive, archive the order
-    if (isReceiveMode && orderId) {
+  // Handle select all checkbox
+  const handleSelectAll = (checked) => {
+    if (checked) {
+      setSelectedItems(new Set(orderLines.map(line => line.id)));
+    } else {
+      setSelectedItems(new Set());
+    }
+  };
+
+  // Handle receive button click - check if partial order
+  const handleReceiveClick = () => {
+    if (!isViewMode || !orderId) return;
+    
+    const totalItems = orderLines.length;
+    const selectedCount = selectedItems.size;
+    
+    // If all items selected, show confirmation modal
+    if (selectedCount === totalItems && totalItems > 0) {
+      setShowReceiveConfirmModal(true);
+      return;
+    }
+    
+    // If some items selected, show partial order modal
+    if (selectedCount > 0 && selectedCount < totalItems) {
+      setShowPartialOrderModal(true);
+      return;
+    }
+    
+    // If no items selected, do nothing
+  };
+
+  // Handle confirm partial order
+  const handleConfirmPartialOrder = () => {
+    setShowPartialOrderModal(false);
+    navigate('/dashboard/supply-chain/bottles', {
+      state: {
+        receivedOrderId: orderId,
+        receivedOrderNumber: orderNumber,
+        isPartial: true,
+      },
+      replace: false,
+    });
+  };
+
+  const handleCompleteOrder = () => {
+    if (isViewMode && orderId && activeTab === 'receivePO') {
       navigate('/dashboard/supply-chain/bottles', {
         state: {
           receivedOrderId: orderId,
-          isPartial: isPartial,
+          receivedOrderNumber: orderNumber,
         },
+        replace: false,
+      });
+      return;
+    }
+    
+    if (addedLines.length === 0) {
+      return;
+    }
+    
+    // Navigate directly without showing export modal
+    navigate('/dashboard/supply-chain/bottles', {
+      state: {
+        newBottleOrder: {
+          orderNumber: orderNumber,
+          supplierName: supplier.name,
+          lines: addedLines,
+        },
+      },
+      replace: false,
+    });
+  };
+
+  const handleExportCSV = () => {
+    const csvContent = generateCSV();
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    // Format filename as TPS_BottleOrder_YYYY-MM-DD.csv
+    const today = new Date().toISOString().split('T')[0];
+    link.setAttribute('download', `TPS_BottleOrder_${today}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const getExportFileName = () => {
+    const today = new Date().toISOString().split('T')[0];
+    return `TPS_BottleOrder_${today}.csv`;
+  };
+
+  const generateCSV = () => {
+    const headers = ['Packaging Name', 'Supplier Inventory', 'Qty', 'Pallets'];
+    const rows = addedLines.map(line => [
+      line.name,
+      line.supplierInventory,
+      line.qty || 0,
+      line.pallets || 0,
+    ]);
+    
+    return [headers.join(','), ...rows.map(row => row.map(cell => `"${cell}"`).join(','))].join('\n');
+  };
+
+  const handleDone = () => {
+    setShowExportModal(false);
+    
+    if (isCreateMode) {
+      navigate('/dashboard/supply-chain/bottles', {
+        state: {
+          newBottleOrder: {
+            orderNumber: orderNumber,
+            supplierName: supplier.name,
+            lines: addedLines,
+          },
+        },
+        replace: false,
       });
     } else {
       navigate('/dashboard/supply-chain/bottles');
@@ -63,186 +357,1161 @@ const BottleOrderPage = () => {
   };
 
   if (!supplier || !orderNumber) {
-    // If this page is hit directly, just send user back to bottles
     handleBack();
     return null;
   }
 
   return (
-    <div className={`p-8 ${themeClasses.pageBg}`}>
-      <div className={`${themeClasses.cardBg} rounded-xl border ${themeClasses.border} shadow-lg`}>
-        {/* Header row */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <div className="flex items-center gap-4">
+    <div className={`min-h-screen ${themeClasses.pageBg}`} style={{ paddingBottom: '100px' }}>
+      {/* Header Section */}
+      <div style={{ 
+        backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+        padding: '16px 24px',
+        borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+      }}>
+        {/* Top Row - Back button and Order Info */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
             <button
               type="button"
-              className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-full hover:bg-gray-100"
               onClick={handleBack}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                border: isDarkMode ? '1px solid #4B5563' : '1px solid #E5E7EB',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                padding: '8px 16px',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = isDarkMode ? '#4B5563' : '#F9FAFB';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#FFFFFF';
+              }}
             >
-              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-gray-400">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              <svg 
+                style={{ width: '16px', height: '16px' }} 
+                className={isDarkMode ? 'text-white' : 'text-gray-900'}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
+              <span style={{ 
+                fontSize: '14px', 
+                fontWeight: 400,
+                color: isDarkMode ? '#FFFFFF' : '#000000',
+              }}>
+                Back
               </span>
-              Back
             </button>
 
-            <div className="flex flex-col gap-1 text-xs text-gray-500">
-              <div className="flex items-center gap-8">
-                <div>
-                  <div className="uppercase tracking-wide text-[10px] text-gray-400">Bottle Order #</div>
-                  <div className="text-sm font-semibold text-gray-900">{orderNumber}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ 
+                  fontSize: '10px', 
+                  fontWeight: 400,
+                  letterSpacing: '0.05em',
+                  color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                }}>
+                  BOTTLE ORDER #
                 </div>
-                <div className="flex flex-col items-start gap-1">
-                  <div className="uppercase tracking-wide text-[10px] text-gray-400">Supplier</div>
-                  <div className="flex items-center gap-2">
+                <div style={{ 
+                  fontSize: '16px', 
+                  fontWeight: 400,
+                  color: isDarkMode ? '#FFFFFF' : '#000000',
+                }}>
+                  {orderNumber}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ 
+                  fontSize: '10px', 
+                  fontWeight: 400,
+                  letterSpacing: '0.05em',
+                  color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                }}>
+                  SUPPLIER
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <img
                       src={supplier.logoSrc}
                       alt={supplier.logoAlt}
-                      className="h-6 object-contain"
-                    />
-                    <span className="text-sm font-semibold text-gray-900">{supplier.name}</span>
-                  </div>
+                    style={{ height: '24px', objectFit: 'contain' }}
+                  />
+                  <span style={{ 
+                    fontSize: '16px', 
+                    fontWeight: 400,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                  }}>
+                    {supplier.name}
+                  </span>
                 </div>
               </div>
             </div>
           </div>
 
-          {!isReceiveMode ? (
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg px-4 py-2 shadow-sm"
-              onClick={handleCreateOrder}
-            >
-              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-white/60">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </span>
-              Create Order
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg px-4 py-2 shadow-sm"
-              onClick={() => {
-                const allChecked = orderLines.every((line) => line.selected);
-                if (allChecked) {
-                  // Full receive – archive the order
-                  handleReceiveComplete(false);
-                } else {
-                  // Partial receive – show confirmation popup
-                  setIsReceiveConfirmOpen(true);
-                }
-              }}
-            >
-              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-white/60">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </span>
-              Receive
-            </button>
-          )}
         </div>
 
-        {/* Table */}
-        <div className="px-6 py-4">
-          <div className="rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            {/* Table header */}
-            <div className="bg-[#1f2937] text-white text-[11px] font-semibold uppercase tracking-wide">
-              <div
-                className="grid items-center"
-                style={{ gridTemplateColumns: '2fr 1.2fr 1.2fr 40px' }}
-              >
-                <div className="px-4 py-2 border-r border-gray-700 text-center">Packaging Name</div>
-                <div className="px-4 py-2 border-r border-gray-700 text-center">Qty</div>
-                <div className="px-4 py-2 border-r border-gray-700 text-center">Pallets</div>
-                <div className="px-4 py-2 text-center"></div>
-              </div>
-            </div>
+        {/* Tabs */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0' }}>
+          <button
+            type="button"
+            disabled
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '12px 16px',
+              fontSize: '14px',
+              fontWeight: 500,
+              color: isDarkMode ? '#9CA3AF' : '#6B7280',
+              backgroundColor: 'transparent',
+              border: 'none',
+              borderBottom: '2px solid transparent',
+              cursor: 'not-allowed',
+              opacity: 0.7,
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" fill="#22C55E"/>
+            </svg>
+            <span>Add Products</span>
+          </button>
+          <button
+            type="button"
+            disabled
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '12px 16px',
+              fontSize: '14px',
+              fontWeight: 500,
+              color: isDarkMode ? '#9CA3AF' : '#6B7280',
+              backgroundColor: 'transparent',
+              border: 'none',
+              borderBottom: '2px solid transparent',
+              cursor: 'not-allowed',
+              opacity: 0.7,
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" fill="#22C55E"/>
+            </svg>
+            <span>Submit PO</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('receivePO')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '12px 16px',
+              fontSize: '14px',
+              fontWeight: 500,
+              color: activeTab === 'receivePO' ? '#007AFF' : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+              backgroundColor: activeTab === 'receivePO' ? (isDarkMode ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.05)') : 'transparent',
+              border: 'none',
+              borderBottom: activeTab === 'receivePO' ? '2px solid #007AFF' : '2px solid transparent',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {activeTab === 'receivePO' ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" fill="#007AFF"/>
+                <path d="M12 8v8M8 12h8" stroke="white" strokeWidth="2"/>
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"/>
+              </svg>
+            )}
+            <span>Receive PO</span>
+          </button>
 
-            {/* Table rows */}
-            <div className="bg-white">
-              {orderLines.map((line) => (
-                <div
-                  key={line.id}
-                  className="grid items-center text-sm border-t border-gray-100"
-                  style={{ gridTemplateColumns: '2fr 1.2fr 1.2fr 40px' }}
-                >
-                  <div className="px-4 py-2 text-sm text-gray-900">{line.name}</div>
-                  <div className="px-4 py-2">
-                    <input
-                      type="number"
-                      className="w-full text-sm px-2 py-1 text-center bg-white shadow-inner border border-gray-200 rounded-none"
-                      value={line.qty}
-                      onChange={(e) => {
-                        const val = Number(e.target.value) || 0;
-                        setOrderLines((prev) =>
-                          prev.map((l) => (l.id === line.id ? { ...l, qty: val } : l))
-                        );
-                      }}
-                    />
-                  </div>
-                  <div className="px-4 py-2">
-                    <input
-                      type="number"
-                      className="w-full text-sm px-2 py-1 text-right bg-white shadow-inner border border-gray-200 rounded-none"
-                      value={line.pallets}
-                      onChange={(e) => {
-                        const val = Number(e.target.value) || 0;
-                        setOrderLines((prev) =>
-                          prev.map((l) => (l.id === line.id ? { ...l, pallets: val } : l))
-                        );
-                      }}
-                    />
-                  </div>
-                  <div className="px-4 py-2 flex items-center justify-center">
-                    <input
-                      type="checkbox"
-                      className="form-checkbox h-3.5 w-3.5 rounded border-gray-400"
-                      checked={line.selected}
-                      onChange={(e) =>
-                        setOrderLines((prev) =>
-                          prev.map((l) =>
-                            l.id === line.id ? { ...l, selected: e.target.checked } : l
-                          )
-                        )
-                      }
-                    />
-                  </div>
-                </div>
-              ))}
+          {/* Legend - only show when not in view mode */}
+          {!isViewMode && (
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '16px', marginRight: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ width: '12px', height: '12px', backgroundColor: '#22C55E', borderRadius: '2px' }}></div>
+              <span style={{ fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>Inventory</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ width: '12px', height: '12px', backgroundColor: '#3B82F6', borderRadius: '2px' }}></div>
+              <span style={{ fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}># to Order</span>
             </div>
           </div>
+          )}
         </div>
       </div>
 
-      {isReceiveMode && isReceiveConfirmOpen && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md px-8 py-6 text-center">
-            <h2 className="text-base font-semibold text-gray-900 mb-2">Are you sure?</h2>
-            <p className="text-xs text-gray-500 mb-6">
-              Proceed with a partial delivery? Only received items will be updated in inventory.
-            </p>
+      {/* Search bar - above table */}
+      <div className="px-6 py-4 flex justify-end" style={{ marginTop: '0' }}>
+        <div className="relative" style={{ maxWidth: '300px', width: '100%' }}>
+          <input
+            type="text"
+            placeholder="Search..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-10 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            style={{
+              backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+              color: isDarkMode ? '#F9FAFB' : '#000000',
+              borderColor: isDarkMode ? '#4B5563' : '#D1D5DB',
+            }}
+          />
+          <svg
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
+          </svg>
+          <svg
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </div>
 
-            <div className="flex items-center justify-center gap-3">
+      {/* Table - Show in all tabs */}
+      {(
+        <div className={`${themeClasses.cardBg} border ${themeClasses.border} shadow-lg mx-6`} style={{ marginTop: '0', borderRadius: '8px', overflow: 'hidden' }}>
+          <div className="overflow-x-auto">
+            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
+              <thead className={themeClasses.headerBg} style={{ borderRadius: '8px 8px 0 0' }}>
+                <tr style={{ height: '40px', maxHeight: '40px' }}>
+                  {/* Checkbox column - show when viewing an order in receivePO tab */}
+                  {isViewMode && activeTab === 'receivePO' && (
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: '1px solid #3C4656', width: 50 }}>
+                    <input 
+                      type="checkbox" 
+                      style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                      checked={selectedItems.size === orderLines.length && orderLines.length > 0}
+                      onChange={(e) => handleSelectAll(e.target.checked)}
+                    />
+                  </th>
+                  )}
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                    width: '142px',
+                    height: '40px',
+                    paddingTop: '12px',
+                    paddingRight: '16px',
+                    paddingBottom: '12px',
+                    paddingLeft: '16px',
+                    textAlign: 'left',
+                    borderRight: '1px solid #3C4656',
+                    gap: '10px',
+                  }}>
+                    PACKAGING NAME
+                  </th>
+                  {/* SUPPLIER INV column - only show in addProducts tab when creating new order (not viewing) */}
+                  {(activeTab === 'addProducts' && !isViewMode) && (
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'left', borderRight: '1px solid #3C4656', width: 200 }}>
+                    SUPPLIER INV
+                  </th>
+                  )}
+                  {/* ADD column - only show in addProducts tab when creating new order (not viewing) */}
+                  {(activeTab === 'addProducts' && !isViewMode) && (
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: '1px solid #3C4656', width: 120 }}>
+                    ADD
+                  </th>
+                  )}
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                    width: '142px',
+                    height: '40px',
+                    paddingTop: '12px',
+                    paddingRight: '16px',
+                    paddingBottom: '12px',
+                    paddingLeft: '16px',
+                    textAlign: 'center',
+                    borderRight: '1px solid #3C4656',
+                    gap: '10px',
+                  }}>
+                    QTY
+                  </th>
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                    width: '142px',
+                    height: '40px',
+                    paddingTop: '12px',
+                    paddingRight: '16px',
+                    paddingBottom: '12px',
+                    paddingLeft: '16px',
+                    textAlign: 'center',
+                    borderRight: (isViewMode && activeTab === 'receivePO') ? '1px solid #3C4656' : '1px solid #3C4656',
+                    gap: '10px',
+                  }}>
+                    PALLETS
+                  </th>
+                  {/* INVENTORY PERCENTAGE column - only show in addProducts tab when creating new order (not viewing) */}
+                  {(activeTab === 'addProducts' && !isViewMode) && (
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'left', width: 300 }}>
+                    INVENTORY PERCENTAGE
+                  </th>
+                  )}
+                  {/* Ellipsis column - show when viewing an order in receivePO tab */}
+                  {isViewMode && activeTab === 'receivePO' && (
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'center', width: 50 }}>
+                  </th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredLines.length === 0 ? (
+                  <tr>
+                    <td colSpan={(isViewMode && activeTab === 'receivePO') ? 4 : ((activeTab === 'addProducts' && !isViewMode) ? 6 : 4)} className="px-6 py-6 text-center text-sm italic text-gray-400">
+                      No items available.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredLines.map((line, index) => (
+                    <tr 
+                      key={line.id}
+                      className={`text-sm ${themeClasses.rowHover} transition-colors border-t`}
+                      style={{
+                        height: '40px',
+                        maxHeight: '40px',
+                        minHeight: '40px',
+                        borderTop: index === 0 ? 'none' : (isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid #e5e7eb'),
+                      }}
+                    >
+                      {/* Checkbox - show when viewing an order in receivePO tab */}
+                      {isViewMode && activeTab === 'receivePO' && (
+                      <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle' }}>
+                        <input 
+                          type="checkbox" 
+                          style={{ cursor: 'pointer' }}
+                          checked={selectedItems.has(line.id)}
+                          onChange={(e) => handleCheckboxChange(line.id, e.target.checked)}
+                        />
+                      </td>
+                      )}
+                      <td style={{ 
+                        width: '142px',
+                        height: '40px',
+                        paddingTop: '12px',
+                        paddingRight: '16px',
+                        paddingBottom: '12px',
+                        paddingLeft: '16px',
+                        fontSize: '0.85rem',
+                        verticalAlign: 'middle',
+                        gap: '10px',
+                      }} className={themeClasses.textPrimary}>
+                        {line.name}
+                      </td>
+                      {/* SUPPLIER INV - only show in addProducts tab when creating new order (not viewing) */}
+                      {(activeTab === 'addProducts' && !isViewMode) && (
+                      <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle' }} className={themeClasses.textPrimary}>
+                        {line.supplierInventory}
+                      </td>
+                      )}
+                      {/* ADD button - only show in addProducts tab when creating new order (not viewing) */}
+                      {(activeTab === 'addProducts' && !isViewMode) && (
+                      <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleAddProduct(line.id)}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            backgroundColor: line.added ? '#22C55E' : '#3B82F6',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            paddingLeft: '12px',
+                            paddingRight: '12px',
+                            paddingTop: '4px',
+                            paddingBottom: '4px',
+                            fontSize: '14px',
+                            fontWeight: 400,
+                            cursor: 'pointer',
+                            transition: 'background-color 0.2s',
+                          }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M12 5v14M5 12h14"/>
+                          </svg>
+                          <span>Add</span>
+                        </button>
+                      </td>
+                      )}
+                      <td style={{ 
+                        width: '142px',
+                        height: '40px',
+                        paddingTop: '12px',
+                        paddingRight: '16px',
+                        paddingBottom: '12px',
+                        paddingLeft: '16px',
+                        textAlign: 'center',
+                        verticalAlign: 'middle',
+                        gap: '10px',
+                      }}>
+                        {editingLineId === line.id ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: '#F3F4F6', borderRadius: '8px', padding: '2px' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleEditQtyChange(line.id, -1)}
+                                style={{
+                                  width: '24px',
+                                  height: '24px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  border: 'none',
+                                  backgroundColor: 'transparent',
+                                  cursor: 'pointer',
+                                  borderRadius: '4px',
+                                  color: '#6B7280',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#E5E7EB';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M5 12h14"/>
+                                </svg>
+                              </button>
+                              <input
+                                type="number"
+                                value={editedValues.qty || 0}
+                                onChange={(e) => setEditedValues(prev => ({ ...prev, qty: Number(e.target.value) || 0 }))}
+                                style={{
+                                  width: '80px',
+                                  padding: '4px 8px',
+                                  fontSize: '14px',
+                                  textAlign: 'center',
+                                  border: 'none',
+                                  backgroundColor: 'transparent',
+                                  color: '#000000',
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleEditQtyChange(line.id, 1)}
+                                style={{
+                                  width: '24px',
+                                  height: '24px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  border: 'none',
+                                  backgroundColor: 'transparent',
+                                  cursor: 'pointer',
+                                  borderRadius: '4px',
+                                  color: '#6B7280',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#E5E7EB';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M12 5v14M5 12h14"/>
+                                </svg>
+                              </button>
+                            </div>
+                            {((editedValues.qty || 0) !== (originalValues.qty || 0)) && (
+                              <span style={{ fontSize: '12px', color: '#EF4444', fontWeight: 500 }}>
+                                {((editedValues.qty || 0) - (originalValues.qty || 0)) > 0 ? '+' : ''}{((editedValues.qty || 0) - (originalValues.qty || 0)).toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <input
+                            type="number"
+                            value={line.qty || ''}
+                            onChange={(e) => handleQtyChange(line.id, e.target.value)}
+                            disabled={!line.added && !(isViewMode && activeTab === 'receivePO')}
+                            style={{
+                              width: '100%',
+                              maxWidth: '120px',
+                              padding: '4px 8px',
+                              fontSize: '14px',
+                              textAlign: 'center',
+                              border: '1px solid #D1D5DB',
+                              borderRadius: '8px',
+                              backgroundColor: (line.added || (isViewMode && activeTab === 'receivePO')) ? '#F3F4F6' : '#F3F4F6',
+                              color: (line.added || (isViewMode && activeTab === 'receivePO')) ? '#000000' : '#9CA3AF',
+                              cursor: (line.added || (isViewMode && activeTab === 'receivePO')) ? 'text' : 'not-allowed',
+                            }}
+                          />
+                        )}
+                      </td>
+                      <td style={{ 
+                        width: '142px',
+                        height: '40px',
+                        paddingTop: '12px',
+                        paddingRight: '16px',
+                        paddingBottom: '12px',
+                        paddingLeft: '16px',
+                        textAlign: 'center',
+                        verticalAlign: 'middle',
+                        gap: '10px',
+                      }}>
+                        {editingLineId === line.id ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: '#F3F4F6', borderRadius: '8px', padding: '2px' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleEditPalletsChange(line.id, -0.1)}
+                                style={{
+                                  width: '24px',
+                                  height: '24px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  border: 'none',
+                                  backgroundColor: 'transparent',
+                                  cursor: 'pointer',
+                                  borderRadius: '4px',
+                                  color: '#6B7280',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#E5E7EB';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M5 12h14"/>
+                                </svg>
+                              </button>
+                              <input
+                                type="number"
+                                step="0.1"
+                                value={editedValues.pallets || 0}
+                                onChange={(e) => setEditedValues(prev => ({ ...prev, pallets: Number(e.target.value) || 0 }))}
+                                style={{
+                                  width: '80px',
+                                  padding: '4px 8px',
+                                  fontSize: '14px',
+                                  textAlign: 'center',
+                                  border: 'none',
+                                  backgroundColor: 'transparent',
+                                  color: '#000000',
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleEditPalletsChange(line.id, 0.1)}
+                                style={{
+                                  width: '24px',
+                                  height: '24px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  border: 'none',
+                                  backgroundColor: 'transparent',
+                                  cursor: 'pointer',
+                                  borderRadius: '4px',
+                                  color: '#6B7280',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#E5E7EB';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M12 5v14M5 12h14"/>
+                                </svg>
+                              </button>
+                            </div>
+                            {(editedValues.pallets || 0) !== (originalValues.pallets || 0) && (
+                              <span style={{ fontSize: '12px', color: '#EF4444', fontWeight: 500 }}>
+                                {((editedValues.pallets || 0) - (originalValues.pallets || 0)) > 0 ? '+' : ''}{((editedValues.pallets || 0) - (originalValues.pallets || 0)).toFixed(1)}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={line.pallets || ''}
+                            onChange={(e) => handlePalletsChange(line.id, e.target.value)}
+                            disabled={!line.added && !(isViewMode && activeTab === 'receivePO')}
+                            style={{
+                              width: '100%',
+                              maxWidth: '120px',
+                              padding: '4px 8px',
+                              fontSize: '14px',
+                              textAlign: 'center',
+                              border: '1px solid #D1D5DB',
+                              borderRadius: '8px',
+                              backgroundColor: (line.added || (isViewMode && activeTab === 'receivePO')) ? '#F3F4F6' : '#F3F4F6',
+                              color: (line.added || (isViewMode && activeTab === 'receivePO')) ? '#000000' : '#9CA3AF',
+                              cursor: (line.added || (isViewMode && activeTab === 'receivePO')) ? 'text' : 'not-allowed',
+                            }}
+                          />
+                        )}
+                      </td>
+                      {/* INVENTORY PERCENTAGE - only show in addProducts tab when creating new order (not viewing) */}
+                      {(activeTab === 'addProducts' && !isViewMode) && (
+                      <td style={{ padding: '0.65rem 1rem', height: '40px', verticalAlign: 'middle' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+                          <div style={{ 
+                            flex: 1, 
+                            height: '20px', 
+                            backgroundColor: '#E5E7EB', 
+                            borderRadius: '4px',
+                            overflow: 'hidden',
+                            position: 'relative',
+                          }}>
+                            <div style={{
+                              width: `${line.inventoryPercentage || 0}%`,
+                              height: '100%',
+                              backgroundColor: '#22C55E',
+                              transition: 'width 0.3s',
+                            }}></div>
+                            <div style={{
+                              position: 'absolute',
+                              left: `${line.inventoryPercentage || 0}%`,
+                              width: `${100 - (line.inventoryPercentage || 0)}%`,
+                              height: '100%',
+                              backgroundColor: '#3B82F6',
+                            }}></div>
+                          </div>
+                          <span style={{ fontSize: '12px', fontWeight: 500, color: themeClasses.textPrimary, minWidth: '40px' }}>
+                            {line.inventoryPercentage || 0}%
+                          </span>
+                        </div>
+                      </td>
+                      )}
+                      {/* Ellipsis column - show when viewing an order in receivePO tab */}
+                      {isViewMode && activeTab === 'receivePO' && (
+                      <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', position: 'relative' }}>
+                        {editingLineId === line.id ? (
+                          <button
+                            type="button"
+                            onClick={() => handleDoneEdit(line.id)}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '6px 12px',
+                              backgroundColor: '#3B82F6',
+                              color: '#FFFFFF',
+                              border: 'none',
+                              borderRadius: '6px',
+                              fontSize: '14px',
+                              fontWeight: 500,
+                              cursor: 'pointer',
+                              transition: 'background-color 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#2563EB';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = '#3B82F6';
+                            }}
+                          >
+                            Done
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              ref={(el) => {
+                                if (el) ellipsisButtonRefs.current[line.id] = el;
+                              }}
+                              type="button"
+                              data-ellipsis-button={line.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEllipsisMenuId(ellipsisMenuId === line.id ? null : line.id);
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setEllipsisMenuPosition({
+                                  top: rect.bottom + 4,
+                                  left: rect.left,
+                                });
+                              }}
+                              className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                              style={{
+                                color: '#6B7280',
+                                backgroundColor: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                              }}
+                              aria-label="Row actions"
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="12" cy="6" r="1.5" fill="currentColor"/>
+                                <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+                                <circle cx="12" cy="18" r="1.5" fill="currentColor"/>
+                              </svg>
+                            </button>
+                            {ellipsisMenuId === line.id && (
+                              <div
+                                ref={(el) => {
+                                  if (el) ellipsisMenuRefs.current[line.id] = el;
+                                }}
+                                style={{
+                                  position: 'fixed',
+                                  top: ellipsisMenuPosition.top,
+                                  left: ellipsisMenuPosition.left,
+                                  backgroundColor: '#FFFFFF',
+                                  border: '1px solid #E5E7EB',
+                                  borderRadius: '8px',
+                                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                                  zIndex: 1000,
+                                  minWidth: '120px',
+                                  padding: '4px',
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEdit(line.id)}
+                                  style={{
+                                    width: '100%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    padding: '8px 12px',
+                                    backgroundColor: 'transparent',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    fontSize: '14px',
+                                    color: '#374151',
+                                    textAlign: 'left',
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = '#F3F4F6';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'transparent';
+                                  }}
+                                >
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                  </svg>
+                                  <span>Edit</span>
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </td>
+                      )}
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Footer - Sticky */}
+      <div 
+        className="fixed bottom-0 left-64 right-0 z-50"
+        style={{ 
+          backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+          borderTop: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+          padding: '16px 24px',
+        }}
+      >
+        <div className="flex items-center justify-between gap-6">
+          {/* Summary - Left side */}
+          {(activeTab === 'addProducts' || activeTab === 'receivePO') && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 500, color: isDarkMode ? '#9CA3AF' : '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  PALLETS
+                </div>
+                <div style={{ fontSize: '16px', fontWeight: 700, color: isDarkMode ? '#F9FAFB' : '#1F2937' }}>
+                  {summary.totalPallets.toFixed(1)}
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 500, color: isDarkMode ? '#9CA3AF' : '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  TOTAL BOXES
+                </div>
+                <div style={{ fontSize: '16px', fontWeight: 700, color: isDarkMode ? '#F9FAFB' : '#1F2937' }}>
+                  {summary.totalQty.toLocaleString()}
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 500, color: isDarkMode ? '#9CA3AF' : '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  UNITS
+                </div>
+                <div style={{ fontSize: '16px', fontWeight: 700, color: isDarkMode ? '#F9FAFB' : '#1F2937' }}>
+                  {summary.units.toLocaleString()}
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Action Buttons - Right side */}
+          <div className="flex items-center gap-3">
+            {/* Export button */}
+            <button
+              type="button"
+              onClick={() => setShowExportModal(true)}
+              className="inline-flex items-center gap-2 text-xs font-semibold transition-colors"
+              style={{
+                backgroundColor: 'transparent',
+                color: '#3B82F6',
+                padding: '8px 12px',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.opacity = '0.8';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.opacity = '1';
+              }}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+              </svg>
+              Export
+            </button>
+            
+            {/* Edit Order button - only show when viewing */}
+            {isViewMode && activeTab === 'receivePO' && (
               <button
                 type="button"
-                className="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100"
-                onClick={() => setIsReceiveConfirmOpen(false)}
+                onClick={() => {
+                  // Handle edit order - could navigate or set edit mode
+                }}
+                className="inline-flex items-center gap-2 text-xs font-semibold rounded-lg px-4 py-2 transition-colors"
+                style={{
+                  backgroundColor: '#F3F4F6',
+                  color: '#374151',
+                  border: '1px solid #D1D5DB',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#E5E7EB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#F3F4F6';
+                }}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Edit Order
+            </button>
+            )}
+            
+            {/* Receive Order button */}
+            <button
+              type="button"
+              onClick={isViewMode && activeTab === 'receivePO' ? handleReceiveClick : handleCompleteOrder}
+              disabled={!isViewMode && addedLines.length === 0}
+              className="inline-flex items-center gap-2 text-xs font-semibold rounded-lg px-4 py-2 transition-colors"
+              style={{
+                backgroundColor: (isViewMode || addedLines.length > 0) ? '#007AFF' : (isDarkMode ? '#374151' : '#D1D5DB'),
+                color: '#FFFFFF',
+                cursor: (isViewMode || addedLines.length > 0) ? 'pointer' : 'not-allowed',
+                opacity: (isViewMode || addedLines.length > 0) ? 1 : 0.6,
+              }}
+              onMouseEnter={(e) => {
+                if (isViewMode || addedLines.length > 0) {
+                  e.currentTarget.style.backgroundColor = '#0056CC';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (isViewMode || addedLines.length > 0) {
+                  e.currentTarget.style.backgroundColor = '#007AFF';
+                } else {
+                  e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#D1D5DB';
+                }
+              }}
+            >
+              {activeTab === 'receivePO' ? 'Receive Order' : 'Complete Order'}
+            </button>
+          </div>
+        </div>
+        </div>
+
+      {/* Receive Confirmation Modal */}
+      {showReceiveConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowReceiveConfirmModal(false)}>
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-md px-6 py-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-gray-900 mb-4" style={{ color: '#374151' }}>Receive Bottle Order</h2>
+            <p className="text-sm text-gray-700 mb-6" style={{ color: '#374151' }}>
+              You're about to confirm this bottle order. Continue?
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowReceiveConfirmModal(false)}
+                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  color: '#374151',
+                  border: '1px solid #D1D5DB',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#F9FAFB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                }}
               >
                 Go Back
               </button>
               <button
                 type="button"
-                className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
                 onClick={() => {
-                  setIsReceiveConfirmOpen(false);
-                  handleReceiveComplete(true);
+                  setShowReceiveConfirmModal(false);
+                  handleCompleteOrder();
+                }}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors"
+                style={{
+                  backgroundColor: '#3B82F6',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#2563EB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#3B82F6';
                 }}
               >
-                Complete Partial
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Partial Order Confirmation Modal */}
+      {showPartialOrderModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowPartialOrderModal(false)}>
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-md px-6 py-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-col items-center mb-4">
+              <div className="mb-4">
+                <img src="/assets/risk.png" alt="Warning" className="w-12 h-12" />
+              </div>
+              <h2 className="text-lg font-bold text-gray-900 mb-4" style={{ color: '#374151' }}>Partial Order Confirmation</h2>
+            </div>
+            <p className="text-sm text-gray-700 mb-2" style={{ color: '#374151', textAlign: 'center' }}>
+              You've selected {selectedItems.size} of {orderLines.length} items to receive.
+            </p>
+            <p className="text-sm text-gray-700 mb-6" style={{ color: '#374151', textAlign: 'center' }}>
+              The remaining items will not be updated within your inventory.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowPartialOrderModal(false)}
+                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  color: '#374151',
+                  border: '1px solid #D1D5DB',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#F9FAFB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                }}
+              >
+                Go Back
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmPartialOrder}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors"
+                style={{
+                  backgroundColor: '#3B82F6',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#2563EB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#3B82F6';
+                }}
+              >
+                Confirm & Recieve
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Partial Order Confirmation Modal */}
+      {showPartialOrderModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowPartialOrderModal(false)}>
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-md px-6 py-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-col items-center mb-4">
+              <div className="mb-4">
+                <img src="/assets/risk.png" alt="Warning" className="w-12 h-12" />
+              </div>
+              <h2 className="text-lg font-bold text-gray-900 mb-4" style={{ color: '#374151' }}>Partial Order Confirmation</h2>
+            </div>
+            <p className="text-sm text-gray-700 mb-2" style={{ color: '#374151', textAlign: 'center' }}>
+              You've selected {selectedItems.size} of {orderLines.length} items to receive.
+            </p>
+            <p className="text-sm text-gray-700 mb-6" style={{ color: '#374151', textAlign: 'center' }}>
+              The remaining items will not be updated within your inventory.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowPartialOrderModal(false)}
+                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  color: '#374151',
+                  border: '1px solid #D1D5DB',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#F9FAFB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                }}
+              >
+                Go Back
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmPartialOrder}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors"
+                style={{
+                  backgroundColor: '#3B82F6',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#2563EB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#3B82F6';
+                }}
+              >
+                Confirm & Recieve
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowExportModal(false)}>
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-md px-6 py-6" onClick={(e) => e.stopPropagation()}>
+            {/* Header with title and close button */}
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-bold text-gray-900" style={{ color: '#374151' }}>Export Bottle Order</h2>
+              <button
+                type="button"
+                onClick={() => setShowExportModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label="Close"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* File display area */}
+            <div className="mb-6" style={{
+              border: '1px solid #3B82F6',
+              borderRadius: '8px',
+              backgroundColor: '#E0F2FE',
+              padding: '12px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+            }}>
+              <svg className="w-6 h-6" fill="#3B82F6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" fill="#3B82F6"/>
+                <path d="M14 2v6h6" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span className="text-sm font-medium" style={{ color: '#3B82F6' }}>
+                {getExportFileName()}
+              </span>
+            </div>
+
+            {/* Information message */}
+            <div className="flex items-start gap-3 mb-6">
+              <div className="flex-shrink-0 mt-0.5">
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="10" fill="#3B82F6"/>
+                  <text x="12" y="17" textAnchor="middle" fill="white" fontSize="14" fontWeight="600" fontFamily="Arial, sans-serif">i</text>
+                </svg>
+              </div>
+              <p className="text-sm text-gray-700" style={{ color: '#374151' }}>
+                After submitting to your supplier, click Complete Order to finalize.
+              </p>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  handleExportCSV();
+                }}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors"
+                style={{
+                  backgroundColor: '#3B82F6',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#2563EB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#3B82F6';
+                }}
+              >
+                Export as CSV
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowExportModal(false);
+                  handleDone();
+                }}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors"
+                style={{
+                  backgroundColor: '#3B82F6',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#2563EB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#3B82F6';
+                }}
+              >
+                Done
               </button>
             </div>
           </div>
@@ -253,5 +1522,3 @@ const BottleOrderPage = () => {
 };
 
 export default BottleOrderPage;
-
-

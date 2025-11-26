@@ -18,10 +18,10 @@ const InventoryTable = forwardRef(({
         return JSON.parse(stored);
       }
     } catch {}
-    // Default data
+    // Default data - matching the image
     return [
-      { id: 1, name: '8oz Bottle', warehouseInventory: 1000, supplierInventory: 1000 },
-      
+      { id: 1, name: '8oz Bottle', warehouseInventory: 24869, supplierInventory: 87980 },
+      { id: 2, name: 'Quart', warehouseInventory: 1345, supplierInventory: 80898 },
       { id: 3, name: 'Gallon', warehouseInventory: 1000, supplierInventory: 1000 },
       { id: 4, name: '3oz Spray Bottle', warehouseInventory: 1000, supplierInventory: 1000 },
       { id: 5, name: '6oz Spray Bottle', warehouseInventory: 1000, supplierInventory: 1000 },
@@ -185,55 +185,45 @@ const InventoryTable = forwardRef(({
   return (
     <>
       <div
-        className={`${themeClasses.cardBg} border ${themeClasses.border} shadow-md w-full`}
-        style={{ overflow: 'hidden' }}
+        className="w-full bg-white"
+        style={{ 
+          borderRadius: '8px',
+          border: '1px solid #E5E7EB',
+          overflow: 'hidden',
+        }}
       >
         {/* Table header row */}
         <div 
-          className={`${themeClasses.headerBg} border-b border-[#3C4656] w-full`}
-          style={{ height: '40px' }}
+          className="bg-[#2C3544] border-b border-[#3C4656] w-full"
+          style={{ height: '40px', borderRadius: '8px 8px 0 0' }}
         >
           <div
             className="grid h-full"
             style={{
-              gridTemplateColumns: '2fr 1fr 1fr 120px',
+              gridTemplateColumns: '253px 253px 253px 1fr',
+              gap: '0',
             }}
           >
             {['BOTTLE NAME', 'WAREHOUSE INVENTORY', 'SUPPLIER INVENTORY'].map((label, idx) => (
               <div
                 key={label}
-                className={`group h-full text-xs font-bold text-white uppercase tracking-wider border-r-2 border-white flex items-center justify-center ${
-                  idx === 0 ? 'pl-3 pr-1.5' : 'px-3'
-                } gap-2`}
+                className={`h-full text-xs font-bold text-white uppercase tracking-wider flex items-center`}
+                style={{
+                  width: '253px',
+                  height: '40px',
+                  paddingTop: '12px',
+                  paddingRight: '16px',
+                  paddingBottom: '12px',
+                  paddingLeft: '16px',
+                  gap: '10px',
+                  textAlign: 'left',
+                }}
               >
                 <span>{label}</span>
-                <button
-                  type="button"
-                  className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-white hover:text-white/80 flex items-center justify-center"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Handle filter click
-                    console.log(`Filter clicked for ${label}`);
-                  }}
-                >
-                  <svg
-                    className="w-3.5 h-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 4h18M7 10h10M10 16h4"
-                    />
-                  </svg>
-                </button>
               </div>
             ))}
-            <div className="px-3 h-full text-xs font-bold text-white uppercase tracking-wider text-center flex items-center justify-center">
-              ACTIONS
+            <div className="h-full flex items-center justify-end" style={{ paddingRight: '16px' }}>
+              {/* Empty space for ellipsis icon */}
             </div>
           </div>
         </div>
@@ -259,26 +249,54 @@ const InventoryTable = forwardRef(({
             return (
               <div
                 key={bottle.id}
-                className={`grid text-sm ${themeClasses.rowHover} transition-colors`}
+                className="grid text-sm bg-white"
                 style={{
-                  gridTemplateColumns: '2fr 1fr 1fr 120px',
+                  gridTemplateColumns: '253px 253px 253px 1fr',
+                  gap: '0',
                   borderBottom:
                     index === filteredData.length - 1
                       ? 'none'
-                      : isDarkMode
-                      ? '1px solid rgba(75,85,99,0.3)'
                       : '1px solid #e5e7eb',
+                  minHeight: '40px',
+                  borderRadius: index === filteredData.length - 1 ? '0 0 8px 8px' : '0',
                 }}
               >
-                <button
-                  type="button"
-                  className="px-3 py-3 text-left font-semibold text-blue-500 hover:text-blue-400 underline-offset-2 hover:underline cursor-pointer"
-                  onClick={() => onBottleClick(bottle)}
+                <div 
+                  className="flex items-center" 
+                  style={{ 
+                    width: '253px',
+                    height: '40px',
+                    paddingTop: '12px',
+                    paddingRight: '16px',
+                    paddingBottom: '12px',
+                    paddingLeft: '16px',
+                    gap: '10px',
+                  }}
                 >
-                  {bottle.name}
-                </button>
+                  <button
+                    type="button"
+                    className="text-left text-blue-600 hover:text-blue-700 underline cursor-pointer font-normal"
+                    onClick={() => onBottleClick(bottle)}
+                    style={{
+                      fontSize: '14px',
+                    }}
+                  >
+                    {bottle.name}
+                  </button>
+                </div>
 
-                <div className="px-3 py-3 text-center">
+                <div 
+                  className="flex items-center justify-start" 
+                  style={{ 
+                    width: '253px',
+                    height: '40px',
+                    paddingTop: '12px',
+                    paddingRight: '16px',
+                    paddingBottom: '12px',
+                    paddingLeft: '16px',
+                    gap: '10px',
+                  }}
+                >
                   {showInputs ? (
                     <input
                       type="number"
@@ -293,11 +311,24 @@ const InventoryTable = forwardRef(({
                       className="w-28 rounded-full border border-blue-300 px-3 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
                     />
                   ) : (
-                    <span className={themeClasses.textPrimary}>{bottle.warehouseInventory}</span>
+                    <span className="text-gray-900 text-left" style={{ fontSize: '14px' }}>
+                      {bottle.warehouseInventory.toLocaleString()}
+                    </span>
                   )}
                 </div>
 
-                <div className="px-3 py-3 text-center">
+                <div 
+                  className="flex items-center justify-start" 
+                  style={{ 
+                    width: '253px',
+                    height: '40px',
+                    paddingTop: '12px',
+                    paddingRight: '16px',
+                    paddingBottom: '12px',
+                    paddingLeft: '16px',
+                    gap: '10px',
+                  }}
+                >
                   {showInputs ? (
                     <input
                       type="number"
@@ -312,11 +343,13 @@ const InventoryTable = forwardRef(({
                       className="w-28 rounded-full border border-blue-300 px-3 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
                     />
                   ) : (
-                    <span className={themeClasses.textPrimary}>{bottle.supplierInventory}</span>
+                    <span className="text-gray-900 text-left" style={{ fontSize: '14px' }}>
+                      {bottle.supplierInventory.toLocaleString()}
+                    </span>
                   )}
                 </div>
 
-                <div className="px-3 py-3 flex items-center justify-center relative">
+                <div className="flex items-center justify-end relative" style={{ paddingTop: '12px', paddingBottom: '12px', paddingRight: '16px' }}>
                   {isBulkRow ? (
                     <span className="text-xs text-gray-400">Bulk editing</span>
                   ) : isRowEditing ? (
@@ -342,11 +375,27 @@ const InventoryTable = forwardRef(({
                     <>
                       <button
                         type="button"
-                        className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors"
+                        className="rounded transition-colors"
                         onClick={() => handleActionMenuToggle(bottle.id)}
                         aria-label="More actions"
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F3F4F6'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        style={{
+                          color: '#6B7280',
+                          padding: '4px 8px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '3px',
+                          backgroundColor: 'transparent',
+                        }}
                       >
-                        <span className={themeClasses.textSecondary}>⋮</span>
+                        <svg width="4" height="14" viewBox="0 0 4 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <circle cx="2" cy="2" r="1.5" fill="currentColor" />
+                          <circle cx="2" cy="7" r="1.5" fill="currentColor" />
+                          <circle cx="2" cy="12" r="1.5" fill="currentColor" />
+                        </svg>
                       </button>
 
                       {actionMenuBottleId === bottle.id && (

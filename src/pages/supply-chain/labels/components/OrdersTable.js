@@ -109,22 +109,8 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
 
   // Expose function to archive order (for parent component)
   useImperativeHandle(ref, () => ({
-    archiveOrder: (orderId) => {
-      setOrders((prev) => {
-        const orderToArchive = prev.find((o) => o.id === orderId);
-        if (!orderToArchive) return prev;
-        
-        const remaining = prev.filter((o) => o.id !== orderId);
-        try {
-          window.localStorage.setItem('labelOrders', JSON.stringify(remaining));
-        } catch {}
-        
-        if (archivedOrdersRef && archivedOrdersRef.current) {
-          archivedOrdersRef.current.addArchivedOrder({ ...orderToArchive, status: 'Received' });
-        }
-        
-        return remaining;
-      });
+    archiveOrder: (order) => {
+      handleArchiveOrder(order);
     },
     updateOrder: (orderId, updates) => {
       setOrders((prev) => {
@@ -139,6 +125,9 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
         } catch {}
         return updated;
       });
+    },
+    getOrderById: (orderId) => {
+      return orders.find((order) => order.id === orderId);
     },
   }));
 

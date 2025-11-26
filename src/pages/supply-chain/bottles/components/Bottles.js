@@ -184,9 +184,9 @@ const Bottles = () => {
 
     // Pre-populate line items for the second-step order details page
     const defaultLines = [
-      { id: 1, name: '8oz', supplierInventory: 'Auto Replenishment', unitsNeeded: 29120, qty: 29120, pallets: 4, selected: true },
-      { id: 2, name: 'Quart', supplierInventory: 'Auto Replenishment', unitsNeeded: 5040, qty: 5040, pallets: 4, selected: true },
-      { id: 3, name: 'Gallon', supplierInventory: 'Auto Replenishment', unitsNeeded: 768, qty: 768, pallets: 4, selected: true },
+      { id: 1, name: '8oz', supplierInventory: 'Auto Replenishment', unitsNeeded: 29120, qty: 29120, pallets: 4, selected: true, inventoryPercentage: 50 },
+      { id: 2, name: 'Quart', supplierInventory: 'Auto Replenishment', unitsNeeded: 5040, qty: 5040, pallets: 4, selected: true, inventoryPercentage: 75 },
+      { id: 3, name: 'Gallon', supplierInventory: 'Auto Replenishment', unitsNeeded: 768, qty: 768, pallets: 4, selected: true, inventoryPercentage: 100 },
     ];
 
     setIsNewOrderOpen(false);
@@ -229,16 +229,14 @@ const Bottles = () => {
   // Order details page is now a separate route; no in-tab rendering here.
 
   return (
-    <div className={`p-8 ${themeClasses.pageBg}`}>
-      {/* Main card with header + tabs + search + table */}
-      <div className={`${themeClasses.cardBg} rounded-xl border ${themeClasses.border} shadow-lg`}>
-        {/* Card header: title + tabs + search + actions */}
-        <div
-          className="flex items-center justify-between px-6 py-4 border-b"
-          style={{
-            borderColor: isDarkMode ? '#374151' : '#e5e7eb',
-          }}
-        >
+    <div className={`min-h-screen ${themeClasses.pageBg}`} style={{ padding: '24px' }}>
+      {/* Header section */}
+      <div
+        className="flex items-center justify-between"
+        style={{
+          paddingBottom: '16px',
+        }}
+      >
           {/* Left: Icon, title and tabs */}
           <div className="flex items-center space-x-4">
             {/* Home icon in dark pill */}
@@ -400,51 +398,57 @@ const Bottles = () => {
               )}
             </div>
 
+            {/* Cycle Counts button */}
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 bg-gray-900 hover:bg-black text-white text-sm font-medium rounded-lg px-5 py-2 shadow-md transition"
+              onClick={() => {
+                // Navigate to cycle counts page
+                navigate('/dashboard/supply-chain/bottles/cycle-counts');
+              }}
+            >
+              Cycle Counts
+            </button>
+
             {/* New Order button */}
             <button
               type="button"
               className="inline-flex items-center gap-2 bg-gray-900 hover:bg-black text-white text-sm font-medium rounded-lg px-5 py-2 shadow-md transition"
               onClick={() => setIsNewOrderOpen(true)}
             >
-              <span className="flex items-center justify-center">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-              </span>
-              New Order
+              + New Order
             </button>
           </div>
         </div>
 
-        {/* Card content */}
-        <div className="p-6">
-          {activeTab === 'inventory' && (
-            <InventoryTable
-              ref={inventoryTableRef}
-              searchQuery={search}
-              themeClasses={themeClasses}
-              onBottleClick={openBottleDetails}
-              onDeleteClick={(bottle) => {
-                setBottleToDelete(bottle);
-                setIsDeleteOpen(true);
-              }}
-            />
-          )}
-          {/* Always render OrdersTable (hidden when not active) so state persists */}
-          <div style={{ display: activeTab === 'orders' ? 'block' : 'none' }}>
-            <OrdersTable
-              searchQuery={search}
-              themeClasses={themeClasses}
-              onViewOrder={handleViewOrder}
-              onArchiveOrder={() => setActiveTab('archive')}
-              onNewOrderCreated={() => setActiveTab('orders')}
-              archivedOrdersRef={archivedOrdersTableRef}
-            />
-                </div>
-          {/* Always render ArchivedOrdersTable (hidden when not active) so ref is available */}
-          <div style={{ display: activeTab === 'archive' ? 'block' : 'none' }}>
-            <ArchivedOrdersTable ref={archivedOrdersTableRef} themeClasses={themeClasses} />
-                      </div>
+      {/* Content section */}
+      <div style={{ marginTop: '24px' }}>
+        {activeTab === 'inventory' && (
+          <InventoryTable
+            ref={inventoryTableRef}
+            searchQuery={search}
+            themeClasses={themeClasses}
+            onBottleClick={openBottleDetails}
+            onDeleteClick={(bottle) => {
+              setBottleToDelete(bottle);
+              setIsDeleteOpen(true);
+            }}
+          />
+        )}
+        {/* Always render OrdersTable (hidden when not active) so state persists */}
+        <div style={{ display: activeTab === 'orders' ? 'block' : 'none' }}>
+          <OrdersTable
+            searchQuery={search}
+            themeClasses={themeClasses}
+            onViewOrder={handleViewOrder}
+            onArchiveOrder={() => setActiveTab('archive')}
+            onNewOrderCreated={() => setActiveTab('orders')}
+            archivedOrdersRef={archivedOrdersTableRef}
+          />
+        </div>
+        {/* Always render ArchivedOrdersTable (hidden when not active) so ref is available */}
+        <div style={{ display: activeTab === 'archive' ? 'block' : 'none' }}>
+          <ArchivedOrdersTable ref={archivedOrdersTableRef} themeClasses={themeClasses} />
         </div>
       </div>
 

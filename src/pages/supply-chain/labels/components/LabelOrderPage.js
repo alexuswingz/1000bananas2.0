@@ -32,6 +32,14 @@ const LabelOrderPage = () => {
   const [editingQtyValue, setEditingQtyValue] = useState('');
   const qtyInputRef = useRef(null);
   
+  // Checkbox selection state for partial orders
+  const [selectedItems, setSelectedItems] = useState(new Set());
+  const [showPartialOrderModal, setShowPartialOrderModal] = useState(false);
+  const [orderStatus, setOrderStatus] = useState(() => {
+    // Initialize from state if available, otherwise default to 'Draft'
+    return state.status || 'Draft';
+  }); // Track order status: 'Draft', 'Received', 'Partially Received'
+  
   // Focus and select input when editing starts
   useEffect(() => {
     if (editingRowId && qtyInputRef.current) {
@@ -172,6 +180,10 @@ const LabelOrderPage = () => {
   useEffect(() => {
     if (isViewMode && orderId && state.lines) {
       setIsEditMode(true);
+      // Set order status from state if available
+      if (state.status) {
+        setOrderStatus(state.status);
+      }
       // Store original added lines for comparison
       const originalAdded = state.lines.filter(line => line.added !== false);
       setOriginalOrder({
@@ -192,7 +204,7 @@ const LabelOrderPage = () => {
         setCurrentRecipients(recipients);
       }
     }
-  }, [isViewMode, orderId, orderNumber, state.lines]);
+  }, [isViewMode, orderId, orderNumber, state.lines, state.status]);
 
   // Handle Edit Order - load all inventory items and mark existing order items
   const handleEditOrder = () => {
@@ -506,9 +518,87 @@ const LabelOrderPage = () => {
     setShowExportModal(true);
   };
 
+  // Handle checkbox selection
+  const handleCheckboxChange = (lineId, checked) => {
+    setSelectedItems((prev) => {
+      const newSet = new Set(prev);
+      if (checked) {
+        newSet.add(lineId);
+      } else {
+        newSet.delete(lineId);
+      }
+      return newSet;
+    });
+  };
+
+  // Handle select all checkbox
+  const handleSelectAll = (checked) => {
+    if (checked) {
+      setSelectedItems(new Set(orderLines.map(line => line.id)));
+    } else {
+      setSelectedItems(new Set());
+    }
+  };
+
+  // Handle receive button click - check if partial order
+  const handleReceiveClick = () => {
+    if (!isViewMode || !orderId) return;
+    
+    const totalItems = orderLines.length;
+    const selectedCount = selectedItems.size;
+    
+    // If all items selected, receive normally
+    if (selectedCount === totalItems) {
+      handleCompleteOrder();
+      return;
+    }
+    
+    // If some items selected, show partial order modal
+    if (selectedCount > 0 && selectedCount < totalItems) {
+      setShowPartialOrderModal(true);
+      return;
+    }
+    
+    // If no items selected, do nothing
+  };
+
+  // Handle confirm partial order
+  const handleConfirmPartialOrder = () => {
+    setOrderStatus('Partially Received');
+    setShowPartialOrderModal(false);
+    
+    // Update order status in OrdersTable
+    if (orderId) {
+      navigate('/dashboard/supply-chain/labels', {
+        state: {
+          partialOrderId: orderId,
+          partialOrderNumber: orderNumber,
+          selectedCount: selectedItems.size,
+          totalCount: orderLines.length,
+        },
+        replace: false,
+      });
+    }
+  };
+
+  // Handle archive button click
+  const handleArchiveOrder = () => {
+    if (!orderId) return;
+    
+    navigate('/dashboard/supply-chain/labels', {
+      state: {
+        archiveOrderId: orderId,
+        archiveOrderNumber: orderNumber,
+        archiveOrderStatus: orderStatus,
+      },
+      replace: false,
+    });
+  };
+
   const handleCompleteOrder = () => {
     // If viewing an order (on receivePO tab), archive it with "Received" status
     if (isViewMode && orderId && activeTab === 'receivePO') {
+      setOrderStatus('Received');
       navigate('/dashboard/supply-chain/labels', {
         state: {
           receivedOrderId: orderId,
@@ -829,12 +919,87 @@ const LabelOrderPage = () => {
                   LABEL ORDER #
               </div>
                 <div style={{ 
-                  fontSize: '16px', 
-                  fontWeight: 400,
-                  color: isDarkMode ? '#FFFFFF' : '#000000',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
                 }}>
-                  {orderNumber}
-          </div>
+                  <div style={{ 
+                    fontSize: '16px', 
+                    fontWeight: 400,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                  }}>
+                    {orderNumber}
+                  </div>
+                  {/* Partially Received Status Badge */}
+                  {isViewMode && orderStatus === 'Partially Received' && (
+                    <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      backgroundColor: '#FFFFFF',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '4px',
+                      padding: '4px 12px',
+                      height: '24px',
+                    }}>
+                      {/* Circular icon with bottom half filled orange */}
+                      <div style={{
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '50%',
+                        border: '1.5px solid #F97316',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        flexShrink: 0,
+                      }}>
+                        {/* Bottom half filled with orange */}
+                        <div style={{
+                          position: 'absolute',
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          height: '50%',
+                          backgroundColor: '#F97316',
+                        }} />
+                      </div>
+                      <span style={{ 
+                        fontSize: '14px', 
+                        color: '#374151', 
+                        fontWeight: 400,
+                        lineHeight: '1',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        Partially Received
+                      </span>
+                    </div>
+                  )}
+                  {/* Archive Button - show when partially received, beside order number */}
+                  {isViewMode && orderStatus === 'Partially Received' && (
+                    <button
+                      type="button"
+                      onClick={handleArchiveOrder}
+                      style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#007AFF',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        transition: 'background-color 0.2s',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#0056CC';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#007AFF';
+                      }}
+                    >
+                      Archive
+                    </button>
+                  )}
+                </div>
         </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <div style={{ 
@@ -955,8 +1120,7 @@ const LabelOrderPage = () => {
         }}>
                 <button
                   type="button"
-            onClick={() => !isViewMode && setActiveTab('addProducts')}
-            disabled={isViewMode}
+            onClick={() => setActiveTab('addProducts')}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -968,8 +1132,7 @@ const LabelOrderPage = () => {
               backgroundColor: activeTab === 'addProducts' ? (isDarkMode ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.05)') : 'transparent',
               border: 'none',
               borderBottom: activeTab === 'addProducts' ? '2px solid #007AFF' : '2px solid transparent',
-              cursor: isViewMode ? 'not-allowed' : 'pointer',
-              opacity: isViewMode ? 0.5 : 1,
+              cursor: 'pointer',
               transition: 'all 0.2s',
               whiteSpace: 'nowrap',
             }}
@@ -1087,11 +1250,11 @@ const LabelOrderPage = () => {
           >
             <thead className={themeClasses.headerBg}>
               <tr style={{ height: '40px', maxHeight: '40px' }}>
-              {/* Checkbox column for submitPO/receivePO tabs when viewing order */}
-              {(activeTab === 'submitPO' || activeTab === 'receivePO') && isViewMode ? (
+              {/* Checkbox column - show when viewing an order (isViewMode) */}
+              {isViewMode && (
                 <th
                   className="text-xs font-bold text-white uppercase tracking-wider"
-                style={{
+                  style={{
                     padding: '0 1rem',
                     height: '40px',
                     maxHeight: '40px',
@@ -1102,11 +1265,16 @@ const LabelOrderPage = () => {
                     width: 50,
                   }}
                 >
-                  <input type="checkbox" style={{ cursor: 'pointer' }} />
+                  <input 
+                    type="checkbox" 
+                    style={{ cursor: 'pointer' }}
+                    checked={selectedItems.size === orderLines.length && orderLines.length > 0}
+                    onChange={(e) => handleSelectAll(e.target.checked)}
+                  />
                 </th>
-              ) : null}
-              {/* LABEL STATUS column - only show in addProducts tab or when creating new order */}
-              {(activeTab === 'addProducts' || !isViewMode) && (
+              )}
+              {/* LABEL STATUS column - only show in addProducts tab when creating new order (not viewing) */}
+              {(activeTab === 'addProducts' && !isViewMode) && (
               <th
                 className="text-xs font-bold text-white uppercase tracking-wider"
                 style={{
@@ -1175,8 +1343,8 @@ const LabelOrderPage = () => {
               >
                 SIZE
               </th>
-              {/* ADD column - only show in addProducts tab or when creating new order */}
-              {(activeTab === 'addProducts' || !isViewMode) && (
+              {/* ADD column - only show in addProducts tab when creating new order (not viewing) */}
+              {(activeTab === 'addProducts' && !isViewMode) && (
               <th
                 className="text-xs font-bold text-white uppercase tracking-wider relative"
                 style={{
@@ -1359,14 +1527,19 @@ const LabelOrderPage = () => {
                       borderTop: index === 0 ? 'none' : (isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid #e5e7eb'),
                     }}
                   >
-                    {/* Checkbox for submitPO/receivePO when viewing order */}
-                    {(activeTab === 'submitPO' || activeTab === 'receivePO') && isViewMode && (
+                    {/* Checkbox - show when viewing an order (isViewMode) */}
+                    {isViewMode && (
                       <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', maxHeight: '40px', minHeight: '40px', verticalAlign: 'middle', lineHeight: '1', boxSizing: 'border-box' }}>
-                        <input type="checkbox" style={{ cursor: 'pointer' }} />
+                        <input 
+                          type="checkbox" 
+                          style={{ cursor: 'pointer' }}
+                          checked={selectedItems.has(line.id)}
+                          onChange={(e) => handleCheckboxChange(line.id, e.target.checked)}
+                        />
                       </td>
                     )}
-                    {/* LABEL STATUS - only show in addProducts tab or when creating new order */}
-                    {(activeTab === 'addProducts' || !isViewMode) && (
+                    {/* LABEL STATUS - only show in addProducts tab when creating new order (not viewing) */}
+                    {(activeTab === 'addProducts' && !isViewMode) && (
                       <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', maxHeight: '40px', minHeight: '40px', verticalAlign: 'middle', lineHeight: '1', boxSizing: 'border-box' }}>
                         {renderLabelStatus(line)}
                       </td>
@@ -1395,8 +1568,8 @@ const LabelOrderPage = () => {
                       {line.size}
                     </td>
 
-                    {/* ADD - only show in addProducts tab or when creating new order or in edit order mode */}
-                    {(activeTab === 'addProducts' || !isViewMode || isEditOrderMode) && (
+                    {/* ADD - only show in addProducts tab when creating new order or in edit order mode (not when viewing) */}
+                    {(activeTab === 'addProducts' && (!isViewMode || isEditOrderMode)) && (
                     <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', maxHeight: '40px', minHeight: '40px', verticalAlign: 'middle', lineHeight: '1', boxShadow: 'inset 4px 0 8px -4px rgba(0, 0, 0, 0.15)', boxSizing: 'border-box' }}>
                       <button
                         type="button"
@@ -2250,7 +2423,7 @@ const LabelOrderPage = () => {
                 {/* Complete/Receive Order button */}
                 <button
                   type="button"
-                  onClick={handleCompleteOrder}
+                  onClick={isViewMode ? handleReceiveClick : handleCompleteOrder}
                   disabled={!isViewMode && addedLines.length === 0}
                   className="inline-flex items-center gap-2 text-xs font-semibold rounded-lg px-4 py-2 transition-colors"
                   style={{
@@ -2421,6 +2594,58 @@ const LabelOrderPage = () => {
                 Done
               </button>
       </div>
+          </div>
+        </div>
+      )}
+
+      {/* Partial Order Confirmation Modal */}
+      {showPartialOrderModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md" style={{ padding: '32px' }}>
+            {/* Icon */}
+            <div className="flex justify-center mb-6">
+              <div style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                backgroundColor: '#FED7AA',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Title */}
+            <h2 className="text-xl font-semibold text-gray-900 text-center mb-4">
+              Partial Order Confirmation
+            </h2>
+
+            {/* Message */}
+            <p className="text-sm text-gray-600 text-center mb-8">
+              You've selected {selectedItems.size} of {orderLines.length} items to receive. The remaining items will not be updated within your inventory.
+            </p>
+
+            {/* Buttons */}
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowPartialOrderModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100"
+              >
+                Go Back
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmPartialOrder}
+                className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+              >
+                Confirm & Receive
+              </button>
+            </div>
           </div>
         </div>
       )}
