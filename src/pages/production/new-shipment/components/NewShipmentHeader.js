@@ -413,14 +413,18 @@ const NewShipmentHeader = ({ tableMode, onTableModeToggle, onReviewShipmentClick
             whiteSpace: 'nowrap',
           }}
         >
-          {activeAction === 'formula-check' ? (
+          {completedTabs.has('formula-check') ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#10B981">
+              <circle cx="12" cy="12" r="6"/>
+            </svg>
+          ) : activeAction === 'formula-check' ? (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="#007AFF">
               <circle cx="12" cy="12" r="6"/>
             </svg>
           ) : (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={isDarkMode ? '#9CA3AF' : '#6B7280'} strokeWidth="2">
               <circle cx="12" cy="12" r="6"/>
-          </svg>
+            </svg>
           )}
           <span>Formula Check</span>
         </button>
@@ -443,14 +447,18 @@ const NewShipmentHeader = ({ tableMode, onTableModeToggle, onReviewShipmentClick
             whiteSpace: 'nowrap',
           }}
         >
-          {activeAction === 'label-check' ? (
+          {completedTabs.has('label-check') ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#10B981">
+              <circle cx="12" cy="12" r="6"/>
+            </svg>
+          ) : activeAction === 'label-check' ? (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="#007AFF">
               <circle cx="12" cy="12" r="6"/>
             </svg>
           ) : (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={isDarkMode ? '#9CA3AF' : '#6B7280'} strokeWidth="2">
               <circle cx="12" cy="12" r="6"/>
-          </svg>
+            </svg>
           )}
           <span>Label Check</span>
         </button>

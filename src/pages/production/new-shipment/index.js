@@ -162,23 +162,35 @@ const NewShipment = () => {
   };
 
   const handleCompleteClick = () => {
-    // Check for variance exceeded first
-    const varianceCount = checkVarianceExceeded();
-    
+    // When completing Formula Check: mark it as completed and move to Label Check (no variance modal)
+    if (activeAction === 'formula-check') {
+      setCompletedTabs(prev => new Set(prev).add('formula-check'));
+      setActiveAction('label-check');
+      return;
+    }
+
+    // Only label-check (and potentially other actions in future) should trigger variance check
+    let varianceCount = 0;
+    if (activeAction === 'label-check') {
+      varianceCount = checkVarianceExceeded();
+    }
+
     if (varianceCount > 0) {
       setVarianceCount(varianceCount);
       setIsVarianceExceededOpen(true);
       return;
     }
     
-    // If no variance, proceed with normal completion flow
+    // If no variance (or action doesn't use variance), proceed with normal completion flow
     if (activeAction === 'sort-products') {
+      setCompletedTabs(prev => new Set(prev).add('sort-products'));
       setIsSortProductsCompleteOpen(true);
     } else if (activeAction === 'sort-formulas') {
+      setCompletedTabs(prev => new Set(prev).add('sort-formulas'));
       setIsSortFormulasCompleteOpen(true);
-    } else if (activeAction === 'formula-check' || activeAction === 'label-check') {
-      // Handle completion for formula-check and label-check
-      // You can add completion logic here
+    } else if (activeAction === 'label-check') {
+      // Mark label-check as completed when there's no variance
+      setCompletedTabs(prev => new Set(prev).add('label-check'));
     }
   };
 
@@ -501,29 +513,37 @@ const NewShipment = () => {
         )}
 
         {activeAction === 'sort-products' && (
-          <SortProductsTable />
+          <div style={{ marginTop: '1.5rem' }}>
+            <SortProductsTable />
+          </div>
         )}
 
         {activeAction === 'sort-formulas' && (
-          <SortFormulasTable />
+          <div style={{ marginTop: '1.5rem' }}>
+            <SortFormulasTable />
+          </div>
         )}
 
         {activeAction === 'formula-check' && (
-          <FormulaCheckTable 
-            isRecountMode={isRecountMode}
-            varianceExceededRowIds={varianceExceededRowIds}
-          />
+          <div style={{ marginTop: '1.5rem' }}>
+            <FormulaCheckTable 
+              isRecountMode={isRecountMode}
+              varianceExceededRowIds={varianceExceededRowIds}
+            />
+          </div>
         )}
 
         {activeAction === 'label-check' && (
-          <LabelCheckTable 
-            isRecountMode={isRecountMode}
-            varianceExceededRowIds={varianceExceededRowIds}
-            onExitRecountMode={() => {
-              setIsRecountMode(false);
-              setVarianceExceededRowIds([]);
-            }}
-          />
+          <div style={{ marginTop: '1.5rem' }}>
+            <LabelCheckTable 
+              isRecountMode={isRecountMode}
+              varianceExceededRowIds={varianceExceededRowIds}
+              onExitRecountMode={() => {
+                setIsRecountMode(false);
+                setVarianceExceededRowIds([]);
+              }}
+            />
+          </div>
         )}
       </div>
 

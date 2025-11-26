@@ -244,7 +244,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
       <>
         <div
           className={`${themeClasses.cardBg} ${themeClasses.border} border rounded-xl shadow-sm`}
-          style={{ marginTop: '1.25rem' }}
+          style={{ marginTop: '1.25rem', overflow: 'hidden', borderRadius: '16px' }}
         >
           <div style={{ overflowX: 'auto' }}>
             <table
@@ -255,7 +255,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
               }}
             >
               <thead className={themeClasses.headerBg}>
-                <tr style={{ height: '40px', maxHeight: '40px' }}>
+                <tr style={{ height: '40px', maxHeight: '40px', borderRadius: '16px', overflow: 'hidden' }}>
                   {['Brand', 'Product', 'Size', 'Add', 'Qty'].map((col, idx) => (
                     <th
                       key={col}
@@ -269,6 +269,8 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                         textAlign: idx === 3 || idx === 4 ? 'center' : 'left',
                         borderRight: '1px solid #FFFFFF',
                         position: 'relative',
+                        // Soften outer header corners more
+                        borderTopLeftRadius: idx === 0 ? '16px' : undefined,
                         width:
                           idx === 0
                             ? 160
@@ -318,6 +320,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                       overflow: 'hidden',
                       borderRight: '1px solid #FFFFFF',
                       position: 'relative',
+                      borderTopRightRadius: '16px',
                     }}
                   >
                     <div
@@ -888,7 +891,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                 zIndex: 20,
                 backgroundColor: '#1C2634',
                 boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
-                borderTopLeftRadius: '6px',
+                borderTopLeftRadius: '16px',
                 borderRight: '1px solid #FFFFFF',
               }}>
                 <input 
@@ -1308,7 +1311,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                 backgroundColor: '#1C2634',
                 boxShadow: '-2px 0 4px rgba(0,0,0,0.1)',
                 borderRight: '1px solid #FFFFFF',
-                borderTopRightRadius: '6px',
+                borderTopRightRadius: '16px',
               }}>
                 <span style={{ color: '#FFFFFF', fontSize: '1rem' }}>⋮</span>
               </th>

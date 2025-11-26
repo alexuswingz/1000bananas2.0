@@ -345,6 +345,7 @@ const LabelCheckTable = ({ isRecountMode = false, varianceExceededRowIds = [], o
         onClick={() => setIsExpanded(!isExpanded)}
         style={{
           padding: '16px 24px',
+          marginTop: '16px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -1091,7 +1092,8 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, is
       const viewportHeight = window.innerHeight;
       
       let left = rect.left;
-      let top = rect.bottom + 8;
+      // Start a bit lower than before so the dropdown sits further under the icon
+      let top = rect.bottom + 16;
       
       // Adjust if dropdown goes off right edge
       if (left + dropdownWidth > viewportWidth) {
@@ -1182,7 +1184,8 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, is
         boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
         border: '1px solid #E5E7EB',
         zIndex: 10000,
-        padding: '16px',
+        // Match Figma spec: top/bottom 12px, left/right 24px, horizontal gap handled in children
+        padding: '12px 24px',
       }}
       onClick={(e) => e.stopPropagation()}
     >

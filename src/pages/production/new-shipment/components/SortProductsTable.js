@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
+import SortProductsFilterDropdown from './SortProductsFilterDropdown';
 
 const SortProductsTable = () => {
   const { isDarkMode } = useTheme();
   const [draggedIndex, setDraggedIndex] = useState(null);
+  const [lockedProductIds, setLockedProductIds] = useState(() => new Set());
+  const [openFilterColumn, setOpenFilterColumn] = useState(null);
+  const filterIconRefs = useRef({});
 
   // Sample data matching the image
   const [products, setProducts] = useState([
@@ -146,6 +150,25 @@ const SortProductsTable = () => {
     setDraggedIndex(null);
   };
 
+  // Locking a product means it will NOT be affected by filters,
+  // but it can still be moved via drag & drop.
+  const handleToggleLock = (productId) => {
+    setLockedProductIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(productId)) {
+        next.delete(productId);
+      } else {
+        next.add(productId);
+      }
+      return next;
+    });
+  };
+
+  const handleFilterClick = (columnKey, event) => {
+    event.stopPropagation();
+    setOpenFilterColumn((prev) => (prev === columnKey ? null : columnKey));
+  };
+
   return (
     <div style={{
       backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
@@ -169,9 +192,10 @@ const SortProductsTable = () => {
               {columns.map((column) => (
                 <th
                   key={column.key}
+                  className={column.key === 'drag' ? undefined : 'group'}
                   style={{
-                    padding: column.key === 'drag' ? '0 8px' : '0 16px',
-                    textAlign: column.key === 'drag' ? 'center' : 'left',
+                    padding: column.key === 'drag' ? '0 8px' : '12px 16px',
+                    textAlign: column.key === 'drag' ? 'center' : 'center',
                     fontSize: '11px',
                     fontWeight: 600,
                     color: '#9CA3AF',
@@ -181,9 +205,35 @@ const SortProductsTable = () => {
                     whiteSpace: 'nowrap',
                     borderRight: column.key === 'drag' ? 'none' : '1px solid #FFFFFF',
                     height: '40px',
+                    position: column.key === 'drag' ? 'static' : 'relative',
                   }}
                 >
-                  {column.label}
+                  {column.key === 'drag' ? (
+                    column.label
+                  ) : (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '0.5rem',
+                      }}
+                    >
+                      <span>{column.label}</span>
+                      <img
+                        src="/assets/Vector (1).png"
+                        alt="Filter"
+                        className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
+                        ref={(el) => {
+                          if (el) {
+                            filterIconRefs.current[column.key] = el;
+                          }
+                        }}
+                        onClick={(e) => handleFilterClick(column.key, e)}
+                        style={{ width: '12px', height: '12px', cursor: 'pointer' }}
+                      />
+                    </div>
+                  )}
                 </th>
               ))}
             </tr>
@@ -220,32 +270,86 @@ const SortProductsTable = () => {
                   }
                 }}
               >
+                {(() => {
+                  const isLocked = lockedProductIds.has(product.id);
+                  return (
                 <td style={{
                   padding: '0 8px',
                   textAlign: 'center',
                   height: '40px',
                 }}>
                   <div
-                    draggable
-                    onDragStart={() => handleDragStart(index)}
-                    onDragEnd={handleDragEnd}
                     style={{
-                      cursor: draggedIndex === index ? 'grabbing' : 'grab',
-                      padding: '4px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      margin: '0 auto',
-                      width: 'fit-content',
+                      gap: '6px',
                     }}
                   >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <rect x="2" y="3" width="12" height="2" rx="1" fill={isDarkMode ? '#9CA3AF' : '#6B7280'}/>
-                      <rect x="2" y="7" width="12" height="2" rx="1" fill={isDarkMode ? '#9CA3AF' : '#6B7280'}/>
-                      <rect x="2" y="11" width="12" height="2" rx="1" fill={isDarkMode ? '#9CA3AF' : '#6B7280'}/>
-                    </svg>
+                    <div
+                      draggable
+                      onDragStart={() => handleDragStart(index)}
+                      onDragEnd={handleDragEnd}
+                      style={{
+                        cursor: draggedIndex === index ? 'grabbing' : 'grab',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto',
+                        width: 'fit-content',
+                      }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <rect x="2" y="3" width="12" height="2" rx="1" fill={isDarkMode ? '#9CA3AF' : '#6B7280'}/>
+                        <rect x="2" y="7" width="12" height="2" rx="1" fill={isDarkMode ? '#9CA3AF' : '#6B7280'}/>
+                        <rect x="2" y="11" width="12" height="2" rx="1" fill={isDarkMode ? '#9CA3AF' : '#6B7280'}/>
+                      </svg>
+                    </div>
+
+                    {/* Lock / Unlock icon beside hamburger */}
+                    <div
+                      style={{
+                        width: '20px',
+                        height: '20px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      onClick={() => handleToggleLock(product.id)}
+                    >
+                      {isLocked ? (
+                        <img
+                          src="/assets/lock.png"
+                          alt="Lock"
+                          style={{
+                            width: '12px',
+                            height: '15.75px',
+                            display: 'block',
+                            position: 'relative',
+                            top: '0.75px',
+                            left: '3px',
+                          }}
+                        />
+                      ) : (
+                        <img
+                          src="/assets/unlock.png"
+                          alt="Unlock"
+                          style={{
+                            width: '12px',
+                            height: '15.75px',
+                            display: 'block',
+                            position: 'relative',
+                            top: '0.75px',
+                            left: '3px',
+                          }}
+                        />
+                      )}
+                    </div>
                   </div>
                 </td>
+                  );
+                })()}
                 <td style={{
                   padding: '0 16px',
                   fontSize: '14px',
@@ -356,6 +460,15 @@ const SortProductsTable = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Column Filter Dropdown */}
+      {openFilterColumn && filterIconRefs.current[openFilterColumn] && (
+        <SortProductsFilterDropdown
+          filterIconRef={filterIconRefs.current[openFilterColumn]}
+          columnKey={openFilterColumn}
+          onClose={() => setOpenFilterColumn(null)}
+        />
+      )}
     </div>
   );
 };
