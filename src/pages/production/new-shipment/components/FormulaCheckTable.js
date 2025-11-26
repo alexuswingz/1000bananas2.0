@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 
-const FormulaCheckTable = () => {
+const FormulaCheckTable = ({ isRecountMode = false, varianceExceededRowIds = [] }) => {
   const { isDarkMode } = useTheme();
   const [selectedRows, setSelectedRows] = useState(new Set());
 
@@ -168,11 +168,17 @@ const FormulaCheckTable = () => {
 
           {/* Body */}
           <tbody>
-            {formulas.map((formula, index) => (
+            {(isRecountMode 
+              ? formulas.filter(formula => varianceExceededRowIds.includes(formula.id))
+              : formulas
+            ).map((formula, index) => {
+              // Find the original index for styling
+              const originalIndex = formulas.findIndex(f => f.id === formula.id);
+              return (
               <tr
                 key={formula.id}
                 style={{
-                  backgroundColor: index % 2 === 0
+                  backgroundColor: originalIndex % 2 === 0
                     ? (isDarkMode ? '#1F2937' : '#FFFFFF')
                     : (isDarkMode ? '#1A1F2E' : '#F9FAFB'),
                   borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
@@ -183,7 +189,7 @@ const FormulaCheckTable = () => {
                   e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = index % 2 === 0
+                  e.currentTarget.style.backgroundColor = originalIndex % 2 === 0
                     ? (isDarkMode ? '#1F2937' : '#FFFFFF')
                     : (isDarkMode ? '#1A1F2E' : '#F9FAFB');
                 }}
@@ -330,7 +336,8 @@ const FormulaCheckTable = () => {
                   </div>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

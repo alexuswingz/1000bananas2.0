@@ -11,7 +11,44 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
   const [accountOpen, setAccountOpen] = useState(false);
   const marketplaceRef = useRef(null);
   const accountRef = useRef(null);
+  const hasInitializedRef = useRef(false);
   
+  // Auto-populate shipment name with current date and set marketplace to Amazon when modal opens
+  useEffect(() => {
+    if (isOpen && !hasInitializedRef.current) {
+      const updates = {};
+      
+      // Auto-populate shipment name if empty
+      if (!newShipment.shipmentName) {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const dateString = `${year}.${month}.${day}`;
+        updates.shipmentName = dateString;
+      }
+      
+      // Auto-select Amazon if marketplace is not set
+      if (!newShipment.marketplace) {
+        updates.marketplace = 'Amazon';
+      }
+      
+      if (Object.keys(updates).length > 0) {
+        setNewShipment((prev) => ({
+          ...prev,
+          ...updates,
+        }));
+      }
+      
+      hasInitializedRef.current = true;
+    }
+    
+    // Reset initialization flag when modal closes
+    if (!isOpen) {
+      hasInitializedRef.current = false;
+    }
+  }, [isOpen, newShipment.shipmentName, newShipment.marketplace, setNewShipment]);
+
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -237,7 +274,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                     zIndex: 100,
                   }}
                 >
-                  {['Amazon', 'Walmart', 'eBay'].map((option) => (
+                  {['Amazon'].map((option) => (
                     <button
                       key={option}
                       type="button"

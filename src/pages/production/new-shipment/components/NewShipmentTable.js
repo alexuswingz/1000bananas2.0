@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
 const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyChange, onAddedRowsChange }) => {
@@ -637,7 +638,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
         </div>
 
         {/* Filter Modals */}
-        {['normal-0', 'normal-1', 'normal-2', 'normal-3', 'normal-4', 'doi-goal'].map((filterKey) => (
+        {['normal-0', 'normal-1', 'normal-2', 'normal-3', 'normal-4'].map((filterKey) => (
           openFilterIndex === filterKey && (
             <div
               key={filterKey}
@@ -822,6 +823,17 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
             </div>
           )
         ))}
+        
+        {/* Timeline (doi-goal) Filter Modal with new design */}
+        {openFilterIndex === 'doi-goal' && (
+          <TimelineFilterDropdown
+            ref={(el) => {
+              if (el) filterModalRefs.current['doi-goal'] = el;
+            }}
+            filterIconRef={filterRefs.current['doi-goal']}
+            onClose={() => setOpenFilterIndex(null)}
+          />
+        )}
       </>
     );
   }
@@ -1911,6 +1923,590 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
     </>
   );
 };
+
+// Timeline Filter Dropdown Component
+const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose }, ref) => {
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [popularFilter, setPopularFilter] = useState('');
+  const [isPopularFilterOpen, setIsPopularFilterOpen] = useState(false);
+  const [sortField, setSortField] = useState('');
+  const [isSortFieldOpen, setIsSortFieldOpen] = useState(false);
+  const [sortOrder, setSortOrder] = useState('');
+  const [isFilterConditionExpanded, setIsFilterConditionExpanded] = useState(true);
+  const [filterField, setFilterField] = useState('');
+  const [filterCondition, setFilterCondition] = useState('');
+  const [filterValue, setFilterValue] = useState('');
+  const popularFilterRef = useRef(null);
+  const sortFieldRef = useRef(null);
+
+  useEffect(() => {
+    if (filterIconRef) {
+      const rect = filterIconRef.getBoundingClientRect();
+      const dropdownWidth = 320;
+      const dropdownHeight = 500;
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      
+      let left = rect.left;
+      let top = rect.bottom + 8;
+      
+      // Adjust if dropdown goes off right edge
+      if (left + dropdownWidth > viewportWidth) {
+        left = viewportWidth - dropdownWidth - 16;
+      }
+      
+      // Adjust if dropdown goes off bottom
+      if (top + dropdownHeight > viewportHeight) {
+        top = rect.top - dropdownHeight - 8;
+      }
+      
+      // Don't go off left edge
+      if (left < 16) {
+        left = 16;
+      }
+      
+      // Don't go off top edge
+      if (top < 16) {
+        top = 16;
+      }
+      
+      setPosition({ top, left });
+    }
+  }, [filterIconRef]);
+
+  // Close popular filter dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (popularFilterRef.current && !popularFilterRef.current.contains(event.target)) {
+        setIsPopularFilterOpen(false);
+      }
+      if (sortFieldRef.current && !sortFieldRef.current.contains(event.target)) {
+        setIsSortFieldOpen(false);
+      }
+    };
+
+    if (isPopularFilterOpen || isSortFieldOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isPopularFilterOpen, isSortFieldOpen]);
+
+  const handleClearPopular = () => {
+    setPopularFilter('');
+  };
+
+  const handleClearSort = () => {
+    setSortField('');
+    setSortOrder('');
+  };
+
+  const handleReset = () => {
+    setPopularFilter('');
+    setSortField('');
+    setSortOrder('');
+    setFilterField('');
+    setFilterCondition('');
+    setFilterValue('');
+  };
+
+  const handleApply = () => {
+    // Apply filter logic here
+    onClose();
+  };
+
+  const popularFilters = [
+    { value: 'bestSellers', label: 'Best Sellers (Top Revenue)' },
+    { value: 'fastestMovers', label: 'Fastest Movers (Highest Unit Velocity)' },
+    { value: 'topProfit', label: 'Top Profit Products' },
+    { value: 'topTraffic', label: 'Top Traffic Drivers (Sessions/CTR)' },
+    { value: 'outOfStock', label: 'Out of Stock' },
+    { value: 'overstock', label: 'Overstock' },
+  ];
+
+  const sortFields = [
+    { value: '', label: 'Select field' },
+    { value: 'fbaAvailable', label: 'FBA Available' },
+    { value: 'totalInventory', label: 'Total Inventory' },
+    { value: 'forecast', label: 'Forecast' },
+    { value: 'sales7', label: '7 Day Sales' },
+    { value: 'sales30', label: '30 Day Sales' },
+  ];
+
+  const sortOrders = [
+    { value: '', label: 'Select order' },
+    { value: 'asc', label: 'A^Z Sort ascending (A to Z)', icon: 'A^Z' },
+    { value: 'desc', label: 'Z^A Sort descending (Z to A)', icon: 'Z^A' },
+  ];
+
+  const filterFields = [
+    { value: '', label: 'Select field' },
+    { value: 'brand', label: 'Brand' },
+    { value: 'product', label: 'Product' },
+    { value: 'size', label: 'Size' },
+    { value: 'qty', label: 'Qty' },
+    { value: 'fbaAvailable', label: 'FBA Available' },
+    { value: 'totalInventory', label: 'Total Inventory' },
+    { value: 'forecast', label: 'Forecast' },
+  ];
+
+  const filterConditions = [
+    { value: '', label: 'Select condition' },
+    { value: 'equals', label: 'Equals' },
+    { value: 'contains', label: 'Contains' },
+    { value: 'greaterThan', label: 'Greater than' },
+    { value: 'lessThan', label: 'Less than' },
+  ];
+
+  return createPortal(
+    <div
+      ref={ref}
+      style={{
+        position: 'fixed',
+        top: `${position.top}px`,
+        left: `${position.left}px`,
+        width: '320px',
+        backgroundColor: '#FFFFFF',
+        borderRadius: '12px',
+        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+        border: '1px solid #E5E7EB',
+        zIndex: 10000,
+        padding: '16px',
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* Popular filters section */}
+      <div style={{ marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', textTransform: 'uppercase' }}>
+            Popular filters:
+          </label>
+          <button
+            type="button"
+            onClick={handleClearPopular}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#3B82F6',
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+              padding: 0,
+            }}
+          >
+            Clear
+          </button>
+        </div>
+        
+        <div style={{ position: 'relative' }} ref={popularFilterRef}>
+          <button
+            type="button"
+            onClick={() => setIsPopularFilterOpen(!isPopularFilterOpen)}
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              border: '1px solid #D1D5DB',
+              borderRadius: '6px',
+              fontSize: '0.875rem',
+              color: popularFilter ? '#374151' : '#9CA3AF',
+              backgroundColor: '#FFFFFF',
+              cursor: 'pointer',
+              textAlign: 'left',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <span>
+              {popularFilter 
+                ? popularFilters.find(f => f.value === popularFilter)?.label || 'Select filter'
+                : 'Select filter'
+              }
+            </span>
+            <svg
+              width="12"
+              height="8"
+              viewBox="0 0 12 8"
+              fill="none"
+              style={{
+                transform: isPopularFilterOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.2s',
+              }}
+            >
+              <path d="M1 1L6 6L11 1" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+          
+          {isPopularFilterOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                marginTop: '4px',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #D1D5DB',
+                borderRadius: '6px',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                overflow: 'hidden',
+                zIndex: 10001,
+              }}
+            >
+              {popularFilters.map((filter) => (
+                <button
+                  key={filter.value}
+                  type="button"
+                  onClick={() => {
+                    setPopularFilter(filter.value);
+                    setIsPopularFilterOpen(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '10px 12px',
+                    fontSize: '0.875rem',
+                    color: popularFilter === filter.value ? '#3B82F6' : '#374151',
+                    backgroundColor: '#FFFFFF',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontWeight: popularFilter === filter.value ? 500 : 400,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (popularFilter !== filter.value) {
+                      e.currentTarget.style.backgroundColor = '#F9FAFB';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  }}
+                >
+                  {popularFilter === filter.value && (
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      style={{ flexShrink: 0 }}
+                    >
+                      <path
+                        d="M13.3333 4L6 11.3333L2.66667 8"
+                        stroke="#3B82F6"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  )}
+                  {popularFilter !== filter.value && (
+                    <div style={{ width: '16px', height: '16px', flexShrink: 0 }} />
+                  )}
+                  <span>{filter.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Sort by section */}
+      <div style={{ marginBottom: '16px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', textTransform: 'uppercase' }}>
+            Sort by:
+          </label>
+          <button
+            type="button"
+            onClick={handleClearSort}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#3B82F6',
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+              padding: 0,
+            }}
+          >
+            Clear
+          </button>
+        </div>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ position: 'relative' }} ref={sortFieldRef}>
+            <button
+              type="button"
+              onClick={() => setIsSortFieldOpen(!isSortFieldOpen)}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                border: '1px solid #D1D5DB',
+                borderRadius: '6px',
+                fontSize: '0.875rem',
+                color: sortField ? '#374151' : '#9CA3AF',
+                backgroundColor: '#FFFFFF',
+                cursor: 'pointer',
+                textAlign: 'left',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <span>
+                {sortField 
+                  ? sortFields.find(f => f.value === sortField)?.label || 'Select field'
+                  : 'Select field'
+                }
+              </span>
+              <svg
+                width="12"
+                height="8"
+                viewBox="0 0 12 8"
+                fill="none"
+                style={{
+                  transform: isSortFieldOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.2s',
+                }}
+              >
+                <path d="M1 1L6 6L11 1" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            
+            {isSortFieldOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  marginTop: '4px',
+                  backgroundColor: '#FFFFFF',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '6px',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                  overflow: 'hidden',
+                  zIndex: 10001,
+                }}
+              >
+                {sortFields.filter(f => f.value !== '').map((field) => (
+                  <button
+                    key={field.value}
+                    type="button"
+                    onClick={() => {
+                      setSortField(field.value);
+                      setIsSortFieldOpen(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '10px 12px',
+                      fontSize: '0.875rem',
+                      color: '#374151',
+                      backgroundColor: sortField === field.value ? '#F9FAFB' : '#FFFFFF',
+                      border: 'none',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (sortField !== field.value) {
+                        e.currentTarget.style.backgroundColor = '#F9FAFB';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = sortField === field.value ? '#F9FAFB' : '#FFFFFF';
+                    }}
+                  >
+                    {field.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              border: sortOrder ? '1px solid #3B82F6' : '1px solid #D1D5DB',
+              borderRadius: '6px',
+              fontSize: '0.875rem',
+              color: sortOrder ? '#374151' : '#9CA3AF',
+              backgroundColor: sortOrder ? '#EFF6FF' : '#FFFFFF',
+              cursor: 'pointer',
+              appearance: 'none',
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'right 12px center',
+              paddingRight: '36px',
+            }}
+          >
+            {sortOrders.map((order) => (
+              <option key={order.value} value={order.value}>
+                {order.icon ? `${order.icon} ${order.label}` : order.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Filter by condition section - collapsible */}
+      <div style={{ marginBottom: '16px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: isFilterConditionExpanded ? '12px' : 0,
+            cursor: 'pointer',
+          }}
+          onClick={() => setIsFilterConditionExpanded(!isFilterConditionExpanded)}
+        >
+          <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', textTransform: 'uppercase' }}>
+            Filter by condition:
+          </label>
+          <svg
+            width="12"
+            height="8"
+            viewBox="0 0 12 8"
+            fill="none"
+            style={{
+              transform: isFilterConditionExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s',
+            }}
+          >
+            <path d="M1 1L6 6L11 1" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
+        
+        {isFilterConditionExpanded && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <select
+              value={filterField}
+              onChange={(e) => setFilterField(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                border: '1px solid #D1D5DB',
+                borderRadius: '6px',
+                fontSize: '0.875rem',
+                color: filterField ? '#374151' : '#9CA3AF',
+                backgroundColor: '#FFFFFF',
+                cursor: 'pointer',
+                appearance: 'none',
+                backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 12px center',
+                paddingRight: '36px',
+              }}
+            >
+              {filterFields.map((field) => (
+                <option key={field.value} value={field.value}>
+                  {field.label}
+                </option>
+              ))}
+            </select>
+            
+            <select
+              value={filterCondition}
+              onChange={(e) => setFilterCondition(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                border: '1px solid #D1D5DB',
+                borderRadius: '6px',
+                fontSize: '0.875rem',
+                color: filterCondition ? '#374151' : '#9CA3AF',
+                backgroundColor: '#FFFFFF',
+                cursor: 'pointer',
+                appearance: 'none',
+                backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%239CA3AF' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 12px center',
+                paddingRight: '36px',
+              }}
+            >
+              {filterConditions.map((condition) => (
+                <option key={condition.value} value={condition.value}>
+                  {condition.label}
+                </option>
+              ))}
+            </select>
+            
+            <div style={{ position: 'relative' }}>
+              <input
+                type="text"
+                placeholder="Value here..."
+                value={filterValue}
+                onChange={(e) => setFilterValue(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 36px 8px 12px',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  color: '#374151',
+                  backgroundColor: '#FFFFFF',
+                  boxSizing: 'border-box',
+                }}
+              />
+              <div style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style={{ cursor: 'pointer' }}>
+                  <path d="M1 5L5 1L9 5" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style={{ cursor: 'pointer' }}>
+                  <path d="M1 1L5 5L9 1" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Action buttons */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
+        <button
+          type="button"
+          onClick={handleReset}
+          style={{
+            padding: '8px 16px',
+            border: '1px solid #D1D5DB',
+            borderRadius: '6px',
+            backgroundColor: '#FFFFFF',
+            color: '#374151',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+            cursor: 'pointer',
+          }}
+        >
+          Reset
+        </button>
+        <button
+          type="button"
+          onClick={handleApply}
+          style={{
+            padding: '8px 16px',
+            border: 'none',
+            borderRadius: '6px',
+            backgroundColor: '#3B82F6',
+            color: '#FFFFFF',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+            cursor: 'pointer',
+          }}
+        >
+          Apply
+        </button>
+      </div>
+    </div>,
+    document.body
+  );
+});
+
+TimelineFilterDropdown.displayName = 'TimelineFilterDropdown';
 
 export default NewShipmentTable;
 

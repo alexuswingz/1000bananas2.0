@@ -15,6 +15,7 @@ import ShipmentDetailsModal from './components/ShipmentDetailsModal';
 import ExportTemplateModal from './components/ExportTemplateModal';
 import SortProductsCompleteModal from './components/SortProductsCompleteModal';
 import SortFormulasCompleteModal from './components/SortFormulasCompleteModal';
+import VarianceExceededModal from './components/VarianceExceededModal';
 
 const NewShipment = () => {
   const { isDarkMode } = useTheme();
@@ -25,6 +26,10 @@ const NewShipment = () => {
   const [isExportTemplateOpen, setIsExportTemplateOpen] = useState(false);
   const [isSortProductsCompleteOpen, setIsSortProductsCompleteOpen] = useState(false);
   const [isSortFormulasCompleteOpen, setIsSortFormulasCompleteOpen] = useState(false);
+  const [isVarianceExceededOpen, setIsVarianceExceededOpen] = useState(false);
+  const [varianceCount, setVarianceCount] = useState(0);
+  const [isRecountMode, setIsRecountMode] = useState(false);
+  const [varianceExceededRowIds, setVarianceExceededRowIds] = useState([]);
   const [tableMode, setTableMode] = useState(false);
   const [activeAction, setActiveAction] = useState('add-products');
   const [completedTabs, setCompletedTabs] = useState(new Set());
@@ -131,12 +136,63 @@ const NewShipment = () => {
     setActiveAction('sort-formulas');
   };
 
+  // Check for variance exceeded and get row IDs
+  const checkVarianceExceeded = () => {
+    // For label-check and formula-check actions, check if there are products with variance exceeded
+    // This is a placeholder - you'll need to get actual data from the tables
+    // For now, we'll use a mock check. In production, you'd get this from LabelCheckTable or FormulaCheckTable
+    
+    if (activeAction === 'label-check' || activeAction === 'formula-check') {
+      // Mock data - replace with actual variance check from tables
+      // Example: Check if any products have totalCount that exceeds allowed variance
+      // For demonstration, we'll assume 3 products have variance exceeded
+      const mockVarianceCount = 3; // Replace with actual count from table data
+      const mockVarianceRowIds = [1, 2, 3]; // Replace with actual row IDs from table data
+      
+      // In production, you would:
+      // 1. Get rows from LabelCheckTable or FormulaCheckTable
+      // 2. Count products where variance exceeds threshold (e.g., Math.abs(totalCount) > allowedThreshold)
+      // 3. Return the count and row IDs
+      
+      setVarianceExceededRowIds(mockVarianceRowIds);
+      return mockVarianceCount;
+    }
+    setVarianceExceededRowIds([]);
+    return 0;
+  };
+
   const handleCompleteClick = () => {
+    // Check for variance exceeded first
+    const varianceCount = checkVarianceExceeded();
+    
+    if (varianceCount > 0) {
+      setVarianceCount(varianceCount);
+      setIsVarianceExceededOpen(true);
+      return;
+    }
+    
+    // If no variance, proceed with normal completion flow
     if (activeAction === 'sort-products') {
       setIsSortProductsCompleteOpen(true);
     } else if (activeAction === 'sort-formulas') {
       setIsSortFormulasCompleteOpen(true);
+    } else if (activeAction === 'formula-check' || activeAction === 'label-check') {
+      // Handle completion for formula-check and label-check
+      // You can add completion logic here
     }
+  };
+
+  const handleVarianceGoBack = () => {
+    setIsVarianceExceededOpen(false);
+    setIsRecountMode(false);
+    setVarianceExceededRowIds([]);
+  };
+
+  const handleVarianceRecount = () => {
+    setIsVarianceExceededOpen(false);
+    setIsRecountMode(true);
+    // Stay on the current action to allow recount
+    // The tables will now filter to show only rows with variance exceeded
   };
 
   const handleExport = () => {
@@ -453,11 +509,21 @@ const NewShipment = () => {
         )}
 
         {activeAction === 'formula-check' && (
-          <FormulaCheckTable />
+          <FormulaCheckTable 
+            isRecountMode={isRecountMode}
+            varianceExceededRowIds={varianceExceededRowIds}
+          />
         )}
 
         {activeAction === 'label-check' && (
-          <LabelCheckTable />
+          <LabelCheckTable 
+            isRecountMode={isRecountMode}
+            varianceExceededRowIds={varianceExceededRowIds}
+            onExitRecountMode={() => {
+              setIsRecountMode(false);
+              setVarianceExceededRowIds([]);
+            }}
+          />
         )}
       </div>
 
@@ -646,6 +712,20 @@ const NewShipment = () => {
       <SortFormulasCompleteModal
         isOpen={isSortFormulasCompleteOpen}
         onClose={() => setIsSortFormulasCompleteOpen(false)}
+      />
+      <VarianceExceededModal
+        isOpen={isVarianceExceededOpen}
+        onClose={() => setIsVarianceExceededOpen(false)}
+        onGoBack={handleVarianceGoBack}
+        onRecount={handleVarianceRecount}
+        varianceCount={varianceCount}
+      />
+      <VarianceExceededModal
+        isOpen={isVarianceExceededOpen}
+        onClose={() => setIsVarianceExceededOpen(false)}
+        onGoBack={handleVarianceGoBack}
+        onRecount={handleVarianceRecount}
+        varianceCount={varianceCount}
       />
     </div>
   );
