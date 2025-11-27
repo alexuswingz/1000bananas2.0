@@ -104,19 +104,24 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
             <th
               className="text-xs font-bold text-white uppercase tracking-wider border-r border-white"
               style={{
-                padding: '0 1rem',
+                padding: '12px 16px',
                 textAlign: 'left',
-                width: '140px',
+                width: '169px',
+                height: '40px',
+                borderRight: '1px solid white',
+                borderTopLeftRadius: '12px',
               }}
             >
-              LABEL STATUS
+              ORDER STATUS
             </th>
             <th
               className="text-xs font-bold text-white uppercase tracking-wider border-r border-white"
               style={{
-                padding: '0 1rem',
+                padding: '12px 16px',
                 textAlign: 'left',
-                width: '150px',
+                width: '169px',
+                height: '40px',
+                borderRight: '1px solid white',
               }}
             >
               LABEL ORDER #
@@ -124,9 +129,11 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
             <th
               className="text-xs font-bold text-white uppercase tracking-wider border-r border-white"
               style={{
-                padding: '0 1rem',
+                padding: '12px 16px',
                 textAlign: 'left',
-                width: '150px',
+                width: '169px',
+                height: '40px',
+                borderRight: '1px solid white',
               }}
             >
               SUPPLIER
@@ -134,9 +141,11 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
             <th
               className="text-xs font-bold text-white uppercase tracking-wider border-r border-white"
               style={{
-                padding: '0 1rem',
+                padding: '12px 16px',
                 textAlign: 'center',
-                width: '90px',
+                width: '169px',
+                height: '40px',
+                borderRight: '1px solid white',
               }}
             >
               ADD PRODUCTS
@@ -144,19 +153,22 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
             <th
               className="text-xs font-bold text-white uppercase tracking-wider border-r border-white"
               style={{
-                padding: '0 1rem',
+                padding: '12px 16px',
                 textAlign: 'center',
-                width: '90px',
+                width: '169px',
+                height: '40px',
+                borderRight: '1px solid white',
               }}
             >
               SUBMIT PO
             </th>
             <th
-              className="text-xs font-bold text-white uppercase tracking-wider border-r border-white"
+              className="text-xs font-bold text-white uppercase tracking-wider"
               style={{
-                padding: '0 1rem',
+                padding: '12px 16px',
                 textAlign: 'center',
-                width: '90px',
+                width: '169px',
+                height: '40px',
               }}
             >
               RECEIVE PO
@@ -164,9 +176,11 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
             <th
               className="text-xs font-bold text-white uppercase tracking-wider"
               style={{
-                padding: '0 1rem',
-                textAlign: 'center',
+                padding: '12px 16px',
+                textAlign: 'right',
                 width: '40px',
+                height: '40px',
+                borderTopRightRadius: '12px',
               }}
             >
             </th>
@@ -286,7 +300,7 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
                   </td>
 
                   {/* Action Menu */}
-                  <td style={{ padding: '0.65rem 1rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                  <td style={{ padding: '0.65rem 1rem', textAlign: 'right', verticalAlign: 'middle', width: '40px' }}>
                     <button
                       type="button"
                       className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors"

@@ -508,14 +508,16 @@ const Labels = () => {
             )}
           </div>
 
-          {/* Cycle Counts button */}
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 bg-gray-900 hover:bg-black text-white text-sm font-medium rounded-lg px-5 py-2 shadow-md transition"
-            onClick={() => navigate('/dashboard/supply-chain/labels/cycle-counts')}
-          >
-            Cycle Counts
-          </button>
+          {/* Cycle Counts button - only show in inventory tab */}
+          {activeTab === 'inventory' && (
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 bg-gray-900 hover:bg-black text-white text-sm font-medium rounded-lg px-5 py-2 shadow-md transition"
+              onClick={() => navigate('/dashboard/supply-chain/labels/cycle-counts')}
+            >
+              Cycle Counts
+            </button>
+          )}
           
           {/* New Order button */}
           <button

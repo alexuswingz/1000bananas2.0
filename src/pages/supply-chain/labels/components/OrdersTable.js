@@ -43,7 +43,7 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
   useEffect(() => {
     const newOrderState = location.state && location.state.newLabelOrder;
     if (newOrderState) {
-      const { orderNumber: newOrderNumber, supplierName, lines } = newOrderState;
+      const { orderNumber: newOrderNumber, supplierName, lines, status } = newOrderState;
       setOrders((prev) => {
         // Check for duplicates in the current state
         const existing = prev.find(
@@ -55,7 +55,7 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
 
         const newOrder = {
           id: Date.now(),
-          status: 'Submitted',
+          status: status || 'Submitted', // Use provided status or default to 'Submitted'
           orderNumber: newOrderNumber,
           supplier: supplierName,
           lines: lines || [], // Save the lines data with the order
@@ -254,6 +254,10 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
   // Helper function to determine step completion status
   const getStepStatus = (order, step) => {
     const status = order.status || 'Draft';
+    // If order is being edited, don't show receivePO as completed
+    if (step === 'receivePO' && order.isEdited) {
+      return false;
+    }
     if (step === 'addProducts') {
       return status !== 'Draft'; // Completed if not draft
     } else if (step === 'submitPO') {
@@ -286,6 +290,7 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
           width: '100%',
           borderCollapse: 'separate',
           borderSpacing: 0,
+          tableLayout: 'fixed',
         }}
       >
         {/* Table header */}
@@ -293,6 +298,9 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
           className={themeClasses.headerBg} 
           style={{ 
             position: 'relative',
+            width: '100%',
+            height: '40px',
+            backgroundColor: '#2C3544',
           }}
         >
           <tr 
@@ -304,19 +312,26 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
             <th
               className="text-xs font-bold text-white uppercase tracking-wider border-r border-white"
               style={{
-                padding: '0 1rem',
-                textAlign: 'left',
-                width: '140px',
+                padding: '12px 16px',
+                textAlign: 'center',
+                width: '16.67%',
+                height: '40px',
+                borderRight: '1px solid white',
+                borderTopLeftRadius: '12px',
+                backgroundColor: '#2C3544',
               }}
             >
-              LABEL STATUS
+              ORDER STATUS
             </th>
             <th
               className="text-xs font-bold text-white uppercase tracking-wider border-r border-white"
               style={{
-                padding: '0 1rem',
-                textAlign: 'left',
-                width: '150px',
+                padding: '12px 16px',
+                textAlign: 'center',
+                width: '16.67%',
+                height: '40px',
+                borderRight: '1px solid white',
+                backgroundColor: '#2C3544',
               }}
             >
               LABEL ORDER #
@@ -324,9 +339,12 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
             <th
               className="text-xs font-bold text-white uppercase tracking-wider border-r border-white"
               style={{
-                padding: '0 1rem',
-                textAlign: 'left',
-                width: '150px',
+                padding: '12px 16px',
+                textAlign: 'center',
+                width: '16.67%',
+                height: '40px',
+                borderRight: '1px solid white',
+                backgroundColor: '#2C3544',
               }}
             >
               SUPPLIER
@@ -334,9 +352,12 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
              <th
                className="text-xs font-bold text-white uppercase tracking-wider border-r border-white"
                style={{
-                 padding: '0 1rem',
+                 padding: '12px 16px',
                  textAlign: 'center',
-                 width: '90px',
+                 width: '16.67%',
+                 height: '40px',
+                 borderRight: '1px solid white',
+                 backgroundColor: '#2C3544',
                }}
              >
                ADD PRODUCTS
@@ -344,31 +365,29 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
              <th
                className="text-xs font-bold text-white uppercase tracking-wider border-r border-white"
                style={{
-                 padding: '0 1rem',
+                 padding: '12px 16px',
                  textAlign: 'center',
-                 width: '90px',
+                 width: '16.67%',
+                 height: '40px',
+                 borderRight: '1px solid white',
+                 backgroundColor: '#2C3544',
                }}
              >
                SUBMIT PO
              </th>
              <th
-               className="text-xs font-bold text-white uppercase tracking-wider border-r border-white"
+               className="text-xs font-bold text-white uppercase tracking-wider"
                style={{
-                 padding: '0 1rem',
-                 textAlign: 'center',
-                 width: '90px',
+                 padding: '12px 16px',
+                 textAlign: 'left',
+                 width: '16.65%',
+                 height: '40px',
+                 borderTopRightRadius: '12px',
+                 backgroundColor: '#2C3544',
+                 position: 'relative',
                }}
              >
                RECEIVE PO
-             </th>
-             <th
-               className="text-xs font-bold text-white uppercase tracking-wider"
-               style={{
-                 padding: '0 1rem',
-                 textAlign: 'center',
-                 width: '40px',
-               }}
-             >
              </th>
           </tr>
         </thead>
@@ -377,7 +396,7 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
         <tbody>
           {filteredOrders.length === 0 ? (
             <tr>
-              <td colSpan="7" className="px-6 py-6 text-center text-sm italic text-gray-400">
+              <td colSpan="6" className="px-6 py-6 text-center text-sm italic text-gray-400">
                 No orders yet.
               </td>
             </tr>
@@ -423,7 +442,7 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
                   </td>
 
                   {/* LABEL ORDER # */}
-                  <td style={{ padding: '0.65rem 1rem', verticalAlign: 'middle' }}>
+                  <td style={{ padding: '0.65rem 1rem', verticalAlign: 'middle', textAlign: 'left' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <button
                         type="button"
@@ -435,6 +454,7 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
                           cursor: 'pointer',
                           fontSize: '14px',
                           textDecoration: 'none',
+                          padding: 0,
                         }}
                         onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
                         onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
@@ -445,11 +465,11 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
                       {order.isEdited && (
                         <span
                           style={{
-                            backgroundColor: '#FED7AA', // Light orange background
-                            color: '#C2410C', // Darker orange/brown text
+                            backgroundColor: '#FED7AA', // Light orange/peach background
+                            color: '#000000', // Black text
                             fontSize: '11px',
                             fontWeight: 500,
-                            padding: '2px 6px',
+                            padding: '2px 8px',
                             borderRadius: '4px',
                             fontFamily: 'system-ui, -apple-system, sans-serif',
                             whiteSpace: 'nowrap',
@@ -475,8 +495,8 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
                         width: '20px',
                         height: '20px',
                         borderRadius: '50%',
-                        backgroundColor: getStepStatus(order, 'addProducts') ? (isDraft ? '#3B82F6' : '#10B981') : '#FFFFFF',
-                        border: getStepStatus(order, 'addProducts') ? 'none' : '2px solid #D1D5DB',
+                        backgroundColor: status === 'Draft' ? '#3B82F6' : (getStepStatus(order, 'addProducts') ? '#10B981' : '#FFFFFF'),
+                        border: (status === 'Draft' || getStepStatus(order, 'addProducts')) ? 'none' : '2px solid #D1D5DB',
                         margin: '0 auto',
                       }}
                     />
@@ -497,75 +517,72 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
                   </td>
 
                   {/* RECEIVE PO */}
-                  <td style={{ padding: '0.65rem 1rem', textAlign: 'center', verticalAlign: 'middle' }}>
-                    <div
-                      style={{
-                        width: '20px',
-                        height: '20px',
-                        borderRadius: '50%',
-                        backgroundColor: getStepStatus(order, 'receivePO') ? '#10B981' : '#FFFFFF',
-                        border: getStepStatus(order, 'receivePO') ? 'none' : '2px solid #D1D5DB',
-                        margin: '0 auto',
-                      }}
-                    />
-                  </td>
-
-                  {/* Action Menu */}
-                  <td style={{ padding: '0.65rem 1rem', textAlign: 'center', verticalAlign: 'middle' }}>
-                    <div className="relative">
-                      <button
-                        ref={(el) => (buttonRefs.current[order.id] = el)}
-                        type="button"
-                        data-menu-button={order.id}
-                        className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOrderActionMenuId((prev) => (prev === order.id ? null : order.id));
-                        }}
-                        aria-label="Order actions"
+                  <td style={{ padding: '0.65rem 1rem', textAlign: 'left', verticalAlign: 'middle', position: 'relative' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                      <div
                         style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
+                          width: '20px',
+                          height: '20px',
+                          borderRadius: '50%',
+                          backgroundColor: getStepStatus(order, 'receivePO') ? '#10B981' : '#FFFFFF',
+                          border: getStepStatus(order, 'receivePO') ? 'none' : '2px solid #D1D5DB',
                         }}
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <circle cx="12" cy="5" r="1" fill="#6B7280" />
-                          <circle cx="12" cy="12" r="1" fill="#6B7280" />
-                          <circle cx="12" cy="19" r="1" fill="#6B7280" />
-                        </svg>
-                      </button>
-
-                      {orderActionMenuId === order.id && (
-                        <div
-                          ref={(el) => (menuRefs.current[order.id] = el)}
-                          className="fixed bg-white border border-gray-200 rounded-md shadow-lg text-xs z-50 min-w-[120px]"
+                      />
+                      <div className="relative">
+                        <button
+                          ref={(el) => (buttonRefs.current[order.id] = el)}
+                          type="button"
+                          data-menu-button={order.id}
+                          className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOrderActionMenuId((prev) => (prev === order.id ? null : order.id));
+                          }}
+                          aria-label="Order actions"
                           style={{
-                            top: `${menuPosition.top}px`,
-                            right: `${menuPosition.right}px`,
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
                           }}
                         >
-                          <button
-                            type="button"
-                            className={`w-full flex items-center gap-2 px-3 py-2.5 ${themeClasses.rowHover} ${themeClasses.textPrimary} transition-colors`}
-                            onClick={() => {
-                              onViewOrder(order);
-                              setOrderActionMenuId(null);
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="12" cy="5" r="1" fill="#6B7280" />
+                            <circle cx="12" cy="12" r="1" fill="#6B7280" />
+                            <circle cx="12" cy="19" r="1" fill="#6B7280" />
+                          </svg>
+                        </button>
+
+                        {orderActionMenuId === order.id && (
+                          <div
+                            ref={(el) => (menuRefs.current[order.id] = el)}
+                            className="fixed bg-white border border-gray-200 rounded-md shadow-lg text-xs z-50 min-w-[120px]"
+                            style={{
+                              top: `${menuPosition.top}px`,
+                              right: `${menuPosition.right}px`,
                             }}
                           >
-                            <span className={themeClasses.textSecondary}>
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                              </svg>
-                            </span>
-                            View
-                          </button>
-                        </div>
-                      )}
+                            <button
+                              type="button"
+                              className={`w-full flex items-center gap-2 px-3 py-2.5 ${themeClasses.rowHover} ${themeClasses.textPrimary} transition-colors`}
+                              onClick={() => {
+                                onViewOrder(order);
+                                setOrderActionMenuId(null);
+                              }}
+                            >
+                              <span className={themeClasses.textSecondary}>
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                              </span>
+                              View
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </td>
                 </tr>

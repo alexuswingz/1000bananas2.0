@@ -16,15 +16,15 @@ const InventoryTable = forwardRef(({
       }
     } catch {}
     // Default data matching the image
+    const inboundValues = [3000, 500, 0, 0, 0, 0, 500, 4000, 0, 0, 0, 0, 2000, 1000, 0];
     return Array.from({ length: 15 }, (_, i) => ({
       id: i + 1,
-      status: i === 9 || i === 14 ? 'Needs Proofing' : 'Up to Date',
+      status: i === 7 || i === 14 ? 'Needs Proofing' : 'Up to Date', // Row 8 and 15 (0-indexed: 7 and 14)
       brand: 'Total Pest Spray',
       product: 'Cherry Tree Fertilizer',
       size: 'Gallon',
-      labelLink: 'https://drive.google.com/file/d/1a2b3c4d5e6f7g8h9i0j/view',
-      labelSize: '5.375" x 4.5"',
       inventory: 25000,
+      inbound: inboundValues[i] || 0,
     }));
   });
 
@@ -257,16 +257,22 @@ const InventoryTable = forwardRef(({
   return (
     <>
       {/* Table header */}
-      <div className={themeClasses.headerBg}>
+      <div style={{ width: '100%', height: '40px', borderRadius: '12px 12px 0 0', backgroundColor: '#2C3544', overflow: 'hidden' }}>
         <div
-          className="grid"
+          className="grid h-full"
           style={{
-            gridTemplateColumns: '200px 1.5fr 1.5fr 1fr 2fr 1.5fr 1fr 40px',
+            gridTemplateColumns: '220px 180px 220px 120px 140px 140px 1fr',
+            width: '100%',
+            height: '100%',
+            backgroundColor: '#2C3544',
+            gap: 0,
+            margin: 0,
+            padding: 0,
           }}
         >
-          <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] group">
-            <div className="flex items-center justify-between gap-2">
-              <span>STATUS</span>
+          <div className="text-xs font-bold text-white uppercase tracking-wider border-r border-white group" style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', borderTopLeftRadius: '12px', backgroundColor: '#2C3544', paddingTop: '12px', paddingRight: '24px', paddingBottom: '12px', paddingLeft: '24px', boxSizing: 'border-box', gap: '10px' }}>
+            <div className="flex items-center gap-2">
+              <span>LABEL STATUS</span>
               <img
                 ref={(el) => { if (el) filterIconRefs.current['status'] = el; }}
                 src="/assets/Vector (1).png"
@@ -288,8 +294,8 @@ const InventoryTable = forwardRef(({
               />
             </div>
           </div>
-          <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] group">
-            <div className="flex items-center justify-between gap-2">
+          <div className="text-xs font-bold text-white uppercase tracking-wider border-r border-white group" style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#2C3544', paddingTop: '12px', paddingRight: '24px', paddingBottom: '12px', paddingLeft: '24px', boxSizing: 'border-box', gap: '10px' }}>
+            <div className="flex items-center justify-center gap-2">
               <span>BRAND</span>
               <img
                 ref={(el) => { if (el) filterIconRefs.current['brand'] = el; }}
@@ -312,8 +318,8 @@ const InventoryTable = forwardRef(({
               />
             </div>
           </div>
-          <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] group">
-            <div className="flex items-center justify-between gap-2">
+          <div className="text-xs font-bold text-white uppercase tracking-wider border-r border-white group" style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#2C3544', paddingTop: '12px', paddingRight: '24px', paddingBottom: '12px', paddingLeft: '24px', boxSizing: 'border-box', gap: '10px' }}>
+            <div className="flex items-center justify-center gap-2">
               <span>PRODUCT</span>
               <img
                 ref={(el) => { if (el) filterIconRefs.current['product'] = el; }}
@@ -336,8 +342,8 @@ const InventoryTable = forwardRef(({
               />
             </div>
           </div>
-          <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] group">
-            <div className="flex items-center justify-between gap-2">
+          <div className="text-xs font-bold text-white uppercase tracking-wider border-r border-white group" style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#2C3544', paddingTop: '12px', paddingRight: '24px', paddingBottom: '12px', paddingLeft: '24px', boxSizing: 'border-box', gap: '10px' }}>
+            <div className="flex items-center justify-center gap-2">
               <span>SIZE</span>
               <img
                 ref={(el) => { if (el) filterIconRefs.current['size'] = el; }}
@@ -360,56 +366,8 @@ const InventoryTable = forwardRef(({
               />
             </div>
           </div>
-          <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] group">
-            <div className="flex items-center justify-between gap-2">
-              <span>LABEL LINK</span>
-              <img
-                ref={(el) => { if (el) filterIconRefs.current['labelLink'] = el; }}
-                src="/assets/Vector (1).png"
-                alt="Filter"
-                className={`w-3 h-3 transition-opacity cursor-pointer ${
-                  openFilterColumn === 'labelLink'
-                    ? 'opacity-100'
-                    : 'opacity-0 group-hover:opacity-100'
-                }`}
-                onClick={(e) => handleFilterClick('labelLink', e)}
-                style={
-                  openFilterColumn === 'labelLink'
-                    ? {
-                        filter:
-                          'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
-                      }
-                    : undefined
-                }
-              />
-            </div>
-          </div>
-          <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] group">
-            <div className="flex items-center justify-between gap-2">
-              <span>LABEL SIZE</span>
-              <img
-                ref={(el) => { if (el) filterIconRefs.current['labelSize'] = el; }}
-                src="/assets/Vector (1).png"
-                alt="Filter"
-                className={`w-3 h-3 transition-opacity cursor-pointer ${
-                  openFilterColumn === 'labelSize'
-                    ? 'opacity-100'
-                    : 'opacity-0 group-hover:opacity-100'
-                }`}
-                onClick={(e) => handleFilterClick('labelSize', e)}
-                style={
-                  openFilterColumn === 'labelSize'
-                    ? {
-                        filter:
-                          'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
-                      }
-                    : undefined
-                }
-              />
-            </div>
-          </div>
-          <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] group">
-            <div className="flex items-center justify-between gap-2">
+          <div className="text-xs font-bold text-white uppercase tracking-wider border-r border-white group" style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#2C3544', paddingTop: '12px', paddingRight: '24px', paddingBottom: '12px', paddingLeft: '24px', boxSizing: 'border-box', gap: '10px' }}>
+            <div className="flex items-center justify-center gap-2">
               <span>INVENTORY</span>
               <img
                 ref={(el) => { if (el) filterIconRefs.current['inventory'] = el; }}
@@ -432,8 +390,32 @@ const InventoryTable = forwardRef(({
               />
             </div>
           </div>
-          <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider">
-            {/* Actions column */}
+          <div className="text-xs font-bold text-white uppercase tracking-wider border-r border-white group" style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#2C3544', paddingTop: '12px', paddingRight: '24px', paddingBottom: '12px', paddingLeft: '24px', boxSizing: 'border-box', gap: '10px' }}>
+            <div className="flex items-center justify-center gap-2">
+              <span>INBOUND</span>
+              <img
+                ref={(el) => { if (el) filterIconRefs.current['inbound'] = el; }}
+                src="/assets/Vector (1).png"
+                alt="Filter"
+                className={`w-3 h-3 transition-opacity cursor-pointer ${
+                  openFilterColumn === 'inbound'
+                    ? 'opacity-100'
+                    : 'opacity-0 group-hover:opacity-100'
+                }`}
+                onClick={(e) => handleFilterClick('inbound', e)}
+                style={
+                  openFilterColumn === 'inbound'
+                    ? {
+                        filter:
+                          'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
+                      }
+                    : undefined
+                }
+              />
+            </div>
+          </div>
+          <div className="text-xs font-bold text-white uppercase tracking-wider" style={{ width: '100%', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', borderTopRightRadius: '12px', backgroundColor: '#2C3544', paddingTop: '12px', paddingRight: '16px', paddingBottom: '12px', paddingLeft: '16px', boxSizing: 'border-box', gap: '10px' }}>
+            {/* Actions column header - separate tab */}
           </div>
         </div>
       </div>
@@ -450,7 +432,7 @@ const InventoryTable = forwardRef(({
               key={label.id}
               className={`grid text-sm ${themeClasses.rowHover} transition-colors`}
               style={{
-                gridTemplateColumns: '200px 1.5fr 1.5fr 1fr 2fr 1.5fr 1fr 40px',
+                gridTemplateColumns: '220px 180px 220px 120px 140px 140px 1fr',
                 borderBottom:
                   index === filteredData.length - 1
                     ? 'none'
@@ -459,55 +441,42 @@ const InventoryTable = forwardRef(({
                     : '1px solid #e5e7eb',
               }}
             >
-              {/* STATUS */}
-              <div className="px-6 py-3 flex items-center relative">
+              {/* LABEL STATUS */}
+              <div className="py-3 flex items-center relative" style={{ paddingLeft: '24px', paddingRight: '24px', justifyContent: 'flex-start' }}>
                 {renderStatus(label)}
               </div>
 
               {/* BRAND */}
-              <div className="px-6 py-3 flex items-center">
+              <div className="py-3 flex items-center" style={{ paddingLeft: '24px', paddingRight: '24px', justifyContent: 'center' }}>
                 <span className={themeClasses.textPrimary}>{label.brand}</span>
               </div>
 
               {/* PRODUCT */}
-              <div className="px-6 py-3 flex items-center">
+              <div className="py-3 flex items-center" style={{ paddingLeft: '24px', paddingRight: '24px', justifyContent: 'center' }}>
                 <span className={themeClasses.textPrimary}>{label.product}</span>
               </div>
 
               {/* SIZE */}
-              <div className="px-6 py-3 flex items-center">
+              <div className="py-3 flex items-center" style={{ paddingLeft: '24px', paddingRight: '24px', justifyContent: 'center' }}>
                 <span className={themeClasses.textPrimary}>{label.size}</span>
               </div>
 
-              {/* LABEL LINK */}
-              <div className="px-6 py-3 flex items-center">
-                <a
-                  href={label.labelLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:text-blue-700 hover:underline text-sm truncate"
-                  title={label.labelLink}
-                >
-                  {label.labelLink.length > 30
-                    ? `${label.labelLink.substring(0, 30)}...`
-                    : label.labelLink}
-                </a>
-              </div>
-
-              {/* LABEL SIZE */}
-              <div className="px-6 py-3 flex items-center">
-                <span className={themeClasses.textPrimary}>{label.labelSize}</span>
-              </div>
-
               {/* INVENTORY */}
-              <div className="px-6 py-3 flex items-center">
+              <div className="py-3 flex items-center" style={{ paddingLeft: '24px', paddingRight: '24px', justifyContent: 'center' }}>
                 <span className={themeClasses.textPrimary}>
                   {label.inventory.toLocaleString()}
                 </span>
               </div>
 
+              {/* INBOUND */}
+              <div className="py-3 flex items-center" style={{ paddingLeft: '24px', paddingRight: '24px', justifyContent: 'center' }}>
+                <span className={themeClasses.textPrimary}>
+                  {(label.inbound || 0).toLocaleString()}
+                </span>
+              </div>
+
               {/* Actions */}
-              <div className="px-6 py-3 flex items-center justify-end relative">
+              <div className="py-3 flex items-center justify-end relative" style={{ paddingRight: '16px', paddingLeft: '16px', width: '100%' }}>
                 <button
                   ref={(el) => (actionButtonRefs.current[label.id] = el)}
                   type="button"
@@ -815,12 +784,12 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, is
   };
 
   const sortFields = [
-    { value: 'status', label: 'Status' },
+    { value: 'status', label: 'Label Status' },
     { value: 'brand', label: 'Brand' },
     { value: 'product', label: 'Product' },
     { value: 'size', label: 'Size' },
-    { value: 'labelSize', label: 'Label Size' },
     { value: 'inventory', label: 'Inventory' },
+    { value: 'inbound', label: 'Inbound' },
   ];
 
   const sortOrders = [
@@ -830,13 +799,12 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, is
 
   const filterFields = [
     { value: '', label: 'Select field' },
-    { value: 'status', label: 'Status' },
+    { value: 'status', label: 'Label Status' },
     { value: 'brand', label: 'Brand' },
     { value: 'product', label: 'Product' },
     { value: 'size', label: 'Size' },
-    { value: 'labelLink', label: 'Label Link' },
-    { value: 'labelSize', label: 'Label Size' },
     { value: 'inventory', label: 'Inventory' },
+    { value: 'inbound', label: 'Inbound' },
   ];
 
   const filterConditions = [

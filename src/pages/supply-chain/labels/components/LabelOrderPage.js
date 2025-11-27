@@ -22,11 +22,12 @@ const LabelOrderPage = () => {
     { id: 3, brand: 'TPS Plant F...', product: 'Cherry Tree...', size: 'Gallon', qty: 250, labelStatus: 'Needs Proofing', inventory: 5000, toOrder: 2000 },
   ];
 
-  // Navigation tab state - default to 'addProducts' always (can view order items or edit)
-  const [activeTab, setActiveTab] = useState('addProducts');
+  // Navigation tab state - default to 'receivePO' when viewing, 'addProducts' when creating
+  const [activeTab, setActiveTab] = useState(isViewMode ? 'receivePO' : 'addProducts');
   const [tableMode, setTableMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showExportModal, setShowExportModal] = useState(false);
+  const [csvExported, setCsvExported] = useState(false);
   const [openMenuId, setOpenMenuId] = useState(null);
   const [editingRowId, setEditingRowId] = useState(null);
   const [editingQtyValue, setEditingQtyValue] = useState('');
@@ -315,6 +316,7 @@ const LabelOrderPage = () => {
     
     // Show export modal instead of directly navigating
     setShowExportModal(true);
+    setCsvExported(false); // Reset export status when modal opens
   };
 
   // Calculate qty difference for display
@@ -516,6 +518,8 @@ const LabelOrderPage = () => {
 
   const handleOpenExportModal = () => {
     setShowExportModal(true);
+    setCsvExported(false); // Reset export status when modal opens
+    setCsvExported(false); // Reset export status when modal opens
   };
 
   // Handle checkbox selection
@@ -610,11 +614,25 @@ const LabelOrderPage = () => {
     }
     
     // For new orders, show export modal
+    // If no products selected, create a Draft order
     if (addedLines.length === 0) {
+      // Create Draft order directly
+      navigate('/dashboard/supply-chain/labels', {
+        state: {
+          newLabelOrder: {
+            orderNumber: orderNumber,
+            supplierName: supplier.name,
+            lines: [],
+            status: 'Draft',
+          },
+        },
+        replace: false,
+      });
       return;
     }
     
     setShowExportModal(true);
+    setCsvExported(false); // Reset export status when modal opens
   };
 
   const handleExportCSV = () => {
@@ -629,6 +647,7 @@ const LabelOrderPage = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    setCsvExported(true); // Mark CSV as exported
   };
 
   const handleAddRecipient = () => {
@@ -698,12 +717,15 @@ const LabelOrderPage = () => {
       });
     } else {
       // For new orders, navigate with new order data
+      // Set status to Draft if no products selected, otherwise Submitted
+      const orderStatus = addedLines.length === 0 ? 'Draft' : 'Submitted';
       navigate('/dashboard/supply-chain/labels', {
         state: {
           newLabelOrder: {
             orderNumber: orderNumber,
             supplierName: supplier.name,
             lines: addedLines,
+            status: orderStatus,
           },
         },
         replace: false,
@@ -1137,7 +1159,7 @@ const LabelOrderPage = () => {
               whiteSpace: 'nowrap',
             }}
           >
-            {(isViewMode && orderId && !isEditOrderMode) || showExportModal ? (
+            {(isViewMode && orderId && !isEditOrderMode) || showExportModal || isEditOrderMode ? (
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10B981' }} />
             ) : (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1167,7 +1189,7 @@ const LabelOrderPage = () => {
               whiteSpace: 'nowrap',
             }}
           >
-            {(isViewMode && orderId && !isEditOrderMode) || showExportModal ? (
+            {(isViewMode && orderId && !isEditOrderMode) || showExportModal || isEditOrderMode ? (
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10B981' }} />
             ) : (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1208,8 +1230,54 @@ const LabelOrderPage = () => {
             </div>
 
       {/* Search bar - above table */}
-      <div className="px-6 py-4 flex justify-end" style={{ marginTop: '0' }}>
-        <div className="relative" style={{ maxWidth: '300px', width: '100%' }}>
+      <div className="px-6 py-4 flex items-center justify-end" style={{ marginTop: '0' }}>
+        {/* Legend and Search bar grouped together */}
+        <div className="flex items-center gap-4">
+          {/* Legend - show when creating or editing an order */}
+          {(isCreateMode || isEditOrderMode) && (
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2.5">
+                <div 
+                  style={{
+                    width: '16px',
+                    height: '16px',
+                    backgroundColor: '#22C55E',
+                    borderRadius: '3px',
+                    flexShrink: 0,
+                  }}
+                />
+                <span style={{ 
+                  color: isDarkMode ? '#D1D5DB' : '#374151',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  lineHeight: '1.5',
+                }}>
+                  Inventory
+                </span>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <div 
+                  style={{
+                    width: '16px',
+                    height: '16px',
+                    backgroundColor: '#2563EB',
+                    borderRadius: '3px',
+                    flexShrink: 0,
+                  }}
+                />
+                <span style={{ 
+                  color: isDarkMode ? '#D1D5DB' : '#374151',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  lineHeight: '1.5',
+                  whiteSpace: 'nowrap',
+                }}>
+                  # to Order
+                </span>
+              </div>
+            </div>
+          )}
+          <div className="relative" style={{ maxWidth: '300px', width: '100%' }}>
           <input
             type="text"
             placeholder="Search..."
@@ -1235,95 +1303,123 @@ const LabelOrderPage = () => {
               d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
             />
           </svg>
+          </div>
         </div>
       </div>
 
       {/* Table */}
       <div className={`${themeClasses.cardBg} rounded-xl border ${themeClasses.border} shadow-lg mx-6`} style={{ marginTop: '0' }}>
-        <div className="overflow-x-auto">
+        <div style={{ overflowX: 'auto', overflowY: 'visible' }}>
           <table
               style={{
               width: '100%',
-              borderCollapse: 'separate',
+              borderCollapse: 'collapse',
               borderSpacing: 0,
+              margin: 0,
+              padding: 0,
             }}
           >
             <thead className={themeClasses.headerBg}>
-              <tr style={{ height: '40px', maxHeight: '40px' }}>
-              {/* Checkbox column - show when viewing an order (isViewMode) */}
-              {isViewMode && (
+              <tr style={{ height: 'auto', minHeight: '40px', width: '100%', display: 'table-row' }}>
+              {/* Checkbox column when viewing, LABEL STATUS when creating/editing */}
+              {(isViewMode && !isEditOrderMode) ? (
                 <th
                   className="text-xs font-bold text-white uppercase tracking-wider"
                   style={{
-                    padding: '0 1rem',
+                    paddingTop: '12px',
+                    paddingRight: '24px',
+                    paddingBottom: '12px',
+                    paddingLeft: '24px',
                     height: '40px',
                     maxHeight: '40px',
-                    lineHeight: '40px',
+                    minHeight: '40px',
                     boxSizing: 'border-box',
                     textAlign: 'center',
-                    borderRight: '1px solid #3C4656',
-                    width: 50,
+                    borderRight: '1px solid white',
+                    borderBottom: '1px solid #3C4656',
+                    borderTopLeftRadius: '12px',
+                    width: '72px',
+                    verticalAlign: 'middle',
+                    display: 'table-cell',
                   }}
                 >
-                  <input 
-                    type="checkbox" 
-                    style={{ cursor: 'pointer' }}
-                    checked={selectedItems.size === orderLines.length && orderLines.length > 0}
-                    onChange={(e) => handleSelectAll(e.target.checked)}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedItems.size === orderLines.length && orderLines.length > 0}
+                      onChange={handleSelectAll}
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        cursor: 'pointer',
+                      }}
+                    />
+                  </div>
+                </th>
+              ) : (
+                <th
+                  className="text-xs font-bold text-white uppercase tracking-wider"
+                  style={{
+                    paddingTop: '12px',
+                    paddingRight: '16px',
+                    paddingBottom: '12px',
+                    paddingLeft: '16px',
+                    height: '40px',
+                    maxHeight: '40px',
+                    boxSizing: 'border-box',
+                    textAlign: 'center',
+                    borderRight: '1px solid white',
+                    borderTopLeftRadius: '12px',
+                    width: '156px',
+                    verticalAlign: 'middle',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                    <span>LABEL STATUS</span>
+                    <img
+                      src="/assets/Vector (1).png"
+                      alt="Filter"
+                      className="w-3 h-3 transition-opacity cursor-pointer opacity-0 group-hover:opacity-100"
                   />
+                </div>
                 </th>
               )}
-              {/* LABEL STATUS column - only show in addProducts tab when creating new order (not viewing) */}
-              {(activeTab === 'addProducts' && !isViewMode) && (
               <th
                 className="text-xs font-bold text-white uppercase tracking-wider"
                 style={{
-                  padding: '0 1rem',
+                  paddingTop: '12px',
+                  paddingRight: '16px',
+                  paddingBottom: '12px',
+                  paddingLeft: '16px',
                   height: '40px',
                   maxHeight: '40px',
-                  lineHeight: '40px',
+                  minHeight: '40px',
                   boxSizing: 'border-box',
                   textAlign: 'left',
-                  borderRight: '1px solid #3C4656',
-                  width: 220,
+                  borderRight: '1px solid white',
+                  width: '142px',
+                  verticalAlign: 'middle',
+                  display: 'table-cell',
                 }}
               >
-                <div className="flex items-center justify-between gap-2 group">
-                  <span>LABEL STATUS</span>
-                  <img
-                    src="/assets/Vector (1).png"
-                    alt="Filter"
-                    className="w-3 h-3 transition-opacity cursor-pointer opacity-0 group-hover:opacity-100"
-                />
-              </div>
-              </th>
-              )}
-              <th
-                className="text-xs font-bold text-white uppercase tracking-wider"
-                style={{
-                  padding: '0 1rem',
-                  height: '40px',
-                  maxHeight: '40px',
-                  lineHeight: '40px',
-                  boxSizing: 'border-box',
-                  textAlign: 'left',
-                  borderRight: '1px solid #3C4656',
-                  width: 200,
-                }}
-              >
-                BRAND
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '10px' }}>
+                  BRAND
+                </div>
               </th>
               <th
                 className="text-xs font-bold text-white uppercase tracking-wider"
                 style={{
-                  padding: '0 1rem',
+                  paddingTop: '12px',
+                  paddingRight: '16px',
+                  paddingBottom: '12px',
+                  paddingLeft: '16px',
                   height: '40px',
                   maxHeight: '40px',
-                  lineHeight: '40px',
                   boxSizing: 'border-box',
-                  textAlign: 'left',
-                  borderRight: '1px solid #3C4656',
-                  width: 200,
+                  textAlign: 'center',
+                  borderRight: '1px solid white',
+                  width: '172px',
+                  verticalAlign: 'middle',
                 }}
               >
                 PRODUCT
@@ -1331,32 +1427,35 @@ const LabelOrderPage = () => {
               <th
                 className="text-xs font-bold text-white uppercase tracking-wider"
                 style={{
-                  padding: '0 1rem',
+                  paddingTop: '12px',
+                  paddingRight: '16px',
+                  paddingBottom: '12px',
+                  paddingLeft: '16px',
                   height: '40px',
                   maxHeight: '40px',
-                  lineHeight: '40px',
                   boxSizing: 'border-box',
-                  textAlign: 'left',
-                  borderRight: '1px solid #3C4656',
-                  width: 120,
+                  textAlign: 'center',
+                  borderRight: '1px solid white',
+                  width: '74px',
+                  verticalAlign: 'middle',
                 }}
               >
                 SIZE
               </th>
-              {/* ADD column - only show in addProducts tab when creating new order (not viewing) */}
-              {(activeTab === 'addProducts' && !isViewMode) && (
+              {/* ADD column - show in addProducts tab when creating new order or editing order */}
+              {(activeTab === 'addProducts' && (!isViewMode || isEditOrderMode)) && (
               <th
                 className="text-xs font-bold text-white uppercase tracking-wider relative"
                 style={{
-                  padding: '0 1rem',
+                  padding: '12px 16px',
                   height: '40px',
                   maxHeight: '40px',
-                  lineHeight: '40px',
                   boxSizing: 'border-box',
                   textAlign: 'center',
-                  borderRight: '1px solid #3C4656',
+                  borderRight: '1px solid white',
                   width: 120,
                   boxShadow: 'inset 4px 0 4px -2px rgba(0, 0, 0, 0.3)',
+                  verticalAlign: 'middle',
                 }}
               >
                 ADD
@@ -1365,14 +1464,18 @@ const LabelOrderPage = () => {
               <th
                 className="text-xs font-bold text-white uppercase tracking-wider"
                 style={{
-                  padding: '0 1rem',
+                  paddingTop: '12px',
+                  paddingRight: '16px',
+                  paddingBottom: '12px',
+                  paddingLeft: '16px',
                   height: '40px',
                   maxHeight: '40px',
-                  lineHeight: '40px',
                   boxSizing: 'border-box',
                   textAlign: 'center',
-                  borderRight: (activeTab === 'submitPO' || activeTab === 'receivePO') && isViewMode ? 'none' : '1px solid #3C4656',
-                  width: 150,
+                  borderRight: (activeTab === 'addProducts' && (!isViewMode || isEditOrderMode)) ? '1px solid white' : '1px solid #3C4656',
+                  borderTopRightRadius: (activeTab === 'addProducts' && (!isViewMode || isEditOrderMode)) ? '0' : ((activeTab === 'submitPO' || activeTab === 'receivePO') && isViewMode) || (isViewMode && activeTab === 'addProducts' && !isEditOrderMode) ? '12px' : '0',
+                  width: '139px',
+                  verticalAlign: 'middle',
                 }}
               >
                 QTY
@@ -1382,131 +1485,134 @@ const LabelOrderPage = () => {
               <th
                 className="text-xs font-bold text-white uppercase tracking-wider relative"
                 style={{
-                  padding: '0 1rem',
-                  height: '40px',
-                  maxHeight: '40px',
+                  paddingTop: '4px',
+                  paddingRight: '16px',
+                  paddingBottom: '8px',
+                  paddingLeft: '16px',
+                  height: '50px',
+                  minHeight: '50px',
                   boxSizing: 'border-box',
                   textAlign: 'left',
                   verticalAlign: 'middle',
-                  overflow: 'hidden',
-                  position: 'relative',
+                  borderTopRightRadius: '12px',
+                  borderRight: 'none',
                   minWidth: 400,
+                  position: 'relative',
+                  overflow: 'visible',
                 }}
               >
-                {(
-                <div className="absolute inset-0" style={{ height: '40px', maxHeight: '40px' }}>
-                  {/* Today label (top left) */}
-                  <div className="absolute" style={{ left: '24px', top: '2px' }}>
-                    <div className="flex flex-col" style={{ lineHeight: 1.2 }}>
-                      <span className="text-[9px] text-white" style={{ lineHeight: 1.1 }}>Today</span>
-                      <span className="text-[9px] text-white mt-0.5" style={{ lineHeight: 1.1 }}>11/11/25</span>
-              </div>
-              </div>
-                  
-                  {/* DOI Goal label (top right) */}
-                  <div className="absolute" style={{ right: '24px', top: '2px' }}>
-                    <div className="flex flex-col items-end" style={{ lineHeight: 1.2 }}>
-                      <span className="text-[9px] text-white" style={{ lineHeight: 1.1 }}>DOI Goal</span>
-                      <span className="text-[9px] text-white mt-0.5" style={{ lineHeight: 1.1 }}>4/13/25</span>
-              </div>
-              </div>
-                  
-                  {/* Timeline line - thick white line in lower half */}
+                <div style={{ position: 'relative', width: '100%', height: '100%', paddingLeft: '24px', paddingRight: '24px' }}>
+                  {/* Timeline line - white horizontal line at bottom */}
                   <div 
                     className="absolute bg-white" 
                     style={{ 
                       left: '24px', 
                       right: '24px', 
-                      bottom: '6px',
+                      bottom: '8px',
                       height: '2px' 
                     }}
                   ></div>
                   
-                  {/* Today marker (left) - solid white circle */}
-                  <div className="absolute" style={{ left: '24px', bottom: '5px' }}>
-                    <div className="w-2.5 h-2.5 rounded-full bg-white"></div>
-              </div>
-                  
-                  {/* Month markers - white circles with dark centers, evenly spaced */}
-                  <div className="absolute" style={{ left: 'calc(24px + 20%)', bottom: '5px', transform: 'translateX(-50%)' }}>
-                    <div className="flex flex-col items-center">
-                      <span className="text-[9px] text-white mb-0.5" style={{ lineHeight: 1 }}>Dec</span>
-                      <div className="w-2 h-2 rounded-full bg-white relative">
-                        <div className="absolute inset-0.5 rounded-full" style={{ backgroundColor: '#2C3544' }}></div>
-              </div>
-              </div>
-              </div>
-                  <div className="absolute" style={{ left: 'calc(24px + 40%)', bottom: '5px', transform: 'translateX(-50%)' }}>
-                    <div className="flex flex-col items-center">
-                      <span className="text-[9px] text-white mb-0.5" style={{ lineHeight: 1 }}>Jan</span>
-                      <div className="w-2 h-2 rounded-full bg-white relative">
-                        <div className="absolute inset-0.5 rounded-full" style={{ backgroundColor: '#2C3544' }}></div>
-              </div>
+                  {/* Today label - both lines above the timeline */}
+                  <div className="absolute" style={{ left: '24px', bottom: '8px', transform: 'translate(-50%, 0)' }}>
+                    <div className="flex flex-col items-center" style={{ lineHeight: 1.2 }}>
+                      <span className="text-[10px] text-white font-bold uppercase" style={{ lineHeight: 1.2, marginBottom: '2px' }}>Today</span>
+                      <span className="text-[10px] text-white" style={{ lineHeight: 1.2, marginBottom: '10px' }}>11/11/25</span>
+                      <div className="w-2 h-2 rounded-full bg-white" style={{ transform: 'translateY(1px)' }}></div>
                     </div>
                   </div>
-                  <div className="absolute" style={{ left: 'calc(24px + 60%)', bottom: '5px', transform: 'translateX(-50%)' }}>
+                  
+                  {/* Month labels - above the timeline */}
+                  <div className="absolute" style={{ left: 'calc(24px + 20%)', bottom: '8px', transform: 'translate(-50%, 0)' }}>
                     <div className="flex flex-col items-center">
-                      <span className="text-[9px] text-white mb-0.5" style={{ lineHeight: 1 }}>Feb</span>
-                      <div className="w-2 h-2 rounded-full bg-white relative">
+                      <span className="text-[10px] text-white uppercase" style={{ lineHeight: 1.2, marginBottom: '10px' }}>Dec</span>
+                      <div className="w-2 h-2 rounded-full bg-white relative" style={{ border: '1px solid white', backgroundColor: 'transparent', transform: 'translateY(1px)' }}>
                         <div className="absolute inset-0.5 rounded-full" style={{ backgroundColor: '#2C3544' }}></div>
                       </div>
                     </div>
                   </div>
-                  <div className="absolute" style={{ left: 'calc(24px + 80%)', bottom: '5px', transform: 'translateX(-50%)' }}>
+                  <div className="absolute" style={{ left: 'calc(24px + 40%)', bottom: '8px', transform: 'translate(-50%, 0)' }}>
                     <div className="flex flex-col items-center">
-                      <span className="text-[9px] text-white mb-0.5" style={{ lineHeight: 1 }}>Mar</span>
-                      <div className="w-2 h-2 rounded-full bg-white relative">
+                      <span className="text-[10px] text-white uppercase" style={{ lineHeight: 1.2, marginBottom: '10px' }}>Jan</span>
+                      <div className="w-2 h-2 rounded-full bg-white relative" style={{ border: '1px solid white', backgroundColor: 'transparent', transform: 'translateY(1px)' }}>
                         <div className="absolute inset-0.5 rounded-full" style={{ backgroundColor: '#2C3544' }}></div>
-              </div>
-            </div>
-          </div>
-
-                  {/* DOI Goal marker (right) - solid white circle */}
-                  <div className="absolute" style={{ right: '24px', bottom: '5px' }}>
-                    <div className="w-2.5 h-2.5 rounded-full bg-white"></div>
-              </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="absolute" style={{ left: 'calc(24px + 60%)', bottom: '8px', transform: 'translate(-50%, 0)' }}>
+                    <div className="flex flex-col items-center">
+                      <span className="text-[10px] text-white uppercase" style={{ lineHeight: 1.2, marginBottom: '10px' }}>Feb</span>
+                      <div className="w-2 h-2 rounded-full bg-white relative" style={{ border: '1px solid white', backgroundColor: 'transparent', transform: 'translateY(1px)' }}>
+                        <div className="absolute inset-0.5 rounded-full" style={{ backgroundColor: '#2C3544' }}></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="absolute" style={{ left: 'calc(24px + 80%)', bottom: '8px', transform: 'translate(-50%, 0)' }}>
+                    <div className="flex flex-col items-center">
+                      <span className="text-[10px] text-white uppercase" style={{ lineHeight: 1.2, marginBottom: '10px' }}>Mar</span>
+                      <div className="w-2 h-2 rounded-full bg-white relative" style={{ border: '1px solid white', backgroundColor: 'transparent', transform: 'translateY(1px)' }}>
+                        <div className="absolute inset-0.5 rounded-full" style={{ backgroundColor: '#2C3544' }}></div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* DOI Goal label - both lines above the timeline */}
+                  <div className="absolute" style={{ right: '24px', bottom: '8px', transform: 'translate(50%, 0)' }}>
+                    <div className="flex flex-col items-center" style={{ lineHeight: 1.2 }}>
+                      <div className="flex items-center gap-1" style={{ marginBottom: '2px' }}>
+                        <span className="text-[10px] text-white font-bold uppercase" style={{ lineHeight: 1.2 }}>DOI Goal</span>
+                        <svg width="8" height="8" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M2 3L4 5L6 3" stroke="white" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
+                      <span className="text-[10px] text-white" style={{ lineHeight: 1.2, marginBottom: '10px' }}>4/13/25</span>
+                      <div className="w-2 h-2 rounded-full bg-white" style={{ transform: 'translateY(1px)' }}></div>
+                    </div>
+                  </div>
+                  
+                  {/* Filter icon - far right, aligned with timeline */}
+                  <div className="absolute" style={{ right: '16px', bottom: '8px', transform: 'translateY(50%)' }}>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M6 1L8 3H4L6 1Z" fill="white"/>
+                      <path d="M1 4H11" stroke="white" strokeWidth="1"/>
+                    </svg>
+                  </div>
                 </div>
-                )}
               </th>
               )}
-              {/* Actions column - show Edit button and menu for submitPO/receivePO when viewing order */}
-              {(activeTab === 'submitPO' || activeTab === 'receivePO') && isViewMode && (
-              <th
-                className="text-xs font-bold text-white uppercase tracking-wider"
-                style={{
-                  padding: '0 1rem',
-                  height: '40px',
-                  maxHeight: '40px',
-                  lineHeight: '40px',
-                  boxSizing: 'border-box',
-                  textAlign: 'center',
-                  width: 120,
-                }}
-              >
-              </th>
-              )}
-              {/* Actions column for addProducts tab */}
-              {(activeTab === 'addProducts' || !isViewMode) && (
-              <th
-                className="text-xs font-bold text-white uppercase tracking-wider"
-                style={{
-                  padding: '0 1rem',
-                  height: '40px',
-                  maxHeight: '40px',
-                  lineHeight: '40px',
-                  boxSizing: 'border-box',
-                  textAlign: 'center',
-                  width: 60,
-                }}
-              >
-              </th>
+              
+              {/* Ellipsis column - show when viewing order */}
+              {(isViewMode && !isEditOrderMode) && (
+                <th
+                  className="text-xs font-bold text-white uppercase tracking-wider"
+                  style={{
+                    paddingTop: '12px',
+                    paddingRight: '16px',
+                    paddingBottom: '12px',
+                    paddingLeft: '16px',
+                    height: '40px',
+                    maxHeight: '40px',
+                    minHeight: '40px',
+                    boxSizing: 'border-box',
+                    textAlign: 'center',
+                    borderTopRightRadius: '12px',
+                    width: '60px',
+                    verticalAlign: 'middle',
+                    display: 'table-cell',
+                  }}
+                >
+                </th>
               )}
             </tr>
           </thead>
           <tbody>
             {filteredLines.length === 0 ? (
               <tr>
-                <td colSpan={(activeTab === 'submitPO' || activeTab === 'receivePO') && isViewMode ? 7 : 8} className="px-6 py-6 text-center text-sm italic text-gray-400">
+                <td colSpan={
+                  isViewMode 
+                    ? (activeTab === 'addProducts' && isEditOrderMode ? 7 : (isViewMode && !isEditOrderMode ? 7 : 6))
+                    : (activeTab === 'addProducts' ? 7 : 6)
+                } className="px-6 py-6 text-center text-sm italic text-gray-400">
                   No items available.
                 </td>
               </tr>
@@ -1520,38 +1626,68 @@ const LabelOrderPage = () => {
                     key={line.id}
                     className={`text-sm ${themeClasses.rowHover} transition-colors border-t`}
                     style={{
-                      height: '40px',
-                      maxHeight: '40px',
-                      minHeight: '40px',
-                      lineHeight: '40px',
+                      height: '32px',
+                      maxHeight: '32px',
+                      minHeight: '32px',
+                      lineHeight: '32px',
                       borderTop: index === 0 ? 'none' : (isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid #e5e7eb'),
                     }}
                   >
-                    {/* Checkbox - show when viewing an order (isViewMode) */}
-                    {isViewMode && (
-                      <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', maxHeight: '40px', minHeight: '40px', verticalAlign: 'middle', lineHeight: '1', boxSizing: 'border-box' }}>
-                        <input 
-                          type="checkbox" 
-                          style={{ cursor: 'pointer' }}
+                    {/* Checkbox when viewing, LABEL STATUS when creating/editing */}
+                    {(isViewMode && !isEditOrderMode) ? (
+                      <td style={{ paddingTop: '8px', paddingRight: '24px', paddingBottom: '8px', paddingLeft: '24px', height: '32px', maxHeight: '32px', minHeight: '32px', verticalAlign: 'middle', lineHeight: '1', boxSizing: 'border-box', width: '72px', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
+                        <input
+                          type="checkbox"
                           checked={selectedItems.has(line.id)}
                           onChange={(e) => handleCheckboxChange(line.id, e.target.checked)}
+                          style={{
+                            width: '16px',
+                            height: '16px',
+                            cursor: 'pointer',
+                          }}
                         />
                       </td>
-                    )}
-                    {/* LABEL STATUS - only show in addProducts tab when creating new order (not viewing) */}
-                    {(activeTab === 'addProducts' && !isViewMode) && (
-                      <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', maxHeight: '40px', minHeight: '40px', verticalAlign: 'middle', lineHeight: '1', boxSizing: 'border-box' }}>
+                    ) : (
+                      <td style={{ paddingTop: '8px', paddingRight: '16px', paddingBottom: '8px', paddingLeft: '16px', fontSize: '0.85rem', height: '32px', maxHeight: '32px', minHeight: '32px', verticalAlign: 'middle', lineHeight: '1', boxSizing: 'border-box', width: '156px', textAlign: 'left' }}>
                         {renderLabelStatus(line)}
                       </td>
                     )}
 
                     {/* BRAND */}
-                    <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', maxHeight: '40px', minHeight: '40px', verticalAlign: 'middle', lineHeight: '1', boxSizing: 'border-box' }} className={themeClasses.textPrimary}>
+                    <td style={{ 
+                      paddingTop: '8px',
+                      paddingRight: '16px',
+                      paddingBottom: '8px',
+                      paddingLeft: '16px',
+                      fontSize: '0.85rem', 
+                      height: '32px', 
+                      maxHeight: '32px', 
+                      minHeight: '32px', 
+                      verticalAlign: 'middle', 
+                      lineHeight: '1', 
+                      boxSizing: 'border-box',
+                      width: '142px',
+                      textAlign: 'left',
+                    }} className={themeClasses.textPrimary}>
                       {line.brand}
                     </td>
 
                     {/* PRODUCT - blue clickable link */}
-                    <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', maxHeight: '40px', minHeight: '40px', verticalAlign: 'middle', lineHeight: '1', boxSizing: 'border-box' }}>
+                    <td style={{ 
+                      paddingTop: '8px',
+                      paddingRight: '16px',
+                      paddingBottom: '8px',
+                      paddingLeft: '16px',
+                      fontSize: '0.85rem', 
+                      height: '32px', 
+                      maxHeight: '32px', 
+                      minHeight: '32px', 
+                      verticalAlign: 'middle', 
+                      lineHeight: '1', 
+                      boxSizing: 'border-box',
+                      width: '172px',
+                      textAlign: 'left',
+                    }}>
                       <button
                         type="button"
                         className="text-blue-600 hover:text-blue-700 hover:underline text-sm"
@@ -1564,13 +1700,27 @@ const LabelOrderPage = () => {
                     </td>
 
                     {/* SIZE */}
-                    <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', maxHeight: '40px', minHeight: '40px', verticalAlign: 'middle', lineHeight: '1', boxSizing: 'border-box' }} className={themeClasses.textSecondary}>
+                    <td style={{ 
+                      paddingTop: '8px',
+                      paddingRight: '16px',
+                      paddingBottom: '8px',
+                      paddingLeft: '16px',
+                      fontSize: '0.85rem', 
+                      height: '32px', 
+                      maxHeight: '32px', 
+                      minHeight: '32px', 
+                      verticalAlign: 'middle', 
+                      lineHeight: '1', 
+                      boxSizing: 'border-box',
+                      width: '74px',
+                      textAlign: 'left',
+                    }} className={themeClasses.textSecondary}>
                       {line.size}
                     </td>
 
                     {/* ADD - only show in addProducts tab when creating new order or in edit order mode (not when viewing) */}
                     {(activeTab === 'addProducts' && (!isViewMode || isEditOrderMode)) && (
-                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', maxHeight: '40px', minHeight: '40px', verticalAlign: 'middle', lineHeight: '1', boxShadow: 'inset 4px 0 8px -4px rgba(0, 0, 0, 0.15)', boxSizing: 'border-box' }}>
+                    <td style={{ paddingTop: '8px', paddingRight: '16px', paddingBottom: '8px', paddingLeft: '16px', textAlign: 'center', height: '32px', maxHeight: '32px', minHeight: '32px', verticalAlign: 'middle', lineHeight: '1', boxShadow: 'inset 4px 0 8px -4px rgba(0, 0, 0, 0.15)', boxSizing: 'border-box', width: '120px' }}>
                       <button
                         type="button"
                         onClick={() => {
@@ -1583,7 +1733,7 @@ const LabelOrderPage = () => {
                           display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '10px',
+                          gap: line.added ? '0' : '10px',
                           backgroundColor: line.added ? '#22C55E' : '#3B82F6',
                           color: '#ffffff',
                           border: 'none',
@@ -1597,7 +1747,7 @@ const LabelOrderPage = () => {
                           fontFamily: 'system-ui, -apple-system, sans-serif',
                           cursor: (isViewMode && !isEditOrderMode) ? 'default' : 'pointer',
                           transition: 'background-color 0.2s',
-                          boxShadow: line.added ? '0 1px 2px 0 rgba(0, 0, 0, 0.1)' : 'none',
+                          boxShadow: line.added ? '0 1px 3px 0 rgba(0, 0, 0, 0.2)' : 'none',
                           width: '72px',
                           height: '24px',
                           maxWidth: '72px',
@@ -1605,47 +1755,43 @@ const LabelOrderPage = () => {
                           minWidth: '72px',
                           minHeight: '24px',
                           boxSizing: 'border-box',
-                          lineHeight: '1',
-                          overflow: 'hidden',
-                          margin: 0,
-                          verticalAlign: 'middle',
-                          opacity: (isViewMode && !isEditOrderMode) ? 1 : 1,
                         }}
                         onMouseEnter={(e) => {
-                          if (!line.added && !(isViewMode && !isEditOrderMode)) {
-                            e.target.style.backgroundColor = '#2563EB';
+                          if (!(isViewMode && !isEditOrderMode)) {
+                            e.target.style.backgroundColor = line.added ? '#16A34A' : '#2563EB';
                           }
                         }}
                         onMouseLeave={(e) => {
-                          e.target.style.backgroundColor = line.added ? '#22C55E' : '#3B82F6';
+                          if (!(isViewMode && !isEditOrderMode)) {
+                            e.target.style.backgroundColor = line.added ? '#22C55E' : '#3B82F6';
+                          }
                         }}
                       >
-                        {line.added ? (
-                          <span style={{ color: '#ffffff', lineHeight: '1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Added</span>
-                        ) : (
-                          <>
-                            <svg 
-                              width="16" 
-                              height="16" 
-                              viewBox="0 0 24 24" 
-                              fill="none" 
-                              stroke="currentColor" 
-                              strokeWidth="2.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              style={{ color: '#ffffff', flexShrink: 0, display: 'block' }}
-                            >
-                              <path d="M12 4v16m8-8H4" />
-                            </svg>
-                            <span style={{ color: '#ffffff', lineHeight: '1', whiteSpace: 'nowrap' }}>Add</span>
-                          </>
+                        {!line.added && (
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M7 1V13M1 7H13" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                          </svg>
                         )}
+                        <span>{line.added ? 'Added' : 'Add'}</span>
                       </button>
                     </td>
                     )}
 
                     {/* QTY */}
-                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', maxHeight: '40px', minHeight: '40px', verticalAlign: 'middle', lineHeight: '1', boxSizing: 'border-box' }}>
+                    <td style={{ 
+                      paddingTop: '8px',
+                      paddingRight: '16px',
+                      paddingBottom: '8px',
+                      paddingLeft: '16px',
+                      textAlign: 'left', 
+                      height: '32px', 
+                      maxHeight: '32px', 
+                      minHeight: '32px', 
+                      verticalAlign: 'middle', 
+                      lineHeight: '1', 
+                      boxSizing: 'border-box',
+                      width: '139px',
+                    }}>
                       {((activeTab === 'submitPO' || activeTab === 'receivePO') && isViewMode) ? (
                         editingRowId === line.id ? (
                           <div
@@ -1819,47 +1965,25 @@ const LabelOrderPage = () => {
 
                     {/* Timeline - show in addProducts tab when creating new order or editing order */}
                     {(activeTab === 'addProducts' && (!isViewMode || isEditOrderMode)) && (
-                    <td style={{ padding: '0.65rem 1rem', minWidth: '380px', height: '40px', maxHeight: '40px', minHeight: '40px', verticalAlign: 'middle', lineHeight: '1', boxSizing: 'border-box', position: 'relative' }}>
+                    <td style={{ paddingTop: '8px', paddingRight: '16px', paddingBottom: '8px', paddingLeft: '16px', width: '400px', height: '32px', maxHeight: '32px', minHeight: '32px', verticalAlign: 'middle', lineHeight: '1', boxSizing: 'border-box', position: 'relative', backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF' }}>
                       {timelineData && (
                     <div 
                       style={{
                             position: 'relative',
-                            width: 'calc(100% - 48px)',
-                            margin: '0 auto',
-                            height: '18px',
-                            marginTop: '11px',
+                            width: '100%',
+                            height: '32px',
+                            paddingLeft: '24px',
+                            paddingRight: '24px',
                           }}
                         >
-                          {/* Vertical dashed line from Today position (left) */}
-                          <div
-                            style={{
-                              position: 'absolute',
-                              top: '-11px',
-                              bottom: '-11px',
-                              left: '0px',
-                              width: '1px',
-                              borderLeft: '1px dashed #9CA3AF',
-                              opacity: 0.5,
-                            }}
-                          />
-                          {/* Vertical dashed line from DOI Goal position (right) */}
-                          <div
-                            style={{
-                              position: 'absolute',
-                              top: '-11px',
-                              bottom: '-11px',
-                              right: '0px',
-                              width: '1px',
-                              borderRight: '1px dashed #9CA3AF',
-                              opacity: 0.5,
-                            }}
-                          />
                           {/* Progress bar container - spans from Today to DOI Goal */}
                           <div
                             style={{
-                              position: 'relative',
-                              width: '100%',
-                              height: '18px',
+                              position: 'absolute',
+                              left: '24px',
+                              right: '24px',
+                              bottom: '4px',
+                              height: '14px',
                               display: 'flex',
                               borderRadius: '9999px',
                               overflow: 'hidden',
@@ -1869,7 +1993,7 @@ const LabelOrderPage = () => {
                             <div
                               style={{
                                 width: `${timelineData.inventoryPercent}%`,
-                                backgroundColor: '#00D084',
+                                backgroundColor: '#22C55E',
                                 height: '100%',
                                 borderRadius: timelineData.orderPercent > 0 ? '9999px 0 0 9999px' : '9999px',
                               }}
@@ -1878,285 +2002,189 @@ const LabelOrderPage = () => {
                             <div
                               style={{
                                 width: `${timelineData.orderPercent}%`,
-                                backgroundColor: '#0066FF',
+                                backgroundColor: '#2563EB',
                                 height: '100%',
                                 borderRadius: timelineData.inventoryPercent > 0 ? '0 9999px 9999px 0' : '9999px',
                               }}
                             />
-                    </div>
-                          {/* Blue circle marker at end of blue bar (only for row 3) */}
+                          </div>
+
+                          {/* +5 indicator - above Feb position (only for row 3) */}
                           {index === 2 && (
-                            <>
-                              <div
-                        style={{
-                                  position: 'absolute',
-                                  right: '0px',
-                                  top: '50%',
-                                  transform: 'translate(50%, -50%)',
-                                  width: '4px',
-                                  height: '4px',
-                                  borderRadius: '50%',
-                                  backgroundColor: '#0066FF',
-                                }}
-                              />
-                              {/* +5 indicator for row 3 */}
-                              <div
-                                style={{
-                                  position: 'absolute',
-                                  right: '8px',
-                                  top: '22px',
-                                  fontSize: '10px',
-                                  color: '#0066FF',
-                                  fontWeight: 500,
-                                }}
-                              >
-                                +5
-                    </div>
-                            </>
+                            <div
+                              style={{
+                                position: 'absolute',
+                                left: 'calc(24px + 60%)',
+                                top: '2px',
+                                transform: 'translateX(-50%)',
+                                fontSize: '10px',
+                                color: '#2563EB',
+                                fontWeight: 600,
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              +5
+                            </div>
                           )}
+
+                          {/* Month markers with dashed lines - only dashed lines, no circles */}
+                          <div className="absolute" style={{ left: 'calc(24px + 20%)', bottom: '8px', transform: 'translateX(-50%)' }}>
+                            {/* Vertical dashed line above */}
+                            <div
+                              style={{
+                                position: 'absolute',
+                                bottom: '8px',
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                                width: '1px',
+                                height: '12px',
+                                borderLeft: '1px dashed #9CA3AF',
+                                opacity: 0.6,
+                              }}
+                            />
+                          </div>
+                          <div className="absolute" style={{ left: 'calc(24px + 40%)', bottom: '8px', transform: 'translateX(-50%)' }}>
+                            {/* Vertical dashed line above */}
+                            <div
+                              style={{
+                                position: 'absolute',
+                                bottom: '8px',
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                                width: '1px',
+                                height: '12px',
+                                borderLeft: '1px dashed #9CA3AF',
+                                opacity: 0.6,
+                              }}
+                            />
+                          </div>
+                          <div className="absolute" style={{ left: 'calc(24px + 60%)', bottom: '8px', transform: 'translateX(-50%)' }}>
+                            {/* Vertical dashed line above */}
+                            <div
+                              style={{
+                                position: 'absolute',
+                                bottom: '8px',
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                                width: '1px',
+                                height: '12px',
+                                borderLeft: '1px dashed #9CA3AF',
+                                opacity: 0.6,
+                              }}
+                            />
+                          </div>
                         </div>
                       )}
                     </td>
                     )}
-
-                    {/* Actions - Done button or ellipsis menu for submitPO/receivePO when viewing order */}
-                    {((activeTab === 'submitPO' || activeTab === 'receivePO') && isViewMode) && (
-                      <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', maxHeight: '40px', minHeight: '40px', verticalAlign: 'middle', lineHeight: '1', boxSizing: 'border-box', position: 'relative' }}>
-                        {editingRowId === line.id ? (
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                    
+                    {/* Ellipsis menu - show when viewing order */}
+                    {(isViewMode && !isEditOrderMode) && (
+                      <td style={{ 
+                        paddingTop: '8px', 
+                        paddingRight: '16px', 
+                        paddingBottom: '8px', 
+                        paddingLeft: '16px', 
+                        height: '32px', 
+                        maxHeight: '32px', 
+                        minHeight: '32px', 
+                        verticalAlign: 'middle', 
+                        lineHeight: '1', 
+                        boxSizing: 'border-box', 
+                        width: '60px',
+                        textAlign: 'center',
+                        position: 'relative',
+                      }}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleMenu(line.id);
+                          }}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="8" cy="4" r="1.5" fill={isDarkMode ? '#9CA3AF' : '#6B7280'}/>
+                            <circle cx="8" cy="8" r="1.5" fill={isDarkMode ? '#9CA3AF' : '#6B7280'}/>
+                            <circle cx="8" cy="12" r="1.5" fill={isDarkMode ? '#9CA3AF' : '#6B7280'}/>
+                          </svg>
+                        </button>
+                        
+                        {/* Dropdown menu */}
+                        {openMenuId === line.id && (
+                          <div
+                            ref={(el) => {
+                              if (el) {
+                                const menuRefs = statusMenuRefs.current || {};
+                                menuRefs[line.id] = el;
+                                statusMenuRefs.current = menuRefs;
+                              }
+                            }}
+                            style={{
+                              position: 'absolute',
+                              right: '100%',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              marginRight: '8px',
+                              backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                              border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                              borderRadius: '6px',
+                              boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.06)',
+                              zIndex: 1000,
+                              padding: '2px',
+                            }}
+                          >
                             <button
                               type="button"
-                              onClick={() => handleDoneEditing(line.id)}
-                        style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                backgroundColor: '#3B82F6',
-                                color: '#FFFFFF',
-                                border: 'none',
-                                borderRadius: '6px',
-                                padding: '6px 16px',
-                                fontSize: '14px',
-                                fontWeight: 500,
-                                cursor: 'pointer',
-                                fontFamily: 'system-ui, -apple-system, sans-serif',
-                                transition: 'background-color 0.2s',
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // Handle edit action
+                                setOpenMenuId(null);
                               }}
-                              onMouseEnter={(e) => e.target.style.backgroundColor = '#2563EB'}
-                              onMouseLeave={(e) => e.target.style.backgroundColor = '#3B82F6'}
+                              style={{
+                                width: '100%',
+                                padding: '4px 8px',
+                                textAlign: 'left',
+                                background: 'transparent',
+                                border: 'none',
+                                color: isDarkMode ? '#F9FAFB' : '#111827',
+                                fontSize: '12px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'flex-start',
+                                gap: '6px',
+                                borderRadius: '4px',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.target.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.backgroundColor = 'transparent';
+                              }}
                             >
-                              Done
+                              {/* Pencil/Edit icon */}
+                              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path 
+                                  d="M11.333 2.667a1.333 1.333 0 0 1 1.886 0l.781.781a1.333 1.333 0 0 1 0 1.886l-8.5 8.5a1.333 1.333 0 0 1-.943.39H2.667a1.333 1.333 0 0 1-1.334-1.333v-1.608a1.333 1.333 0 0 1 .39-.943l8.5-8.5zm1.057 2.276l-.781-.781-8.5 8.5v.781h.781l8.5-8.5z" 
+                                  fill={isDarkMode ? '#9CA3AF' : '#6B7280'}
+                                />
+                              </svg>
+                              <span>Edit</span>
                             </button>
                           </div>
-                        ) : (
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-                            <div style={{ position: 'relative', display: 'inline-block' }}>
-                              <button
-                                type="button"
-                                onClick={() => handleToggleMenu(line.id)}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  width: '24px',
-                                  height: '24px',
-                                  backgroundColor: 'transparent',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <circle cx="12" cy="5" r="1" />
-                                  <circle cx="12" cy="12" r="1" />
-                                  <circle cx="12" cy="19" r="1" />
-                                </svg>
-                              </button>
-                              {openMenuId === line.id && (
-                                <div
-                                  onClick={(e) => e.stopPropagation()}
-                                  onMouseDown={(e) => e.stopPropagation()}
-                                  style={{
-                                    position: 'absolute',
-                                    right: 0,
-                                    top: '100%',
-                                    marginTop: '4px',
-                          backgroundColor: '#FFFFFF',
-                          border: '1px solid #E5E7EB',
-                                    borderRadius: '8px',
-                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                                    zIndex: 50,
-                                    minWidth: '120px',
-                                  }}
-                                >
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleEditRow(line.id, line.qty);
-                                    }}
-                                    style={{
-                                      width: '100%',
-                                      textAlign: 'left',
-                                      padding: '8px 12px',
-                                      fontSize: '14px',
-                          color: '#374151',
-                                      backgroundColor: 'transparent',
-                                      border: 'none',
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '8px',
-                                    }}
-                                    onMouseEnter={(e) => e.target.style.backgroundColor = '#F3F4F6'}
-                                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                                  >
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                        </svg>
-                                    <span>Edit</span>
-                                  </button>
-                    </div>
-                              )}
-                    </div>
-                    </div>
                         )}
                       </td>
                     )}
-                    {/* Three Dots Menu / Done Button - for addProducts tab */}
-                    {(activeTab === 'addProducts' || !isViewMode) && (
-                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', maxHeight: '40px', minHeight: '40px', verticalAlign: 'middle', lineHeight: '1', boxSizing: 'border-box', position: 'relative', width: '60px' }}>
-                      {editingRowId === line.id ? (
-                        // Done Button
-                        <div style={{ display: 'inline-block', width: '55px', height: '23px' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleDoneEditing(line.id)}
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              padding: 0,
-                              margin: 0,
-                              backgroundColor: '#10B981',
-                              color: '#FFFFFF',
-                              border: 'none',
-                              borderRadius: 6,
-                              cursor: 'pointer',
-                              fontSize: 12,
-                              fontWeight: 500,
-                              fontFamily: 'system-ui, -apple-system, sans-serif',
-                              transition: 'background-color 0.2s',
-                              lineHeight: '23px',
-                              textAlign: 'center',
-                              boxSizing: 'border-box',
-                              overflow: 'hidden',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#059669';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = '#10B981';
-                            }}
-                          >
-                            Done
-                          </button>
-                    </div>
-                      ) : (
-                        // Three Dots Menu
-                        <div style={{ position: 'relative', display: 'inline-block', width: '32px', height: '32px' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleMenu(line.id)}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: '100%',
-                              height: '100%',
-                              backgroundColor: openMenuId === line.id ? (isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)') : 'transparent',
-                              border: 'none',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              transition: 'background-color 0.2s',
-                            }}
-                            onMouseEnter={(e) => {
-                              if (openMenuId !== line.id) {
-                                e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (openMenuId !== line.id) {
-                                e.currentTarget.style.backgroundColor = 'transparent';
-                              }
-                            }}
-                          >
-                            <svg 
-                              width="16" 
-                              height="16" 
-                              viewBox="0 0 16 16" 
-                              fill="none"
-                              style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280' }}
-                            >
-                              <circle cx="8" cy="3" r="1.5" fill="currentColor"/>
-                              <circle cx="8" cy="8" r="1.5" fill="currentColor"/>
-                              <circle cx="8" cy="13" r="1.5" fill="currentColor"/>
-                            </svg>
-                          </button>
 
-                          {/* Dropdown Menu */}
-                          {openMenuId === line.id && (
-                            <div
-                              onClick={(e) => e.stopPropagation()}
-                              onMouseDown={(e) => e.stopPropagation()}
-                              style={{
-                                position: 'absolute',
-                                right: 0,
-                                top: '40px',
-                                backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
-                                border: isDarkMode ? '1px solid #4B5563' : '1px solid #E5E7EB',
-                                borderRadius: '8px',
-                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                                zIndex: 50,
-                                minWidth: '120px',
-                              }}
-                            >
-                              <button
-                                type="button"
-                                onClick={() => handleEditRow(line.id)}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '8px',
-                                  width: '100%',
-                                  padding: '10px 16px',
-                                  backgroundColor: 'transparent',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  fontSize: '14px',
-                                  color: isDarkMode ? '#F9FAFB' : '#111827',
-                                  textAlign: 'left',
-                                  transition: 'background-color 0.2s',
-                                  borderRadius: '8px',
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.backgroundColor = isDarkMode ? '#4B5563' : '#F3F4F6';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.backgroundColor = 'transparent';
-                                }}
-                              >
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                                </svg>
-                                <span>Edit</span>
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                    )}
                   </tr>
                 );
               })
@@ -2371,7 +2399,7 @@ const LabelOrderPage = () => {
             ) : (
               <>
                 {/* View Mode - Edit Order button */}
-                {isViewMode && activeTab === 'addProducts' && !isEditOrderMode && (
+                {isViewMode && !isEditOrderMode && (
                   <button
                     type="button"
                     onClick={handleEditOrder}
@@ -2424,24 +2452,22 @@ const LabelOrderPage = () => {
                 <button
                   type="button"
                   onClick={isViewMode ? handleReceiveClick : handleCompleteOrder}
-                  disabled={!isViewMode && addedLines.length === 0}
+                  disabled={isViewMode && activeTab === 'receivePO' && selectedItems.size === 0}
                   className="inline-flex items-center gap-2 text-xs font-semibold rounded-lg px-4 py-2 transition-colors"
                   style={{
-                    backgroundColor: (isViewMode || addedLines.length > 0) ? '#007AFF' : (isDarkMode ? '#374151' : '#D1D5DB'),
-                    color: (isViewMode || addedLines.length > 0) ? '#FFFFFF' : (isDarkMode ? '#6B7280' : '#9CA3AF'),
-                    cursor: (isViewMode || addedLines.length > 0) ? 'pointer' : 'not-allowed',
-                    opacity: (isViewMode || addedLines.length > 0) ? 1 : 0.6,
+                    backgroundColor: '#007AFF',
+                    color: '#FFFFFF',
+                    cursor: (isViewMode && activeTab === 'receivePO' && selectedItems.size === 0) ? 'not-allowed' : 'pointer',
+                    opacity: (isViewMode && activeTab === 'receivePO' && selectedItems.size === 0) ? 0.5 : 1,
                   }}
                   onMouseEnter={(e) => {
-                    if (isViewMode || addedLines.length > 0) {
+                    if (!(isViewMode && activeTab === 'receivePO' && selectedItems.size === 0)) {
                       e.currentTarget.style.backgroundColor = '#0056CC';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (isViewMode || addedLines.length > 0) {
+                    if (!(isViewMode && activeTab === 'receivePO' && selectedItems.size === 0)) {
                       e.currentTarget.style.backgroundColor = '#007AFF';
-                    } else {
-                      e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#D1D5DB';
                     }
                   }}
                 >
@@ -2505,22 +2531,6 @@ const LabelOrderPage = () => {
               </button>
                     </div>
 
-            {/* Change Summary (if in edit mode with changes) */}
-            {isEditMode && detectChanges.hasChanges && (
-              <div style={{ marginBottom: '20px', padding: '12px', backgroundColor: '#FEF3C7', borderRadius: '8px', border: '1px solid #FCD34D' }}>
-                <div style={{ fontSize: '14px', fontWeight: 600, color: '#92400E', marginBottom: '8px' }}>
-                  Changes Detected ({detectChanges.changes.length})
-                    </div>
-                <div style={{ fontSize: '12px', color: '#78350F' }}>
-                  {detectChanges.changes.slice(0, 3).map((change, idx) => (
-                    <div key={idx} style={{ marginBottom: '4px' }}>• {change.change}</div>
-                  ))}
-                  {detectChanges.changes.length > 3 && (
-                    <div>... and {detectChanges.changes.length - 3} more changes</div>
-                  )}
-                  </div>
-              </div>
-            )}
 
             {/* File Display */}
             <div style={{ marginBottom: '24px' }}>
@@ -2532,6 +2542,7 @@ const LabelOrderPage = () => {
                   padding: '12px 16px',
                   backgroundColor: '#E0F2FE', // Light blue background
                   borderRadius: '8px',
+                  border: '1px solid #007AFF',
                 }}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -2553,43 +2564,136 @@ const LabelOrderPage = () => {
               </div>
             </div>
 
+            {/* Warning Message - Show when editing order with changes */}
+            {isEditOrderMode && (
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'flex-start', 
+                gap: '8px', 
+                marginBottom: '24px',
+              }}>
+                <svg 
+                  width="20" 
+                  height="20" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  style={{ 
+                    marginTop: '2px',
+                    flexShrink: 0,
+                  }}
+                >
+                  <circle cx="12" cy="12" r="10" fill="#F59E0B" />
+                  <path 
+                    d="M12 9V13M12 17H12.01" 
+                    stroke="white" 
+                    strokeWidth="2" 
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span style={{ 
+                  color: '#6B7280',
+                  fontSize: '14px',
+                  lineHeight: '1.5',
+                }}>
+                  You've saved label order changes. Please export and resubmit the PO before continuing.
+                </span>
+              </div>
+            )}
+
+            {/* Informational Message - Show when not editing */}
+            {!isEditOrderMode && (
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'flex-start', 
+                gap: '8px', 
+                marginBottom: '24px',
+              }}>
+                <svg 
+                  width="16" 
+                  height="16" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  style={{ 
+                    marginTop: '2px',
+                    flexShrink: 0,
+                  }}
+                >
+                  <circle cx="12" cy="12" r="10" fill="#2563EB" />
+                  <path 
+                    d="M12 16V12M12 8H12.01" 
+                    stroke="white" 
+                    strokeWidth="2" 
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span style={{ 
+                  color: '#374151',
+                  fontSize: '14px',
+                  lineHeight: '1.5',
+                }}>
+                  After submitting to your supplier, click Complete Order to finalize.
+                </span>
+              </div>
+            )}
+
             {/* Buttons */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', alignItems: 'center' }}>
               <button
                 type="button"
                 onClick={handleExportCSV}
                 style={{
-                  backgroundColor: '#007AFF',
-                  color: '#FFFFFF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  backgroundColor: 'transparent',
+                  color: '#007AFF',
                   border: 'none',
-                  borderRadius: '8px',
-                  padding: '10px 20px',
+                  padding: '0',
                   fontSize: '14px',
                   fontWeight: 500,
                   cursor: 'pointer',
-                  transition: 'background-color 0.2s',
+                  textDecoration: 'none',
                 }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#0056CC'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = '#007AFF'}
+                onMouseEnter={(e) => {
+                  e.target.style.textDecoration = 'underline';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.textDecoration = 'none';
+                }}
               >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#007AFF" strokeWidth="2">
+                  <path d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                </svg>
                 Export as CSV
               </button>
               <button
                 type="button"
                 onClick={handleDone}
+                disabled={isEditOrderMode && !csvExported}
                 style={{
-                  backgroundColor: '#0066FF',
+                  backgroundColor: (isEditOrderMode && csvExported) ? '#0066FF' : '#9CA3AF',
                   color: '#FFFFFF',
                   border: 'none',
                   borderRadius: '8px',
                   padding: '10px 20px',
                   fontSize: '14px',
                   fontWeight: 500,
-                  cursor: 'pointer',
+                  cursor: (isEditOrderMode && !csvExported) ? 'not-allowed' : 'pointer',
                   transition: 'background-color 0.2s',
+                  opacity: (isEditOrderMode && !csvExported) ? 0.6 : 1,
                 }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#0052CC'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = '#0066FF'}
+                onMouseEnter={(e) => {
+                  if (!(isEditOrderMode && !csvExported)) {
+                    e.target.style.backgroundColor = (isEditOrderMode && csvExported) ? '#0052CC' : '#6B7280';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!(isEditOrderMode && !csvExported)) {
+                    e.target.style.backgroundColor = (isEditOrderMode && csvExported) ? '#0066FF' : '#9CA3AF';
+                  }
+                }}
               >
                 Done
               </button>
