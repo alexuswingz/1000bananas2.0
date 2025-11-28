@@ -6,9 +6,11 @@ const ShinersView = () => {
   const { isDarkMode } = useTheme();
   const [expandedFormulas, setExpandedFormulas] = useState(new Set(['F.ULTRAGROW', 'F.ULTRABLOOM']));
   const [addedProducts, setAddedProducts] = useState(new Set(['F.ULTRAGROW-Cherry Tree Fer...']));
-  const [openFilterIndex, setOpenFilterIndex] = useState(null);
+  // Track which specific column header filter is open (per-formula + column)
+  const [openFilterIndex, setOpenFilterIndex] = useState(null); // e.g. "F.ULTRAGROW:brand"
+  const [filterPosition, setFilterPosition] = useState({ top: 0, left: 0 });
   const filterRefs = useRef({});
-  const filterModalRefs = useRef({});
+  const filterModalRef = useRef(null);
 
   // Sample data matching the image
   const formulas = [
@@ -150,16 +152,15 @@ const ShinersView = () => {
     });
   };
 
-  // Position filter modal when it appears
+  // Position filter modal when it appears (align under filter icon similar to Sort Formulas)
   useEffect(() => {
     if (openFilterIndex !== null) {
       const updatePosition = () => {
         const filterButton = filterRefs.current[openFilterIndex];
-        const filterModal = filterModalRefs.current[openFilterIndex];
         
-        if (filterButton && filterModal) {
+        if (filterButton) {
           const rect = filterButton.getBoundingClientRect();
-          const dropdownWidth = 228;
+          const dropdownWidth = 320;   // match sort formulas dropdown width
           const dropdownHeight = 400;
           const viewportWidth = window.innerWidth;
           const viewportHeight = window.innerHeight;
@@ -187,26 +188,14 @@ const ShinersView = () => {
             top = 16;
           }
           
-          filterModal.style.top = `${top}px`;
-          filterModal.style.left = `${left}px`;
+          setFilterPosition({ top, left });
         }
       };
 
-      // Use multiple attempts to ensure positioning works
-      const timeoutId1 = setTimeout(updatePosition, 0);
-      const timeoutId2 = setTimeout(updatePosition, 10);
-      const timeoutId3 = setTimeout(updatePosition, 50);
-      
-      // Also update on scroll/resize
-      window.addEventListener('scroll', updatePosition, true);
-      window.addEventListener('resize', updatePosition);
-      
+      updatePosition();
+
       return () => {
-        clearTimeout(timeoutId1);
-        clearTimeout(timeoutId2);
-        clearTimeout(timeoutId3);
-        window.removeEventListener('scroll', updatePosition, true);
-        window.removeEventListener('resize', updatePosition);
+        // no-op cleanup; listeners not used
       };
     }
   }, [openFilterIndex]);
@@ -216,7 +205,7 @@ const ShinersView = () => {
     const handleClickOutside = (event) => {
       if (openFilterIndex !== null) {
         const filterButton = filterRefs.current[openFilterIndex];
-        const filterModal = filterModalRefs.current[openFilterIndex];
+        const filterModal = filterModalRef.current;
         
         if (filterButton && filterModal) {
           const isClickInsideButton = filterButton.contains(event.target);
@@ -469,7 +458,7 @@ const ShinersView = () => {
                           <span>BRAND</span>
                           <img
                             ref={(el) => {
-                              if (el) filterRefs.current['brand'] = el;
+                              if (el) filterRefs.current[`${formula.id}:brand`] = el;
                             }}
                             src="/assets/Vector (1).png"
                             alt="Filter"
@@ -481,7 +470,8 @@ const ShinersView = () => {
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
-                              setOpenFilterIndex(openFilterIndex === 'brand' ? null : 'brand');
+                              const key = `${formula.id}:brand`;
+                              setOpenFilterIndex(openFilterIndex === key ? null : key);
                             }}
                           />
                         </div>
@@ -508,7 +498,7 @@ const ShinersView = () => {
                           <span>PRODUCT</span>
                           <img
                             ref={(el) => {
-                              if (el) filterRefs.current['product'] = el;
+                              if (el) filterRefs.current[`${formula.id}:product`] = el;
                             }}
                             src="/assets/Vector (1).png"
                             alt="Filter"
@@ -520,7 +510,8 @@ const ShinersView = () => {
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
-                              setOpenFilterIndex(openFilterIndex === 'product' ? null : 'product');
+                              const key = `${formula.id}:product`;
+                              setOpenFilterIndex(openFilterIndex === key ? null : key);
                             }}
                           />
                         </div>
@@ -547,7 +538,7 @@ const ShinersView = () => {
                           <span>SIZE</span>
                           <img
                             ref={(el) => {
-                              if (el) filterRefs.current['size'] = el;
+                              if (el) filterRefs.current[`${formula.id}:size`] = el;
                             }}
                             src="/assets/Vector (1).png"
                             alt="Filter"
@@ -559,7 +550,8 @@ const ShinersView = () => {
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
-                              setOpenFilterIndex(openFilterIndex === 'size' ? null : 'size');
+                              const key = `${formula.id}:size`;
+                              setOpenFilterIndex(openFilterIndex === key ? null : key);
                             }}
                           />
                         </div>
@@ -586,7 +578,7 @@ const ShinersView = () => {
                           <span>ADD</span>
                           <img
                             ref={(el) => {
-                              if (el) filterRefs.current['add'] = el;
+                              if (el) filterRefs.current[`${formula.id}:add`] = el;
                             }}
                             src="/assets/Vector (1).png"
                             alt="Filter"
@@ -598,7 +590,8 @@ const ShinersView = () => {
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
-                              setOpenFilterIndex(openFilterIndex === 'add' ? null : 'add');
+                              const key = `${formula.id}:add`;
+                              setOpenFilterIndex(openFilterIndex === key ? null : key);
                             }}
                           />
                         </div>
@@ -625,7 +618,7 @@ const ShinersView = () => {
                           <span>QTY</span>
                           <img
                             ref={(el) => {
-                              if (el) filterRefs.current['qty'] = el;
+                              if (el) filterRefs.current[`${formula.id}:qty`] = el;
                             }}
                             src="/assets/Vector (1).png"
                             alt="Filter"
@@ -637,7 +630,8 @@ const ShinersView = () => {
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
-                              setOpenFilterIndex(openFilterIndex === 'qty' ? null : 'qty');
+                              const key = `${formula.id}:qty`;
+                              setOpenFilterIndex(openFilterIndex === key ? null : key);
                             }}
                           />
                         </div>
@@ -677,7 +671,7 @@ const ShinersView = () => {
                         </div>
                         <img
                           ref={(el) => {
-                            if (el) filterRefs.current['timeline'] = el;
+                            if (el) filterRefs.current[`${formula.id}:timeline`] = el;
                           }}
                           src="/assets/Vector (1).png"
                           alt="Filter"
@@ -693,7 +687,8 @@ const ShinersView = () => {
                           }}
                           onClick={(e) => {
                             e.stopPropagation();
-                            setOpenFilterIndex(openFilterIndex === 'timeline' ? null : 'timeline');
+                            const key = `${formula.id}:timeline`;
+                            setOpenFilterIndex(openFilterIndex === key ? null : key);
                           }}
                         />
                         <div style={{
@@ -919,24 +914,23 @@ const ShinersView = () => {
         })}
       </div>
 
-      {/* Filter Modals */}
-      {['brand', 'product', 'size', 'add', 'qty', 'timeline'].map((filterKey) => (
-        openFilterIndex === filterKey && createPortal(
+      {/* Filter Modal (single instance, anchored to the active header icon) */}
+      {openFilterIndex &&
+        createPortal(
           <div
-            key={filterKey}
-            ref={(el) => {
-              if (el) filterModalRefs.current[filterKey] = el;
-            }}
+            key={openFilterIndex}
+            ref={filterModalRef}
             style={{
               position: 'fixed',
-              top: '-9999px',
-              left: '-9999px',
+              top: `${filterPosition.top}px`,
+              left: `${filterPosition.left}px`,
               backgroundColor: '#FFFFFF',
               borderRadius: '8px',
               padding: '16px',
               width: '228px',
               boxSizing: 'border-box',
-              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+              boxShadow:
+                '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
               zIndex: 10000,
               border: '1px solid #E5E7EB',
               pointerEvents: 'auto',
@@ -1106,8 +1100,7 @@ const ShinersView = () => {
             </div>
           </div>,
           document.body
-        )
-      ))}
+        )}
     </>
   );
 };

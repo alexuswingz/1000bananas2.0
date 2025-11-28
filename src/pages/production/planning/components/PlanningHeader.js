@@ -64,10 +64,10 @@ const PlanningHeader = ({ activeTab, onTabChange, onNewShipmentClick, onSearch }
         <div
           style={{
             display: 'inline-flex',
-            gap: '0',
-            backgroundColor: isDarkMode ? '#374151' : '#F3F4F6',
+            gap: '8px',
             borderRadius: '8px',
             padding: '4px',
+            border: '1px solid #EAEAEA',
           }}
         >
           {shipmentsTabs.map((tab) => {
@@ -77,10 +77,11 @@ const PlanningHeader = ({ activeTab, onTabChange, onNewShipmentClick, onSearch }
                 key={tab.id}
                 onClick={() => onTabChange(tab.id)}
                 style={{
-                  padding: '6px 16px',
+                  padding: '4px 12px',
                   fontSize: '14px',
                   fontWeight: 400,
-                  borderRadius: '6px',
+                  borderRadius: '4px',
+                  border: isActive ? '1px solid #EAEAEA' : 'none',
                   transition: 'all 0.2s ease',
                   backgroundColor: isActive
                     ? (isDarkMode ? '#1F2937' : '#FFFFFF')
@@ -88,9 +89,12 @@ const PlanningHeader = ({ activeTab, onTabChange, onNewShipmentClick, onSearch }
                   color: isActive
                     ? (isDarkMode ? '#FFFFFF' : '#111827')
                     : (isDarkMode ? '#9CA3AF' : '#6B7280'),
-                  border: 'none',
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
+                  height: '23px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
                 {tab.label}
