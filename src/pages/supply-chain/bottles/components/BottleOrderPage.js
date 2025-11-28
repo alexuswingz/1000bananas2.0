@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
+import { calculatePallets } from '../../../../utils/palletCalculations';
+import { bottlesApi, transformInventoryData } from '../../../../services/supplyChainApi';
 
 const BottleOrderPage = () => {
   const { isDarkMode } = useTheme();
@@ -13,6 +15,7 @@ const BottleOrderPage = () => {
   const mode = state.mode || 'create';
   const isCreateMode = mode === 'create';
   const isViewMode = mode === 'view' || mode === 'receive';
+  const isReceiveMode = mode === 'receive';
   const orderId = state.orderId || null;
 
   // Get lines from state or use default
@@ -45,6 +48,7 @@ const BottleOrderPage = () => {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showReceiveConfirmModal, setShowReceiveConfirmModal] = useState(false);
   const [showPartialOrderModal, setShowPartialOrderModal] = useState(false);
+  const [showAddBottleModal, setShowAddBottleModal] = useState(false);
   
   // Checkbox selection state for partial orders
   const [selectedItems, setSelectedItems] = useState(new Set());
@@ -351,8 +355,6 @@ const BottleOrderPage = () => {
         },
         replace: false,
       });
-    } else {
-      navigate('/dashboard/supply-chain/bottles');
     }
   };
 
@@ -554,6 +556,19 @@ const BottleOrderPage = () => {
               <div style={{ width: '12px', height: '12px', backgroundColor: '#3B82F6', borderRadius: '2px' }}></div>
               <span style={{ fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}># to Order</span>
             </div>
+            
+            {/* Add bottle button */}
+            {!isReceiveMode && (
+              <div className="bg-gray-50 border-t border-gray-200 px-4 py-3">
+                <button
+                  type="button"
+                  className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+                  onClick={() => setShowAddBottleModal(true)}
+                >
+                  <span className="text-lg">+</span> Add Bottle
+                </button>
+              </div>
+            )}
           </div>
           )}
         </div>

@@ -1,338 +1,303 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 import { useLocation } from 'react-router-dom';
+import { closuresApi } from '../../../../services/supplyChainApi';
 
-const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrder, onStatusChange, archivedOrdersRef, onNewOrderCreated }) => {
+const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrder, onNewOrderCreated, archivedOrdersRef }) => {
   const { isDarkMode } = useTheme();
   const location = useLocation();
-  const [orderActionMenuId, setOrderActionMenuId] = useState(null);
-  const [editingStatusId, setEditingStatusId] = useState(null);
-  const menuRefs = useRef({});
-  const buttonRefs = useRef({});
-  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
 
-  // Orders data - manage own state like labels
-  const [orders, setOrders] = useState(() => {
-    try {
-      const stored = window.localStorage.getItem('closureOrders');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          // Filter out the two sample orders: "514413413" and "43145"
-          const cleaned = parsed.filter((order) => 
-            order.orderNumber !== '514413413' && order.orderNumber !== '43145'
-          );
-          // Update localStorage with cleaned data if any were removed
-          if (cleaned.length !== parsed.length) {
-            window.localStorage.setItem('closureOrders', JSON.stringify(cleaned));
-          }
-          return cleaned;
-        }
-      }
-    } catch {}
-    return [];
-  });
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Persist orders to localStorage
+  // Fetch orders from API
   useEffect(() => {
-    try {
-      window.localStorage.setItem('closureOrders', JSON.stringify(orders));
-    } catch {}
-  }, [orders]);
-
-  // Get archived orders to exclude them from active orders
-  const [archivedOrders, setArchivedOrders] = useState(() => {
-    try {
-      const stored = window.localStorage.getItem('closureArchivedOrders');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        return Array.isArray(parsed) ? parsed : [];
-      }
-    } catch {}
-    return [];
-  });
-
-  // Listen for changes to archived orders in localStorage
-  useEffect(() => {
-    const handleStorageChange = () => {
+    const fetchOrders = async () => {
       try {
-        const stored = window.localStorage.getItem('closureArchivedOrders');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          setArchivedOrders(Array.isArray(parsed) ? parsed : []);
-        } else {
-          setArchivedOrders([]);
+        setLoading(true);
+        const response = await closuresApi.getOrders();
+        if (response.success) {
+          const allOrders = response.data.map(order => ({
+            id: order.id,
+            orderNumber: order.order_number,
+            supplier: order.supplier,
+            closureName: order.closure_name,
+            status: order.status || 'pending',
+            orderDate: order.order_date,
+            quantityOrdered: order.quantity_ordered,
+            quantityReceived: order.quantity_received || 0,
+          }));
+          
+          // Group orders by base order number (before timestamp)
+          const grouped = {};
+          allOrders.forEach(order => {
+            const baseOrderNumber = order.orderNumber.split('-')[0];
+            if (!grouped[baseOrderNumber]) {
+              grouped[baseOrderNumber] = {
+                id: order.id, // Use first order ID
+                orderNumber: baseOrderNumber,
+                supplier: order.supplier,
+                status: order.status,
+                orderDate: order.orderDate,
+                orderCount: 0,
+                lineItems: [],
+              };
+            }
+            grouped[baseOrderNumber].orderCount++;
+            grouped[baseOrderNumber].lineItems.push(order);
+          });
+          
+          // Filter: Only show groups that have at least one 'pending' or 'partial' line item
+          // Exclude groups where ALL items are 'received' or 'archived'
+          const activeGroupedOrders = Object.values(grouped)
+            .filter(group => {
+              // Include if at least one line item is pending or partial
+              return group.lineItems.some(item => 
+                item.status === 'pending' || item.status === 'partial'
+              );
+            })
+            .map(group => {
+              // Determine group status: if any partial, show partial; otherwise pending
+              const hasPartial = group.lineItems.some(item => item.status === 'partial');
+              return {
+                ...group,
+                status: hasPartial ? 'partial' : 'pending'
+              };
+            });
+          
+          console.log('Grouped orders:', activeGroupedOrders);
+          setOrders(activeGroupedOrders);
         }
-      } catch {}
+      } catch (err) {
+        console.error('Error fetching orders:', err);
+      } finally {
+        setLoading(false);
+      }
     };
-
-    // Check on mount and when component updates
-    handleStorageChange();
-
-    // Listen for storage events (when localStorage changes from other tabs/windows)
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Also check periodically in case changes happen in same tab
-    const interval = setInterval(handleStorageChange, 500);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
+    fetchOrders();
   }, []);
 
-  // Filter orders based on search query and exclude archived orders
+  // Filter orders based on search query
   const filteredOrders = useMemo(() => {
-    // Get archived order IDs to exclude
-    const archivedOrderIds = new Set(archivedOrders.map(order => String(order.id)));
-    
-    // Filter out archived orders
-    const activeOrders = orders.filter(order => !archivedOrderIds.has(String(order.id)));
-    
-    // Then filter by search query if provided
-    if (!searchQuery.trim()) return activeOrders;
+    if (!searchQuery.trim()) return orders;
     const query = searchQuery.toLowerCase();
-    return activeOrders.filter(
+    return orders.filter(
       (order) =>
         order.orderNumber.toLowerCase().includes(query) ||
         order.supplier.toLowerCase().includes(query)
     );
-  }, [orders, searchQuery, archivedOrders]);
+  }, [orders, searchQuery]);
 
   // Handle new order from navigation state
   useEffect(() => {
     const newOrderState = location.state && location.state.newClosureOrder;
     if (newOrderState) {
-      const { orderNumber: newOrderNumber, supplierName, lines } = newOrderState;
-
-      setOrders((prev) => {
-        // Check for duplicates
-        const existing = prev.find(
-          (o) => o.orderNumber === newOrderNumber && o.supplier === supplierName
-        );
-        if (existing) {
-          return prev;
-        }
-
-        const newOrder = {
-          id: Date.now(),
-          status: 'In Progress',
-          orderNumber: newOrderNumber,
-          supplier: supplierName,
-          lines: lines || [],
-        };
-
-        const updated = [newOrder, ...prev];
+      // Refresh orders from API
+      const fetchOrders = async () => {
         try {
-          window.localStorage.setItem('closureOrders', JSON.stringify(updated));
-        } catch {}
-        
-        // Clear navigation state to prevent re-processing
-        if (window.history && window.history.replaceState) {
-          window.history.replaceState({ ...location.state, newClosureOrder: null }, '');
+          const response = await closuresApi.getOrders();
+          if (response.success) {
+            const allOrders = response.data.map(order => ({
+              id: order.id,
+              orderNumber: order.order_number,
+              supplier: order.supplier,
+              closureName: order.closure_name,
+              status: order.status || 'pending',
+              orderDate: order.order_date,
+              quantityOrdered: order.quantity_ordered,
+              quantityReceived: order.quantity_received || 0,
+            }));
+            
+            // Group orders by base order number
+            const grouped = {};
+            allOrders.forEach(order => {
+              const baseOrderNumber = order.orderNumber.split('-')[0];
+              if (!grouped[baseOrderNumber]) {
+                grouped[baseOrderNumber] = {
+                  id: order.id,
+                  orderNumber: baseOrderNumber,
+                  supplier: order.supplier,
+                  status: order.status,
+                  orderDate: order.orderDate,
+                  orderCount: 0,
+                  lineItems: [],
+                };
+              }
+              grouped[baseOrderNumber].orderCount++;
+              grouped[baseOrderNumber].lineItems.push(order);
+            });
+            
+            // Filter: Only show groups that have at least one 'pending' or 'partial' line item
+            const activeGroupedOrders = Object.values(grouped)
+              .filter(group => {
+                return group.lineItems.some(item => 
+                  item.status === 'pending' || item.status === 'partial'
+                );
+              })
+              .map(group => {
+                const hasPartial = group.lineItems.some(item => item.status === 'partial');
+                return {
+                  ...group,
+                  status: hasPartial ? 'partial' : 'pending'
+                };
+              });
+            
+            setOrders(activeGroupedOrders);
+            if (onNewOrderCreated) {
+              onNewOrderCreated();
+            }
+          }
+        } catch (err) {
+          console.error('Error refreshing orders:', err);
         }
-        
-        if (onNewOrderCreated) {
-          onNewOrderCreated();
-        }
-        
-        return updated;
-      });
+      };
+      fetchOrders();
+      
+      // Clear the navigation state
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState({ ...location.state, newClosureOrder: null }, '');
+      }
     }
   }, [location.state, onNewOrderCreated]);
 
-  // Archive order function (matching boxes/bottles pattern)
-  const handleArchiveOrder = (order) => {
-    console.log('🗄️ Manual archive clicked for order:', order);
-    
-    // Remove from active orders FIRST and save immediately to localStorage
-    setOrders((prev) => {
-      console.log('📦 Orders before archive:', prev.length);
-      const remaining = prev.filter((o) => Number(o.id) !== Number(order.id));
-      console.log('📋 Orders after archive:', remaining.length);
+  const handleArchiveOrder = async (order, shouldReceive = false) => {
+    try {
+      // Update all line items for this order
+      const lineItems = order.lineItems || [];
       
-      // Save immediately to localStorage before component unmounts
-      try {
-        window.localStorage.setItem('closureOrders', JSON.stringify(remaining));
-        console.log('💾 Saved to localStorage:', remaining.length, 'orders');
-      } catch (err) {
-        console.error('❌ Failed to save to localStorage', err);
-      }
-      return remaining;
-    });
-    
-    // Add to archived orders
-    if (archivedOrdersRef && archivedOrdersRef.current) {
-      // Partial orders should become Received when archived
-      archivedOrdersRef.current.addArchivedOrder({
-        ...order,
-        status: order.status === 'Partial' ? 'Received' : (order.status || 'Draft')
-      });
-    } else {
-      // Fallback: save directly to localStorage if ref not available
-      try {
-        const stored = window.localStorage.getItem('closureArchivedOrders');
-        const existing = stored ? JSON.parse(stored) : [];
-        if (!existing.some((o) => o.id === order.id)) {
-          const updated = [...existing, { 
-            ...order, 
-            status: order.status === 'Partial' ? 'Received' : (order.status || 'Draft')
-          }];
-          window.localStorage.setItem('closureArchivedOrders', JSON.stringify(updated));
+      for (const line of lineItems) {
+        if (shouldReceive) {
+          await closuresApi.updateOrder(line.id, {
+            status: 'received',
+          });
+        } else {
+          await closuresApi.updateOrder(line.id, {
+            status: 'archived',
+          });
         }
-      } catch (err) {
-        console.error('Failed to save to localStorage', err);
       }
-    }
-    
-    // Call parent callback to switch to archive tab
-    if (onArchiveOrder) {
-      onArchiveOrder(order);
+      
+      // Remove from UI
+      setOrders((prev) => prev.filter((o) => o.orderNumber !== order.orderNumber));
+      
+      // Add to archived orders with final status
+      if (archivedOrdersRef && archivedOrdersRef.current) {
+        archivedOrdersRef.current.addArchivedOrder({
+          ...order,
+          status: shouldReceive ? 'received' : 'archived'
+        });
+      }
+      
+      // Call parent callback
+      if (onArchiveOrder) {
+        onArchiveOrder(order);
+      }
+    } catch (err) {
+      console.error('Error archiving order:', err);
+      alert('Failed to archive order');
     }
   };
 
-  // Handle received orders (from navigation state) - matching bottles pattern
+  // Handle received orders (from navigation state)
   useEffect(() => {
     const receivedOrderId = location.state && location.state.receivedOrderId;
-    const receivedOrderNumber = location.state && location.state.receivedOrderNumber;
-    const receivedSupplier = location.state && location.state.receivedSupplier;
     const isPartial = location.state && location.state.isPartial;
     
-    if (receivedOrderId || receivedOrderNumber) {
-      console.log('🔍 Processing receive:', { receivedOrderId, receivedOrderNumber, receivedSupplier, isPartial, type: typeof receivedOrderId });
-      
-      setOrders((prev) => {
-        console.log('📦 Current orders before update:', prev.map(o => ({ id: o.id, type: typeof o.id, orderNumber: o.orderNumber, supplier: o.supplier })));
-        
-        // Try to find order by ID first, then by orderNumber and supplier
-        let order = null;
-        if (receivedOrderId) {
-          // Use Number() comparison to handle type mismatches
-          order = prev.find((o) => Number(o.id) === Number(receivedOrderId));
-        }
-        
-        // Fallback: find by orderNumber and supplier if ID not found
-        if (!order && receivedOrderNumber && receivedSupplier) {
-          order = prev.find((o) => 
-            o.orderNumber === receivedOrderNumber && o.supplier === receivedSupplier
-          );
-        }
-        
-        console.log('✅ Found order:', order);
-        
-        if (order) {
-          // Use the found order's ID for all operations
-          const targetOrderId = order.id;
-          
-          if (isPartial === true) {
-            // Partial receive - update status and keep in orders (DO NOT archive)
-            console.log('📝 Updating to Partial status');
-            const updated = prev.map((o) =>
-              Number(o.id) === Number(targetOrderId)
-                ? { ...o, status: 'Partial' }
-                : o
-            );
-            try {
-              window.localStorage.setItem('closureOrders', JSON.stringify(updated));
-              console.log('💾 Saved to localStorage:', updated.length, 'orders');
-            } catch (err) {
-              console.error('❌ Failed to save:', err);
-            }
-            return updated;
-          } else {
-            // Full receive - archive the order
-            console.log('🗄️ Archiving order (full receive)');
-            // Remove from active orders FIRST
-            const remaining = prev.filter((o) => Number(o.id) !== Number(targetOrderId));
-            console.log('📋 Remaining orders:', remaining.length);
+    if (receivedOrderId) {
+      // Refresh orders and archive received ones
+      const handleReceivedOrders = async () => {
+        try {
+          const response = await closuresApi.getOrders();
+          if (response.success) {
+            const allOrders = response.data.map(order => ({
+              id: order.id,
+              orderNumber: order.order_number,
+              supplier: order.supplier,
+              closureName: order.closure_name,
+              status: order.status || 'pending',
+              orderDate: order.order_date,
+              quantityOrdered: order.quantity_ordered,
+              quantityReceived: order.quantity_received || 0,
+            }));
             
-            try {
-              window.localStorage.setItem('closureOrders', JSON.stringify(remaining));
-              console.log('💾 Saved remaining to localStorage');
-            } catch (err) {
-              console.error('❌ Failed to save:', err);
-            }
-            
-            // Archive the order with Received status
-            const archivedOrder = { 
-              ...order, 
-              status: 'Received',
-              fromArchive: true 
-            };
-            console.log('📦 Archiving order:', archivedOrder);
-            console.log('📦 Order details:', { id: archivedOrder.id, orderNumber: archivedOrder.orderNumber, supplier: archivedOrder.supplier });
-            
-            if (archivedOrdersRef && archivedOrdersRef.current) {
-              console.log('✅ archivedOrdersRef is available, calling addArchivedOrder');
-              archivedOrdersRef.current.addArchivedOrder(archivedOrder);
-              console.log('✅ Called addArchivedOrder');
-            } else {
-              console.log('⚠️ archivedOrdersRef not available, saving directly to localStorage');
-              // Fallback: save directly to localStorage if ref not available
-              try {
-                const stored = window.localStorage.getItem('closureArchivedOrders');
-                const existing = stored ? JSON.parse(stored) : [];
-                const isDuplicate = existing.some((o) => 
-                  Number(o.id) === Number(archivedOrder.id) || 
-                  (o.orderNumber === archivedOrder.orderNumber && o.supplier === archivedOrder.supplier)
-                );
-                if (!isDuplicate) {
-                  const updated = [...existing, archivedOrder];
-                  window.localStorage.setItem('closureArchivedOrders', JSON.stringify(updated));
-                  console.log('💾 Saved directly to localStorage');
+            // Only archive and switch tab if order is FULLY received (not partial)
+            if (!isPartial) {
+              // Find the order that was received
+              const receivedOrder = allOrders.find(o => o.id === receivedOrderId);
+              
+              if (receivedOrder && receivedOrder.status === 'received') {
+                // Find all line items for this order group
+                const baseOrderNumber = receivedOrder.orderNumber.split('-')[0];
+                const orderGroup = allOrders.filter(o => o.orderNumber.split('-')[0] === baseOrderNumber);
+                
+                // Archive all line items
+                for (const order of orderGroup) {
+                  if (archivedOrdersRef && archivedOrdersRef.current) {
+                    archivedOrdersRef.current.addArchivedOrder(order);
+                  }
                 }
-              } catch (err) {
-                console.error('❌ Failed to save to localStorage', err);
+                
+                // Switch to archive tab only if fully received
+                if (onArchiveOrder) {
+                  onArchiveOrder();
+                }
               }
             }
+            // If isPartial is true, stay on orders tab (don't switch)
             
-            // Call parent callback to switch to archive tab
-            if (onArchiveOrder) {
-              onArchiveOrder(archivedOrder);
-              console.log('✅ Called onArchiveOrder callback');
-            }
+            // Group all orders first
+            const grouped = {};
+            allOrders.forEach(order => {
+              const baseOrderNumber = order.orderNumber.split('-')[0];
+              if (!grouped[baseOrderNumber]) {
+                grouped[baseOrderNumber] = {
+                  id: order.id,
+                  orderNumber: baseOrderNumber,
+                  supplier: order.supplier,
+                  status: order.status,
+                  orderDate: order.orderDate,
+                  orderCount: 0,
+                  lineItems: [],
+                };
+              }
+              grouped[baseOrderNumber].orderCount++;
+              grouped[baseOrderNumber].lineItems.push(order);
+            });
             
-            return remaining;
+            // Filter: Only show groups that have at least one 'pending' or 'partial' line item
+            const activeGroupedOrders = Object.values(grouped)
+              .filter(group => {
+                return group.lineItems.some(item => 
+                  item.status === 'pending' || item.status === 'partial'
+                );
+              })
+              .map(group => {
+                const hasPartial = group.lineItems.some(item => item.status === 'partial');
+                return {
+                  ...group,
+                  status: hasPartial ? 'partial' : 'pending'
+                };
+              });
+            
+            setOrders(activeGroupedOrders);
           }
-        } else {
-          console.log('❌ Order not found! Looking for:', { receivedOrderId, receivedOrderNumber, receivedSupplier });
+        } catch (err) {
+          console.error('Error handling received orders:', err);
         }
-        return prev;
-      });
+      };
+      handleReceivedOrders();
       
-      // Clear the navigation state to prevent re-processing
+      // Clear the navigation state
       if (window.history && window.history.replaceState) {
-        window.history.replaceState({ 
-          ...location.state, 
-          receivedOrderId: null, 
-          receivedOrderNumber: null,
-          receivedSupplier: null,
-          isPartial: null 
-        }, '');
+        window.history.replaceState({ ...location.state, receivedOrderId: null, isPartial: null }, '');
       }
     }
   }, [location.state, archivedOrdersRef, onArchiveOrder]);
 
-  const computedThemeClasses = themeClasses ? themeClasses : {
-    cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
-    headerBg: isDarkMode ? 'bg-[#2C3544]' : 'bg-[#2C3544]',
-    border: isDarkMode ? 'border-dark-border-primary' : 'border-gray-200',
-    rowHover: isDarkMode ? 'hover:bg-dark-bg-tertiary' : 'hover:bg-gray-50',
-    textPrimary: isDarkMode ? 'text-dark-text-primary' : 'text-gray-900',
-    textSecondary: isDarkMode ? 'text-dark-text-secondary' : 'text-gray-500',
-  };
-
-  const statusOptions = ['In Progress', 'Partial', 'Draft', 'Submitted', 'Received', 'Partially Received'];
-
-  const statusStyles = {
-    Draft: { bg: 'bg-blue-100', text: 'text-blue-700' },
-    Submitted: { bg: 'bg-purple-100', text: 'text-purple-700' },
-    Received: { bg: 'bg-green-50', text: 'text-green-600' },
-    'Partially Received': { bg: 'bg-blue-100', text: 'text-blue-700' },
-    // Legacy statuses for backward compatibility
-    'In Progress': { bg: 'bg-blue-100', text: 'text-blue-700' },
-    'Partial': { bg: 'bg-blue-100', text: 'text-blue-700' },
-  };
+  const [orderActionMenuId, setOrderActionMenuId] = useState(null);
+  const menuRefs = useRef({});
+  const buttonRefs = useRef({});
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
 
   // Calculate dropdown position and handle click outside
   useEffect(() => {
@@ -365,215 +330,135 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
     };
   }, [orderActionMenuId]);
 
-  const renderStatusIcon = (status) => {
-    switch (status) {
-      case 'In Progress':
-        // Blue loading/spinning icon (starburst pattern with 8 radiating lines)
-        return (
+
+  const renderStatusPill = (order) => {
+    // Map backend status to display status
+    const backendStatus = order.status || 'pending';
+    let displayStatus = 'Pending';
+    let style = { bg: 'bg-blue-100', text: 'text-blue-700' };
+    
+    if (backendStatus === 'partial') {
+      displayStatus = 'Partially Received';
+      style = { bg: 'bg-orange-100', text: 'text-orange-700' };
+    } else {
+      displayStatus = 'Pending';
+      style = { bg: 'bg-blue-100', text: 'text-blue-700' };
+    }
+
+    return (
+      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${style.bg} ${style.text}`}>
+        {displayStatus === 'Partially Received' ? (
           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <g stroke="#3B82F6" strokeWidth="2" strokeLinecap="round">
-              <line x1="12" y1="2" x2="12" y2="4"/>
-              <line x1="12" y1="20" x2="12" y2="22"/>
-              <line x1="2" y1="12" x2="4" y2="12"/>
-              <line x1="20" y1="12" x2="22" y2="12"/>
-              <line x1="5.66" y1="5.66" x2="6.83" y2="6.83"/>
-              <line x1="17.17" y1="17.17" x2="18.34" y2="18.34"/>
-              <line x1="18.34" y1="5.66" x2="17.17" y2="6.83"/>
-              <line x1="6.83" y1="17.17" x2="5.66" y2="18.34"/>
-            </g>
+            <circle cx="12" cy="12" r="10" stroke="#F97316" strokeWidth="1.5" fill="none"/>
+            <path d="M 2 12 A 10 10 0 0 1 22 12 L 12 12 Z" fill="#F97316"/>
           </svg>
-        );
-      case 'Partial':
-        // Blue half-filled circle
-        return (
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="12" cy="12" r="10" stroke="#3B82F6" strokeWidth="1.5" fill="none"/>
-            <path d="M 2 12 A 10 10 0 0 1 22 12 L 12 12 Z" fill="#3B82F6"/>
-          </svg>
-        );
-      case 'Draft':
-        return (
+        ) : (
           <svg className="w-3.5 h-3.5" fill="#3B82F6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" fill="#3B82F6"/>
             <path d="M14 2v6h6" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
             <line x1="9" y1="13" x2="15" y2="13" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
             <line x1="9" y1="17" x2="15" y2="17" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
           </svg>
-        );
-      case 'Submitted':
-        return (
-          <svg className="w-3.5 h-3.5" fill="#9333EA" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <rect x="6" y="6" width="12" height="12" rx="2" fill="#9333EA"/>
-            <path d="M12 16l-3-3m0 0l3-3m-3 3h6" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        );
-      case 'Received':
-        return (
-          <svg className="w-3.5 h-3.5" fill="#10B981" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="#10B981"/>
-          </svg>
-        );
-      case 'Partially Received':
-        return (
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="12" cy="12" r="10" stroke="#3B82F6" strokeWidth="1.5" fill="none"/>
-            <path d="M 2 12 A 10 10 0 0 1 22 12 L 12 12 Z" fill="#3B82F6"/>
-          </svg>
-        );
-      default:
-        return null;
-    }
-  };
-
-  const renderStatusPill = (order) => {
-    const status = order.status || 'In Progress';
-    const style = statusStyles[status] || {
-      bg: 'bg-gray-100',
-      text: 'text-gray-700',
-    };
-    const isEditing = editingStatusId === order.id;
-
-    if (isEditing) {
-      return (
-        <div className="relative">
-          <select
-            autoFocus
-            value={status}
-            onChange={(e) => {
-              setOrders((prev) => {
-                const updated = prev.map((o) =>
-                  o.id === order.id ? { ...o, status: e.target.value } : o
-                );
-                try {
-                  window.localStorage.setItem('closureOrders', JSON.stringify(updated));
-                } catch {}
-                return updated;
-              });
-              setEditingStatusId(null);
-            }}
-            onBlur={() => setEditingStatusId(null)}
-            className={`${style.bg} ${style.text} border-2 border-blue-500 rounded-full text-xs font-semibold px-3 py-1 pr-8 appearance-none cursor-pointer`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {statusOptions.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))}
-          </select>
-        </div>
-      );
-    }
-
-    return (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setEditingStatusId(order.id);
-        }}
-        className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${style.bg} ${style.text} hover:opacity-80 transition-opacity cursor-pointer`}
-      >
-        {renderStatusIcon(status)}
-        {status}
-      </button>
+        )}
+        {displayStatus}
+      </span>
     );
   };
 
   return (
     <div
-      className={`${computedThemeClasses.cardBg} rounded-xl border ${computedThemeClasses.border} shadow-md`}
+      className={`${themeClasses.cardBg} rounded-xl border ${themeClasses.border} shadow-md`}
       style={{ overflow: 'hidden' }}
     >
       {/* Table header row */}
-      <div className={computedThemeClasses.headerBg}>
+      <div className={themeClasses.headerBg}>
         <div
           className="grid"
           style={{
-            gridTemplateColumns: '140px 2fr 2fr 120px',
+            gridTemplateColumns: '140px 2fr 2fr',
           }}
         >
           <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center">
             Status
           </div>
           <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center">
-            CAP Order #
-          </div>
-          <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center">
-            Supplier
+            Closure Order #
           </div>
           <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider text-center">
-            Action
+            Supplier
           </div>
         </div>
       </div>
 
       {/* Table body */}
       <div>
-        {filteredOrders.length === 0 ? (
-          <div className="px-6 py-6 text-center text-sm italic text-gray-400">
-            No closure orders yet. Click &quot;New Order&quot; to create one.
+        {loading ? (
+          <div className="px-6 py-6 text-center text-sm text-gray-400">
+            Loading orders...
           </div>
         ) : (
-          filteredOrders.map((order, index) => (
-            <div
-              key={order.id}
-              className={`grid text-sm ${computedThemeClasses.rowHover} transition-colors`}
-              style={{
-                gridTemplateColumns: '140px 2fr 2fr 120px',
-                borderBottom:
-                  index === filteredOrders.length - 1
-                    ? 'none'
-                    : isDarkMode
-                    ? '1px solid rgba(75,85,99,0.3)'
-                    : '1px solid #e5e7eb',
-              }}
-            >
-              <div className="px-6 py-3 flex items-center justify-center">
-                {renderStatusPill(order)}
-              </div>
-              <div className="px-6 py-3 flex items-center gap-2">
-                <span className="text-xs font-medium text-gray-900">{order.orderNumber}</span>
-                {order.status === 'Partial' && (
-                  <button
-                    type="button"
-                    onClick={() => handleArchiveOrder(order)}
-                    className="px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded-full hover:bg-blue-700"
-                  >
-                    Archive
-                  </button>
-                )}
-              </div>
-              <div className="px-6 py-3 flex items-center justify-between relative">
-                <span className={computedThemeClasses.textPrimary}>{order.supplier}</span>
+          <>
+            {filteredOrders.map((order, index) => (
+              <div
+                key={order.id}
+                className={`grid text-sm ${themeClasses.rowHover} transition-colors`}
+                style={{
+                  gridTemplateColumns: '140px 2fr 2fr',
+                    borderBottom:
+                      index === filteredOrders.length - 1
+                        ? 'none'
+                        : isDarkMode
+                        ? '1px solid rgba(75,85,99,0.3)'
+                        : '1px solid #e5e7eb',
+                }}
+              >
+                <div className="px-6 py-3 flex items-center justify-center">
+                  {renderStatusPill(order)}
+                </div>
+                <div className="px-6 py-3 flex items-center gap-2">
+                  <div className="flex flex-col">
+                    <button
+                      type="button"
+                      className="text-xs font-medium text-blue-600 hover:text-blue-700 underline-offset-2 hover:underline text-left"
+                      onClick={() => onViewOrder(order)}
+                    >
+                      {order.orderNumber}
+                    </button>
+                    {order.orderCount > 1 && (
+                      <span className="text-[10px] text-gray-400">
+                        {order.orderCount} closure types
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="px-6 py-3 flex items-center justify-between relative">
+                  <span className={themeClasses.textPrimary}>{order.supplier}</span>
 
-                <div className="relative">
-                  <button
-                    ref={(el) => (buttonRefs.current[order.id] = el)}
-                    type="button"
-                    data-menu-button={order.id}
-                    className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors ml-2"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setOrderActionMenuId((prev) => (prev === order.id ? null : order.id));
-                    }}
-                    aria-label="Order actions"
-                  >
-                    <span className={computedThemeClasses.textSecondary}>⋮</span>
-                  </button>
+                  <div className="relative">
+                    <button
+                      ref={(el) => (buttonRefs.current[order.id] = el)}
+                      type="button"
+                      data-menu-button={order.id}
+                      className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors ml-2"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOrderActionMenuId((prev) => (prev === order.id ? null : order.id));
+                      }}
+                      aria-label="Order actions"
+                    >
+                      <span className={themeClasses.textSecondary}>⋮</span>
+                    </button>
+                  </div>
                 </div>
               </div>
-              <div className="px-6 py-3 flex items-center justify-center">
-                <button
-                  type="button"
-                  className="text-xs font-medium text-blue-600 hover:text-blue-700 underline-offset-2 hover:underline"
-                  onClick={() => onViewOrder(order)}
-                >
-                  View
-                </button>
+            ))}
+
+            {filteredOrders.length === 0 && (
+              <div className="px-6 py-6 text-center text-sm italic text-gray-400">
+                No closure orders yet. Click &quot;New Order&quot; to create one.
               </div>
-            </div>
-          ))
+            )}
+          </>
         )}
       </div>
 
@@ -581,7 +466,7 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
       {orderActionMenuId && (
         <div
           ref={(el) => (menuRefs.current[orderActionMenuId] = el)}
-          className={`fixed z-[9999] w-32 ${computedThemeClasses.cardBg} ${computedThemeClasses.border} border rounded-md shadow-xl text-xs`}
+          className={`fixed z-[9999] w-32 ${themeClasses.cardBg} ${themeClasses.border} border rounded-md shadow-xl text-xs`}
           style={{
             top: `${menuPosition.top}px`,
             right: `${menuPosition.right}px`,
@@ -591,38 +476,66 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
           {orders
             .filter((order) => order.id === orderActionMenuId)
             .map((order) => (
-              <button
-                key={order.id}
-                type="button"
-                className={`w-full flex items-center gap-2 px-3 py-2.5 ${computedThemeClasses.rowHover} ${computedThemeClasses.textPrimary} transition-colors`}
-                onClick={() => {
-                  onViewOrder(order);
-                  setOrderActionMenuId(null);
-                }}
-              >
-                <span className={computedThemeClasses.textSecondary}>
-                  <svg
-                    className="w-3.5 h-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+              <React.Fragment key={order.id}>
+                <button
+                  type="button"
+                  className={`w-full flex items-center gap-2 px-3 py-2.5 ${themeClasses.rowHover} ${themeClasses.textPrimary} transition-colors`}
+                    onClick={() => {
+                      if (onViewOrder) {
+                        onViewOrder(order);
+                      }
+                      setOrderActionMenuId(null);
+                    }}
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                    />
-                  </svg>
-                </span>
-                <span className="font-medium">View</span>
-              </button>
+                    <span className={themeClasses.textSecondary}>
+                      <svg
+                        className="w-3.5 h-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                        />
+                      </svg>
+                    </span>
+                    <span className="font-medium">View</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`w-full flex items-center gap-2 px-3 py-2.5 ${themeClasses.rowHover} ${themeClasses.textPrimary} border-t ${themeClasses.border} transition-colors`}
+                    onClick={() => {
+                      handleArchiveOrder(order);
+                      setOrderActionMenuId(null);
+                    }}
+                  >
+                  <span className={themeClasses.textSecondary}>
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 4h16v4H4zM6 8v10a2 2 0 002 2h8a2 2 0 002-2V8"
+                      />
+                    </svg>
+                  </span>
+                  <span className="font-medium">Archive</span>
+                </button>
+              </React.Fragment>
             ))}
         </div>
       )}
@@ -631,4 +544,3 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
 };
 
 export default OrdersTable;
-

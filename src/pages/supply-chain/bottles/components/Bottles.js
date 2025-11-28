@@ -117,11 +117,52 @@ const Bottles = () => {
   };
 
   const openBottleDetails = (bottle) => {
-    const details = bottleDetails[bottle.name] || null;
+    // Use actual bottle data from API instead of static data
+    const originalData = bottle._original || {};
+    const details = {
+      core: {
+        packagingName: bottle.name,
+        bottleName: bottle.name,
+        imageLink: originalData.image_link || '',
+        sizeOz: originalData.size_oz || '',
+        shape: originalData.shape || '',
+        color: originalData.color || '',
+        threadType: originalData.thread_type || '',
+        capSize: originalData.cap_size || '',
+        material: originalData.material || '',
+        supplier: bottle.supplier || '',
+        packagingPart: originalData.packaging_part_number || '',
+        description: originalData.description || '',
+        brand: originalData.brand || '',
+      },
+      supplier: {
+        leadTimeWeeks: bottle.leadTimeWeeks || 0,
+        moq: bottle.moq || 0,
+        unitsPerPallet: bottle.unitsPerPallet || 0,
+        unitsPerCase: bottle.unitsPerCase || 0,
+        casesPerPallet: bottle.casesPerPallet || 0,
+      },
+      dimensions: {
+        lengthIn: originalData.length_in || '',
+        widthIn: originalData.width_in || '',
+        heightIn: originalData.height_in || '',
+        weightLbs: originalData.weight_lbs || '',
+        labelSize: originalData.label_size || '',
+      },
+      inventory: {
+        orderStrategy: originalData.order_strategy || 'Manual',
+        supplierInventory: bottle.supplierInventory || 0,
+        warehouseInventory: bottle.warehouseInventory || 0,
+        maxWarehouseInventory: originalData.max_warehouse_inventory || 0,
+        bottlesPerMinute: originalData.bottles_per_minute || 0,
+      }
+    };
+    
     setSelectedBottle({
       id: bottle.id,
       name: bottle.name,
       details,
+      rawData: originalData,
     });
     setActiveDetailsTab('core');
     setIsDetailsOpen(true);
@@ -215,13 +256,17 @@ const Bottles = () => {
         logoAlt: order.supplier,
       };
 
+    // Use the first line item's ID for fetching order details
+    const orderId = order.lineItems && order.lineItems.length > 0 
+      ? order.lineItems[0].id 
+      : order.id;
+
     navigate('/dashboard/supply-chain/bottles/order', {
       state: {
         orderNumber: order.orderNumber,
         supplier: supplierMeta,
         mode: 'receive',
-        orderId: order.id,
-        // Existing orders don't persist custom lines yet; BottleOrderPage falls back to defaults.
+        orderId: orderId,
       },
     });
   };

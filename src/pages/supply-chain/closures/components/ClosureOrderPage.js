@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
+import { calculatePallets } from '../../../../utils/palletCalculations';
+import { closuresApi, transformInventoryData } from '../../../../services/supplyChainApi';
 
 const ClosureOrderPage = () => {
   const { isDarkMode } = useTheme();
@@ -12,31 +14,114 @@ const ClosureOrderPage = () => {
   const supplier = state.supplier || null;
   const mode = state.mode || 'create';
   const isReceiveMode = mode === 'receive';
-  const isViewMode = mode === 'view';
   const orderId = state.orderId || null;
-  
-  // If viewing an existing order, use the lines from state (which are already filtered to selected items)
-  // If creating a new order, show all available items
-  const getInitialLines = () => {
-    if (state.lines && (isReceiveMode || isViewMode)) {
-      // When viewing/receiving, show the selected items that were saved
-      // In receive mode, check all boxes by default; in view mode, keep them checked but disabled
-      return state.lines.map(line => ({
-        ...line,
-        selected: isReceiveMode ? true : (line.selected !== undefined ? line.selected : true)
-      }));
-    }
-    return [
-      { id: 1, type: 'Cap', name: 'Aptar Pour', supplierInventory: 'Auto Replenishment', unitsNeeded: 61120, qty: 61120, pallets: 1, selected: false },
-      { id: 2, type: 'Sprayer', name: '3oz Sprayer Top Down', supplierInventory: 'Auto Replenishment', unitsNeeded: 10000, qty: 10000, pallets: 1, selected: false },
-      { id: 3, type: 'Sprayer', name: '6oz Sprayer Top Top Down', supplierInventory: 'Auto Replenishment', unitsNeeded: 10000, qty: 10000, pallets: 1, selected: false },
-      { id: 4, type: 'Sprayer', name: '16oz Sprayer Trigger Foam', supplierInventory: 'Auto Replenishment', unitsNeeded: 8160, qty: 8160, pallets: 1, selected: false },
-      { id: 5, type: 'Sprayer', name: '16oz Spray Trigger No-Foam', supplierInventory: 'Auto Replenishment', unitsNeeded: 8160, qty: 8160, pallets: 1, selected: false },
-    ];
-  };
 
-  const [orderLines, setOrderLines] = useState(getInitialLines());
+  // Fetch available closures from API
+  const [availableClosures, setAvailableClosures] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [orderLines, setOrderLines] = useState([]);
   const [isReceiveConfirmOpen, setIsReceiveConfirmOpen] = useState(false);
+  const [showAddClosureModal, setShowAddClosureModal] = useState(false);
+
+  // Fetch order details if viewing/receiving existing order
+  useEffect(() => {
+    const fetchOrderDetails = async () => {
+      if (isReceiveMode && orderId) {
+        try {
+          setLoading(true);
+          const response = await closuresApi.getOrder(orderId);
+          if (response.success) {
+            const orderData = response.data;
+            
+            // Handle multiple order lines
+            const lines = orderData.lines || [];
+            const orderLines = lines.map((line, index) => {
+              const originalQty = line.quantity_ordered || 0;
+              const receivedQty = line.quantity_received || 0;
+              const qtyToReceive = originalQty - receivedQty; // Remaining to receive
+              const calculatedPallets = calculatePallets(
+                qtyToReceive,
+                line.units_per_pallet || 1
+              );
+              return {
+                id: line.id || index + 1,
+                orderId: line.id,
+                name: line.closure_name || 'Unknown Closure',
+                closureName: line.closure_name || 'Unknown Closure',
+                qty: qtyToReceive, // Default to remaining quantity
+                originalQty: originalQty, // Store original ordered quantity
+                receivedQty: receivedQty, // Store already received quantity
+                pallets: calculatedPallets,
+                unitsPerPallet: line.units_per_pallet || 1,
+                unitsPerCase: line.units_per_case,
+                casesPerPallet: line.cases_per_pallet,
+                supplier: line.supplier,
+                selected: qtyToReceive > 0, // Auto-select if there's remaining to receive
+              };
+            });
+            
+            console.log('Loaded order lines:', orderLines);
+            setOrderLines(orderLines);
+          }
+        } catch (err) {
+          console.error('Error fetching order details:', err);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    fetchOrderDetails();
+  }, [isReceiveMode, orderId]);
+
+  // Fetch closures on mount for create mode
+  useEffect(() => {
+    const fetchClosures = async () => {
+      if (!isReceiveMode) {
+        try {
+          setLoading(true);
+          const response = await closuresApi.getInventory();
+          console.log('RAW API RESPONSE:', response);
+          if (response.success) {
+            const closures = transformInventoryData(response);
+            console.log('Fetched closures from API:', closures.length, closures);
+            console.log('First closure data:', closures[0]);
+            setAvailableClosures(closures);
+            
+            // Create lines for ALL closures
+            const allClosureLines = closures.map((closure, index) => {
+              const defaultQty = closure.unitsPerPallet || 1000;
+              const calculatedPallets = calculatePallets(defaultQty, closure.unitsPerPallet || 1);
+              console.log(`Creating line for ${closure.name}:`, {
+                unitsPerPallet: closure.unitsPerPallet,
+                defaultQty,
+                calculatedPallets
+              });
+              return {
+                id: index + 1,
+                name: closure.name,
+                closureName: closure.name,
+                unitsNeeded: defaultQty,
+                qty: defaultQty,
+                pallets: calculatedPallets,
+                unitsPerPallet: closure.unitsPerPallet || 1,
+                unitsPerCase: closure.unitsPerCase,
+                casesPerPallet: closure.casesPerPallet,
+                supplier: closure.supplier,
+                selected: true,
+              };
+            });
+            console.log('Created order lines:', allClosureLines.length, allClosureLines);
+            setOrderLines(allClosureLines);
+          }
+        } catch (err) {
+          console.error('Error fetching closures:', err);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    fetchClosures();
+  }, [isReceiveMode]);
 
   const themeClasses = {
     pageBg: isDarkMode ? 'bg-dark-bg-primary' : 'bg-light-bg-primary',
@@ -49,65 +134,134 @@ const ClosureOrderPage = () => {
     navigate('/dashboard/supply-chain/closures');
   };
 
-  const handleCreateOrder = () => {
-    // Filter to only include selected items
-    const selectedLines = orderLines.filter((line) => line.selected);
-    
-    // Send newly created order back to Closures page via navigation state
-    navigate('/dashboard/supply-chain/closures', {
-      state: {
-        newClosureOrder: {
-          orderNumber,
-          supplierName: supplier.name,
-          lines: selectedLines, // Only save selected items
-        },
-      },
-    });
-  };
+  const handleCreateOrder = async () => {
+    try {
+      const selectedLines = orderLines.filter(l => l.selected);
+      const timestamp = Date.now();
+      
+      // Create separate order for each closure type
+      for (let i = 0; i < selectedLines.length; i++) {
+        const line = selectedLines[i];
+        const orderData = {
+          order_number: `${orderNumber}-${timestamp}-${i + 1}`,
+          closure_name: line.closureName,
+          supplier: supplier.name,
+          order_date: new Date().toISOString().split('T')[0],
+          quantity_ordered: line.qty,
+          cost_per_unit: 0,
+          total_cost: 0,
+          status: 'pending',
+          notes: `${line.qty} units (${line.pallets} pallets)`,
+        };
 
-  const handleReceiveComplete = (isPartial = false) => {
-    // If partial receive, update status and keep in orders
-    // If full receive, archive the order
-    console.log('📤 Navigating with:', { orderId, orderNumber, supplier: supplier?.name, isPartial, isReceiveMode });
-    
-    if (isReceiveMode) {
-      // Always pass orderNumber and supplier, and orderId if available
+        await closuresApi.createOrder(orderData);
+      }
+      
       navigate('/dashboard/supply-chain/closures', {
         state: {
-          receivedOrderId: orderId || null,
-          receivedOrderNumber: orderNumber,
-          receivedSupplier: supplier?.name,
-          isPartial: isPartial,
+          newClosureOrder: {
+            orderNumber,
+            supplierName: supplier.name,
+          },
         },
       });
-    } else {
-      console.log('⚠️ Cannot receive - not in receive mode');
-      navigate('/dashboard/supply-chain/closures');
+    } catch (err) {
+      console.error('Error creating order:', err);
+      alert(`Failed to create order: ${err.message}`);
     }
   };
 
-  const handleQtyChange = (lineId, delta) => {
-    setOrderLines((prev) =>
-      prev.map((line) => {
-        if (line.id === lineId) {
-          const newQty = Math.max(0, line.qty + delta);
-          return { ...line, qty: newQty };
-        }
-        return line;
-      })
-    );
+  const handleAddClosure = (closure) => {
+    const nextId = orderLines.length ? Math.max(...orderLines.map(l => l.id)) + 1 : 1;
+    const defaultQty = closure.unitsPerPallet || 1000;
+    const newLine = {
+      id: nextId,
+      name: closure.name,
+      closureName: closure.name,
+      unitsNeeded: defaultQty,
+      qty: defaultQty,
+      pallets: calculatePallets(defaultQty, closure.unitsPerPallet || 1),
+      unitsPerPallet: closure.unitsPerPallet || 1,
+      unitsPerCase: closure.unitsPerCase,
+      casesPerPallet: closure.casesPerPallet,
+      supplier: closure.supplier,
+      selected: true,
+    };
+    setOrderLines([...orderLines, newLine]);
+    setShowAddClosureModal(false);
   };
 
-  const handlePalletsChange = (lineId, delta) => {
-    setOrderLines((prev) =>
-      prev.map((line) => {
-        if (line.id === lineId) {
-          const newPallets = Math.max(0, line.pallets + delta);
-          return { ...line, pallets: newPallets };
+  const handleRemoveLine = (lineId) => {
+    setOrderLines(prev => prev.filter(l => l.id !== lineId));
+  };
+
+  const handleReceiveComplete = async (isPartial = false) => {
+    try {
+      const selectedLines = orderLines.filter(l => l.selected);
+      
+      if (selectedLines.length === 0) {
+        alert('Please select at least one line to receive');
+        return;
+      }
+      
+      // Validate quantities before processing
+      for (const line of selectedLines) {
+        const alreadyReceived = line.receivedQty || 0;
+        const newReceived = line.qty || 0;
+        const totalReceived = alreadyReceived + newReceived;
+        const originalQty = line.originalQty || 0;
+        
+        if (totalReceived > originalQty) {
+          alert(`Cannot receive ${totalReceived} units for ${line.closureName}. Maximum is ${originalQty} units (${alreadyReceived} already received, ${originalQty - alreadyReceived} remaining).`);
+          return;
         }
-        return line;
-      })
-    );
+        
+        if (newReceived <= 0) {
+          alert(`Please enter a valid quantity greater than 0 for ${line.closureName}`);
+          return;
+        }
+      }
+      
+      // Update each received line
+      for (const line of selectedLines) {
+        const lineOrderId = line.orderId || orderId;
+        
+        // Calculate total received: already received + new received
+        const alreadyReceived = line.receivedQty || 0;
+        const newReceived = line.qty || 0;
+        const totalReceived = alreadyReceived + newReceived;
+        
+        // Determine if this is partial (total received < original ordered)
+        const originalQty = line.originalQty || totalReceived;
+        const isLinePartial = totalReceived < originalQty;
+        
+        // Update order with total received quantity
+        await closuresApi.updateOrder(lineOrderId, {
+          closure_name: line.closureName,
+          status: isLinePartial ? 'partial' : 'received',
+          actual_delivery_date: new Date().toISOString().split('T')[0],
+          quantity_received: totalReceived, // Total received (previous + new)
+        });
+      }
+      
+      // Check if any lines were not selected or quantities reduced (partial receive)
+      const unselectedLines = orderLines.filter(l => !l.selected);
+      const hasUnselected = unselectedLines.length > 0;
+      const hasReducedQty = selectedLines.some(l => {
+        const totalReceived = (l.receivedQty || 0) + (l.qty || 0);
+        return totalReceived < (l.originalQty || 0);
+      });
+      
+      navigate('/dashboard/supply-chain/closures', {
+        state: {
+          receivedOrderId: orderId,
+          isPartial: isPartial || hasUnselected || hasReducedQty,
+        },
+      });
+    } catch (err) {
+      console.error('Error receiving order:', err);
+      alert(`Failed to receive order: ${err.message}`);
+    }
   };
 
   if (!supplier || !orderNumber) {
@@ -138,7 +292,7 @@ const ClosureOrderPage = () => {
             <div className="flex flex-col gap-1 text-xs text-gray-500">
               <div className="flex items-center gap-8">
                 <div>
-                  <div className="uppercase tracking-wide text-[10px] text-gray-400">CAP Order #</div>
+                  <div className="uppercase tracking-wide text-[10px] text-gray-400">Closure Order #</div>
                   <div className="text-sm font-semibold text-gray-900">{orderNumber}</div>
                 </div>
                 <div className="flex flex-col items-start gap-1">
@@ -156,94 +310,53 @@ const ClosureOrderPage = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Search bar */}
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search..."
-                className="w-64 rounded-full border border-gray-300 px-10 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
-              />
-              <svg
-                className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col">
-                <svg
-                  className="w-3 h-3 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 15l7-7 7 7"
-                  />
+          {!isReceiveMode ? (
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg px-4 py-2 shadow-sm"
+              onClick={handleCreateOrder}
+            >
+              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-white/60">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                <svg
-                  className="w-3 h-3 text-gray-400 -mt-0.5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
+              </span>
+              Create Order
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg px-4 py-2 shadow-sm"
+              onClick={() => {
+                const selectedLines = orderLines.filter((line) => line.selected);
+                if (selectedLines.length === 0) {
+                  alert('Please select at least one line to receive');
+                  return;
+                }
+                
+                const allChecked = orderLines.every((line) => line.selected);
+                const allFullQty = selectedLines.every((line) => {
+                  // Check if received qty equals original ordered qty
+                  return line.qty >= (line.originalQty || line.qty);
+                });
+                
+                if (allChecked && allFullQty) {
+                  // Full receive – all lines, full quantities
+                  handleReceiveComplete(false);
+                } else {
+                  // Partial receive – show confirmation popup
+                  setIsReceiveConfirmOpen(true);
+                }
+              }}
+            >
+              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-white/60">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-              </div>
-            </div>
-
-            {!isReceiveMode ? (
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg px-4 py-2 shadow-sm"
-                onClick={handleCreateOrder}
-              >
-                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-white/60">
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </span>
-                Create Order
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg px-4 py-2 shadow-sm"
-                onClick={() => {
-                  const allChecked = orderLines.every((line) => line.selected);
-                  if (allChecked) {
-                    // Full receive – archive the order
-                    handleReceiveComplete(false);
-                  } else {
-                    // Partial receive – show confirmation popup
-                    setIsReceiveConfirmOpen(true);
-                  }
-                }}
-              >
-                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-white/60">
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </span>
-                Receive
-              </button>
-            )}
-          </div>
+              </span>
+              Receive
+            </button>
+          )}
         </div>
 
         {/* Table */}
@@ -253,98 +366,82 @@ const ClosureOrderPage = () => {
             <div className="bg-[#1f2937] text-white text-[11px] font-semibold uppercase tracking-wide">
               <div
                 className="grid items-center"
-                style={{ gridTemplateColumns: '1fr 2fr 2fr 1.5fr 1.2fr 1.2fr 40px' }}
+                style={{ gridTemplateColumns: '2fr 1.2fr 1.2fr 40px 40px' }}
               >
-                <div className="px-4 py-2 border-r border-gray-700 text-center">Type</div>
-                <div className="px-4 py-2 border-r border-gray-700 text-center">Packaging Name</div>
-                <div className="px-4 py-2 border-r border-gray-700 text-center">Supplier Inventory</div>
-                <div className="px-4 py-2 border-r border-gray-700 text-center">Units Needed</div>
+                <div className="px-4 py-2 border-r border-gray-700 text-center">Closure Name</div>
                 <div className="px-4 py-2 border-r border-gray-700 text-center">Qty</div>
                 <div className="px-4 py-2 border-r border-gray-700 text-center">Pallets</div>
-                <div className="px-4 py-2 flex items-center justify-center">
-                  <input type="checkbox" className="form-checkbox h-3 w-3 rounded border-gray-400" />
-                </div>
+                <div className="px-4 py-2 border-r border-gray-700 text-center"></div>
+                <div className="px-4 py-2 text-center"></div>
               </div>
             </div>
 
             {/* Table rows */}
             <div className="bg-white">
-              {orderLines.map((line) => (
+              {loading ? (
+                <div className="px-4 py-6 text-center text-gray-500">Loading closures...</div>
+              ) : orderLines.length === 0 ? (
+                <div className="px-4 py-6 text-center text-gray-500">No closures added yet</div>
+              ) : (
+                orderLines.map((line) => (
                 <div
                   key={line.id}
                   className="grid items-center text-sm border-t border-gray-100"
-                  style={{ gridTemplateColumns: '1fr 2fr 2fr 1.5fr 1.2fr 1.2fr 40px' }}
+                  style={{ gridTemplateColumns: '2fr 1.2fr 1.2fr 40px 40px' }}
                 >
-                  <div className="px-4 py-2 text-sm text-gray-900">{line.type}</div>
                   <div className="px-4 py-2 text-sm text-gray-900">{line.name}</div>
-                  <div className="px-4 py-2 text-xs text-gray-500">{line.supplierInventory}</div>
-                  <div className="px-4 py-2 text-sm text-gray-900">
-                    {line.unitsNeeded.toLocaleString()}
+                  <div className="px-4 py-2">
+                    <input
+                      type="number"
+                      min="0"
+                      max={isReceiveMode && line.originalQty ? (line.originalQty - (line.receivedQty || 0)) : undefined}
+                      className="w-full text-sm px-2 py-1 text-center bg-white shadow-inner border border-gray-200 rounded-none"
+                      value={line.qty}
+                      onChange={(e) => {
+                        const val = Number(e.target.value) || 0;
+                        
+                        // Only validate max quantity when receiving (originalQty exists)
+                        if (isReceiveMode && line.originalQty) {
+                          const maxQty = line.originalQty - (line.receivedQty || 0);
+                          const clampedVal = Math.min(val, maxQty);
+                          
+                          if (val > maxQty) {
+                            alert(`Cannot receive more than ${maxQty} units (${line.originalQty} ordered - ${line.receivedQty || 0} already received)`);
+                          }
+                          
+                          // Use clamped value for receive mode
+                          const finalVal = clampedVal;
+                          const unitsPerPallet = line.unitsPerPallet || 1;
+                          const newPallets = calculatePallets(finalVal, unitsPerPallet);
+                          
+                          setOrderLines((prev) =>
+                            prev.map((l) => {
+                              if (l.id === line.id) {
+                                return { ...l, qty: finalVal, pallets: newPallets };
+                              }
+                              return l;
+                            })
+                          );
+                        } else {
+                          // Create mode: allow any positive quantity, no max limit
+                          const unitsPerPallet = line.unitsPerPallet || 1;
+                          const newPallets = calculatePallets(val, unitsPerPallet);
+                          
+                          setOrderLines((prev) =>
+                            prev.map((l) => {
+                              if (l.id === line.id) {
+                                return { ...l, qty: val, pallets: newPallets };
+                              }
+                              return l;
+                            })
+                          );
+                        }
+                      }}
+                    />
                   </div>
                   <div className="px-4 py-2">
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => handleQtyChange(line.id, -1)}
-                        className="w-6 h-6 flex items-center justify-center border border-gray-300 rounded text-gray-600 hover:bg-gray-100"
-                      >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                        </svg>
-                      </button>
-                      <input
-                        type="number"
-                        className="w-20 text-sm rounded-lg px-2 py-1 text-right bg-white shadow-inner border border-gray-200"
-                        value={line.qty}
-                        onChange={(e) => {
-                          const val = Number(e.target.value) || 0;
-                          setOrderLines((prev) =>
-                            prev.map((l) => (l.id === line.id ? { ...l, qty: val } : l))
-                          );
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleQtyChange(line.id, 1)}
-                        className="w-6 h-6 flex items-center justify-center border border-gray-300 rounded text-gray-600 hover:bg-gray-100"
-                      >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                  <div className="px-4 py-2">
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => handlePalletsChange(line.id, -1)}
-                        className="w-6 h-6 flex items-center justify-center border border-gray-300 rounded text-gray-600 hover:bg-gray-100"
-                      >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                        </svg>
-                      </button>
-                      <input
-                        type="number"
-                        className="w-20 text-sm rounded-lg px-2 py-1 text-right bg-white shadow-inner border border-gray-200"
-                        value={line.pallets}
-                        onChange={(e) => {
-                          const val = Number(e.target.value) || 0;
-                          setOrderLines((prev) =>
-                            prev.map((l) => (l.id === line.id ? { ...l, pallets: val } : l))
-                          );
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handlePalletsChange(line.id, 1)}
-                        className="w-6 h-6 flex items-center justify-center border border-gray-300 rounded text-gray-600 hover:bg-gray-100"
-                      >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                      </button>
+                    <div className="text-sm px-2 py-1 text-right text-gray-700 font-medium" title={`Auto-calculated: ${line.qty} ÷ ${line.unitsPerPallet || 'N/A'} units/pallet = ${line.pallets} pallet${line.pallets !== 1 ? 's' : ''}`}>
+                      {line.pallets}
                     </div>
                   </div>
                   <div className="px-4 py-2 flex items-center justify-center">
@@ -361,12 +458,81 @@ const ClosureOrderPage = () => {
                       }
                     />
                   </div>
+                  <div className="px-4 py-2 flex items-center justify-center">
+                    <button
+                      type="button"
+                      className="text-red-500 hover:text-red-700 text-xs"
+                      onClick={() => handleRemoveLine(line.id)}
+                      title="Remove line"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </div>
-              ))}
+              )))}
             </div>
+            
+            {/* Add closure button */}
+            {!isReceiveMode && (
+              <div className="bg-gray-50 border-t border-gray-200 px-4 py-3">
+                <button
+                  type="button"
+                  className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+                  onClick={() => setShowAddClosureModal(true)}
+                >
+                  <span className="text-lg">+</span> Add Closure
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Add Closure Modal */}
+      {showAddClosureModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Add Closure to Order</h2>
+            </div>
+            <div className="px-6 py-4 max-h-[60vh] overflow-y-auto">
+              <div className="grid grid-cols-1 gap-2">
+                {availableClosures.map((closure) => {
+                  const alreadyAdded = orderLines.some(l => l.name === closure.name);
+                  return (
+                    <button
+                      key={closure.id}
+                      type="button"
+                      className={`text-left px-4 py-3 rounded-lg border transition-colors ${
+                        alreadyAdded 
+                          ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+                          : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50'
+                      }`}
+                      onClick={() => !alreadyAdded && handleAddClosure(closure)}
+                      disabled={alreadyAdded}
+                    >
+                      <div className="font-semibold text-sm">{closure.name}</div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {closure.unitsPerPallet} units/pallet • {closure.supplier}
+                        {alreadyAdded && ' • Already added'}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+              <button
+                type="button"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100"
+                onClick={() => setShowAddClosureModal(false)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isReceiveMode && isReceiveConfirmOpen && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
@@ -403,4 +569,3 @@ const ClosureOrderPage = () => {
 };
 
 export default ClosureOrderPage;
-

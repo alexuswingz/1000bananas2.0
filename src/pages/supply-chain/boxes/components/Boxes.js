@@ -55,40 +55,16 @@ const Boxes = () => {
       return;
     }
 
-    // Get boxes data from localStorage
-    try {
-      const stored = window.localStorage.getItem('boxInventory');
-      const boxes = stored ? JSON.parse(stored) : [];
-      
-      // Pre-populate line items for the order details page (WITH PALLETS)
-      const defaultLines = boxes.map((box) => ({
-        id: box.id,
-        name: box.boxSize,
-        supplierInventory: 'Auto',
-        unitsNeeded: box.boxesNeeded,
-        qty: box.boxesNeeded,
-        pallets: 4, // Default pallets value
-        selected: false,
-      }));
+    setIsNewOrderOpen(false);
 
-      setIsNewOrderOpen(false);
-
-      // Navigate to order page with new order data
-      navigate('/dashboard/supply-chain/boxes/order', {
-        state: {
-          orderNumber: orderNumber.trim(),
-          supplier: selectedSupplier,
-          lines: defaultLines,
-          mode: 'create',
-          newBoxOrder: {
-            orderNumber: orderNumber.trim(),
-            supplierName: selectedSupplier.name,
-          },
-        },
-      });
-    } catch (err) {
-      console.error('Failed to load boxes from localStorage', err);
-    }
+    // Navigate to order page - BoxOrderPage will fetch boxes from API
+    navigate('/dashboard/supply-chain/boxes/order', {
+      state: {
+        orderNumber: orderNumber.trim(),
+        supplier: selectedSupplier,
+        mode: 'create',
+      },
+    });
   };
 
   const handleViewOrder = (order) => {

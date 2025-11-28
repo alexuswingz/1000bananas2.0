@@ -1,120 +1,143 @@
 import React, { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
+import { closuresApi } from '../../../../services/supplyChainApi';
 
-const ArchivedOrdersTable = forwardRef(({ themeClasses, onViewOrder }, ref) => {
+const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
   const { isDarkMode } = useTheme();
-  const navigate = useNavigate();
+  const [archivedOrders, setArchivedOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Archived orders data - moved from Closures.js
-  const [archivedOrders, setArchivedOrders] = useState(() => {
-    try {
-      const stored = window.localStorage.getItem('closureArchivedOrders');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          // Filter out the two sample orders: "514413413" and "43145"
-          const cleaned = parsed.filter((order) => 
-            order.orderNumber !== '514413413' && order.orderNumber !== '43145'
-          );
-          // Update localStorage with cleaned data if any were removed
-          if (cleaned.length !== parsed.length) {
-            window.localStorage.setItem('closureArchivedOrders', JSON.stringify(cleaned));
-          }
-          return cleaned;
-        }
-      }
-      return [];
-    } catch {
-      return [];
-    }
-  });
-
-  // Persist archived orders to localStorage
+  // Fetch archived orders from API
   useEffect(() => {
-    try {
-      window.localStorage.setItem('closureArchivedOrders', JSON.stringify(archivedOrders));
-    } catch (err) {
-      console.error('Failed to save archived orders to localStorage', err);
-    }
-  }, [archivedOrders]);
-
-  // Reload archived orders from localStorage when component mounts or when storage changes
-  useEffect(() => {
-    const handleStorageChange = () => {
+    const fetchArchivedOrders = async () => {
       try {
-        const stored = window.localStorage.getItem('closureArchivedOrders');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed)) {
-            const cleaned = parsed.filter((order) => 
-              order.orderNumber !== '514413413' && order.orderNumber !== '43145'
-            );
-            setArchivedOrders(cleaned);
-            console.log('🔄 Reloaded archived orders from localStorage:', cleaned.length);
-          }
+        setLoading(true);
+        const response = await closuresApi.getOrders();
+        if (response.success) {
+          const allOrders = response.data.map(order => ({
+            id: order.id,
+            orderNumber: order.order_number,
+            supplier: order.supplier,
+            closureName: order.closure_name,
+            status: order.status || 'pending',
+            orderDate: order.order_date,
+            quantityOrdered: order.quantity_ordered,
+            quantityReceived: order.quantity_received || 0,
+          }));
+          
+          // Group by base order number first
+          const grouped = {};
+          allOrders.forEach(order => {
+            const baseOrderNumber = order.orderNumber.split('-')[0];
+            if (!grouped[baseOrderNumber]) {
+              grouped[baseOrderNumber] = {
+                id: order.id,
+                orderNumber: baseOrderNumber,
+                supplier: order.supplier,
+                status: order.status,
+                orderDate: order.orderDate,
+                orderCount: 0,
+                lineItems: [],
+              };
+            }
+            grouped[baseOrderNumber].orderCount++;
+            grouped[baseOrderNumber].lineItems.push(order);
+          });
+          
+          // Filter: Only show groups where ALL line items are fully received or archived (no partial)
+          const fullyArchived = Object.values(grouped)
+            .filter(group => {
+              // Check if ALL line items in the group are 'received' or 'archived' (no 'partial' or 'pending')
+              return group.lineItems.every(item => 
+                item.status === 'received' || item.status === 'archived'
+              );
+            })
+            .map(group => {
+              // Set status: 'received' if all items are received, otherwise 'archived'
+              const allReceived = group.lineItems.every(item => item.status === 'received');
+              return {
+                ...group,
+                status: allReceived ? 'received' : 'archived'
+              };
+            });
+          
+          setArchivedOrders(fullyArchived);
         }
       } catch (err) {
-        console.error('Failed to reload archived orders', err);
+        console.error('Error fetching archived orders:', err);
+      } finally {
+        setLoading(false);
       }
     };
-
-    // Check on mount
-    handleStorageChange();
-
-    // Listen for storage events (when localStorage changes from other tabs/windows)
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Also check periodically in case changes happen in same tab
-    const interval = setInterval(handleStorageChange, 1000);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
+    fetchArchivedOrders();
   }, []);
 
-  // Expose function to add archived order (called from Closures.js and OrdersTable)
+  // Expose function to add archived order (called from OrdersTable)
   useImperativeHandle(ref, () => ({
     addArchivedOrder: (order) => {
-      console.log('📦 Adding archived order:', order);
-      setArchivedOrders((prev) => {
-        // Avoid duplicates - check by ID (handle both number and string comparisons)
-        const isDuplicate = prev.some((o) => 
-          Number(o.id) === Number(order.id) || 
-          o.orderNumber === order.orderNumber && o.supplier === order.supplier
-        );
-        
-        if (isDuplicate) {
-          console.log('⚠️ Order already exists in archive, skipping');
-          return prev;
-        }
-        
-        const updated = [...prev, { ...order, status: order.status || 'Received' }];
-        console.log('✅ Added to archive, total orders:', updated.length);
-        
+      // Refresh from API instead of localStorage
+      const fetchArchivedOrders = async () => {
         try {
-          window.localStorage.setItem('closureArchivedOrders', JSON.stringify(updated));
-          console.log('💾 Saved archived orders to localStorage');
+          const response = await closuresApi.getOrders();
+          if (response.success) {
+            const allOrders = response.data.map(order => ({
+              id: order.id,
+              orderNumber: order.order_number,
+              supplier: order.supplier,
+              closureName: order.closure_name,
+              status: order.status || 'pending',
+              orderDate: order.order_date,
+              quantityOrdered: order.quantity_ordered,
+              quantityReceived: order.quantity_received || 0,
+            }));
+            
+            // Group by base order number first
+            const grouped = {};
+            allOrders.forEach(order => {
+              const baseOrderNumber = order.orderNumber.split('-')[0];
+              if (!grouped[baseOrderNumber]) {
+                grouped[baseOrderNumber] = {
+                  id: order.id,
+                  orderNumber: baseOrderNumber,
+                  supplier: order.supplier,
+                  status: order.status,
+                  orderDate: order.orderDate,
+                  orderCount: 0,
+                  lineItems: [],
+                };
+              }
+              grouped[baseOrderNumber].orderCount++;
+              grouped[baseOrderNumber].lineItems.push(order);
+            });
+            
+            // Filter: Only show groups where ALL line items are fully received or archived (no partial)
+            const fullyArchived = Object.values(grouped)
+              .filter(group => {
+                return group.lineItems.every(item => 
+                  item.status === 'received' || item.status === 'archived'
+                );
+              })
+              .map(group => {
+                // Set status: 'received' if all items are received, otherwise 'archived'
+                const allReceived = group.lineItems.every(item => item.status === 'received');
+                return {
+                  ...group,
+                  status: allReceived ? 'received' : 'archived'
+                };
+              });
+            
+            setArchivedOrders(fullyArchived);
+          }
         } catch (err) {
-          console.error('❌ Failed to save archived orders to localStorage', err);
+          console.error('Error refreshing archived orders:', err);
         }
-        return updated;
-      });
+      };
+      fetchArchivedOrders();
     },
   }));
 
-  const computedThemeClasses = themeClasses ? themeClasses : {
-    cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
-    headerBg: isDarkMode ? 'bg-[#2C3544]' : 'bg-[#2C3544]',
-    border: isDarkMode ? 'border-dark-border-primary' : 'border-gray-200',
-    rowHover: isDarkMode ? 'hover:bg-dark-bg-tertiary' : 'hover:bg-gray-50',
-    textPrimary: isDarkMode ? 'text-dark-text-primary' : 'text-gray-900',
-    textSecondary: isDarkMode ? 'text-dark-text-secondary' : 'text-gray-500',
-  };
-
   const renderStatusPill = (status) => {
-    if (status === 'Received') {
+    if (status === 'received') {
       return (
         <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-600">
           <svg className="w-3.5 h-3.5" fill="#10B981" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -123,17 +146,24 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses, onViewOrder }, ref) => {
           Received
         </span>
       );
+    } else if (status === 'partial') {
+      return (
+        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-600">
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="10" stroke="#F97316" strokeWidth="2" fill="none"/>
+            <path d="M12 2 A 10 10 0 0 1 12 22" fill="#F97316"/>
+          </svg>
+          Partially Received
+        </span>
+      );
     } else {
-      // Draft status
+      // Archived status
       return (
         <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">
-          <svg className="w-3.5 h-3.5" fill="#3B82F6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" fill="#3B82F6"/>
-            <path d="M14 2v6h6" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-            <line x1="9" y1="13" x2="15" y2="13" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-            <line x1="9" y1="17" x2="15" y2="17" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+          <svg className="w-3.5 h-3.5" fill="#6B7280" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 4h16v4H4zM6 8v10a2 2 0 002 2h8a2 2 0 002-2V8" fill="#6B7280"/>
           </svg>
-          Draft
+          Archived
         </span>
       );
     }
@@ -141,11 +171,11 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses, onViewOrder }, ref) => {
 
   return (
     <div
-      className={`${computedThemeClasses.cardBg} rounded-xl border ${computedThemeClasses.border} shadow-md`}
+      className={`${themeClasses.cardBg} rounded-xl border ${themeClasses.border} shadow-md`}
       style={{ overflow: 'hidden' }}
     >
       {/* Table header row */}
-      <div className={computedThemeClasses.headerBg}>
+      <div className={themeClasses.headerBg}>
         <div
           className="grid"
           style={{
@@ -156,7 +186,7 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses, onViewOrder }, ref) => {
             Status
           </div>
           <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center">
-            CAP Order #
+            Closure Order #
           </div>
           <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider text-center">
             Supplier
@@ -166,15 +196,19 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses, onViewOrder }, ref) => {
 
       {/* Table body */}
       <div>
-        {archivedOrders.length === 0 ? (
+        {loading ? (
+          <div className="px-6 py-6 text-center text-sm text-gray-400">
+            Loading archived orders...
+          </div>
+        ) : archivedOrders.length === 0 ? (
           <div className="px-6 py-6 text-center text-sm italic text-gray-400">
             No archived orders yet.
           </div>
         ) : (
           archivedOrders.map((order, index) => (
             <div
-              key={order.id}
-              className={`grid text-sm ${computedThemeClasses.rowHover} transition-colors`}
+              key={order.orderNumber}
+              className={`grid text-sm ${themeClasses.rowHover} transition-colors`}
               style={{
                 gridTemplateColumns: '140px 2fr 2fr',
                 borderBottom:
@@ -186,46 +220,27 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses, onViewOrder }, ref) => {
               }}
             >
               <div className="px-6 py-3 flex items-center justify-center">
-                {renderStatusPill(order.status || 'Draft')}
+                {renderStatusPill(order.status || 'archived')}
               </div>
               <div className="px-6 py-3 flex items-center">
-                <span className="text-xs font-medium text-blue-600">{order.orderNumber}</span>
+                <div className="flex flex-col">
+                  <span className="text-xs font-medium text-blue-600">{order.orderNumber}</span>
+                  {order.orderCount > 1 && (
+                    <span className="text-[10px] text-gray-400">
+                      {order.orderCount} closure types
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="px-6 py-3 flex items-center justify-between">
-                <span className={computedThemeClasses.textPrimary}>{order.supplier}</span>
-                {order.status === 'Received' ? (
-                  <button
-                    type="button"
-                    className="px-3 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
-                    onClick={() => {
-                      if (onViewOrder) {
-                        // Pass a flag to indicate this is from archive
-                        onViewOrder({ ...order, fromArchive: true });
-                      } else {
-                        // Fallback navigation
-                        navigate('/dashboard/supply-chain/closures/order', {
-                          state: {
-                            orderNumber: order.orderNumber,
-                            supplier: { name: order.supplier },
-                            mode: 'view',
-                            orderId: order.id,
-                            lines: order.lines || [],
-                          },
-                        });
-                      }
-                    }}
-                  >
-                    View
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors ml-2"
-                    aria-label="Archived order actions"
-                  >
-                    <span className={computedThemeClasses.textSecondary}>⋮</span>
-                  </button>
-                )}
+                <span className={themeClasses.textPrimary}>{order.supplier}</span>
+                <button
+                  type="button"
+                  className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors ml-2"
+                  aria-label="Archived order actions"
+                >
+                  <span className={themeClasses.textSecondary}>⋮</span>
+                </button>
               </div>
             </div>
           ))
@@ -238,4 +253,3 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses, onViewOrder }, ref) => {
 ArchivedOrdersTable.displayName = 'ArchivedOrdersTable';
 
 export default ArchivedOrdersTable;
-

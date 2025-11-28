@@ -1,31 +1,81 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 import { useLocation } from 'react-router-dom';
+import { bottlesApi } from '../../../../services/supplyChainApi';
 
 const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrder, onNewOrderCreated, archivedOrdersRef }) => {
   const { isDarkMode } = useTheme();
   const location = useLocation();
 
-  // Orders data - moved from Bottles.js
-  const [orders, setOrders] = useState(() => {
-    try {
-      const stored = window.localStorage.getItem('bottleOrders');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          return parsed;
-        }
-      }
-    } catch {}
-    return [];
-  });
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Persist orders to localStorage
+  // Fetch orders from API
   useEffect(() => {
-    try {
-      window.localStorage.setItem('bottleOrders', JSON.stringify(orders));
-    } catch {}
-  }, [orders]);
+    const fetchOrders = async () => {
+      try {
+        setLoading(true);
+        const response = await bottlesApi.getOrders();
+        if (response.success) {
+          const allOrders = response.data.map(order => ({
+            id: order.id,
+            orderNumber: order.order_number,
+            supplier: order.supplier,
+            bottleName: order.bottle_name,
+            status: order.status || 'pending',
+            orderDate: order.order_date,
+            quantityOrdered: order.quantity_ordered,
+            quantityReceived: order.quantity_received || 0,
+          }));
+          
+          // Group orders by base order number (before timestamp)
+          const grouped = {};
+          allOrders.forEach(order => {
+            const baseOrderNumber = order.orderNumber.split('-')[0];
+            if (!grouped[baseOrderNumber]) {
+              grouped[baseOrderNumber] = {
+                id: order.id, // Use first order ID
+                orderNumber: baseOrderNumber,
+                supplier: order.supplier,
+                status: order.status,
+                orderDate: order.orderDate,
+                orderCount: 0,
+                lineItems: [],
+              };
+            }
+            grouped[baseOrderNumber].orderCount++;
+            grouped[baseOrderNumber].lineItems.push(order);
+          });
+          
+          // Filter: Only show groups that have at least one 'pending' or 'partial' line item
+          // Exclude groups where ALL items are 'received' or 'archived'
+          const activeGroupedOrders = Object.values(grouped)
+            .filter(group => {
+              // Include if at least one line item is pending or partial
+              return group.lineItems.some(item => 
+                item.status === 'pending' || item.status === 'partial'
+              );
+            })
+            .map(group => {
+              // Determine group status: if any partial, show partial; otherwise pending
+              const hasPartial = group.lineItems.some(item => item.status === 'partial');
+              return {
+                ...group,
+                status: hasPartial ? 'partial' : 'pending'
+              };
+            });
+          
+          console.log('Grouped orders:', activeGroupedOrders);
+          setOrders(activeGroupedOrders);
+        }
+      } catch (err) {
+        console.error('Error fetching orders:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchOrders();
+  }, []);
 
   // Filter orders based on search query
   const filteredOrders = useMemo(() => {
@@ -42,76 +92,109 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
   useEffect(() => {
     const newOrderState = location.state && location.state.newBottleOrder;
     if (newOrderState) {
-      const { orderNumber: newOrderNumber, supplierName } = newOrderState;
-      setOrders((prev) => {
-        // Check for duplicates in the current state
-        const existing = prev.find(
-          (o) => o.orderNumber === newOrderNumber && o.supplier === supplierName
-        );
-        if (!existing) {
-          const newOrder = {
-            id: Date.now(),
-            orderNumber: newOrderNumber,
-            supplier: supplierName,
-            status: 'Submitted',
-          };
-          if (onNewOrderCreated) {
-            onNewOrderCreated();
+      // Refresh orders from API
+      const fetchOrders = async () => {
+        try {
+          const response = await bottlesApi.getOrders();
+          if (response.success) {
+            const allOrders = response.data.map(order => ({
+              id: order.id,
+              orderNumber: order.order_number,
+              supplier: order.supplier,
+              bottleName: order.bottle_name,
+              status: order.status || 'pending',
+              orderDate: order.order_date,
+              quantityOrdered: order.quantity_ordered,
+              quantityReceived: order.quantity_received || 0,
+            }));
+            
+            // Group orders by base order number
+            const grouped = {};
+            allOrders.forEach(order => {
+              const baseOrderNumber = order.orderNumber.split('-')[0];
+              if (!grouped[baseOrderNumber]) {
+                grouped[baseOrderNumber] = {
+                  id: order.id,
+                  orderNumber: baseOrderNumber,
+                  supplier: order.supplier,
+                  status: order.status,
+                  orderDate: order.orderDate,
+                  orderCount: 0,
+                  lineItems: [],
+                };
+              }
+              grouped[baseOrderNumber].orderCount++;
+              grouped[baseOrderNumber].lineItems.push(order);
+            });
+            
+            // Filter: Only show groups that have at least one 'pending' or 'partial' line item
+            const activeGroupedOrders = Object.values(grouped)
+              .filter(group => {
+                return group.lineItems.some(item => 
+                  item.status === 'pending' || item.status === 'partial'
+                );
+              })
+              .map(group => {
+                const hasPartial = group.lineItems.some(item => item.status === 'partial');
+                return {
+                  ...group,
+                  status: hasPartial ? 'partial' : 'pending'
+                };
+              });
+            
+            setOrders(activeGroupedOrders);
+            if (onNewOrderCreated) {
+              onNewOrderCreated();
+            }
           }
-          return [...prev, newOrder];
+        } catch (err) {
+          console.error('Error refreshing orders:', err);
         }
-        return prev;
-      });
-      // Clear the navigation state to prevent re-processing
+      };
+      fetchOrders();
+      
+      // Clear the navigation state
       if (window.history && window.history.replaceState) {
         window.history.replaceState({ ...location.state, newBottleOrder: null }, '');
       }
     }
   }, [location.state, onNewOrderCreated]);
 
-  const handleArchiveOrder = (order) => {
-    // Remove from active orders FIRST to ensure it disappears immediately from the UI
-    setOrders((prev) => {
-      // Double-check: filter out the order by ID
-      const remaining = prev.filter((o) => {
-        const shouldKeep = o.id !== order.id;
-        return shouldKeep;
-      });
+  const handleArchiveOrder = async (order, shouldReceive = false) => {
+    try {
+      // Update all line items for this order
+      const lineItems = order.lineItems || [];
       
-      // Save to localStorage immediately to persist the change
-      try {
-        window.localStorage.setItem('bottleOrders', JSON.stringify(remaining));
-      } catch (err) {
-        console.error('Failed to save to localStorage', err);
-      }
-      
-      return remaining;
-    });
-    
-    // Add to archived orders
-    if (archivedOrdersRef && archivedOrdersRef.current) {
-      // Preserve the order status when archiving
-      archivedOrdersRef.current.addArchivedOrder({
-        ...order,
-        status: order.status || 'Draft'
-      });
-    } else {
-      // Fallback: save directly to localStorage if ref not available
-      try {
-        const stored = window.localStorage.getItem('bottleArchivedOrders');
-        const existing = stored ? JSON.parse(stored) : [];
-        if (!existing.some((o) => o.id === order.id)) {
-          const updated = [...existing, { ...order, status: order.status || 'Draft' }];
-          window.localStorage.setItem('bottleArchivedOrders', JSON.stringify(updated));
+      for (const line of lineItems) {
+        if (shouldReceive) {
+          await bottlesApi.updateOrder(line.id, {
+            status: 'received',
+          });
+        } else {
+          await bottlesApi.updateOrder(line.id, {
+            status: 'archived',
+          });
         }
-      } catch (err) {
-        console.error('Failed to save to localStorage', err);
       }
-    }
-    
-    // Call parent callback to switch to archive tab
-    if (onArchiveOrder) {
-      onArchiveOrder(order);
+      
+      // Remove from UI
+      setOrders((prev) => prev.filter((o) => o.orderNumber !== order.orderNumber));
+      
+      // Add to archived orders with final status
+      if (archivedOrdersRef && archivedOrdersRef.current) {
+        archivedOrdersRef.current.addArchivedOrder({
+          ...order,
+          status: shouldReceive ? 'received' : 'archived'
+        });
+      }
+      
+      // Call parent callback
+      if (onArchiveOrder) {
+        onArchiveOrder(order);
+      }
+    } catch (err) {
+      console.error('Error archiving order:', err);
+      alert('Failed to archive order');
     }
   };
 
@@ -121,41 +204,90 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
     const isPartial = location.state && location.state.isPartial;
     
     if (receivedOrderId) {
-      setOrders((prev) => {
-        const order = prev.find((o) => o.id === receivedOrderId);
-        if (order) {
-          if (isPartial) {
-            // Partial receive - update status and keep in orders
-            const updated = prev.map((o) =>
-              o.id === receivedOrderId
-                ? { ...o, status: 'Partially Received' }
-                : o
-            );
-            try {
-              window.localStorage.setItem('bottleOrders', JSON.stringify(updated));
-            } catch {}
-            return updated;
-          } else {
-            // Full receive - set status to "Received" and archive the order
-            const orderWithReceivedStatus = { ...order, status: 'Received' };
-            // Remove from active orders
-            const remaining = prev.filter((o) => o.id !== receivedOrderId);
-            try {
-              window.localStorage.setItem('bottleOrders', JSON.stringify(remaining));
-            } catch {}
-            // Archive the order with "Received" status
-            if (archivedOrdersRef && archivedOrdersRef.current) {
-              archivedOrdersRef.current.addArchivedOrder(orderWithReceivedStatus);
+      // Refresh orders and archive received ones
+      const handleReceivedOrders = async () => {
+        try {
+          const response = await bottlesApi.getOrders();
+          if (response.success) {
+            const allOrders = response.data.map(order => ({
+              id: order.id,
+              orderNumber: order.order_number,
+              supplier: order.supplier,
+              bottleName: order.bottle_name,
+              status: order.status || 'pending',
+              orderDate: order.order_date,
+              quantityOrdered: order.quantity_ordered,
+              quantityReceived: order.quantity_received || 0,
+            }));
+            
+            // Only archive and switch tab if order is FULLY received (not partial)
+            if (!isPartial) {
+              // Find the order that was received
+              const receivedOrder = allOrders.find(o => o.id === receivedOrderId);
+              
+              if (receivedOrder && receivedOrder.status === 'received') {
+                // Find all line items for this order group
+                const baseOrderNumber = receivedOrder.orderNumber.split('-')[0];
+                const orderGroup = allOrders.filter(o => o.orderNumber.split('-')[0] === baseOrderNumber);
+                
+                // Archive all line items
+                for (const order of orderGroup) {
+                  if (archivedOrdersRef && archivedOrdersRef.current) {
+                    archivedOrdersRef.current.addArchivedOrder(order);
+                  }
+                }
+                
+                // Switch to archive tab only if fully received
+                if (onArchiveOrder) {
+                  onArchiveOrder();
+                }
+              }
             }
-            if (onArchiveOrder) {
-              onArchiveOrder(orderWithReceivedStatus);
-            }
-            return remaining;
+            // If isPartial is true, stay on orders tab (don't switch)
+            
+            // Group all orders first
+            const grouped = {};
+            allOrders.forEach(order => {
+              const baseOrderNumber = order.orderNumber.split('-')[0];
+              if (!grouped[baseOrderNumber]) {
+                grouped[baseOrderNumber] = {
+                  id: order.id,
+                  orderNumber: baseOrderNumber,
+                  supplier: order.supplier,
+                  status: order.status,
+                  orderDate: order.orderDate,
+                  orderCount: 0,
+                  lineItems: [],
+                };
+              }
+              grouped[baseOrderNumber].orderCount++;
+              grouped[baseOrderNumber].lineItems.push(order);
+            });
+            
+            // Filter: Only show groups that have at least one 'pending' or 'partial' line item
+            const activeGroupedOrders = Object.values(grouped)
+              .filter(group => {
+                return group.lineItems.some(item => 
+                  item.status === 'pending' || item.status === 'partial'
+                );
+              })
+              .map(group => {
+                const hasPartial = group.lineItems.some(item => item.status === 'partial');
+                return {
+                  ...group,
+                  status: hasPartial ? 'partial' : 'pending'
+                };
+              });
+            
+            setOrders(activeGroupedOrders);
           }
+        } catch (err) {
+          console.error('Error handling received orders:', err);
         }
-        return prev;
-      });
-      // Clear the navigation state to prevent re-processing
+      };
+      handleReceivedOrders();
+      
+      // Clear the navigation state
       if (window.history && window.history.replaceState) {
         window.history.replaceState({ ...location.state, receivedOrderId: null, isPartial: null }, '');
       }
@@ -163,19 +295,9 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
   }, [location.state, archivedOrdersRef, onArchiveOrder]);
 
   const [orderActionMenuId, setOrderActionMenuId] = useState(null);
-  const [editingStatusId, setEditingStatusId] = useState(null);
   const menuRefs = useRef({});
   const buttonRefs = useRef({});
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
-
-  const statusOptions = ['Draft', 'Submitted', 'Received', 'Partially Received'];
-
-  const statusStyles = {
-    Draft: { bg: 'bg-blue-100', text: 'text-blue-700' },
-    Submitted: { bg: 'bg-purple-100', text: 'text-purple-700' },
-    Received: { bg: 'bg-green-50', text: 'text-green-600' },
-    'Partially Received': { bg: 'bg-orange-100', text: 'text-orange-700' },
-  };
 
   // Calculate dropdown position and handle click outside
   useEffect(() => {
@@ -208,98 +330,38 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
     };
   }, [orderActionMenuId]);
 
-  const renderStatusIcon = (status) => {
-    switch (status) {
-      case 'Draft':
-        return (
+
+  const renderStatusPill = (order) => {
+    // Map backend status to display status
+    const backendStatus = order.status || 'pending';
+    let displayStatus = 'Pending';
+    let style = { bg: 'bg-blue-100', text: 'text-blue-700' };
+    
+    if (backendStatus === 'partial') {
+      displayStatus = 'Partially Received';
+      style = { bg: 'bg-orange-100', text: 'text-orange-700' };
+    } else {
+      displayStatus = 'Pending';
+      style = { bg: 'bg-blue-100', text: 'text-blue-700' };
+    }
+
+    return (
+      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${style.bg} ${style.text}`}>
+        {displayStatus === 'Partially Received' ? (
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="10" stroke="#F97316" strokeWidth="1.5" fill="none"/>
+            <path d="M 2 12 A 10 10 0 0 1 22 12 L 12 12 Z" fill="#F97316"/>
+          </svg>
+        ) : (
           <svg className="w-3.5 h-3.5" fill="#3B82F6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" fill="#3B82F6"/>
             <path d="M14 2v6h6" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
             <line x1="9" y1="13" x2="15" y2="13" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
             <line x1="9" y1="17" x2="15" y2="17" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
           </svg>
-        );
-      case 'Submitted':
-        return (
-          <svg className="w-3.5 h-3.5" fill="#9333EA" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <rect x="6" y="6" width="12" height="12" rx="2" fill="#9333EA"/>
-            <path d="M12 16l-3-3m0 0l3-3m-3 3h6" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        );
-      case 'Received':
-        return (
-          <svg className="w-3.5 h-3.5" fill="#10B981" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="#10B981"/>
-          </svg>
-        );
-      case 'Partially Received':
-        return (
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="12" cy="12" r="10" stroke="#F97316" strokeWidth="1.5" fill="none"/>
-            <path d="M 2 12 A 10 10 0 0 1 22 12 L 12 12 Z" fill="#F97316"/>
-          </svg>
-        );
-      default:
-        return null;
-    }
-  };
-
-  const renderStatusPill = (order) => {
-    const status = order.status || 'Draft';
-    const style = statusStyles[status] || {
-      bg: 'bg-gray-100',
-      text: 'text-gray-700',
-    };
-    const isEditing = editingStatusId === order.id;
-
-    const handleStatusChange = (orderId, newStatus) => {
-      setOrders((prev) => {
-        const updated = prev.map((o) =>
-          o.id === orderId ? { ...o, status: newStatus } : o
-        );
-        try {
-          window.localStorage.setItem('bottleOrders', JSON.stringify(updated));
-        } catch {}
-        return updated;
-      });
-    };
-
-    if (isEditing) {
-      return (
-        <div className="relative">
-          <select
-            autoFocus
-            value={status}
-            onChange={(e) => {
-              handleStatusChange(order.id, e.target.value);
-              setEditingStatusId(null);
-            }}
-            onBlur={() => setEditingStatusId(null)}
-            className={`${style.bg} ${style.text} border-2 border-blue-500 rounded-full text-xs font-semibold px-3 py-1 pr-8 appearance-none cursor-pointer`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {statusOptions.map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))}
-          </select>
-        </div>
-      );
-    }
-
-    return (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setEditingStatusId(order.id);
-        }}
-        className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${style.bg} ${style.text} hover:opacity-80 transition-opacity cursor-pointer`}
-      >
-        {renderStatusIcon(status)}
-        {status}
-      </button>
+        )}
+        {displayStatus}
+      </span>
     );
   };
 
@@ -382,150 +444,73 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
 
       {/* Table body */}
       <div>
-        {filteredOrders.map((order, index) => (
-          <div
-            key={order.id}
-            className="grid text-sm"
-            style={{
-              gridTemplateColumns: '222px 222px 222px 120px 120px 120px 1fr',
-              gap: 0,
-              backgroundColor: '#FFFFFF',
-              borderBottom:
-                index === filteredOrders.length - 1
-                  ? 'none'
-                  : '1px solid #e5e7eb',
-            }}
-          >
-            <div className="flex items-center" style={{ 
-              textAlign: 'left', 
-              width: '222px',
-              height: '40px',
-              paddingTop: '12px',
-              paddingRight: '16px',
-              paddingBottom: '12px',
-              paddingLeft: '16px',
-              gap: '10px',
-            }}>
-              {renderStatusPill(order)}
-            </div>
-            <div className="flex items-center gap-2" style={{ 
-              textAlign: 'left', 
-              width: '222px',
-              height: '40px',
-              paddingTop: '12px',
-              paddingRight: '16px',
-              paddingBottom: '12px',
-              paddingLeft: '16px',
-              gap: '10px',
-            }}>
-              <button
-                type="button"
-                className="text-xs font-medium text-blue-600 hover:text-blue-700 underline-offset-2 hover:underline"
-                onClick={() => onViewOrder(order)}
-                style={{ textAlign: 'left' }}
-              >
-                {order.orderNumber}
-              </button>
-              {order.status === 'Partially Received' && (
-                <button
-                  type="button"
-                  onClick={() => handleArchiveOrder(order)}
-                  className="px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded-full hover:bg-blue-700"
-                >
-                  Archive
-                </button>
-              )}
-            </div>
-            <div className="flex items-center" style={{ 
-              textAlign: 'left', 
-              width: '222px',
-              height: '40px',
-              paddingTop: '12px',
-              paddingRight: '16px',
-              paddingBottom: '12px',
-              paddingLeft: '16px',
-              gap: '10px',
-            }}>
-              <span style={{ textAlign: 'left', fontSize: '14px', color: '#374151' }}>{order.supplier}</span>
-            </div>
-            {/* ADD PRODUCTS status */}
-            <div className="flex items-center justify-center" style={{ padding: '12px 8px', height: '40px' }}>
-              {(() => {
-                const isCompleted = order.status === 'Submitted' || order.status === 'Received' || order.status === 'Partially Received' || order.status === 'Draft';
-                return isCompleted ? (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="12" cy="12" r="8" fill="#22C55E"/>
-                  </svg>
-                ) : (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="1.5" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="12" cy="12" r="8"/>
-                  </svg>
-                );
-              })()}
-            </div>
-            {/* SUBMIT PO status */}
-            <div className="flex items-center justify-center" style={{ padding: '12px 8px', height: '40px' }}>
-              {(() => {
-                const isCompleted = order.status === 'Submitted' || order.status === 'Received' || order.status === 'Partially Received' || order.status === 'Draft';
-                return isCompleted ? (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="12" cy="12" r="8" fill="#22C55E"/>
-                  </svg>
-                ) : (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="1.5" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="12" cy="12" r="8"/>
-                  </svg>
-                );
-              })()}
-            </div>
-            {/* RECEIVE PO status */}
-            <div className="flex items-center justify-center" style={{ padding: '12px 8px', height: '40px' }}>
-              {(() => {
-                const isCompleted = order.status === 'Received' || order.status === 'Partially Received';
-                return isCompleted ? (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="12" cy="12" r="8" fill="#22C55E"/>
-                  </svg>
-                ) : (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="1.5" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="12" cy="12" r="8"/>
-                  </svg>
-                );
-              })()}
-            </div>
-            <div className="flex items-center justify-end relative" style={{ paddingRight: '16px', paddingLeft: '0px', paddingTop: '12px', paddingBottom: '12px', height: '40px', width: '100%', boxSizing: 'border-box' }}>
-              <button
-                ref={(el) => (buttonRefs.current[order.id] = el)}
-                type="button"
-                data-menu-button={order.id}
-                className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+        {loading ? (
+          <div className="px-6 py-6 text-center text-sm text-gray-400">
+            Loading orders...
+          </div>
+        ) : (
+          <>
+            {filteredOrders.map((order, index) => (
+              <div
+                key={order.id}
+                className={`grid text-sm ${themeClasses.rowHover} transition-colors`}
                 style={{
-                  color: '#6B7280',
-                  backgroundColor: 'transparent',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  gridTemplateColumns: '140px 2fr 2fr',
+                    borderBottom:
+                      index === filteredOrders.length - 1
+                        ? 'none'
+                        : isDarkMode
+                        ? '1px solid rgba(75,85,99,0.3)'
+                        : '1px solid #e5e7eb',
                 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setOrderActionMenuId((prev) => (prev === order.id ? null : order.id));
-                }}
-                aria-label="Order actions"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="12" cy="6" r="1.5" fill="currentColor"/>
-                  <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
-                  <circle cx="12" cy="18" r="1.5" fill="currentColor"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-        ))}
+                <div className="px-6 py-3 flex items-center justify-center">
+                  {renderStatusPill(order)}
+                </div>
+                <div className="px-6 py-3 flex items-center gap-2">
+                  <div className="flex flex-col">
+                    <button
+                      type="button"
+                      className="text-xs font-medium text-blue-600 hover:text-blue-700 underline-offset-2 hover:underline text-left"
+                      onClick={() => onViewOrder(order)}
+                    >
+                      {order.orderNumber}
+                    </button>
+                    {order.orderCount > 1 && (
+                      <span className="text-[10px] text-gray-400">
+                        {order.orderCount} bottle types
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="px-6 py-3 flex items-center justify-between relative">
+                  <span className={themeClasses.textPrimary}>{order.supplier}</span>
 
-        {filteredOrders.length === 0 && (
-          <div className="px-6 py-6 text-center text-sm italic text-gray-400">
-            No bottle orders yet. Click &quot;New Order&quot; to create one.
-          </div>
+                  <div className="relative">
+                    <button
+                      ref={(el) => (buttonRefs.current[order.id] = el)}
+                      type="button"
+                      data-menu-button={order.id}
+                      className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors ml-2"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOrderActionMenuId((prev) => (prev === order.id ? null : order.id));
+                      }}
+                      aria-label="Order actions"
+                    >
+                      <span className={themeClasses.textSecondary}>⋮</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {filteredOrders.length === 0 && (
+              <div className="px-6 py-6 text-center text-sm italic text-gray-400">
+                No bottle orders yet. Click &quot;New Order&quot; to create one.
+              </div>
+            )}
+          </>
         )}
       </div>
 

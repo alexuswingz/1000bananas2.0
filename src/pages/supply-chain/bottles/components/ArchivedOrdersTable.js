@@ -1,46 +1,143 @@
 import React, { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
+import { bottlesApi } from '../../../../services/supplyChainApi';
 
 const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
   const { isDarkMode } = useTheme();
+  const [archivedOrders, setArchivedOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Archived orders data - moved from Bottles.js
-  const [archivedOrders, setArchivedOrders] = useState(() => {
-    try {
-      const stored = window.localStorage.getItem('bottleArchivedOrders');
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch {}
-    return [];
-  });
-
-  // Persist archived orders to localStorage
+  // Fetch archived orders from API
   useEffect(() => {
-    try {
-      window.localStorage.setItem('bottleArchivedOrders', JSON.stringify(archivedOrders));
-    } catch {}
-  }, [archivedOrders]);
+    const fetchArchivedOrders = async () => {
+      try {
+        setLoading(true);
+        const response = await bottlesApi.getOrders();
+        if (response.success) {
+          const allOrders = response.data.map(order => ({
+            id: order.id,
+            orderNumber: order.order_number,
+            supplier: order.supplier,
+            bottleName: order.bottle_name,
+            status: order.status || 'pending',
+            orderDate: order.order_date,
+            quantityOrdered: order.quantity_ordered,
+            quantityReceived: order.quantity_received || 0,
+          }));
+          
+          // Group by base order number first
+          const grouped = {};
+          allOrders.forEach(order => {
+            const baseOrderNumber = order.orderNumber.split('-')[0];
+            if (!grouped[baseOrderNumber]) {
+              grouped[baseOrderNumber] = {
+                id: order.id,
+                orderNumber: baseOrderNumber,
+                supplier: order.supplier,
+                status: order.status,
+                orderDate: order.orderDate,
+                orderCount: 0,
+                lineItems: [],
+              };
+            }
+            grouped[baseOrderNumber].orderCount++;
+            grouped[baseOrderNumber].lineItems.push(order);
+          });
+          
+          // Filter: Only show groups where ALL line items are fully received or archived (no partial)
+          const fullyArchived = Object.values(grouped)
+            .filter(group => {
+              // Check if ALL line items in the group are 'received' or 'archived' (no 'partial' or 'pending')
+              return group.lineItems.every(item => 
+                item.status === 'received' || item.status === 'archived'
+              );
+            })
+            .map(group => {
+              // Set status: 'received' if all items are received, otherwise 'archived'
+              const allReceived = group.lineItems.every(item => item.status === 'received');
+              return {
+                ...group,
+                status: allReceived ? 'received' : 'archived'
+              };
+            });
+          
+          setArchivedOrders(fullyArchived);
+        }
+      } catch (err) {
+        console.error('Error fetching archived orders:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchArchivedOrders();
+  }, []);
 
   // Expose function to add archived order (called from OrdersTable)
   useImperativeHandle(ref, () => ({
     addArchivedOrder: (order) => {
-      setArchivedOrders((prev) => {
-        // Avoid duplicates
-        if (prev.some((o) => o.id === order.id)) {
-          return prev;
-        }
-        const updated = [...prev, { ...order, status: order.status || 'Received' }];
+      // Refresh from API instead of localStorage
+      const fetchArchivedOrders = async () => {
         try {
-          window.localStorage.setItem('bottleArchivedOrders', JSON.stringify(updated));
-        } catch {}
-        return updated;
-      });
+          const response = await bottlesApi.getOrders();
+          if (response.success) {
+            const allOrders = response.data.map(order => ({
+              id: order.id,
+              orderNumber: order.order_number,
+              supplier: order.supplier,
+              bottleName: order.bottle_name,
+              status: order.status || 'pending',
+              orderDate: order.order_date,
+              quantityOrdered: order.quantity_ordered,
+              quantityReceived: order.quantity_received || 0,
+            }));
+            
+            // Group by base order number first
+            const grouped = {};
+            allOrders.forEach(order => {
+              const baseOrderNumber = order.orderNumber.split('-')[0];
+              if (!grouped[baseOrderNumber]) {
+                grouped[baseOrderNumber] = {
+                  id: order.id,
+                  orderNumber: baseOrderNumber,
+                  supplier: order.supplier,
+                  status: order.status,
+                  orderDate: order.orderDate,
+                  orderCount: 0,
+                  lineItems: [],
+                };
+              }
+              grouped[baseOrderNumber].orderCount++;
+              grouped[baseOrderNumber].lineItems.push(order);
+            });
+            
+            // Filter: Only show groups where ALL line items are fully received or archived (no partial)
+            const fullyArchived = Object.values(grouped)
+              .filter(group => {
+                return group.lineItems.every(item => 
+                  item.status === 'received' || item.status === 'archived'
+                );
+              })
+              .map(group => {
+                // Set status: 'received' if all items are received, otherwise 'archived'
+                const allReceived = group.lineItems.every(item => item.status === 'received');
+                return {
+                  ...group,
+                  status: allReceived ? 'received' : 'archived'
+                };
+              });
+            
+            setArchivedOrders(fullyArchived);
+          }
+        } catch (err) {
+          console.error('Error refreshing archived orders:', err);
+        }
+      };
+      fetchArchivedOrders();
     },
   }));
 
   const renderStatusPill = (status) => {
-    if (status === 'Received') {
+    if (status === 'received') {
       return (
         <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-600">
           <svg className="w-3.5 h-3.5" fill="#10B981" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -49,7 +146,7 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
           Received
         </span>
       );
-    } else if (status === 'Partially Received') {
+    } else if (status === 'partial') {
       return (
         <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-600">
           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -60,16 +157,13 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
         </span>
       );
     } else {
-      // Draft status
+      // Archived status
       return (
         <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700">
-          <svg className="w-3.5 h-3.5" fill="#3B82F6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" fill="#3B82F6"/>
-            <path d="M14 2v6h6" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-            <line x1="9" y1="13" x2="15" y2="13" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-            <line x1="9" y1="17" x2="15" y2="17" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+          <svg className="w-3.5 h-3.5" fill="#6B7280" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 4h16v4H4zM6 8v10a2 2 0 002 2h8a2 2 0 002-2V8" fill="#6B7280"/>
           </svg>
-          Draft
+          Archived
         </span>
       );
     }
@@ -154,15 +248,19 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
 
       {/* Table body */}
       <div>
-        {archivedOrders.length === 0 ? (
+        {loading ? (
+          <div className="px-6 py-6 text-center text-sm text-gray-400">
+            Loading archived orders...
+          </div>
+        ) : archivedOrders.length === 0 ? (
           <div className="px-6 py-6 text-center text-sm italic text-gray-400">
             No archived orders yet.
           </div>
         ) : (
           archivedOrders.map((order, index) => (
             <div
-              key={order.id}
-              className="grid text-sm"
+              key={order.orderNumber}
+              className={`grid text-sm ${themeClasses.rowHover} transition-colors`}
               style={{
                 gridTemplateColumns: '222px 222px 222px 120px 120px 120px 1fr',
                 gap: 0,
@@ -173,29 +271,18 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
                     : '1px solid #e5e7eb',
               }}
             >
-              <div className="flex items-center" style={{ 
-                textAlign: 'left', 
-                width: '222px',
-                height: '40px',
-                paddingTop: '12px',
-                paddingRight: '16px',
-                paddingBottom: '12px',
-                paddingLeft: '16px',
-                gap: '10px',
-              }}>
-                {renderStatusPill(order.status || 'Draft')}
+              <div className="px-6 py-3 flex items-center justify-center">
+                {renderStatusPill(order.status || 'archived')}
               </div>
-              <div className="flex items-center" style={{ 
-                textAlign: 'left', 
-                width: '222px',
-                height: '40px',
-                paddingTop: '12px',
-                paddingRight: '16px',
-                paddingBottom: '12px',
-                paddingLeft: '16px',
-                gap: '10px',
-              }}>
-                <span className="text-xs font-medium text-blue-600">{order.orderNumber}</span>
+              <div className="px-6 py-3 flex items-center">
+                <div className="flex flex-col">
+                  <span className="text-xs font-medium text-blue-600">{order.orderNumber}</span>
+                  {order.orderCount > 1 && (
+                    <span className="text-[10px] text-gray-400">
+                      {order.orderCount} bottle types
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="flex items-center" style={{ 
                 textAlign: 'left', 

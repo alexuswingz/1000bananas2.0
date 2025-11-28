@@ -89,6 +89,7 @@ const Closures = () => {
   };
 
   const handleViewOrder = (order) => {
+    // Map the simple supplier name on the order back to the full supplier meta
     const supplierMeta =
       suppliers.find((s) => s.name === order.supplier) ||
       suppliers[0] || {
@@ -98,16 +99,17 @@ const Closures = () => {
         logoAlt: order.supplier,
       };
 
-    // If order is from archive or has 'Received' status, use 'view' mode, otherwise 'receive'
-    const mode = order.fromArchive || order.status === 'Received' ? 'view' : 'receive';
+    // Use the first line item's ID for fetching order details
+    const orderId = order.lineItems && order.lineItems.length > 0 
+      ? order.lineItems[0].id 
+      : order.id;
 
     navigate('/dashboard/supply-chain/closures/order', {
       state: {
         orderNumber: order.orderNumber,
         supplier: supplierMeta,
-        mode,
-        orderId: order.id,
-        lines: order.lines || [],
+        mode: 'receive',
+        orderId: orderId,
       },
     });
   };

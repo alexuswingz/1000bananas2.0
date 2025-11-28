@@ -188,7 +188,11 @@ const Ngoos = ({ data }) => {
     if (!chartData || !forecastData) return [];
 
     const historical = chartData.historical || [];
-    const forecast = chartData.forecast || [];
+    let forecast = chartData.forecast || [];
+    
+    // 🎯 Limit forecast to half of selected period for better detail/zoom
+    const maxForecastWeeks = getWeeksForView(selectedView) / 2;
+    forecast = forecast.slice(0, maxForecastWeeks);
     
     // Get current date and DOI goal date from forecast
     const currentDate = new Date(forecastData.current_date || Date.now());
@@ -269,7 +273,7 @@ const Ngoos = ({ data }) => {
     });
     
     return combinedData;
-  }, [chartData, forecastData]);
+  }, [chartData, forecastData, selectedView]);
 
   // Get timeline period boundaries for highlighting
   const timelinePeriods = useMemo(() => {

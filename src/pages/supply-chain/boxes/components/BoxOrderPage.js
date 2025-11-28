@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
+import { calculatePallets } from '../../../../utils/palletCalculations';
+import { boxesApi, transformInventoryData } from '../../../../services/supplyChainApi';
 
 const BoxOrderPage = () => {
   const { isDarkMode } = useTheme();
@@ -8,122 +10,262 @@ const BoxOrderPage = () => {
   const navigate = useNavigate();
 
   const state = location.state || {};
-  const orderNumber = state.orderNumber || new Date().toISOString().split('T')[0];
-  const supplier = state.supplier || { name: 'Rhino Container', logoSrc: '/assets/rhino.png' };
-  const mode = state.mode || 'receive';
-  const isReceiveMode = mode === 'receive'; // Simple view (first image)
-  const isCreateMode = mode === 'create'; // Detailed view (second image)
+  const orderNumber = state.orderNumber || '';
+  const supplier = state.supplier || null;
+  const mode = state.mode || 'create';
+  const isReceiveMode = mode === 'receive';
   const orderId = state.orderId || null;
-  
-  // Default box order lines with pallets - for receive mode
-  const getInitialLines = () => {
-    if (state.lines && state.lines.length > 0) {
-      // If lines are provided, use them but ensure they have pallets
-      // Transform box sizes to packaging names
-      // Limit to first 3 items only
-      const limitedLines = state.lines.slice(0, 3);
-      
-      return limitedLines.map((line, index) => {
-        // Map box sizes to packaging names for both receive and create mode
-        let packagingName = line.name;
-        // If it's a box size format (e.g., "12 x 10 x 12"), map to packaging name
-        if (line.name && line.name.includes('x')) {
-          // Use first 3 items as packaging names
-          const packagingNames = ['8oz', 'Quart', 'Gallon'];
-          packagingName = packagingNames[index] || line.name;
+
+  // Fetch available boxes from API
+  const [availableBoxes, setAvailableBoxes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [orderLines, setOrderLines] = useState([]);
+  const [isReceiveConfirmOpen, setIsReceiveConfirmOpen] = useState(false);
+  const [showAddBoxModal, setShowAddBoxModal] = useState(false);
+
+  // Fetch order details if viewing/receiving existing order
+  useEffect(() => {
+    const fetchOrderDetails = async () => {
+      if (isReceiveMode && orderId) {
+        try {
+          setLoading(true);
+          const response = await boxesApi.getOrder(orderId);
+          if (response.success) {
+            const orderData = response.data;
+            
+            // Handle multiple order lines
+            const lines = orderData.lines || [];
+            const orderLines = lines.map((line, index) => {
+              const originalQty = line.quantity_ordered || 0;
+              const receivedQty = line.quantity_received || 0;
+              const qtyToReceive = originalQty - receivedQty; // Remaining to receive
+              const calculatedPallets = calculatePallets(
+                qtyToReceive,
+                line.units_per_pallet || 1
+              );
+              return {
+                id: line.id || index + 1,
+                orderId: line.id,
+                name: line.box_type || 'Unknown Box',
+                boxType: line.box_type || 'Unknown Box',
+                qty: qtyToReceive, // Default to remaining quantity
+                originalQty: originalQty, // Store original ordered quantity
+                receivedQty: receivedQty, // Store already received quantity
+                pallets: calculatedPallets,
+                unitsPerPallet: line.units_per_pallet || 1,
+                supplier: line.supplier,
+                selected: qtyToReceive > 0, // Auto-select if there's remaining to receive
+              };
+            });
+            
+            console.log('Loaded order lines:', orderLines);
+            setOrderLines(orderLines);
+          }
+        } catch (err) {
+          console.error('Error fetching order details:', err);
+        } finally {
+          setLoading(false);
         }
-        
-        return {
-          ...line,
-          name: packagingName,
-          pallets: line.pallets || 4,
-          selected: line.selected !== undefined ? line.selected : (index < 2), // First two checked by default
-        };
-      });
-    }
-    // Default data matching the second image - only 3 rows
-    return [
-      { id: 1, name: '8oz', qty: 29120, pallets: 4, selected: true },
-      { id: 2, name: 'Quart', qty: 5040, pallets: 4, selected: true },
-      { id: 3, name: 'Gallon', qty: 768, pallets: 4, selected: false },
-    ];
-  };
+      }
+    };
+    fetchOrderDetails();
+  }, [isReceiveMode, orderId]);
 
-  const initialLines = getInitialLines();
-
-  const [orderLines, setOrderLines] = useState(initialLines);
+  // Fetch boxes on mount for create mode
+  useEffect(() => {
+    const fetchBoxes = async () => {
+      if (!isReceiveMode) {
+        try {
+          setLoading(true);
+          const response = await boxesApi.getInventory();
+          console.log('RAW API RESPONSE:', response);
+          if (response.success) {
+            const boxes = transformInventoryData(response);
+            console.log('Fetched boxes from API:', boxes.length, boxes);
+            console.log('First box data:', boxes[0]);
+            setAvailableBoxes(boxes);
+            
+            // Create lines for ALL boxes
+            const allBoxLines = boxes.map((box, index) => {
+              const defaultQty = box.unitsPerPallet || 1000;
+              const calculatedPallets = calculatePallets(defaultQty, box.unitsPerPallet || 1);
+              console.log(`Creating line for ${box.name}:`, {
+                unitsPerPallet: box.unitsPerPallet,
+                defaultQty,
+                calculatedPallets
+              });
+              return {
+                id: index + 1,
+                name: box.name,
+                boxType: box.name,
+                unitsNeeded: defaultQty,
+                qty: defaultQty,
+                pallets: calculatedPallets,
+                unitsPerPallet: box.unitsPerPallet || 1,
+                supplier: box.supplier,
+                selected: true,
+              };
+            });
+            console.log('Created order lines:', allBoxLines.length, allBoxLines);
+            setOrderLines(allBoxLines);
+          }
+        } catch (err) {
+          console.error('Error fetching boxes:', err);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    fetchBoxes();
+  }, [isReceiveMode]);
 
   const themeClasses = {
     pageBg: isDarkMode ? 'bg-dark-bg-primary' : 'bg-light-bg-primary',
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
     border: isDarkMode ? 'border-dark-border-primary' : 'border-gray-200',
     textPrimary: isDarkMode ? 'text-dark-text-primary' : 'text-gray-900',
-    headerBg: isDarkMode ? 'bg-[#2C3544]' : 'bg-[#2C3544]',
-    rowHover: isDarkMode ? 'hover:bg-dark-bg-tertiary' : 'hover:bg-gray-50',
-    inputBg: isDarkMode ? 'bg-dark-bg-tertiary' : 'bg-white',
-    inputBorder: isDarkMode ? 'border-dark-border-primary' : 'border-gray-300',
-    inputText: isDarkMode ? 'text-dark-text-primary' : 'text-gray-900',
   };
 
   const handleBack = () => {
     navigate('/dashboard/supply-chain/boxes');
   };
 
-  const handleQtyChange = (id, delta) => {
-    setOrderLines((prev) =>
-      prev.map((line) =>
-        line.id === id
-          ? { ...line, qty: Math.max(0, line.qty + delta) }
-          : line
-      )
-    );
+  const handleCreateOrder = async () => {
+    try {
+      const selectedLines = orderLines.filter(l => l.selected);
+      const timestamp = Date.now();
+      
+      // Create separate order for each box type
+      for (let i = 0; i < selectedLines.length; i++) {
+        const line = selectedLines[i];
+        const orderData = {
+          order_number: `${orderNumber}-${timestamp}-${i + 1}`,
+          box_type: line.boxType,
+          supplier: supplier.name,
+          order_date: new Date().toISOString().split('T')[0],
+          quantity_ordered: line.qty,
+          cost_per_unit: 0,
+          total_cost: 0,
+          status: 'pending',
+          notes: `${line.qty} units (${line.pallets} pallets)`,
+        };
+
+        await boxesApi.createOrder(orderData);
+      }
+      
+      navigate('/dashboard/supply-chain/boxes', {
+        state: {
+          newBoxOrder: {
+            orderNumber,
+            supplierName: supplier.name,
+          },
+        },
+      });
+    } catch (err) {
+      console.error('Error creating order:', err);
+      alert(`Failed to create order: ${err.message}`);
+    }
   };
 
-  const handleQtyInputChange = (id, value) => {
-    const numValue = Math.max(0, parseInt(value.replace(/,/g, '')) || 0);
-    setOrderLines((prev) =>
-      prev.map((line) =>
-        line.id === id ? { ...line, qty: numValue } : line
-      )
-    );
+  const handleAddBox = (box) => {
+    const nextId = orderLines.length ? Math.max(...orderLines.map(l => l.id)) + 1 : 1;
+    const defaultQty = box.unitsPerPallet || 1000;
+    const newLine = {
+      id: nextId,
+      name: box.name,
+      boxType: box.name,
+      unitsNeeded: defaultQty,
+      qty: defaultQty,
+      pallets: calculatePallets(defaultQty, box.unitsPerPallet || 1),
+      unitsPerPallet: box.unitsPerPallet || 1,
+      supplier: box.supplier,
+      selected: true,
+    };
+    setOrderLines([...orderLines, newLine]);
+    setShowAddBoxModal(false);
   };
 
-  const handlePalletsChange = (id, delta) => {
-    setOrderLines((prev) =>
-      prev.map((line) =>
-        line.id === id
-          ? { ...line, pallets: Math.max(0, (line.pallets || 0) + delta) }
-          : line
-      )
-    );
+  const handleRemoveLine = (lineId) => {
+    setOrderLines(prev => prev.filter(l => l.id !== lineId));
   };
 
-  const handlePalletsInputChange = (id, value) => {
-    const numValue = Math.max(0, parseInt(value) || 0);
-    setOrderLines((prev) =>
-      prev.map((line) =>
-        line.id === id ? { ...line, pallets: numValue } : line
-      )
-    );
+  const handleReceiveComplete = async (isPartial = false) => {
+    try {
+      const selectedLines = orderLines.filter(l => l.selected);
+      
+      if (selectedLines.length === 0) {
+        alert('Please select at least one line to receive');
+        return;
+      }
+      
+      // Validate quantities before processing
+      for (const line of selectedLines) {
+        const alreadyReceived = line.receivedQty || 0;
+        const newReceived = line.qty || 0;
+        const totalReceived = alreadyReceived + newReceived;
+        const originalQty = line.originalQty || 0;
+        
+        if (totalReceived > originalQty) {
+          alert(`Cannot receive ${totalReceived} units for ${line.boxType}. Maximum is ${originalQty} units (${alreadyReceived} already received, ${originalQty - alreadyReceived} remaining).`);
+          return;
+        }
+        
+        if (newReceived <= 0) {
+          alert(`Please enter a valid quantity greater than 0 for ${line.boxType}`);
+          return;
+        }
+      }
+      
+      // Update each received line
+      for (const line of selectedLines) {
+        const lineOrderId = line.orderId || orderId;
+        
+        // Calculate total received: already received + new received
+        const alreadyReceived = line.receivedQty || 0;
+        const newReceived = line.qty || 0;
+        const totalReceived = alreadyReceived + newReceived;
+        
+        // Determine if this is partial (total received < original ordered)
+        const originalQty = line.originalQty || totalReceived;
+        const isLinePartial = totalReceived < originalQty;
+        
+        // Update order with total received quantity
+        await boxesApi.updateOrder(lineOrderId, {
+          box_type: line.boxType,
+          status: isLinePartial ? 'partial' : 'received',
+          actual_delivery_date: new Date().toISOString().split('T')[0],
+          quantity_received: totalReceived, // Total received (previous + new)
+        });
+      }
+      
+      // Check if any lines were not selected or quantities reduced (partial receive)
+      const unselectedLines = orderLines.filter(l => !l.selected);
+      const hasUnselected = unselectedLines.length > 0;
+      const hasReducedQty = selectedLines.some(l => {
+        const totalReceived = (l.receivedQty || 0) + (l.qty || 0);
+        return totalReceived < (l.originalQty || 0);
+      });
+      
+      navigate('/dashboard/supply-chain/boxes', {
+        state: {
+          receivedOrderId: orderId,
+          isPartial: isPartial || hasUnselected || hasReducedQty,
+        },
+      });
+    } catch (err) {
+      console.error('Error receiving order:', err);
+      alert(`Failed to receive order: ${err.message}`);
+    }
   };
 
-  const handleCheckboxChange = (id) => {
-    setOrderLines((prev) =>
-      prev.map((line) =>
-        line.id === id ? { ...line, selected: !line.selected } : line
-      )
-    );
-  };
-
-  const handleSelectAll = () => {
-    const allSelected = orderLines.every((line) => line.selected);
-    setOrderLines((prev) =>
-      prev.map((line) => ({ ...line, selected: !allSelected }))
-    );
-  };
+  if (!supplier || !orderNumber) {
+    // If this page is hit directly, just send user back to boxes
+    handleBack();
+    return null;
+  }
 
   return (
-    <div className={`min-h-screen p-8 ${themeClasses.pageBg}`}>
+    <div className={`p-8 ${themeClasses.pageBg}`}>
       <div className={`${themeClasses.cardBg} rounded-xl border ${themeClasses.border} shadow-lg`}>
         {/* Header row */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
@@ -144,19 +286,17 @@ const BoxOrderPage = () => {
             <div className="flex flex-col gap-1 text-xs text-gray-500">
               <div className="flex items-center gap-8">
                 <div>
-                  <div className="uppercase tracking-wide text-[10px] text-gray-400">ORDER #</div>
+                  <div className="uppercase tracking-wide text-[10px] text-gray-400">Box Order #</div>
                   <div className="text-sm font-semibold text-gray-900">{orderNumber}</div>
                 </div>
                 <div className="flex flex-col items-start gap-1">
-                  <div className="uppercase tracking-wide text-[10px] text-gray-400">SUPPLIER</div>
+                  <div className="uppercase tracking-wide text-[10px] text-gray-400">Supplier</div>
                   <div className="flex items-center gap-2">
-                    {supplier.logoSrc && (
-                      <img
-                        src={supplier.logoSrc}
-                        alt={supplier.name}
-                        className="h-5 w-auto"
-                      />
-                    )}
+                    <img
+                      src={supplier.logoSrc}
+                      alt={supplier.logoAlt}
+                      className="h-6 object-contain"
+                    />
                     <span className="text-sm font-semibold text-gray-900">{supplier.name}</span>
                   </div>
                 </div>
@@ -164,292 +304,262 @@ const BoxOrderPage = () => {
             </div>
           </div>
 
-          {/* Receive button - only show in receive mode */}
-          {isReceiveMode && (
+          {!isReceiveMode ? (
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg px-4 py-2 shadow-sm"
+              onClick={handleCreateOrder}
+            >
+              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-white/60">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </span>
+              Create Order
+            </button>
+          ) : (
             <button
               type="button"
               className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg px-4 py-2 shadow-sm"
               onClick={() => {
-                // Handle receive action
-                console.log('Receive clicked', orderLines.filter(line => line.selected));
-                navigate('/dashboard/supply-chain/boxes');
+                const selectedLines = orderLines.filter((line) => line.selected);
+                if (selectedLines.length === 0) {
+                  alert('Please select at least one line to receive');
+                  return;
+                }
+                
+                const allChecked = orderLines.every((line) => line.selected);
+                const allFullQty = selectedLines.every((line) => {
+                  // Check if received qty equals original ordered qty
+                  return line.qty >= (line.originalQty || line.qty);
+                });
+                
+                if (allChecked && allFullQty) {
+                  // Full receive – all lines, full quantities
+                  handleReceiveComplete(false);
+                } else {
+                  // Partial receive – show confirmation popup
+                  setIsReceiveConfirmOpen(true);
+                }
               }}
             >
               <span className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-white/60">
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </span>
-              + Receive
+              Receive
             </button>
-          )}
-          
-          {/* Search bar - only show in create mode */}
-          {isCreateMode && (
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search..."
-                className="w-64 pl-10 pr-8 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <svg
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col">
-                <svg
-                  className="w-3 h-3 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 15l7-7 7 7"
-                  />
-                </svg>
-                <svg
-                  className="w-3 h-3 text-gray-400 -mt-0.5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </div>
-            </div>
           )}
         </div>
 
         {/* Table */}
-        <div className="rounded-lg overflow-hidden">
-          {/* Table header */}
-          <div className={themeClasses.headerBg}>
-            {isReceiveMode ? (
-              // Receive view: PACKAGING NAME, QTY, PALLETS, checkbox
+        <div className="px-6 py-4">
+          <div className="rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            {/* Table header */}
+            <div className="bg-[#1f2937] text-white text-[11px] font-semibold uppercase tracking-wide">
               <div
-                className="grid"
-                style={{
-                  gridTemplateColumns: '2fr 1.2fr 1.2fr 40px',
-                }}
+                className="grid items-center"
+                style={{ gridTemplateColumns: '2fr 1.2fr 1.2fr 40px 40px' }}
               >
-                <div className="px-4 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]">
-                  PACKAGING NAME
-                </div>
-                <div className="px-4 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center">
-                  QTY
-                </div>
-                <div className="px-4 py-3 text-xs font-bold text-white uppercase tracking-wider text-center">
-                  PALLETS
-                </div>
-                <div className="px-4 py-3 flex items-center justify-center">
-                  <input
-                    type="checkbox"
-                    checked={orderLines.length > 0 && orderLines.every((line) => line.selected)}
-                    onChange={handleSelectAll}
-                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    style={{
-                      accentColor: '#2563EB',
-                      borderColor: orderLines.length > 0 && orderLines.every((line) => line.selected) ? '#2563EB' : '#D1D5DB',
-                      backgroundColor: orderLines.length > 0 && orderLines.every((line) => line.selected) ? '#2563EB' : 'white',
-                    }}
-                  />
-                </div>
+                <div className="px-4 py-2 border-r border-gray-700 text-center">Box Size</div>
+                <div className="px-4 py-2 border-r border-gray-700 text-center">Qty</div>
+                <div className="px-4 py-2 border-r border-gray-700 text-center">Pallets</div>
+                <div className="px-4 py-2 border-r border-gray-700 text-center"></div>
+                <div className="px-4 py-2 text-center"></div>
               </div>
-            ) : (
-              // Create/Ordering view: PACKAGING NAME, SUPPLIER INVENTORY, UNITS NEEDED, QTY, PALLETS, checkbox
-              <div
-                className="grid"
-                style={{
-                  gridTemplateColumns: '2fr 1.5fr 1.5fr 1.5fr 1.5fr 40px',
-                }}
-              >
-                <div className="px-4 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]">
-                  PACKAGING NAME
+            </div>
+
+            {/* Table rows */}
+            <div className="bg-white">
+              {loading ? (
+                <div className="px-4 py-6 text-center text-gray-500">Loading boxes...</div>
+              ) : orderLines.length === 0 ? (
+                <div className="px-4 py-6 text-center text-gray-500">No boxes added yet</div>
+              ) : (
+                orderLines.map((line) => (
+                <div
+                  key={line.id}
+                  className="grid items-center text-sm border-t border-gray-100"
+                  style={{ gridTemplateColumns: '2fr 1.2fr 1.2fr 40px 40px' }}
+                >
+                  <div className="px-4 py-2 text-sm text-gray-900">{line.name}</div>
+                  <div className="px-4 py-2">
+                    <input
+                      type="number"
+                      min="0"
+                      max={isReceiveMode && line.originalQty ? (line.originalQty - (line.receivedQty || 0)) : undefined}
+                      className="w-full text-sm px-2 py-1 text-center bg-white shadow-inner border border-gray-200 rounded-none"
+                      value={line.qty}
+                      onChange={(e) => {
+                        const val = Number(e.target.value) || 0;
+                        
+                        // Only validate max quantity when receiving (originalQty exists)
+                        if (isReceiveMode && line.originalQty) {
+                          const maxQty = line.originalQty - (line.receivedQty || 0);
+                          const clampedVal = Math.min(val, maxQty);
+                          
+                          if (val > maxQty) {
+                            alert(`Cannot receive more than ${maxQty} units (${line.originalQty} ordered - ${line.receivedQty || 0} already received)`);
+                          }
+                          
+                          // Use clamped value for receive mode
+                          const finalVal = clampedVal;
+                          const unitsPerPallet = line.unitsPerPallet || 1;
+                          const newPallets = calculatePallets(finalVal, unitsPerPallet);
+                          
+                          setOrderLines((prev) =>
+                            prev.map((l) => {
+                              if (l.id === line.id) {
+                                return { ...l, qty: finalVal, pallets: newPallets };
+                              }
+                              return l;
+                            })
+                          );
+                        } else {
+                          // Create mode: allow any positive quantity, no max limit
+                          const unitsPerPallet = line.unitsPerPallet || 1;
+                          const newPallets = calculatePallets(val, unitsPerPallet);
+                          
+                          setOrderLines((prev) =>
+                            prev.map((l) => {
+                              if (l.id === line.id) {
+                                return { ...l, qty: val, pallets: newPallets };
+                              }
+                              return l;
+                            })
+                          );
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="px-4 py-2">
+                    <div className="text-sm px-2 py-1 text-right text-gray-700 font-medium" title={`Auto-calculated: ${line.qty} ÷ ${line.unitsPerPallet || 'N/A'} units/pallet = ${line.pallets} pallet${line.pallets !== 1 ? 's' : ''}`}>
+                      {line.pallets}
+                    </div>
+                  </div>
+                  <div className="px-4 py-2 flex items-center justify-center">
+                    <input
+                      type="checkbox"
+                      className="form-checkbox h-3.5 w-3.5 rounded border-gray-400"
+                      checked={line.selected}
+                      onChange={(e) =>
+                        setOrderLines((prev) =>
+                          prev.map((l) =>
+                            l.id === line.id ? { ...l, selected: e.target.checked } : l
+                          )
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="px-4 py-2 flex items-center justify-center">
+                    <button
+                      type="button"
+                      className="text-red-500 hover:text-red-700 text-xs"
+                      onClick={() => handleRemoveLine(line.id)}
+                      title="Remove line"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </div>
-                <div className="px-4 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]">
-                  SUPPLIER INVENTORY
-                </div>
-                <div className="px-4 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656]">
-                  UNITS NEEDED
-                </div>
-                <div className="px-4 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center">
-                  QTY
-                </div>
-                <div className="px-4 py-3 text-xs font-bold text-white uppercase tracking-wider text-center">
-                  PALLETS
-                </div>
-                <div className="px-4 py-3 flex items-center justify-center">
-                  <input
-                    type="checkbox"
-                    checked={orderLines.length > 0 && orderLines.every((line) => line.selected)}
-                    onChange={handleSelectAll}
-                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    style={{
-                      accentColor: '#2563EB',
-                      borderColor: orderLines.length > 0 && orderLines.every((line) => line.selected) ? '#2563EB' : '#D1D5DB',
-                      backgroundColor: orderLines.length > 0 && orderLines.every((line) => line.selected) ? '#2563EB' : 'white',
-                    }}
-                  />
-                </div>
+              )))}
+            </div>
+            
+            {/* Add box button */}
+            {!isReceiveMode && (
+              <div className="bg-gray-50 border-t border-gray-200 px-4 py-3">
+                <button
+                  type="button"
+                  className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+                  onClick={() => setShowAddBoxModal(true)}
+                >
+                  <span className="text-lg">+</span> Add Box
+                </button>
               </div>
             )}
           </div>
-
-          {/* Table body */}
-          <div className="bg-white">
-            {orderLines.map((line, index) => (
-              <div
-                key={line.id}
-                className="grid text-sm bg-white"
-                style={{
-                  gridTemplateColumns: isReceiveMode ? '2fr 1.2fr 1.2fr 40px' : '2fr 1.5fr 1.5fr 1.5fr 1.5fr 40px',
-                  borderBottom:
-                    index === orderLines.length - 1
-                      ? 'none'
-                      : '1px solid #e5e7eb',
-                }}
-              >
-                {/* Packaging Name */}
-                <div className="px-4 py-3 flex items-center">
-                  <span className="text-gray-900">{line.name}</span>
-                </div>
-
-                {/* Supplier Inventory - only in create mode */}
-                {isCreateMode && (
-                  <div className="px-4 py-3 flex items-center">
-                    <span className="text-gray-900">{line.supplierInventory || 'Auto'}</span>
-                  </div>
-                )}
-
-                {/* Units Needed - only in create mode */}
-                {isCreateMode && (
-                  <div className="px-4 py-3 flex items-center">
-                    <span className="text-gray-900">{line.unitsNeeded?.toLocaleString() || '0'}</span>
-                  </div>
-                )}
-
-                {/* QTY */}
-                <div className="px-4 py-3 flex items-center justify-center">
-                  {isReceiveMode ? (
-                    // Plain text display in receive mode - no input box
-                    <span className="text-sm text-gray-900 text-center">
-                      {line.qty?.toLocaleString() || '0'}
-                    </span>
-                  ) : (
-                    // Rounded rectangular control with +/- buttons in create mode - all in one container, compact, no borders
-                    <div className="flex items-center rounded-lg bg-gray-100 overflow-hidden" style={{ width: 'fit-content' }}>
-                      <button
-                        type="button"
-                        onClick={() => handleQtyChange(line.id, -1)}
-                        className="px-2 py-1.5 text-gray-600 hover:bg-gray-200 transition-colors flex-shrink-0"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                        </svg>
-                      </button>
-                      <input
-                        type="number"
-                        min="0"
-                        value={line.qty || 0}
-                        onChange={(e) => handleQtyInputChange(line.id, e.target.value)}
-                        className="px-2 py-1.5 text-center border-0 bg-gray-100 text-gray-900 focus:outline-none focus:ring-0 text-sm"
-                        style={{ width: '70px', minWidth: '70px' }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleQtyChange(line.id, 1)}
-                        className="px-2 py-1.5 text-gray-600 hover:bg-gray-200 transition-colors flex-shrink-0"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* PALLETS - show in create mode with +/- buttons */}
-                {isCreateMode && (
-                  <div className="px-4 py-3 flex items-center justify-center">
-                    <div className="flex items-center rounded-lg bg-gray-100 overflow-hidden" style={{ width: 'fit-content' }}>
-                      <button
-                        type="button"
-                        onClick={() => handlePalletsChange(line.id, -1)}
-                        className="px-2 py-1.5 text-gray-600 hover:bg-gray-200 transition-colors flex-shrink-0"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                        </svg>
-                      </button>
-                      <input
-                        type="number"
-                        min="0"
-                        value={line.pallets || 0}
-                        onChange={(e) => handlePalletsInputChange(line.id, e.target.value)}
-                        className="px-2 py-1.5 text-center border-0 bg-gray-100 text-gray-900 focus:outline-none focus:ring-0 text-sm"
-                        style={{ width: '50px', minWidth: '50px' }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handlePalletsChange(line.id, 1)}
-                        className="px-2 py-1.5 text-gray-600 hover:bg-gray-200 transition-colors flex-shrink-0"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* PALLETS - only in receive mode */}
-                {isReceiveMode && (
-                  <div className="px-4 py-3 flex items-center justify-center">
-                    <span className="text-sm text-gray-900 text-center">
-                      {line.pallets || '0'}
-                    </span>
-                  </div>
-                )}
-
-                {/* Checkbox */}
-                <div className="px-4 py-3 flex items-center justify-center">
-                  <input
-                    type="checkbox"
-                    checked={line.selected || false}
-                    onChange={() => handleCheckboxChange(line.id)}
-                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    style={{
-                      accentColor: '#2563EB',
-                      borderColor: line.selected ? '#2563EB' : '#D1D5DB',
-                      backgroundColor: line.selected ? '#2563EB' : 'white',
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
+
+      {/* Add Box Modal */}
+      {showAddBoxModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Add Box to Order</h2>
+            </div>
+            <div className="px-6 py-4 max-h-[60vh] overflow-y-auto">
+              <div className="grid grid-cols-1 gap-2">
+                {availableBoxes.map((box) => {
+                  const alreadyAdded = orderLines.some(l => l.name === box.name);
+                  return (
+                    <button
+                      key={box.id}
+                      type="button"
+                      className={`text-left px-4 py-3 rounded-lg border transition-colors ${
+                        alreadyAdded 
+                          ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+                          : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50'
+                      }`}
+                      onClick={() => !alreadyAdded && handleAddBox(box)}
+                      disabled={alreadyAdded}
+                    >
+                      <div className="font-semibold text-sm">{box.name}</div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {box.unitsPerPallet} units/pallet • {box.supplier}
+                        {alreadyAdded && ' • Already added'}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+              <button
+                type="button"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100"
+                onClick={() => setShowAddBoxModal(false)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isReceiveMode && isReceiveConfirmOpen && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md px-8 py-6 text-center">
+            <h2 className="text-base font-semibold text-gray-900 mb-2">Are you sure?</h2>
+            <p className="text-xs text-gray-500 mb-6">
+              Proceed with a partial delivery? Only received items will be updated in inventory.
+            </p>
+
+            <div className="flex items-center justify-center gap-3">
+              <button
+                type="button"
+                className="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100"
+                onClick={() => setIsReceiveConfirmOpen(false)}
+              >
+                Go Back
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                onClick={() => {
+                  setIsReceiveConfirmOpen(false);
+                  handleReceiveComplete(true);
+                }}
+              >
+                Complete Partial
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 export default BoxOrderPage;
-

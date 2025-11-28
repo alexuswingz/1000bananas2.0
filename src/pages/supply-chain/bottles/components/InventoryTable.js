@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useImperativeHandle, forwardRef, useEffect } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 import { showSuccessToast } from '../../../../utils/notifications';
+import { calculatePallets } from '../../../../utils/palletCalculations';
+import { bottlesApi, transformInventoryData, transformToBackendFormat } from '../../../../services/supplyChainApi';
 
 const InventoryTable = forwardRef(({
   searchQuery = '',
@@ -10,34 +12,33 @@ const InventoryTable = forwardRef(({
 }, ref) => {
   const { isDarkMode } = useTheme();
 
-  // Bottles data - moved from Bottles.js
-  const [bottles, setBottles] = useState(() => {
-    try {
-      const stored = window.localStorage.getItem('bottlesInventory');
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch {}
-    // Default data - matching the image
-    return [
-      { id: 1, name: '8oz Bottle', warehouseInventory: 24869, supplierInventory: 87980 },
-      { id: 2, name: 'Quart', warehouseInventory: 1345, supplierInventory: 80898 },
-      { id: 3, name: 'Gallon', warehouseInventory: 1000, supplierInventory: 1000 },
-      { id: 4, name: '3oz Spray Bottle', warehouseInventory: 1000, supplierInventory: 1000 },
-      { id: 5, name: '6oz Spray Bottle', warehouseInventory: 1000, supplierInventory: 1000 },
-      { id: 6, name: '16oz Square Cylinder Clear', warehouseInventory: 1000, supplierInventory: 1000 },
-      { id: 7, name: '16oz Square Cylinder Spray White', warehouseInventory: 1000, supplierInventory: 1000 },
-      { id: 8, name: '16oz Round Cylinder Spray Clear', warehouseInventory: 1000, supplierInventory: 1000 },
-      { id: 9, name: '16oz Round Cylinder Spray White', warehouseInventory: 1000, supplierInventory: 1000 },
-    ];
-  });
+  // Bottles data - fetch from API
+  const [bottles, setBottles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Persist bottles to localStorage
+  // Fetch bottles from API on mount
   useEffect(() => {
-    try {
-      window.localStorage.setItem('bottlesInventory', JSON.stringify(bottles));
-    } catch {}
-  }, [bottles]);
+    const fetchBottles = async () => {
+      try {
+        setLoading(true);
+        const response = await bottlesApi.getInventory();
+        if (response.success) {
+          const transformed = transformInventoryData(response);
+          setBottles(transformed);
+        } else {
+          setError(response.error || 'Failed to load inventory');
+        }
+      } catch (err) {
+        console.error('Error fetching bottles:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBottles();
+  }, []);
 
   // Filter bottles based on search query
   const filteredData = useMemo(() => {
@@ -46,9 +47,8 @@ const InventoryTable = forwardRef(({
     return bottles.filter((bottle) => bottle.name.toLowerCase().includes(query));
   }, [bottles, searchQuery]);
 
-  // Inline inventory editing (single row)
+  // Inline inventory editing (single row) - only for supplier inventory
   const [editingBottleId, setEditingBottleId] = useState(null);
-  const [editWarehouseInv, setEditWarehouseInv] = useState('');
   const [editSupplierInv, setEditSupplierInv] = useState('');
 
   // Bulk inventory editing (multiple rows)
@@ -58,7 +58,7 @@ const InventoryTable = forwardRef(({
   // Action menu state
   const [actionMenuBottleId, setActionMenuBottleId] = useState(null);
 
-  // Calculate bulk unsaved count
+  // Calculate bulk unsaved count (only for supplier inventory)
   const bulkUnsavedCount = useMemo(() => {
     if (!isBulkEditing) return 0;
     let count = 0;
@@ -66,11 +66,8 @@ const InventoryTable = forwardRef(({
     Object.entries(bulkEdits).forEach(([id, values]) => {
       const original = bottles.find((b) => b.id === Number(id));
       if (!original) return;
-      const w = values.warehouseInventory;
       const s = values.supplierInventory;
-      const changed =
-        (w !== undefined && Number(w) !== original.warehouseInventory) ||
-        (s !== undefined && Number(s) !== original.supplierInventory);
+      const changed = s !== undefined && Number(s) !== original.supplierInventory;
       if (changed) count += 1;
     });
 
@@ -88,66 +85,104 @@ const InventoryTable = forwardRef(({
     }));
   };
 
-  // Handle start edit
+  // Handle start edit (only for supplier inventory)
   const handleStartEdit = (bottle) => {
     setEditingBottleId(bottle.id);
-    setEditWarehouseInv(String(bottle.warehouseInventory ?? ''));
     setEditSupplierInv(String(bottle.supplierInventory ?? ''));
     setActionMenuBottleId(null);
   };
 
-  // Handle save edit
-  const handleSaveEdit = (bottleId, warehouseInv, supplierInv, bottleName) => {
-    setBottles((prev) =>
-      prev.map((b) =>
-        b.id === bottleId
-          ? {
-              ...b,
-              warehouseInventory: Number(warehouseInv) || 0,
-              supplierInventory: Number(supplierInv) || 0,
-            }
-          : b
-      )
-    );
-    showSuccessToast(`${bottleName} Inventory updated`);
-    setEditingBottleId(null);
-    setEditWarehouseInv('');
-    setEditSupplierInv('');
+  // Handle save edit (only updates supplier inventory, warehouse is read-only)
+  const handleSaveEdit = async (bottleId, supplierInv, bottleName) => {
+    try {
+      const response = await bottlesApi.updateInventory(bottleId, {
+        supplier_quantity: Number(supplierInv) || 0,
+        // warehouse_quantity is not updated - it's read-only and updated automatically when orders are received
+      });
+
+      if (response.success) {
+        setBottles((prev) =>
+          prev.map((b) =>
+            b.id === bottleId
+              ? {
+                  ...b,
+                  supplierInventory: Number(supplierInv) || 0,
+                }
+              : b
+          )
+        );
+        showSuccessToast(`${bottleName} Supplier inventory updated`);
+        setEditingBottleId(null);
+        setEditSupplierInv('');
+      } else {
+        throw new Error(response.error || 'Failed to update');
+      }
+    } catch (err) {
+      console.error('Error updating inventory:', err);
+      alert(`Failed to update: ${err.message}`);
+    }
   };
 
   // Handle cancel edit
   const handleCancelEdit = () => {
     setEditingBottleId(null);
-    setEditWarehouseInv('');
     setEditSupplierInv('');
   };
 
-  // Handle bulk edit save
-  const handleBulkEditSave = () => {
-    setBottles((prev) =>
-      prev.map((b) => {
-        const edits = bulkEdits[b.id];
-        if (!edits) return b;
-        const nextWarehouse =
-          edits.warehouseInventory !== undefined
-            ? Number(edits.warehouseInventory) || 0
-            : b.warehouseInventory;
-        const nextSupplier =
-          edits.supplierInventory !== undefined
-            ? Number(edits.supplierInventory) || 0
-            : b.supplierInventory;
-        return {
-          ...b,
-          warehouseInventory: nextWarehouse,
-          supplierInventory: nextSupplier,
-        };
-      })
-    );
-    if (bulkUnsavedCount > 0) {
-      showSuccessToast(`${bulkUnsavedCount} bottle(s) inventory updated`);
+  // Handle bulk edit save (only updates supplier inventory)
+  const handleBulkEditSave = async () => {
+    const updates = [];
+    
+    bottles.forEach((b) => {
+      const edits = bulkEdits[b.id];
+      if (!edits) return;
+      
+      const nextSupplier =
+        edits.supplierInventory !== undefined
+          ? Number(edits.supplierInventory) || 0
+          : b.supplierInventory;
+      
+      // Only update if supplier inventory changed (warehouse is read-only)
+      if (nextSupplier !== b.supplierInventory) {
+        updates.push({
+          id: b.id,
+          supplier_quantity: nextSupplier,
+        });
+      }
+    });
+
+    try {
+      await Promise.all(
+        updates.map(update =>
+          bottlesApi.updateInventory(update.id, {
+            supplier_quantity: update.supplier_quantity,
+            // warehouse_quantity is not updated - it's read-only
+          })
+        )
+      );
+
+      setBottles((prev) =>
+        prev.map((b) => {
+          const update = updates.find(u => u.id === b.id);
+          if (update) {
+            return {
+              ...b,
+              supplierInventory: update.supplier_quantity,
+            };
+          }
+          return b;
+        })
+      );
+
+      if (updates.length > 0) {
+        showSuccessToast(`${updates.length} bottle(s) supplier inventory updated`);
+      }
+      setIsBulkEditing(false);
+      setBulkEdits({});
+    } catch (err) {
+      console.error('Error bulk updating:', err);
+      alert(`Failed to update: ${err.message}`);
     }
-    setIsBulkEditing(false);
-    setBulkEdits({});
   };
 
   // Handle bulk edit discard
@@ -233,15 +268,25 @@ const InventoryTable = forwardRef(({
           className="w-full"
           style={{ minHeight: '360px' }}
         >
-          {filteredData.map((bottle, index) => {
+          {loading ? (
+            <div className="px-6 py-6 text-center text-sm text-gray-400">
+              Loading inventory...
+            </div>
+          ) : error ? (
+            <div className="px-6 py-6 text-center text-sm text-red-500">
+              Error: {error}
+            </div>
+          ) : filteredData.length === 0 ? (
+            <div className="px-6 py-6 text-center text-sm italic text-gray-400">
+              No bottles match your search.
+            </div>
+          ) : (
+            filteredData.map((bottle, index) => {
             const isRowEditing = editingBottleId === bottle.id;
             const isBulkRow = isBulkEditing;
             const showInputs = isBulkRow || isRowEditing;
 
             const bulkValues = bulkEdits[bottle.id] || {};
-            const warehouseValue = isBulkRow
-              ? bulkValues.warehouseInventory ?? bottle.warehouseInventory
-              : editWarehouseInv;
             const supplierValue = isBulkRow
               ? bulkValues.supplierInventory ?? bottle.supplierInventory
               : editSupplierInv;
@@ -285,36 +330,11 @@ const InventoryTable = forwardRef(({
                   </button>
                 </div>
 
-                <div 
-                  className="flex items-center justify-start" 
-                  style={{ 
-                    width: '253px',
-                    height: '40px',
-                    paddingTop: '12px',
-                    paddingRight: '16px',
-                    paddingBottom: '12px',
-                    paddingLeft: '16px',
-                    gap: '10px',
-                  }}
-                >
-                  {showInputs ? (
-                    <input
-                      type="number"
-                      value={warehouseValue}
-                      onChange={(e) => {
-                        if (isBulkRow) {
-                          handleBulkEditChange(bottle.id, 'warehouseInventory', e.target.value);
-                        } else {
-                          setEditWarehouseInv(e.target.value);
-                        }
-                      }}
-                      className="w-28 rounded-full border border-blue-300 px-3 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
-                    />
-                  ) : (
-                    <span className="text-gray-900 text-left" style={{ fontSize: '14px' }}>
-                      {bottle.warehouseInventory.toLocaleString()}
-                    </span>
-                  )}
+                <div className="px-3 py-3 text-center">
+                  {/* Warehouse inventory is read-only - updated automatically when orders are received */}
+                  <span className={themeClasses.textPrimary} title="Warehouse inventory is updated automatically when orders are received">
+                    {bottle.warehouseInventory}
+                  </span>
                 </div>
 
                 <div 
@@ -365,7 +385,7 @@ const InventoryTable = forwardRef(({
                         type="button"
                         className="px-3 py-1 text-xs font-semibold text-white bg-blue-600 rounded-full hover:bg-blue-700"
                         onClick={() => {
-                          handleSaveEdit(bottle.id, editWarehouseInv, editSupplierInv, bottle.name);
+                          handleSaveEdit(bottle.id, editSupplierInv, bottle.name);
                         }}
                       >
                         Save
@@ -426,13 +446,7 @@ const InventoryTable = forwardRef(({
                 </div>
               </div>
             );
-          })}
-
-          {filteredData.length === 0 && (
-            <div className="px-6 py-6 text-center text-sm italic text-gray-400">
-              No bottles match your search.
-            </div>
-          )}
+          }))}
         </div>
       </div>
 

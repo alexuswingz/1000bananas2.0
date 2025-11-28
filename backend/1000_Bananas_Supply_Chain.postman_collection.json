@@ -1,0 +1,373 @@
+{
+	"info": {
+		"name": "1000 Bananas - Supply Chain & Production",
+		"description": "API endpoints for supply chain management and production planning",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Supply Chain - Bottles",
+			"item": [
+				{
+					"name": "Get All Bottle Orders",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com/supply-chain/bottles/orders",
+							"protocol": "https",
+							"host": ["sl2r0ip8zl", "execute-api", "ap-southeast-2", "amazonaws", "com"],
+							"path": ["supply-chain", "bottles", "orders"]
+						}
+					}
+				},
+				{
+					"name": "Get Bottle Orders by Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com/supply-chain/bottles/orders?status=pending",
+							"protocol": "https",
+							"host": ["sl2r0ip8zl", "execute-api", "ap-southeast-2", "amazonaws", "com"],
+							"path": ["supply-chain", "bottles", "orders"],
+							"query": [
+								{
+									"key": "status",
+									"value": "pending",
+									"description": "pending, ordered, in_transit, received, archived"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Bottle Order",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"order_number\": \"BO-2025-001\",\n  \"bottle_name\": \"8oz Tall Cylinder Bottle\",\n  \"supplier\": \"Rhino Container\",\n  \"order_date\": \"2025-11-28\",\n  \"expected_delivery_date\": \"2025-12-15\",\n  \"quantity_ordered\": 10000,\n  \"cost_per_unit\": 0.25,\n  \"total_cost\": 2500.00,\n  \"status\": \"pending\",\n  \"notes\": \"Regular order\"\n}"
+						},
+						"url": {
+							"raw": "https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com/supply-chain/bottles/orders",
+							"protocol": "https",
+							"host": ["sl2r0ip8zl", "execute-api", "ap-southeast-2", "amazonaws", "com"],
+							"path": ["supply-chain", "bottles", "orders"]
+						}
+					}
+				},
+				{
+					"name": "Update Bottle Order",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"received\",\n  \"actual_delivery_date\": \"2025-12-14\",\n  \"quantity_received\": 10000,\n  \"tracking_number\": \"TRACK123456\",\n  \"notes\": \"Delivered on time\"\n}"
+						},
+						"url": {
+							"raw": "https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com/supply-chain/bottles/orders/1",
+							"protocol": "https",
+							"host": ["sl2r0ip8zl", "execute-api", "ap-southeast-2", "amazonaws", "com"],
+							"path": ["supply-chain", "bottles", "orders", "1"]
+						}
+					}
+				},
+				{
+					"name": "Delete Bottle Order (Archive)",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com/supply-chain/bottles/orders/1",
+							"protocol": "https",
+							"host": ["sl2r0ip8zl", "execute-api", "ap-southeast-2", "amazonaws", "com"],
+							"path": ["supply-chain", "bottles", "orders", "1"]
+						}
+					}
+				},
+				{
+					"name": "Get Bottle Inventory",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com/supply-chain/bottles/inventory",
+							"protocol": "https",
+							"host": ["sl2r0ip8zl", "execute-api", "ap-southeast-2", "amazonaws", "com"],
+							"path": ["supply-chain", "bottles", "inventory"]
+						}
+					}
+				},
+				{
+					"name": "Update Bottle Inventory",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"warehouse_quantity\": 8000,\n  \"supplier_quantity\": 75000\n}"
+						},
+						"url": {
+							"raw": "https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com/supply-chain/bottles/inventory/1",
+							"protocol": "https",
+							"host": ["sl2r0ip8zl", "execute-api", "ap-southeast-2", "amazonaws", "com"],
+							"path": ["supply-chain", "bottles", "inventory", "1"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Supply Chain - Closures",
+			"item": [
+				{
+					"name": "Get All Closure Orders",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com/supply-chain/closures/orders",
+							"protocol": "https",
+							"host": ["sl2r0ip8zl", "execute-api", "ap-southeast-2", "amazonaws", "com"],
+							"path": ["supply-chain", "closures", "orders"]
+						}
+					}
+				},
+				{
+					"name": "Create Closure Order",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"order_number\": \"CO-2025-001\",\n  \"closure_name\": \"28mm Spray Top\",\n  \"supplier\": \"ABC Closures\",\n  \"order_date\": \"2025-11-28\",\n  \"expected_delivery_date\": \"2025-12-10\",\n  \"quantity_ordered\": 5000,\n  \"cost_per_unit\": 0.15,\n  \"total_cost\": 750.00,\n  \"status\": \"pending\"\n}"
+						},
+						"url": {
+							"raw": "https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com/supply-chain/closures/orders",
+							"protocol": "https",
+							"host": ["sl2r0ip8zl", "execute-api", "ap-southeast-2", "amazonaws", "com"],
+							"path": ["supply-chain", "closures", "orders"]
+						}
+					}
+				},
+				{
+					"name": "Update Closure Order",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"received\",\n  \"actual_delivery_date\": \"2025-12-09\",\n  \"quantity_received\": 5000\n}"
+						},
+						"url": {
+							"raw": "https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com/supply-chain/closures/orders/1",
+							"protocol": "https",
+							"host": ["sl2r0ip8zl", "execute-api", "ap-southeast-2", "amazonaws", "com"],
+							"path": ["supply-chain", "closures", "orders", "1"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Supply Chain - Boxes",
+			"item": [
+				{
+					"name": "Get All Box Orders",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com/supply-chain/boxes/orders",
+							"protocol": "https",
+							"host": ["sl2r0ip8zl", "execute-api", "ap-southeast-2", "amazonaws", "com"],
+							"path": ["supply-chain", "boxes", "orders"]
+						}
+					}
+				},
+				{
+					"name": "Create Box Order",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"order_number\": \"BX-2025-001\",\n  \"box_type\": \"Standard Shipping Box\",\n  \"supplier\": \"PackSupply Co\",\n  \"order_date\": \"2025-11-28\",\n  \"expected_delivery_date\": \"2025-12-05\",\n  \"quantity_ordered\": 1000,\n  \"cost_per_unit\": 1.50,\n  \"total_cost\": 1500.00,\n  \"status\": \"pending\"\n}"
+						},
+						"url": {
+							"raw": "https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com/supply-chain/boxes/orders",
+							"protocol": "https",
+							"host": ["sl2r0ip8zl", "execute-api", "ap-southeast-2", "amazonaws", "com"],
+							"path": ["supply-chain", "boxes", "orders"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Supply Chain - Labels",
+			"item": [
+				{
+					"name": "Get All Label Orders",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com/supply-chain/labels/orders",
+							"protocol": "https",
+							"host": ["sl2r0ip8zl", "execute-api", "ap-southeast-2", "amazonaws", "com"],
+							"path": ["supply-chain", "labels", "orders"]
+						}
+					}
+				},
+				{
+					"name": "Create Label Order",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"order_number\": \"LB-2025-001\",\n  \"label_name\": \"Air Plant Fertilizer Label\",\n  \"label_size\": \"5\\\" x 8\\\"\",\n  \"supplier\": \"Label Print Co\",\n  \"order_date\": \"2025-11-28\",\n  \"expected_delivery_date\": \"2025-12-20\",\n  \"quantity_ordered\": 5000,\n  \"cost_per_label\": 0.10,\n  \"total_cost\": 500.00,\n  \"status\": \"pending\"\n}"
+						},
+						"url": {
+							"raw": "https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com/supply-chain/labels/orders",
+							"protocol": "https",
+							"host": ["sl2r0ip8zl", "execute-api", "ap-southeast-2", "amazonaws", "com"],
+							"path": ["supply-chain", "labels", "orders"]
+						}
+					}
+				},
+				{
+					"name": "Get Label Costs - All",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com/supply-chain/labels/costs",
+							"protocol": "https",
+							"host": ["sl2r0ip8zl", "execute-api", "ap-southeast-2", "amazonaws", "com"],
+							"path": ["supply-chain", "labels", "costs"]
+						}
+					}
+				},
+				{
+					"name": "Get Label Costs - By Size",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com/supply-chain/labels/costs?size=5\" x 8\"",
+							"protocol": "https",
+							"host": ["sl2r0ip8zl", "execute-api", "ap-southeast-2", "amazonaws", "com"],
+							"path": ["supply-chain", "labels", "costs"],
+							"query": [
+								{
+									"key": "size",
+									"value": "5\" x 8\""
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Production Planning",
+			"item": [
+				{
+					"name": "Get Production Planning Data",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com/production/planning",
+							"protocol": "https",
+							"host": ["sl2r0ip8zl", "execute-api", "ap-southeast-2", "amazonaws", "com"],
+							"path": ["production", "planning"]
+						},
+						"description": "Returns products with BPM, formula availability, and sales data"
+					}
+				},
+				{
+					"name": "Calculate Production Time",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com/production/calculate-time?product=Air Plant Fertilizer&units=1000",
+							"protocol": "https",
+							"host": ["sl2r0ip8zl", "execute-api", "ap-southeast-2", "amazonaws", "com"],
+							"path": ["production", "calculate-time"],
+							"query": [
+								{
+									"key": "product",
+									"value": "Air Plant Fertilizer",
+									"description": "Product name"
+								},
+								{
+									"key": "units",
+									"value": "1000",
+									"description": "Number of units to manufacture"
+								}
+							]
+						},
+						"description": "Calculate bottling and packaging time for a product"
+					}
+				},
+				{
+					"name": "Get Warehouse Capacity",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com/production/warehouse-capacity",
+							"protocol": "https",
+							"host": ["sl2r0ip8zl", "execute-api", "ap-southeast-2", "amazonaws", "com"],
+							"path": ["production", "warehouse-capacity"]
+						},
+						"description": "Check current warehouse capacity for all bottles"
+					}
+				}
+			]
+		}
+	]
+}
+

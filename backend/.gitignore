@@ -38,3 +38,12 @@ Thumbs.db
 # Lambda
 lambda/*.zip
 
+# Environment variables
+.env
+.env.local
+
+# Temporary CSV exports
+*.csv
+
+# Excel database files (keep in local only)
+*.xlsx
