@@ -1,7 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 
-const VarianceExceededModal = ({ isOpen, onClose, onGoBack, onRecount, varianceCount = 0 }) => {
+const VarianceStillExceededModal = ({ isOpen, onClose, onGoBack, onConfirm }) => {
   if (!isOpen) return null;
 
   return createPortal(
@@ -13,7 +13,7 @@ const VarianceExceededModal = ({ isOpen, onClose, onGoBack, onRecount, varianceC
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 10000,
+        zIndex: 10001,
       }}
       onClick={onClose}
     >
@@ -32,13 +32,14 @@ const VarianceExceededModal = ({ isOpen, onClose, onGoBack, onRecount, varianceC
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Orange Warning Icon */}
+        {/* Warning Icon - Gray outlined circle with orange exclamation */}
         <div
           style={{
             width: '64px',
             height: '64px',
             borderRadius: '50%',
-            backgroundColor: '#F97316',
+            border: '2px solid #E5E7EB',
+            backgroundColor: '#FFFFFF',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -49,8 +50,8 @@ const VarianceExceededModal = ({ isOpen, onClose, onGoBack, onRecount, varianceC
             height="32"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#FFFFFF"
-            strokeWidth="3"
+            stroke="#F97316"
+            strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
           >
@@ -77,13 +78,13 @@ const VarianceExceededModal = ({ isOpen, onClose, onGoBack, onRecount, varianceC
           style={{
             fontSize: '14px',
             fontWeight: 400,
-            color: '#6B7280',
+            color: '#374151',
             margin: 0,
             textAlign: 'center',
             lineHeight: '1.5',
           }}
         >
-          {varianceCount} {varianceCount === 1 ? 'product exceeds' : 'products exceed'} allowed variance. Please perform a recount.
+          Your recount still exceeds the allowed variance. Confirm this variance or go back and edit the count.
         </p>
 
         {/* Action Buttons */}
@@ -103,7 +104,7 @@ const VarianceExceededModal = ({ isOpen, onClose, onGoBack, onRecount, varianceC
               padding: '10px 16px',
               borderRadius: '6px',
               border: '1px solid #D1D5DB',
-              backgroundColor: '#F9FAFB',
+              backgroundColor: '#FFFFFF',
               color: '#374151',
               fontSize: '14px',
               fontWeight: 500,
@@ -111,17 +112,17 @@ const VarianceExceededModal = ({ isOpen, onClose, onGoBack, onRecount, varianceC
               transition: 'all 0.2s',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#F3F4F6';
+              e.currentTarget.style.backgroundColor = '#F9FAFB';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#F9FAFB';
+              e.currentTarget.style.backgroundColor = '#FFFFFF';
             }}
           >
             Go Back
           </button>
           <button
             type="button"
-            onClick={onRecount}
+            onClick={onConfirm}
             style={{
               flex: 1,
               padding: '10px 16px',
@@ -141,7 +142,7 @@ const VarianceExceededModal = ({ isOpen, onClose, onGoBack, onRecount, varianceC
               e.currentTarget.style.backgroundColor = '#3B82F6';
             }}
           >
-            Recount ({varianceCount})
+            Confirm
           </button>
         </div>
       </div>
@@ -150,9 +151,5 @@ const VarianceExceededModal = ({ isOpen, onClose, onGoBack, onRecount, varianceC
   );
 };
 
-export default VarianceExceededModal;
-
-
-
-
+export default VarianceStillExceededModal;
 
