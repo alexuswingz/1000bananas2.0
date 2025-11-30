@@ -21,6 +21,7 @@ import ExportTemplateModal from './components/ExportTemplateModal';
 import SortProductsCompleteModal from './components/SortProductsCompleteModal';
 import SortFormulasCompleteModal from './components/SortFormulasCompleteModal';
 import VarianceExceededModal from './components/VarianceExceededModal';
+import LabelCheckCompleteModal from './components/LabelCheckCompleteModal';
 
 const NewShipment = () => {
   const { isDarkMode } = useTheme();
@@ -37,9 +38,11 @@ const NewShipment = () => {
   const [isSortProductsCompleteOpen, setIsSortProductsCompleteOpen] = useState(false);
   const [isSortFormulasCompleteOpen, setIsSortFormulasCompleteOpen] = useState(false);
   const [isVarianceExceededOpen, setIsVarianceExceededOpen] = useState(false);
+  const [isLabelCheckCompleteOpen, setIsLabelCheckCompleteOpen] = useState(false);
   const [varianceCount, setVarianceCount] = useState(0);
   const [isRecountMode, setIsRecountMode] = useState(false);
   const [varianceExceededRowIds, setVarianceExceededRowIds] = useState([]);
+  const [labelCheckRows, setLabelCheckRows] = useState([]);
   const [tableMode, setTableMode] = useState(false);
   const [activeAction, setActiveAction] = useState('add-products');
   const [completedTabs, setCompletedTabs] = useState(new Set());
@@ -51,7 +54,7 @@ const NewShipment = () => {
   const floorInventoryButtonRef = useRef(null);
   const [floorInventoryPosition, setFloorInventoryPosition] = useState({ top: 0, left: 0 });
   const [shipmentData, setShipmentData] = useState({
-    shipmentNumber: new Date().toISOString().split('T')[0].replace(/-/g, '.') + ' AWD',
+    shipmentNumber: new Date().toISOString().split('T')[0].replace(/-/g, '.') + '-' + Date.now().toString().slice(-6),
     shipmentDate: new Date().toISOString().split('T')[0], // YYYY-MM-DD format
     shipmentType: 'AWD',
     location: '',
@@ -399,6 +402,51 @@ const NewShipment = () => {
     }
   };
 
+  // Check for variance exceeded and get row IDs
+  const checkVarianceExceeded = () => {
+    // For label-check and formula-check actions, check if there are products with variance exceeded
+    if (activeAction === 'label-check') {
+      // Check rows from LabelCheckTable
+      // Variance is exceeded when totalCount exists and exceeds a threshold
+      // Threshold: absolute value > 5% of lblCurrentInv or > 10 units (whichever is larger)
+      const varianceThreshold = 10; // Minimum threshold in units
+      const varianceThresholdPercent = 0.05; // 5% threshold
+      
+      const rowsWithVariance = labelCheckRows.filter(row => {
+        // Only check rows that have been completed (have a totalCount value)
+        if (row.totalCount === '' || row.totalCount === null || row.totalCount === undefined) {
+          return false;
+        }
+        
+        const totalCount = typeof row.totalCount === 'number' ? row.totalCount : parseFloat(row.totalCount) || 0;
+        const lblCurrentInv = row.lblCurrentInv || 0;
+        
+        // Calculate absolute variance
+        const absVariance = Math.abs(totalCount);
+        
+        // Check if variance exceeds threshold (either absolute or percentage)
+        const percentThreshold = Math.abs(lblCurrentInv * varianceThresholdPercent);
+        const threshold = Math.max(varianceThreshold, percentThreshold);
+        
+        return absVariance > threshold;
+      });
+      
+      const varianceRowIds = rowsWithVariance.map(row => row.id);
+      setVarianceExceededRowIds(varianceRowIds);
+      return varianceRowIds.length;
+    }
+    
+    if (activeAction === 'formula-check') {
+      // Similar logic for formula-check if needed
+      // For now, return 0
+      setVarianceExceededRowIds([]);
+      return 0;
+    }
+    
+    setVarianceExceededRowIds([]);
+    return 0;
+  };
+
   const handleBeginSortFormulas = async () => {
     try {
       if (!shipmentId) {
@@ -448,14 +496,22 @@ const NewShipment = () => {
       }
 
       if (activeAction === 'label-check') {
+        // Check for variance first
+        const varianceCount = checkVarianceExceeded();
+        if (varianceCount > 0) {
+          setVarianceCount(varianceCount);
+          setIsVarianceExceededOpen(true);
+          return;
+        }
+        
         // Label Check: Complete and prepare for Sort Products
         await updateShipment(shipmentId, {
           label_check_completed: true,
           status: 'sort_products',
         });
         setCompletedTabs(prev => new Set(prev).add('label-check'));
+        setIsLabelCheckCompleteOpen(true);
         toast.success('Label Check completed! Ready for manufacturing.');
-        // User can now manually navigate to Sort Products/Formulas for production
         return;
       }
 
@@ -892,6 +948,7 @@ const NewShipment = () => {
                 setIsRecountMode(false);
                 setVarianceExceededRowIds([]);
               }}
+              onRowsDataChange={setLabelCheckRows}
             />
           </div>
         )}
@@ -1090,12 +1147,38 @@ const NewShipment = () => {
         onRecount={handleVarianceRecount}
         varianceCount={varianceCount}
       />
-      <VarianceExceededModal
-        isOpen={isVarianceExceededOpen}
-        onClose={() => setIsVarianceExceededOpen(false)}
-        onGoBack={handleVarianceGoBack}
-        onRecount={handleVarianceRecount}
-        varianceCount={varianceCount}
+      <LabelCheckCompleteModal
+        isOpen={isLabelCheckCompleteOpen}
+        onClose={() => setIsLabelCheckCompleteOpen(false)}
+        onGoToShipments={() => {
+          // Collect completed rows from label check and pass to planning
+          console.log('All labelCheckRows:', labelCheckRows);
+          console.log('Shipment data:', shipmentData);
+          
+          const completedRows = labelCheckRows.filter(row => 
+            row.totalCount !== '' && row.totalCount !== null && row.totalCount !== undefined
+          );
+          
+          console.log('Completed rows (with totalCount):', completedRows);
+          console.log('Number of completed rows:', completedRows.length);
+          
+          // Store in localStorage BEFORE navigation so planning page can read it
+          const dataToSave = {
+            rows: completedRows,
+            shipmentData: shipmentData,
+            timestamp: new Date().toISOString(),
+          };
+          
+          console.log('Data to save to localStorage:', dataToSave);
+          localStorage.setItem('labelCheckCompletedRows', JSON.stringify(dataToSave));
+          
+          // Verify it was saved
+          const saved = localStorage.getItem('labelCheckCompletedRows');
+          console.log('Verified localStorage save:', saved ? 'SUCCESS' : 'FAILED');
+          if (saved) {
+            console.log('Saved data:', JSON.parse(saved));
+          }
+        }}
       />
     </div>
   );

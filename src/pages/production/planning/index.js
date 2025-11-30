@@ -21,6 +21,70 @@ const Planning = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // State for planning table rows
+  const [rows, setRows] = useState([
+    {
+      id: 1,
+      status: 'Packaging',
+      shipment: '2025.11.18 AWD',
+      marketplace: 'Amazon',
+      account: 'TPS Nutrients',
+      addProducts: 'completed',
+      formulaCheck: 'completed',
+      labelCheck: 'in progress',
+      sortProducts: 'pending',
+      sortFormulas: 'pending',
+    },
+    {
+      id: 2,
+      status: 'Packaging',
+      shipment: '2025.11.19 FBA',
+      marketplace: 'Amazon',
+      account: 'TPS Nutrients',
+      addProducts: 'completed',
+      formulaCheck: 'pending',
+      labelCheck: 'pending',
+      sortProducts: 'pending',
+      sortFormulas: 'pending',
+    },
+    {
+      id: 3,
+      status: 'Shipped',
+      shipment: '2025.11.20 AWD',
+      marketplace: 'Amazon',
+      account: 'TPS Nutrients',
+      addProducts: 'completed',
+      formulaCheck: 'completed',
+      labelCheck: 'completed',
+      sortProducts: 'completed',
+      sortFormulas: 'completed',
+    },
+    {
+      id: 4,
+      status: 'Ready for Pickup',
+      shipment: '2025.11.21 AWD',
+      marketplace: 'Amazon',
+      account: 'TPS Nutrients',
+      addProducts: 'completed',
+      formulaCheck: 'completed',
+      labelCheck: 'completed',
+      sortProducts: 'completed',
+      sortFormulas: 'in progress',
+    },
+    {
+      id: 5,
+      status: 'Packaging',
+      shipment: '2025.11.22 FBA',
+      marketplace: 'Amazon',
+      account: 'TPS Nutrients',
+      addProducts: 'in progress',
+      formulaCheck: 'pending',
+      labelCheck: 'pending',
+      sortProducts: 'pending',
+      sortFormulas: 'pending',
+    },
+  ]);
+
   const themeClasses = {
     pageBg: isDarkMode ? 'bg-dark-bg-primary' : 'bg-light-bg-primary',
   };
@@ -121,6 +185,88 @@ const Planning = () => {
   };
 
   // Use shipments from API instead of dummy data
+  
+  // Check for completed label check rows from localStorage
+  useEffect(() => {
+    console.log('Planning page mounted/activeTab changed:', activeTab);
+    
+    const checkForCompletedRows = () => {
+      console.log('Checking localStorage for completed rows...');
+      const completedLabelCheck = localStorage.getItem('labelCheckCompletedRows');
+      console.log('localStorage value:', completedLabelCheck);
+      
+      if (completedLabelCheck) {
+        try {
+          const data = JSON.parse(completedLabelCheck);
+          console.log('Parsed data:', data);
+          const { rows: completedRows, shipmentData } = data;
+          
+          console.log('Found completed label check rows:', completedRows?.length);
+          console.log('Completed rows data:', completedRows);
+          console.log('Shipment data:', shipmentData);
+          
+          if (completedRows && completedRows.length > 0) {
+            // Create a new shipment entry from the completed label check
+            const shipmentDate = new Date().toISOString().split('T')[0];
+            const shipmentType = shipmentData?.shipmentType || 'AWD';
+            const shipmentNumber = shipmentData?.shipmentNumber || `${shipmentDate} ${shipmentType}`;
+            
+            const newShipmentRow = {
+              id: Date.now(),
+              status: 'Packaging',
+              shipment: shipmentNumber,
+              marketplace: shipmentData?.marketplace || 'Amazon',
+              account: shipmentData?.account || 'TPS',
+              addProducts: 'completed',
+              formulaCheck: 'completed',
+              labelCheck: 'completed',
+              sortProducts: 'pending',
+              sortFormulas: 'pending',
+              completedRows: completedRows,
+            };
+            
+            console.log('Adding new shipment row:', newShipmentRow);
+            
+            // Add to the rows array
+            setRows(prev => {
+              console.log('Current rows before adding:', prev.length);
+              // Check if this shipment already exists to avoid duplicates
+              const exists = prev.some(row => 
+                row.shipment === newShipmentRow.shipment && 
+                row.labelCheck === 'completed'
+              );
+              if (exists) {
+                console.log('Shipment already exists, skipping');
+                return prev;
+              }
+              const newRows = [newShipmentRow, ...prev];
+              console.log('New rows after adding:', newRows.length);
+              return newRows;
+            });
+            
+            // Clear localStorage after processing
+            localStorage.removeItem('labelCheckCompletedRows');
+            console.log('Cleared localStorage');
+          } else {
+            console.log('No completed rows found in data');
+          }
+        } catch (error) {
+          console.error('Error processing completed label check:', error);
+          localStorage.removeItem('labelCheckCompletedRows');
+        }
+      } else {
+        console.log('No data found in localStorage');
+      }
+    };
+    
+    // Check immediately on mount
+    checkForCompletedRows();
+    
+    // Also check when activeTab changes to 'shipments' in case user navigates away and back
+    if (activeTab === 'shipments') {
+      checkForCompletedRows();
+    }
+  }, [activeTab]);
 
   const toggleFilter = (key) => {
     setActiveFilters((prev) =>

@@ -2,8 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 import { getShipmentProducts } from '../../../../services/productionApi';
+import VarianceStillExceededModal from './VarianceStillExceededModal';
 
-const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRowIds = [], onExitRecountMode }) => {
+const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRowIds = [], onExitRecountMode, onRowsDataChange }) => {
   const { isDarkMode } = useTheme();
   const [isExpanded, setIsExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -14,13 +15,28 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
       setIsExpanded(true);
     }
   }, [isRecountMode]);
-  
+
+  // Reset completed status for rows that need recount
+  useEffect(() => {
+    if (isRecountMode && varianceExceededRowIds.length > 0) {
+      setCompletedRows(prev => {
+        const newSet = new Set(prev);
+        // Remove rows that need recount from completed set so they show "Start" again
+        varianceExceededRowIds.forEach(id => {
+          newSet.delete(id);
+        });
+        return newSet;
+      });
+    }
+  }, [isRecountMode, varianceExceededRowIds]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
   const [selectedRowIndex, setSelectedRowIndex] = useState(null);
   const [fullRolls, setFullRolls] = useState(['', '', '']);
   const [partialWeights, setPartialWeights] = useState(['', '', '']);
   const [openFilterColumn, setOpenFilterColumn] = useState(null);
+  const [completedRows, setCompletedRows] = useState(new Set());
+  const [isVarianceStillExceededOpen, setIsVarianceStillExceededOpen] = useState(false);
   const filterIconRefs = useRef({});
   const filterDropdownRef = useRef(null);
 
@@ -91,18 +107,57 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
   };
 
   const handleSave = () => {
-    if (selectedRowIndex !== null) {
+    if (selectedRow && selectedRow.id) {
       const discrepancy = calculateDiscrepancy();
+      const lblCurrentInv = selectedRow.lblCurrentInv || 0;
+      
+      // Check if variance still exceeds after saving
+      const varianceStillExceeds = checkVarianceExceeded(discrepancy, lblCurrentInv);
+      
+      if (varianceStillExceeds) {
+        // Show the variance still exceeded modal
+        setIsVarianceStillExceededOpen(true);
+        // Don't close the edit modal yet - user might want to go back and edit
+        return;
+      }
+      
       // Only save if there's a discrepancy (positive or negative)
       if (discrepancy !== 0) {
-        const updatedRows = [...rows];
-        updatedRows[selectedRowIndex] = {
-          ...updatedRows[selectedRowIndex],
-          totalCount: discrepancy,
-        };
+        const updatedRows = rows.map(row => 
+          row.id === selectedRow.id 
+            ? { ...row, totalCount: discrepancy }
+            : row
+        );
         setRows(updatedRows);
       }
+      // Mark the row as completed
+      setCompletedRows(prev => new Set(prev).add(selectedRow.id));
+      handleCloseModal();
     }
+  };
+
+  const handleVarianceGoBack = () => {
+    // Close the variance modal but keep the edit modal open
+    setIsVarianceStillExceededOpen(false);
+  };
+
+  const handleVarianceConfirm = () => {
+    // User confirmed the variance - save the data and close both modals
+    if (selectedRow && selectedRow.id) {
+      const discrepancy = calculateDiscrepancy();
+      // Save the discrepancy even though variance exceeds
+      if (discrepancy !== 0) {
+        const updatedRows = rows.map(row => 
+          row.id === selectedRow.id 
+            ? { ...row, totalCount: discrepancy }
+            : row
+        );
+        setRows(updatedRows);
+      }
+      // Mark the row as completed
+      setCompletedRows(prev => new Set(prev).add(selectedRow.id));
+    }
+    setIsVarianceStillExceededOpen(false);
     handleCloseModal();
   };
 
@@ -148,6 +203,25 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
     const currentInventory = selectedRow.lblCurrentInv || 0;
     return calculatedTotal - currentInventory;
   };
+
+  // Check if variance exceeds threshold
+  const checkVarianceExceeded = (discrepancy, lblCurrentInv) => {
+    const varianceThreshold = 10; // Minimum threshold in units
+    const varianceThresholdPercent = 0.05; // 5% threshold
+    
+    const absVariance = Math.abs(discrepancy);
+    const percentThreshold = Math.abs(lblCurrentInv * varianceThresholdPercent);
+    const threshold = Math.max(varianceThreshold, percentThreshold);
+    
+    return absVariance > threshold;
+  };
+
+  // Notify parent component when rows data changes
+  useEffect(() => {
+    if (onRowsDataChange) {
+      onRowsDataChange(rows);
+    }
+  }, [rows, onRowsDataChange]);
 
   // Close filter dropdown when clicking outside
   useEffect(() => {
@@ -460,34 +534,60 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
                     textAlign: 'center',
                     height: '40px',
                   }}>
-                    <button
-                      type="button"
-                      onClick={() => handleStartClick(row, index)}
-                      style={{
-                        height: '24px',
-                        padding: '0 12px',
-                        borderRadius: '6px',
-                        border: 'none',
-                        backgroundColor: '#3B82F6',
-                        color: '#FFFFFF',
-                        fontSize: '14px',
-                        fontWeight: 500,
-                        cursor: 'pointer',
-                        transition: 'background-color 0.2s',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        whiteSpace: 'nowrap',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#2563EB';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#3B82F6';
-                      }}
-                    >
-                      Start
-                    </button>
+                    {completedRows.has(row.id) ? (
+                      <button
+                        type="button"
+                        disabled
+                        style={{
+                          height: '23px',
+                          padding: '0 10px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          backgroundColor: '#22C55E',
+                          color: '#FFFFFF',
+                          fontSize: '14px',
+                          fontWeight: 500,
+                          cursor: 'default',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          whiteSpace: 'nowrap',
+                          minWidth: '55px',
+                        }}
+                      >
+                        Done
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleStartClick(row, index)}
+                        style={{
+                          height: '23px',
+                          padding: '0 10px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          backgroundColor: '#3B82F6',
+                          color: '#FFFFFF',
+                          fontSize: '14px',
+                          fontWeight: 500,
+                          cursor: 'pointer',
+                          transition: 'background-color 0.2s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          whiteSpace: 'nowrap',
+                          minWidth: '55px',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#2563EB';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = '#3B82F6';
+                        }}
+                      >
+                        Start
+                      </button>
+                    )}
                   </td>
                   <td style={{
                     padding: '0 16px',
@@ -965,6 +1065,14 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
           isDarkMode={isDarkMode}
         />
       )}
+
+      {/* Variance Still Exceeded Modal */}
+      <VarianceStillExceededModal
+        isOpen={isVarianceStillExceededOpen}
+        onClose={() => setIsVarianceStillExceededOpen(false)}
+        onGoBack={handleVarianceGoBack}
+        onConfirm={handleVarianceConfirm}
+      />
     </div>
   );
 };
