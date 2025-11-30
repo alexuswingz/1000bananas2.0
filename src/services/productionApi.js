@@ -259,6 +259,247 @@ export const getAllShipments = async ({ status } = {}) => {
   }
 };
 
+/**
+ * Get shipment by ID with products
+ * @param {number} shipmentId - Shipment ID
+ * @returns {Promise<Object>} Shipment object with products
+ */
+export const getShipmentById = async (shipmentId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/production/shipments/${shipmentId}`);
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to fetch shipment');
+    }
+    
+    return data.data;
+  } catch (error) {
+    console.error(`Error fetching shipment ${shipmentId}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Update shipment
+ * @param {number} shipmentId - Shipment ID
+ * @param {Object} updates - Fields to update
+ * @returns {Promise<Object>} Updated shipment object
+ */
+export const updateShipment = async (shipmentId, updates) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/production/shipments/${shipmentId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updates),
+    });
+    
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to update shipment');
+    }
+    
+    return data.data;
+  } catch (error) {
+    console.error(`Error updating shipment ${shipmentId}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Add products to shipment
+ * @param {number} shipmentId - Shipment ID
+ * @param {Array} products - Array of products with catalog_id and quantity
+ * @returns {Promise<Array>} Added products
+ */
+export const addShipmentProducts = async (shipmentId, products) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/production/shipments/${shipmentId}/products`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ products }),
+    });
+    
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to add products to shipment');
+    }
+    
+    return data.data;
+  } catch (error) {
+    console.error(`Error adding products to shipment ${shipmentId}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Get shipment products with inventory levels
+ * @param {number} shipmentId - Shipment ID
+ * @returns {Promise<Array>} Products with inventory availability
+ */
+export const getShipmentProducts = async (shipmentId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/production/shipments/${shipmentId}/products`);
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to fetch shipment products');
+    }
+    
+    return data.data;
+  } catch (error) {
+    console.error(`Error fetching products for shipment ${shipmentId}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Get formula check data for shipment
+ * @param {number} shipmentId - Shipment ID
+ * @returns {Promise<Array>} Formula aggregation with availability
+ */
+export const getShipmentFormulaCheck = async (shipmentId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/production/shipments/${shipmentId}/formula-check`);
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to fetch formula check data');
+    }
+    
+    return data.data;
+  } catch (error) {
+    console.error(`Error fetching formula check for shipment ${shipmentId}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Get inventory levels for all products with supply chain dependencies
+ * @returns {Promise<Array>} Products with inventory, DOI, and supply chain data
+ */
+export const getProductsInventory = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/production/products/inventory`);
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to fetch products inventory');
+    }
+    
+    return data.data || [];
+  } catch (error) {
+    console.error('Error fetching products inventory:', error);
+    // Return empty array on error instead of throwing
+    return [];
+  }
+};
+
+// ============================================
+// FLOOR INVENTORY
+// ============================================
+
+/**
+ * Get sellable products (all components in stock)
+ * @returns {Promise<Array>} Products ready to manufacture/ship
+ */
+export const getSellables = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/production/floor-inventory/sellables`);
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to fetch sellables');
+    }
+    
+    return data.data || [];
+  } catch (error) {
+    console.error('Error fetching sellables:', error);
+    return [];
+  }
+};
+
+/**
+ * Get shiners (damaged/cosmetic issue products)
+ * @returns {Promise<Array>} Shiners grouped by formula
+ */
+export const getShiners = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/production/floor-inventory/shiners`);
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to fetch shiners');
+    }
+    
+    return data.data || [];
+  } catch (error) {
+    console.error('Error fetching shiners:', error);
+    return [];
+  }
+};
+
+/**
+ * Add a damaged product to shiners inventory
+ * @param {Object} shinerData - Shiner details
+ * @param {number} shinerData.catalog_id - Product catalog ID
+ * @param {number} shinerData.quantity - Quantity of damaged units
+ * @param {string} shinerData.issue_type - Type of issue
+ * @param {string} shinerData.severity - Severity level
+ * @param {string} shinerData.location - Warehouse location
+ * @param {string} shinerData.notes - Additional notes
+ * @param {boolean} shinerData.can_rework - Can be reworked?
+ * @returns {Promise<Object>} Created shiner record
+ */
+export const addShiner = async (shinerData) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/production/floor-inventory/shiners`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(shinerData),
+    });
+    
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to add shiner');
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error adding shiner:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get unused formulas (excess formula inventory)
+ * @returns {Promise<Array>} Formulas with excess inventory
+ */
+export const getUnusedFormulas = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/production/floor-inventory/unused-formulas`);
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to fetch unused formulas');
+    }
+    
+    return data.data || [];
+  } catch (error) {
+    console.error('Error fetching unused formulas:', error);
+    return [];
+  }
+};
+
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
@@ -300,6 +541,20 @@ export default {
   // Shipments
   createShipment,
   getAllShipments,
+  getShipmentById,
+  updateShipment,
+  addShipmentProducts,
+  getShipmentProducts,
+  getShipmentFormulaCheck,
+  
+  // Products Inventory
+  getProductsInventory,
+  
+  // Floor Inventory
+  getSellables,
+  getShiners,
+  addShiner,
+  getUnusedFormulas,
   
   // Helpers
   calculateFormulaGallons,

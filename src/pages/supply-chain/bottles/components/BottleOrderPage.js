@@ -18,12 +18,8 @@ const BottleOrderPage = () => {
   const isReceiveMode = mode === 'receive';
   const orderId = state.orderId || null;
 
-  // Get lines from state or use default
-  const allLines = state.lines || [
-    { id: 1, name: '8oz', supplierInventory: 'Auto Replenishment', unitsNeeded: 29120, qty: 14560, pallets: 2.0, added: false, inventoryPercentage: 50 },
-    { id: 2, name: 'Quart', supplierInventory: 'Auto Replenishment', unitsNeeded: 5040, qty: 1080, pallets: 1.5, added: false, inventoryPercentage: 75 },
-    { id: 3, name: 'Gallon', supplierInventory: 'Auto Replenishment', unitsNeeded: 768, qty: 774, pallets: 4.0, added: false, inventoryPercentage: 100 },
-  ];
+  // Get lines from state or default (will be replaced by API data)
+  const allLines = state.lines || [];
 
   // Navigation tab state
   const [activeTab, setActiveTab] = useState(() => {
@@ -31,6 +27,8 @@ const BottleOrderPage = () => {
     return (mode === 'view' || mode === 'receive') ? 'receivePO' : 'addProducts';
   });
   const [searchQuery, setSearchQuery] = useState('');
+  const [bottleInventoryData, setBottleInventoryData] = useState({});
+  
   // Initialize order lines - items in view mode are already "added", new orders start with all items not added
   const [orderLines, setOrderLines] = useState(() => {
     return allLines.map((line) => ({
@@ -39,12 +37,145 @@ const BottleOrderPage = () => {
     }));
   });
   
+  // Fetch bottle inventory data for calculations
+  useEffect(() => {
+    const fetchBottleData = async () => {
+      try {
+        const response = await bottlesApi.getInventory();
+        if (response.success) {
+          // Create a map with BOTH full names and short names as keys
+          const dataMap = {};
+          const bottlesList = [];
+          
+          response.data.forEach((bottle, index) => {
+            const bottleData = {
+              fullName: bottle.bottle_name,
+              unitsPerPallet: bottle.units_per_pallet || 1,
+              maxWarehouseInventory: bottle.max_warehouse_inventory,
+              warehouseQuantity: bottle.warehouse_quantity || 0,
+              supplierQuantity: bottle.supplier_quantity || 0,
+              supplier: bottle.supplier || '',
+            };
+            
+            // Store by full name
+            dataMap[bottle.bottle_name] = bottleData;
+            
+            // Extract short name (first part before space, or full name if no space)
+            const shortName = bottle.bottle_name.split(' ')[0] || bottle.bottle_name;
+            
+            // Store by short name too
+            dataMap[shortName] = bottleData;
+            
+            // Always create bottle line items for ALL bottles
+            bottlesList.push({
+              id: index + 1,
+              name: shortName,
+              fullName: bottle.bottle_name,
+              supplierInventory: bottle.supplier_quantity ? bottle.supplier_quantity.toLocaleString() : 'N/A',
+              supplier: bottle.supplier || '',
+              qty: 0,
+              pallets: 0,
+              added: false,
+              inventoryPercentage: 0,
+              maxWarehouseInventory: bottle.max_warehouse_inventory,
+              warehouseQuantity: bottle.warehouse_quantity || 0,
+              unitsPerPallet: bottle.units_per_pallet || 1,
+            });
+          });
+          
+          setBottleInventoryData(dataMap);
+          
+          // Set order lines for create mode
+          if (isCreateMode) {
+            setOrderLines(bottlesList.map(line => ({
+              ...line,
+              added: false, // Start with nothing added
+            })));
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching bottle inventory:', err);
+      }
+    };
+    
+    if (isCreateMode) {
+      fetchBottleData();
+    }
+  }, [isCreateMode, isViewMode]);
+  
   // Ensure tab is set to receivePO when viewing an order
   useEffect(() => {
     if (isViewMode) {
       setActiveTab('receivePO');
     }
   }, [isViewMode]);
+
+  // Fetch actual order details when viewing an order
+  useEffect(() => {
+    const fetchOrderDetails = async () => {
+      if (isViewMode && orderId) {
+        try {
+          const response = await bottlesApi.getOrder(orderId);
+          console.log('Fetched order response:', response);
+          if (response.success && response.data) {
+            const order = response.data;
+            console.log('Order data:', order);
+            console.log('Order lines:', order.lines);
+            
+            // Get all bottles inventory for reference
+            const inventoryResponse = await bottlesApi.getInventory();
+            const bottleInventoryData = {};
+            
+            if (inventoryResponse.success) {
+              inventoryResponse.data.forEach((bottle) => {
+                const fullName = bottle.bottle_name;
+                const shortName = fullName.split(' ')[0]; // e.g., "8oz"
+                
+                const bottleData = {
+                  fullName: fullName,
+                  unitsPerPallet: bottle.units_per_pallet || 1,
+                  maxWarehouseInventory: bottle.max_warehouse_inventory,
+                  warehouseQuantity: bottle.warehouse_quantity || 0,
+                  supplierQuantity: bottle.supplier_quantity || 0,
+                  supplier: bottle.supplier || '',
+                };
+                
+                // Store with both full name and short name as keys
+                bottleInventoryData[fullName] = bottleData;
+                bottleInventoryData[shortName] = bottleData;
+              });
+            }
+            
+            // Transform order lines to match the expected format
+            const orderLinesFormatted = (order.lines || []).map(item => {
+              const bottleName = item.bottle_name;
+              const bottleInfo = bottleInventoryData[bottleName] || {};
+              
+              return {
+                id: item.id,
+                name: bottleInfo.fullName || bottleName,
+                supplierInventory: bottleInfo.supplierQuantity || 0,
+                qty: item.quantity_ordered || 0,
+                pallets: calculatePallets(item.quantity_ordered || 0, bottleInfo.unitsPerPallet || 1),
+                added: true, // Mark as added since it's from the order
+                maxWarehouseInventory: bottleInfo.maxWarehouseInventory,
+                warehouseQuantity: bottleInfo.warehouseQuantity || 0,
+                unitsPerPallet: bottleInfo.unitsPerPallet || 1,
+              };
+            });
+            
+            console.log('Order lines formatted:', orderLinesFormatted);
+            setOrderLines(orderLinesFormatted);
+          }
+        } catch (error) {
+          console.error('Error fetching order details:', error);
+          alert('Failed to load order details. Please try again.');
+        }
+      }
+    };
+    
+    fetchOrderDetails();
+  }, [isViewMode, orderId]);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showReceiveConfirmModal, setShowReceiveConfirmModal] = useState(false);
   const [showPartialOrderModal, setShowPartialOrderModal] = useState(false);
@@ -115,19 +246,81 @@ const BottleOrderPage = () => {
 
   const handleAddProduct = (lineId) => {
     setOrderLines((prev) =>
-      prev.map((line) =>
-        line.id === lineId
-          ? { ...line, added: !line.added, qty: line.added ? 0 : (line.qty || 0) }
-          : line
-      )
+      prev.map((line) => {
+        if (line.id === lineId) {
+          const isAdding = !line.added;
+          
+          // Get bottle data for calculations
+          const bottleData = bottleInventoryData[line.name] || {};
+          const unitsPerPallet = bottleData.unitsPerPallet || line.unitsPerPallet || 1;
+          const maxInventory = bottleData.maxWarehouseInventory || line.maxWarehouseInventory || 0;
+          const currentInventory = bottleData.warehouseQuantity || line.warehouseQuantity || 0;
+          
+          if (isAdding) {
+            // When adding, set a default quantity if needed
+            const defaultQty = line.qty > 0 ? line.qty : unitsPerPallet;
+            const pallets = calculatePallets(defaultQty, unitsPerPallet);
+            const inventoryPercentage = maxInventory > 0 
+              ? Math.round(((currentInventory + defaultQty) / maxInventory) * 100)
+              : 0;
+            
+            return { 
+              ...line, 
+              added: true, 
+              qty: defaultQty,
+              pallets: parseFloat(pallets.toFixed(2)), 
+              inventoryPercentage,
+              maxWarehouseInventory: maxInventory,
+              warehouseQuantity: currentInventory,
+              unitsPerPallet: unitsPerPallet,
+            };
+          } else {
+            // When removing
+            return { ...line, added: false, qty: 0, pallets: 0, inventoryPercentage: 0 };
+          }
+        }
+        return line;
+      })
     );
   };
 
   const handleQtyChange = (lineId, value) => {
     setOrderLines((prev) =>
-      prev.map((line) =>
-        line.id === lineId ? { ...line, qty: Number(value) || 0 } : line
-      )
+      prev.map((line) => {
+        if (line.id === lineId) {
+          let qty = Number(value) || 0;
+          const bottleData = bottleInventoryData[line.name] || {};
+          const unitsPerPallet = bottleData.unitsPerPallet || 1;
+          const maxInventory = bottleData.maxWarehouseInventory || 0;
+          const currentInventory = bottleData.warehouseQuantity || 0;
+          
+          // Calculate max allowed quantity to order
+          const maxAllowedQty = maxInventory > 0 ? Math.max(0, maxInventory - currentInventory) : Infinity;
+          
+          // Limit quantity to max allowed
+          if (maxInventory > 0 && qty > maxAllowedQty) {
+            alert(`Cannot exceed max warehouse capacity!\n\nCurrent Inventory: ${currentInventory.toLocaleString()} units\nMax Capacity: ${maxInventory.toLocaleString()} units\nAvailable Space: ${maxAllowedQty.toLocaleString()} units\n\nQuantity has been limited to ${maxAllowedQty.toLocaleString()} units.`);
+            qty = maxAllowedQty;
+          }
+          
+          // Auto-calculate pallets using utility function
+          const pallets = calculatePallets(qty, unitsPerPallet);
+          
+          // Calculate inventory percentage: (current + qty) / max * 100
+          // This shows what % of warehouse will be filled after this order
+          const inventoryPercentage = maxInventory > 0 
+            ? Math.round(((currentInventory + qty) / maxInventory) * 100)
+            : 0;
+          
+          return { 
+            ...line, 
+            qty, 
+            pallets: parseFloat(pallets.toFixed(2)),
+            inventoryPercentage 
+          };
+        }
+        return line;
+      })
     );
   };
 
@@ -280,33 +473,126 @@ const BottleOrderPage = () => {
     });
   };
 
-  const handleCompleteOrder = () => {
+  const handleCompleteOrder = async () => {
     if (isViewMode && orderId && activeTab === 'receivePO') {
-      navigate('/dashboard/supply-chain/bottles', {
-        state: {
-          receivedOrderId: orderId,
-          receivedOrderNumber: orderNumber,
-        },
-        replace: false,
-      });
-      return;
+      // Receive the order - update each line item
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const selectedLines = orderLines.filter(line => line.added && selectedItems.has(line.id));
+        
+        // If no items selected, select all
+        const linesToReceive = selectedLines.length > 0 ? selectedLines : orderLines.filter(line => line.added);
+        
+        if (linesToReceive.length === 0) {
+          alert('No items to receive');
+          return;
+        }
+        
+        // Update each line item to mark as received
+        for (const line of linesToReceive) {
+          const updateData = {
+            quantity_received: line.qty,
+            bottle_name: line.name,
+            status: 'received',
+            actual_delivery_date: today,
+          };
+          
+          await bottlesApi.updateOrder(line.id, updateData);
+        }
+        
+        // Navigate back with success message
+        navigate('/dashboard/supply-chain/bottles', {
+          state: {
+            receivedOrderId: orderId,
+            receivedOrderNumber: orderNumber,
+          },
+          replace: false,
+        });
+        return;
+      } catch (error) {
+        console.error('Error receiving order:', error);
+        alert('Failed to receive order: ' + error.message);
+        return;
+      }
     }
     
     if (addedLines.length === 0) {
       return;
     }
     
-    // Navigate directly without showing export modal
-    navigate('/dashboard/supply-chain/bottles', {
-      state: {
-        newBottleOrder: {
-          orderNumber: orderNumber,
-          supplierName: supplier.name,
-          lines: addedLines,
-        },
-      },
-      replace: false,
+    // Validate: Check if any items exceed max warehouse capacity
+    const overCapacityItems = addedLines.filter(line => {
+      const bottleData = bottleInventoryData[line.name] || {};
+      const maxInventory = bottleData.maxWarehouseInventory || 0;
+      const currentInventory = bottleData.warehouseQuantity || 0;
+      const inventoryPercentage = maxInventory > 0 
+        ? Math.round(((currentInventory + (line.qty || 0)) / maxInventory) * 100)
+        : 0;
+      return inventoryPercentage > 100;
     });
+    
+    if (overCapacityItems.length > 0) {
+      const itemNames = overCapacityItems.map(item => {
+        const bottleData = bottleInventoryData[item.name] || {};
+        const maxInventory = bottleData.maxWarehouseInventory || 0;
+        const currentInventory = bottleData.warehouseQuantity || 0;
+        const percentage = maxInventory > 0 
+          ? Math.round(((currentInventory + (item.qty || 0)) / maxInventory) * 100)
+          : 0;
+        return `• ${item.name}: ${percentage}% (exceeds 100%)`;
+      }).join('\n');
+      
+      alert(`Cannot submit order!\n\nThe following items exceed max warehouse capacity:\n\n${itemNames}\n\nPlease reduce quantities before submitting.`);
+      return;
+    }
+    
+    // Validate: Check if any items have 0 quantity
+    const zeroQtyItems = addedLines.filter(line => !line.qty || line.qty === 0);
+    if (zeroQtyItems.length > 0) {
+      alert('Cannot submit order with 0 quantity items!\n\nPlease remove items with 0 quantity or enter a valid quantity.');
+      return;
+    }
+    
+    // Create order via API - one order per bottle
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const createdOrders = [];
+      
+      for (const line of addedLines) {
+        const orderData = {
+          order_number: `${orderNumber}-${line.name}`,
+          bottle_name: line.fullName || line.name, // Use full name for database
+          supplier: supplier.name,
+          order_date: today,
+          expected_delivery_date: null,
+          quantity_ordered: line.qty || 0,
+          cost_per_unit: null,
+          total_cost: null,
+          status: 'pending',
+          notes: null,
+        };
+        
+        const response = await bottlesApi.createOrder(orderData);
+        if (response.success) {
+          createdOrders.push(response.data);
+        } else {
+          throw new Error(`Failed to create order for ${line.name}: ${response.error}`);
+        }
+      }
+      
+      // Navigate back with success message
+      navigate('/dashboard/supply-chain/bottles', {
+        state: {
+          orderCreated: true,
+          orderNumber: orderNumber,
+          bottleCount: addedLines.length,
+        },
+        replace: false,
+      });
+    } catch (err) {
+      console.error('Error creating order:', err);
+      alert(`Failed to create order: ${err.message}\n\nPlease try again.`);
+    }
   };
 
   const handleExportCSV = () => {
@@ -726,7 +1012,7 @@ const BottleOrderPage = () => {
                       </td>
                       )}
                       <td style={{ 
-                        width: '142px',
+                        width: '300px',
                         height: '40px',
                         paddingTop: '12px',
                         paddingRight: '16px',
@@ -736,7 +1022,7 @@ const BottleOrderPage = () => {
                         verticalAlign: 'middle',
                         gap: '10px',
                       }} className={themeClasses.textPrimary}>
-                        {line.name}
+                        {line.fullName || line.name}
                       </td>
                       {/* SUPPLIER INV - only show in addProducts tab when creating new order (not viewing) */}
                       {(activeTab === 'addProducts' && !isViewMode) && (
@@ -769,10 +1055,21 @@ const BottleOrderPage = () => {
                             transition: 'background-color 0.2s',
                           }}
                         >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M12 5v14M5 12h14"/>
-                          </svg>
-                          <span>Add</span>
+                          {line.added ? (
+                            <>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M5 13l4 4L19 7"/>
+                              </svg>
+                              <span>Added</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M12 5v14M5 12h14"/>
+                              </svg>
+                              <span>Add</span>
+                            </>
+                          )}
                         </button>
                       </td>
                       )}
@@ -868,7 +1165,7 @@ const BottleOrderPage = () => {
                             type="number"
                             value={line.qty || ''}
                             onChange={(e) => handleQtyChange(line.id, e.target.value)}
-                            disabled={!line.added && !(isViewMode && activeTab === 'receivePO')}
+                            readOnly={isViewMode && activeTab === 'receivePO'}
                             style={{
                               width: '100%',
                               maxWidth: '120px',
@@ -877,9 +1174,9 @@ const BottleOrderPage = () => {
                               textAlign: 'center',
                               border: '1px solid #D1D5DB',
                               borderRadius: '8px',
-                              backgroundColor: (line.added || (isViewMode && activeTab === 'receivePO')) ? '#F3F4F6' : '#F3F4F6',
-                              color: (line.added || (isViewMode && activeTab === 'receivePO')) ? '#000000' : '#9CA3AF',
-                              cursor: (line.added || (isViewMode && activeTab === 'receivePO')) ? 'text' : 'not-allowed',
+                              backgroundColor: '#F3F4F6',
+                              color: '#000000',
+                              cursor: 'text',
                             }}
                           />
                         )}
@@ -973,12 +1270,7 @@ const BottleOrderPage = () => {
                             )}
                           </div>
                         ) : (
-                          <input
-                            type="number"
-                            step="0.1"
-                            value={line.pallets || ''}
-                            onChange={(e) => handlePalletsChange(line.id, e.target.value)}
-                            disabled={!line.added && !(isViewMode && activeTab === 'receivePO')}
+                          <div
                             style={{
                               width: '100%',
                               maxWidth: '120px',
@@ -987,11 +1279,14 @@ const BottleOrderPage = () => {
                               textAlign: 'center',
                               border: '1px solid #D1D5DB',
                               borderRadius: '8px',
-                              backgroundColor: (line.added || (isViewMode && activeTab === 'receivePO')) ? '#F3F4F6' : '#F3F4F6',
+                              backgroundColor: (line.added || (isViewMode && activeTab === 'receivePO')) ? '#E5E7EB' : '#F3F4F6',
                               color: (line.added || (isViewMode && activeTab === 'receivePO')) ? '#000000' : '#9CA3AF',
-                              cursor: (line.added || (isViewMode && activeTab === 'receivePO')) ? 'text' : 'not-allowed',
+                              cursor: 'default',
                             }}
-                          />
+                            title="Auto-calculated from quantity"
+                          >
+                            {(line.pallets || 0).toFixed(2)}
+                          </div>
                         )}
                       </td>
                       {/* INVENTORY PERCENTAGE - only show in addProducts tab when creating new order (not viewing) */}
@@ -1005,23 +1300,81 @@ const BottleOrderPage = () => {
                             borderRadius: '4px',
                             overflow: 'hidden',
                             position: 'relative',
+                            display: 'flex',
                           }}>
-                            <div style={{
-                              width: `${line.inventoryPercentage || 0}%`,
-                              height: '100%',
-                              backgroundColor: '#22C55E',
-                              transition: 'width 0.3s',
-                            }}></div>
-                            <div style={{
-                              position: 'absolute',
-                              left: `${line.inventoryPercentage || 0}%`,
-                              width: `${100 - (line.inventoryPercentage || 0)}%`,
-                              height: '100%',
-                              backgroundColor: '#3B82F6',
-                            }}></div>
+                            {(() => {
+                              const bottleData = bottleInventoryData[line.name] || {};
+                              const maxInventory = bottleData.maxWarehouseInventory;
+                              const currentInventory = bottleData.warehouseQuantity || 0;
+                              const orderQty = line.qty || 0;
+                              
+                              // If no max is set, show unlimited/unrestricted indicator
+                              if (!maxInventory || maxInventory === 0) {
+                                return (
+                                  <div style={{ 
+                                    width: '100%', 
+                                    height: '100%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '11px', 
+                                    color: '#9CA3AF',
+                                    fontStyle: 'italic'
+                                  }}>
+                                    Unlimited
+                                  </div>
+                                );
+                              }
+                              
+                              const currentPct = Math.round((currentInventory / maxInventory) * 100);
+                              const orderPct = Math.round((orderQty / maxInventory) * 100);
+                              const totalPct = currentPct + orderPct;
+                              const remainingPct = Math.max(0, 100 - totalPct);
+                              
+                              return (
+                                <>
+                                  {/* Current inventory - Dark Green */}
+                                  {currentPct > 0 && (
+                                    <div style={{
+                                      width: `${Math.min(100, currentPct)}%`,
+                                      height: '100%',
+                                      backgroundColor: '#059669',
+                                      transition: 'width 0.3s',
+                                    }} title={`Current: ${currentInventory.toLocaleString()} (${currentPct}%)`}></div>
+                                  )}
+                                  {/* Order quantity - Yellow/Orange */}
+                                  {orderPct > 0 && (
+                                    <div style={{
+                                      width: `${Math.min(100 - currentPct, orderPct)}%`,
+                                      height: '100%',
+                                      backgroundColor: totalPct > 100 ? '#EF4444' : '#F59E0B',
+                                      transition: 'width 0.3s, background-color 0.3s',
+                                    }} title={`Order: ${orderQty.toLocaleString()} (${orderPct}%)`}></div>
+                                  )}
+                                  {/* Remaining space - Blue */}
+                                  {remainingPct > 0 && totalPct <= 100 && (
+                                    <div style={{
+                                      width: `${remainingPct}%`,
+                                      height: '100%',
+                                      backgroundColor: '#3B82F6',
+                                      transition: 'width 0.3s',
+                                    }} title={`Available: ${(maxInventory - currentInventory - orderQty).toLocaleString()}`}></div>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </div>
-                          <span style={{ fontSize: '12px', fontWeight: 500, color: themeClasses.textPrimary, minWidth: '40px' }}>
-                            {line.inventoryPercentage || 0}%
+                          <span style={{ 
+                            fontSize: '12px', 
+                            fontWeight: 500, 
+                            color: (line.inventoryPercentage || 0) > 100 ? '#EF4444' : themeClasses.textPrimary, 
+                            minWidth: '40px' 
+                          }}>
+                            {(() => {
+                              const bottleData = bottleInventoryData[line.name] || {};
+                              const maxInventory = bottleData.maxWarehouseInventory;
+                              return (!maxInventory || maxInventory === 0) ? '-' : `${line.inventoryPercentage || 0}%`;
+                            })()}
                           </span>
                         </div>
                       </td>
@@ -1527,6 +1880,130 @@ const BottleOrderPage = () => {
                 }}
               >
                 Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Bottle Modal */}
+      {showAddBottleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowAddBottleModal(false)}>
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Add Bottles to Order</h2>
+              <button
+                type="button"
+                className="text-gray-400 hover:text-gray-600"
+                onClick={() => setShowAddBottleModal(false)}
+                aria-label="Close"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Search box */}
+            <div className="px-6 pt-4">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search bottles..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <svg className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Modal body - scrollable list of bottles */}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <div className="space-y-2">
+                {orderLines
+                  .filter(line => {
+                    if (!searchQuery.trim()) return true;
+                    const query = searchQuery.toLowerCase();
+                    return line.fullName?.toLowerCase().includes(query) || 
+                           line.name?.toLowerCase().includes(query);
+                  })
+                  .map((line) => {
+                    const isAlreadyAdded = line.added;
+                    return (
+                  <div 
+                    key={line.id}
+                    className={`flex items-center justify-between p-4 border rounded-lg transition ${
+                      isAlreadyAdded 
+                        ? 'border-gray-200 bg-gray-50 opacity-60' 
+                        : 'border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-medium text-gray-900">{line.fullName || line.name}</h3>
+                        {isAlreadyAdded && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                            <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Added
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {(() => {
+                          const bottleData = bottleInventoryData[line.name] || {};
+                          const currentInv = bottleData.warehouseQuantity || 0;
+                          const maxInv = bottleData.maxWarehouseInventory || 0;
+                          const supplier = bottleData.supplier || line.supplier || 'N/A';
+                          return `Current: ${currentInv.toLocaleString()} | Max: ${maxInv > 0 ? maxInv.toLocaleString() : 'Unlimited'} | Supplier: ${supplier}`;
+                        })()}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!isAlreadyAdded) {
+                          handleAddProduct(line.id);
+                        }
+                      }}
+                      disabled={isAlreadyAdded}
+                      className={`px-4 py-2 text-sm font-medium rounded-lg transition ${
+                        isAlreadyAdded
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer'
+                      }`}
+                    >
+                      {isAlreadyAdded ? 'Already Added' : '+ Add Row'}
+                    </button>
+                  </div>
+                  );
+                })}
+                {orderLines.filter(line => {
+                  if (!searchQuery.trim()) return true;
+                  const query = searchQuery.toLowerCase();
+                  return line.fullName?.toLowerCase().includes(query) || 
+                         line.name?.toLowerCase().includes(query);
+                }).length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    {searchQuery ? 'No bottles match your search.' : 'No bottles available.'}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => setShowAddBottleModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+              >
+                Close
               </button>
             </div>
           </div>

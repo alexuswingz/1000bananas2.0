@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTheme } from '../../../context/ThemeContext';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
+import { toast } from 'sonner';
+import { createShipment, getShipmentById, updateShipment, addShipmentProducts, getShipmentProducts, getShipmentFormulaCheck } from '../../../services/productionApi';
+import CatalogAPI from '../../../services/catalogApi';
+import NgoosAPI from '../../../services/ngoosApi';
 import NewShipmentHeader from './components/NewShipmentHeader';
 import NewShipmentTable from './components/NewShipmentTable';
 import SortProductsTable from './components/SortProductsTable';
@@ -9,6 +13,7 @@ import SortFormulasTable from './components/SortFormulasTable';
 import FormulaCheckTable from './components/FormulaCheckTable';
 import LabelCheckTable from './components/LabelCheckTable';
 import ShinersView from './components/ShinersView';
+import SellablesView from './components/SellablesView';
 import UnusedFormulasView from './components/UnusedFormulasView';
 import NgoosModal from './components/NgoosModal';
 import ShipmentDetailsModal from './components/ShipmentDetailsModal';
@@ -20,6 +25,11 @@ import VarianceExceededModal from './components/VarianceExceededModal';
 const NewShipment = () => {
   const { isDarkMode } = useTheme();
   const location = useLocation();
+  const navigate = useNavigate();
+  const { id } = useParams();
+  
+  const [shipmentId, setShipmentId] = useState(id || null);
+  const [loading, setLoading] = useState(false);
   const [isNgoosOpen, setIsNgoosOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
   const [isShipmentDetailsOpen, setIsShipmentDetailsOpen] = useState(false);
@@ -41,36 +51,219 @@ const NewShipment = () => {
   const floorInventoryButtonRef = useRef(null);
   const [floorInventoryPosition, setFloorInventoryPosition] = useState({ top: 0, left: 0 });
   const [shipmentData, setShipmentData] = useState({
-    shipmentNumber: '2025-09-23',
+    shipmentNumber: new Date().toISOString().split('T')[0].replace(/-/g, '.') + ' AWD',
+    shipmentDate: new Date().toISOString().split('T')[0], // YYYY-MM-DD format
     shipmentType: 'AWD',
     location: '',
-    account: 'TPS',
+    account: 'TPS Nutrients',
   });
+  const [dataAsOfDate, setDataAsOfDate] = useState(new Date()); // Track when data was loaded
 
-  // Get shipment data from navigation state
+  // Load products from catalog
   useEffect(() => {
-    if (location.state?.shipmentData) {
+    loadProducts();
+  }, []);
+
+  const loadProducts = async () => {
+    try {
+      setLoadingProducts(true);
+      
+      // Load both Amazon forecast data and production supply chain data
+      const [planningData, productionInventory] = await Promise.all([
+        NgoosAPI.getPlanning(1, 1000),
+        import('../../../services/productionApi').then(api => api.getProductsInventory())
+      ]);
+      
+      console.log('Loaded planning data:', planningData.products.length, 'products');
+      console.log('Loaded production inventory:', productionInventory.length, 'items');
+      
+      if (productionInventory.length > 0) {
+        console.log('Sample production item:', productionInventory[0]);
+      }
+      
+      // Create lookup for production inventory by ASIN
+      const productionMap = {};
+      productionInventory.forEach(item => {
+        if (item.child_asin) {
+          productionMap[item.child_asin] = item;
+        }
+      });
+      
+      console.log('Production map has', Object.keys(productionMap).length, 'entries');
+      console.log('Sample ASINs in map:', Object.keys(productionMap).slice(0, 5));
+      
+      // Remove duplicates by ASIN (in case forecast lambda returns dupes)
+      const uniqueProducts = {};
+      planningData.products.forEach(item => {
+        if (!uniqueProducts[item.asin]) {
+          uniqueProducts[item.asin] = item;
+        }
+      });
+      
+      // Transform planning data to match table format
+      const formattedProducts = Object.values(uniqueProducts).map((item) => {
+        // Get supply chain data for this product
+        const supplyChain = productionMap[item.asin] || {};
+        
+        // Debug Cherry Tree specifically
+        if (item.product && item.product.includes('Cherry Tree')) {
+          console.log('Cherry Tree product:', item.asin, item.product);
+          console.log('Has supply chain data?', !!productionMap[item.asin]);
+          if (productionMap[item.asin]) {
+            console.log('Supply chain:', productionMap[item.asin]);
+          }
+        }
+        
+        // Calculate DOI if not provided (fallback to 30-day sales)
+        let calculatedDoiTotal = item.doi_total || 0;
+        let calculatedDoiFba = item.doi_fba || 0;
+        
+        // If DOI not provided or zero, calculate from sales
+        if (calculatedDoiTotal === 0 && item.sales_30_day > 0) {
+          const dailySales = item.sales_30_day / 30.0;
+          const totalInventory = item.inventory || 0;
+          calculatedDoiTotal = Math.round(totalInventory / dailySales);
+          
+          // Estimate FBA Available as ~50% of total (typical split between FBA available/reserved/inbound)
+          const estimatedFbaAvailable = totalInventory * 0.5;
+          calculatedDoiFba = Math.round(estimatedFbaAvailable / dailySales);
+        }
+        
+        // Ensure FBA DOI is always <= Total DOI and differentiate them
+        if (calculatedDoiFba === calculatedDoiTotal && calculatedDoiTotal > 0) {
+          // If they're the same, estimate FBA as 50% of total
+          calculatedDoiFba = Math.round(calculatedDoiTotal * 0.5);
+        } else if (calculatedDoiFba === 0 && calculatedDoiTotal > 0) {
+          // If we have doi_total but not doi_fba, estimate FBA as 50% of total
+          calculatedDoiFba = Math.round(calculatedDoiTotal * 0.5);
+        } else if (calculatedDoiFba > calculatedDoiTotal) {
+          // If FBA is somehow greater than total, cap it
+          calculatedDoiFba = calculatedDoiTotal;
+        }
+        
+        // Calculate forecast (use ML forecast or fallback to recent sales trend)
+        let weeklyForecast = item.weekly_forecast || 0;
+        if (weeklyForecast === 0 && item.sales_30_day > 0) {
+          // Fallback: Use 30-day sales average as forecast estimate
+          weeklyForecast = (item.sales_30_day / 30) * 7; // Convert daily avg to weekly
+        }
+        
+        return {
+          id: item.asin, // Use ASIN as temp ID
+          catalogId: supplyChain.id || item.asin,
+          brand: item.brand,
+          product: item.product,
+          size: item.size,
+          childAsin: item.asin,
+          childSku: supplyChain.child_sku_final || '',
+          marketplace: 'Amazon',
+          account: 'TPS Nutrients',
+          // Inventory/DOI data from N-GOOS planning endpoint
+          fbaAvailable: Math.round((item.inventory || 0) * 0.5), // Estimate FBA as 50% of total
+          totalInventory: item.inventory || 0,
+          forecast: Math.round(weeklyForecast), // Weekly forecast (ML or sales-based estimate)
+          daysOfInventory: calculatedDoiTotal, // Total DOI (used for color coding)
+          doiFba: calculatedDoiFba, // DOI for FBA Available (purple bar)
+          doiTotal: calculatedDoiTotal, // DOI for Total Inventory (green bar)
+          sales7Day: item.sales_7_day || 0,
+          sales30Day: item.sales_30_day || 0,
+          weeklyForecast: weeklyForecast,
+          // Supply chain data from production inventory
+          bottle_name: supplyChain.bottle_name || '',
+          formula_name: supplyChain.formula_name || item.formula || '',
+          closure_name: supplyChain.closure_name || '',
+          label_location: supplyChain.label_location || '',
+          label_size: supplyChain.label_size || '',
+          case_size: '',
+          units_per_case: supplyChain.units_per_case || 60,
+          // Supply chain inventory levels
+          bottleInventory: supplyChain.bottle_inventory || 0,
+          closureInventory: supplyChain.closure_inventory || 0,
+          labelsAvailable: supplyChain.label_inventory || 0,
+          formulaGallonsAvailable: supplyChain.formula_gallons_available || 0,
+          formulaGallonsPerUnit: supplyChain.gallons_per_unit || 0,
+          maxUnitsProducible: supplyChain.max_units_producible || 0,
+          bottle_name: supplyChain.bottle_name || '',
+          closure_name: supplyChain.closure_name || '',
+        };
+      });
+      
+      console.log('Loaded products with supply chain:', formattedProducts.length, 'Sample:', formattedProducts[0]);
+      setProducts(formattedProducts);
+      setDataAsOfDate(new Date()); // Mark data as fresh
+      
+      // Initialize qty values
+      const initialQtyValues = {};
+      formattedProducts.forEach((_, index) => {
+        initialQtyValues[index] = 0;
+      });
+      setQtyValues(initialQtyValues);
+    } catch (error) {
+      console.error('Error loading products:', error);
+      alert('Failed to load products: ' + error.message);
+      setProducts([]);
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
+  // Load existing shipment or get from navigation state
+  useEffect(() => {
+    if (shipmentId) {
+      loadShipment();
+    } else if (location.state?.shipmentData) {
       setShipmentData(location.state.shipmentData);
     }
-  }, [location.state]);
+  }, [shipmentId, location.state]);
+
+  const loadShipment = async () => {
+    try {
+      setLoading(true);
+      const data = await getShipmentById(shipmentId);
+      setShipmentData({
+        shipmentNumber: data.shipment_number,
+        shipmentType: data.shipment_type,
+        location: data.location || '',
+        account: data.account || 'TPS Nutrients',
+      });
+      
+      // Set completed tabs
+      const completed = new Set();
+      if (data.add_products_completed) completed.add('add-products');
+      if (data.formula_check_completed) completed.add('formula-check');
+      if (data.label_check_completed) completed.add('label-check');
+      if (data.sort_products_completed) completed.add('sort-products');
+      if (data.sort_formulas_completed) completed.add('sort-formulas');
+      setCompletedTabs(completed);
+      
+      // Load products
+      if (data.products && data.products.length > 0) {
+        // Transform products to match addedRows format
+        const products = data.products.map(p => ({
+          id: p.catalog_id,
+          brand: p.brand_name,
+          product: p.product_name,
+          size: p.size,
+          qty: p.quantity,
+        }));
+        setAddedRows(products);
+      }
+    } catch (error) {
+      console.error('Error loading shipment:', error);
+      alert('Failed to load shipment');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const themeClasses = {
     pageBg: isDarkMode ? 'bg-dark-bg-primary' : 'bg-light-bg-primary',
   };
 
-  const rows = [
-    { id: 1, brand: 'TPS Plant Foods', product: 'Cherry Tree Fertilizer', size: '8oz', qty: 240, labelsAvailable: 180 },
-    { id: 2, brand: 'TPS Plant Foods', product: 'Cherry Tree Fertilizer', size: 'Quart', qty: 96, labelsAvailable: 180 },
-    { id: 3, brand: 'TPS Plant Foods', product: 'Cherry Tree Fertilizer', size: 'Gallon', qty: 28, labelsAvailable: 180 },
-  ];
-
-  const [qtyValues, setQtyValues] = useState(() => {
-    const initialValues = {};
-    rows.forEach((row, index) => {
-      initialValues[index] = 0; // Default to 0
-    });
-    return initialValues;
-  });
+  // Load products from API
+  const [products, setProducts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [qtyValues, setQtyValues] = useState({});
 
   // Calculate total units from qtyValues
   const totalUnits = Object.values(qtyValues).reduce((sum, qty) => {
@@ -79,22 +272,30 @@ const NewShipment = () => {
   }, 0);
 
   // Calculate total boxes based on size conversion rates
-  const totalBoxes = rows.reduce((sum, row, index) => {
+  const totalBoxes = products.reduce((sum, product, index) => {
     const qty = qtyValues[index] ?? 0;
     const numQty = typeof qty === 'number' ? qty : (qty === '' || qty === null || qty === undefined ? 0 : parseInt(qty, 10) || 0);
     
-    let boxesPerUnit = 0;
-    const size = row.size?.toLowerCase() || '';
-    
-    if (size.includes('8oz')) {
-      boxesPerUnit = 1 / 60; // 60 units = 1 box
-    } else if (size.toLowerCase().includes('quart')) {
-      boxesPerUnit = 1 / 12; // 12 units = 1 box
-    } else if (size.toLowerCase().includes('gallon')) {
-      boxesPerUnit = 1 / 4; // 4 units = 1 box
+    // Use units_per_case from catalog if available, otherwise calculate based on size
+    let boxesNeeded = 0;
+    if (product.units_per_case && product.units_per_case > 0) {
+      boxesNeeded = numQty / product.units_per_case;
+    } else {
+      // Fallback to size-based calculation
+      let boxesPerUnit = 0;
+      const size = product.size?.toLowerCase() || '';
+      
+      if (size.includes('8oz')) {
+        boxesPerUnit = 1 / 60; // 60 units = 1 box
+      } else if (size.toLowerCase().includes('quart')) {
+        boxesPerUnit = 1 / 12; // 12 units = 1 box
+      } else if (size.toLowerCase().includes('gallon')) {
+        boxesPerUnit = 1 / 4; // 4 units = 1 box
+      }
+      boxesNeeded = numQty * boxesPerUnit;
     }
     
-    return sum + (numQty * boxesPerUnit);
+    return sum + boxesNeeded;
   }, 0);
 
   // Calculate palettes (assuming ~50 boxes per palette, can be adjusted)
@@ -115,82 +316,175 @@ const NewShipment = () => {
     setActiveAction(action);
   };
 
-  const handleBookAndProceed = () => {
-    // Mark 'add-products' as completed when navigating to 'sort-products'
-    setCompletedTabs(prev => {
-      const newSet = new Set(prev);
-      newSet.add('add-products');
-      return newSet;
-    });
-    setActiveAction('sort-products');
-    setIsShipmentDetailsOpen(false);
-  };
-
-  const handleBeginSortFormulas = () => {
-    // Mark 'sort-products' as completed when navigating to 'sort-formulas'
-    setCompletedTabs(prev => {
-      const newSet = new Set(prev);
-      newSet.add('sort-products');
-      return newSet;
-    });
-    setActiveAction('sort-formulas');
-  };
-
-  // Check for variance exceeded and get row IDs
-  const checkVarianceExceeded = () => {
-    // For label-check and formula-check actions, check if there are products with variance exceeded
-    // This is a placeholder - you'll need to get actual data from the tables
-    // For now, we'll use a mock check. In production, you'd get this from LabelCheckTable or FormulaCheckTable
-    
-    if (activeAction === 'label-check' || activeAction === 'formula-check') {
-      // Mock data - replace with actual variance check from tables
-      // Example: Check if any products have totalCount that exceeds allowed variance
-      // For demonstration, we'll assume 3 products have variance exceeded
-      const mockVarianceCount = 3; // Replace with actual count from table data
-      const mockVarianceRowIds = [1, 2, 3]; // Replace with actual row IDs from table data
+  const handleBookAndProceed = async () => {
+    try {
+      setLoading(true);
       
-      // In production, you would:
-      // 1. Get rows from LabelCheckTable or FormulaCheckTable
-      // 2. Count products where variance exceeds threshold (e.g., Math.abs(totalCount) > allowedThreshold)
-      // 3. Return the count and row IDs
+      // Validate: Must have products selected
+      const productsToAdd = Object.keys(qtyValues)
+        .filter(idx => qtyValues[idx] > 0)
+        .map(idx => ({
+          catalog_id: products[idx].catalogId,
+          quantity: qtyValues[idx],
+        }));
       
-      setVarianceExceededRowIds(mockVarianceRowIds);
-      return mockVarianceCount;
+      if (productsToAdd.length === 0) {
+        toast.error('Please add at least one product before booking');
+        setLoading(false);
+        return;
+      }
+      
+      let currentShipmentId = shipmentId;
+      
+      // Create shipment if it doesn't exist
+      if (!currentShipmentId) {
+        const newShipment = await createShipment({
+          shipment_number: shipmentData.shipmentNumber,
+          shipment_date: shipmentData.shipmentDate,
+          shipment_type: shipmentData.shipmentType,
+          marketplace: 'Amazon',
+          account: shipmentData.account,
+          location: shipmentData.location,
+          created_by: 'current_user', // TODO: Get from auth context
+        });
+        currentShipmentId = newShipment.id;
+        setShipmentId(currentShipmentId);
+        toast.success(`Shipment ${newShipment.shipment_number} created!`);
+      }
+      
+      // Add products to shipment
+      const addResult = await addShipmentProducts(currentShipmentId, productsToAdd);
+      
+      // Check for supply warnings
+      if (addResult.supply_warnings && addResult.supply_warnings.length > 0) {
+        const warningMessage = addResult.supply_warnings.map(w => 
+          `${w.product} (${w.size}): Requested ${w.requested}, Max available ${w.max_available}`
+        ).join('\n');
+        
+        const confirmed = window.confirm(
+          `⚠️ Supply Chain Warning!\n\n` +
+          `The following products exceed available inventory:\n\n${warningMessage}\n\n` +
+          `Do you want to proceed anyway? You'll need to order more supplies before manufacturing.`
+        );
+        
+        if (!confirmed) {
+          setLoading(false);
+          return;
+        }
+        toast.warning(`${addResult.supply_warnings.length} products exceed inventory`);
+      } else {
+        toast.success(`${productsToAdd.length} products added to shipment`);
+      }
+      
+      // Update shipment to mark add_products as completed and move to formula_check
+      await updateShipment(currentShipmentId, {
+        add_products_completed: true,
+        status: 'formula_check',
+      });
+      
+      // Mark 'add-products' as completed when navigating to 'formula-check'
+      setCompletedTabs(prev => {
+        const newSet = new Set(prev);
+        newSet.add('add-products');
+        return newSet;
+      });
+      setActiveAction('formula-check');
+      setIsShipmentDetailsOpen(false);
+      toast.success('Moving to Formula Check');
+    } catch (error) {
+      console.error('Error booking shipment:', error);
+      toast.error('Failed to book shipment: ' + error.message);
+    } finally {
+      setLoading(false);
     }
-    setVarianceExceededRowIds([]);
-    return 0;
   };
 
-  const handleCompleteClick = () => {
-    // When completing Formula Check: mark it as completed and move to Label Check (no variance modal)
-    if (activeAction === 'formula-check') {
-      setCompletedTabs(prev => new Set(prev).add('formula-check'));
-      setActiveAction('label-check');
-      return;
+  const handleBeginSortFormulas = async () => {
+    try {
+      if (!shipmentId) {
+        toast.error('No shipment found');
+        return;
+      }
+      
+      await updateShipment(shipmentId, {
+        sort_products_completed: true,
+        status: 'sort_formulas',
+      });
+      
+      // Mark 'sort-products' as completed when navigating to 'sort-formulas'
+      setCompletedTabs(prev => {
+        const newSet = new Set(prev);
+        newSet.add('sort-products');
+        return newSet;
+      });
+      setActiveAction('sort-formulas');
+      toast.success('Moving to Sort Formulas');
+    } catch (error) {
+      console.error('Error updating shipment:', error);
+      toast.error('Failed to move to Sort Formulas');
     }
+  };
 
-    // Only label-check (and potentially other actions in future) should trigger variance check
-    let varianceCount = 0;
-    if (activeAction === 'label-check') {
-      varianceCount = checkVarianceExceeded();
-    }
+  const handleCompleteClick = async () => {
+    try {
+      if (!shipmentId) {
+        toast.error('Please book the shipment first');
+        return;
+      }
 
-    if (varianceCount > 0) {
-      setVarianceCount(varianceCount);
-      setIsVarianceExceededOpen(true);
-      return;
-    }
-    
-    // If no variance (or action doesn't use variance), proceed with normal completion flow
-    if (activeAction === 'sort-products') {
-      setCompletedTabs(prev => new Set(prev).add('sort-products'));
-      setIsSortProductsCompleteOpen(true);
-    } else if (activeAction === 'sort-formulas') {
-      setCompletedTabs(prev => new Set(prev).add('sort-formulas'));
-      setIsSortFormulasCompleteOpen(true);
-    } else if (activeAction === 'label-check') {
-      // Mark label-check as completed when there's no variance
-      setCompletedTabs(prev => new Set(prev).add('label-check'));
+      // WORKFLOW PROGRESSION:
+      // add-products → formula-check → label-check → (review) → sort-products → sort-formulas
+
+      if (activeAction === 'formula-check') {
+        // Formula Check: Verify formulas are reviewed, then move to Label Check
+        await updateShipment(shipmentId, {
+          formula_check_completed: true,
+          status: 'label_check',
+        });
+        setCompletedTabs(prev => new Set(prev).add('formula-check'));
+        setActiveAction('label-check');
+        toast.success('Formula Check completed! Moving to Label Check');
+        return;
+      }
+
+      if (activeAction === 'label-check') {
+        // Label Check: Complete and prepare for Sort Products
+        await updateShipment(shipmentId, {
+          label_check_completed: true,
+          status: 'sort_products',
+        });
+        setCompletedTabs(prev => new Set(prev).add('label-check'));
+        toast.success('Label Check completed! Ready for manufacturing.');
+        // User can now manually navigate to Sort Products/Formulas for production
+        return;
+      }
+
+      if (activeAction === 'sort-products') {
+        // Sort Products: Complete and show modal to move to Sort Formulas
+        await updateShipment(shipmentId, {
+          sort_products_completed: true,
+          status: 'sort_formulas',
+        });
+        setCompletedTabs(prev => new Set(prev).add('sort-products'));
+        setIsSortProductsCompleteOpen(true);
+        return;
+      }
+
+      if (activeAction === 'sort-formulas') {
+        // Sort Formulas: Final step - mark as ready for packaging
+        await updateShipment(shipmentId, {
+          sort_formulas_completed: true,
+          status: 'packaging',
+        });
+        setCompletedTabs(prev => new Set(prev).add('sort-formulas'));
+        setIsSortFormulasCompleteOpen(true);
+        toast.success('All steps completed! Shipment ready for packaging.');
+        return;
+      }
+
+    } catch (error) {
+      console.error('Error completing stage:', error);
+      toast.error('Failed to complete stage: ' + error.message);
     }
   };
 
@@ -203,19 +497,58 @@ const NewShipment = () => {
   const handleVarianceRecount = () => {
     setIsVarianceExceededOpen(false);
     setIsRecountMode(true);
-    // Stay on the current action to allow recount
-    // The tables will now filter to show only rows with variance exceeded
+  };
+
+  // Validate workflow progression
+  const canAccessTab = (tabName) => {
+    if (!shipmentId) {
+      // Can only access add-products if no shipment exists
+      return tabName === 'add-products';
+    }
+    
+    // Workflow order: add-products → formula-check → label-check → sort-products → sort-formulas
+    const tabOrder = ['add-products', 'formula-check', 'label-check', 'sort-products', 'sort-formulas'];
+    const currentIndex = tabOrder.indexOf(tabName);
+    
+    // Can access current tab or any completed tab
+    if (completedTabs.has(tabName)) {
+      return true;
+    }
+    
+    // Can access next tab if previous tab is completed
+    if (currentIndex > 0) {
+      const previousTab = tabOrder[currentIndex - 1];
+      return completedTabs.has(previousTab);
+    }
+    
+    return currentIndex === 0; // add-products is always accessible
   };
 
   const handleExport = () => {
     setIsExportTemplateOpen(true);
   };
 
-  const handleSaveShipment = (data) => {
-    setShipmentData(prev => ({
-      ...prev,
-      ...data,
-    }));
+  const handleSaveShipment = async (data) => {
+    try {
+      setShipmentData(prev => ({
+        ...prev,
+        ...data,
+      }));
+      
+      // If shipment exists, update it
+      if (shipmentId) {
+        await updateShipment(shipmentId, {
+          shipment_number: data.shipmentNumber,
+          shipment_date: data.shipmentDate,
+          shipment_type: data.shipmentType,
+          location: data.location,
+          account: data.account,
+        });
+      }
+    } catch (error) {
+      console.error('Error saving shipment:', error);
+      alert('Failed to save shipment details');
+    }
   };
 
   // Handle Floor Inventory dropdown
@@ -275,11 +608,14 @@ const NewShipment = () => {
         onReviewShipmentClick={() => setIsShipmentDetailsOpen(true)}
         onCompleteClick={handleCompleteClick}
         shipmentData={shipmentData}
+        dataAsOfDate={dataAsOfDate}
         totalUnits={totalUnits}
         totalBoxes={Math.ceil(totalBoxes)}
         activeAction={activeAction}
         onActionChange={handleActionChange}
         completedTabs={completedTabs}
+        shipmentId={shipmentId}
+        canAccessTab={canAccessTab}
       />
 
       <div style={{ padding: '0 1.5rem' }}>
@@ -486,16 +822,28 @@ const NewShipment = () => {
             </div>
 
             {activeView === 'all-products' && (
-              <NewShipmentTable
-                rows={rows}
-                tableMode={tableMode}
-                onProductClick={handleProductClick}
-                qtyValues={qtyValues}
-                onQtyChange={setQtyValues}
-                onAddedRowsChange={setAddedRows}
-              />
+              <>
+                {loadingProducts && <div style={{ textAlign: 'center', padding: '2rem' }}>Loading products...</div>}
+                {!loadingProducts && (
+                  <NewShipmentTable
+                    rows={products}
+                    tableMode={tableMode}
+                    onProductClick={handleProductClick}
+                    qtyValues={qtyValues}
+                    onQtyChange={setQtyValues}
+                    onAddedRowsChange={setAddedRows}
+                  />
+                )}
+              </>
             )}
           </>
+        )}
+
+        {/* Separate container for Sellables View */}
+        {activeAction === 'add-products' && activeView === 'floor-inventory' && selectedFloorInventory === 'Sellables' && (
+          <div style={{ padding: '0 1.5rem' }}>
+            <SellablesView />
+          </div>
         )}
 
         {/* Separate container for Shiners View */}
@@ -527,6 +875,7 @@ const NewShipment = () => {
         {activeAction === 'formula-check' && (
           <div style={{ marginTop: '1.5rem' }}>
             <FormulaCheckTable 
+              shipmentId={shipmentId}
               isRecountMode={isRecountMode}
               varianceExceededRowIds={varianceExceededRowIds}
             />
@@ -536,6 +885,7 @@ const NewShipment = () => {
         {activeAction === 'label-check' && (
           <div style={{ marginTop: '1.5rem' }}>
             <LabelCheckTable 
+              shipmentId={shipmentId}
               isRecountMode={isRecountMode}
               varianceExceededRowIds={varianceExceededRowIds}
               onExitRecountMode={() => {

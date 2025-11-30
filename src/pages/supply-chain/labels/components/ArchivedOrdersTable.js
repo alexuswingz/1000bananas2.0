@@ -1,41 +1,66 @@
 import React, { useState, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
+import { labelsApi } from '../../../../services/supplyChainApi';
 
 const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
   const { isDarkMode } = useTheme();
 
-  // Archived orders data - moved from Labels.js
-  const [archivedOrders, setArchivedOrders] = useState(() => {
-    try {
-      const stored = window.localStorage.getItem('labelArchivedOrders');
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch {}
-    return [];
-  });
+  // Archived orders data - fetch from API
+  const [archivedOrders, setArchivedOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Persist archived orders to localStorage
+  // Fetch archived orders from API on mount
   useEffect(() => {
-    try {
-      window.localStorage.setItem('labelArchivedOrders', JSON.stringify(archivedOrders));
-    } catch {}
-  }, [archivedOrders]);
-
-  // Expose function to add archived order (called from OrdersTable)
-  useImperativeHandle(ref, () => ({
-    addArchivedOrder: (order) => {
-      setArchivedOrders((prev) => {
-        // Avoid duplicates
-        if (prev.some((o) => o.id === order.id)) {
-          return prev;
+    const fetchArchivedOrders = async () => {
+      try {
+        setLoading(true);
+        const response = await labelsApi.getOrders();
+        if (response.success) {
+          // Filter to show only received/archived orders
+          const archived = response.data
+            .filter(order => order.status === 'received' || order.status === 'archived')
+            .map(order => ({
+              id: order.id,
+              orderNumber: order.order_number,
+              supplier: order.supplier,
+              status: order.status,
+              orderDate: order.order_date,
+              totalQuantity: order.total_quantity,
+              lines: order.lines || []
+            }));
+          setArchivedOrders(archived);
         }
-        const updated = [...prev, { ...order, status: order.status || 'Received' }];
-        try {
-          window.localStorage.setItem('labelArchivedOrders', JSON.stringify(updated));
-        } catch {}
-        return updated;
-      });
+      } catch (err) {
+        console.error('Error fetching archived label orders:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchArchivedOrders();
+  }, []);
+
+  // Expose function to add archived order (called from OrdersTable) - refresh from API
+  useImperativeHandle(ref, () => ({
+    addArchivedOrder: async () => {
+      try {
+        const response = await labelsApi.getOrders();
+        if (response.success) {
+          const archived = response.data
+            .filter(order => order.status === 'received' || order.status === 'archived')
+            .map(order => ({
+              id: order.id,
+              orderNumber: order.order_number,
+              supplier: order.supplier,
+              status: order.status,
+              orderDate: order.order_date,
+              totalQuantity: order.total_quantity,
+              lines: order.lines || []
+            }));
+          setArchivedOrders(archived);
+        }
+      } catch (err) {
+        console.error('Error refreshing archived label orders:', err);
+      }
     },
   }));
 

@@ -1895,7 +1895,94 @@ def update_box_inventory(event):
 # SUPPLY CHAIN - LABEL ENDPOINTS
 # ============================================
 
+def get_label_inventory(event):
+    """GET /supply-chain/labels/inventory - Get all label inventory"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cursor.execute("""
+            SELECT * FROM label_inventory
+            ORDER BY brand_name, product_name, bottle_size
+        """)
+        inventory = cursor.fetchall()
+        return cors_response(200, {'success': True, 'data': [dict(row) for row in inventory]})
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_label_inventory_by_id(event):
+    """GET /supply-chain/labels/inventory/{id} - Get specific label"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        label_id = event['pathParameters']['id']
+        cursor.execute("SELECT * FROM label_inventory WHERE id = %s", (label_id,))
+        label = cursor.fetchone()
+        
+        if not label:
+            return cors_response(404, {'success': False, 'error': 'Label not found'})
+        
+        return cors_response(200, {'success': True, 'data': dict(label)})
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def update_label_inventory(event):
+    """PUT /supply-chain/labels/inventory/{id} - Update label inventory"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        label_id = event['pathParameters']['id']
+        data = json.loads(event.get('body', '{}'))
+        
+        cursor.execute("""
+            UPDATE label_inventory 
+            SET warehouse_inventory = COALESCE(%s, warehouse_inventory),
+                inbound_quantity = COALESCE(%s, inbound_quantity),
+                label_status = COALESCE(%s, label_status),
+                google_drive_link = COALESCE(%s, google_drive_link),
+                notes = COALESCE(%s, notes),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s RETURNING *
+        """, (data.get('warehouse_inventory'), data.get('inbound_quantity'),
+              data.get('label_status'), data.get('google_drive_link'),
+              data.get('notes'), label_id))
+        
+        label = cursor.fetchone()
+        conn.commit()
+        
+        if not label:
+            return cors_response(404, {'success': False, 'error': 'Label not found'})
+        
+        return cors_response(200, {'success': True, 'data': dict(label)})
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
 def get_label_orders(event):
+    """GET /supply-chain/labels/orders - Get all label orders"""
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -1909,32 +1996,239 @@ def get_label_orders(event):
             cursor.execute("SELECT * FROM label_orders ORDER BY order_date DESC")
         orders = cursor.fetchall()
         return cors_response(200, {'success': True, 'data': [dict(row) for row in orders]})
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_label_order_by_id(event):
+    """GET /supply-chain/labels/orders/{id} - Get order with line items"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        order_id = event['pathParameters']['id']
+        
+        # Get order header
+        cursor.execute("SELECT * FROM label_orders WHERE id = %s", (order_id,))
+        order = cursor.fetchone()
+        
+        if not order:
+            return cors_response(404, {'success': False, 'error': 'Order not found'})
+        
+        # Get order lines
+        cursor.execute("""
+            SELECT * FROM label_order_lines 
+            WHERE order_id = %s 
+            ORDER BY id
+        """, (order_id,))
+        lines = cursor.fetchall()
+        
+        return cors_response(200, {
+            'success': True,
+            'data': {
+                **dict(order),
+                'lines': [dict(line) for line in lines]
+            }
+        })
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
     finally:
         cursor.close()
         conn.close()
 
 def create_label_order(event):
+    """POST /supply-chain/labels/orders - Create order with line items"""
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
         data = json.loads(event.get('body', '{}'))
+        lines = data.get('lines', [])
+        
+        # Create order header
         cursor.execute("""
-            INSERT INTO label_orders (order_number, label_name, label_size, supplier, order_date,
-                                     expected_delivery_date, quantity_ordered, cost_per_label,
-                                     total_cost, status, notes)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *
-        """, (data.get('order_number'), data.get('label_name'), data.get('label_size'),
-              data.get('supplier'), data.get('order_date'), data.get('expected_delivery_date'),
-              data.get('quantity_ordered'), data.get('cost_per_label'),
-              data.get('total_cost'), data.get('status', 'pending'), data.get('notes')))
+            INSERT INTO label_orders (
+                order_number, supplier, order_date, expected_delivery_date,
+                total_quantity, total_cost, status, notes
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING *
+        """, (
+            data.get('order_number'),
+            data.get('supplier', 'Richmark Label'),
+            data.get('order_date'),
+            data.get('expected_delivery_date'),
+            data.get('total_quantity', 0),
+            data.get('total_cost', 0),
+            data.get('status', 'pending'),
+            data.get('notes')
+        ))
         order = cursor.fetchone()
+        order_id = order['id']
+        
+        # Create order lines
+        for line in lines:
+            cursor.execute("""
+                INSERT INTO label_order_lines (
+                    order_id, brand_name, product_name, bottle_size, label_size,
+                    quantity_ordered, cost_per_label, line_total, google_drive_link
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                order_id,
+                line.get('brand_name'),
+                line.get('product_name'),
+                line.get('bottle_size'),
+                line.get('label_size'),
+                line.get('quantity_ordered', 0),
+                line.get('cost_per_label', 0),
+                line.get('line_total', 0),
+                line.get('google_drive_link')
+            ))
+        
         conn.commit()
         return cors_response(201, {'success': True, 'data': dict(order)})
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def update_label_order(event):
+    """PUT /supply-chain/labels/orders/{id} - Update order (receive, status, etc.)"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        order_id = event['pathParameters']['id']
+        data = json.loads(event.get('body', '{}'))
+        
+        # Get current order
+        cursor.execute("SELECT * FROM label_orders WHERE id = %s", (order_id,))
+        current_order = cursor.fetchone()
+        
+        if not current_order:
+            return cors_response(404, {'success': False, 'error': 'Order not found'})
+        
+        # Update order header
+        cursor.execute("""
+            UPDATE label_orders 
+            SET status = COALESCE(%s, status),
+                actual_delivery_date = COALESCE(%s, actual_delivery_date),
+                notes = COALESCE(%s, notes),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s RETURNING *
+        """, (
+            data.get('status'),
+            data.get('actual_delivery_date'),
+            data.get('notes'),
+            order_id
+        ))
+        order = cursor.fetchone()
+        
+        # If receiving, update line items and inventory
+        if data.get('status') in ['received', 'partial']:
+            line_updates = data.get('line_updates', [])
+            
+            # If status is 'received' and no line_updates, receive ALL items
+            if data.get('status') == 'received' and not line_updates:
+                # Get all order lines
+                cursor.execute("""
+                    SELECT * FROM label_order_lines 
+                    WHERE order_id = %s
+                """, (order_id,))
+                all_lines = cursor.fetchall()
+                
+                # Receive all items at full quantity
+                for line in all_lines:
+                    qty_ordered = line['quantity_ordered'] or 0
+                    prev_received = line['quantity_received'] or 0
+                    qty_to_add = qty_ordered - prev_received
+                    
+                    if qty_to_add > 0:
+                        # Update inventory
+                        cursor.execute("""
+                            UPDATE label_inventory 
+                            SET warehouse_inventory = warehouse_inventory + %s,
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE brand_name = %s 
+                            AND product_name = %s 
+                            AND bottle_size = %s
+                        """, (qty_to_add, line['brand_name'], line['product_name'], line['bottle_size']))
+                        
+                        # Update line received quantity
+                        cursor.execute("""
+                            UPDATE label_order_lines 
+                            SET quantity_received = %s,
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE id = %s
+                        """, (qty_ordered, line['id']))
+            else:
+                # Partial receive - only update specified lines
+                for line_update in line_updates:
+                    line_id = line_update.get('id')
+                    qty_received = line_update.get('quantity_received', 0)
+                    
+                    # Update line
+                    cursor.execute("""
+                        SELECT * FROM label_order_lines WHERE id = %s
+                    """, (line_id,))
+                    line = cursor.fetchone()
+                    
+                    if line and qty_received > 0:
+                        # Calculate delta to add
+                        prev_received = line['quantity_received'] or 0
+                        qty_to_add = qty_received - prev_received
+                        
+                        if qty_to_add > 0:
+                            # Update inventory
+                            cursor.execute("""
+                                UPDATE label_inventory 
+                                SET warehouse_inventory = warehouse_inventory + %s,
+                                    updated_at = CURRENT_TIMESTAMP
+                                WHERE brand_name = %s 
+                                AND product_name = %s 
+                                AND bottle_size = %s
+                            """, (qty_to_add, line['brand_name'], line['product_name'], line['bottle_size']))
+                        
+                        # Update line received quantity
+                        cursor.execute("""
+                            UPDATE label_order_lines 
+                            SET quantity_received = %s,
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE id = %s
+                        """, (qty_received, line_id))
+        
+        conn.commit()
+        return cors_response(200, {'success': True, 'data': dict(order)})
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
     finally:
         cursor.close()
         conn.close()
 
 def get_label_costs(event):
+    """GET /supply-chain/labels/costs - Get label pricing tiers"""
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -1952,6 +2246,1168 @@ def get_label_costs(event):
             cursor.execute("SELECT * FROM label_costs ORDER BY label_size, min_quantity ASC")
         costs = cursor.fetchall()
         return cors_response(200, {'success': True, 'data': [dict(row) for row in costs]})
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+# ============================================
+# LABEL CYCLE COUNTS
+# ============================================
+
+def get_label_cycle_counts(event):
+    """GET /supply-chain/labels/cycle-counts - Get all cycle counts"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cursor.execute("""
+            SELECT * FROM label_cycle_counts 
+            ORDER BY count_date DESC, id DESC
+        """)
+        counts = cursor.fetchall()
+        return cors_response(200, {'success': True, 'data': [dict(row) for row in counts]})
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_label_cycle_count_by_id(event):
+    """GET /supply-chain/labels/cycle-counts/{id} - Get cycle count with line items"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        count_id = event['pathParameters']['id']
+        
+        # Get count header
+        cursor.execute("SELECT * FROM label_cycle_counts WHERE id = %s", (count_id,))
+        count = cursor.fetchone()
+        
+        if not count:
+            return cors_response(404, {'success': False, 'error': 'Cycle count not found'})
+        
+        # Get count lines
+        cursor.execute("""
+            SELECT * FROM label_cycle_count_lines 
+            WHERE cycle_count_id = %s 
+            ORDER BY brand_name, product_name, bottle_size
+        """, (count_id,))
+        lines = cursor.fetchall()
+        
+        return cors_response(200, {
+            'success': True,
+            'data': {
+                'count': dict(count),
+                'lines': [dict(row) for row in lines]
+            }
+        })
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_label_cycle_count_by_id(event):
+    """GET /supply-chain/labels/cycle-counts/{id} - Get cycle count with lines"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        count_id = event['pathParameters']['id']
+        
+        # Get cycle count header
+        cursor.execute("SELECT * FROM label_cycle_counts WHERE id = %s", (count_id,))
+        count = cursor.fetchone()
+        
+        if not count:
+            return cors_response(404, {'success': False, 'error': 'Cycle count not found'})
+        
+        # Get count lines
+        cursor.execute("""
+            SELECT * FROM label_cycle_count_lines 
+            WHERE cycle_count_id = %s 
+            ORDER BY id
+        """, (count_id,))
+        lines = cursor.fetchall()
+        
+        return cors_response(200, {
+            'success': True,
+            'data': {
+                **dict(count),
+                'lines': [dict(line) for line in lines]
+            }
+        })
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def create_label_cycle_count(event):
+    """POST /supply-chain/labels/cycle-counts - Create new cycle count"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        data = json.loads(event.get('body', '{}'))
+        lines = data.get('lines', [])
+        
+        # Create cycle count header
+        cursor.execute("""
+            INSERT INTO label_cycle_counts (
+                count_date, counted_by, status, notes
+            )
+            VALUES (%s, %s, %s, %s) RETURNING *
+        """, (
+            data.get('count_date'),
+            data.get('counted_by'),
+            data.get('status', 'draft'),
+            data.get('notes')
+        ))
+        count = cursor.fetchone()
+        count_id = count['id']
+        
+        # Create count lines
+        for line in lines:
+            # Get expected quantity from inventory
+            cursor.execute("""
+                SELECT warehouse_inventory FROM label_inventory 
+                WHERE brand_name = %s 
+                AND product_name = %s 
+                AND bottle_size = %s
+            """, (line.get('brand_name'), line.get('product_name'), line.get('bottle_size')))
+            
+            inv = cursor.fetchone()
+            expected_qty = inv['warehouse_inventory'] if inv else 0
+            counted_qty = line.get('counted_quantity', 0)
+            variance = counted_qty - expected_qty
+            
+            cursor.execute("""
+                INSERT INTO label_cycle_count_lines (
+                    cycle_count_id, brand_name, product_name, bottle_size,
+                    expected_quantity, counted_quantity, variance
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                count_id,
+                line.get('brand_name'),
+                line.get('product_name'),
+                line.get('bottle_size'),
+                expected_qty,
+                counted_qty,
+                variance
+            ))
+        
+        conn.commit()
+        return cors_response(201, {'success': True, 'data': dict(count)})
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def update_label_cycle_count(event):
+    """PUT /supply-chain/labels/cycle-counts/{id} - Update cycle count"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        count_id = event['pathParameters']['id']
+        data = json.loads(event.get('body', '{}'))
+        
+        cursor.execute("""
+            UPDATE label_cycle_counts 
+            SET status = COALESCE(%s, status),
+                notes = COALESCE(%s, notes),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s RETURNING *
+        """, (data.get('status'), data.get('notes'), count_id))
+        
+        count = cursor.fetchone()
+        
+        if not count:
+            return cors_response(404, {'success': False, 'error': 'Cycle count not found'})
+        
+        # If lines are provided, delete existing and insert new ones
+        lines = data.get('lines', [])
+        if lines:
+            # Delete existing lines
+            cursor.execute("""
+                DELETE FROM label_cycle_count_lines WHERE cycle_count_id = %s
+            """, (count_id,))
+            
+            # Insert new lines
+            for line in lines:
+                # Get expected quantity from inventory
+                cursor.execute("""
+                    SELECT warehouse_inventory FROM label_inventory 
+                    WHERE brand_name = %s 
+                    AND product_name = %s 
+                    AND bottle_size = %s
+                """, (line.get('brand_name'), line.get('product_name'), line.get('bottle_size')))
+                
+                inv = cursor.fetchone()
+                expected_qty = inv['warehouse_inventory'] if inv else 0
+                counted_qty = line.get('counted_quantity', 0)
+                variance = counted_qty - expected_qty
+                
+                cursor.execute("""
+                    INSERT INTO label_cycle_count_lines (
+                        cycle_count_id, brand_name, product_name, bottle_size,
+                        expected_quantity, counted_quantity, variance
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    count_id,
+                    line.get('brand_name'),
+                    line.get('product_name'),
+                    line.get('bottle_size'),
+                    expected_qty,
+                    counted_qty,
+                    variance
+                ))
+        
+        conn.commit()
+        return cors_response(200, {'success': True, 'data': dict(count)})
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def complete_label_cycle_count(event):
+    """POST /supply-chain/labels/cycle-counts/{id}/complete - Complete count and update inventory"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        count_id = event['pathParameters']['id']
+        
+        # Get cycle count
+        cursor.execute("SELECT * FROM label_cycle_counts WHERE id = %s", (count_id,))
+        count = cursor.fetchone()
+        
+        if not count:
+            return cors_response(404, {'success': False, 'error': 'Cycle count not found'})
+        
+        if count['status'] == 'completed':
+            return cors_response(400, {'success': False, 'error': 'Cycle count already completed'})
+        
+        # Get all count lines
+        cursor.execute("""
+            SELECT * FROM label_cycle_count_lines WHERE cycle_count_id = %s
+        """, (count_id,))
+        lines = cursor.fetchall()
+        
+        # Update inventory for each line
+        for line in lines:
+            cursor.execute("""
+                UPDATE label_inventory 
+                SET warehouse_inventory = %s,
+                    last_count_date = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE brand_name = %s 
+                AND product_name = %s 
+                AND bottle_size = %s
+            """, (
+                line['counted_quantity'],
+                count['count_date'],
+                line['brand_name'],
+                line['product_name'],
+                line['bottle_size']
+            ))
+        
+        # Mark cycle count as completed
+        cursor.execute("""
+            UPDATE label_cycle_counts 
+            SET status = 'completed',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s RETURNING *
+        """, (count_id,))
+        
+        updated_count = cursor.fetchone()
+        conn.commit()
+        
+        return cors_response(200, {'success': True, 'data': dict(updated_count)})
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+# ============================================
+# BOTTLE CYCLE COUNTS
+# ============================================
+
+def get_bottle_cycle_counts(event):
+    """GET /supply-chain/bottles/cycle-counts - Get all cycle counts"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cursor.execute("""
+            SELECT * FROM bottle_cycle_counts 
+            ORDER BY count_date DESC, id DESC
+        """)
+        counts = cursor.fetchall()
+        return cors_response(200, {'success': True, 'data': [dict(row) for row in counts]})
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_bottle_cycle_count_by_id(event):
+    """GET /supply-chain/bottles/cycle-counts/{id} - Get cycle count with line items"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        count_id = event['pathParameters']['id']
+        
+        cursor.execute("SELECT * FROM bottle_cycle_counts WHERE id = %s", (count_id,))
+        count = cursor.fetchone()
+        
+        if not count:
+            return cors_response(404, {'success': False, 'error': 'Cycle count not found'})
+        
+        cursor.execute("""
+            SELECT * FROM bottle_cycle_count_lines 
+            WHERE cycle_count_id = %s 
+            ORDER BY bottle_name
+        """, (count_id,))
+        lines = cursor.fetchall()
+        
+        return cors_response(200, {
+            'success': True,
+            'data': {
+                'count': dict(count),
+                'lines': [dict(row) for row in lines]
+            }
+        })
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def create_bottle_cycle_count(event):
+    """POST /supply-chain/bottles/cycle-counts - Create new cycle count"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        data = json.loads(event.get('body', '{}'))
+        lines = data.get('lines', [])
+        
+        cursor.execute("""
+            INSERT INTO bottle_cycle_counts (
+                count_date, counted_by, status, notes
+            )
+            VALUES (%s, %s, %s, %s) RETURNING *
+        """, (
+            data.get('count_date'),
+            data.get('counted_by'),
+            data.get('status', 'draft'),
+            data.get('notes')
+        ))
+        count = cursor.fetchone()
+        count_id = count['id']
+        
+        for line in lines:
+            cursor.execute("""
+                SELECT warehouse_quantity FROM bottle_inventory 
+                WHERE bottle_name = %s
+            """, (line.get('bottle_name'),))
+            
+            inv = cursor.fetchone()
+            expected_qty = inv['warehouse_quantity'] if inv else 0
+            counted_qty = line.get('counted_quantity', 0)
+            variance = counted_qty - expected_qty
+            
+            cursor.execute("""
+                INSERT INTO bottle_cycle_count_lines (
+                    cycle_count_id, bottle_name,
+                    expected_quantity, counted_quantity, variance
+                )
+                VALUES (%s, %s, %s, %s, %s)
+            """, (
+                count_id,
+                line.get('bottle_name'),
+                expected_qty,
+                counted_qty,
+                variance
+            ))
+        
+        conn.commit()
+        return cors_response(201, {'success': True, 'data': dict(count)})
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def update_bottle_cycle_count(event):
+    """PUT /supply-chain/bottles/cycle-counts/{id} - Update cycle count"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        count_id = event['pathParameters']['id']
+        data = json.loads(event.get('body', '{}'))
+        
+        cursor.execute("""
+            UPDATE bottle_cycle_counts 
+            SET status = COALESCE(%s, status),
+                notes = COALESCE(%s, notes),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s RETURNING *
+        """, (data.get('status'), data.get('notes'), count_id))
+        
+        count = cursor.fetchone()
+        
+        if not count:
+            return cors_response(404, {'success': False, 'error': 'Cycle count not found'})
+        
+        lines = data.get('lines', [])
+        if lines:
+            cursor.execute("DELETE FROM bottle_cycle_count_lines WHERE cycle_count_id = %s", (count_id,))
+            
+            for line in lines:
+                cursor.execute("""
+                    SELECT warehouse_quantity FROM bottle_inventory 
+                    WHERE bottle_name = %s
+                """, (line.get('bottle_name'),))
+                
+                inv = cursor.fetchone()
+                expected_qty = inv['warehouse_quantity'] if inv else 0
+                counted_qty = line.get('counted_quantity', 0)
+                variance = counted_qty - expected_qty
+                
+                cursor.execute("""
+                    INSERT INTO bottle_cycle_count_lines (
+                        cycle_count_id, bottle_name,
+                        expected_quantity, counted_quantity, variance
+                    )
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (count_id, line.get('bottle_name'), expected_qty, counted_qty, variance))
+        
+        conn.commit()
+        return cors_response(200, {'success': True, 'data': dict(count)})
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def complete_bottle_cycle_count(event):
+    """POST /supply-chain/bottles/cycle-counts/{id}/complete - Complete count and update inventory"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        count_id = event['pathParameters']['id']
+        
+        cursor.execute("SELECT * FROM bottle_cycle_counts WHERE id = %s", (count_id,))
+        count = cursor.fetchone()
+        
+        if not count:
+            return cors_response(404, {'success': False, 'error': 'Cycle count not found'})
+        
+        if count['status'] == 'completed':
+            return cors_response(400, {'success': False, 'error': 'Cycle count already completed'})
+        
+        cursor.execute("""
+            SELECT * FROM bottle_cycle_count_lines WHERE cycle_count_id = %s
+        """, (count_id,))
+        lines = cursor.fetchall()
+        
+        for line in lines:
+            cursor.execute("""
+                UPDATE bottle_inventory 
+                SET warehouse_quantity = %s,
+                    last_count_date = %s,
+                    last_updated = CURRENT_TIMESTAMP
+                WHERE bottle_name = %s
+            """, (
+                line['counted_quantity'],
+                count['count_date'],
+                line['bottle_name']
+            ))
+        
+        cursor.execute("""
+            UPDATE bottle_cycle_counts 
+            SET status = 'completed',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s RETURNING *
+        """, (count_id,))
+        
+        updated_count = cursor.fetchone()
+        conn.commit()
+        
+        return cors_response(200, {'success': True, 'data': dict(updated_count)})
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+# ============================================
+# CLOSURE CYCLE COUNTS
+# ============================================
+
+def get_closure_cycle_counts(event):
+    """GET /supply-chain/closures/cycle-counts - Get all cycle counts"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cursor.execute("""
+            SELECT * FROM closure_cycle_counts 
+            ORDER BY count_date DESC, id DESC
+        """)
+        counts = cursor.fetchall()
+        return cors_response(200, {'success': True, 'data': [dict(row) for row in counts]})
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_closure_cycle_count_by_id(event):
+    """GET /supply-chain/closures/cycle-counts/{id} - Get cycle count with line items"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        count_id = event['pathParameters']['id']
+        
+        cursor.execute("SELECT * FROM closure_cycle_counts WHERE id = %s", (count_id,))
+        count = cursor.fetchone()
+        
+        if not count:
+            return cors_response(404, {'success': False, 'error': 'Cycle count not found'})
+        
+        cursor.execute("""
+            SELECT * FROM closure_cycle_count_lines 
+            WHERE cycle_count_id = %s 
+            ORDER BY closure_name
+        """, (count_id,))
+        lines = cursor.fetchall()
+        
+        return cors_response(200, {
+            'success': True,
+            'data': {
+                'count': dict(count),
+                'lines': [dict(row) for row in lines]
+            }
+        })
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def create_closure_cycle_count(event):
+    """POST /supply-chain/closures/cycle-counts - Create new cycle count"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        data = json.loads(event.get('body', '{}'))
+        lines = data.get('lines', [])
+        
+        cursor.execute("""
+            INSERT INTO closure_cycle_counts (
+                count_date, counted_by, status, notes
+            )
+            VALUES (%s, %s, %s, %s) RETURNING *
+        """, (
+            data.get('count_date'),
+            data.get('counted_by'),
+            data.get('status', 'draft'),
+            data.get('notes')
+        ))
+        count = cursor.fetchone()
+        count_id = count['id']
+        
+        for line in lines:
+            cursor.execute("""
+                SELECT warehouse_quantity FROM closure_inventory 
+                WHERE closure_name = %s
+            """, (line.get('closure_name'),))
+            
+            inv = cursor.fetchone()
+            expected_qty = inv['warehouse_quantity'] if inv else 0
+            counted_qty = line.get('counted_quantity', 0)
+            variance = counted_qty - expected_qty
+            
+            cursor.execute("""
+                INSERT INTO closure_cycle_count_lines (
+                    cycle_count_id, closure_name,
+                    expected_quantity, counted_quantity, variance
+                )
+                VALUES (%s, %s, %s, %s, %s)
+            """, (
+                count_id,
+                line.get('closure_name'),
+                expected_qty,
+                counted_qty,
+                variance
+            ))
+        
+        conn.commit()
+        return cors_response(201, {'success': True, 'data': dict(count)})
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def update_closure_cycle_count(event):
+    """PUT /supply-chain/closures/cycle-counts/{id} - Update cycle count"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        count_id = event['pathParameters']['id']
+        data = json.loads(event.get('body', '{}'))
+        
+        cursor.execute("""
+            UPDATE closure_cycle_counts 
+            SET status = COALESCE(%s, status),
+                notes = COALESCE(%s, notes),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s RETURNING *
+        """, (data.get('status'), data.get('notes'), count_id))
+        
+        count = cursor.fetchone()
+        
+        if not count:
+            return cors_response(404, {'success': False, 'error': 'Cycle count not found'})
+        
+        lines = data.get('lines', [])
+        if lines:
+            cursor.execute("DELETE FROM closure_cycle_count_lines WHERE cycle_count_id = %s", (count_id,))
+            
+            for line in lines:
+                cursor.execute("""
+                    SELECT warehouse_quantity FROM closure_inventory 
+                    WHERE closure_name = %s
+                """, (line.get('closure_name'),))
+                
+                inv = cursor.fetchone()
+                expected_qty = inv['warehouse_quantity'] if inv else 0
+                counted_qty = line.get('counted_quantity', 0)
+                variance = counted_qty - expected_qty
+                
+                cursor.execute("""
+                    INSERT INTO closure_cycle_count_lines (
+                        cycle_count_id, closure_name,
+                        expected_quantity, counted_quantity, variance
+                    )
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (count_id, line.get('closure_name'), expected_qty, counted_qty, variance))
+        
+        conn.commit()
+        return cors_response(200, {'success': True, 'data': dict(count)})
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def complete_closure_cycle_count(event):
+    """POST /supply-chain/closures/cycle-counts/{id}/complete - Complete count and update inventory"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        count_id = event['pathParameters']['id']
+        
+        cursor.execute("SELECT * FROM closure_cycle_counts WHERE id = %s", (count_id,))
+        count = cursor.fetchone()
+        
+        if not count:
+            return cors_response(404, {'success': False, 'error': 'Cycle count not found'})
+        
+        if count['status'] == 'completed':
+            return cors_response(400, {'success': False, 'error': 'Cycle count already completed'})
+        
+        cursor.execute("""
+            SELECT * FROM closure_cycle_count_lines WHERE cycle_count_id = %s
+        """, (count_id,))
+        lines = cursor.fetchall()
+        
+        for line in lines:
+            cursor.execute("""
+                UPDATE closure_inventory 
+                SET warehouse_quantity = %s,
+                    last_count_date = %s,
+                    last_updated = CURRENT_TIMESTAMP
+                WHERE closure_name = %s
+            """, (
+                line['counted_quantity'],
+                count['count_date'],
+                line['closure_name']
+            ))
+        
+        cursor.execute("""
+            UPDATE closure_cycle_counts 
+            SET status = 'completed',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s RETURNING *
+        """, (count_id,))
+        
+        updated_count = cursor.fetchone()
+        conn.commit()
+        
+        return cors_response(200, {'success': True, 'data': dict(updated_count)})
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+# ============================================
+# BOX CYCLE COUNTS
+# ============================================
+
+def get_box_cycle_counts(event):
+    """GET /supply-chain/boxes/cycle-counts - Get all cycle counts"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cursor.execute("""
+            SELECT * FROM box_cycle_counts 
+            ORDER BY count_date DESC, id DESC
+        """)
+        counts = cursor.fetchall()
+        return cors_response(200, {'success': True, 'data': [dict(row) for row in counts]})
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_box_cycle_count_by_id(event):
+    """GET /supply-chain/boxes/cycle-counts/{id} - Get cycle count with line items"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        count_id = event['pathParameters']['id']
+        
+        cursor.execute("SELECT * FROM box_cycle_counts WHERE id = %s", (count_id,))
+        count = cursor.fetchone()
+        
+        if not count:
+            return cors_response(404, {'success': False, 'error': 'Cycle count not found'})
+        
+        cursor.execute("""
+            SELECT * FROM box_cycle_count_lines 
+            WHERE cycle_count_id = %s 
+            ORDER BY box_type
+        """, (count_id,))
+        lines = cursor.fetchall()
+        
+        return cors_response(200, {
+            'success': True,
+            'data': {
+                'count': dict(count),
+                'lines': [dict(row) for row in lines]
+            }
+        })
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def create_box_cycle_count(event):
+    """POST /supply-chain/boxes/cycle-counts - Create new cycle count"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        data = json.loads(event.get('body', '{}'))
+        lines = data.get('lines', [])
+        
+        cursor.execute("""
+            INSERT INTO box_cycle_counts (
+                count_date, counted_by, status, notes
+            )
+            VALUES (%s, %s, %s, %s) RETURNING *
+        """, (
+            data.get('count_date'),
+            data.get('counted_by'),
+            data.get('status', 'draft'),
+            data.get('notes')
+        ))
+        count = cursor.fetchone()
+        count_id = count['id']
+        
+        for line in lines:
+            cursor.execute("""
+                SELECT warehouse_quantity FROM box_inventory 
+                WHERE box_type = %s
+            """, (line.get('box_type'),))
+            
+            inv = cursor.fetchone()
+            expected_qty = inv['warehouse_quantity'] if inv else 0
+            counted_qty = line.get('counted_quantity', 0)
+            variance = counted_qty - expected_qty
+            
+            cursor.execute("""
+                INSERT INTO box_cycle_count_lines (
+                    cycle_count_id, box_type,
+                    expected_quantity, counted_quantity, variance
+                )
+                VALUES (%s, %s, %s, %s, %s)
+            """, (
+                count_id,
+                line.get('box_type'),
+                expected_qty,
+                counted_qty,
+                variance
+            ))
+        
+        conn.commit()
+        return cors_response(201, {'success': True, 'data': dict(count)})
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def update_box_cycle_count(event):
+    """PUT /supply-chain/boxes/cycle-counts/{id} - Update cycle count"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        count_id = event['pathParameters']['id']
+        data = json.loads(event.get('body', '{}'))
+        
+        cursor.execute("""
+            UPDATE box_cycle_counts 
+            SET status = COALESCE(%s, status),
+                notes = COALESCE(%s, notes),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s RETURNING *
+        """, (data.get('status'), data.get('notes'), count_id))
+        
+        count = cursor.fetchone()
+        
+        if not count:
+            return cors_response(404, {'success': False, 'error': 'Cycle count not found'})
+        
+        lines = data.get('lines', [])
+        if lines:
+            cursor.execute("DELETE FROM box_cycle_count_lines WHERE cycle_count_id = %s", (count_id,))
+            
+            for line in lines:
+                cursor.execute("""
+                    SELECT warehouse_quantity FROM box_inventory 
+                    WHERE box_type = %s
+                """, (line.get('box_type'),))
+                
+                inv = cursor.fetchone()
+                expected_qty = inv['warehouse_quantity'] if inv else 0
+                counted_qty = line.get('counted_quantity', 0)
+                variance = counted_qty - expected_qty
+                
+                cursor.execute("""
+                    INSERT INTO box_cycle_count_lines (
+                        cycle_count_id, box_type,
+                        expected_quantity, counted_quantity, variance
+                    )
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (count_id, line.get('box_type'), expected_qty, counted_qty, variance))
+        
+        conn.commit()
+        return cors_response(200, {'success': True, 'data': dict(count)})
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def complete_box_cycle_count(event):
+    """POST /supply-chain/boxes/cycle-counts/{id}/complete - Complete count and update inventory"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        count_id = event['pathParameters']['id']
+        
+        cursor.execute("SELECT * FROM box_cycle_counts WHERE id = %s", (count_id,))
+        count = cursor.fetchone()
+        
+        if not count:
+            return cors_response(404, {'success': False, 'error': 'Cycle count not found'})
+        
+        if count['status'] == 'completed':
+            return cors_response(400, {'success': False, 'error': 'Cycle count already completed'})
+        
+        cursor.execute("""
+            SELECT * FROM box_cycle_count_lines WHERE cycle_count_id = %s
+        """, (count_id,))
+        lines = cursor.fetchall()
+        
+        for line in lines:
+            cursor.execute("""
+                UPDATE box_inventory 
+                SET warehouse_quantity = %s,
+                    last_count_date = %s,
+                    last_updated = CURRENT_TIMESTAMP
+                WHERE box_type = %s
+            """, (
+                line['counted_quantity'],
+                count['count_date'],
+                line['box_type']
+            ))
+        
+        cursor.execute("""
+            UPDATE box_cycle_counts 
+            SET status = 'completed',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s RETURNING *
+        """, (count_id,))
+        
+        updated_count = cursor.fetchone()
+        conn.commit()
+        
+        return cors_response(200, {'success': True, 'data': dict(updated_count)})
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+# ============================================
+# LABEL DOI (DAYS OF INVENTORY) CALCULATION
+# ============================================
+
+def calculate_label_doi(event):
+    """GET /supply-chain/labels/doi - Calculate DOI for all labels"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        query_params = event.get('queryStringParameters') or {}
+        doi_goal = int(query_params.get('goal', 196))
+        
+        # Get all labels with inventory
+        cursor.execute("""
+            SELECT * FROM label_inventory 
+            ORDER BY brand_name, product_name, bottle_size
+        """)
+        labels = cursor.fetchall()
+        
+        results = []
+        for label in labels:
+            # TODO: Get daily usage from sales data or N-GOOS
+            # For now, using a placeholder calculation
+            daily_usage = 10  # Placeholder
+            
+            current_inv = label['warehouse_inventory'] or 0
+            inbound = label['inbound_quantity'] or 0
+            total_available = current_inv + inbound
+            
+            if daily_usage > 0:
+                doi = total_available / daily_usage
+                status = 'good' if doi >= doi_goal else 'low'
+                shortage = max(0, doi_goal - doi)
+            else:
+                doi = float('inf')
+                status = 'no_usage_data'
+                shortage = 0
+            
+            results.append({
+                'id': label['id'],
+                'brand_name': label['brand_name'],
+                'product_name': label['product_name'],
+                'bottle_size': label['bottle_size'],
+                'current_inventory': current_inv,
+                'inbound': inbound,
+                'daily_usage': daily_usage,
+                'doi_days': doi if doi != float('inf') else None,
+                'doi_goal': doi_goal,
+                'status': status,
+                'shortage_in_days': shortage
+            })
+        
+        return cors_response(200, {'success': True, 'data': results})
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def calculate_label_doi_by_id(event):
+    """GET /supply-chain/labels/doi/{id} - Calculate DOI for specific label"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        label_id = event['pathParameters']['id']
+        query_params = event.get('queryStringParameters') or {}
+        doi_goal = int(query_params.get('goal', 196))
+        
+        # Get label
+        cursor.execute("SELECT * FROM label_inventory WHERE id = %s", (label_id,))
+        label = cursor.fetchone()
+        
+        if not label:
+            return cors_response(404, {'success': False, 'error': 'Label not found'})
+        
+        # TODO: Get daily usage from sales data or N-GOOS
+        daily_usage = 10  # Placeholder
+        
+        current_inv = label['warehouse_inventory'] or 0
+        inbound = label['inbound_quantity'] or 0
+        total_available = current_inv + inbound
+        
+        if daily_usage > 0:
+            doi = total_available / daily_usage
+            status = 'good' if doi >= doi_goal else 'low'
+            shortage = max(0, doi_goal - doi)
+        else:
+            doi = float('inf')
+            status = 'no_usage_data'
+            shortage = 0
+        
+        result = {
+            'id': label['id'],
+            'brand_name': label['brand_name'],
+            'product_name': label['product_name'],
+            'bottle_size': label['bottle_size'],
+            'current_inventory': current_inv,
+            'inbound': inbound,
+            'daily_usage': daily_usage,
+            'doi_days': doi if doi != float('inf') else None,
+            'doi_goal': doi_goal,
+            'status': status,
+            'shortage_in_days': shortage
+        }
+        
+        return cors_response(200, {'success': True, 'data': result})
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
     finally:
         cursor.close()
         conn.close()
@@ -2091,6 +3547,814 @@ def get_warehouse_capacity(event):
         cursor.close()
         conn.close()
 
+# ============================================
+# SHIPMENT ENDPOINTS
+# ============================================
+
+def get_shipments(event):
+    """GET /production/shipments - Get all shipments"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        query_params = event.get('queryStringParameters') or {}
+        status = query_params.get('status')
+        
+        query = """
+            SELECT 
+                id,
+                shipment_number,
+                shipment_date,
+                shipment_type,
+                marketplace,
+                account,
+                location,
+                status,
+                add_products_completed,
+                formula_check_completed,
+                label_check_completed,
+                sort_products_completed,
+                sort_formulas_completed,
+                total_units,
+                total_boxes,
+                total_palettes,
+                estimated_hours,
+                created_by,
+                created_at,
+                updated_at
+            FROM shipments
+        """
+        
+        if status:
+            query += " WHERE status = %s"
+            cursor.execute(query + " ORDER BY shipment_date DESC", (status,))
+        else:
+            cursor.execute(query + " ORDER BY shipment_date DESC")
+        
+        shipments = cursor.fetchall()
+        
+        return cors_response(200, {
+            'success': True,
+            'data': shipments
+        })
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_shipment_by_id(event):
+    """GET /production/shipments/{id} - Get shipment details"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        shipment_id = event['pathParameters']['id']
+        
+        # Get shipment
+        cursor.execute("""
+            SELECT * FROM shipments WHERE id = %s
+        """, (shipment_id,))
+        shipment = cursor.fetchone()
+        
+        if not shipment:
+            return cors_response(404, {
+                'success': False,
+                'error': 'Shipment not found'
+            })
+        
+        # Get products
+        cursor.execute("""
+            SELECT * FROM shipment_products WHERE shipment_id = %s
+        """, (shipment_id,))
+        products = cursor.fetchall()
+        
+        shipment['products'] = products
+        
+        return cors_response(200, {
+            'success': True,
+            'data': shipment
+        })
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def create_shipment(event):
+    """POST /production/shipments - Create new shipment"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        body = json.loads(event.get('body', '{}'))
+        
+        cursor.execute("""
+            INSERT INTO shipments (
+                shipment_number,
+                shipment_date,
+                shipment_type,
+                marketplace,
+                account,
+                location,
+                created_by
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING *
+        """, (
+            body.get('shipment_number'),
+            body.get('shipment_date'),
+            body.get('shipment_type', 'AWD'),
+            body.get('marketplace', 'Amazon'),
+            body.get('account'),
+            body.get('location'),
+            body.get('created_by', 'system')
+        ))
+        
+        shipment = cursor.fetchone()
+        conn.commit()
+        
+        return cors_response(201, {
+            'success': True,
+            'data': shipment
+        })
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def update_shipment(event):
+    """PUT /production/shipments/{id} - Update shipment"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        shipment_id = event['pathParameters']['id']
+        body = json.loads(event.get('body', '{}'))
+        
+        # Build dynamic UPDATE query
+        update_fields = []
+        values = []
+        
+        allowed_fields = [
+            'shipment_number', 'shipment_date', 'shipment_type', 
+            'marketplace', 'account', 'location', 'status',
+            'add_products_completed', 'formula_check_completed',
+            'label_check_completed', 'sort_products_completed',
+            'sort_formulas_completed', 'notes'
+        ]
+        
+        for field in allowed_fields:
+            if field in body:
+                update_fields.append(f"{field} = %s")
+                values.append(body[field])
+        
+        if not update_fields:
+            return cors_response(400, {
+                'success': False,
+                'error': 'No valid fields to update'
+            })
+        
+        values.append(shipment_id)
+        
+        query = f"""
+            UPDATE shipments 
+            SET {', '.join(update_fields)}
+            WHERE id = %s
+            RETURNING *
+        """
+        
+        cursor.execute(query, values)
+        shipment = cursor.fetchone()
+        conn.commit()
+        
+        return cors_response(200, {
+            'success': True,
+            'data': shipment
+        })
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def add_shipment_products(event):
+    """POST /production/shipments/{id}/products - Add products to shipment"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        shipment_id = event['pathParameters']['id']
+        body = json.loads(event.get('body', '{}'))
+        products = body.get('products', [])
+        
+        added_products = []
+        supply_warnings = []
+        
+        for product in products:
+            catalog_id = product['catalog_id']
+            quantity = product['quantity']
+            
+            # Get catalog data with inventory levels
+            cursor.execute("""
+                SELECT 
+                    c.id,
+                    c.product_name,
+                    c.brand_name,
+                    c.size,
+                    c.child_asin,
+                    c.child_sku_final,
+                    c.units_per_case,
+                    c.packaging_name as bottle_name,
+                    c.formula_name,
+                    c.closure_name,
+                    c.label_location,
+                    c.case_size as box_type,
+                    b.size_oz,
+                    b.bottles_per_minute,
+                    -- Inventory levels
+                    COALESCE(bi.warehouse_quantity, 0) as bottle_inventory,
+                    COALESCE(ci.warehouse_quantity, 0) as closure_inventory,
+                    COALESCE(li.warehouse_inventory, 0) as label_inventory,
+                    COALESCE(fi.gallons_available, 0) as formula_gallons_available,
+                    -- Calculate max producible
+                    LEAST(
+                        COALESCE(bi.warehouse_quantity, 0),
+                        COALESCE(ci.warehouse_quantity, 0),
+                        COALESCE(li.warehouse_inventory, 0),
+                        CASE 
+                            WHEN c.size = '8oz' THEN FLOOR(COALESCE(fi.gallons_available, 0) / 0.0625)
+                            WHEN c.size = '16oz' THEN FLOOR(COALESCE(fi.gallons_available, 0) / 0.125)
+                            WHEN c.size IN ('Quart', '32oz') THEN FLOOR(COALESCE(fi.gallons_available, 0) / 0.25)
+                            WHEN c.size = 'Gallon' THEN FLOOR(COALESCE(fi.gallons_available, 0) / 1.0)
+                            WHEN c.size = '5 Gallon' THEN FLOOR(COALESCE(fi.gallons_available, 0) / 5.0)
+                            ELSE FLOOR(COALESCE(fi.gallons_available, 0) / 0.25)
+                        END
+                    ) as max_units_producible
+                FROM catalog c
+                LEFT JOIN bottle b ON c.packaging_name = b.bottle_name
+                LEFT JOIN bottle_inventory bi ON c.packaging_name = bi.bottle_name
+                LEFT JOIN closure_inventory ci ON c.closure_name = ci.closure_name
+                LEFT JOIN label_inventory li ON c.label_location = li.label_location
+                LEFT JOIN formula_inventory fi ON c.formula_name = fi.formula_name
+                WHERE c.id = %s
+            """, (catalog_id,))
+            
+            catalog_data = cursor.fetchone()
+            
+            if not catalog_data:
+                continue
+            
+            # Check supply chain availability
+            max_producible = catalog_data['max_units_producible']
+            if quantity > max_producible:
+                supply_warnings.append({
+                    'product': catalog_data['product_name'],
+                    'size': catalog_data['size'],
+                    'requested': quantity,
+                    'max_available': max_producible,
+                    'bottles': catalog_data['bottle_inventory'],
+                    'closures': catalog_data['closure_inventory'],
+                    'labels': catalog_data['label_inventory'],
+                    'formula_gallons': float(catalog_data['formula_gallons_available'])
+                })
+            
+            # Calculate needs
+            units_per_case = float(catalog_data['units_per_case'] or 1)
+            boxes_needed = int(quantity / units_per_case) + (1 if quantity % units_per_case > 0 else 0)
+            
+            # Calculate formula gallons (size_oz / 128 = gallons)
+            size_oz = float(catalog_data['size_oz'] or 0)
+            formula_gallons = (quantity * size_oz) / 128.0
+            
+            # Calculate production time
+            bpm = float(catalog_data['bottles_per_minute'] or 30)
+            production_minutes = quantity / bpm if bpm > 0 else 0
+            
+            # Insert product
+            cursor.execute("""
+                INSERT INTO shipment_products (
+                    shipment_id,
+                    catalog_id,
+                    product_name,
+                    brand_name,
+                    size,
+                    child_asin,
+                    child_sku,
+                    quantity,
+                    units_per_case,
+                    boxes_needed,
+                    bottle_name,
+                    formula_name,
+                    closure_name,
+                    label_location,
+                    box_type,
+                    formula_gallons_needed,
+                    bottles_needed,
+                    closures_needed,
+                    labels_needed,
+                    bottles_per_minute,
+                    production_time_minutes
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                )
+                RETURNING *
+            """, (
+                shipment_id,
+                catalog_id,
+                catalog_data['product_name'],
+                catalog_data['brand_name'],
+                catalog_data['size'],
+                catalog_data['child_asin'],
+                catalog_data['child_sku_final'],
+                quantity,
+                units_per_case,
+                boxes_needed,
+                catalog_data['bottle_name'],
+                catalog_data['formula_name'],
+                catalog_data['closure_name'],
+                catalog_data['label_location'],
+                catalog_data['box_type'],
+                formula_gallons,
+                quantity,
+                quantity,
+                quantity,
+                bpm,
+                production_minutes
+            ))
+            
+            added_products.append(cursor.fetchone())
+        
+        # Aggregate formulas
+        cursor.execute("SELECT aggregate_shipment_formulas(%s)", (shipment_id,))
+        
+        conn.commit()
+        
+        response_data = {
+            'success': True,
+            'data': added_products,
+            'supply_warnings': supply_warnings if supply_warnings else None
+        }
+        
+        # If there are supply warnings, add a warning message
+        if supply_warnings:
+            response_data['message'] = f'⚠️ Warning: {len(supply_warnings)} product(s) exceed available inventory'
+        
+        return cors_response(201, response_data)
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_shipment_formula_check(event):
+    """GET /production/shipments/{id}/formula-check - Get formula aggregation"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        shipment_id = event['pathParameters']['id']
+        
+        cursor.execute("""
+            SELECT 
+                sf.*,
+                fi.gallons_available,
+                fi.gallons_allocated,
+                (fi.gallons_available - COALESCE(fi.gallons_allocated, 0)) as gallons_free
+            FROM shipment_formulas sf
+            LEFT JOIN formula_inventory fi ON sf.formula_name = fi.formula_name
+            WHERE sf.shipment_id = %s
+            ORDER BY sf.formula_name
+        """, (shipment_id,))
+        
+        formulas = cursor.fetchall()
+        
+        # Check for shortages
+        for formula in formulas:
+            gallons_free = formula.get('gallons_free') or 0
+            gallons_needed = formula.get('total_gallons_needed') or 0
+            formula['has_shortage'] = gallons_needed > gallons_free
+            formula['shortage_amount'] = max(0, gallons_needed - gallons_free)
+        
+        return cors_response(200, {
+            'success': True,
+            'data': formulas
+        })
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_shipment_products(event):
+    """GET /production/shipments/{id}/products - Get shipment products"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        shipment_id = event['pathParameters']['id']
+        
+        cursor.execute("""
+            SELECT 
+                sp.*,
+                bi.warehouse_quantity as bottles_available,
+                ci.warehouse_quantity as closures_available,
+                li.warehouse_inventory as labels_available
+            FROM shipment_products sp
+            LEFT JOIN bottle_inventory bi ON sp.bottle_name = bi.bottle_name
+            LEFT JOIN closure_inventory ci ON sp.closure_name = ci.closure_name
+            LEFT JOIN label_inventory li ON sp.label_location = li.label_location
+            WHERE sp.shipment_id = %s
+            ORDER BY sp.brand_name, sp.product_name, sp.size
+        """, (shipment_id,))
+        
+        products = cursor.fetchall()
+        
+        return cors_response(200, {
+            'success': True,
+            'data': products
+        })
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_sellables(event):
+    """GET /production/floor-inventory/sellables - Get products ready to manufacture/ship"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cursor.execute("""
+            SELECT * FROM v_sellables
+            ORDER BY max_sellable_units DESC, brand_name, product_name, size
+        """)
+        
+        sellables = cursor.fetchall()
+        
+        return cors_response(200, {
+            'success': True,
+            'data': sellables
+        })
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_shiners(event):
+    """GET /production/floor-inventory/shiners - Get damaged/cosmetic issue products"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # Get shiners grouped by formula
+        cursor.execute("""
+            SELECT 
+                s.id,
+                s.catalog_id,
+                s.product_name,
+                s.brand_name,
+                s.size,
+                s.formula_name,
+                s.bottle_name,
+                s.closure_name,
+                s.quantity,
+                s.issue_type,
+                s.severity,
+                s.location,
+                s.notes,
+                s.can_rework,
+                s.created_at,
+                s.updated_at
+            FROM shiners s
+            WHERE s.quantity > 0
+            ORDER BY s.formula_name, s.severity DESC, s.quantity DESC
+        """)
+        
+        shiners = cursor.fetchall()
+        
+        # Group by formula for the view
+        formula_groups = {}
+        for shiner in shiners:
+            formula = shiner['formula_name'] or 'Unknown'
+            if formula not in formula_groups:
+                formula_groups[formula] = {
+                    'formula_name': formula,
+                    'total_units': 0,
+                    'products': []
+                }
+            formula_groups[formula]['total_units'] += shiner['quantity']
+            formula_groups[formula]['products'].append(shiner)
+        
+        return cors_response(200, {
+            'success': True,
+            'data': list(formula_groups.values())
+        })
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_unused_formulas(event):
+    """GET /production/floor-inventory/unused-formulas - Get formulas with excess inventory"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cursor.execute("""
+            SELECT * FROM v_unused_formulas
+            ORDER BY unused_gallons DESC, formula_name
+        """)
+        
+        unused = cursor.fetchall()
+        
+        # For each formula, get products that use it
+        result = []
+        for formula_row in unused:
+            formula_name = formula_row['formula_name']
+            
+            # Get products using this formula (calculate gallons_per_unit from size)
+            cursor.execute("""
+                SELECT 
+                    c.id as catalog_id,
+                    c.product_name,
+                    c.brand_name,
+                    c.size,
+                    c.child_asin,
+                    CASE 
+                        WHEN c.size = '8oz' THEN 0.0625
+                        WHEN c.size = '16oz' THEN 0.125
+                        WHEN c.size IN ('Quart', '32oz') THEN 0.25
+                        WHEN c.size = 'Gallon' THEN 1.0
+                        WHEN c.size = '5 Gallon' THEN 5.0
+                        ELSE 0.25
+                    END as gallons_per_unit,
+                    FLOOR(%s / CASE 
+                        WHEN c.size = '8oz' THEN 0.0625
+                        WHEN c.size = '16oz' THEN 0.125
+                        WHEN c.size IN ('Quart', '32oz') THEN 0.25
+                        WHEN c.size = 'Gallon' THEN 1.0
+                        WHEN c.size = '5 Gallon' THEN 5.0
+                        ELSE 0.25
+                    END) as potential_units
+                FROM catalog c
+                WHERE c.formula_name = %s
+                ORDER BY c.brand_name, c.product_name, c.size
+            """, (formula_row['unused_gallons'], formula_name))
+            
+            products = cursor.fetchall()
+            
+            result.append({
+                'formula_name': formula_name,
+                'total_gallons': float(formula_row['total_gallons']),
+                'allocated_gallons': float(formula_row['allocated_gallons']),
+                'unused_gallons': float(formula_row['unused_gallons']),
+                'gallons_in_production': float(formula_row.get('gallons_in_production') or 0),
+                'product_count': formula_row['product_count'],
+                'product_names': formula_row['product_names'],
+                'last_manufactured': str(formula_row['last_manufactured']) if formula_row.get('last_manufactured') else None,
+                'products': products
+            })
+        
+        return cors_response(200, {
+            'success': True,
+            'data': result
+        })
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def add_shiner(event):
+    """POST /production/floor-inventory/shiners - Add damaged product to shiners"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        body = json.loads(event.get('body', '{}'))
+        
+        catalog_id = body.get('catalog_id')
+        quantity = body.get('quantity')
+        issue_type = body.get('issue_type')
+        severity = body.get('severity', 'minor')
+        location = body.get('location')
+        notes = body.get('notes')
+        can_rework = body.get('can_rework', False)
+        
+        if not catalog_id or not quantity:
+            return cors_response(400, {
+                'success': False,
+                'error': 'catalog_id and quantity are required'
+            })
+        
+        # Get product details from catalog
+        cursor.execute("""
+            SELECT product_name, brand_name, size, formula_name, packaging_name, closure_name
+            FROM catalog
+            WHERE id = %s
+        """, (catalog_id,))
+        
+        catalog_item = cursor.fetchone()
+        
+        if not catalog_item:
+            return cors_response(404, {
+                'success': False,
+                'error': 'Product not found in catalog'
+            })
+        
+        # Insert shiner record
+        cursor.execute("""
+            INSERT INTO shiners (
+                catalog_id, product_name, brand_name, size, formula_name, 
+                bottle_name, closure_name, quantity, issue_type, severity, 
+                location, notes, can_rework
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+        """, (
+            catalog_id,
+            catalog_item['product_name'],
+            catalog_item['brand_name'],
+            catalog_item['size'],
+            catalog_item['formula_name'],
+            catalog_item['packaging_name'],
+            catalog_item['closure_name'],
+            quantity,
+            issue_type,
+            severity,
+            location,
+            notes,
+            can_rework
+        ))
+        
+        shiner_id = cursor.fetchone()['id']
+        conn.commit()
+        
+        return cors_response(201, {
+            'success': True,
+            'shiner_id': shiner_id,
+            'message': 'Shiner added successfully'
+        })
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_products_inventory(event):
+    """GET /production/products/inventory - Get inventory levels for all products with supply chain dependencies"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # Get all catalog products with complete supply chain inventory
+        cursor.execute("""
+            SELECT 
+                c.id,
+                c.child_asin,
+                c.child_sku_final,
+                c.product_name,
+                c.brand_name,
+                c.size,
+                c.units_sold_30_days,
+                c.units_per_case,
+                
+                -- Formula details
+                c.formula_name,
+                CASE 
+                    WHEN c.size = '8oz' THEN 0.0625
+                    WHEN c.size = '16oz' THEN 0.125
+                    WHEN c.size IN ('Quart', '32oz') THEN 0.25
+                    WHEN c.size = 'Gallon' THEN 1.0
+                    WHEN c.size = '5 Gallon' THEN 5.0
+                    ELSE 0.25
+                END as gallons_per_unit,
+                fi.gallons_available as formula_gallons_available,
+                fi.gallons_in_production as formula_gallons_in_production,
+                
+                -- Bottle details
+                c.packaging_name as bottle_name,
+                b.size_oz as bottle_size_oz,
+                bi.warehouse_quantity as bottle_inventory,
+                b.max_warehouse_inventory as bottle_max_inventory,
+                
+                -- Closure details
+                c.closure_name,
+                ci.warehouse_quantity as closure_inventory,
+                
+                -- Label details
+                c.label_location,
+                c.label_size,
+                li.warehouse_inventory as label_inventory,
+                
+                -- Sales velocity (units per day)
+                CASE 
+                    WHEN c.units_sold_30_days > 0 THEN c.units_sold_30_days / 30.0
+                    ELSE 0
+                END as daily_sales_velocity,
+                
+                -- DOI calculation (Days of Inventory)
+                CASE 
+                    WHEN c.units_sold_30_days > 0 THEN 
+                        (bi.warehouse_quantity / (c.units_sold_30_days / 30.0))
+                    ELSE 9999
+                END as days_of_inventory,
+                
+                -- Supply chain bottlenecks (max units producible with current inventory)
+                LEAST(
+                    COALESCE(bi.warehouse_quantity, 0),
+                    COALESCE(ci.warehouse_quantity, 0),
+                    COALESCE(li.warehouse_inventory, 0),
+                    CASE 
+                        WHEN c.size = '8oz' AND 0.0625 > 0 THEN FLOOR(COALESCE(fi.gallons_available, 0) / 0.0625)
+                        WHEN c.size = '16oz' AND 0.125 > 0 THEN FLOOR(COALESCE(fi.gallons_available, 0) / 0.125)
+                        WHEN c.size IN ('Quart', '32oz') AND 0.25 > 0 THEN FLOOR(COALESCE(fi.gallons_available, 0) / 0.25)
+                        WHEN c.size = 'Gallon' AND 1.0 > 0 THEN FLOOR(COALESCE(fi.gallons_available, 0) / 1.0)
+                        WHEN c.size = '5 Gallon' AND 5.0 > 0 THEN FLOOR(COALESCE(fi.gallons_available, 0) / 5.0)
+                        ELSE FLOOR(COALESCE(fi.gallons_available, 0) / 0.25)
+                    END
+                ) as max_units_producible
+                
+            FROM catalog c
+            LEFT JOIN formula f ON c.formula_name = f.formula
+            LEFT JOIN formula_inventory fi ON c.formula_name = fi.formula_name
+            LEFT JOIN bottle b ON c.packaging_name = b.bottle_name
+            LEFT JOIN bottle_inventory bi ON c.packaging_name = bi.bottle_name
+            LEFT JOIN closure_inventory ci ON c.closure_name = ci.closure_name
+            LEFT JOIN label_inventory li ON c.label_location = li.label_location
+            WHERE c.child_asin IS NOT NULL
+            ORDER BY c.brand_name, c.product_name, c.size
+        """)
+        
+        products = cursor.fetchall()
+        
+        return cors_response(200, {
+            'success': True,
+            'data': products
+        })
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
 def lambda_handler(event, context):
     """Main Lambda handler"""
     
@@ -2178,6 +4442,24 @@ def lambda_handler(event, context):
         elif http_method == 'PUT' and '/bottles/orders/' in path:
             return update_bottle_order(event)
         
+        # Supply Chain - Bottles Cycle Counts
+        elif http_method == 'GET' and '/bottles/cycle-counts/' in path and not path.endswith('/bottles/cycle-counts'):
+            if '/complete' in path:
+                return cors_response(405, {'success': False, 'error': 'Use POST for complete'})
+            return get_bottle_cycle_count_by_id(event)
+        
+        elif http_method == 'GET' and ('/bottles/cycle-counts' in path or path.endswith('/bottles/cycle-counts')):
+            return get_bottle_cycle_counts(event)
+        
+        elif http_method == 'POST' and '/bottles/cycle-counts/' in path and '/complete' in path:
+            return complete_bottle_cycle_count(event)
+        
+        elif http_method == 'POST' and ('/bottles/cycle-counts' in path or path.endswith('/bottles/cycle-counts')):
+            return create_bottle_cycle_count(event)
+        
+        elif http_method == 'PUT' and '/bottles/cycle-counts/' in path:
+            return update_bottle_cycle_count(event)
+        
         # Supply Chain - Closures
         elif http_method == 'GET' and ('/closures/inventory' in path or path.endswith('/closures/inventory')):
             return get_closure_inventory(event)
@@ -2196,6 +4478,24 @@ def lambda_handler(event, context):
         
         elif http_method == 'PUT' and '/closures/orders/' in path:
             return update_closure_order(event)
+        
+        # Supply Chain - Closures Cycle Counts
+        elif http_method == 'GET' and '/closures/cycle-counts/' in path and not path.endswith('/closures/cycle-counts'):
+            if '/complete' in path:
+                return cors_response(405, {'success': False, 'error': 'Use POST for complete'})
+            return get_closure_cycle_count_by_id(event)
+        
+        elif http_method == 'GET' and ('/closures/cycle-counts' in path or path.endswith('/closures/cycle-counts')):
+            return get_closure_cycle_counts(event)
+        
+        elif http_method == 'POST' and '/closures/cycle-counts/' in path and '/complete' in path:
+            return complete_closure_cycle_count(event)
+        
+        elif http_method == 'POST' and ('/closures/cycle-counts' in path or path.endswith('/closures/cycle-counts')):
+            return create_closure_cycle_count(event)
+        
+        elif http_method == 'PUT' and '/closures/cycle-counts/' in path:
+            return update_closure_cycle_count(event)
         
         # Supply Chain - Boxes
         elif http_method == 'GET' and ('/boxes/inventory' in path or path.endswith('/boxes/inventory')):
@@ -2216,14 +4516,73 @@ def lambda_handler(event, context):
         elif http_method == 'PUT' and '/boxes/orders/' in path:
             return update_box_order(event)
         
-        # Supply Chain - Labels
-        elif http_method == 'GET' and path.endswith('/labels/orders'):
+        # Supply Chain - Boxes Cycle Counts
+        elif http_method == 'GET' and '/boxes/cycle-counts/' in path and not path.endswith('/boxes/cycle-counts'):
+            if '/complete' in path:
+                return cors_response(405, {'success': False, 'error': 'Use POST for complete'})
+            return get_box_cycle_count_by_id(event)
+        
+        elif http_method == 'GET' and ('/boxes/cycle-counts' in path or path.endswith('/boxes/cycle-counts')):
+            return get_box_cycle_counts(event)
+        
+        elif http_method == 'POST' and '/boxes/cycle-counts/' in path and '/complete' in path:
+            return complete_box_cycle_count(event)
+        
+        elif http_method == 'POST' and ('/boxes/cycle-counts' in path or path.endswith('/boxes/cycle-counts')):
+            return create_box_cycle_count(event)
+        
+        elif http_method == 'PUT' and '/boxes/cycle-counts/' in path:
+            return update_box_cycle_count(event)
+        
+        # Supply Chain - Labels Inventory
+        elif http_method == 'GET' and ('/labels/inventory' in path or path.endswith('/labels/inventory')):
+            if '/labels/inventory/' in path and not path.endswith('/labels/inventory'):
+                return get_label_inventory_by_id(event)
+            return get_label_inventory(event)
+        
+        elif http_method == 'PUT' and '/labels/inventory/' in path:
+            return update_label_inventory(event)
+        
+        # Supply Chain - Labels Orders
+        elif http_method == 'GET' and '/labels/orders/' in path and not path.endswith('/labels/orders'):
+            return get_label_order_by_id(event)
+        
+        elif http_method == 'GET' and ('/labels/orders' in path or path.endswith('/labels/orders')):
             return get_label_orders(event)
         
-        elif http_method == 'POST' and path.endswith('/labels/orders'):
+        elif http_method == 'POST' and ('/labels/orders' in path or path.endswith('/labels/orders')):
             return create_label_order(event)
         
-        elif http_method == 'GET' and path.endswith('/labels/costs'):
+        elif http_method == 'PUT' and '/labels/orders/' in path:
+            return update_label_order(event)
+        
+        # Supply Chain - Labels Cycle Counts
+        elif http_method == 'GET' and '/labels/cycle-counts/' in path and not path.endswith('/labels/cycle-counts'):
+            if '/complete' in path:
+                return cors_response(405, {'success': False, 'error': 'Use POST for complete'})
+            return get_label_cycle_count_by_id(event)
+        
+        elif http_method == 'GET' and ('/labels/cycle-counts' in path or path.endswith('/labels/cycle-counts')):
+            return get_label_cycle_counts(event)
+        
+        elif http_method == 'POST' and '/labels/cycle-counts/' in path and '/complete' in path:
+            return complete_label_cycle_count(event)
+        
+        elif http_method == 'POST' and ('/labels/cycle-counts' in path or path.endswith('/labels/cycle-counts')):
+            return create_label_cycle_count(event)
+        
+        elif http_method == 'PUT' and '/labels/cycle-counts/' in path:
+            return update_label_cycle_count(event)
+        
+        # Supply Chain - Labels DOI
+        elif http_method == 'GET' and '/labels/doi/' in path and not path.endswith('/labels/doi'):
+            return calculate_label_doi_by_id(event)
+        
+        elif http_method == 'GET' and ('/labels/doi' in path or path.endswith('/labels/doi')):
+            return calculate_label_doi(event)
+        
+        # Supply Chain - Labels Costs
+        elif http_method == 'GET' and ('/labels/costs' in path or path.endswith('/labels/costs')):
             return get_label_costs(event)
         
         # Production Planning
@@ -2232,6 +4591,45 @@ def lambda_handler(event, context):
         
         elif http_method == 'GET' and '/production/calculate-time' in path:
             return calculate_production_time(event)
+        
+        # Products inventory endpoint
+        elif http_method == 'GET' and path.endswith('/production/products/inventory'):
+            return get_products_inventory(event)
+        
+        # Floor Inventory endpoints
+        elif http_method == 'GET' and path.endswith('/production/floor-inventory/sellables'):
+            return get_sellables(event)
+        
+        elif http_method == 'GET' and path.endswith('/production/floor-inventory/shiners'):
+            return get_shiners(event)
+        
+        elif http_method == 'POST' and path.endswith('/production/floor-inventory/shiners'):
+            return add_shiner(event)
+        
+        elif http_method == 'GET' and path.endswith('/production/floor-inventory/unused-formulas'):
+            return get_unused_formulas(event)
+        
+        # Shipment endpoints
+        elif http_method == 'GET' and '/production/shipments/' in path and '/formula-check' in path:
+            return get_shipment_formula_check(event)
+        
+        elif http_method == 'GET' and '/production/shipments/' in path and '/products' in path:
+            return get_shipment_products(event)
+        
+        elif http_method == 'POST' and '/production/shipments/' in path and '/products' in path:
+            return add_shipment_products(event)
+        
+        elif http_method == 'GET' and '/production/shipments/' in path:
+            return get_shipment_by_id(event)
+        
+        elif http_method == 'PUT' and '/production/shipments/' in path:
+            return update_shipment(event)
+        
+        elif http_method == 'GET' and path.endswith('/production/shipments'):
+            return get_shipments(event)
+        
+        elif http_method == 'POST' and path.endswith('/production/shipments'):
+            return create_shipment(event)
         
         elif http_method == 'GET' and path.endswith('/production/warehouse-capacity'):
             return get_warehouse_capacity(event)

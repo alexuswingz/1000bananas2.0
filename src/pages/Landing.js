@@ -17,14 +17,20 @@ import Listing from './team/Listing';
 import Ads from './team/Ads';
 import Bottles from './supply-chain/bottles/index';
 import BottleOrderPage from './supply-chain/bottles/components/BottleOrderPage';
+import BottleCycleCounts from './supply-chain/bottles/components/CycleCounts';
+import BottleCycleCountDetail from './supply-chain/bottles/components/CycleCountDetail';
 import Closures from './supply-chain/closures/index';
 import ClosureOrderPage from './supply-chain/closures/components/ClosureOrderPage';
+import ClosureCycleCounts from './supply-chain/closures/components/CycleCounts';
+import ClosureCycleCountDetail from './supply-chain/closures/components/CycleCountDetail';
 import Boxes from './supply-chain/boxes/index';
 import BoxOrderPage from './supply-chain/boxes/components/BoxOrderPage';
+import BoxCycleCounts from './supply-chain/boxes/components/CycleCounts';
+import BoxCycleCountDetail from './supply-chain/boxes/components/CycleCountDetail';
 import Labels from './supply-chain/labels/index';
 import LabelOrderPage from './supply-chain/labels/components/LabelOrderPage';
-import CycleCounts from './supply-chain/labels/components/CycleCounts';
-import CycleCountDetail from './supply-chain/labels/components/CycleCountDetail';
+import LabelCycleCounts from './supply-chain/labels/components/CycleCounts';
+import LabelCycleCountDetail from './supply-chain/labels/components/CycleCountDetail';
 import RawMaterials from './supply-chain/rawMaterials/index';
 import Planning from './production/planning';
 import Manufacturing from './production/Manufacturing';
@@ -58,14 +64,20 @@ const Landing = () => {
           <Route path="/team/ads" element={<Ads />} />
           <Route path="/supply-chain/bottles" element={<Bottles />} />
           <Route path="/supply-chain/bottles/order" element={<BottleOrderPage />} />
+          <Route path="/supply-chain/bottles/cycle-counts" element={<BottleCycleCounts />} />
+          <Route path="/supply-chain/bottles/cycle-counts/detail" element={<BottleCycleCountDetail />} />
           <Route path="/supply-chain/closures" element={<Closures />} />
           <Route path="/supply-chain/closures/order" element={<ClosureOrderPage />} />
+          <Route path="/supply-chain/closures/cycle-counts" element={<ClosureCycleCounts />} />
+          <Route path="/supply-chain/closures/cycle-counts/detail" element={<ClosureCycleCountDetail />} />
           <Route path="/supply-chain/boxes" element={<Boxes />} />
           <Route path="/supply-chain/boxes/order" element={<BoxOrderPage />} />
+          <Route path="/supply-chain/boxes/cycle-counts" element={<BoxCycleCounts />} />
+          <Route path="/supply-chain/boxes/cycle-counts/detail" element={<BoxCycleCountDetail />} />
           <Route path="/supply-chain/labels" element={<Labels />} />
           <Route path="/supply-chain/labels/order" element={<LabelOrderPage />} />
-          <Route path="/supply-chain/labels/cycle-counts" element={<CycleCounts />} />
-          <Route path="/supply-chain/labels/cycle-counts/detail" element={<CycleCountDetail />} />
+          <Route path="/supply-chain/labels/cycle-counts" element={<LabelCycleCounts />} />
+          <Route path="/supply-chain/labels/cycle-counts/detail" element={<LabelCycleCountDetail />} />
           <Route path="/supply-chain/raw-materials" element={<RawMaterials />} />
           <Route path="/production/planning" element={<Planning />} />
           <Route path="/production/manufacturing" element={<Manufacturing />} />

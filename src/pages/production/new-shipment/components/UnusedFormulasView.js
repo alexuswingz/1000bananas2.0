@@ -1,9 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
+import { getUnusedFormulas } from '../../../../services/productionApi';
+import { toast } from 'sonner';
 
 const UnusedFormulasView = () => {
   const { isDarkMode } = useTheme();
+  const [formulas, setFormulas] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [expandedFormulas, setExpandedFormulas] = useState(new Set());
   const [addedProducts, setAddedProducts] = useState(new Set());
   // Track which specific column header filter is open (per-formula + column)
@@ -12,8 +16,62 @@ const UnusedFormulasView = () => {
   const filterRefs = useRef({});
   const filterModalRef = useRef(null);
 
-  // Sample data for unused formulas
-  const formulas = [
+  // Fetch unused formulas data from API
+  useEffect(() => {
+    const fetchUnusedFormulas = async () => {
+      setLoading(true);
+      try {
+        const data = await getUnusedFormulas();
+        
+        // Transform API data to match the component structure
+        const transformedData = data.map(formula => ({
+          id: formula.formula_name,
+          formula: formula.formula_name,
+          unusedGals: formula.unused_gallons,
+          usedGals: formula.allocated_gallons,
+          totalGals: formula.total_gallons,
+          products: formula.products.map(p => ({
+            id: `${formula.formula_name}-${p.catalog_id}`,
+            catalog_id: p.catalog_id,
+            brand: p.brand_name || '',
+            product: p.product_name || '',
+            size: p.size || '',
+            qty: p.potential_units || 0, // Units that could be made with unused formula
+            gallons_per_unit: p.gallons_per_unit,
+            timeline: {
+              purple: 0,
+              green: 0,
+              blue: 0,
+              variance: 0,
+            },
+          }))
+        }));
+        
+        setFormulas(transformedData);
+        
+        // Auto-expand formulas with products
+        const expandedSet = new Set();
+        transformedData.forEach(f => {
+          if (f.products.length > 0) {
+            expandedSet.add(f.id);
+          }
+        });
+        setExpandedFormulas(expandedSet);
+        
+      } catch (error) {
+        console.error('Error fetching unused formulas:', error);
+        toast.error('Failed to load unused formulas data');
+        setFormulas([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchUnusedFormulas();
+  }, []);
+
+  // Sample data for unused formulas (fallback)
+  const sampleFormulas = [
     {
       id: 'F.ULTRAGROW',
       formula: 'F.ULTRAGROW',
@@ -299,6 +357,34 @@ const UnusedFormulasView = () => {
       </div>
     );
   };
+
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: '2rem',
+        color: isDarkMode ? '#9CA3AF' : '#6B7280',
+      }}>
+        Loading unused formulas...
+      </div>
+    );
+  }
+
+  if (formulas.length === 0) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: '2rem',
+        color: isDarkMode ? '#9CA3AF' : '#6B7280',
+      }}>
+        No unused formulas. All formula inventory is allocated! ✨
+      </div>
+    );
+  }
 
   return (
     <>

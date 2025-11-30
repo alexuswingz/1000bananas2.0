@@ -40,37 +40,42 @@ const Planning = () => {
       // Transform API data to match your table format
       const formattedShipments = data.map(shipment => ({
         id: shipment.id,
-        status: shipment.status || 'planning',
+        status: getStatusDisplay(shipment.status),
         statusColor: getStatusColor(shipment.status),
-        marketplace: 'Amazon',
+        shipment: shipment.shipment_number,
+        marketplace: shipment.marketplace || 'Amazon',
         account: shipment.account || 'TPS Nutrients',
-        shipmentDate: shipment.shipment_date,
-        shipmentType: shipment.shipment_type || 'AWD',
-        shipmentNumber: shipment.shipment_number,
-        amznShipment: shipment.shipment_number,
-        amznRefId: '-',
+        addProducts: shipment.add_products_completed ? 'completed' : 'pending',
+        formulaCheck: shipment.formula_check_completed ? 'completed' : 'pending',
+        labelCheck: shipment.label_check_completed ? 'completed' : 'pending',
+        sortProducts: shipment.sort_products_completed ? 'completed' : 'pending',
+        sortFormulas: shipment.sort_formulas_completed ? 'completed' : 'pending',
       }));
       setShipments(formattedShipments);
     } catch (err) {
       console.error('Error fetching shipments:', err);
       setError('Failed to load shipments');
-      // Fallback to dummy data on error
-      setShipments([
-        {
-          id: 1,
-          status: 'Shipped',
-          statusColor: '#7C3AED',
-          marketplace: 'Amazon',
-          account: 'TPS Nutrients',
-          shipmentDate: '2025-09-23',
-          shipmentType: 'AWD',
-          amznShipment: 'STAR-VTFU4AYC',
-          amznRefId: '43WA0H1U',
-        },
-      ]);
+      setShipments([]);
     } finally {
       setLoading(false);
     }
+  };
+
+  const getStatusDisplay = (status) => {
+    const statusMap = {
+      'planning': 'Planning',
+      'add_products': 'Add Products',
+      'formula_check': 'Formula Check',
+      'label_check': 'Label Check',
+      'sort_products': 'Sort Products',
+      'sort_formulas': 'Sort Formulas',
+      'manufacturing': 'Manufacturing',
+      'packaging': 'Packaging',
+      'ready_for_pickup': 'Ready for Pickup',
+      'shipped': 'Shipped',
+      'received': 'Received',
+    };
+    return statusMap[status] || 'Planning';
   };
 
   const getStatusColor = (status) => {
@@ -115,69 +120,7 @@ const Planning = () => {
     }
   };
 
-  // Dummy product data for shipments tab (to be replaced with real planning data)
-  const rows = [
-    {
-      id: 1,
-      status: 'Packaging',
-      shipment: '2025.11.18 AWD',
-      marketplace: 'Amazon',
-      account: 'TPS Nutrients',
-      addProducts: 'completed',
-      formulaCheck: 'completed',
-      labelCheck: 'in progress',
-      sortProducts: 'pending',
-      sortFormulas: 'pending',
-    },
-    {
-      id: 2,
-      status: 'Packaging',
-      shipment: '2025.11.19 FBA',
-      marketplace: 'Amazon',
-      account: 'TPS Nutrients',
-      addProducts: 'completed',
-      formulaCheck: 'pending',
-      labelCheck: 'pending',
-      sortProducts: 'pending',
-      sortFormulas: 'pending',
-    },
-    {
-      id: 3,
-      status: 'Shipped',
-      shipment: '2025.11.20 AWD',
-      marketplace: 'Amazon',
-      account: 'TPS Nutrients',
-      addProducts: 'completed',
-      formulaCheck: 'completed',
-      labelCheck: 'completed',
-      sortProducts: 'completed',
-      sortFormulas: 'completed',
-    },
-    {
-      id: 4,
-      status: 'Ready for Pickup',
-      shipment: '2025.11.21 AWD',
-      marketplace: 'Amazon',
-      account: 'TPS Nutrients',
-      addProducts: 'completed',
-      formulaCheck: 'completed',
-      labelCheck: 'completed',
-      sortProducts: 'completed',
-      sortFormulas: 'in progress',
-    },
-    {
-      id: 5,
-      status: 'Packaging',
-      shipment: '2025.11.22 FBA',
-      marketplace: 'Amazon',
-      account: 'TPS Nutrients',
-      addProducts: 'in progress',
-      formulaCheck: 'pending',
-      labelCheck: 'pending',
-      sortProducts: 'pending',
-      sortFormulas: 'pending',
-    },
-  ];
+  // Use shipments from API instead of dummy data
 
   const toggleFilter = (key) => {
     setActiveFilters((prev) =>
@@ -210,16 +153,22 @@ const Planning = () => {
       <div style={{ padding: '1rem 2rem 2rem 2rem' }}>
         {/* Shipments tab */}
         {activeTab === 'shipments' && (
-          <PlanningTable
-            rows={rows}
-            activeFilters={activeFilters}
-            onFilterToggle={toggleFilter}
-          />
+          <>
+            {loading && <div style={{ textAlign: 'center', padding: '2rem' }}>Loading shipments...</div>}
+            {error && <div style={{ textAlign: 'center', padding: '2rem', color: '#EF4444' }}>{error}</div>}
+            {!loading && !error && (
+              <PlanningTable
+                rows={shipments}
+                activeFilters={activeFilters}
+                onFilterToggle={toggleFilter}
+              />
+            )}
+          </>
         )}
 
         {/* Archive tab */}
         {activeTab === 'archive' && (
-          <ArchiveTable rows={rows} />
+          <ArchiveTable rows={shipments.filter(s => s.status === 'archived')} />
         )}
       </div>
     </div>

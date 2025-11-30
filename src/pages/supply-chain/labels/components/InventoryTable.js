@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useImperativeHandle, forwardRef, useEffect, useRef } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
+import { labelsApi } from '../../../../services/supplyChainApi';
 
 const InventoryTable = forwardRef(({
   searchQuery = '',
@@ -7,33 +8,49 @@ const InventoryTable = forwardRef(({
 }, ref) => {
   const { isDarkMode } = useTheme();
 
-  // Labels data
-  const [labels, setLabels] = useState(() => {
-    try {
-      const stored = window.localStorage.getItem('labelsInventory');
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch {}
-    // Default data matching the image
-    const inboundValues = [3000, 500, 0, 0, 0, 0, 500, 4000, 0, 0, 0, 0, 2000, 1000, 0];
-    return Array.from({ length: 15 }, (_, i) => ({
-      id: i + 1,
-      status: i === 7 || i === 14 ? 'Needs Proofing' : 'Up to Date', // Row 8 and 15 (0-indexed: 7 and 14)
-      brand: 'Total Pest Spray',
-      product: 'Cherry Tree Fertilizer',
-      size: 'Gallon',
-      inventory: 25000,
-      inbound: inboundValues[i] || 0,
-    }));
-  });
+  // Labels data - fetch from API
+  const [labels, setLabels] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Persist labels to localStorage
+  // Fetch labels from API on mount
   useEffect(() => {
-    try {
-      window.localStorage.setItem('labelsInventory', JSON.stringify(labels));
-    } catch {}
-  }, [labels]);
+    const fetchLabels = async () => {
+      try {
+        setLoading(true);
+        const response = await labelsApi.getInventory();
+        if (response.success) {
+          // Transform API data to frontend format
+          const transformed = response.data.map(label => ({
+            id: label.id,
+            status: label.label_status || 'Up to Date',
+            brand: label.brand_name,
+            product: label.product_name,
+            size: label.bottle_size,
+            labelSize: label.label_size,
+            labelLocation: label.label_location,
+            inventory: label.warehouse_inventory || 0,
+            inbound: label.inbound_quantity || 0,
+            supplier: label.supplier,
+            moq: label.moq,
+            leadTimeWeeks: label.lead_time_weeks,
+            lastCountDate: label.last_count_date,
+            googleDriveLink: label.google_drive_link,
+            notes: label.notes,
+          }));
+          setLabels(transformed);
+        } else {
+          setError(response.error || 'Failed to load label inventory');
+        }
+      } catch (err) {
+        console.error('Error fetching labels:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchLabels();
+  }, []);
 
   // Filter labels based on search query
   const filteredData = useMemo(() => {
@@ -60,6 +77,15 @@ const InventoryTable = forwardRef(({
   
   // Status dropdown state
   const [statusDropdownId, setStatusDropdownId] = useState(null);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
+  
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
   const statusMenuRefs = useRef({});
   const statusButtonRefs = useRef({});
 
@@ -106,12 +132,27 @@ const InventoryTable = forwardRef(({
   }));
 
   // Handle status change
-  const handleStatusChange = (labelId, newStatus) => {
-    setLabels((prev) =>
-      prev.map((label) =>
-        label.id === labelId ? { ...label, status: newStatus } : label
-      )
-    );
+  const handleStatusChange = async (labelId, newStatus) => {
+    try {
+      const response = await labelsApi.updateInventory(labelId, {
+        label_status: newStatus
+      });
+      
+      if (response.success) {
+        // Update local state
+        setLabels((prev) =>
+          prev.map((label) =>
+            label.id === labelId ? { ...label, status: newStatus } : label
+          )
+        );
+      } else {
+        console.error('Failed to update label status:', response.error);
+        alert('Failed to update label status');
+      }
+    } catch (err) {
+      console.error('Error updating label status:', err);
+      alert('Failed to update label status');
+    }
     setStatusDropdownId(null);
   };
 
@@ -196,7 +237,7 @@ const InventoryTable = forwardRef(({
           ref={(el) => (statusButtonRefs.current[label.id] = el)}
           type="button"
           data-status-button={label.id}
-          className="inline-flex items-center justify-between h-6 w-[156px] py-1 px-3 rounded border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          className={`inline-flex items-center justify-between h-6 w-[156px] py-1 px-3 rounded border ${themeClasses.border} ${themeClasses.inputBg} text-xs font-medium ${themeClasses.textPrimary} ${themeClasses.rowHover} transition-colors`}
           onClick={(e) => {
             e.stopPropagation();
             setStatusDropdownId(statusDropdownId === label.id ? null : label.id);
@@ -212,7 +253,7 @@ const InventoryTable = forwardRef(({
                 <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" fill="#F97316"/>
               </svg>
             )}
-            <span className="text-gray-700">{status}</span>
+            <span className={themeClasses.textPrimary}>{status}</span>
           </div>
           <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -222,7 +263,7 @@ const InventoryTable = forwardRef(({
         {statusDropdownId === label.id && (
           <div
             ref={(el) => (statusMenuRefs.current[label.id] = el)}
-            className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg text-xs z-50 min-w-[160px]"
+            className={`absolute top-full left-0 mt-1 ${themeClasses.cardBg} border ${themeClasses.border} rounded-md shadow-lg text-xs z-50 min-w-[160px]`}
           >
             <button
               type="button"
@@ -246,7 +287,7 @@ const InventoryTable = forwardRef(({
               <svg className="w-3.5 h-3.5" fill="#F97316" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" fill="#F97316"/>
               </svg>
-              <span className="text-gray-700 font-medium">Needs Proofing</span>
+              <span className={`${themeClasses.textPrimary} font-medium`}>Needs Proofing</span>
             </button>
           </div>
         )}
@@ -427,14 +468,16 @@ const InventoryTable = forwardRef(({
             No labels found.
           </div>
         ) : (
-          filteredData.map((label, index) => (
+          filteredData
+            .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+            .map((label, index, array) => (
             <div
               key={label.id}
               className={`grid text-sm ${themeClasses.rowHover} transition-colors`}
               style={{
                 gridTemplateColumns: '220px 180px 220px 120px 140px 140px 1fr',
                 borderBottom:
-                  index === filteredData.length - 1
+                  index === array.length - 1
                     ? 'none'
                     : isDarkMode
                     ? '1px solid rgba(75,85,99,0.3)'
@@ -494,11 +537,11 @@ const InventoryTable = forwardRef(({
                 {actionMenuLabelId === label.id && (
                   <div
                     ref={(el) => (actionMenuRefs.current[label.id] = el)}
-                    className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg text-xs z-50 min-w-[160px]"
+                    className={`absolute top-full right-0 mt-1 ${themeClasses.cardBg} border ${themeClasses.border} rounded-md shadow-lg text-xs z-50 min-w-[160px]`}
                   >
                     <button
                       type="button"
-                      className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-gray-50 text-gray-700 transition-colors border-b border-gray-200"
+                      className={`w-full flex items-center gap-2 px-3 py-2.5 ${themeClasses.rowHover} ${themeClasses.textPrimary} transition-colors border-b ${themeClasses.border}`}
                       onClick={() => handleEditInventory(label)}
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -508,7 +551,7 @@ const InventoryTable = forwardRef(({
                     </button>
                     <button
                       type="button"
-                      className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-gray-50 text-red-600 transition-colors"
+                      className={`w-full flex items-center gap-2 px-3 py-2.5 ${themeClasses.rowHover} text-red-600 transition-colors`}
                       onClick={() => handleDelete(label)}
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -523,6 +566,129 @@ const InventoryTable = forwardRef(({
           ))
         )}
       </div>
+
+      {/* Pagination Controls */}
+      {filteredData.length > 0 && (() => {
+        const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+        const startItem = (currentPage - 1) * itemsPerPage + 1;
+        const endItem = Math.min(currentPage * itemsPerPage, filteredData.length);
+        
+        const getPageNumbers = () => {
+          const pages = [];
+          const maxVisible = 5;
+          
+          if (totalPages <= maxVisible) {
+            for (let i = 1; i <= totalPages; i++) {
+              pages.push(i);
+            }
+          } else {
+            if (currentPage <= 3) {
+              for (let i = 1; i <= 4; i++) pages.push(i);
+              pages.push('...');
+              pages.push(totalPages);
+            } else if (currentPage >= totalPages - 2) {
+              pages.push(1);
+              pages.push('...');
+              for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
+            } else {
+              pages.push(1);
+              pages.push('...');
+              pages.push(currentPage - 1);
+              pages.push(currentPage);
+              pages.push(currentPage + 1);
+              pages.push('...');
+              pages.push(totalPages);
+            }
+          }
+          return pages;
+        };
+        
+        return (
+          <div className={`flex items-center justify-between px-6 py-4 border-t ${themeClasses.border}`}>
+            {/* Left side - Items info */}
+            <div className="flex items-center gap-2">
+              <span className={`text-sm font-medium ${themeClasses.textPrimary}`}>
+                {startItem}-{endItem}
+              </span>
+              <span className={`text-sm ${themeClasses.textSecondary}`}>
+                of {filteredData.length}
+              </span>
+            </div>
+
+            {/* Center - Pagination controls */}
+            <div className="flex items-center gap-1">
+              {/* Previous button */}
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all border ${
+                  currentPage === 1
+                    ? `cursor-not-allowed ${themeClasses.textSecondary} ${themeClasses.border} opacity-50`
+                    : `${themeClasses.textPrimary} ${themeClasses.border} hover:bg-gray-100 ${isDarkMode ? 'hover:bg-dark-bg-tertiary' : ''} hover:border-blue-400`
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+
+              {/* Page numbers */}
+              <div className="flex gap-1 mx-2">
+                {getPageNumbers().map((page, index) => (
+                  page === '...' ? (
+                    <span
+                      key={`ellipsis-${index}`}
+                      className={`px-3 py-2 text-sm font-medium ${themeClasses.textSecondary}`}
+                    >
+                      ...
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all border ${
+                        currentPage === page
+                          ? 'bg-blue-600 text-white border-transparent hover:bg-blue-700 shadow-md'
+                          : `${themeClasses.textPrimary} ${themeClasses.border} hover:bg-gray-100 ${isDarkMode ? 'hover:bg-dark-bg-tertiary' : ''} hover:border-blue-400`
+                      }`}
+                      style={{ minWidth: '2.75rem' }}
+                    >
+                      {page}
+                    </button>
+                  )
+                ))}
+              </div>
+
+              {/* Next button */}
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all border ${
+                  currentPage === totalPages
+                    ? `cursor-not-allowed ${themeClasses.textSecondary} ${themeClasses.border} opacity-50`
+                    : `${themeClasses.textPrimary} ${themeClasses.border} hover:bg-gray-100 ${isDarkMode ? 'hover:bg-dark-bg-tertiary' : ''} hover:border-blue-400`
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Right side - Page info */}
+            <div className="flex items-center gap-2">
+              <span className={`text-sm ${themeClasses.textSecondary}`}>Page</span>
+              <span className={`text-sm font-medium ${themeClasses.textPrimary}`}>
+                {currentPage}
+              </span>
+              <span className={`text-sm ${themeClasses.textSecondary}`}>of</span>
+              <span className={`text-sm font-medium ${themeClasses.textPrimary}`}>
+                {totalPages}
+              </span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Edit Inventory Modal */}
       {isEditInventoryOpen && editingLabel && (

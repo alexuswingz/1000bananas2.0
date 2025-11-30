@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
-const NewShipmentHeader = ({ tableMode, onTableModeToggle, onReviewShipmentClick, onCompleteClick, shipmentData, totalUnits = 0, totalBoxes = 0, activeAction = 'add-products', onActionChange, completedTabs = new Set() }) => {
+const NewShipmentHeader = ({ tableMode, onTableModeToggle, onReviewShipmentClick, onCompleteClick, shipmentData, dataAsOfDate, totalUnits = 0, totalBoxes = 0, activeAction = 'add-products', onActionChange, completedTabs = new Set() }) => {
   const navigate = useNavigate();
   const { isDarkMode } = useTheme();
   const [showDropdown, setShowDropdown] = useState(false);
@@ -14,6 +14,17 @@ const NewShipmentHeader = ({ tableMode, onTableModeToggle, onReviewShipmentClick
   const shipmentType = shipmentData?.shipmentType || 'AWD';
   const marketplace = shipmentData?.marketplace || 'Amazon';
   const account = shipmentData?.account || 'TPS Nutrients';
+  
+  // Format data freshness
+  const formatDataFreshness = () => {
+    if (!dataAsOfDate) return '';
+    const now = new Date();
+    const diff = Math.floor((now - dataAsOfDate) / 1000); // seconds
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return dataAsOfDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -158,6 +169,41 @@ const NewShipmentHeader = ({ tableMode, onTableModeToggle, onReviewShipmentClick
                 color: isDarkMode ? '#FFFFFF' : '#000000',
               }}>
                 {account}
+                </div>
+            </div>
+            </div>
+            {dataAsOfDate && activeAction === 'add-products' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ 
+                  fontSize: '10px', 
+                  fontWeight: 400,
+                  letterSpacing: '0.05em',
+                  color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                }}>
+                  DATA AS OF
+                </div>
+                <div style={{ 
+                  fontSize: '14px', 
+                  fontWeight: 400,
+                  color: isDarkMode ? '#10B981' : '#059669',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                    <circle cx="6" cy="6" r="6"/>
+                  </svg>
+                  {formatDataFreshness()}
+                </div>
+              </div>
+            )}
+            <div style={{ height: '40px' }}> {/* Spacer */}
+              <div style={{ 
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}>
+              <div style={{display: 'none'}}>
                 </div>
                 <div style={{ position: 'relative' }}>
                   <button

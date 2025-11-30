@@ -56,38 +56,16 @@ const Labels = () => {
       return;
     }
 
-    // Get labels data from localStorage
-    try {
-      const stored = window.localStorage.getItem('labelsInventory');
-      const labels = stored ? JSON.parse(stored) : [];
-      
-      // Pre-populate line items for the order details page
-      const defaultLines = labels.map((label) => ({
-        id: label.id,
-        brand: label.brand,
-        product: label.product,
-        size: label.size,
-        qty: label.inventory,
-        status: label.status === 'Up to Date' ? 'Completed' : 'Pending',
-        inventory: label.inventory,
-        toOrder: label.inventory,
-        daysOfInv: label.inventory,
-      }));
+    setIsNewOrderOpen(false);
 
-      setIsNewOrderOpen(false);
-
-      // Navigate to label order page
-      navigate('/dashboard/supply-chain/labels/order', {
-        state: {
-          orderNumber: orderNumber.trim(),
-          supplier: selectedSupplier,
-          lines: defaultLines,
-          mode: 'create',
-        },
-      });
-    } catch (err) {
-      console.error('Failed to load labels from localStorage', err);
-    }
+    // Navigate to label order page - LabelOrderPage will fetch labels from API
+    navigate('/dashboard/supply-chain/labels/order', {
+      state: {
+        orderNumber: orderNumber.trim(),
+        supplier: selectedSupplier,
+        mode: 'create',
+      },
+    });
   };
 
   // Handle new order from LabelOrderPage
@@ -299,6 +277,7 @@ const Labels = () => {
             width: 'fit-content',
             height: '36px',
             boxSizing: 'border-box',
+            pointerEvents: 'auto', // Ensure notification itself is clickable
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
+import { getShipmentProducts } from '../../../../services/productionApi';
 
-const LabelCheckTable = ({ isRecountMode = false, varianceExceededRowIds = [], onExitRecountMode }) => {
+const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRowIds = [], onExitRecountMode }) => {
   const { isDarkMode } = useTheme();
   const [isExpanded, setIsExpanded] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   // Auto-expand table when in recount mode
   useEffect(() => {
@@ -12,6 +14,7 @@ const LabelCheckTable = ({ isRecountMode = false, varianceExceededRowIds = [], o
       setIsExpanded(true);
     }
   }, [isRecountMode]);
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
   const [selectedRowIndex, setSelectedRowIndex] = useState(null);
@@ -21,149 +24,41 @@ const LabelCheckTable = ({ isRecountMode = false, varianceExceededRowIds = [], o
   const filterIconRefs = useRef({});
   const filterDropdownRef = useRef(null);
 
-  // Sample data matching the image
-  const [rows, setRows] = useState([
-    {
-      id: 1,
-      brand: 'TPS Plant Foods',
-      product: 'Lime Tree Fertilizer',
-      size: '8oz',
-      quantity: 1000,
-      lblCurrentInv: 1526,
-      labelLocation: 'LBL-PLANT-567',
-      totalCount: '',
-    },
-    {
-      id: 2,
-      brand: 'TPS Plant Foods',
-      product: 'Lime Tree Fertilizer',
-      size: '8oz',
-      quantity: 50,
-      lblCurrentInv: 1526,
-      labelLocation: 'LBL-PLANT-567',
-      totalCount: '',
-    },
-    {
-      id: 3,
-      brand: 'TPS Plant Foods',
-      product: 'Lime Tree Fertilizer',
-      size: '8oz',
-      quantity: 480,
-      lblCurrentInv: 1526,
-      labelLocation: 'LBL-PLANT-567',
-      totalCount: '',
-    },
-    {
-      id: 4,
-      brand: 'TPS Plant Foods',
-      product: 'Lime Tree Fertilizer',
-      size: '8oz',
-      quantity: 160,
-      lblCurrentInv: 1526,
-      labelLocation: 'LBL-PLANT-567',
-      totalCount: '',
-    },
-    {
-      id: 5,
-      brand: 'TPS Plant Foods',
-      product: 'Lime Tree Fertilizer',
-      size: '8oz',
-      quantity: 240,
-      lblCurrentInv: 1526,
-      labelLocation: 'LBL-PLANT-567',
-      totalCount: '',
-    },
-    {
-      id: 6,
-      brand: 'TPS Plant Foods',
-      product: 'Lime Tree Fertilizer',
-      size: '8oz',
-      quantity: 600,
-      lblCurrentInv: 1526,
-      labelLocation: 'LBL-PLANT-567',
-      totalCount: '',
-    },
-    {
-      id: 7,
-      brand: 'TPS Plant Foods',
-      product: 'Lime Tree Fertilizer',
-      size: '8oz',
-      quantity: 120,
-      lblCurrentInv: 1526,
-      labelLocation: 'LBL-PLANT-567',
-      totalCount: '',
-    },
-    {
-      id: 8,
-      brand: 'TPS Plant Foods',
-      product: 'Lime Tree Fertilizer',
-      size: '8oz',
-      quantity: 240,
-      lblCurrentInv: 1526,
-      labelLocation: 'LBL-PLANT-567',
-      totalCount: '',
-    },
-    {
-      id: 9,
-      brand: 'TPS Plant Foods',
-      product: 'Lime Tree Fertilizer',
-      size: '8oz',
-      quantity: 480,
-      lblCurrentInv: 1526,
-      labelLocation: 'LBL-PLANT-567',
-      totalCount: '',
-    },
-    {
-      id: 10,
-      brand: 'TPS Plant Foods',
-      product: 'Lime Tree Fertilizer',
-      size: '8oz',
-      quantity: 6480,
-      lblCurrentInv: 1526,
-      labelLocation: 'LBL-PLANT-567',
-      totalCount: '',
-    },
-    {
-      id: 11,
-      brand: 'TPS Plant Foods',
-      product: 'Lime Tree Fertilizer',
-      size: '8oz',
-      quantity: 300,
-      lblCurrentInv: 1526,
-      labelLocation: 'LBL-PLANT-567',
-      totalCount: '',
-    },
-    {
-      id: 12,
-      brand: 'TPS Plant Foods',
-      product: 'Lime Tree Fertilizer',
-      size: '8oz',
-      quantity: 240,
-      lblCurrentInv: 1526,
-      labelLocation: 'LBL-PLANT-567',
-      totalCount: '',
-    },
-    {
-      id: 13,
-      brand: 'TPS Plant Foods',
-      product: 'Lime Tree Fertilizer',
-      size: '8oz',
-      quantity: 120,
-      lblCurrentInv: 1526,
-      labelLocation: 'LBL-PLANT-567',
-      totalCount: '',
-    },
-    {
-      id: 14,
-      brand: 'TPS Plant Foods',
-      product: 'Lime Tree Fertilizer',
-      size: '8oz',
-      quantity: 300,
-      lblCurrentInv: 1526,
-      labelLocation: 'LBL-PLANT-567',
-      totalCount: '',
-    },
-  ]);
+  // Load label data from API
+  useEffect(() => {
+    if (shipmentId) {
+      loadLabelData();
+    }
+  }, [shipmentId]);
+
+  const loadLabelData = async () => {
+    try {
+      setLoading(true);
+      const data = await getShipmentProducts(shipmentId);
+      
+      // Transform API data to match table format
+      const formattedRows = data.map(product => ({
+        id: product.id,
+        brand: product.brand_name,
+        product: product.product_name,
+        size: product.size,
+        quantity: product.labels_needed,
+        lblCurrentInv: product.labels_available || 0,
+        labelLocation: product.label_location,
+        totalCount: '',
+      }));
+      
+      setRows(formattedRows);
+    } catch (error) {
+      console.error('Error loading label data:', error);
+      setRows([]); // Use empty array on error instead of dummy data
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Initialize rows state with empty array - only use real data from API
+  const [rows, setRows] = useState([]);
 
   const columns = [
     { key: 'start', label: '', width: '100px' },

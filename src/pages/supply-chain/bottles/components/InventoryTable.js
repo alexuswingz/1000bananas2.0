@@ -220,7 +220,7 @@ const InventoryTable = forwardRef(({
   return (
     <>
       <div
-        className="w-full bg-white"
+        className={`w-full ${themeClasses.cardBg}`}
         style={{ 
           borderRadius: '8px',
           border: '1px solid #E5E7EB',
@@ -269,7 +269,7 @@ const InventoryTable = forwardRef(({
           style={{ minHeight: '360px' }}
         >
           {loading ? (
-            <div className="px-6 py-6 text-center text-sm text-gray-400">
+            <div className={`px-6 py-6 text-center text-sm ${themeClasses.textSecondary}`}>
               Loading inventory...
             </div>
           ) : error ? (
@@ -277,7 +277,7 @@ const InventoryTable = forwardRef(({
               Error: {error}
             </div>
           ) : filteredData.length === 0 ? (
-            <div className="px-6 py-6 text-center text-sm italic text-gray-400">
+            <div className={`px-6 py-6 text-center text-sm italic ${themeClasses.textSecondary}`}>
               No bottles match your search.
             </div>
           ) : (
@@ -294,7 +294,7 @@ const InventoryTable = forwardRef(({
             return (
               <div
                 key={bottle.id}
-                className="grid text-sm bg-white"
+                className={`grid text-sm ${themeClasses.cardBg}`}
                 style={{
                   gridTemplateColumns: '253px 253px 253px 1fr',
                   gap: '0',
@@ -363,7 +363,7 @@ const InventoryTable = forwardRef(({
                       className="w-28 rounded-full border border-blue-300 px-3 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
                     />
                   ) : (
-                    <span className="text-gray-900 text-left" style={{ fontSize: '14px' }}>
+                    <span className={`${themeClasses.textPrimary} text-left`} style={{ fontSize: '14px' }}>
                       {bottle.supplierInventory.toLocaleString()}
                     </span>
                   )}
@@ -371,12 +371,12 @@ const InventoryTable = forwardRef(({
 
                 <div className="flex items-center justify-end relative" style={{ paddingTop: '12px', paddingBottom: '12px', paddingRight: '16px' }}>
                   {isBulkRow ? (
-                    <span className="text-xs text-gray-400">Bulk editing</span>
+                    <span className={`text-xs ${themeClasses.textSecondary}`}>Bulk editing</span>
                   ) : isRowEditing ? (
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        className="px-3 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-full hover:bg-gray-100"
+                        className={`px-3 py-1 text-xs font-medium ${themeClasses.textPrimary} ${themeClasses.inputBg} border ${themeClasses.border} rounded-full ${themeClasses.rowHover}`}
                         onClick={handleCancelEdit}
                       >
                         Cancel
@@ -419,7 +419,7 @@ const InventoryTable = forwardRef(({
                       </button>
 
                       {actionMenuBottleId === bottle.id && (
-                        <div className="absolute right-4 top-9 z-20 w-32 bg-white border border-gray-200 rounded-md shadow-lg text-xs">
+                        <div className={`absolute right-4 top-9 z-20 w-32 ${themeClasses.cardBg} border ${themeClasses.border} rounded-md shadow-lg text-xs`}>
                           <button
                             type="button"
                             className="w-full text-left px-3 py-2 hover:bg-gray-50 text-blue-600"
@@ -477,7 +477,7 @@ const InventoryTable = forwardRef(({
 
             <button
               type="button"
-              className="px-3 py-1 text-xs font-medium text-gray-900 bg-white rounded-full hover:bg-gray-100"
+              className={`px-3 py-1 text-xs font-medium ${themeClasses.textPrimary} ${themeClasses.inputBg} rounded-full ${themeClasses.rowHover}`}
               onClick={handleBulkEditDiscard}
             >
               Discard

@@ -1,103 +1,52 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
+import { getShipmentFormulaCheck } from '../../../../services/productionApi';
 
-const FormulaCheckTable = ({ isRecountMode = false, varianceExceededRowIds = [] }) => {
+const FormulaCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRowIds = [] }) => {
   const { isDarkMode } = useTheme();
   const [selectedRows, setSelectedRows] = useState(new Set());
+  const [formulas, setFormulas] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  // Sample data matching the image
-  const [formulas] = useState([
-    {
-      id: 1,
-      formula: 'F.Tomato Veggie',
-      vessel: 'Tote',
-      qty: 1,
-      vesselType: 'Clean',
-      totalVolume: 275,
-      measure: 'Gallon',
-      formulaType: 'Liquid',
-    },
-    {
-      id: 2,
-      formula: 'F.TPS One',
-      vessel: 'Tote',
-      qty: 1,
-      vesselType: 'Clean',
-      totalVolume: 275,
-      measure: 'Gallon',
-      formulaType: 'Liquid',
-    },
-    {
-      id: 3,
-      formula: 'F.Succulent',
-      vessel: 'Barrel',
-      qty: 1,
-      vesselType: 'Clean',
-      totalVolume: 55,
-      measure: 'Gallon',
-      formulaType: 'Liquid',
-    },
-    {
-      id: 4,
-      formula: 'F.CleanKelp',
-      vessel: 'Tote',
-      qty: 1,
-      vesselType: 'Clean',
-      totalVolume: 275,
-      measure: 'Gallon',
-      formulaType: 'Liquid',
-    },
-    {
-      id: 5,
-      formula: 'F.UltraGrow',
-      vessel: 'Tote',
-      qty: 3,
-      vesselType: 'Clean',
-      totalVolume: 825,
-      measure: 'Gallon',
-      formulaType: 'Liquid',
-    },
-    {
-      id: 6,
-      formula: 'F.Indoor Plant Food',
-      vessel: 'Tote',
-      qty: 1,
-      vesselType: 'Clean',
-      totalVolume: 275,
-      measure: 'Gallon',
-      formulaType: 'Liquid',
-    },
-    {
-      id: 7,
-      formula: 'F.Silica for Plants',
-      vessel: 'Tote',
-      qty: 1,
-      vesselType: 'Clean',
-      totalVolume: 275,
-      measure: 'Gallon',
-      formulaType: 'Liquid',
-    },
-    {
-      id: 8,
-      formula: 'F.Silica',
-      vessel: 'Tote',
-      qty: 1,
-      vesselType: 'Clean',
-      totalVolume: 275,
-      measure: 'Gallon',
-      formulaType: 'Liquid',
-    },
-    {
-      id: 9,
-      formula: 'F.Worm Tea',
-      vessel: 'Tote',
-      qty: 1,
-      vesselType: 'Clean',
-      totalVolume: 275,
-      measure: 'Gallon',
-      formulaType: 'Liquid',
-    },
-  ]);
+  // Load formula data from API
+  useEffect(() => {
+    if (shipmentId) {
+      loadFormulaData();
+    }
+  }, [shipmentId]);
+
+  const loadFormulaData = async () => {
+    try {
+      setLoading(true);
+      const data = await getShipmentFormulaCheck(shipmentId);
+      
+      // Transform API data to match table format
+      const formattedFormulas = data.map(formula => ({
+        id: formula.id,
+        formula: formula.formula_name,
+        vessel: formula.vessel_type,
+        qty: formula.vessel_quantity,
+        vesselType: 'Clean',
+        totalVolume: formula.total_gallons_needed,
+        measure: 'Gallon',
+        formulaType: 'Liquid',
+        gallonsAvailable: formula.gallons_available,
+        gallonsFree: formula.gallons_free,
+        hasShortage: formula.has_shortage,
+        shortageAmount: formula.shortage_amount,
+      }));
+      
+      setFormulas(formattedFormulas);
+    } catch (error) {
+      console.error('Error loading formula data:', error);
+      setFormulas([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Only use real data from API - no dummy data
+  const displayFormulas = formulas;
 
   const handleCheckboxChange = (id) => {
     setSelectedRows(prev => {
@@ -168,12 +117,19 @@ const FormulaCheckTable = ({ isRecountMode = false, varianceExceededRowIds = [] 
 
           {/* Body */}
           <tbody>
-            {(isRecountMode 
-              ? formulas.filter(formula => varianceExceededRowIds.includes(formula.id))
-              : formulas
+            {loading && (
+              <tr>
+                <td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>
+                  Loading formula data...
+                </td>
+              </tr>
+            )}
+            {!loading && (isRecountMode 
+              ? displayFormulas.filter(formula => varianceExceededRowIds.includes(formula.id))
+              : displayFormulas
             ).map((formula, index) => {
               // Find the original index for styling
-              const originalIndex = formulas.findIndex(f => f.id === formula.id);
+              const originalIndex = displayFormulas.findIndex(f => f.id === formula.id);
               return (
               <tr
                 key={formula.id}

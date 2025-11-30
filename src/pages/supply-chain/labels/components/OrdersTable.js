@@ -1,32 +1,46 @@
 import React, { useState, useEffect, useRef, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { labelsApi } from '../../../../services/supplyChainApi';
 
 const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrder, onNewOrderCreated, archivedOrdersRef }, ref) => {
   const { isDarkMode } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Orders data - moved from Labels.js
-  const [orders, setOrders] = useState(() => {
-    try {
-      const stored = window.localStorage.getItem('labelOrders');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          return parsed;
-        }
-      }
-    } catch {}
-    return [];
-  });
+  // Orders data - fetch from API
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Persist orders to localStorage
+  // Fetch orders from API on mount
   useEffect(() => {
-    try {
-      window.localStorage.setItem('labelOrders', JSON.stringify(orders));
-    } catch {}
-  }, [orders]);
+    const fetchOrders = async () => {
+      try {
+        setLoading(true);
+        const response = await labelsApi.getOrders();
+        if (response.success) {
+          // Filter to show only pending/partial orders
+          const activeOrders = response.data
+            .filter(order => order.status === 'pending' || order.status === 'partial')
+            .map(order => ({
+              id: order.id,
+              orderNumber: order.order_number,
+              supplier: order.supplier,
+              status: order.status,
+              orderDate: order.order_date,
+              totalQuantity: order.total_quantity,
+              lines: order.lines || []
+            }));
+          setOrders(activeOrders);
+        }
+      } catch (err) {
+        console.error('Error fetching label orders:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchOrders();
+  }, []);
 
   // Filter orders based on search query
   const filteredOrders = useMemo(() => {
@@ -39,73 +53,89 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
     );
   }, [orders, searchQuery]);
 
-  // Handle new order from navigation state
+  // Handle new order from navigation state - refresh from API
   useEffect(() => {
     const newOrderState = location.state && location.state.newLabelOrder;
     if (newOrderState) {
-      const { orderNumber: newOrderNumber, supplierName, lines, status } = newOrderState;
-      setOrders((prev) => {
-        // Check for duplicates in the current state
-        const existing = prev.find(
-          (o) => o.orderNumber === newOrderNumber && o.supplier === supplierName
-        );
-        if (existing) {
-          return prev;
-        }
-
-        const newOrder = {
-          id: Date.now(),
-          status: status || 'Submitted', // Use provided status or default to 'Submitted'
-          orderNumber: newOrderNumber,
-          supplier: supplierName,
-          lines: lines || [], // Save the lines data with the order
-        };
-
-        const updated = [newOrder, ...prev];
+      // Refresh orders from API
+      const fetchOrders = async () => {
         try {
-          window.localStorage.setItem('labelOrders', JSON.stringify(updated));
-        } catch {}
-        
-        // Clear navigation state to prevent re-processing
-        if (window.history && window.history.replaceState) {
-          window.history.replaceState({ ...location.state, newLabelOrder: null }, '');
+          const response = await labelsApi.getOrders();
+          if (response.success) {
+            const activeOrders = response.data
+              .filter(order => order.status === 'pending' || order.status === 'partial')
+              .map(order => ({
+                id: order.id,
+                orderNumber: order.order_number,
+                supplier: order.supplier,
+                status: order.status,
+                orderDate: order.order_date,
+                totalQuantity: order.total_quantity,
+                lines: order.lines || []
+              }));
+            setOrders(activeOrders);
+            
+            if (onNewOrderCreated) {
+              onNewOrderCreated();
+            }
+          }
+        } catch (err) {
+          console.error('Error refreshing label orders:', err);
         }
-        
-        if (onNewOrderCreated) {
-          onNewOrderCreated();
-        }
-        
-        return updated;
-      });
+      };
+      fetchOrders();
+      
+      // Clear navigation state
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState({ ...location.state, newLabelOrder: null }, '');
+      }
     }
   }, [location.state, onNewOrderCreated]);
 
-  // Handle received order from navigation state
+  // Handle received order from navigation state - refresh from API
   useEffect(() => {
     const receivedOrderId = location.state && location.state.receivedOrderId;
+    const isPartial = location.state && location.state.isPartial;
     
     if (receivedOrderId) {
-      setOrders((prev) => {
-        const orderToArchive = prev.find((o) => o.id === receivedOrderId);
-        if (!orderToArchive) return prev;
-        
-        const remaining = prev.filter((o) => o.id !== receivedOrderId);
+      const handleReceivedOrders = async () => {
         try {
-          window.localStorage.setItem('labelOrders', JSON.stringify(remaining));
+          const response = await labelsApi.getOrders();
+          if (response.success) {
+            // Only archive and switch tab if FULLY received (not partial)
+            if (!isPartial && archivedOrdersRef && archivedOrdersRef.current) {
+              archivedOrdersRef.current.addArchivedOrder();
+              if (onArchiveOrder) {
+                onArchiveOrder();
+              }
+            }
+            
+            // Update orders to show only active (pending/partial)
+            const activeOrders = response.data
+              .filter(order => order.status === 'pending' || order.status === 'partial')
+              .map(order => ({
+                id: order.id,
+                orderNumber: order.order_number,
+                supplier: order.supplier,
+                status: order.status,
+                orderDate: order.order_date,
+                totalQuantity: order.total_quantity,
+                lines: order.lines || []
+              }));
+            setOrders(activeOrders);
+          }
         } catch (err) {
-          console.error('Failed to update label orders in localStorage', err);
+          console.error('Error handling received orders:', err);
         }
-        
-        // Add to archived orders with "Received" status
-        const archivedOrder = { ...orderToArchive, status: 'Received' };
-        if (archivedOrdersRef && archivedOrdersRef.current) {
-          archivedOrdersRef.current.addArchivedOrder(archivedOrder);
-        }
-        
-        return remaining;
-      });
+      };
+      handleReceivedOrders();
+      
+      // Clear navigation state
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState({ ...location.state, receivedOrderId: null, isPartial: null }, '');
+      }
     }
-  }, [location.state, archivedOrdersRef]);
+  }, [location.state, archivedOrdersRef, onArchiveOrder]);
 
   // Expose function to archive order (for parent component)
   useImperativeHandle(ref, () => ({

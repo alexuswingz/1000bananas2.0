@@ -126,7 +126,9 @@ const Boxes = () => {
               <div className={`flex items-center rounded-full border ${themeClasses.border} bg-white/70 dark:bg-dark-bg-tertiary`}>
                 {['inventory', 'orders', 'archive'].map((tabKey, index) => {
                   const label =
-                    tabKey === 'inventory' ? 'Inventory' : tabKey === 'orders' ? 'Orders' : 'Archive';
+                    tabKey === 'inventory' ? 'Inventory' : 
+                    tabKey === 'orders' ? 'Orders' : 
+                    'Archive';
                   const isActive = activeTab === tabKey;
 
                   return (
@@ -240,6 +242,15 @@ const Boxes = () => {
                 </div>
               )}
             </div>
+
+            {/* Cycle Counts button */}
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 bg-gray-900 hover:bg-black text-white text-sm font-medium rounded-lg px-5 py-2 shadow-md transition"
+              onClick={() => navigate('/dashboard/supply-chain/boxes/cycle-counts')}
+            >
+              Cycle Counts
+            </button>
 
             {/* New Order button */}
             <button

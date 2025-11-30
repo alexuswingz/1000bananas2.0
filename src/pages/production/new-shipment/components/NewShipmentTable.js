@@ -335,11 +335,15 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                     >
                       <div style={{ marginLeft: '20px' }}>
                         <div style={{ fontWeight: 600 }}>Today</div>
-                        <div style={{ opacity: 0.85 }}>11/11/25</div>
+                        <div style={{ opacity: 0.85 }}>
+                          {new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}
+                        </div>
                       </div>
                       <div style={{ textAlign: 'left', marginLeft: '40px' }}>
                         <div style={{ fontWeight: 600 }}>DOI Goal</div>
-                        <div style={{ opacity: 0.85 }}>4/13/25</div>
+                        <div style={{ opacity: 0.85 }}>
+                          {new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}
+                        </div>
                       </div>
                     </div>
                     <img
@@ -427,14 +431,68 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                       {row.brand}
                     </td>
                     <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }}>
-                      <button
-                        type="button"
-                        onClick={() => onProductClick(row)}
-                        className="text-xs text-blue-500 hover:text-blue-600"
-                        style={{ cursor: 'pointer' }}
-                      >
-                        {row.product}...
-                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={() => onProductClick(row)}
+                          className="text-xs text-blue-500 hover:text-blue-600"
+                          style={{ cursor: 'pointer' }}
+                        >
+                          {row.product}...
+                        </button>
+                        {/* Supply chain warning indicator */}
+                        {(() => {
+                          const qty = effectiveQtyValues[index] || 0;
+                          const maxUnits = row.maxUnitsProducible || 0;
+                          const hasSupplyIssue = qty > maxUnits;
+                          
+                          // Identify bottleneck component
+                          let bottleneck = '';
+                          if (hasSupplyIssue) {
+                            const bottles = row.bottleInventory || 0;
+                            const closures = row.closureInventory || 0;
+                            const labels = row.labelsAvailable || 0;
+                            const formulaUnits = Math.floor((row.formulaGallonsAvailable || 0) / (row.formulaGallonsPerUnit || 0.25));
+                            const min = Math.min(bottles, closures, labels, formulaUnits);
+                            
+                            if (bottles === min) bottleneck = 'Bottles';
+                            else if (closures === min) bottleneck = 'Closures';
+                            else if (labels === min) bottleneck = 'Labels';
+                            else bottleneck = 'Formula';
+                          }
+                          
+                          return hasSupplyIssue && qty > 0 ? (
+                            <span
+                              title={`⚠️ Supply Chain Warning
+Requested: ${qty} units
+Max Available: ${maxUnits} units
+Bottleneck: ${bottleneck}
+
+Current Inventory:
+• Bottles (${row.bottle_name || 'N/A'}): ${row.bottleInventory || 0}
+• Closures (${row.closure_name || 'N/A'}): ${row.closureInventory || 0}
+• Labels: ${row.labelsAvailable || 0}
+• Formula: ${row.formulaGallonsAvailable || 0} gal (${Math.floor((row.formulaGallonsAvailable || 0) / (row.formulaGallonsPerUnit || 0.25))} units)`}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '16px',
+                                height: '16px',
+                                borderRadius: '50%',
+                                backgroundColor: '#FEE2E2',
+                                color: '#DC2626',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                cursor: 'help',
+                                marginLeft: '6px',
+                              }}
+                            >
+                              ⚠
+                            </span>
+                          ) : null;
+                        })()}
+                      </div>
                     </td>
                     <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }} className={themeClasses.textSecondary}>
                       {row.size}
@@ -560,26 +618,96 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                               height: '18px',
                               display: 'flex',
                               cursor: 'pointer',
+                              position: 'relative',
                             }}
-                            title="Double-click to view N-GOOS details"
+                            title={`FBA: ${row.fbaAvailable || 0}, Total: ${row.totalInventory || 0}, Forecast: ${Math.round(row.weeklyForecast || row.forecast || 0)}/week, DOI: ${row.daysOfInventory || 0}d | Double-click for N-GOOS details`}
                           >
-                            <div style={{ flex: 2, backgroundColor: '#A855F7' }} />
-                            <div style={{ flex: 3, backgroundColor: '#22C55E' }} />
-                            <div style={{ flex: 3, backgroundColor: '#3B82F6' }} />
+                            {/* DOI Timeline Visualization (120-day goal) - Stacked segments */}
+                            {(() => {
+                              const doiGoal = 120; // 120 days goal
+                              const fba = row.fbaAvailable || 0;
+                              const total = row.totalInventory || 0;
+                              const weeklyForecast = row.weeklyForecast || row.forecast || 0;
+                              const doiFba = row.doiFba || 0;
+                              const doiTotal = row.doiTotal || row.daysOfInventory || 0;
+                              
+                              // Calculate DOI if not provided (using sales velocity)
+                              let calculatedDoiFba = doiFba;
+                              let calculatedDoiTotal = doiTotal;
+                              
+                              if (calculatedDoiTotal === 0 && row.sales30Day > 0) {
+                                const dailySales = row.sales30Day / 30.0;
+                                calculatedDoiFba = fba / dailySales;
+                                calculatedDoiTotal = total / dailySales;
+                              }
+                              
+                              // Calculate bar widths as percentage of 120-day timeline
+                              const fbaWidth = Math.min((calculatedDoiFba / doiGoal) * 100, 100);
+                              const totalWidth = Math.min((calculatedDoiTotal / doiGoal) * 100, 100);
+                              
+                              // Calculate the green segment (total beyond FBA)
+                              const greenWidth = Math.max(0, totalWidth - fbaWidth);
+                              
+                              // Show as segments: Purple (FBA) + Green (additional) + Blue (forecast reference)
+                              return (
+                                <>
+                                  {/* Purple segment: FBA Available */}
+                                  {fbaWidth > 0 && (
+                                    <div style={{ 
+                                      width: `${fbaWidth}%`, 
+                                      height: '100%',
+                                      backgroundColor: '#A855F7',
+                                      position: 'absolute',
+                                      left: 0,
+                                      top: 0,
+                                      borderRadius: greenWidth > 0 ? '9999px 0 0 9999px' : '9999px',
+                                    }} />
+                                  )}
+                                  
+                                  {/* Green segment: Additional Total Inventory beyond FBA */}
+                                  {greenWidth > 0 && (
+                                    <div style={{ 
+                                      width: `${greenWidth}%`, 
+                                      height: '100%',
+                                      backgroundColor: '#22C55E',
+                                      position: 'absolute',
+                                      left: `${fbaWidth}%`,
+                                      top: 0,
+                                      borderRadius: '0 9999px 9999px 0',
+                                    }} />
+                                  )}
+                                  
+                                  {/* Blue segment: Forecast reference (rest of timeline) */}
+                                  {weeklyForecast > 0 && totalWidth < 100 && (
+                                    <div style={{ 
+                                      width: `${100 - totalWidth}%`, 
+                                      height: '100%',
+                                      backgroundColor: '#3B82F6',
+                                      position: 'absolute',
+                                      left: `${totalWidth}%`,
+                                      top: 0,
+                                      opacity: 0.4,
+                                      borderRadius: '0 9999px 9999px 0',
+                                    }} />
+                                  )}
+                                </>
+                              );
+                            })()}
                           </div>
-                          {index === 0 && (
+                          {row.daysOfInventory > 0 && (
                             <span
                               style={{
                                 position: 'absolute',
-                                right: '-18px',
+                                right: '-28px',
                                 top: '50%',
                                 transform: 'translateY(-50%)',
                                 fontSize: '0.7rem',
                                 fontWeight: 600,
-                                color: '#007AFF',
+                                color: row.daysOfInventory < 30 ? '#EF4444' : row.daysOfInventory < 60 ? '#F59E0B' : '#10B981',
                               }}
+                              title={`${row.daysOfInventory} days of inventory`}
                             >
-                              +5
+                              {row.daysOfInventory}d
                             </span>
                           )}
                           {index === 2 && (
@@ -1478,7 +1606,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          const labelsAvailable = row.labelsAvailable || 180;
+                          const labelsAvailable = row.labelsAvailable || 0;
                           const labelsNeeded = effectiveQtyValues[index] ?? 0;
                           // Only show popup if labels needed exceed available
                           if (labelsNeeded > labelsAvailable) {
@@ -1644,7 +1772,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                         </div>
                       )}
                       {(() => {
-                        const labelsAvailable = row.labelsAvailable || 180;
+                        const labelsAvailable = row.labelsAvailable || 0;
                         const labelsNeeded = effectiveQtyValues[index] ?? 0;
                         // Only show exclamation if labels needed exceed available
                         if (labelsNeeded > labelsAvailable) {
@@ -1674,7 +1802,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                       })()}
                     </div>
                     {clickedQtyIndex === index && (() => {
-                      const labelsAvailable = row.labelsAvailable || 180;
+                      const labelsAvailable = row.labelsAvailable || 0;
                       const labelsNeeded = effectiveQtyValues[index] ?? 0;
                       return labelsNeeded > labelsAvailable;
                     })() && (
@@ -1724,7 +1852,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                             color: '#6B7280',
                             lineHeight: '1.4',
                           }}>
-                            Labels Available: {row.labelsAvailable || 180}
+                            Labels Available: {row.labelsAvailable || 0}
                           </p>
                           <p style={{
                             fontSize: '14px',
@@ -1765,7 +1893,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                               e.stopPropagation();
                               e.preventDefault();
                               // Set QTY to available labels only (removes excess units)
-                              const labelsAvailable = row.labelsAvailable || 180;
+                              const labelsAvailable = row.labelsAvailable || 0;
                               
                               // Update state - React will re-render with new value
                               effectiveSetQtyValues(prev => {
@@ -1816,8 +1944,38 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   verticalAlign: 'middle',
                   boxSizing: 'border-box',
                   borderTop: '1px solid #E5E7EB',
-                }} className={themeClasses.text}>
-                  {index === 0 ? '12' : index === 1 ? '8' : '5'}
+                  fontWeight: 600,
+                  color: '#A855F7', // Purple - matches FBA Avail. legend
+                }}>
+                  {row.doiFba || row.doiTotal || 0}
+                </td>
+                <td style={{ 
+                  padding: '12px 16px', 
+                  fontSize: '0.85rem', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  verticalAlign: 'middle',
+                  boxSizing: 'border-box',
+                  borderTop: '1px solid #E5E7EB',
+                  fontWeight: 600,
+                  color: '#22C55E', // Green - matches Total Inv. legend
+                }}>
+                  {row.doiTotal || row.daysOfInventory || 0}
+                </td>
+                <td style={{ 
+                  padding: '12px 16px', 
+                  fontSize: '0.85rem', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  verticalAlign: 'middle',
+                  boxSizing: 'border-box',
+                  borderTop: '1px solid #E5E7EB',
+                  fontWeight: 600,
+                  color: '#3B82F6', // Blue - matches Forecast legend
+                }}>
+                  {Math.round(row.weeklyForecast || row.forecast || 0)}
                 </td>
                 <td style={{ 
                   padding: '12px 16px', 
@@ -1829,7 +1987,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   boxSizing: 'border-box',
                   borderTop: '1px solid #E5E7EB',
                 }} className={themeClasses.text}>
-                  {index === 0 ? '32' : index === 1 ? '24' : '12'}
+                  {row.sales7Day || 0}
                 </td>
                 <td style={{ 
                   padding: '12px 16px', 
@@ -1841,7 +1999,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   boxSizing: 'border-box',
                   borderTop: '1px solid #E5E7EB',
                 }} className={themeClasses.text}>
-                  {index === 0 ? '240' : index === 1 ? '96' : '28'}
+                  {row.sales30Day || 0}
                 </td>
                 <td style={{ 
                   padding: '12px 16px', 
@@ -1853,7 +2011,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   boxSizing: 'border-box',
                   borderTop: '1px solid #E5E7EB',
                 }} className={themeClasses.text}>
-                  {index === 0 ? '34' : index === 1 ? '12' : '5'}
+                  {Math.round((row.sales30Day || 0) * 4)}
                 </td>
                 <td style={{ 
                   padding: '12px 16px', 
@@ -1865,31 +2023,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                   boxSizing: 'border-box',
                   borderTop: '1px solid #E5E7EB',
                 }} className={themeClasses.text}>
-                  {index === 0 ? '145' : index === 1 ? '48' : '20'}
-                </td>
-                <td style={{ 
-                  padding: '12px 16px', 
-                  fontSize: '0.85rem', 
-                  textAlign: 'center', 
-                  width: '143px',
-                  height: '40px',
-                  verticalAlign: 'middle',
-                  boxSizing: 'border-box',
-                  borderTop: '1px solid #E5E7EB',
-                }} className={themeClasses.text}>
-                  {index === 0 ? '580' : index === 1 ? '192' : '80'}
-                </td>
-                <td style={{ 
-                  padding: '12px 16px', 
-                  fontSize: '0.85rem', 
-                  textAlign: 'center', 
-                  width: '143px',
-                  height: '40px',
-                  verticalAlign: 'middle',
-                  boxSizing: 'border-box',
-                  borderTop: '1px solid #E5E7EB',
-                }} className={themeClasses.text}>
-                  {index === 0 ? 'F.Ultra Bloom' : index === 1 ? 'F.Ultra Grow' : 'F.Fabric Heavy'}
+                  {row.formula_name || ''}
                 </td>
                 {/* Sticky three dots */}
                 <td style={{ 

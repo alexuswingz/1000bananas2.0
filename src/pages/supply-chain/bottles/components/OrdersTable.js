@@ -9,6 +9,7 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Fetch orders from API
   useEffect(() => {
@@ -75,7 +76,15 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
       }
     };
     fetchOrders();
-  }, []);
+  }, [refreshTrigger]); // Re-fetch when refreshTrigger changes
+  
+  // Listen for order created events
+  useEffect(() => {
+    if (location.state?.orderCreated) {
+      // Trigger a refresh after a short delay to ensure backend is ready
+      setTimeout(() => setRefreshTrigger(prev => prev + 1), 500);
+    }
+  }, [location.state]);
 
   // Filter orders based on search query
   const filteredOrders = useMemo(() => {

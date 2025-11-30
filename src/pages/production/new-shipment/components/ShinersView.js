@@ -1,19 +1,81 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
+import { getShiners } from '../../../../services/productionApi';
+import { toast } from 'sonner';
 
 const ShinersView = () => {
   const { isDarkMode } = useTheme();
-  const [expandedFormulas, setExpandedFormulas] = useState(new Set(['F.ULTRAGROW', 'F.ULTRABLOOM']));
-  const [addedProducts, setAddedProducts] = useState(new Set(['F.ULTRAGROW-Cherry Tree Fer...']));
+  const [formulas, setFormulas] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedFormulas, setExpandedFormulas] = useState(new Set());
+  const [addedProducts, setAddedProducts] = useState(new Set());
   // Track which specific column header filter is open (per-formula + column)
   const [openFilterIndex, setOpenFilterIndex] = useState(null); // e.g. "F.ULTRAGROW:brand"
   const [filterPosition, setFilterPosition] = useState({ top: 0, left: 0 });
   const filterRefs = useRef({});
   const filterModalRef = useRef(null);
 
-  // Sample data matching the image
-  const formulas = [
+  // Fetch shiners data from API
+  useEffect(() => {
+    const fetchShiners = async () => {
+      setLoading(true);
+      try {
+        const data = await getShiners();
+        
+        // Transform API data to match the component structure
+        const transformedData = data.map(group => ({
+          id: group.formula_name,
+          formula: group.formula_name,
+          size: '', // Will be determined by products
+          unitsAvailable: group.total_units,
+          unitsUsed: 0,
+          products: group.products.map(p => ({
+            id: `${group.formula_name}-${p.id}`,
+            catalog_id: p.catalog_id,
+            brand: p.brand_name || '',
+            product: p.product_name || '',
+            size: p.size || '',
+            qty: p.quantity,
+            issue_type: p.issue_type,
+            severity: p.severity,
+            location: p.location,
+            can_rework: p.can_rework,
+            notes: p.notes,
+            timeline: {
+              purple: 0,
+              green: 0,
+              blue: 0,
+              variance: 0,
+            },
+          }))
+        }));
+        
+        setFormulas(transformedData);
+        
+        // Auto-expand formulas with products
+        const expandedSet = new Set();
+        transformedData.forEach(f => {
+          if (f.products.length > 0) {
+            expandedSet.add(f.id);
+          }
+        });
+        setExpandedFormulas(expandedSet);
+        
+      } catch (error) {
+        console.error('Error fetching shiners:', error);
+        toast.error('Failed to load shiners data');
+        setFormulas([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchShiners();
+  }, []);
+
+  // Sample data matching the image (fallback)
+  const sampleFormulas = [
     {
       id: 'F.ULTRAGROW',
       formula: 'F.ULTRAGROW',
@@ -304,6 +366,34 @@ const ShinersView = () => {
     );
   };
 
+
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: '2rem',
+        color: isDarkMode ? '#9CA3AF' : '#6B7280',
+      }}>
+        Loading shiners...
+      </div>
+    );
+  }
+
+  if (formulas.length === 0) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: '2rem',
+        color: isDarkMode ? '#9CA3AF' : '#6B7280',
+      }}>
+        No shiners found. All products are in good condition! ✨
+      </div>
+    );
+  }
 
   return (
     <>

@@ -123,15 +123,19 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
   const handleSaveAndExit = () => {
     if (onSave) {
       // Parse shipment name back to separate name and type
-      const parts = editableData.shipmentName.split(' ');
-      const name = parts.slice(0, -1).join(' ') || parts[0];
-      const type = parts[parts.length - 1] || editableData.shipmentType;
+      const parts = editableData.shipmentName.trim().split(' ');
+      // If there are multiple parts, the last is the type and the rest is the name
+      // If only one part, it's the name and we use the existing shipmentType
+      const name = parts.length > 1 ? parts.slice(0, -1).join(' ') : parts[0];
+      const type = parts.length > 1 ? parts[parts.length - 1] : (shipmentData?.shipmentType || editableData.shipmentType || 'AWD');
       
       onSave({
-        shipmentName: name,
-        shipmentType: type || editableData.shipmentType,
+        shipmentNumber: name, // Use shipmentNumber (backend expects this)
+        shipmentDate: shipmentData?.shipmentDate || new Date().toISOString().split('T')[0], // YYYY-MM-DD format
+        shipmentType: type,
         marketplace: shipmentData?.marketplace || 'Amazon',
         account: shipmentData?.account || 'TPS Nutrients',
+        location: editableData.shipTo || '', // Use shipTo as location
         amazonShipmentNumber: editableData.amazonShipmentNumber,
         amazonRefId: editableData.amazonRefId,
         shipping: editableData.shipping,
@@ -144,17 +148,27 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
   };
 
   const handleBookAndProceed = () => {
+    // Validate that products have been added
+    if (totalUnits === 0) {
+      alert('Please add at least one product with quantity before booking the shipment.');
+      return;
+    }
+
     if (onSave) {
       // Parse shipment name back to separate name and type
-      const parts = editableData.shipmentName.split(' ');
-      const name = parts.slice(0, -1).join(' ') || parts[0];
-      const type = parts[parts.length - 1] || editableData.shipmentType;
+      const parts = editableData.shipmentName.trim().split(' ');
+      // If there are multiple parts, the last is the type and the rest is the name
+      // If only one part, it's the name and we use the existing shipmentType
+      const name = parts.length > 1 ? parts.slice(0, -1).join(' ') : parts[0];
+      const type = parts.length > 1 ? parts[parts.length - 1] : (shipmentData?.shipmentType || editableData.shipmentType || 'AWD');
       
       onSave({
-        shipmentName: name,
-        shipmentType: type || editableData.shipmentType,
+        shipmentNumber: name, // Use shipmentNumber (backend expects this)
+        shipmentDate: shipmentData?.shipmentDate || new Date().toISOString().split('T')[0], // YYYY-MM-DD format
+        shipmentType: type,
         marketplace: shipmentData?.marketplace || 'Amazon',
         account: shipmentData?.account || 'TPS Nutrients',
+        location: editableData.shipTo || '', // Use shipTo as location
         amazonShipmentNumber: editableData.amazonShipmentNumber,
         amazonRefId: editableData.amazonRefId,
         shipping: editableData.shipping,

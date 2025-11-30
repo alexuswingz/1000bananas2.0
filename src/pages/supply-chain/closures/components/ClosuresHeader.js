@@ -110,6 +110,13 @@ const ClosuresHeader = ({ activeTab, onTabChange, search, onSearchChange, onNewO
         </div>
         <button
           type="button"
+          onClick={() => navigate('/dashboard/supply-chain/closures/cycle-counts')}
+          className="inline-flex items-center gap-2 bg-gray-900 hover:bg-black text-white text-sm font-medium rounded-lg px-5 py-2 shadow-md transition"
+        >
+          Cycle Counts
+        </button>
+        <button
+          type="button"
           onClick={onNewOrderClick}
           className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
         >

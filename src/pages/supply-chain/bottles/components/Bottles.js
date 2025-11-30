@@ -12,6 +12,18 @@ const Bottles = () => {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('inventory');
   const [search, setSearch] = useState('');
+  
+  // Handle order creation notification
+  React.useEffect(() => {
+    if (location.state?.orderCreated) {
+      const { orderNumber, bottleCount } = location.state;
+      showSuccessToast(`Order ${orderNumber} created successfully! ${bottleCount} bottle(s) ordered.`);
+      setActiveTab('orders'); // Switch to orders tab
+      
+      // Clear the state
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, navigate, location.pathname]);
 
   // New order state
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
@@ -223,20 +235,12 @@ const Bottles = () => {
       return;
     }
 
-    // Pre-populate line items for the second-step order details page
-    const defaultLines = [
-      { id: 1, name: '8oz', supplierInventory: 'Auto Replenishment', unitsNeeded: 29120, qty: 29120, pallets: 4, selected: true, inventoryPercentage: 50 },
-      { id: 2, name: 'Quart', supplierInventory: 'Auto Replenishment', unitsNeeded: 5040, qty: 5040, pallets: 4, selected: true, inventoryPercentage: 75 },
-      { id: 3, name: 'Gallon', supplierInventory: 'Auto Replenishment', unitsNeeded: 768, qty: 768, pallets: 4, selected: true, inventoryPercentage: 100 },
-    ];
-
     setIsNewOrderOpen(false);
 
     navigate('/dashboard/supply-chain/bottles/order', {
       state: {
         orderNumber: orderNumber.trim(),
         supplier: selectedSupplier,
-        lines: defaultLines,
         mode: 'create',
       },
     });
@@ -256,10 +260,8 @@ const Bottles = () => {
         logoAlt: order.supplier,
       };
 
-    // Use the first line item's ID for fetching order details
-    const orderId = order.lineItems && order.lineItems.length > 0 
-      ? order.lineItems[0].id 
-      : order.id;
+    // Use the order's ID
+    const orderId = order.id;
 
     navigate('/dashboard/supply-chain/bottles/order', {
       state: {
@@ -309,7 +311,9 @@ const Bottles = () => {
               <div className={`flex items-center rounded-full border ${themeClasses.border} bg-white/70 dark:bg-dark-bg-tertiary`}>
                 {['inventory', 'orders', 'archive'].map((tabKey, index) => {
                   const label =
-                    tabKey === 'inventory' ? 'Inventory' : tabKey === 'orders' ? 'Orders' : 'Archive';
+                    tabKey === 'inventory' ? 'Inventory' : 
+                    tabKey === 'orders' ? 'Orders' : 
+                    'Archive';
                   const isActive = activeTab === tabKey;
 
                   return (

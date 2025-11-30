@@ -3,7 +3,7 @@
  * Handles full product catalog CRUD operations
  */
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'YOUR_API_GATEWAY_URL';
+const API_BASE_URL = 'https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com';
 
 class CatalogAPI {
   /**
