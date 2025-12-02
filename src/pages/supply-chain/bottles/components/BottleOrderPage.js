@@ -28,6 +28,11 @@ const BottleOrderPage = () => {
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [bottleInventoryData, setBottleInventoryData] = useState({});
+  const [bottleForecastRequirements, setBottleForecastRequirements] = useState({});
+  const [doiGoal, setDoiGoal] = useState(120); // Days of Inventory goal for forecasting
+  const [safetyBuffer, setSafetyBuffer] = useState(85); // Safety buffer percentage (85% = leave 15% free space)
+  const [showDoiDropdown, setShowDoiDropdown] = useState(false);
+  const [showSafetyDropdown, setShowSafetyDropdown] = useState(false);
   
   // Initialize order lines - items in view mode are already "added", new orders start with all items not added
   const [orderLines, setOrderLines] = useState(() => {
@@ -37,17 +42,33 @@ const BottleOrderPage = () => {
     }));
   });
   
-  // Fetch bottle inventory data for calculations
+  // Fetch bottle inventory data and forecast requirements for calculations
   useEffect(() => {
     const fetchBottleData = async () => {
       try {
-        const response = await bottlesApi.getInventory();
-        if (response.success) {
+        // Fetch inventory data
+        const inventoryResponse = await bottlesApi.getInventory();
+        
+        // Fetch forecast requirements using selected DOI goal and safety buffer
+        const forecastData = await bottlesApi.getForecastRequirements(doiGoal, safetyBuffer / 100);
+        
+        if (inventoryResponse.success) {
           // Create a map with BOTH full names and short names as keys
           const dataMap = {};
+          const forecastMap = {};
           const bottlesList = [];
           
-          response.data.forEach((bottle, index) => {
+          // Build forecast map by bottle name
+          if (forecastData.success && forecastData.data) {
+            forecastData.data.forEach(forecast => {
+              forecastMap[forecast.bottle_name] = forecast;
+            });
+          }
+          
+          inventoryResponse.data.forEach((bottle, index) => {
+            const forecast = forecastMap[bottle.bottle_name] || {};
+            const recommendedQty = Math.round(forecast.recommended_order_qty || 0);
+            
             const bottleData = {
               fullName: bottle.bottle_name,
               unitsPerPallet: bottle.units_per_pallet || 1,
@@ -55,6 +76,8 @@ const BottleOrderPage = () => {
               warehouseQuantity: bottle.warehouse_quantity || 0,
               supplierQuantity: bottle.supplier_quantity || 0,
               supplier: bottle.supplier || '',
+              recommendedQty: recommendedQty,
+              forecastedUnitsNeeded: forecast.forecasted_units_needed || 0,
             };
             
             // Store by full name
@@ -73,17 +96,21 @@ const BottleOrderPage = () => {
               fullName: bottle.bottle_name,
               supplierInventory: bottle.supplier_quantity ? bottle.supplier_quantity.toLocaleString() : 'N/A',
               supplier: bottle.supplier || '',
-              qty: 0,
-              pallets: 0,
+              qty: recommendedQty, // Auto-populate with recommended quantity
+              pallets: calculatePallets(recommendedQty, bottle.units_per_pallet || 1),
               added: false,
-              inventoryPercentage: 0,
+              inventoryPercentage: bottle.max_warehouse_inventory > 0 
+                ? Math.round(((bottle.warehouse_quantity + recommendedQty) / bottle.max_warehouse_inventory) * 100)
+                : 0,
               maxWarehouseInventory: bottle.max_warehouse_inventory,
               warehouseQuantity: bottle.warehouse_quantity || 0,
               unitsPerPallet: bottle.units_per_pallet || 1,
+              recommendedQty: recommendedQty,
             });
           });
           
           setBottleInventoryData(dataMap);
+          setBottleForecastRequirements(forecastMap);
           
           // Set order lines for create mode
           if (isCreateMode) {
@@ -94,14 +121,14 @@ const BottleOrderPage = () => {
           }
         }
       } catch (err) {
-        console.error('Error fetching bottle inventory:', err);
+        console.error('Error fetching bottle data:', err);
       }
     };
     
     if (isCreateMode) {
       fetchBottleData();
     }
-  }, [isCreateMode, isViewMode]);
+  }, [isCreateMode, isViewMode, doiGoal, safetyBuffer]);
   
   // Ensure tab is set to receivePO when viewing an order
   useEffect(() => {
@@ -109,6 +136,21 @@ const BottleOrderPage = () => {
       setActiveTab('receivePO');
     }
   }, [isViewMode]);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showDoiDropdown && !event.target.closest('.doi-dropdown-container')) {
+        setShowDoiDropdown(false);
+      }
+      if (showSafetyDropdown && !event.target.closest('.safety-dropdown-container')) {
+        setShowSafetyDropdown(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showDoiDropdown, showSafetyDropdown]);
 
   // Fetch actual order details when viewing an order
   useEffect(() => {
@@ -255,10 +297,11 @@ const BottleOrderPage = () => {
           const unitsPerPallet = bottleData.unitsPerPallet || line.unitsPerPallet || 1;
           const maxInventory = bottleData.maxWarehouseInventory || line.maxWarehouseInventory || 0;
           const currentInventory = bottleData.warehouseQuantity || line.warehouseQuantity || 0;
+          const recommendedQty = bottleData.recommendedQty || line.recommendedQty || 0;
           
           if (isAdding) {
-            // When adding, set a default quantity if needed
-            const defaultQty = line.qty > 0 ? line.qty : unitsPerPallet;
+            // When adding, use recommended quantity from forecast, or existing qty, or default to units per pallet
+            const defaultQty = recommendedQty > 0 ? recommendedQty : (line.qty > 0 ? line.qty : unitsPerPallet);
             const pallets = calculatePallets(defaultQty, unitsPerPallet);
             const inventoryPercentage = maxInventory > 0 
               ? Math.round(((currentInventory + defaultQty) / maxInventory) * 100)
@@ -275,8 +318,15 @@ const BottleOrderPage = () => {
               unitsPerPallet: unitsPerPallet,
             };
           } else {
-            // When removing
-            return { ...line, added: false, qty: 0, pallets: 0, inventoryPercentage: 0 };
+            // When removing, restore the recommended quantity
+            const restoreQty = recommendedQty > 0 ? recommendedQty : 0;
+            return { 
+              ...line, 
+              added: false, 
+              qty: restoreQty,
+              pallets: calculatePallets(restoreQty, unitsPerPallet), 
+              inventoryPercentage: 0 
+            };
           }
         }
         return line;
@@ -858,8 +908,122 @@ const BottleOrderPage = () => {
         </div>
       </div>
 
-      {/* Search bar - above table */}
-      <div className="px-6 py-4 flex justify-end" style={{ marginTop: '0' }}>
+      {/* Search bar and forecast controls - above table */}
+      <div className="px-6 py-4 flex justify-between items-center" style={{ marginTop: '0' }}>
+        {/* Forecast Controls */}
+        {!isViewMode && (
+          <div className="flex items-center gap-6">
+            {/* DOI Goal Selector */}
+            <div className="flex items-center gap-3">
+              <span style={{ fontSize: '14px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
+                Forecast Period:
+              </span>
+              <div className="relative doi-dropdown-container">
+                <button
+                  type="button"
+                  onClick={() => setShowDoiDropdown(!showDoiDropdown)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors"
+                  style={{
+                    backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                    color: isDarkMode ? '#F9FAFB' : '#000000',
+                    borderColor: isDarkMode ? '#4B5563' : '#D1D5DB',
+                  }}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span style={{ fontSize: '14px', fontWeight: 500 }}>{doiGoal} Days</span>
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                
+                {showDoiDropdown && (
+                  <div 
+                    className="absolute top-full mt-1 left-0 bg-white rounded-lg shadow-lg border z-50"
+                    style={{ minWidth: '180px', borderColor: '#E5E7EB' }}
+                  >
+                    {[30, 60, 90, 120, 150, 180].map((days) => (
+                      <button
+                        key={days}
+                        type="button"
+                        onClick={() => {
+                          setDoiGoal(days);
+                          setShowDoiDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors first:rounded-t-lg last:rounded-b-lg"
+                        style={{
+                          fontSize: '14px',
+                          color: doiGoal === days ? '#3B82F6' : '#374151',
+                          fontWeight: doiGoal === days ? 600 : 400,
+                          backgroundColor: doiGoal === days ? '#EFF6FF' : 'transparent',
+                        }}
+                      >
+                        {days} Days {days === 120 && '(Recommended)'}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Safety Buffer Selector */}
+            <div className="flex items-center gap-3">
+              <span style={{ fontSize: '14px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
+                Capacity Target:
+              </span>
+              <div className="relative safety-dropdown-container">
+                <button
+                  type="button"
+                  onClick={() => setShowSafetyDropdown(!showSafetyDropdown)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors"
+                  style={{
+                    backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                    color: isDarkMode ? '#F9FAFB' : '#000000',
+                    borderColor: isDarkMode ? '#4B5563' : '#D1D5DB',
+                  }}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  </svg>
+                  <span style={{ fontSize: '14px', fontWeight: 500 }}>{safetyBuffer}%</span>
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                
+                {showSafetyDropdown && (
+                  <div 
+                    className="absolute top-full mt-1 left-0 bg-white rounded-lg shadow-lg border z-50"
+                    style={{ minWidth: '200px', borderColor: '#E5E7EB' }}
+                  >
+                    {[70, 75, 80, 85, 90, 95, 100].map((pct) => (
+                      <button
+                        key={pct}
+                        type="button"
+                        onClick={() => {
+                          setSafetyBuffer(pct);
+                          setShowSafetyDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors first:rounded-t-lg last:rounded-b-lg"
+                        style={{
+                          fontSize: '14px',
+                          color: safetyBuffer === pct ? '#3B82F6' : '#374151',
+                          fontWeight: safetyBuffer === pct ? 600 : 400,
+                          backgroundColor: safetyBuffer === pct ? '#EFF6FF' : 'transparent',
+                        }}
+                      >
+                        {pct}% {pct === 85 && '(Recommended)'} {pct === 100 && '(Full)'} {pct < 80 && '(Conservative)'}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Search Bar */}
         <div className="relative" style={{ maxWidth: '300px', width: '100%' }}>
           <input
             type="text"
@@ -1159,24 +1323,50 @@ const BottleOrderPage = () => {
                             )}
                           </div>
                         ) : (
-                          <input
-                            type="number"
-                            value={line.qty || ''}
-                            onChange={(e) => handleQtyChange(line.id, e.target.value)}
-                            readOnly={isViewMode && activeTab === 'receivePO'}
-                            style={{
-                              width: '100%',
-                              maxWidth: '120px',
-                              padding: '4px 8px',
-                              fontSize: '14px',
-                              textAlign: 'center',
-                              border: '1px solid #D1D5DB',
-                              borderRadius: '8px',
-                              backgroundColor: '#F3F4F6',
-                              color: '#000000',
-                              cursor: 'text',
-                            }}
-                          />
+                          <div style={{ position: 'relative', display: 'inline-block' }}>
+                            <input
+                              type="number"
+                              value={line.qty || ''}
+                              onChange={(e) => handleQtyChange(line.id, e.target.value)}
+                              readOnly={isViewMode && activeTab === 'receivePO'}
+                              title={line.recommendedQty > 0 ? `Forecast-based qty: ${line.recommendedQty.toLocaleString()} units (${doiGoal} day DOI)` : ''}
+                              style={{
+                                width: '100%',
+                                maxWidth: '120px',
+                                padding: '4px 8px',
+                                fontSize: '14px',
+                                textAlign: 'center',
+                                border: `1px solid ${line.recommendedQty > 0 ? '#3B82F6' : '#D1D5DB'}`,
+                                borderRadius: '8px',
+                                backgroundColor: line.recommendedQty > 0 ? '#EFF6FF' : '#F3F4F6',
+                                color: '#000000',
+                                cursor: 'text',
+                              }}
+                            />
+                            {line.recommendedQty > 0 && !line.added && (
+                              <span 
+                                title="Auto-calculated from product forecasts"
+                                style={{ 
+                                  position: 'absolute',
+                                  top: '-6px',
+                                  right: '-6px',
+                                  backgroundColor: '#3B82F6',
+                                  color: 'white',
+                                  borderRadius: '50%',
+                                  width: '16px',
+                                  height: '16px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '10px',
+                                  fontWeight: 'bold',
+                                  cursor: 'help'
+                                }}
+                              >
+                                F
+                              </span>
+                            )}
+                          </div>
                         )}
                       </td>
                       <td style={{ 

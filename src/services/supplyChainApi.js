@@ -27,6 +27,13 @@ export const bottlesApi = {
     return response.json();
   },
 
+  // Forecast Requirements
+  getForecastRequirements: async (doiGoal = 120, safetyBuffer = 0.85) => {
+    const response = await fetch(`${API_BASE_URL}/supply-chain/bottles/forecast-requirements?doi_goal=${doiGoal}&safety_buffer=${safetyBuffer}`);
+    if (!response.ok) throw new Error('Failed to fetch bottle forecast requirements');
+    return response.json();
+  },
+
   // Orders
   getOrders: async (status = null) => {
     const url = status 

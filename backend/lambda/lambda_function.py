@@ -1368,6 +1368,105 @@ def get_bottle_inventory(event):
         cursor.close()
         conn.close()
 
+def get_bottle_forecast_requirements(event):
+    """GET /supply-chain/bottles/forecast-requirements - Calculate bottle requirements based on product forecasts"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # Get query params for forecast period (default 120 days DOI goal)
+        query_params = event.get('queryStringParameters') or {}
+        doi_goal = int(query_params.get('doi_goal', 120))
+        safety_buffer = float(query_params.get('safety_buffer', 0.85))  # Default 85% max capacity
+        
+        # Calculate bottle requirements based on product forecasts from sales_metrics table
+        cursor.execute("""
+            SELECT 
+                c.packaging_name as bottle_name,
+                b.max_warehouse_inventory,
+                bi.warehouse_quantity as current_inventory,
+                
+                -- Calculate total units forecasted for this bottle type
+                SUM(
+                    CASE 
+                        WHEN sm.units_sold_30_days > 0 
+                        THEN (sm.units_sold_30_days / 30.0) * %s  -- daily_rate * doi_goal
+                        ELSE 0
+                    END
+                ) as forecasted_units_needed,
+                
+                -- Calculate available space in warehouse (with safety buffer)
+                CASE 
+                    WHEN b.max_warehouse_inventory > 0 
+                    THEN GREATEST(0, (b.max_warehouse_inventory * %s) - COALESCE(bi.warehouse_quantity, 0))
+                    ELSE 999999
+                END as available_capacity,
+                
+                -- Calculate recommended order quantity (forecasted need - current inventory, capped at available capacity with safety buffer)
+                CASE 
+                    WHEN b.max_warehouse_inventory > 0 THEN
+                        LEAST(
+                            GREATEST(0, 
+                                SUM(
+                                    CASE 
+                                        WHEN sm.units_sold_30_days > 0 
+                                        THEN (sm.units_sold_30_days / 30.0) * %s
+                                        ELSE 0
+                                    END
+                                ) - COALESCE(bi.warehouse_quantity, 0)
+                            ),
+                            GREATEST(0, (b.max_warehouse_inventory * %s) - COALESCE(bi.warehouse_quantity, 0))
+                        )
+                    ELSE 
+                        GREATEST(0, 
+                            SUM(
+                                CASE 
+                                    WHEN sm.units_sold_30_days > 0 
+                                    THEN (sm.units_sold_30_days / 30.0) * %s
+                                    ELSE 0
+                                END
+                            ) - COALESCE(bi.warehouse_quantity, 0)
+                        )
+                END as recommended_order_qty,
+                
+                -- List all products using this bottle
+                json_agg(
+                    json_build_object(
+                        'product_name', c.product_name,
+                        'size', c.size,
+                        'units_sold_30_days', sm.units_sold_30_days,
+                        'daily_sales_rate', CASE WHEN sm.units_sold_30_days > 0 THEN sm.units_sold_30_days / 30.0 ELSE 0 END
+                    )
+                ) as products_using_bottle
+                
+            FROM catalog c
+            LEFT JOIN sales_metrics sm ON c.id = sm.catalog_id
+            LEFT JOIN bottle b ON c.packaging_name = b.bottle_name
+            LEFT JOIN bottle_inventory bi ON c.packaging_name = bi.bottle_name
+            WHERE c.packaging_name IS NOT NULL
+            GROUP BY c.packaging_name, b.max_warehouse_inventory, bi.warehouse_quantity
+            ORDER BY c.packaging_name
+        """, (doi_goal, safety_buffer, doi_goal, safety_buffer, doi_goal))
+        
+        requirements = cursor.fetchall()
+        
+        return cors_response(200, {
+            'success': True,
+            'data': [dict(row) for row in requirements],
+            'doi_goal': doi_goal,
+            'safety_buffer': safety_buffer,
+            'safety_buffer_pct': int(safety_buffer * 100)
+        })
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
 def get_bottle_orders(event):
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
@@ -4356,7 +4455,7 @@ def get_products_inventory(event):
                 c.product_name,
                 c.brand_name,
                 c.size,
-                c.units_sold_30_days,
+                sm.units_sold_30_days,
                 c.units_per_case,
                 
                 -- Formula details
@@ -4389,14 +4488,14 @@ def get_products_inventory(event):
                 
                 -- Sales velocity (units per day)
                 CASE 
-                    WHEN c.units_sold_30_days > 0 THEN c.units_sold_30_days / 30.0
+                    WHEN sm.units_sold_30_days > 0 THEN sm.units_sold_30_days / 30.0
                     ELSE 0
                 END as daily_sales_velocity,
                 
                 -- DOI calculation (Days of Inventory)
                 CASE 
-                    WHEN c.units_sold_30_days > 0 THEN 
-                        (bi.warehouse_quantity / (c.units_sold_30_days / 30.0))
+                    WHEN sm.units_sold_30_days > 0 THEN 
+                        (bi.warehouse_quantity / (sm.units_sold_30_days / 30.0))
                     ELSE 9999
                 END as days_of_inventory,
                 
@@ -4416,6 +4515,7 @@ def get_products_inventory(event):
                 ) as max_units_producible
                 
             FROM catalog c
+            LEFT JOIN sales_metrics sm ON c.id = sm.catalog_id
             LEFT JOIN formula f ON c.formula_name = f.formula
             LEFT JOIN formula_inventory fi ON c.formula_name = fi.formula_name
             LEFT JOIN bottle b ON c.packaging_name = b.bottle_name
@@ -4512,6 +4612,9 @@ def lambda_handler(event, context):
             return delete_formula(event)
         
         # Supply Chain - Bottles
+        elif http_method == 'GET' and ('/bottles/forecast-requirements' in path or path.endswith('/bottles/forecast-requirements')):
+            return get_bottle_forecast_requirements(event)
+        
         elif http_method == 'GET' and ('/bottles/inventory' in path or path.endswith('/bottles/inventory')):
             return get_bottle_inventory(event)
         
