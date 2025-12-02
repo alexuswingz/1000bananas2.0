@@ -553,31 +553,29 @@ const BottleOrderPage = () => {
       return;
     }
     
-    // Create order via API - one order per bottle
+    // Create order via API - batch creation for all bottles
     try {
       const today = new Date().toISOString().split('T')[0];
-      const createdOrders = [];
       
-      for (const line of addedLines) {
-        const orderData = {
-          order_number: `${orderNumber}-${line.name}`,
+      // Prepare batch order data with all bottles
+      const batchOrderData = {
+        order_number: orderNumber,
+        supplier: supplier.name,
+        order_date: today,
+        expected_delivery_date: null,
+        bottles: addedLines.map(line => ({
           bottle_name: line.fullName || line.name, // Use full name for database
-          supplier: supplier.name,
-          order_date: today,
-          expected_delivery_date: null,
           quantity_ordered: line.qty || 0,
           cost_per_unit: null,
           total_cost: null,
           status: 'pending',
-          notes: null,
-        };
-        
-        const response = await bottlesApi.createOrder(orderData);
-        if (response.success) {
-          createdOrders.push(response.data);
-        } else {
-          throw new Error(`Failed to create order for ${line.name}: ${response.error}`);
-        }
+          notes: `${line.qty} units (${line.pallets} pallets)`,
+        })),
+      };
+      
+      const response = await bottlesApi.createOrder(batchOrderData);
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to create order');
       }
       
       // Navigate back with success message

@@ -53,8 +53,13 @@ const NewShipment = () => {
   const floorInventoryRef = useRef(null);
   const floorInventoryButtonRef = useRef(null);
   const [floorInventoryPosition, setFloorInventoryPosition] = useState({ top: 0, left: 0 });
+  // Generate unique shipment number
+  const generateShipmentNumber = () => {
+    return new Date().toISOString().split('T')[0].replace(/-/g, '.') + '-' + Date.now().toString().slice(-6);
+  };
+
   const [shipmentData, setShipmentData] = useState({
-    shipmentNumber: new Date().toISOString().split('T')[0].replace(/-/g, '.') + '-' + Date.now().toString().slice(-6),
+    shipmentNumber: generateShipmentNumber(),
     shipmentDate: new Date().toISOString().split('T')[0], // YYYY-MM-DD format
     shipmentType: 'AWD',
     location: '',
@@ -66,6 +71,17 @@ const NewShipment = () => {
   useEffect(() => {
     loadProducts();
   }, []);
+
+  // Reset shipment number for new shipments (when no ID in route)
+  useEffect(() => {
+    if (!id) {
+      setShipmentData(prev => ({
+        ...prev,
+        shipmentNumber: generateShipmentNumber(),
+        shipmentDate: new Date().toISOString().split('T')[0],
+      }));
+    }
+  }, [id]); // Re-run when ID changes (e.g., navigating from edit to new)
 
   const loadProducts = async () => {
     try {
@@ -319,9 +335,12 @@ const NewShipment = () => {
     setActiveAction(action);
   };
 
-  const handleBookAndProceed = async () => {
+  const handleBookAndProceed = async (updatedShipmentData = null) => {
     try {
       setLoading(true);
+      
+      // Use the passed data or fall back to state (for backward compatibility)
+      const currentShipmentData = updatedShipmentData || shipmentData;
       
       // Validate: Must have products selected
       const productsToAdd = Object.keys(qtyValues)
@@ -342,12 +361,12 @@ const NewShipment = () => {
       // Create shipment if it doesn't exist
       if (!currentShipmentId) {
         const newShipment = await createShipment({
-          shipment_number: shipmentData.shipmentNumber,
-          shipment_date: shipmentData.shipmentDate,
-          shipment_type: shipmentData.shipmentType,
+          shipment_number: currentShipmentData.shipmentNumber,
+          shipment_date: currentShipmentData.shipmentDate,
+          shipment_type: currentShipmentData.shipmentType,
           marketplace: 'Amazon',
-          account: shipmentData.account,
-          location: shipmentData.location,
+          account: currentShipmentData.account,
+          location: currentShipmentData.location,
           created_by: 'current_user', // TODO: Get from auth context
         });
         currentShipmentId = newShipment.id;

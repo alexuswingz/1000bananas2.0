@@ -10,6 +10,7 @@ import uuid
 from datetime import datetime, date
 from decimal import Decimal
 import os
+import time
 
 # Database configuration
 DB_CONFIG = {
@@ -1426,18 +1427,73 @@ def create_bottle_order(event):
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
         data = json.loads(event.get('body', '{}'))
-        cursor.execute("""
-            INSERT INTO bottle_orders (order_number, bottle_name, supplier, order_date,
-                                       expected_delivery_date, quantity_ordered, cost_per_unit,
-                                       total_cost, status, notes)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *
-        """, (data.get('order_number'), data.get('bottle_name'), data.get('supplier'),
-              data.get('order_date'), data.get('expected_delivery_date'),
-              data.get('quantity_ordered'), data.get('cost_per_unit'),
-              data.get('total_cost'), data.get('status', 'pending'), data.get('notes')))
-        order = cursor.fetchone()
-        conn.commit()
-        return cors_response(201, {'success': True, 'data': dict(order)})
+        
+        # Check if this is a batch order (multiple bottles) or single order
+        bottles = data.get('bottles')
+        
+        if bottles and isinstance(bottles, list) and len(bottles) > 0:
+            # Batch order creation - multiple bottles in one order
+            base_order_number = data.get('order_number')
+            supplier = data.get('supplier')
+            order_date = data.get('order_date')
+            expected_delivery_date = data.get('expected_delivery_date')
+            
+            # Generate unique batch ID for this order
+            batch_id = str(uuid.uuid4())[:8]  # Use first 8 chars of UUID for uniqueness
+            
+            created_orders = []
+            
+            for idx, bottle_item in enumerate(bottles):
+                # Create unique order number for each bottle variant
+                bottle_name = bottle_item.get('bottle_name')
+                quantity_ordered = bottle_item.get('quantity_ordered', 0)
+                
+                # Skip items with 0 quantity
+                if quantity_ordered <= 0:
+                    continue
+                
+                # Generate unique order number: base-batchid-index
+                # This ensures uniqueness even if same order number is reused
+                unique_order_number = f"{base_order_number}-{batch_id}-{idx}"
+                
+                cursor.execute("""
+                    INSERT INTO bottle_orders (order_number, bottle_name, supplier, order_date,
+                                               expected_delivery_date, quantity_ordered, cost_per_unit,
+                                               total_cost, status, notes)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *
+                """, (unique_order_number, bottle_name, supplier,
+                      order_date, expected_delivery_date,
+                      quantity_ordered, bottle_item.get('cost_per_unit'),
+                      bottle_item.get('total_cost'), bottle_item.get('status', 'pending'), 
+                      bottle_item.get('notes')))
+                
+                order = cursor.fetchone()
+                created_orders.append(dict(order))
+            
+            conn.commit()
+            return cors_response(201, {
+                'success': True, 
+                'data': created_orders,
+                'count': len(created_orders),
+                'base_order_number': base_order_number
+            })
+        else:
+            # Single order creation (legacy support)
+            cursor.execute("""
+                INSERT INTO bottle_orders (order_number, bottle_name, supplier, order_date,
+                                           expected_delivery_date, quantity_ordered, cost_per_unit,
+                                           total_cost, status, notes)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *
+            """, (data.get('order_number'), data.get('bottle_name'), data.get('supplier'),
+                  data.get('order_date'), data.get('expected_delivery_date'),
+                  data.get('quantity_ordered'), data.get('cost_per_unit'),
+                  data.get('total_cost'), data.get('status', 'pending'), data.get('notes')))
+            order = cursor.fetchone()
+            conn.commit()
+            return cors_response(201, {'success': True, 'data': dict(order)})
+    except Exception as e:
+        conn.rollback()
+        raise e
     finally:
         cursor.close()
         conn.close()
@@ -2160,7 +2216,10 @@ def update_label_order(event):
                     qty_to_add = qty_ordered - prev_received
                     
                     if qty_to_add > 0:
-                        # Update inventory
+                        # Log what we're updating
+                        print(f"Updating label inventory: {line['brand_name']} - {line['product_name']} - {line['bottle_size']} + {qty_to_add}")
+                        
+                        # Try to update inventory first
                         cursor.execute("""
                             UPDATE label_inventory 
                             SET warehouse_inventory = warehouse_inventory + %s,
@@ -2169,6 +2228,19 @@ def update_label_order(event):
                             AND product_name = %s 
                             AND bottle_size = %s
                         """, (qty_to_add, line['brand_name'], line['product_name'], line['bottle_size']))
+                        
+                        rows_affected = cursor.rowcount
+                        print(f"Label inventory update affected {rows_affected} rows")
+                        
+                        # If no rows updated, inventory record doesn't exist - create it
+                        if rows_affected == 0:
+                            print(f"Creating new label inventory record for {line['brand_name']} - {line['product_name']} - {line['bottle_size']}")
+                            cursor.execute("""
+                                INSERT INTO label_inventory 
+                                (brand_name, product_name, bottle_size, warehouse_inventory, inbound_quantity, supplier, label_status, updated_at)
+                                VALUES (%s, %s, %s, %s, 0, %s, 'Up to Date', CURRENT_TIMESTAMP)
+                            """, (line['brand_name'], line['product_name'], line['bottle_size'], qty_to_add, 
+                                  current_order['supplier']))
                         
                         # Update line received quantity
                         cursor.execute("""
@@ -2195,7 +2267,10 @@ def update_label_order(event):
                         qty_to_add = qty_received - prev_received
                         
                         if qty_to_add > 0:
-                            # Update inventory
+                            # Log what we're updating
+                            print(f"Partial receive - Updating label inventory: {line['brand_name']} - {line['product_name']} - {line['bottle_size']} + {qty_to_add}")
+                            
+                            # Try to update inventory first
                             cursor.execute("""
                                 UPDATE label_inventory 
                                 SET warehouse_inventory = warehouse_inventory + %s,
@@ -2204,6 +2279,19 @@ def update_label_order(event):
                                 AND product_name = %s 
                                 AND bottle_size = %s
                             """, (qty_to_add, line['brand_name'], line['product_name'], line['bottle_size']))
+                            
+                            rows_affected = cursor.rowcount
+                            print(f"Label inventory update affected {rows_affected} rows")
+                            
+                            # If no rows updated, inventory record doesn't exist - create it
+                            if rows_affected == 0:
+                                print(f"Creating new label inventory record for {line['brand_name']} - {line['product_name']} - {line['bottle_size']}")
+                                cursor.execute("""
+                                    INSERT INTO label_inventory 
+                                    (brand_name, product_name, bottle_size, warehouse_inventory, inbound_quantity, supplier, label_status, updated_at)
+                                    VALUES (%s, %s, %s, %s, 0, %s, 'Up to Date', CURRENT_TIMESTAMP)
+                                """, (line['brand_name'], line['product_name'], line['bottle_size'], qty_to_add, 
+                                      current_order['supplier']))
                         
                         # Update line received quantity
                         cursor.execute("""

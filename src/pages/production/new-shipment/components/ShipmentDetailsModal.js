@@ -162,7 +162,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
       const name = parts.length > 1 ? parts.slice(0, -1).join(' ') : parts[0];
       const type = parts.length > 1 ? parts[parts.length - 1] : (shipmentData?.shipmentType || editableData.shipmentType || 'AWD');
       
-      onSave({
+      const updatedData = {
         shipmentNumber: name, // Use shipmentNumber (backend expects this)
         shipmentDate: shipmentData?.shipmentDate || new Date().toISOString().split('T')[0], // YYYY-MM-DD format
         shipmentType: type,
@@ -175,12 +175,16 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
         shipFrom: editableData.shipFrom,
         shipTo: editableData.shipTo,
         carrier: editableData.carrier,
-      });
+      };
+      
+      onSave(updatedData);
+      
+      // Pass the updated data to onBookAndProceed so it doesn't have to wait for state update
+      if (onBookAndProceed) {
+        onBookAndProceed(updatedData);
+      }
     }
     onClose();
-    if (onBookAndProceed) {
-      onBookAndProceed();
-    }
   };
 
   return (
