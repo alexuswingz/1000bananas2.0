@@ -22,6 +22,10 @@ const ClosureOrderPage = () => {
   const [orderLines, setOrderLines] = useState([]);
   const [isReceiveConfirmOpen, setIsReceiveConfirmOpen] = useState(false);
   const [showAddClosureModal, setShowAddClosureModal] = useState(false);
+  const [doiGoal, setDoiGoal] = useState(120); // Days of Inventory goal for forecasting
+  const [safetyBuffer, setSafetyBuffer] = useState(85); // Safety buffer percentage
+  const [showDoiDropdown, setShowDoiDropdown] = useState(false);
+  const [showSafetyDropdown, setShowSafetyDropdown] = useState(false);
 
   // Fetch order details if viewing/receiving existing order
   useEffect(() => {
@@ -73,41 +77,61 @@ const ClosureOrderPage = () => {
     fetchOrderDetails();
   }, [isReceiveMode, orderId]);
 
-  // Fetch closures on mount for create mode
+  // Fetch closures and forecast requirements on mount for create mode
   useEffect(() => {
     const fetchClosures = async () => {
       if (!isReceiveMode) {
         try {
           setLoading(true);
           const response = await closuresApi.getInventory();
+          const forecastData = await closuresApi.getForecastRequirements(doiGoal, safetyBuffer / 100);
+          
           console.log('RAW API RESPONSE:', response);
+          console.log('FORECAST DATA:', forecastData);
+          
           if (response.success) {
             const closures = transformInventoryData(response);
+            
+            // Build forecast map by closure name
+            const forecastMap = {};
+            if (forecastData.success && forecastData.data) {
+              forecastData.data.forEach(forecast => {
+                forecastMap[forecast.closure_name] = forecast;
+              });
+            }
+            
             console.log('Fetched closures from API:', closures.length, closures);
-            console.log('First closure data:', closures[0]);
             setAvailableClosures(closures);
             
-            // Create lines for ALL closures
+            // Create lines for ALL closures with forecast-based quantities (no mock data)
             const allClosureLines = closures.map((closure, index) => {
-              const defaultQty = closure.unitsPerPallet || 1000;
-              const calculatedPallets = calculatePallets(defaultQty, closure.unitsPerPallet || 1);
+              const forecast = forecastMap[closure.name] || {};
+              const recommendedQty = Math.round(forecast.recommended_order_qty || 0);
+              const calculatedPallets = calculatePallets(recommendedQty, closure.unitsPerPallet || 1);
+              
               console.log(`Creating line for ${closure.name}:`, {
                 unitsPerPallet: closure.unitsPerPallet,
-                defaultQty,
+                recommendedQty,
+                forecastedNeeded: forecast.forecasted_units_needed,
+                currentInventory: forecast.current_inventory,
                 calculatedPallets
               });
+              
               return {
                 id: index + 1,
                 name: closure.name,
                 closureName: closure.name,
-                unitsNeeded: defaultQty,
-                qty: defaultQty,
+                unitsNeeded: recommendedQty,
+                qty: recommendedQty,
                 pallets: calculatedPallets,
                 unitsPerPallet: closure.unitsPerPallet || 1,
                 unitsPerCase: closure.unitsPerCase,
                 casesPerPallet: closure.casesPerPallet,
                 supplier: closure.supplier,
-                selected: true,
+                selected: recommendedQty > 0, // Auto-select only if forecast suggests ordering
+                recommendedQty: recommendedQty,
+                forecastedUnitsNeeded: Math.round(forecast.forecasted_units_needed || 0),
+                currentInventory: forecast.current_inventory || 0,
               };
             });
             console.log('Created order lines:', allClosureLines.length, allClosureLines);
@@ -121,7 +145,7 @@ const ClosureOrderPage = () => {
       }
     };
     fetchClosures();
-  }, [isReceiveMode]);
+  }, [isReceiveMode, doiGoal, safetyBuffer]);
 
   const themeClasses = {
     pageBg: isDarkMode ? 'bg-dark-bg-primary' : 'bg-light-bg-primary',
@@ -264,6 +288,21 @@ const ClosureOrderPage = () => {
     }
   };
 
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showDoiDropdown && !event.target.closest('.doi-dropdown-container')) {
+        setShowDoiDropdown(false);
+      }
+      if (showSafetyDropdown && !event.target.closest('.safety-dropdown-container')) {
+        setShowSafetyDropdown(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showDoiDropdown, showSafetyDropdown]);
+
   if (!supplier || !orderNumber) {
     // If this page is hit directly, just send user back to closures
     handleBack();
@@ -359,6 +398,119 @@ const ClosureOrderPage = () => {
           )}
         </div>
 
+        {/* Forecast Controls - Only show in create mode */}
+        {!isReceiveMode && (
+          <div className="px-6 py-4 flex items-center gap-6 border-b border-gray-200">
+            {/* DOI Goal Selector */}
+            <div className="flex items-center gap-3">
+              <span style={{ fontSize: '14px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
+                Forecast Period:
+              </span>
+              <div className="relative doi-dropdown-container">
+                <button
+                  type="button"
+                  onClick={() => setShowDoiDropdown(!showDoiDropdown)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors"
+                  style={{
+                    backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                    color: isDarkMode ? '#F9FAFB' : '#000000',
+                    borderColor: isDarkMode ? '#4B5563' : '#D1D5DB',
+                  }}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span style={{ fontSize: '14px', fontWeight: 500 }}>{doiGoal} Days</span>
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                
+                {showDoiDropdown && (
+                  <div 
+                    className="absolute top-full mt-1 left-0 bg-white rounded-lg shadow-lg border z-50"
+                    style={{ minWidth: '180px', borderColor: '#E5E7EB' }}
+                  >
+                    {[30, 60, 90, 120, 150, 180].map((days) => (
+                      <button
+                        key={days}
+                        type="button"
+                        onClick={() => {
+                          setDoiGoal(days);
+                          setShowDoiDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors first:rounded-t-lg last:rounded-b-lg"
+                        style={{
+                          fontSize: '14px',
+                          color: doiGoal === days ? '#3B82F6' : '#374151',
+                          fontWeight: doiGoal === days ? 600 : 400,
+                          backgroundColor: doiGoal === days ? '#EFF6FF' : 'transparent',
+                        }}
+                      >
+                        {days} Days {days === 120 && '(Recommended)'}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Safety Buffer Selector */}
+            <div className="flex items-center gap-3">
+              <span style={{ fontSize: '14px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
+                Capacity Target:
+              </span>
+              <div className="relative safety-dropdown-container">
+                <button
+                  type="button"
+                  onClick={() => setShowSafetyDropdown(!showSafetyDropdown)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors"
+                  style={{
+                    backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                    color: isDarkMode ? '#F9FAFB' : '#000000',
+                    borderColor: isDarkMode ? '#4B5563' : '#D1D5DB',
+                  }}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  </svg>
+                  <span style={{ fontSize: '14px', fontWeight: 500 }}>{safetyBuffer}%</span>
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                
+                {showSafetyDropdown && (
+                  <div 
+                    className="absolute top-full mt-1 left-0 bg-white rounded-lg shadow-lg border z-50"
+                    style={{ minWidth: '200px', borderColor: '#E5E7EB' }}
+                  >
+                    {[70, 75, 80, 85, 90, 95, 100].map((pct) => (
+                      <button
+                        key={pct}
+                        type="button"
+                        onClick={() => {
+                          setSafetyBuffer(pct);
+                          setShowSafetyDropdown(false);
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-50 transition-colors first:rounded-t-lg last:rounded-b-lg"
+                        style={{
+                          fontSize: '14px',
+                          color: safetyBuffer === pct ? '#3B82F6' : '#374151',
+                          fontWeight: safetyBuffer === pct ? 600 : 400,
+                          backgroundColor: safetyBuffer === pct ? '#EFF6FF' : 'transparent',
+                        }}
+                      >
+                        {pct}% {pct === 85 && '(Recommended)'} {pct === 100 && '(Full)'} {pct < 80 && '(Conservative)'}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Table */}
         <div className="px-6 py-4">
           <div className="rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -390,13 +542,29 @@ const ClosureOrderPage = () => {
                   style={{ gridTemplateColumns: '2fr 1.2fr 1.2fr 40px 40px' }}
                 >
                   <div className="px-4 py-2 text-sm text-gray-900">{line.name}</div>
-                  <div className="px-4 py-2">
+                  <div className="px-4 py-2 relative">
+                    {!isReceiveMode && line.recommendedQty > 0 && (
+                      <div 
+                        className="absolute -top-1 -right-1 bg-blue-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center z-10"
+                        title="Forecast-based quantity"
+                      >
+                        F
+                      </div>
+                    )}
                     <input
                       type="number"
                       min="0"
                       max={isReceiveMode && line.originalQty ? (line.originalQty - (line.receivedQty || 0)) : undefined}
-                      className="w-full text-sm px-2 py-1 text-center bg-white shadow-inner border border-gray-200 rounded-none"
+                      className={`w-full text-sm px-2 py-1 text-center bg-white shadow-inner rounded-none ${
+                        !isReceiveMode && line.recommendedQty > 0 
+                          ? 'border-2 border-blue-500 ring-1 ring-blue-200' 
+                          : 'border border-gray-200'
+                      }`}
                       value={line.qty}
+                      title={!isReceiveMode && line.recommendedQty > 0 
+                        ? `Forecast-based: ${line.recommendedQty.toLocaleString()} units (${doiGoal} days)\nCurrent: ${line.currentInventory?.toLocaleString() || 0} units\nNeeded: ${line.forecastedUnitsNeeded?.toLocaleString() || 0} units` 
+                        : ''
+                      }
                       onChange={(e) => {
                         const val = Number(e.target.value) || 0;
                         

@@ -159,6 +159,13 @@ export const closuresApi = {
     return response.json();
   },
 
+  // Forecast Requirements
+  getForecastRequirements: async (doiGoal = 120, safetyBuffer = 0.85) => {
+    const response = await fetch(`${API_BASE_URL}/supply-chain/closures/forecast-requirements?doi_goal=${doiGoal}&safety_buffer=${safetyBuffer}`);
+    if (!response.ok) throw new Error('Failed to fetch closure forecast requirements');
+    return response.json();
+  },
+
   // Orders
   getOrders: async (status = null) => {
     const url = status 
@@ -273,6 +280,13 @@ export const boxesApi = {
       body: JSON.stringify(data),
     });
     if (!response.ok) throw new Error('Failed to update box inventory');
+    return response.json();
+  },
+
+  // Forecast Requirements
+  getForecastRequirements: async (doiGoal = 120, safetyBuffer = 0.85) => {
+    const response = await fetch(`${API_BASE_URL}/supply-chain/boxes/forecast-requirements?doi_goal=${doiGoal}&safety_buffer=${safetyBuffer}`);
+    if (!response.ok) throw new Error('Failed to fetch box forecast requirements');
     return response.json();
   },
 
@@ -402,6 +416,13 @@ export const labelsApi = {
       }),
     });
     if (!response.ok) throw new Error('Failed to update label inventory');
+    return response.json();
+  },
+
+  // Forecast Requirements
+  getForecastRequirements: async (doiGoal = 120, safetyBuffer = 0.85) => {
+    const response = await fetch(`${API_BASE_URL}/supply-chain/labels/forecast-requirements?doi_goal=${doiGoal}&safety_buffer=${safetyBuffer}`);
+    if (!response.ok) throw new Error('Failed to fetch label forecast requirements');
     return response.json();
   },
 

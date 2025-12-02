@@ -13,19 +13,22 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
   const accountRef = useRef(null);
   const hasInitializedRef = useRef(false);
   
-  // Auto-populate shipment name with current date and set marketplace to Amazon when modal opens
+  // Auto-populate shipment name with current timestamp and set marketplace to Amazon when modal opens
   useEffect(() => {
     if (isOpen && !hasInitializedRef.current) {
       const updates = {};
       
-      // Auto-populate shipment name if empty
+      // Auto-populate shipment name with timestamp (YYYY-MM-DD HH:mm:ss)
       if (!newShipment.shipmentName) {
         const now = new Date();
         const year = now.getFullYear();
         const month = String(now.getMonth() + 1).padStart(2, '0');
         const day = String(now.getDate()).padStart(2, '0');
-        const dateString = `${year}.${month}.${day}`;
-        updates.shipmentName = dateString;
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const timestampString = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+        updates.shipmentName = timestampString;
       }
       
       // Auto-select Amazon if marketplace is not set
@@ -181,25 +184,20 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
             <input
               type="text"
               value={newShipment.shipmentName || ''}
-              onChange={(e) =>
-                setNewShipment((prev) => ({
-                  ...prev,
-                  shipmentName: e.target.value,
-                }))
-              }
-              placeholder="Enter shipment name here..."
+              readOnly
+              disabled
+              placeholder="Auto-generated timestamp..."
               style={{
                 width: '100%',
                 padding: '10px 12px',
                 border: '1px solid #D1D5DB',
                 borderRadius: '6px',
                 fontSize: '14px',
-                color: '#111827',
-                backgroundColor: '#FFFFFF',
+                color: '#6B7280',
+                backgroundColor: '#F9FAFB',
                 outline: 'none',
+                cursor: 'not-allowed',
               }}
-              onFocus={(e) => e.target.style.borderColor = '#3B82F6'}
-              onBlur={(e) => e.target.style.borderColor = '#D1D5DB'}
             />
           </div>
 

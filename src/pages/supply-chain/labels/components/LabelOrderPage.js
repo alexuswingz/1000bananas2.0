@@ -20,7 +20,11 @@ const LabelOrderPage = () => {
   const [allLines, setAllLines] = useState(state.lines || []);
   const [loadingLabels, setLoadingLabels] = useState(false);
   const [doiData, setDoiData] = useState(null);
-  const [doiGoalValue, setDoiGoalValue] = useState(196); // Default DOI goal
+  const [doiGoalValue, setDoiGoalValue] = useState(120); // Default DOI goal (changed from 196 to 120 for consistency)
+  const [safetyBuffer, setSafetyBuffer] = useState(85); // Safety buffer percentage
+  const [showDoiDropdown, setShowDoiDropdown] = useState(false);
+  const [showSafetyDropdown, setShowSafetyDropdown] = useState(false);
+  const [forecastRequirements, setForecastRequirements] = useState({});
   
   // Edit mode state - declare early so useEffect can access it
   const [isEditOrderMode, setIsEditOrderMode] = useState(false);
@@ -28,28 +32,48 @@ const LabelOrderPage = () => {
   // Track if Add Products step is complete (moved to Submit PO)
   const [addProductsComplete, setAddProductsComplete] = useState(false);
   
-  // Fetch labels from API on mount if creating new order
+  // Fetch labels and forecast requirements from API on mount if creating new order
   useEffect(() => {
     if (!state.lines && isCreateMode) {
       const fetchLabels = async () => {
         try {
           setLoadingLabels(true);
           const response = await labelsApi.getInventory();
+          const forecastData = await labelsApi.getForecastRequirements(doiGoalValue, safetyBuffer / 100);
+          
+          // Build forecast map by product_name + bottle_size
+          const forecastMap = {};
+          if (forecastData.success && forecastData.data) {
+            forecastData.data.forEach(forecast => {
+              const key = `${forecast.product_name}|${forecast.bottle_size}`;
+              forecastMap[key] = forecast;
+            });
+          }
+          setForecastRequirements(forecastMap);
+          
           if (response.success) {
-            const transformed = response.data.map(label => ({
-              id: label.id,
-              brand: label.brand_name,
-              product: label.product_name,
-              size: label.bottle_size,
-              labelSize: label.label_size,
-              qty: 0,
-              labelStatus: label.label_status || 'Up to Date',
-              inventory: label.warehouse_inventory || 0,
-              inbound: label.inbound_quantity || 0,
-              toOrder: 0,
-              googleDriveLink: label.google_drive_link,
-              added: false,
-            }));
+            const transformed = response.data.map(label => {
+              const forecastKey = `${label.product_name}|${label.bottle_size}`;
+              const forecast = forecastMap[forecastKey] || {};
+              const recommendedQty = Math.round(forecast.recommended_order_qty || 0);
+              
+              return {
+                id: label.id,
+                brand: label.brand_name,
+                product: label.product_name,
+                size: label.bottle_size,
+                labelSize: label.label_size,
+                qty: recommendedQty,
+                labelStatus: label.label_status || 'Up to Date',
+                inventory: label.warehouse_inventory || 0,
+                inbound: label.inbound_quantity || 0,
+                toOrder: recommendedQty,
+                googleDriveLink: label.google_drive_link,
+                added: recommendedQty > 0, // Auto-add if forecast suggests ordering
+                recommendedQty: recommendedQty,
+                forecastedUnitsNeeded: Math.round(forecast.forecasted_units_needed || 0),
+              };
+            });
             setAllLines(transformed);
           }
         } catch (err) {
@@ -60,7 +84,7 @@ const LabelOrderPage = () => {
       };
       fetchLabels();
     }
-  }, [state.lines, isCreateMode]);
+  }, [state.lines, isCreateMode, doiGoalValue, safetyBuffer]);
 
   // Fetch DOI data from API when in create/edit mode
   useEffect(() => {
@@ -120,6 +144,21 @@ const LabelOrderPage = () => {
       }, 0);
     }
   }, [editingRowId]);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showDoiDropdown && !event.target.closest('.doi-dropdown-container')) {
+        setShowDoiDropdown(false);
+      }
+      if (showSafetyDropdown && !event.target.closest('.safety-dropdown-container')) {
+        setShowSafetyDropdown(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showDoiDropdown, showSafetyDropdown]);
   
   // Edit and change tracking state
   const [originalOrder, setOriginalOrder] = useState(null); // Store original order for comparison

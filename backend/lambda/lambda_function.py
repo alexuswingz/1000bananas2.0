@@ -1706,6 +1706,83 @@ def get_closure_inventory(event):
         cursor.close()
         conn.close()
 
+def get_closure_forecast_requirements(event):
+    """GET /supply-chain/closures/forecast-requirements - Calculate closure requirements based on product forecasts"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # Get query params for forecast period (default 120 days DOI goal)
+        query_params = event.get('queryStringParameters') or {}
+        doi_goal = int(query_params.get('doi_goal', 120))
+        safety_buffer = float(query_params.get('safety_buffer', 0.85))  # Default 85% max capacity
+        
+        # Calculate closure requirements based on product forecasts from sales_metrics table
+        cursor.execute("""
+            SELECT 
+                c.closure_name,
+                cl.moq,
+                cl.lead_time_weeks,
+                ci.warehouse_quantity as current_inventory,
+                
+                -- Calculate total units forecasted for this closure type
+                SUM(
+                    CASE 
+                        WHEN sm.units_sold_30_days > 0 
+                        THEN (sm.units_sold_30_days / 30.0) * %s  -- daily_rate * doi_goal
+                        ELSE 0
+                    END
+                ) as forecasted_units_needed,
+                
+                -- Calculate recommended order quantity (forecasted need - current inventory)
+                GREATEST(0, 
+                    SUM(
+                        CASE 
+                            WHEN sm.units_sold_30_days > 0 
+                            THEN (sm.units_sold_30_days / 30.0) * %s
+                            ELSE 0
+                        END
+                    ) - COALESCE(ci.warehouse_quantity, 0)
+                ) as recommended_order_qty,
+                
+                -- List all products using this closure
+                json_agg(
+                    json_build_object(
+                        'product_name', c.product_name,
+                        'size', c.size,
+                        'units_sold_30_days', sm.units_sold_30_days,
+                        'daily_sales_rate', CASE WHEN sm.units_sold_30_days > 0 THEN sm.units_sold_30_days / 30.0 ELSE 0 END
+                    )
+                ) as products_using_closure
+                
+            FROM catalog c
+            LEFT JOIN sales_metrics sm ON c.id = sm.catalog_id
+            LEFT JOIN closure cl ON c.closure_name = cl.closure_name
+            LEFT JOIN closure_inventory ci ON c.closure_name = ci.closure_name
+            WHERE c.closure_name IS NOT NULL
+            GROUP BY c.closure_name, cl.moq, cl.lead_time_weeks, ci.warehouse_quantity
+            ORDER BY c.closure_name
+        """, (doi_goal, doi_goal))
+        
+        requirements = cursor.fetchall()
+        
+        return cors_response(200, {
+            'success': True,
+            'data': [dict(row) for row in requirements],
+            'doi_goal': doi_goal,
+            'safety_buffer': safety_buffer,
+            'safety_buffer_pct': int(safety_buffer * 100)
+        })
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
 def get_closure_orders(event):
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
@@ -1890,6 +1967,67 @@ def get_box_inventory(event):
         cursor.close()
         conn.close()
 
+def get_box_forecast_requirements(event):
+    """GET /supply-chain/boxes/forecast-requirements - Calculate box requirements based on total case production needs"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # Get query params for forecast period (default 120 days DOI goal)
+        query_params = event.get('queryStringParameters') or {}
+        doi_goal = int(query_params.get('doi_goal', 120))
+        safety_buffer = float(query_params.get('safety_buffer', 0.85))  # Default 85% max capacity
+        
+        # Calculate box requirements based on estimated case production needs
+        # Assumption: Each product unit = 1 case that needs a box
+        cursor.execute("""
+            SELECT 
+                b.box_size as box_type,
+                b.moq,
+                b.lead_time_weeks,
+                bi.warehouse_quantity as current_inventory,
+                
+                -- Estimate total cases needed (based on all product sales)
+                -- Simple estimation: total units sold / average units per case
+                -- This is a rough estimate since boxes aren't product-specific
+                ROUND(
+                    (SELECT SUM(COALESCE(sm.units_sold_30_days, 0)) / 30.0 * %s / 6.0
+                     FROM sales_metrics sm), 0
+                ) as forecasted_cases_needed,
+                
+                -- Recommended order quantity (forecasted need - current inventory)
+                GREATEST(0, 
+                    ROUND(
+                        (SELECT SUM(COALESCE(sm.units_sold_30_days, 0)) / 30.0 * %s / 6.0
+                         FROM sales_metrics sm), 0
+                    ) - COALESCE(bi.warehouse_quantity, 0)
+                ) as recommended_order_qty
+                
+            FROM box b
+            LEFT JOIN box_inventory bi ON b.box_size = bi.box_type
+            ORDER BY b.box_size
+        """, (doi_goal, doi_goal))
+        
+        requirements = cursor.fetchall()
+        
+        return cors_response(200, {
+            'success': True,
+            'data': [dict(row) for row in requirements],
+            'doi_goal': doi_goal,
+            'safety_buffer': safety_buffer,
+            'safety_buffer_pct': int(safety_buffer * 100),
+            'note': 'Box forecasts are estimated based on total production needs (not product-specific)'
+        })
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
 def get_box_orders(event):
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
@@ -2049,6 +2187,76 @@ def update_box_inventory(event):
 # ============================================
 # SUPPLY CHAIN - LABEL ENDPOINTS
 # ============================================
+
+def get_label_forecast_requirements(event):
+    """GET /supply-chain/labels/forecast-requirements - Calculate label requirements based on product forecasts"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # Get query params for forecast period (default 120 days DOI goal)
+        query_params = event.get('queryStringParameters') or {}
+        doi_goal = int(query_params.get('doi_goal', 120))
+        safety_buffer = float(query_params.get('safety_buffer', 0.85))  # Default 85% max capacity
+        
+        # Calculate label requirements based on product forecasts from sales_metrics table
+        # Labels are identified by product_name + bottle_size combination
+        cursor.execute("""
+            SELECT 
+                li.product_name,
+                li.bottle_size,
+                li.label_location,
+                li.supplier,
+                li.moq,
+                li.lead_time_weeks,
+                li.warehouse_inventory as current_inventory,
+                
+                -- Calculate forecasted units needed for this specific product + size
+                COALESCE(
+                    (sm.units_sold_30_days / 30.0) * %s,
+                    0
+                ) as forecasted_units_needed,
+                
+                -- Calculate recommended order quantity (forecasted need - current inventory)
+                GREATEST(0, 
+                    COALESCE(
+                        (sm.units_sold_30_days / 30.0) * %s,
+                        0
+                    ) - COALESCE(li.warehouse_inventory, 0)
+                ) as recommended_order_qty,
+                
+                -- Include sales data for reference
+                sm.units_sold_30_days,
+                CASE 
+                    WHEN sm.units_sold_30_days > 0 
+                    THEN sm.units_sold_30_days / 30.0 
+                    ELSE 0 
+                END as daily_sales_rate
+                
+            FROM label_inventory li
+            LEFT JOIN catalog c ON li.product_name = c.product_name AND li.bottle_size = c.size
+            LEFT JOIN sales_metrics sm ON c.id = sm.catalog_id
+            ORDER BY li.product_name, li.bottle_size
+        """, (doi_goal, doi_goal))
+        
+        requirements = cursor.fetchall()
+        
+        return cors_response(200, {
+            'success': True,
+            'data': [dict(row) for row in requirements],
+            'doi_goal': doi_goal,
+            'safety_buffer': safety_buffer,
+            'safety_buffer_pct': int(safety_buffer * 100)
+        })
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
 
 def get_label_inventory(event):
     """GET /supply-chain/labels/inventory - Get all label inventory"""
@@ -4652,6 +4860,9 @@ def lambda_handler(event, context):
             return update_bottle_cycle_count(event)
         
         # Supply Chain - Closures
+        elif http_method == 'GET' and ('/closures/forecast-requirements' in path or path.endswith('/closures/forecast-requirements')):
+            return get_closure_forecast_requirements(event)
+        
         elif http_method == 'GET' and ('/closures/inventory' in path or path.endswith('/closures/inventory')):
             return get_closure_inventory(event)
         
@@ -4689,6 +4900,9 @@ def lambda_handler(event, context):
             return update_closure_cycle_count(event)
         
         # Supply Chain - Boxes
+        elif http_method == 'GET' and ('/boxes/forecast-requirements' in path or path.endswith('/boxes/forecast-requirements')):
+            return get_box_forecast_requirements(event)
+        
         elif http_method == 'GET' and ('/boxes/inventory' in path or path.endswith('/boxes/inventory')):
             return get_box_inventory(event)
         
@@ -4726,6 +4940,9 @@ def lambda_handler(event, context):
             return update_box_cycle_count(event)
         
         # Supply Chain - Labels Inventory
+        elif http_method == 'GET' and ('/labels/forecast-requirements' in path or path.endswith('/labels/forecast-requirements')):
+            return get_label_forecast_requirements(event)
+        
         elif http_method == 'GET' and ('/labels/inventory' in path or path.endswith('/labels/inventory')):
             if '/labels/inventory/' in path and not path.endswith('/labels/inventory'):
                 return get_label_inventory_by_id(event)
