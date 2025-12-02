@@ -25,3 +25,4 @@ COMMENT ON COLUMN finished_goods.max_packaging_per_minute IS 'Maximum packaging 
 -- Migration complete
 -- ============================================================================
 
+

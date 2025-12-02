@@ -36,3 +36,4 @@ SELECT bottle_name, max_warehouse_inventory, warehouse_quantity
 FROM bottle
 ORDER BY bottle_name;
 
+

@@ -189,3 +189,4 @@ if __name__ == '__main__':
         print("To actually apply the migration, run:")
         print("   python apply_catalog_relationships.py")
 
+

@@ -109,3 +109,4 @@ def check_inventory():
 if __name__ == '__main__':
     check_inventory()
 
+

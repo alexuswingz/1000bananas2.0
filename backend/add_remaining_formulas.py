@@ -102,3 +102,4 @@ print("\n" + "=" * 80)
 print("✅ All formulas now have inventory!")
 print("=" * 80)
 
+

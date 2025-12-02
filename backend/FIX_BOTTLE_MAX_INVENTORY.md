@@ -107,3 +107,4 @@ def fix_bottle_max_inventory(event):
 
 Then call: `POST /admin/fix-bottle-max-inventory`
 
+

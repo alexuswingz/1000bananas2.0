@@ -34,3 +34,4 @@ def delete_empty_shipments():
 if __name__ == '__main__':
     delete_empty_shipments()
 
+
