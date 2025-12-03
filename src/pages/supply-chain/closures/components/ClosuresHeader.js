@@ -1,8 +1,30 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '../../../../context/ThemeContext';
 
-const ClosuresHeader = ({ activeTab, onTabChange, search, onSearchChange, onNewOrderClick }) => {
+const ClosuresHeader = ({ activeTab, onTabChange, search, onSearchChange, onNewOrderClick, onCreateBottleClick }) => {
   const navigate = useNavigate();
+  const { isDarkMode } = useTheme();
+  const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
+
+  // Handle click outside to close settings menu
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (isSettingsMenuOpen && !event.target.closest('.settings-menu-container')) {
+        setIsSettingsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isSettingsMenuOpen]);
+
+  const themeClasses = {
+    inputBg: isDarkMode ? 'bg-dark-bg-tertiary' : 'bg-white',
+    border: isDarkMode ? 'border-dark-border-primary' : 'border-gray-200',
+    textSecondary: isDarkMode ? 'text-dark-text-secondary' : 'text-gray-500',
+  };
 
   return (
     <div className="mb-6 flex items-center justify-between">
@@ -108,6 +130,54 @@ const ClosuresHeader = ({ activeTab, onTabChange, search, onSearchChange, onNewO
             </svg>
           </div>
         </div>
+
+        {/* Settings button + menu */}
+        {activeTab === 'inventory' && (
+          <div className="relative settings-menu-container">
+            <button
+              type="button"
+              className={`${themeClasses.inputBg} ${themeClasses.border} border rounded-full p-2 flex items-center justify-center hover:shadow-sm transition`}
+              aria-label="Settings"
+              onClick={() => setIsSettingsMenuOpen((prev) => !prev)}
+            >
+              <svg
+                className={`${themeClasses.textSecondary} w-4 h-4`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.757.426 1.757 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.757-2.924 1.757-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.757-.426-1.757-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.607 2.296.07 2.572-1.065z"
+                />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
+
+            {isSettingsMenuOpen && (
+              <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-md shadow-lg text-xs z-30">
+                <button
+                  type="button"
+                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-50 text-gray-700"
+                  onClick={() => {
+                    setIsSettingsMenuOpen(false);
+                    if (onCreateBottleClick) onCreateBottleClick();
+                  }}
+                >
+                  <span className="text-gray-400">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  </span>
+                  Create new closure
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         <button
           type="button"
           onClick={() => navigate('/dashboard/supply-chain/closures/cycle-counts')}

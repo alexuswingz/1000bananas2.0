@@ -26,6 +26,11 @@ const LabelOrderPage = () => {
   const [showSafetyDropdown, setShowSafetyDropdown] = useState(false);
   const [forecastRequirements, setForecastRequirements] = useState({});
   
+  // DOI goal settings modal state
+  const [isLabelsSettingsModalOpen, setIsLabelsSettingsModalOpen] = useState(false);
+  const [doiGoal, setDoiGoal] = useState('196'); // Local state for input field
+  const [showDoiTooltip, setShowDoiTooltip] = useState(false);
+  
   // Edit mode state - declare early so useEffect can access it
   const [isEditOrderMode, setIsEditOrderMode] = useState(false);
   
@@ -85,6 +90,18 @@ const LabelOrderPage = () => {
       fetchLabels();
     }
   }, [state.lines, isCreateMode, doiGoalValue, safetyBuffer]);
+
+  // Initialize doiGoal from doiGoalValue
+  useEffect(() => {
+    setDoiGoal(doiGoalValue.toString());
+  }, []);
+
+  // Update doiGoal when modal opens to reflect current doiGoalValue
+  useEffect(() => {
+    if (isLabelsSettingsModalOpen) {
+      setDoiGoal(doiGoalValue.toString());
+    }
+  }, [isLabelsSettingsModalOpen, doiGoalValue]);
 
   // Fetch DOI data from API when in create/edit mode
   useEffect(() => {
@@ -1410,6 +1427,7 @@ const LabelOrderPage = () => {
             {/* Settings Button */}
             <button
               type="button"
+              onClick={() => setIsLabelsSettingsModalOpen(true)}
               style={{
                 width: '32px',
                 height: '32px',
@@ -3228,6 +3246,145 @@ const LabelOrderPage = () => {
               >
                 Confirm & Receive
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Labels Settings Modal */}
+      {isLabelsSettingsModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center" 
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.4)' }} 
+          onClick={() => setIsLabelsSettingsModalOpen(false)}
+        >
+          <div 
+            className="bg-white rounded-lg"
+            style={{ 
+              width: '420px',
+              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                Labels Settings
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsLabelsSettingsModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 transition"
+                aria-label="Close"
+                style={{ padding: '4px' }}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-5">
+              {/* DOI Goal Input - Two Column Layout */}
+              <div className="mb-5">
+                <div className="flex items-center justify-between gap-4">
+                  {/* Left Column: Label and Info Icon */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                      DOI Goal
+                    </label>
+                    <div 
+                      className="relative"
+                      onMouseEnter={() => setShowDoiTooltip(true)}
+                      onMouseLeave={() => setShowDoiTooltip(false)}
+                    >
+                      <svg 
+                        className="w-4 h-4 text-gray-600 cursor-help" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path 
+                          strokeLinecap="round" 
+                          strokeLinejoin="round" 
+                          strokeWidth={2} 
+                          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" 
+                        />
+                      </svg>
+                      
+                      {/* Tooltip */}
+                      {showDoiTooltip && (
+                        <div 
+                          className="absolute left-0 bottom-full mb-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-10"
+                          style={{ 
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                            fontFamily: 'system-ui, -apple-system, sans-serif'
+                          }}
+                        >
+                          <h3 className="text-sm font-semibold text-gray-900 mb-2">
+                            DOI Goal = Days of Inventory Goal
+                          </h3>
+                          <p className="text-sm text-gray-700 mb-2" style={{ lineHeight: '1.5' }}>
+                            Your total label DOI combines three pieces: days of finished goods at Amazon, days of raw labels in your warehouse, and the days covered by the labels you plan to order.
+                          </p>
+                          <p className="text-sm text-gray-700" style={{ lineHeight: '1.5' }}>
+                            Simply put: Total DOI = Amazon + warehouse + your next label order
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Right Column: Input Field */}
+                  <div className="flex-1" style={{ maxWidth: '180px' }}>
+                    <input
+                      type="number"
+                      value={doiGoal}
+                      onChange={(e) => setDoiGoal(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      style={{ 
+                        fontFamily: 'system-ui, -apple-system, sans-serif',
+                        borderRadius: '8px'
+                      }}
+                      placeholder="196"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Buttons */}
+              <div className="flex justify-end gap-3 mt-5">
+                <button
+                  type="button"
+                  onClick={() => setIsLabelsSettingsModalOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                  style={{ 
+                    fontFamily: 'system-ui, -apple-system, sans-serif',
+                    borderRadius: '8px'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newDoiGoal = parseInt(doiGoal, 10);
+                    if (!isNaN(newDoiGoal) && newDoiGoal > 0) {
+                      setDoiGoalValue(newDoiGoal);
+                    }
+                    setIsLabelsSettingsModalOpen(false);
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-white rounded-lg transition"
+                  style={{ 
+                    backgroundColor: '#9CA3AF',
+                    borderRadius: '8px',
+                    fontFamily: 'system-ui, -apple-system, sans-serif'
+                  }}
+                >
+                  Save
+                </button>
+              </div>
             </div>
           </div>
         </div>

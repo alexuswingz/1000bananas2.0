@@ -459,60 +459,108 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
           </div>
         ) : (
           <>
-            {filteredOrders.map((order, index) => (
-              <div
-                key={order.id}
-                className={`grid text-sm ${themeClasses.rowHover} transition-colors`}
-                style={{
-                  gridTemplateColumns: '140px 2fr 2fr',
+            {filteredOrders.map((order, index) => {
+              // Determine status for each stage
+              const addProductsStatus = true; // Always completed (order exists)
+              const submitPOStatus = true; // Always completed (order was submitted)
+              // RECEIVE PO: Only green if order is actually received
+              // Check both order status and line items - must have at least one 'received' status
+              const hasReceivedLineItem = order.lineItems?.some(item => item.status === 'received') || false;
+              const orderStatusIsReceived = order.status === 'received';
+              const receivePOStatus = hasReceivedLineItem || orderStatusIsReceived;
+              
+              return (
+                <div
+                  key={order.id}
+                  className={`grid text-sm ${themeClasses.rowHover} transition-colors`}
+                  style={{
+                    gridTemplateColumns: '222px 222px 222px 120px 120px 120px 1fr',
                     borderBottom:
                       index === filteredOrders.length - 1
                         ? 'none'
                         : isDarkMode
                         ? '1px solid rgba(75,85,99,0.3)'
                         : '1px solid #e5e7eb',
-                }}
-              >
-                <div className="px-6 py-3 flex items-center justify-center">
-                  {renderStatusPill(order)}
-                </div>
-                <div className="px-6 py-3 flex items-center gap-2">
-                  <div className="flex flex-col">
-                    <button
-                      type="button"
-                      className="text-xs font-medium text-blue-600 hover:text-blue-700 underline-offset-2 hover:underline text-left"
-                      onClick={() => onViewOrder(order)}
-                    >
-                      {order.orderNumber}
-                    </button>
-                    {order.orderCount > 1 && (
-                      <span className="text-[10px] text-gray-400">
-                        {order.orderCount} bottle types
-                      </span>
-                    )}
+                  }}
+                >
+                  <div className="px-6 py-3 flex items-center justify-center">
+                    {renderStatusPill(order)}
                   </div>
-                </div>
-                <div className="px-6 py-3 flex items-center justify-between relative">
-                  <span className={themeClasses.textPrimary}>{order.supplier}</span>
-
-                  <div className="relative">
-                    <button
-                      ref={(el) => (buttonRefs.current[order.id] = el)}
-                      type="button"
-                      data-menu-button={order.id}
-                      className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors ml-2"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOrderActionMenuId((prev) => (prev === order.id ? null : order.id));
+                  <div className="px-6 py-3 flex items-center gap-2">
+                    <div className="flex flex-col">
+                      <button
+                        type="button"
+                        className="text-xs font-medium text-blue-600 hover:text-blue-700 underline-offset-2 hover:underline text-left"
+                        onClick={() => onViewOrder(order)}
+                      >
+                        {order.orderNumber}
+                      </button>
+                      {order.orderCount > 1 && (
+                        <span className="text-[10px] text-gray-400">
+                          {order.orderCount} bottle types
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="px-6 py-3 flex items-center">
+                    <span className={themeClasses.textPrimary}>{order.supplier}</span>
+                  </div>
+                  {/* ADD PRODUCTS Circle */}
+                  <div className="px-6 py-3 flex items-center justify-center">
+                    <div
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '50%',
+                        backgroundColor: addProductsStatus ? '#22C55E' : 'transparent',
+                        border: addProductsStatus ? 'none' : '2px solid #9CA3AF',
                       }}
-                      aria-label="Order actions"
-                    >
-                      <span className={themeClasses.textSecondary}>⋮</span>
-                    </button>
+                    />
+                  </div>
+                  {/* SUBMIT PO Circle */}
+                  <div className="px-6 py-3 flex items-center justify-center">
+                    <div
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '50%',
+                        backgroundColor: submitPOStatus ? '#22C55E' : 'transparent',
+                        border: submitPOStatus ? 'none' : '2px solid #9CA3AF',
+                      }}
+                    />
+                  </div>
+                  {/* RECEIVE PO Circle */}
+                  <div className="px-6 py-3 flex items-center justify-center">
+                    <div
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '50%',
+                        backgroundColor: receivePOStatus ? '#22C55E' : 'transparent',
+                        border: receivePOStatus ? 'none' : '2px solid #9CA3AF',
+                      }}
+                    />
+                  </div>
+                  <div className="px-6 py-3 flex items-center justify-end relative">
+                    <div className="relative">
+                      <button
+                        ref={(el) => (buttonRefs.current[order.id] = el)}
+                        type="button"
+                        data-menu-button={order.id}
+                        className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors ml-2"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOrderActionMenuId((prev) => (prev === order.id ? null : order.id));
+                        }}
+                        aria-label="Order actions"
+                      >
+                        <span className={themeClasses.textSecondary}>⋮</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {filteredOrders.length === 0 && (
               <div className="px-6 py-6 text-center text-sm italic text-gray-400">

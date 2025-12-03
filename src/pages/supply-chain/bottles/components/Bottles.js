@@ -603,14 +603,14 @@ const Bottles = () => {
 
       {/* Create New Bottle Modal */}
       {isCreateBottleOpen && (
-        <div className="fixed inset-0 z-40 flex items-start justify-center pt-20 bg-black/40">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[80vh] flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200">
-              <h2 className="text-base font-semibold text-gray-900">Create New Bottle</h2>
+            <div className="flex items-center justify-between px-6 py-3" style={{ backgroundColor: '#2C3544' }}>
+              <h2 className="text-base font-semibold text-white">Create New Bottle</h2>
               <button
                 type="button"
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-300 hover:text-white"
                 onClick={() => setIsCreateBottleOpen(false)}
                 aria-label="Close"
               >

@@ -250,16 +250,19 @@ const InventoryTable = forwardRef(({
                 className={`border-b ${tableThemeClasses.border} ${tableThemeClasses.rowHover} ${tableThemeClasses.bgPrimary}`}
               >
                 <td className={`px-6 py-3 text-sm ${tableThemeClasses.textPrimary}`}>
-                  {onBoxClick ? (
-                    <button
-                      onClick={() => onBoxClick(box)}
-                      className="text-blue-600 hover:text-blue-800 hover:underline"
-                    >
-                      {box.name}
-                    </button>
-                  ) : (
-                    box.name
-                  )}
+                  <button
+                    onClick={() => onBoxClick && onBoxClick(box)}
+                    className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer transition-colors"
+                    style={{ 
+                      background: 'none', 
+                      border: 'none', 
+                      padding: 0, 
+                      font: 'inherit',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {box.name}
+                  </button>
                 </td>
                 <td className="px-6 py-3">
                   {/* Warehouse inventory is read-only - updated automatically when orders are received */}

@@ -257,87 +257,99 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
             No archived orders yet.
           </div>
         ) : (
-          archivedOrders.map((order, index) => (
-            <div
-              key={order.orderNumber}
-              className={`grid text-sm ${themeClasses.rowHover} transition-colors`}
-              style={{
-                gridTemplateColumns: '222px 222px 222px 120px 120px 120px 1fr',
-                gap: 0,
-                backgroundColor: '#FFFFFF',
-                borderBottom:
-                  index === archivedOrders.length - 1
-                    ? 'none'
-                    : '1px solid #e5e7eb',
-              }}
-            >
-              <div className="px-6 py-3 flex items-center justify-center">
-                {renderStatusPill(order.status || 'archived')}
-              </div>
-              <div className="px-6 py-3 flex items-center">
-                <div className="flex flex-col">
-                  <span className="text-xs font-medium text-blue-600">{order.orderNumber}</span>
-                  {order.orderCount > 1 && (
-                    <span className="text-[10px] text-gray-400">
-                      {order.orderCount} bottle types
-                    </span>
-                  )}
+          archivedOrders.map((order, index) => {
+            // Determine status for each stage
+            const addProductsStatus = true; // Always completed (order exists)
+            const submitPOStatus = true; // Always completed (order was submitted)
+            const receivePOStatus = order.status === 'received' || order.lineItems?.some(item => item.status === 'received') || false; // Only green if received
+            
+            return (
+              <div
+                key={order.orderNumber}
+                className={`grid text-sm ${themeClasses.rowHover} transition-colors`}
+                style={{
+                  gridTemplateColumns: '222px 222px 222px 120px 120px 120px 1fr',
+                  gap: 0,
+                  backgroundColor: '#FFFFFF',
+                  borderBottom:
+                    index === archivedOrders.length - 1
+                      ? 'none'
+                      : '1px solid #e5e7eb',
+                }}
+              >
+                <div className="px-6 py-3 flex items-center justify-center">
+                  {renderStatusPill(order.status || 'archived')}
+                </div>
+                <div className="px-6 py-3 flex items-center">
+                  <div className="flex flex-col">
+                    <span className="text-xs font-medium text-blue-600">{order.orderNumber}</span>
+                    {order.orderCount > 1 && (
+                      <span className="text-[10px] text-gray-400">
+                        {order.orderCount} bottle types
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="px-6 py-3 flex items-center">
+                  <span className={themeClasses.textPrimary}>{order.supplier}</span>
+                </div>
+                {/* ADD PRODUCTS Circle */}
+                <div className="px-6 py-3 flex items-center justify-center">
+                  <div
+                    style={{
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '50%',
+                      backgroundColor: addProductsStatus ? '#22C55E' : 'transparent',
+                      border: addProductsStatus ? 'none' : '2px solid #9CA3AF',
+                    }}
+                  />
+                </div>
+                {/* SUBMIT PO Circle */}
+                <div className="px-6 py-3 flex items-center justify-center">
+                  <div
+                    style={{
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '50%',
+                      backgroundColor: submitPOStatus ? '#22C55E' : 'transparent',
+                      border: submitPOStatus ? 'none' : '2px solid #9CA3AF',
+                    }}
+                  />
+                </div>
+                {/* RECEIVE PO Circle */}
+                <div className="px-6 py-3 flex items-center justify-center">
+                  <div
+                    style={{
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '50%',
+                      backgroundColor: receivePOStatus ? '#22C55E' : 'transparent',
+                      border: receivePOStatus ? 'none' : '2px solid #9CA3AF',
+                    }}
+                  />
+                </div>
+                <div className="px-6 py-3 flex items-center justify-end relative">
+                  <button
+                    type="button"
+                    className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                    style={{
+                      color: '#6B7280',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    aria-label="Archived order actions"
+                  >
+                    <span className={themeClasses.textSecondary}>⋮</span>
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center" style={{ 
-                textAlign: 'left', 
-                width: '222px',
-                height: '40px',
-                paddingTop: '12px',
-                paddingRight: '16px',
-                paddingBottom: '12px',
-                paddingLeft: '16px',
-                gap: '10px',
-              }}>
-                <span style={{ textAlign: 'left', fontSize: '14px', color: '#374151' }}>{order.supplier}</span>
-              </div>
-              {/* ADD PRODUCTS status - always green for archived orders */}
-              <div className="flex items-center justify-center" style={{ padding: '12px 8px', height: '40px' }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="12" cy="12" r="8" fill="#22C55E"/>
-                </svg>
-              </div>
-              {/* SUBMIT PO status - always green for archived orders */}
-              <div className="flex items-center justify-center" style={{ padding: '12px 8px', height: '40px' }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="12" cy="12" r="8" fill="#22C55E"/>
-                </svg>
-              </div>
-              {/* RECEIVE PO status - always green for archived orders */}
-              <div className="flex items-center justify-center" style={{ padding: '12px 8px', height: '40px' }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="12" cy="12" r="8" fill="#22C55E"/>
-                </svg>
-              </div>
-              <div className="flex items-center justify-end relative" style={{ paddingRight: '16px', paddingLeft: '0px', paddingTop: '12px', paddingBottom: '12px', height: '40px', width: '100%', boxSizing: 'border-box' }}>
-                <button
-                  type="button"
-                  className="p-1 rounded-full hover:bg-gray-100 transition-colors"
-                  style={{
-                    color: '#6B7280',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                  aria-label="Archived order actions"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="12" cy="6" r="1.5" fill="currentColor"/>
-                    <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
-                    <circle cx="12" cy="18" r="1.5" fill="currentColor"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
