@@ -754,7 +754,7 @@ const NewShipment = () => {
   });
 
   return (
-    <div className={`min-h-screen ${themeClasses.pageBg}`} style={{ paddingBottom: (activeAction === 'add-products' || activeAction === 'formula-check' || activeAction === 'label-check' || activeAction === 'book-shipment') ? '100px' : '0px' }}>
+    <div className={`min-h-screen ${themeClasses.pageBg}`} style={{ paddingBottom: (activeAction === 'add-products' || activeAction === 'formula-check' || activeAction === 'label-check' || activeAction === 'book-shipment' || activeAction === 'sort-products' || activeAction === 'sort-formulas') ? '100px' : '0px' }}>
       <NewShipmentHeader
         tableMode={tableMode}
         onTableModeToggle={() => setTableMode(!tableMode)}
@@ -1292,7 +1292,7 @@ const NewShipment = () => {
         )}
       </div>
 
-      {(activeAction === 'add-products' || activeAction === 'formula-check' || activeAction === 'label-check' || activeAction === 'book-shipment') && (
+      {(activeAction === 'add-products' || activeAction === 'formula-check' || activeAction === 'label-check' || activeAction === 'book-shipment' || activeAction === 'sort-products' || activeAction === 'sort-formulas') && (
         <div
           style={{
             position: 'fixed',
@@ -1513,6 +1513,42 @@ const NewShipment = () => {
                   }}
                 >
                   Book Shipment
+                </button>
+              </div>
+            </>
+          ) : (activeAction === 'sort-products' || activeAction === 'sort-formulas') ? (
+            /* Sort Products / Sort Formulas Footer */
+            <>
+              <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
+                {/* Empty left side */}
+              </div>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={handleCompleteClick}
+                  style={{
+                    height: '38px',
+                    padding: '0 24px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    backgroundColor: '#007AFF',
+                    color: '#FFFFFF',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#0056CC';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#007AFF';
+                  }}
+                >
+                  Complete
                 </button>
               </div>
             </>
