@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 
-const ExportTemplateModal = ({ isOpen, onClose, onExport }) => {
+const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck }) => {
   const { isDarkMode } = useTheme();
   const [selectedType, setSelectedType] = useState(null);
+  const [showExportComplete, setShowExportComplete] = useState(false);
 
   if (!isOpen) return null;
 
@@ -72,11 +73,188 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport }) => {
   ];
 
   const handleExport = () => {
-    if (selectedType && onExport) {
-      onExport(selectedType);
+    if (selectedType) {
+      setShowExportComplete(true);
     }
+  };
+
+  const handleClose = () => {
+    setShowExportComplete(false);
+    setSelectedType(null);
     onClose();
   };
+
+  const handleBeginFormulaCheck = () => {
+    if (onExport) {
+      onExport(selectedType);
+    }
+    if (onBeginFormulaCheck) {
+      onBeginFormulaCheck();
+    }
+    setShowExportComplete(false);
+    setSelectedType(null);
+    onClose();
+  };
+
+  // Export Complete Popup
+  if (showExportComplete) {
+    return (
+      <>
+        {/* Backdrop */}
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 9998,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onClick={handleClose}
+        >
+          {/* Export Complete Modal */}
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '12px',
+              width: '320px',
+              border: '1px solid #E5E7EB',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              zIndex: 9999,
+              position: 'relative',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={handleClose}
+              style={{
+                position: 'absolute',
+                top: '12px',
+                right: '12px',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#9CA3AF',
+                width: '24px',
+                height: '24px',
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            {/* Content */}
+            <div style={{
+              padding: '32px 24px 24px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px',
+            }}>
+              {/* Green checkmark icon */}
+              <div style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '50%',
+                backgroundColor: '#10B981',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M5 12L10 17L19 8" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+
+              {/* Title */}
+              <h2 style={{
+                fontSize: '20px',
+                fontWeight: 600,
+                color: '#111827',
+                margin: 0,
+                textAlign: 'center',
+              }}>
+                Export Complete!
+              </h2>
+            </div>
+
+            {/* Footer buttons */}
+            <div style={{
+              padding: '16px 24px',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: '12px',
+            }}>
+              {/* Close button */}
+              <button
+                type="button"
+                onClick={handleClose}
+                style={{
+                  padding: '8px 20px',
+                  borderRadius: '6px',
+                  border: '1px solid #D1D5DB',
+                  backgroundColor: '#FFFFFF',
+                  color: '#374151',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#F9FAFB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                }}
+              >
+                Close
+              </button>
+
+              {/* Begin Formula Check button */}
+              <button
+                type="button"
+                onClick={handleBeginFormulaCheck}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: '#3B82F6',
+                  color: '#FFFFFF',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#2563EB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#3B82F6';
+                }}
+              >
+                Begin Formula Check
+              </button>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -94,7 +272,7 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport }) => {
           alignItems: 'center',
           justifyContent: 'center',
         }}
-        onClick={onClose}
+        onClick={handleClose}
       >
         {/* Modal */}
         <div
@@ -136,7 +314,7 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport }) => {
             </h2>
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               style={{
                 background: 'transparent',
                 border: 'none',
@@ -263,8 +441,8 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport }) => {
               onClick={handleExport}
               disabled={!selectedType}
               style={{
-                padding: '0',
-                borderRadius: '4px',
+                padding: '0 10px',
+                borderRadius: '6px',
                 border: 'none',
                 backgroundColor: selectedType ? '#3B82F6' : '#9CA3AF',
                 color: '#FFFFFF',
@@ -272,7 +450,6 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport }) => {
                 fontWeight: 500,
                 cursor: selectedType ? 'pointer' : 'not-allowed',
                 transition: 'background-color 0.2s',
-                width: '70px',
                 height: '31px',
                 display: 'flex',
                 alignItems: 'center',
@@ -290,7 +467,7 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport }) => {
                 }
               }}
             >
-              Export
+              Export for Upload
             </button>
           </div>
         </div>

@@ -8,6 +8,8 @@ const SortProductsTable = () => {
   const [lockedProductIds, setLockedProductIds] = useState(() => new Set());
   const [openFilterColumn, setOpenFilterColumn] = useState(null);
   const filterIconRefs = useRef({});
+  const [filters, setFilters] = useState({});
+  const [sortConfig, setSortConfig] = useState({});
 
   // Sample data matching the image
   const [products, setProducts] = useState([
@@ -133,14 +135,26 @@ const SortProductsTable = () => {
       return;
     }
 
+    // Work with filtered products for display, but update the original products array
+    const filteredList = filteredProducts;
+    const draggedItem = filteredList[draggedIndex];
+    const dropItem = filteredList[dropIndex];
+    
+    // Find these items in the original products array
+    const draggedOriginalIndex = products.findIndex(p => p.id === draggedItem.id);
+    const dropOriginalIndex = products.findIndex(p => p.id === dropItem.id);
+    
     const newProducts = [...products];
-    const draggedItem = newProducts[draggedIndex];
     
     // Remove the dragged item
-    newProducts.splice(draggedIndex, 1);
+    newProducts.splice(draggedOriginalIndex, 1);
+    
+    // Find new position after removal
+    const newDropIndex = newProducts.findIndex(p => p.id === dropItem.id);
+    const insertIndex = draggedOriginalIndex < dropOriginalIndex ? newDropIndex + 1 : newDropIndex;
     
     // Insert it at the new position
-    newProducts.splice(dropIndex, 0, draggedItem);
+    newProducts.splice(insertIndex, 0, draggedItem);
     
     setProducts(newProducts);
     setDraggedIndex(null);
@@ -168,6 +182,102 @@ const SortProductsTable = () => {
     event.stopPropagation();
     setOpenFilterColumn((prev) => (prev === columnKey ? null : columnKey));
   };
+
+  const handleApplyFilter = (columnKey, filterData) => {
+    setFilters(prev => ({
+      ...prev,
+      [columnKey]: filterData,
+    }));
+    setSortConfig(prev => ({
+      ...prev,
+      [columnKey]: filterData.sortOrder,
+    }));
+    setOpenFilterColumn(null);
+  };
+
+  // Get unique values for a column
+  const getColumnValues = (columnKey) => {
+    const values = new Set();
+    products.forEach(product => {
+      if (product[columnKey]) {
+        values.add(product[columnKey]);
+      }
+    });
+    return Array.from(values).sort();
+  };
+
+  // Apply filters and sorting to products
+  // Locked items maintain their positions and are not affected by filters/sorting
+  // Unlocked items are filtered and sorted, filling in the gaps
+  const getFilteredAndSortedProducts = () => {
+    // Separate locked and unlocked products
+    const lockedProducts = [];
+    const unlockedProducts = [];
+    
+    products.forEach((product, index) => {
+      if (lockedProductIds.has(product.id)) {
+        lockedProducts.push({ product, originalIndex: index });
+      } else {
+        unlockedProducts.push(product);
+      }
+    });
+
+    // Apply filters to unlocked products only
+    let filteredUnlocked = [...unlockedProducts];
+    
+    Object.keys(filters).forEach(columnKey => {
+      const filter = filters[columnKey];
+      
+      // Apply value filters (checkbox selections)
+      if (filter.selectedValues && filter.selectedValues.size > 0) {
+        filteredUnlocked = filteredUnlocked.filter(product => {
+          return filter.selectedValues.has(product[columnKey]);
+        });
+      }
+    });
+
+    // Apply sorting to unlocked products only
+    const sortColumn = Object.keys(sortConfig).find(key => sortConfig[key]);
+    if (sortColumn && sortConfig[sortColumn]) {
+      filteredUnlocked.sort((a, b) => {
+        const aVal = a[sortColumn];
+        const bVal = b[sortColumn];
+        
+        // Handle numeric values
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+          return sortConfig[sortColumn] === 'asc' ? aVal - bVal : bVal - aVal;
+        }
+        
+        // Handle string values
+        const aStr = String(aVal || '').toLowerCase();
+        const bStr = String(bVal || '').toLowerCase();
+        
+        if (sortConfig[sortColumn] === 'asc') {
+          return aStr.localeCompare(bStr);
+        } else {
+          return bStr.localeCompare(aStr);
+        }
+      });
+    }
+
+    // Rebuild the array: locked items at their original positions, unlocked items fill the rest
+    const result = [];
+    let unlockedIndex = 0;
+    
+    for (let i = 0; i < products.length; i++) {
+      const lockedItem = lockedProducts.find(lp => lp.originalIndex === i);
+      if (lockedItem) {
+        result.push(lockedItem.product);
+      } else if (unlockedIndex < filteredUnlocked.length) {
+        result.push(filteredUnlocked[unlockedIndex]);
+        unlockedIndex++;
+      }
+    }
+
+    return result;
+  };
+
+  const filteredProducts = getFilteredAndSortedProducts();
 
   return (
     <div style={{
@@ -241,7 +351,7 @@ const SortProductsTable = () => {
 
           {/* Body */}
           <tbody>
-            {products.map((product, index) => (
+            {filteredProducts.map((product, index) => (
               <tr
                 key={product.id}
                 onDragOver={(e) => handleDragOver(e, index)}
@@ -466,6 +576,10 @@ const SortProductsTable = () => {
         <SortProductsFilterDropdown
           filterIconRef={filterIconRefs.current[openFilterColumn]}
           columnKey={openFilterColumn}
+          availableValues={getColumnValues(openFilterColumn)}
+          currentFilter={filters[openFilterColumn] || {}}
+          currentSort={sortConfig[openFilterColumn] || ''}
+          onApply={(filterData) => handleApplyFilter(openFilterColumn, filterData)}
           onClose={() => setOpenFilterColumn(null)}
         />
       )}

@@ -1,15 +1,24 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const SortFormulasCompleteModal = ({ isOpen, onClose }) => {
+const SortFormulasCompleteModal = ({ isOpen, onClose, onGoToShipments, shipmentData }) => {
   const navigate = useNavigate();
 
   if (!isOpen) return null;
 
   const handleGoToShipments = () => {
+    // Call the parent handler to save data
+    if (onGoToShipments) {
+      onGoToShipments();
+    }
     onClose();
-    // Return to the Planning table view inside the dashboard shell
-    navigate('/dashboard/production/planning');
+    // Return to the Planning table view inside the dashboard shell with shipment info
+    navigate('/dashboard/production/planning', { 
+      state: { 
+        showBookedToast: true,
+        shipmentInfo: shipmentData 
+      } 
+    });
   };
 
   return (

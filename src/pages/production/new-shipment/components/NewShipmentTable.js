@@ -206,22 +206,12 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
     const newAdded = new Set(addedRows);
     
     if (newAdded.has(row.id)) {
-      // Remove from added - clear qty
+      // Remove from added - keep the qty value (don't clear it)
       newAdded.delete(row.id);
-      effectiveSetQtyValues(prev => ({
-        ...prev,
-        [index]: ''
-      }));
     } else {
-      // Add - don't auto-populate, let user type
+      // Add - just mark as added, don't change qty value
+      // User should have already entered qty before clicking Add
       newAdded.add(row.id);
-      // Only set if qtyValues[index] is undefined, otherwise keep existing value
-      if (effectiveQtyValues[index] === undefined || effectiveQtyValues[index] === null) {
-        effectiveSetQtyValues(prev => ({
-          ...prev,
-          [index]: ''
-        }));
-      }
     }
     setAddedRows(newAdded);
     // Notify parent component of added rows change
@@ -547,6 +537,13 @@ Current Inventory:
                     <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }}>
                       <input
                         type="number"
+                        step={(() => {
+                          const size = row.size?.toLowerCase() || '';
+                          if (size.includes('8oz')) return 60;
+                          if (size.includes('quart')) return 12;
+                          if (size.includes('gallon')) return 4;
+                          return 1;
+                        })()}
                         value={effectiveQtyValues[index] !== undefined && effectiveQtyValues[index] !== null && effectiveQtyValues[index] !== '' ? String(effectiveQtyValues[index]) : ''}
                         onChange={(e) => {
                           const inputValue = e.target.value;
@@ -559,9 +556,22 @@ Current Inventory:
                           } else {
                             const numValue = parseInt(inputValue, 10);
                             if (!isNaN(numValue) && numValue >= 0) {
+                              // Determine increment based on size
+                              let increment = 1;
+                              const size = row.size?.toLowerCase() || '';
+                              if (size.includes('8oz')) {
+                                increment = 60;
+                              } else if (size.includes('quart')) {
+                                increment = 12;
+                              } else if (size.includes('gallon')) {
+                                increment = 4;
+                              }
+                              
+                              // Round immediately as user types
+                              const rounded = Math.round(numValue / increment) * increment;
                               effectiveSetQtyValues(prev => ({
                                 ...prev,
-                                [index]: numValue
+                                [index]: rounded > 0 ? rounded : increment
                               }));
                             }
                           }
@@ -1571,6 +1581,13 @@ Current Inventory:
                           if (el) qtyInputRefs.current[index] = el;
                         }}
                         type="number"
+                        step={(() => {
+                          const size = row.size?.toLowerCase() || '';
+                          if (size.includes('8oz')) return 60;
+                          if (size.includes('quart')) return 12;
+                          if (size.includes('gallon')) return 4;
+                          return 1;
+                        })()}
                         data-row-index={index}
                         value={effectiveQtyValues[index] !== undefined && effectiveQtyValues[index] !== null && effectiveQtyValues[index] !== '' ? String(effectiveQtyValues[index]) : (effectiveQtyValues[index] === '' ? '' : '0')}
                         onChange={(e) => {
@@ -1583,22 +1600,63 @@ Current Inventory:
                             }));
                           } else {
                             const newValue = parseInt(inputValue, 10);
-                            if (!isNaN(newValue)) {
+                            if (!isNaN(newValue) && newValue >= 0) {
+                              // Determine increment based on size
+                              let increment = 1;
+                              const size = row.size?.toLowerCase() || '';
+                              if (size.includes('8oz')) {
+                                increment = 60;
+                              } else if (size.includes('quart')) {
+                                increment = 12;
+                              } else if (size.includes('gallon')) {
+                                increment = 4;
+                              }
+                              
+                              // Round immediately as user types
+                              const rounded = Math.round(newValue / increment) * increment;
                               effectiveSetQtyValues(prev => ({
                                 ...prev,
-                                [index]: newValue
+                                [index]: rounded > 0 ? rounded : increment
                               }));
                             }
                           }
                         }}
                         onBlur={(e) => {
+                          const currentValue = effectiveQtyValues[index];
+                          
                           // Set default value if empty on blur
-                          if (effectiveQtyValues[index] === '' || effectiveQtyValues[index] === null || effectiveQtyValues[index] === undefined) {
+                          if (currentValue === '' || currentValue === null || currentValue === undefined) {
                             effectiveSetQtyValues(prev => ({
                               ...prev,
                               [index]: 0
                             }));
+                          } else {
+                            // Round to nearest multiple based on size
+                            const numValue = typeof currentValue === 'number' ? currentValue : parseInt(currentValue, 10);
+                            if (!isNaN(numValue) && numValue > 0) {
+                              // Determine increment based on size
+                              let increment = 0;
+                              const size = row.size?.toLowerCase() || '';
+                              if (size.includes('8oz')) {
+                                increment = 60;
+                              } else if (size.includes('quart')) {
+                                increment = 12;
+                              } else if (size.includes('gallon')) {
+                                increment = 4;
+                              }
+                              
+                              // Round to nearest multiple of increment
+                              if (increment > 0) {
+                                const rounded = Math.round(numValue / increment) * increment;
+                                // Always set the rounded value
+                                effectiveSetQtyValues(prev => ({
+                                  ...prev,
+                                  [index]: rounded > 0 ? rounded : increment
+                                }));
+                              }
+                            }
                           }
+                          
                           // Close popup if open when blurring
                           if (clickedQtyIndex === index) {
                             setClickedQtyIndex(null);

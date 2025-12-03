@@ -120,33 +120,6 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
 
   if (!isOpen) return null;
 
-  const handleSaveAndExit = () => {
-    if (onSave) {
-      // Parse shipment name back to separate name and type
-      const parts = editableData.shipmentName.trim().split(' ');
-      // If there are multiple parts, the last is the type and the rest is the name
-      // If only one part, it's the name and we use the existing shipmentType
-      const name = parts.length > 1 ? parts.slice(0, -1).join(' ') : parts[0];
-      const type = parts.length > 1 ? parts[parts.length - 1] : (shipmentData?.shipmentType || editableData.shipmentType || 'AWD');
-      
-      onSave({
-        shipmentNumber: name, // Use shipmentNumber (backend expects this)
-        shipmentDate: shipmentData?.shipmentDate || new Date().toISOString().split('T')[0], // YYYY-MM-DD format
-        shipmentType: type,
-        marketplace: shipmentData?.marketplace || 'Amazon',
-        account: shipmentData?.account || 'TPS Nutrients',
-        location: editableData.shipTo || '', // Use shipTo as location
-        amazonShipmentNumber: editableData.amazonShipmentNumber,
-        amazonRefId: editableData.amazonRefId,
-        shipping: editableData.shipping,
-        shipFrom: editableData.shipFrom,
-        shipTo: editableData.shipTo,
-        carrier: editableData.carrier,
-      });
-    }
-    onClose();
-  };
-
   const handleBookAndProceed = () => {
     // Validate that products have been added
     if (totalUnits === 0) {
@@ -787,29 +760,6 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
               Cancel
             </button>
             <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
-              <button
-                type="button"
-                onClick={handleSaveAndExit}
-                style={{
-                  padding: '6px 16px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  backgroundColor: 'transparent',
-                  color: '#3B82F6',
-                  fontSize: '13px',
-              fontWeight: 500,
-              cursor: 'pointer',
-                  transition: 'all 0.2s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-            }}
-          >
-                Save and Exit
-          </button>
           <button
             type="button"
                 onClick={handleBookAndProceed}
@@ -831,7 +781,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                   e.currentTarget.style.backgroundColor = '#3B82F6';
             }}
           >
-                Book and Proceed
+                Save Changes
           </button>
             </div>
           </div>

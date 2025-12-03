@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useTheme } from '../../../context/ThemeContext';
 import PlanningHeader from './components/PlanningHeader';
 import PlanningTable from './components/PlanningTable';
@@ -9,6 +10,7 @@ import { getAllShipments, createShipment } from '../../../services/productionApi
 
 const Planning = () => {
   const { isDarkMode } = useTheme();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState('shipments');
   const [activeFilters, setActiveFilters] = useState([]);
   const [showNewShipmentModal, setShowNewShipmentModal] = useState(false);
@@ -20,6 +22,8 @@ const Planning = () => {
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showBookedToast, setShowBookedToast] = useState(false);
+  const [bookedShipmentInfo, setBookedShipmentInfo] = useState(null);
 
   // State for planning table rows
   const [rows, setRows] = useState([
@@ -32,6 +36,7 @@ const Planning = () => {
       addProducts: 'completed',
       formulaCheck: 'completed',
       labelCheck: 'in progress',
+      bookShipment: 'pending',
       sortProducts: 'pending',
       sortFormulas: 'pending',
     },
@@ -44,6 +49,7 @@ const Planning = () => {
       addProducts: 'completed',
       formulaCheck: 'pending',
       labelCheck: 'pending',
+      bookShipment: 'pending',
       sortProducts: 'pending',
       sortFormulas: 'pending',
     },
@@ -56,6 +62,7 @@ const Planning = () => {
       addProducts: 'completed',
       formulaCheck: 'completed',
       labelCheck: 'completed',
+      bookShipment: 'completed',
       sortProducts: 'completed',
       sortFormulas: 'completed',
     },
@@ -68,6 +75,7 @@ const Planning = () => {
       addProducts: 'completed',
       formulaCheck: 'completed',
       labelCheck: 'completed',
+      bookShipment: 'completed',
       sortProducts: 'completed',
       sortFormulas: 'in progress',
     },
@@ -80,6 +88,7 @@ const Planning = () => {
       addProducts: 'in progress',
       formulaCheck: 'pending',
       labelCheck: 'pending',
+      bookShipment: 'pending',
       sortProducts: 'pending',
       sortFormulas: 'pending',
     },
@@ -88,6 +97,21 @@ const Planning = () => {
   const themeClasses = {
     pageBg: isDarkMode ? 'bg-dark-bg-primary' : 'bg-light-bg-primary',
   };
+
+  // Check for navigation state to show booked toast
+  useEffect(() => {
+    if (location.state?.showBookedToast && location.state?.shipmentInfo) {
+      setShowBookedToast(true);
+      setBookedShipmentInfo(location.state.shipmentInfo);
+      
+      // Auto-dismiss after 5 seconds
+      const timer = setTimeout(() => {
+        setShowBookedToast(false);
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [location.state]);
 
   // Fetch shipments from API
   useEffect(() => {
@@ -112,6 +136,7 @@ const Planning = () => {
         addProducts: shipment.add_products_completed ? 'completed' : 'pending',
         formulaCheck: shipment.formula_check_completed ? 'completed' : 'pending',
         labelCheck: shipment.label_check_completed ? 'completed' : 'pending',
+        bookShipment: shipment.book_shipment_completed ? 'completed' : 'pending',
         sortProducts: shipment.sort_products_completed ? 'completed' : 'pending',
         sortFormulas: shipment.sort_formulas_completed ? 'completed' : 'pending',
       }));
@@ -131,6 +156,7 @@ const Planning = () => {
       'add_products': 'Add Products',
       'formula_check': 'Formula Check',
       'label_check': 'Label Check',
+      'book_shipment': 'Book Shipment',
       'sort_products': 'Sort Products',
       'sort_formulas': 'Sort Formulas',
       'manufacturing': 'Manufacturing',
@@ -186,19 +212,21 @@ const Planning = () => {
 
   // Use shipments from API instead of dummy data
   
-  // Check for completed label check rows from localStorage
+  // Check for completed shipment data from localStorage
   useEffect(() => {
     console.log('Planning page mounted/activeTab changed:', activeTab);
     
     const checkForCompletedRows = () => {
       console.log('Checking localStorage for completed rows...');
+      
+      // Check for completed label check
       const completedLabelCheck = localStorage.getItem('labelCheckCompletedRows');
-      console.log('localStorage value:', completedLabelCheck);
+      console.log('localStorage labelCheckCompletedRows:', completedLabelCheck);
       
       if (completedLabelCheck) {
         try {
           const data = JSON.parse(completedLabelCheck);
-          console.log('Parsed data:', data);
+          console.log('Parsed label check data:', data);
           const { rows: completedRows, shipmentData } = data;
           
           console.log('Found completed label check rows:', completedRows?.length);
@@ -220,6 +248,7 @@ const Planning = () => {
               addProducts: 'completed',
               formulaCheck: 'completed',
               labelCheck: 'completed',
+              bookShipment: 'pending',
               sortProducts: 'pending',
               sortFormulas: 'pending',
               completedRows: completedRows,
@@ -254,8 +283,71 @@ const Planning = () => {
           console.error('Error processing completed label check:', error);
           localStorage.removeItem('labelCheckCompletedRows');
         }
-      } else {
-        console.log('No data found in localStorage');
+      }
+      
+      // Check for completed sort formulas
+      const completedSortFormulas = localStorage.getItem('sortFormulasCompleted');
+      console.log('localStorage sortFormulasCompleted:', completedSortFormulas);
+      
+      if (completedSortFormulas) {
+        try {
+          const data = JSON.parse(completedSortFormulas);
+          console.log('Parsed sort formulas data:', data);
+          const { shipmentData, shipmentId } = data;
+          
+          console.log('Found completed sort formulas for shipment:', shipmentId);
+          console.log('Shipment data:', shipmentData);
+          
+          if (shipmentData) {
+            // Update or create shipment entry with all stages completed
+            const shipmentDate = new Date().toISOString().split('T')[0];
+            const shipmentType = shipmentData?.shipmentType || 'AWD';
+            const shipmentNumber = shipmentData?.shipmentNumber || `${shipmentDate} ${shipmentType}`;
+            
+            const completedShipmentRow = {
+              id: shipmentId || Date.now(),
+              status: 'Ready for Pickup',
+              shipment: shipmentNumber,
+              marketplace: shipmentData?.marketplace || 'Amazon',
+              account: shipmentData?.account || 'TPS',
+              addProducts: 'completed',
+              formulaCheck: 'completed',
+              labelCheck: 'completed',
+              bookShipment: 'completed',
+              sortProducts: 'completed',
+              sortFormulas: 'completed',
+            };
+            
+            console.log('Adding/updating shipment row:', completedShipmentRow);
+            
+            // Add or update in the rows array
+            setRows(prev => {
+              console.log('Current rows before updating:', prev.length);
+              // Check if this shipment already exists
+              const existingIndex = prev.findIndex(row => 
+                row.shipment === completedShipmentRow.shipment || row.id === shipmentId
+              );
+              
+              if (existingIndex >= 0) {
+                console.log('Shipment exists, updating it');
+                const newRows = [...prev];
+                newRows[existingIndex] = completedShipmentRow;
+                return newRows;
+              } else {
+                console.log('Shipment does not exist, adding it');
+                const newRows = [completedShipmentRow, ...prev];
+                return newRows;
+              }
+            });
+            
+            // Clear localStorage after processing
+            localStorage.removeItem('sortFormulasCompleted');
+            console.log('Cleared sortFormulasCompleted from localStorage');
+          }
+        } catch (error) {
+          console.error('Error processing completed sort formulas:', error);
+          localStorage.removeItem('sortFormulasCompleted');
+        }
       }
     };
     
@@ -317,6 +409,108 @@ const Planning = () => {
           <ArchiveTable rows={shipments.filter(s => s.status === 'archived')} />
         )}
       </div>
+
+      {/* Toast Notification for Shipment Booked */}
+      {showBookedToast && bookedShipmentInfo && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '24px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 10000,
+            animation: 'slideDown 0.3s ease-out',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              backgroundColor: '#FFFFFF',
+              border: '1px solid #D1FAE5',
+              borderRadius: '12px',
+              padding: '12px 20px',
+              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+              minWidth: '400px',
+            }}
+          >
+            {/* Green checkmark icon */}
+            <div
+              style={{
+                width: '28px',
+                height: '28px',
+                borderRadius: '50%',
+                backgroundColor: '#10B981',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="3">
+                <polyline points="20 6 9 17 4 12" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+
+            {/* Message text */}
+            <div style={{ flex: 1 }}>
+              <span style={{
+                fontSize: '15px',
+                fontWeight: 600,
+                color: '#10B981',
+              }}>
+                {bookedShipmentInfo.shipmentNumber || bookedShipmentInfo.shipmentName} {bookedShipmentInfo.shipmentType}
+              </span>
+              <span style={{
+                fontSize: '15px',
+                fontWeight: 400,
+                color: '#6B7280',
+                marginLeft: '6px',
+              }}>
+                shipment order booked
+              </span>
+            </div>
+
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={() => setShowBookedToast(false)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#9CA3AF',
+                flexShrink: 0,
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add keyframes animation */}
+      <style>
+        {`
+          @keyframes slideDown {
+            from {
+              opacity: 0;
+              transform: translateX(-50%) translateY(-20px);
+            }
+            to {
+              opacity: 1;
+              transform: translateX(-50%) translateY(0);
+            }
+          }
+        `}
+      </style>
     </div>
   );
 };

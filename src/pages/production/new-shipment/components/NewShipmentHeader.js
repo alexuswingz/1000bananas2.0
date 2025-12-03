@@ -197,91 +197,77 @@ const NewShipmentHeader = ({ tableMode, onTableModeToggle, onReviewShipmentClick
                 </div>
               </div>
             )}
-            <div style={{ height: '40px' }}> {/* Spacer */}
-              <div style={{ 
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}>
-              <div style={{display: 'none'}}>
-                </div>
-                <div style={{ position: 'relative' }}>
-                  <button
-                    ref={buttonRef}
-                    type="button"
-                    onClick={handleThreeDotsClick}
+            {activeAction === 'add-products' && (
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <button
+                  ref={buttonRef}
+                  type="button"
+                  onClick={handleThreeDotsClick}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                    transition: 'opacity 0.2s',
+                  }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="5" r="1" fill="currentColor"/>
+                    <circle cx="12" cy="12" r="1" fill="currentColor"/>
+                    <circle cx="12" cy="19" r="1" fill="currentColor"/>
+                  </svg>
+                </button>
+
+                {/* Dropdown Menu */}
+                {showDropdown && (
+                  <div
+                    ref={dropdownRef}
                     style={{
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: '4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                      transition: 'opacity 0.2s',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.opacity = '1';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.opacity = '1';
+                      position: 'absolute',
+                      top: '100%',
+                      right: 0,
+                      marginTop: '8px',
+                      backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                      border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                      borderRadius: '8px',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                      minWidth: '160px',
+                      zIndex: 1000,
+                      overflow: 'hidden',
                     }}
                   >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="12" cy="5" r="1" fill="currentColor"/>
-                      <circle cx="12" cy="12" r="1" fill="currentColor"/>
-                      <circle cx="12" cy="19" r="1" fill="currentColor"/>
-                    </svg>
-                  </button>
-
-                  {/* Dropdown Menu */}
-                  {showDropdown && (
-                    <div
-                      ref={dropdownRef}
+                    <button
+                      type="button"
+                      onClick={handleShipmentDetailsClick}
                       style={{
-                        position: 'absolute',
-                        top: '100%',
-                        right: 0,
-                        marginTop: '8px',
-                        backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-                        border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
-                        borderRadius: '8px',
-                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                        minWidth: '160px',
-                        zIndex: 1000,
-                        overflow: 'hidden',
+                        width: '100%',
+                        padding: '10px 16px',
+                        textAlign: 'left',
+                        background: 'transparent',
+                        border: 'none',
+                        color: isDarkMode ? '#E5E7EB' : '#374151',
+                        fontSize: '14px',
+                        fontWeight: 400,
+                        cursor: 'pointer',
+                        transition: 'background-color 0.2s',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
                       }}
                     >
-                      <button
-                        type="button"
-                        onClick={handleShipmentDetailsClick}
-                        style={{
-                          width: '100%',
-                          padding: '10px 16px',
-                          textAlign: 'left',
-                          background: 'transparent',
-                          border: 'none',
-                          color: isDarkMode ? '#E5E7EB' : '#374151',
-                          fontSize: '14px',
-                          fontWeight: 400,
-                          cursor: 'pointer',
-                          transition: 'background-color 0.2s',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                        }}
-                      >
-                        Shipment Details
-                      </button>
-                    </div>
-                  )}
-                </div>
+                      Shipment Details
+                    </button>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -346,19 +332,312 @@ const NewShipmentHeader = ({ tableMode, onTableModeToggle, onReviewShipmentClick
             }}
             aria-label="Settings"
           >
-            <svg 
-              style={{ width: '20px', height: '20px' }} 
-              className={isDarkMode ? 'text-white' : 'text-gray-900'}
-              fill="none" 
-              stroke="currentColor" 
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
+            <img
+              src="/assets/Icon Button.png"
+              alt="Settings"
+              style={{
+                width: '19.45px',
+                height: '20px',
+                marginTop: '2px',
+                marginLeft: '2.27px',
+              }}
+            />
           </button>
             </>
-          ) : (activeAction === 'sort-products' || activeAction === 'sort-formulas' || activeAction === 'formula-check' || activeAction === 'label-check') ? (
+          ) : activeAction === 'formula-check' ? (
+            <>
+              {/* Settings/Gear Icon */}
+              <button
+                type="button"
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                aria-label="Settings"
+              >
+                <img
+                  src="/assets/Icon Button.png"
+                  alt="Settings"
+                  style={{
+                    width: '19.45px',
+                    height: '20px',
+                    marginTop: '2px',
+                    marginLeft: '2.27px',
+                  }}
+                />
+              </button>
+
+              {/* Three Dots Menu for Formula Check */}
+              <div style={{ position: 'relative' }}>
+                <button
+                  ref={buttonRef}
+                  type="button"
+                  onClick={handleThreeDotsClick}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                    transition: 'opacity 0.2s',
+                  }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="5" r="1" fill="currentColor"/>
+                    <circle cx="12" cy="12" r="1" fill="currentColor"/>
+                    <circle cx="12" cy="19" r="1" fill="currentColor"/>
+                  </svg>
+                </button>
+
+                {/* Dropdown Menu */}
+                {showDropdown && (
+                  <div
+                    ref={dropdownRef}
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      right: 0,
+                      marginTop: '8px',
+                      backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                      border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                      borderRadius: '8px',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                      minWidth: '160px',
+                      zIndex: 1000,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={handleShipmentDetailsClick}
+                      style={{
+                        width: '100%',
+                        padding: '10px 16px',
+                        textAlign: 'left',
+                        background: 'transparent',
+                        border: 'none',
+                        color: isDarkMode ? '#E5E7EB' : '#374151',
+                        fontSize: '14px',
+                        fontWeight: 400,
+                        cursor: 'pointer',
+                        transition: 'background-color 0.2s',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      Shipment Details
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : activeAction === 'label-check' ? (
+            <>
+              {/* Settings/Gear Icon */}
+              <button
+                type="button"
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                aria-label="Settings"
+              >
+                <img 
+                  src="/assets/Icon Button.png" 
+                  alt="Settings"
+                  style={{ width: '19.45px', height: '20px' }}
+                />
+              </button>
+
+              {/* Three Dots Menu for Label Check */}
+              <div style={{ position: 'relative' }}>
+                <button
+                  ref={buttonRef}
+                  type="button"
+                  onClick={handleThreeDotsClick}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                    transition: 'opacity 0.2s',
+                  }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="5" r="1" fill="currentColor"/>
+                    <circle cx="12" cy="12" r="1" fill="currentColor"/>
+                    <circle cx="12" cy="19" r="1" fill="currentColor"/>
+                  </svg>
+                </button>
+
+                {/* Dropdown Menu */}
+                {showDropdown && (
+                  <div
+                    ref={dropdownRef}
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      right: 0,
+                      marginTop: '8px',
+                      backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                      border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                      borderRadius: '8px',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                      minWidth: '160px',
+                      zIndex: 1000,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={handleShipmentDetailsClick}
+                      style={{
+                        width: '100%',
+                        padding: '10px 16px',
+                        textAlign: 'left',
+                        background: 'transparent',
+                        border: 'none',
+                        color: isDarkMode ? '#E5E7EB' : '#374151',
+                        fontSize: '14px',
+                        fontWeight: 400,
+                        cursor: 'pointer',
+                        transition: 'background-color 0.2s',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      Shipment Details
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : activeAction === 'book-shipment' ? (
+            <>
+              {/* Settings/Gear Icon */}
+              <button
+                type="button"
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                aria-label="Settings"
+              >
+                <img 
+                  src="/assets/Icon Button.png" 
+                  alt="Settings"
+                  style={{ width: '19.45px', height: '20px' }}
+                />
+              </button>
+
+              {/* Three Dots Menu for Book Shipment */}
+              <div style={{ position: 'relative' }}>
+                <button
+                  ref={buttonRef}
+                  type="button"
+                  onClick={handleThreeDotsClick}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                    transition: 'opacity 0.2s',
+                  }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="5" r="1" fill="currentColor"/>
+                    <circle cx="12" cy="12" r="1" fill="currentColor"/>
+                    <circle cx="12" cy="19" r="1" fill="currentColor"/>
+                  </svg>
+                </button>
+
+                {/* Dropdown Menu */}
+                {showDropdown && (
+                  <div
+                    ref={dropdownRef}
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      right: 0,
+                      marginTop: '8px',
+                      backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                      border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                      borderRadius: '8px',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                      minWidth: '160px',
+                      zIndex: 1000,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={handleShipmentDetailsClick}
+                      style={{
+                        width: '100%',
+                        padding: '10px 16px',
+                        textAlign: 'left',
+                        background: 'transparent',
+                        border: 'none',
+                        color: isDarkMode ? '#E5E7EB' : '#374151',
+                        fontSize: '14px',
+                        fontWeight: 400,
+                        cursor: 'pointer',
+                        transition: 'background-color 0.2s',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      Shipment Details
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (activeAction === 'sort-products' || activeAction === 'sort-formulas') ? (
             <>
               {/* Auto-save On */}
               <span style={{ 
@@ -507,6 +786,40 @@ const NewShipmentHeader = ({ tableMode, onTableModeToggle, onReviewShipmentClick
             </svg>
           )}
           <span>Label Check</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onActionChange && onActionChange('book-shipment')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '12px 16px',
+            fontSize: '14px',
+            fontWeight: 500,
+            color: activeAction === 'book-shipment' ? '#007AFF' : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+            backgroundColor: activeAction === 'book-shipment' ? (isDarkMode ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.05)') : 'transparent',
+            border: 'none',
+            borderBottom: activeAction === 'book-shipment' ? '2px solid #007AFF' : '2px solid transparent',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {completedTabs.has('book-shipment') ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#10B981">
+              <circle cx="12" cy="12" r="6"/>
+            </svg>
+          ) : activeAction === 'book-shipment' ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#007AFF">
+              <circle cx="12" cy="12" r="6"/>
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={isDarkMode ? '#9CA3AF' : '#6B7280'} strokeWidth="2">
+              <circle cx="12" cy="12" r="6"/>
+            </svg>
+          )}
+          <span>Book Shipment</span>
         </button>
         <button
           type="button"

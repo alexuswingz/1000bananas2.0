@@ -117,14 +117,28 @@ const FormulaCheckTable = ({ shipmentId, isRecountMode = false, varianceExceeded
 
           {/* Body */}
           <tbody>
-            {loading && (
+            {!shipmentId && (
               <tr>
-                <td colSpan="8" style={{ textAlign: 'center', padding: '2rem' }}>
+                <td colSpan={columns.length} style={{ textAlign: 'center', padding: '2rem', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
+                  Please book the shipment first to view formulas.
+                </td>
+              </tr>
+            )}
+            {shipmentId && loading && (
+              <tr>
+                <td colSpan={columns.length} style={{ textAlign: 'center', padding: '2rem', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
                   Loading formula data...
                 </td>
               </tr>
             )}
-            {!loading && (isRecountMode 
+            {shipmentId && !loading && displayFormulas.length === 0 && (
+              <tr>
+                <td colSpan={columns.length} style={{ textAlign: 'center', padding: '2rem', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
+                  No formulas found for this shipment.
+                </td>
+              </tr>
+            )}
+            {shipmentId && !loading && displayFormulas.length > 0 && (isRecountMode 
               ? displayFormulas.filter(formula => varianceExceededRowIds.includes(formula.id))
               : displayFormulas
             ).map((formula, index) => {

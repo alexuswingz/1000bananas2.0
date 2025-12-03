@@ -6,6 +6,8 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
   const [openFilterColumn, setOpenFilterColumn] = useState(null);
   const filterIconRefs = useRef({});
   const filterDropdownRef = useRef(null);
+  const [filters, setFilters] = useState({});
+  const [sortConfig, setSortConfig] = useState({ field: '', order: '' });
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -18,7 +20,12 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
 
   const columnBorderColor = isDarkMode ? 'rgba(55, 65, 81, 0.9)' : '#E5E7EB';
 
-  const isFilterActive = (key) => activeFilters.includes(key);
+  const isFilterActive = (key) => {
+    // Check if there's an active filter for this column or if sorting is applied
+    const hasFilter = filters[key] !== undefined;
+    const hasSorting = sortConfig.field === key && sortConfig.order !== '';
+    return hasFilter || hasSorting || activeFilters.includes(key);
+  };
 
   // Render status icon based on status
   const renderStatusIcon = (status) => {
@@ -193,6 +200,79 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
     e.stopPropagation();
     setOpenFilterColumn(openFilterColumn === columnKey ? null : columnKey);
   };
+
+  // Handle filter apply
+  const handleApplyFilter = (filterConfig) => {
+    // Update sort config
+    if (filterConfig.sortField && filterConfig.sortOrder) {
+      setSortConfig({ field: filterConfig.sortField, order: filterConfig.sortOrder });
+    }
+    
+    // Update filters
+    if (filterConfig.filterField && filterConfig.filterCondition && filterConfig.filterValue) {
+      setFilters(prev => ({
+        ...prev,
+        [filterConfig.filterField]: {
+          condition: filterConfig.filterCondition,
+          value: filterConfig.filterValue,
+        }
+      }));
+    }
+    
+    setOpenFilterColumn(null);
+  };
+
+  // Handle filter reset
+  const handleResetFilter = () => {
+    setSortConfig({ field: '', order: '' });
+    setFilters({});
+  };
+
+  // Apply filters and sorting to rows
+  const getFilteredAndSortedRows = () => {
+    let filteredRows = [...rows];
+
+    // Apply filters
+    Object.keys(filters).forEach(field => {
+      const filter = filters[field];
+      filteredRows = filteredRows.filter(row => {
+        const value = row[field];
+        const filterValue = filter.value.toLowerCase();
+        const rowValue = String(value || '').toLowerCase();
+
+        switch (filter.condition) {
+          case 'equals':
+            return rowValue === filterValue;
+          case 'contains':
+            return rowValue.includes(filterValue);
+          case 'greaterThan':
+            return rowValue > filterValue;
+          case 'lessThan':
+            return rowValue < filterValue;
+          default:
+            return true;
+        }
+      });
+    });
+
+    // Apply sorting
+    if (sortConfig.field && sortConfig.order) {
+      filteredRows.sort((a, b) => {
+        const aVal = String(a[sortConfig.field] || '').toLowerCase();
+        const bVal = String(b[sortConfig.field] || '').toLowerCase();
+        
+        if (sortConfig.order === 'asc') {
+          return aVal.localeCompare(bVal);
+        } else {
+          return bVal.localeCompare(aVal);
+        }
+      });
+    }
+
+    return filteredRows;
+  };
+
+  const displayRows = getFilteredAndSortedRows();
 
   return (
     <>
@@ -508,6 +588,46 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
               }}
             >
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.1', gap: '1px' }}>
+                <span style={{ fontSize: '9px', fontWeight: 600 }}>BOOK</span>
+                <span style={{ fontSize: '9px', fontWeight: 600 }}>SHIPMENT</span>
+              </div>
+                <img
+                ref={(el) => { if (el) filterIconRefs.current['bookShipment'] = el; }}
+                  src="/assets/Vector (1).png"
+                  alt="Filter"
+                  className={`w-3 h-3 transition-opacity cursor-pointer ${
+                  (isFilterActive('bookShipment') || openFilterColumn === 'bookShipment')
+                      ? 'opacity-100'
+                      : 'opacity-0 group-hover:opacity-100'
+                  }`}
+                onClick={(e) => handleFilterClick('bookShipment', e)}
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  right: '8px',
+                  transform: 'translateY(-50%)',
+                  ...((isFilterActive('bookShipment') || openFilterColumn === 'bookShipment')
+                      ? {
+                          filter:
+                            'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
+                        }
+                    : undefined)
+                }}
+                />
+            </th>
+            <th
+              className="text-center text-white uppercase tracking-wider group cursor-pointer"
+              style={{
+                padding: '0.5rem 1rem',
+                width: '12%',
+                height: '40px',
+                backgroundColor: '#1C2634',
+                borderRight: `1px solid #FFFFFF`,
+                boxSizing: 'border-box',
+                position: 'relative',
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.1', gap: '1px' }}>
                 <span style={{ fontSize: '9px', fontWeight: 600 }}>SORT</span>
                 <span style={{ fontSize: '9px', fontWeight: 600 }}>PRODUCTS</span>
               </div>
@@ -591,7 +711,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
           className="divide-y"
           style={{ borderColor: isDarkMode ? 'rgba(75, 85, 99, 0.3)' : '#f3f4f6' }}
         >
-          {rows.map((row) => (
+          {displayRows.map((row) => (
             <tr
               key={row.id}
               style={{
@@ -738,6 +858,18 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
                   height: '40px',
                 }}
               >
+                {renderStatusCircle(row.bookShipment || 'pending')}
+              </td>
+              <td
+                style={{
+                  padding: '0.75rem 1rem',
+                  verticalAlign: 'middle',
+                  textAlign: 'center',
+                  backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
+                  borderTop: '1px solid #E5E7EB',
+                  height: '40px',
+                }}
+              >
                 {renderStatusCircle(row.sortProducts || 'pending')}
               </td>
               <td
@@ -787,6 +919,10 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
           columnKey={openFilterColumn}
           filterIconRef={filterIconRefs.current[openFilterColumn]}
           onClose={() => setOpenFilterColumn(null)}
+          onApply={handleApplyFilter}
+          onReset={handleResetFilter}
+          currentSort={sortConfig}
+          currentFilters={filters}
           isDarkMode={isDarkMode}
         />
       )}
@@ -876,13 +1012,16 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
 };
 
 // FilterDropdown Component
-const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, isDarkMode }, ref) => {
+const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, onApply, onReset, currentSort, currentFilters, isDarkMode }, ref) => {
   const [position, setPosition] = useState({ top: 0, left: 0 });
-  const [sortField, setSortField] = useState('');
-  const [sortOrder, setSortOrder] = useState('');
-  const [filterField, setFilterField] = useState('');
-  const [filterCondition, setFilterCondition] = useState('');
-  const [filterValue, setFilterValue] = useState('');
+  const [sortField, setSortField] = useState(currentSort?.field || '');
+  const [sortOrder, setSortOrder] = useState(currentSort?.order || '');
+  
+  // Initialize filter fields from current filters if they exist
+  const existingFilter = currentFilters ? Object.entries(currentFilters)[0] : null;
+  const [filterField, setFilterField] = useState(existingFilter ? existingFilter[0] : '');
+  const [filterCondition, setFilterCondition] = useState(existingFilter ? existingFilter[1].condition : '');
+  const [filterValue, setFilterValue] = useState(existingFilter ? existingFilter[1].value : '');
 
   useEffect(() => {
     if (filterIconRef) {
@@ -924,16 +1063,28 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, is
     setSortOrder('');
   };
 
-  const handleReset = () => {
+  const handleLocalReset = () => {
     setSortField('');
     setSortOrder('');
     setFilterField('');
     setFilterCondition('');
     setFilterValue('');
+    if (onReset) {
+      onReset();
+    }
+    onClose();
   };
 
-  const handleApply = () => {
-    // Apply filter logic here
+  const handleLocalApply = () => {
+    if (onApply) {
+      onApply({
+        sortField,
+        sortOrder,
+        filterField,
+        filterCondition,
+        filterValue,
+      });
+    }
     onClose();
   };
 
@@ -958,6 +1109,7 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, is
     { value: 'addProducts', label: 'Add Products' },
     { value: 'formulaCheck', label: 'Formula Check' },
     { value: 'labelCheck', label: 'Label Check' },
+    { value: 'bookShipment', label: 'Book Shipment' },
     { value: 'sortProducts', label: 'Sort Products' },
     { value: 'sortFormulas', label: 'Sort Formulas' },
   ];
@@ -1127,7 +1279,7 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, is
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
         <button
           type="button"
-          onClick={handleReset}
+          onClick={handleLocalReset}
           style={{
             padding: '8px 16px',
             border: '1px solid #D1D5DB',
@@ -1143,7 +1295,7 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, is
         </button>
         <button
           type="button"
-          onClick={handleApply}
+          onClick={handleLocalApply}
           style={{
             padding: '8px 16px',
             border: 'none',

@@ -21,7 +21,6 @@ import ExportTemplateModal from './components/ExportTemplateModal';
 import SortProductsCompleteModal from './components/SortProductsCompleteModal';
 import SortFormulasCompleteModal from './components/SortFormulasCompleteModal';
 import VarianceExceededModal from './components/VarianceExceededModal';
-import LabelCheckCompleteModal from './components/LabelCheckCompleteModal';
 
 const NewShipment = () => {
   const { isDarkMode } = useTheme();
@@ -37,8 +36,8 @@ const NewShipment = () => {
   const [isExportTemplateOpen, setIsExportTemplateOpen] = useState(false);
   const [isSortProductsCompleteOpen, setIsSortProductsCompleteOpen] = useState(false);
   const [isSortFormulasCompleteOpen, setIsSortFormulasCompleteOpen] = useState(false);
+  const [isBookShipmentCompleteOpen, setIsBookShipmentCompleteOpen] = useState(false);
   const [isVarianceExceededOpen, setIsVarianceExceededOpen] = useState(false);
-  const [isLabelCheckCompleteOpen, setIsLabelCheckCompleteOpen] = useState(false);
   const [varianceCount, setVarianceCount] = useState(0);
   const [isRecountMode, setIsRecountMode] = useState(false);
   const [varianceExceededRowIds, setVarianceExceededRowIds] = useState([]);
@@ -46,13 +45,21 @@ const NewShipment = () => {
   const [tableMode, setTableMode] = useState(false);
   const [activeAction, setActiveAction] = useState('add-products');
   const [completedTabs, setCompletedTabs] = useState(new Set());
-  const [addedRows, setAddedRows] = useState([]);
+  const [addedRows, setAddedRows] = useState(new Set());
   const [isFloorInventoryOpen, setIsFloorInventoryOpen] = useState(false);
   const [selectedFloorInventory, setSelectedFloorInventory] = useState(null);
   const [activeView, setActiveView] = useState('all-products'); // 'all-products' or 'floor-inventory'
   const floorInventoryRef = useRef(null);
   const floorInventoryButtonRef = useRef(null);
   const [floorInventoryPosition, setFloorInventoryPosition] = useState({ top: 0, left: 0 });
+  const [isBookShipmentHovered, setIsBookShipmentHovered] = useState(false);
+  const bookShipmentButtonRef = useRef(null);
+  const [bookShipmentTooltipPosition, setBookShipmentTooltipPosition] = useState({ top: 0, left: 0 });
+  const [exportCompleted, setExportCompleted] = useState(false);
+  const [forecastRange, setForecastRange] = useState('150');
+  const [showDOITooltip, setShowDOITooltip] = useState(false);
+  const doiIconRef = useRef(null);
+  const doiTooltipRef = useRef(null);
   // Generate unique shipment number
   const generateShipmentNumber = () => {
     return new Date().toISOString().split('T')[0].replace(/-/g, '.') + '-' + Date.now().toString().slice(-6);
@@ -211,12 +218,8 @@ const NewShipment = () => {
       setProducts(formattedProducts);
       setDataAsOfDate(new Date()); // Mark data as fresh
       
-      // Initialize qty values
-      const initialQtyValues = {};
-      formattedProducts.forEach((_, index) => {
-        initialQtyValues[index] = 0;
-      });
-      setQtyValues(initialQtyValues);
+      // Initialize qty values as empty - only populate when Add is clicked
+      setQtyValues({});
     } catch (error) {
       console.error('Error loading products:', error);
       alert('Failed to load products: ' + error.message);
@@ -251,21 +254,16 @@ const NewShipment = () => {
       if (data.add_products_completed) completed.add('add-products');
       if (data.formula_check_completed) completed.add('formula-check');
       if (data.label_check_completed) completed.add('label-check');
+      if (data.book_shipment_completed) completed.add('book-shipment');
       if (data.sort_products_completed) completed.add('sort-products');
       if (data.sort_formulas_completed) completed.add('sort-formulas');
       setCompletedTabs(completed);
       
       // Load products
       if (data.products && data.products.length > 0) {
-        // Transform products to match addedRows format
-        const products = data.products.map(p => ({
-          id: p.catalog_id,
-          brand: p.brand_name,
-          product: p.product_name,
-          size: p.size,
-          qty: p.quantity,
-        }));
-        setAddedRows(products);
+        // Transform products to Set of IDs for addedRows
+        const addedProductIds = new Set(data.products.map(p => p.catalog_id));
+        setAddedRows(addedProductIds);
       }
     } catch (error) {
       console.error('Error loading shipment:', error);
@@ -283,15 +281,25 @@ const NewShipment = () => {
   const [products, setProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [qtyValues, setQtyValues] = useState({});
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // Calculate total units from qtyValues
-  const totalUnits = Object.values(qtyValues).reduce((sum, qty) => {
+  // Calculate total units from qtyValues - only for products that have been added
+  const totalUnits = products.reduce((sum, product, index) => {
+    // Only count products that are in addedRows
+    if (!addedRows || !(addedRows instanceof Set) || !addedRows.has(product.id)) {
+      return sum;
+    }
+    const qty = qtyValues[index];
     const numQty = typeof qty === 'number' ? qty : (qty === '' || qty === null || qty === undefined ? 0 : parseInt(qty, 10) || 0);
     return sum + numQty;
   }, 0);
 
-  // Calculate total boxes based on size conversion rates
+  // Calculate total boxes based on size conversion rates - only for products that have been added
   const totalBoxes = products.reduce((sum, product, index) => {
+    // Only count products that are in addedRows
+    if (!addedRows || !(addedRows instanceof Set) || !addedRows.has(product.id)) {
+      return sum;
+    }
     const qty = qtyValues[index] ?? 0;
     const numQty = typeof qty === 'number' ? qty : (qty === '' || qty === null || qty === undefined ? 0 : parseInt(qty, 10) || 0);
     
@@ -523,14 +531,26 @@ const NewShipment = () => {
           return;
         }
         
-        // Label Check: Complete and prepare for Sort Products
+        // Label Check: Complete and move to Book Shipment
         await updateShipment(shipmentId, {
           label_check_completed: true,
-          status: 'sort_products',
+          status: 'book_shipment',
         });
         setCompletedTabs(prev => new Set(prev).add('label-check'));
-        setIsLabelCheckCompleteOpen(true);
-        toast.success('Label Check completed! Ready for manufacturing.');
+        setActiveAction('book-shipment');
+        toast.success('Label Check completed! Moving to Book Shipment.');
+        return;
+      }
+
+      if (activeAction === 'book-shipment') {
+        // Book Shipment: Complete and show modal
+        await updateShipment(shipmentId, {
+          book_shipment_completed: true,
+          status: 'sort_products',
+        });
+        setCompletedTabs(prev => new Set(prev).add('book-shipment'));
+        setIsBookShipmentCompleteOpen(true);
+        toast.success('Shipment booked!');
         return;
       }
 
@@ -581,8 +601,8 @@ const NewShipment = () => {
       return tabName === 'add-products';
     }
     
-    // Workflow order: add-products → formula-check → label-check → sort-products → sort-formulas
-    const tabOrder = ['add-products', 'formula-check', 'label-check', 'sort-products', 'sort-formulas'];
+    // Workflow order: add-products → formula-check → label-check → book-shipment → sort-products → sort-formulas
+    const tabOrder = ['add-products', 'formula-check', 'label-check', 'book-shipment', 'sort-products', 'sort-formulas'];
     const currentIndex = tabOrder.indexOf(tabName);
     
     // Can access current tab or any completed tab
@@ -662,6 +682,50 @@ const NewShipment = () => {
     }
   }, [isFloorInventoryOpen]);
 
+  // Handle Book Shipment tooltip position
+  useEffect(() => {
+    const updateTooltipPosition = () => {
+      if (bookShipmentButtonRef.current && isBookShipmentHovered) {
+        const rect = bookShipmentButtonRef.current.getBoundingClientRect();
+        setBookShipmentTooltipPosition({
+          top: rect.top, // Top of the button
+          left: rect.left + rect.width / 2 - 40, // Shifted left from center
+        });
+      }
+    };
+
+    if (isBookShipmentHovered) {
+      updateTooltipPosition();
+      window.addEventListener('resize', updateTooltipPosition);
+      window.addEventListener('scroll', updateTooltipPosition, true);
+      return () => {
+        window.removeEventListener('resize', updateTooltipPosition);
+        window.removeEventListener('scroll', updateTooltipPosition, true);
+      };
+    }
+  }, [isBookShipmentHovered]);
+
+  // Handle DOI tooltip click outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        doiTooltipRef.current && 
+        !doiTooltipRef.current.contains(event.target) &&
+        doiIconRef.current &&
+        !doiIconRef.current.contains(event.target)
+      ) {
+        setShowDOITooltip(false);
+      }
+    };
+
+    if (showDOITooltip) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showDOITooltip]);
+
   const handleFloorInventorySelect = (option) => {
     setSelectedFloorInventory(option);
     setActiveView('floor-inventory');
@@ -675,8 +739,22 @@ const NewShipment = () => {
 
   const floorInventoryOptions = ['Sellables', 'Shiners', 'Unused Formulas'];
 
+  // Filter products based on search term
+  const filteredProducts = products.filter(product => {
+    if (!searchTerm) return true;
+    
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      (product.brand?.toLowerCase() || '').includes(searchLower) ||
+      (product.product?.toLowerCase() || '').includes(searchLower) ||
+      (product.size?.toLowerCase() || '').includes(searchLower) ||
+      (product.childAsin?.toLowerCase() || '').includes(searchLower) ||
+      (product.childSku?.toLowerCase() || '').includes(searchLower)
+    );
+  });
+
   return (
-    <div className={`min-h-screen ${themeClasses.pageBg}`} style={{ paddingBottom: activeAction === 'add-products' ? '100px' : '0px' }}>
+    <div className={`min-h-screen ${themeClasses.pageBg}`} style={{ paddingBottom: (activeAction === 'add-products' || activeAction === 'formula-check' || activeAction === 'label-check' || activeAction === 'book-shipment') ? '100px' : '0px' }}>
       <NewShipmentHeader
         tableMode={tableMode}
         onTableModeToggle={() => setTableMode(!tableMode)}
@@ -794,49 +872,99 @@ const NewShipment = () => {
                 )}
               </div>
 
-              {/* Right: Legend and Search Input */}
+              {/* Right: Forecast Range and Search Input */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-                {/* Legend */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <div
-                      style={{
-                        width: '12px',
-                        height: '12px',
-                        borderRadius: '2px',
-                        backgroundColor: '#A855F7',
-                      }}
-                    />
-                    <span style={{ fontSize: '13px', color: isDarkMode ? '#E5E7EB' : '#374151' }}>
-                      FBA Avail.
+                {/* Forecast Range */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', position: 'relative' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <svg 
+                      ref={doiIconRef}
+                      width="16" 
+                      height="16" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      xmlns="http://www.w3.org/2000/svg"
+                      onClick={() => setShowDOITooltip(!showDOITooltip)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <circle cx="12" cy="12" r="10" stroke="#9CA3AF" strokeWidth="2" fill="none"/>
+                      <circle cx="12" cy="12" r="2" fill="#9CA3AF"/>
+                    </svg>
+                    <span style={{ fontSize: '14px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
+                      Forecast Range
                     </span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  
+                  {/* DOI Tooltip */}
+                  {showDOITooltip && (
                     <div
+                      ref={doiTooltipRef}
                       style={{
-                        width: '12px',
-                        height: '12px',
-                        borderRadius: '2px',
-                        backgroundColor: '#22C55E',
+                        position: 'absolute',
+                        bottom: '40px',
+                        left: '8px',
+                        transform: 'translateX(-50%)',
+                        backgroundColor: '#F3F4F6',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                        padding: '12px',
+                        width: '296px',
+                        zIndex: 10000,
+                        boxSizing: 'border-box',
                       }}
-                    />
-                    <span style={{ fontSize: '13px', color: isDarkMode ? '#E5E7EB' : '#374151' }}>
-                      Total Inv.
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <div
-                      style={{
-                        width: '12px',
-                        height: '12px',
-                        borderRadius: '2px',
-                        backgroundColor: '#3B82F6',
-                      }}
-                    />
-                    <span style={{ fontSize: '13px', color: isDarkMode ? '#E5E7EB' : '#374151' }}>
-                      Forecast
-                    </span>
-                  </div>
+                    >
+                      {/* Arrow pointing down - centered on tooltip */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          bottom: '-6px',
+                          left: '50%',
+                          transform: 'translateX(-50%) rotate(45deg)',
+                          width: '12px',
+                          height: '12px',
+                          backgroundColor: '#F3F4F6',
+                        }}
+                      />
+                      <div style={{ fontSize: '13px', color: '#6B7280', lineHeight: '1.4', position: 'relative' }}>
+                        <p style={{ fontWeight: 400, margin: '0 0 8px 0', color: '#6B7280' }}>
+                          DOI Goal = Days of Inventory Goal
+                        </p>
+                        <p style={{ margin: '0 0 8px 0', color: '#6B7280' }}>
+                          Your total label DOI combines three pieces: days of finished goods at Amazon, days of raw labels in your warehouse, and the days covered by the labels you plan to order.
+                        </p>
+                        <p style={{ margin: 0, color: '#6B7280' }}>
+                          Simply put: Total DOI = Amazon + warehouse + your next label order
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  <input
+                    type="text"
+                    value={forecastRange}
+                    onChange={(e) => setForecastRange(e.target.value)}
+                    style={{
+                      width: '80px',
+                      height: '32px',
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid #D1D5DB',
+                      backgroundColor: '#FFFFFF',
+                      color: '#111827',
+                      fontSize: '14px',
+                      textAlign: 'center',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#3B82F6';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#D1D5DB';
+                    }}
+                  />
+                  <span style={{ fontSize: '14px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
+                    days
+                  </span>
                 </div>
 
                 {/* Search Input */}
@@ -873,6 +1001,8 @@ const NewShipment = () => {
                 <input
                   type="text"
                   placeholder="Search..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                   style={{
                     width: '100%',
                     height: '32px',
@@ -901,7 +1031,7 @@ const NewShipment = () => {
                 {loadingProducts && <div style={{ textAlign: 'center', padding: '2rem' }}>Loading products...</div>}
                 {!loadingProducts && (
                   <NewShipmentTable
-                    rows={products}
+                    rows={filteredProducts}
                     tableMode={tableMode}
                     onProductClick={handleProductClick}
                     qtyValues={qtyValues}
@@ -971,9 +1101,198 @@ const NewShipment = () => {
             />
           </div>
         )}
+
+        {activeAction === 'book-shipment' && (
+          <div style={{ marginTop: '1.5rem', padding: '0' }}>
+            <div style={{
+              backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+              padding: '24px',
+            }}>
+              <h2 style={{
+                fontSize: '18px',
+                fontWeight: 600,
+                color: isDarkMode ? '#FFFFFF' : '#111827',
+                marginBottom: '24px',
+              }}>
+                Shipment Details
+              </h2>
+
+              {/* Row 1: Shipment Name & Shipment Type */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '6px' }}>
+                    Shipment Name
+                  </label>
+                  <input
+                    type="text"
+                    value={`${shipmentData.shipmentNumber} ${shipmentData.shipmentType}`}
+                    readOnly
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '6px',
+                      border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                      backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                      color: isDarkMode ? '#FFFFFF' : '#111827',
+                      fontSize: '14px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '6px' }}>
+                    Shipment Type<span style={{ color: '#EF4444' }}>*</span>
+                  </label>
+                  <select
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '6px',
+                      border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                      backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                      color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                      fontSize: '14px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      cursor: 'pointer',
+                      appearance: 'none',
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%239CA3AF' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'right 12px center',
+                    }}
+                  >
+                    <option value="">Select Shipment Type</option>
+                    <option value="FBA">FBA</option>
+                    <option value="AWD">AWD</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Row 2: Amazon Shipment # & Amazon Ref ID */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '6px' }}>
+                    Amazon Shipment #<span style={{ color: '#EF4444' }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="FBAXXXXXXXXX"
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '6px',
+                      border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                      backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                      color: isDarkMode ? '#FFFFFF' : '#111827',
+                      fontSize: '14px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '6px' }}>
+                    Amazon Ref ID<span style={{ color: '#EF4444' }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="XXXXXXXX"
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '6px',
+                      border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                      backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                      color: isDarkMode ? '#FFFFFF' : '#111827',
+                      fontSize: '14px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Row 3: Ship From */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '6px' }}>
+                  Ship From
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter Shipment Location..."
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                    backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                    color: isDarkMode ? '#FFFFFF' : '#111827',
+                    fontSize: '14px',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              {/* Row 4: Ship To */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '6px' }}>
+                  Ship To
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter Shipment Destination..."
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                    backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                    color: isDarkMode ? '#FFFFFF' : '#111827',
+                    fontSize: '14px',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              {/* Row 5: Carrier */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '6px' }}>
+                  Carrier
+                </label>
+                <select
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                    backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                    fontSize: '14px',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                    cursor: 'pointer',
+                    appearance: 'none',
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%239CA3AF' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 12px center',
+                  }}
+                >
+                  <option value="">Select Carrier Name...</option>
+                  <option value="ups">UPS</option>
+                  <option value="fedex">FedEx</option>
+                  <option value="usps">USPS</option>
+                  <option value="dhl">DHL</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {activeAction === 'add-products' && (
+      {(activeAction === 'add-products' || activeAction === 'formula-check' || activeAction === 'label-check' || activeAction === 'book-shipment') && (
         <div
           style={{
             position: 'fixed',
@@ -989,135 +1308,330 @@ const NewShipment = () => {
             zIndex: 10,
           }}
         >
-          <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span style={{
-                fontSize: '12px',
-                fontWeight: 400,
-                color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-              }}>
-                PALETTES
-              </span>
-              <span style={{
-                fontSize: '18px',
-                fontWeight: 700,
-                color: isDarkMode ? '#FFFFFF' : '#000000',
-              }}>
-                {totalPalettes}
-              </span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span style={{
-                fontSize: '12px',
-                fontWeight: 400,
-                color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-              }}>
-                TOTAL BOXES
-              </span>
-              <span style={{
-                fontSize: '18px',
-                fontWeight: 700,
-                color: isDarkMode ? '#FFFFFF' : '#000000',
-              }}>
-                {Math.ceil(totalBoxes)}
-              </span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span style={{
-                fontSize: '12px',
-                fontWeight: 400,
-                color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-              }}>
-                UNITS
-              </span>
-              <span style={{
-                fontSize: '18px',
-                fontWeight: 700,
-                color: isDarkMode ? '#FFFFFF' : '#000000',
-              }}>
-                {totalUnits}
-              </span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span style={{
-                fontSize: '12px',
-                fontWeight: 400,
-                color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-              }}>
-                TIME (HRS)
-              </span>
-              <span style={{
-                fontSize: '18px',
-                fontWeight: 700,
-                color: isDarkMode ? '#FFFFFF' : '#000000',
-              }}>
-                {totalTimeHours}
-              </span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span style={{
-                fontSize: '12px',
-                fontWeight: 400,
-                color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-              }}>
-                WEIGHT (LBS)
-              </span>
-              <span style={{
-                fontSize: '18px',
-                fontWeight: 700,
-                color: isDarkMode ? '#FFFFFF' : '#000000',
-              }}>
-                {totalWeightLbs}
-              </span>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <button
-              type="button"
-              onClick={handleExport}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: 'none',
-                backgroundColor: 'transparent',
-                color: '#007AFF',
-                fontSize: '14px',
-                fontWeight: 500,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M8 2V10M8 10L5.5 7.5M8 10L10.5 7.5M3 12H13" stroke="#007AFF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Export
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsShipmentDetailsOpen(true)}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: 'none',
-                backgroundColor: '#9CA3AF',
-                color: '#FFFFFF',
-                fontSize: '14px',
-                fontWeight: 500,
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#6B7280';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#9CA3AF';
-              }}
-            >
-              Book Shipment
-            </button>
-          </div>
+          {activeAction === 'formula-check' ? (
+            /* Formula Check Footer */
+            <>
+              <div style={{ display: 'flex', gap: '48px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 400,
+                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                    letterSpacing: '0.05em',
+                  }}>
+                    TOTAL FORMULAS
+                  </span>
+                  <span style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                  }}>
+                    9
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 400,
+                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                    letterSpacing: '0.05em',
+                  }}>
+                    COMPLETED
+                  </span>
+                  <span style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                  }}>
+                    0
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 400,
+                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                    letterSpacing: '0.05em',
+                  }}>
+                    REMAINING
+                  </span>
+                  <span style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                  }}>
+                    9
+                  </span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={handleCompleteClick}
+                  style={{
+                    height: '31px',
+                    padding: '0 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: '#9CA3AF',
+                    color: '#FFFFFF',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#6B7280';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#9CA3AF';
+                  }}
+                >
+                  Complete
+                </button>
+              </div>
+            </>
+          ) : activeAction === 'label-check' ? (
+            /* Label Check Footer */
+            <>
+              <div style={{ display: 'flex', gap: '48px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 400,
+                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                    letterSpacing: '0.05em',
+                  }}>
+                    TOTAL LABELS
+                  </span>
+                  <span style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                  }}>
+                    9
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 400,
+                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                    letterSpacing: '0.05em',
+                  }}>
+                    COMPLETED
+                  </span>
+                  <span style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                  }}>
+                    0
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 400,
+                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                    letterSpacing: '0.05em',
+                  }}>
+                    REMAINING
+                  </span>
+                  <span style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                  }}>
+                    9
+                  </span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={handleCompleteClick}
+                  style={{
+                    height: '31px',
+                    padding: '0 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: '#9CA3AF',
+                    color: '#FFFFFF',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#6B7280';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#9CA3AF';
+                  }}
+                >
+                  Complete
+                </button>
+              </div>
+            </>
+          ) : activeAction === 'book-shipment' ? (
+            /* Book Shipment Footer */
+            <>
+              <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
+                {/* Empty left side */}
+              </div>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={handleCompleteClick}
+                  style={{
+                    height: '31px',
+                    padding: '0 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: '#9CA3AF',
+                    color: '#FFFFFF',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#6B7280';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#9CA3AF';
+                  }}
+                >
+                  Book Shipment
+                </button>
+              </div>
+            </>
+          ) : (
+            /* Default Footer (Add Products) */
+            <>
+              <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 400,
+                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                  }}>
+                    PALETTES
+                  </span>
+                  <span style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                  }}>
+                    {totalPalettes}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 400,
+                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                  }}>
+                    TOTAL BOXES
+                  </span>
+                  <span style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                  }}>
+                    {Math.ceil(totalBoxes)}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 400,
+                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                  }}>
+                    UNITS
+                  </span>
+                  <span style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                  }}>
+                    {totalUnits}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 400,
+                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                  }}>
+                    TIME (HRS)
+                  </span>
+                  <span style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                  }}>
+                    {totalTimeHours}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 400,
+                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                  }}>
+                    WEIGHT (LBS)
+                  </span>
+                  <span style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                  }}>
+                    {totalWeightLbs}
+                  </span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={handleExport}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = addedRows.size > 0 ? '#0066CC' : '#6B7280';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = addedRows.size > 0 ? '#007AFF' : '#9CA3AF';
+                  }}
+                  style={{
+                    height: '31px',
+                    padding: '0 10px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: addedRows.size > 0 ? '#007AFF' : '#9CA3AF',
+                    color: '#FFFFFF',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  Export for Upload
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -1144,8 +1658,86 @@ const NewShipment = () => {
         isOpen={isExportTemplateOpen}
         onClose={() => setIsExportTemplateOpen(false)}
         onExport={() => {
-          setIsExportTemplateOpen(false);
-          // Stay on add-products tab
+          // Mark export as completed
+          setCompletedTabs(prev => {
+            const newSet = new Set(prev);
+            newSet.add('export');
+            return newSet;
+          });
+          setExportCompleted(true);
+        }}
+        onBeginFormulaCheck={async () => {
+          // Book shipment if not already booked (needed for formula check)
+          if (!shipmentId) {
+            try {
+              setLoading(true);
+              
+              // Validate: Must have products selected
+              const productsToAdd = Object.keys(qtyValues)
+                .filter(idx => qtyValues[idx] > 0)
+                .map(idx => ({
+                  catalog_id: products[idx].catalogId,
+                  quantity: qtyValues[idx],
+                }));
+              
+              if (productsToAdd.length === 0) {
+                toast.error('Please add at least one product before exporting');
+                setLoading(false);
+                return;
+              }
+              
+              // Create shipment
+              const newShipment = await createShipment({
+                shipment_number: shipmentData.shipmentNumber,
+                shipment_date: shipmentData.shipmentDate,
+                shipment_type: shipmentData.shipmentType,
+                marketplace: 'Amazon',
+                account: shipmentData.account,
+                location: shipmentData.location,
+                created_by: 'current_user',
+              });
+              
+              const newShipmentId = newShipment.id;
+              setShipmentId(newShipmentId);
+              
+              // Add products to shipment
+              await addShipmentProducts(newShipmentId, productsToAdd);
+              
+              // Update shipment to mark add_products as completed
+              await updateShipment(newShipmentId, {
+                add_products_completed: true,
+                status: 'formula_check',
+              });
+              
+              // Mark 'add-products' and 'export' as completed
+              setCompletedTabs(prev => {
+                const newSet = new Set(prev);
+                newSet.add('add-products');
+                newSet.add('export');
+                return newSet;
+              });
+              setExportCompleted(true);
+              toast.success('Shipment booked and exported!');
+            } catch (error) {
+              console.error('Error booking shipment for export:', error);
+              toast.error('Failed to book shipment: ' + error.message);
+              setLoading(false);
+              return;
+            } finally {
+              setLoading(false);
+            }
+          } else {
+            // If shipment already existed, still mark export as completed
+            setCompletedTabs(prev => {
+              const newSet = new Set(prev);
+              newSet.add('export');
+              return newSet;
+            });
+            setExportCompleted(true);
+          }
+          
+          // After exporting, move to Formula Check and keep footer visible
+          setActiveAction('formula-check');
         }}
       />
 
@@ -1158,6 +1750,21 @@ const NewShipment = () => {
       <SortFormulasCompleteModal
         isOpen={isSortFormulasCompleteOpen}
         onClose={() => setIsSortFormulasCompleteOpen(false)}
+        shipmentData={shipmentData}
+        onGoToShipments={() => {
+          // Store shipment data in localStorage before navigation
+          const dataToSave = {
+            shipmentData: shipmentData,
+            shipmentId: shipmentId,
+            timestamp: new Date().toISOString(),
+          };
+          
+          console.log('Data to save to localStorage:', dataToSave);
+          localStorage.setItem('sortFormulasCompleted', JSON.stringify(dataToSave));
+          
+          // Close modal and navigate will be handled by the modal component
+          setIsSortFormulasCompleteOpen(false);
+        }}
       />
       <VarianceExceededModal
         isOpen={isVarianceExceededOpen}
@@ -1166,39 +1773,170 @@ const NewShipment = () => {
         onRecount={handleVarianceRecount}
         varianceCount={varianceCount}
       />
-      <LabelCheckCompleteModal
-        isOpen={isLabelCheckCompleteOpen}
-        onClose={() => setIsLabelCheckCompleteOpen(false)}
-        onGoToShipments={() => {
-          // Collect completed rows from label check and pass to planning
-          console.log('All labelCheckRows:', labelCheckRows);
-          console.log('Shipment data:', shipmentData);
-          
-          const completedRows = labelCheckRows.filter(row => 
-            row.totalCount !== '' && row.totalCount !== null && row.totalCount !== undefined
-          );
-          
-          console.log('Completed rows (with totalCount):', completedRows);
-          console.log('Number of completed rows:', completedRows.length);
-          
-          // Store in localStorage BEFORE navigation so planning page can read it
-          const dataToSave = {
-            rows: completedRows,
-            shipmentData: shipmentData,
-            timestamp: new Date().toISOString(),
-          };
-          
-          console.log('Data to save to localStorage:', dataToSave);
-          localStorage.setItem('labelCheckCompletedRows', JSON.stringify(dataToSave));
-          
-          // Verify it was saved
-          const saved = localStorage.getItem('labelCheckCompletedRows');
-          console.log('Verified localStorage save:', saved ? 'SUCCESS' : 'FAILED');
-          if (saved) {
-            console.log('Saved data:', JSON.parse(saved));
-          }
-        }}
-      />
+
+      {/* Book Shipment Complete Modal */}
+      {isBookShipmentCompleteOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 9998,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            onClick={() => setIsBookShipmentCompleteOpen(false)}
+          >
+            {/* Modal */}
+            <div
+              style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: '12px',
+                width: '360px',
+                border: '1px solid #E5E7EB',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                zIndex: 9999,
+                position: 'relative',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Close button */}
+              <button
+                type="button"
+                onClick={() => setIsBookShipmentCompleteOpen(false)}
+                style={{
+                  position: 'absolute',
+                  top: '12px',
+                  right: '12px',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#9CA3AF',
+                  width: '24px',
+                  height: '24px',
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+
+              {/* Content */}
+              <div style={{
+                padding: '32px 24px 24px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '16px',
+              }}>
+                {/* Green checkmark icon */}
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '50%',
+                  backgroundColor: '#10B981',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M5 12L10 17L19 8" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+
+                {/* Title */}
+                <h2 style={{
+                  fontSize: '20px',
+                  fontWeight: 600,
+                  color: '#111827',
+                  margin: 0,
+                  textAlign: 'center',
+                }}>
+                  Shipment Booked!
+                </h2>
+              </div>
+
+              {/* Footer buttons */}
+              <div style={{
+                padding: '16px 24px',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: '12px',
+              }}>
+                {/* Go to Shipments button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsBookShipmentCompleteOpen(false);
+                    navigate('/production/planning');
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: '1px solid #D1D5DB',
+                    backgroundColor: '#FFFFFF',
+                    color: '#374151',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#F9FAFB';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  }}
+                >
+                  Go to Shipments
+                </button>
+
+                {/* Begin Sort Products button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsBookShipmentCompleteOpen(false);
+                    setActiveAction('sort-products');
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: '#3B82F6',
+                    color: '#FFFFFF',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#2563EB';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#3B82F6';
+                  }}
+                >
+                  Begin Sort Products
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

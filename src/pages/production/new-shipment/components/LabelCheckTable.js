@@ -953,7 +953,7 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
                   color: isDarkMode ? '#9CA3AF' : '#6B7280',
                   margin: 0,
                 }}>
-                  Current Label Inventory: {formatNumber(selectedRow.lblCurrentInv)}
+                  Current Inventory: {formatNumber(selectedRow.lblCurrentInv)}
                 </p>
               </div>
               <div style={{
@@ -1047,7 +1047,7 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
                   e.currentTarget.style.backgroundColor = '#3B82F6';
                 }}
               >
-                Save
+                Verify
               </button>
             </div>
           </div>
