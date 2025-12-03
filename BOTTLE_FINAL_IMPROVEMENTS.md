@@ -255,3 +255,4 @@ themeClasses.rowHover      // → 'hover:bg-gray-50'
 **All improvements complete and tested!** 🚀
 
 
+

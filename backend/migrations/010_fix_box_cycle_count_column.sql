@@ -29,3 +29,4 @@ WHERE table_name = 'box_cycle_count_lines'
 AND column_name IN ('box_name', 'box_type');
 
 
+

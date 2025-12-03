@@ -185,3 +185,4 @@ All frontend components are already connected to the backend endpoints you added
 The cycle counts feature is now fully integrated and ready for testing! 🎉
 
 
+

@@ -141,3 +141,4 @@ if __name__ == '__main__':
     initialize_closure_inventory_from_excel()
 
 
+
