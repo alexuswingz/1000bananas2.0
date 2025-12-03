@@ -3,7 +3,7 @@ import { useTheme } from '../../../context/ThemeContext';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
-import { createShipment, getShipmentById, updateShipment, addShipmentProducts, getShipmentProducts, getShipmentFormulaCheck } from '../../../services/productionApi';
+import { createShipment, getShipmentById, updateShipment, addShipmentProducts, getShipmentProducts, getShipmentFormulaCheck, getLabelsAvailability } from '../../../services/productionApi';
 import CatalogAPI from '../../../services/catalogApi';
 import NgoosAPI from '../../../services/ngoosApi';
 import NewShipmentHeader from './components/NewShipmentHeader';
@@ -42,6 +42,9 @@ const NewShipment = () => {
   const [isRecountMode, setIsRecountMode] = useState(false);
   const [varianceExceededRowIds, setVarianceExceededRowIds] = useState([]);
   const [labelCheckRows, setLabelCheckRows] = useState([]);
+  const [formulaCheckData, setFormulaCheckData] = useState({ total: 0, completed: 0, remaining: 0 });
+  const [labelCheckData, setLabelCheckData] = useState({ total: 0, completed: 0, remaining: 0 });
+  const [shipmentProducts, setShipmentProducts] = useState([]); // Products loaded from existing shipment
   const [tableMode, setTableMode] = useState(false);
   const [activeAction, setActiveAction] = useState('add-products');
   const [completedTabs, setCompletedTabs] = useState(new Set());
@@ -52,6 +55,7 @@ const NewShipment = () => {
   const floorInventoryRef = useRef(null);
   const floorInventoryButtonRef = useRef(null);
   const [floorInventoryPosition, setFloorInventoryPosition] = useState({ top: 0, left: 0 });
+  const [labelsAvailabilityMap, setLabelsAvailabilityMap] = useState({}); // Map of label_location -> available labels
   const [isBookShipmentHovered, setIsBookShipmentHovered] = useState(false);
   const bookShipmentButtonRef = useRef(null);
   const [bookShipmentTooltipPosition, setBookShipmentTooltipPosition] = useState({ top: 0, left: 0 });
@@ -60,6 +64,7 @@ const NewShipment = () => {
   const [showDOITooltip, setShowDOITooltip] = useState(false);
   const doiIconRef = useRef(null);
   const doiTooltipRef = useRef(null);
+  
   // Generate unique shipment number
   const generateShipmentNumber = () => {
     return new Date().toISOString().split('T')[0].replace(/-/g, '.') + '-' + Date.now().toString().slice(-6);
@@ -74,10 +79,10 @@ const NewShipment = () => {
   });
   const [dataAsOfDate, setDataAsOfDate] = useState(new Date()); // Track when data was loaded
 
-  // Load products from catalog
+  // Load products from catalog - reload when shipment ID changes (new shipment vs editing)
   useEffect(() => {
     loadProducts();
-  }, []);
+  }, [id]); // Re-run when ID changes to get fresh labels availability
 
   // Reset shipment number for new shipments (when no ID in route)
   useEffect(() => {
@@ -94,14 +99,19 @@ const NewShipment = () => {
     try {
       setLoadingProducts(true);
       
-      // Load both Amazon forecast data and production supply chain data
-      const [planningData, productionInventory] = await Promise.all([
+      // Load Amazon forecast data, production supply chain data, and labels availability
+      const [planningData, productionInventory, labelsAvailability] = await Promise.all([
         NgoosAPI.getPlanning(1, 1000),
-        import('../../../services/productionApi').then(api => api.getProductsInventory())
+        import('../../../services/productionApi').then(api => api.getProductsInventory()),
+        getLabelsAvailability(shipmentId) // Pass shipment ID to exclude current shipment
       ]);
       
       console.log('Loaded planning data:', planningData.products.length, 'products');
       console.log('Loaded production inventory:', productionInventory.length, 'items');
+      console.log('Loaded labels availability:', Object.keys(labelsAvailability.byLocation || {}).length, 'label locations');
+      
+      // Store labels availability map
+      setLabelsAvailabilityMap(labelsAvailability.byLocation || {});
       
       if (productionInventory.length > 0) {
         console.log('Sample production item:', productionInventory[0]);
@@ -215,7 +225,22 @@ const NewShipment = () => {
       });
       
       console.log('Loaded products with supply chain:', formattedProducts.length, 'Sample:', formattedProducts[0]);
-      setProducts(formattedProducts);
+      
+      // Sort: items with sales activity first, then by higher sales, then by lower inventory
+      const sortedProducts = formattedProducts.sort((a, b) => {
+        // First: items with sales > 0 come first
+        const aHasSales = a.sales30Day > 0 ? 0 : 1;
+        const bHasSales = b.sales30Day > 0 ? 0 : 1;
+        if (aHasSales !== bHasSales) return aHasSales - bHasSales;
+        
+        // Second: higher sales first
+        if (a.sales30Day !== b.sales30Day) return b.sales30Day - a.sales30Day;
+        
+        // Third: lower inventory first
+        return a.totalInventory - b.totalInventory;
+      });
+      
+      setProducts(sortedProducts);
       setDataAsOfDate(new Date()); // Mark data as fresh
       
       // Initialize qty values as empty - only populate when Add is clicked
@@ -229,14 +254,27 @@ const NewShipment = () => {
     }
   };
 
-  // Load existing shipment or get from navigation state
+  // Handle navigation from Planning table - set shipment ID first
+  useEffect(() => {
+    if (location.state?.existingShipment && location.state.shipmentId) {
+      // Set the shipment ID - this will trigger loadShipment via the next useEffect
+      setShipmentId(location.state.shipmentId);
+      
+      // Set initial action if provided
+      if (location.state.initialAction && location.state.initialAction !== 'completed') {
+        setActiveAction(location.state.initialAction);
+      }
+    }
+  }, [location.state]);
+
+  // Load existing shipment when shipmentId is set
   useEffect(() => {
     if (shipmentId) {
       loadShipment();
     } else if (location.state?.shipmentData) {
       setShipmentData(location.state.shipmentData);
     }
-  }, [shipmentId, location.state]);
+  }, [shipmentId]);
 
   const loadShipment = async () => {
     try {
@@ -244,6 +282,7 @@ const NewShipment = () => {
       const data = await getShipmentById(shipmentId);
       setShipmentData({
         shipmentNumber: data.shipment_number,
+        shipmentDate: data.shipment_date || new Date().toISOString().split('T')[0],
         shipmentType: data.shipment_type,
         location: data.location || '',
         account: data.account || 'TPS Nutrients',
@@ -259,11 +298,15 @@ const NewShipment = () => {
       if (data.sort_formulas_completed) completed.add('sort-formulas');
       setCompletedTabs(completed);
       
-      // Load products
+      // Load products and quantities
       if (data.products && data.products.length > 0) {
         // Transform products to Set of IDs for addedRows
         const addedProductIds = new Set(data.products.map(p => p.catalog_id));
         setAddedRows(addedProductIds);
+        
+        // Store shipment products for quantity mapping
+        // Will be mapped to qtyValues once products are loaded
+        setShipmentProducts(data.products);
       }
     } catch (error) {
       console.error('Error loading shipment:', error);
@@ -282,6 +325,40 @@ const NewShipment = () => {
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [qtyValues, setQtyValues] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Map shipment products to qtyValues once products are loaded
+  useEffect(() => {
+    if (shipmentProducts.length > 0 && products.length > 0) {
+      // Create a map of catalog_id -> quantity from shipment products
+      const shipmentQtyMap = {};
+      shipmentProducts.forEach(sp => {
+        shipmentQtyMap[sp.catalog_id] = sp.quantity;
+      });
+      
+      // Map to qtyValues using product index - match by catalogId (same as when saving)
+      const newQtyValues = {};
+      products.forEach((product, index) => {
+        // Match by catalogId first (primary key used when saving), fall back to id (ASIN)
+        const matchKey = product.catalogId || product.id;
+        if (shipmentQtyMap[matchKey] !== undefined) {
+          newQtyValues[index] = shipmentQtyMap[matchKey];
+        }
+      });
+      
+      if (Object.keys(newQtyValues).length > 0) {
+        setQtyValues(newQtyValues);
+        // Also mark these products as added
+        const addedIds = new Set();
+        products.forEach((product) => {
+          const matchKey = product.catalogId || product.id;
+          if (shipmentQtyMap[matchKey] !== undefined) {
+            addedIds.add(product.id);
+          }
+        });
+        setAddedRows(addedIds);
+      }
+    }
+  }, [shipmentProducts, products]);
 
   // Calculate total units from qtyValues - only for products that have been added
   const totalUnits = products.reduce((sum, product, index) => {
@@ -368,13 +445,17 @@ const NewShipment = () => {
       
       // Create shipment if it doesn't exist
       if (!currentShipmentId) {
+        // Ensure shipment number and date are always set
+        const shipmentNumber = currentShipmentData.shipmentNumber || generateShipmentNumber();
+        const shipmentDate = currentShipmentData.shipmentDate || new Date().toISOString().split('T')[0];
+        
         const newShipment = await createShipment({
-          shipment_number: currentShipmentData.shipmentNumber,
-          shipment_date: currentShipmentData.shipmentDate,
-          shipment_type: currentShipmentData.shipmentType,
+          shipment_number: shipmentNumber,
+          shipment_date: shipmentDate,
+          shipment_type: currentShipmentData.shipmentType || 'AWD',
           marketplace: 'Amazon',
-          account: currentShipmentData.account,
-          location: currentShipmentData.location,
+          account: currentShipmentData.account || 'TPS Nutrients',
+          location: currentShipmentData.location || '',
           created_by: 'current_user', // TODO: Get from auth context
         });
         currentShipmentId = newShipment.id;
@@ -1037,6 +1118,7 @@ const NewShipment = () => {
                     qtyValues={qtyValues}
                     onQtyChange={setQtyValues}
                     onAddedRowsChange={setAddedRows}
+                    labelsAvailabilityMap={labelsAvailabilityMap}
                   />
                 )}
               </>
@@ -1083,6 +1165,7 @@ const NewShipment = () => {
               shipmentId={shipmentId}
               isRecountMode={isRecountMode}
               varianceExceededRowIds={varianceExceededRowIds}
+              onFormulaDataChange={setFormulaCheckData}
             />
           </div>
         )}
@@ -1326,7 +1409,7 @@ const NewShipment = () => {
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
                   }}>
-                    9
+                    {formulaCheckData.total}
                   </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -1343,7 +1426,7 @@ const NewShipment = () => {
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
                   }}>
-                    0
+                    {formulaCheckData.completed}
                   </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -1360,7 +1443,7 @@ const NewShipment = () => {
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
                   }}>
-                    9
+                    {formulaCheckData.remaining}
                   </span>
                 </div>
               </div>
@@ -1412,7 +1495,7 @@ const NewShipment = () => {
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
                   }}>
-                    9
+                    {labelCheckRows.length}
                   </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -1429,7 +1512,7 @@ const NewShipment = () => {
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
                   }}>
-                    0
+                    {labelCheckRows.filter(row => row.totalCount !== '' && row.totalCount !== null && row.totalCount !== undefined).length}
                   </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -1446,7 +1529,7 @@ const NewShipment = () => {
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
                   }}>
-                    9
+                    {labelCheckRows.length - labelCheckRows.filter(row => row.totalCount !== '' && row.totalCount !== null && row.totalCount !== undefined).length}
                   </span>
                 </div>
               </div>
@@ -1678,6 +1761,54 @@ const NewShipment = () => {
           setSelectedRow(null);
         }}
         selectedRow={selectedRow}
+        labelsAvailable={(() => {
+          if (!selectedRow?.label_location) return null;
+          const labelLoc = selectedRow.label_location;
+          const baseAvailable = labelsAvailabilityMap[labelLoc]?.labels_available || selectedRow?.labelsAvailable || 0;
+          
+          // Subtract labels already committed in current shipment for products with same label_location
+          const usedInCurrentShipment = products.reduce((sum, product, index) => {
+            if (product.label_location === labelLoc && product.id !== selectedRow.id) {
+              return sum + (qtyValues[index] || 0);
+            }
+            return sum;
+          }, 0);
+          
+          return Math.max(0, baseAvailable - usedInCurrentShipment);
+        })()}
+        currentQty={(() => {
+          const productIndex = products.findIndex(p => p.id === selectedRow?.id);
+          return productIndex >= 0 ? (qtyValues[productIndex] || 0) : 0;
+        })()}
+        onAddUnits={(row, unitsToAdd) => {
+          const productIndex = products.findIndex(p => p.id === row.id);
+          if (productIndex >= 0) {
+            const labelLoc = row.label_location;
+            const baseAvailable = labelsAvailabilityMap[labelLoc]?.labels_available || row?.labelsAvailable || 0;
+            
+            // Calculate labels already used in current shipment for same label_location
+            const usedInCurrentShipment = products.reduce((sum, product, idx) => {
+              if (product.label_location === labelLoc && idx !== productIndex) {
+                return sum + (qtyValues[idx] || 0);
+              }
+              return sum;
+            }, 0);
+            
+            const maxAvailable = Math.max(0, baseAvailable - usedInCurrentShipment);
+            const finalUnits = Math.min(unitsToAdd, maxAvailable);
+            
+            if (finalUnits < unitsToAdd) {
+              toast.warning(`Only ${finalUnits.toLocaleString()} labels available. Capped from ${unitsToAdd.toLocaleString()}.`);
+            }
+            
+            setQtyValues(prev => ({
+              ...prev,
+              [productIndex]: finalUnits
+            }));
+            
+            toast.success(`Added ${finalUnits.toLocaleString()} units of ${row.product}`);
+          }
+        }}
       />
 
       <ShipmentDetailsModal
@@ -1722,14 +1853,17 @@ const NewShipment = () => {
                 return;
               }
               
-              // Create shipment
+              // Create shipment - ensure shipment number and date are always set
+              const shipmentNumber = shipmentData.shipmentNumber || generateShipmentNumber();
+              const shipmentDate = shipmentData.shipmentDate || new Date().toISOString().split('T')[0];
+              
               const newShipment = await createShipment({
-                shipment_number: shipmentData.shipmentNumber,
-                shipment_date: shipmentData.shipmentDate,
-                shipment_type: shipmentData.shipmentType,
+                shipment_number: shipmentNumber,
+                shipment_date: shipmentDate,
+                shipment_type: shipmentData.shipmentType || 'AWD',
                 marketplace: 'Amazon',
-                account: shipmentData.account,
-                location: shipmentData.location,
+                account: shipmentData.account || 'TPS Nutrients',
+                location: shipmentData.location || '',
                 created_by: 'current_user',
               });
               
@@ -1775,6 +1909,11 @@ const NewShipment = () => {
           // After exporting, move to Formula Check and keep footer visible
           setActiveAction('formula-check');
         }}
+        products={products.map((product, index) => ({
+          ...product,
+          qty: qtyValues[index] || 0
+        })).filter(p => p.qty > 0)}
+        shipmentData={shipmentData}
       />
 
       <SortProductsCompleteModal

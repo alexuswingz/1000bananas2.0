@@ -19,7 +19,14 @@ import {
   Brush
 } from 'recharts';
 
-const NgoosModal = ({ isOpen, onClose, selectedRow }) => {
+const NgoosModal = ({ 
+  isOpen, 
+  onClose, 
+  selectedRow,
+  labelsAvailable = null,  // Available labels for this product's label_location
+  onAddUnits = null,  // Callback when "Add Units" is clicked
+  currentQty = 0,  // Current qty already added for this product
+}) => {
   const { isDarkMode } = useTheme();
   const [allVariations, setAllVariations] = useState(true);
   const [forecastView, setForecastView] = useState(true);
@@ -68,12 +75,27 @@ const NgoosModal = ({ isOpen, onClose, selectedRow }) => {
         
         const weeks = getWeeksForView(selectedView);
         
-        // Fetch all N-GOOS data in parallel
-        const [details, forecast, chart] = await Promise.all([
+        // Fetch all N-GOOS data in parallel, but handle each independently
+        const results = await Promise.allSettled([
           NgoosAPI.getProductDetails(childAsin),
           NgoosAPI.getForecast(childAsin),
           NgoosAPI.getChartData(childAsin, weeks)
         ]);
+
+        const details = results[0].status === 'fulfilled' ? results[0].value : null;
+        const forecast = results[1].status === 'fulfilled' ? results[1].value : null;
+        const chart = results[2].status === 'fulfilled' ? results[2].value : null;
+
+        console.log('N-GOOS API responses:', { 
+          details: results[0].status, 
+          forecast: results[1].status, 
+          chart: results[2].status,
+          chartValue: chart
+        });
+        
+        if (results[0].status === 'rejected') console.error('Details API failed:', results[0].reason);
+        if (results[1].status === 'rejected') console.error('Forecast API failed:', results[1].reason);
+        if (results[2].status === 'rejected') console.error('Chart API failed:', results[2].reason);
 
         setProductDetails(details);
         setForecastData(forecast);
@@ -91,11 +113,11 @@ const NgoosModal = ({ isOpen, onClose, selectedRow }) => {
     fetchNgoosData();
   }, [isOpen, selectedRow, selectedView]);
 
-  // Extract inventory data from API response or use fallback
+  // Extract inventory data from API response or use selectedRow fallback
   const inventoryData = productDetails?.inventory || {
     fba: {
-      total: 0,
-      available: 0,
+      total: selectedRow?.totalInventory || 0,
+      available: selectedRow?.fbaAvailable || 0,
       reserved: 0,
       inbound: 0
     },
@@ -107,12 +129,19 @@ const NgoosModal = ({ isOpen, onClose, selectedRow }) => {
     }
   };
 
-  // Extract timeline data from forecast API response
+  // Extract timeline data from forecast API response or use selectedRow fallback
   const timeline = {
-    fbaAvailable: Math.round(forecastData?.fba_available_days || 0),
-    totalDays: Math.round(forecastData?.total_days || 0),
-    forecast: Math.round(forecastData?.forecast_days || 0),
+    fbaAvailable: Math.round(forecastData?.fba_available_days || selectedRow?.doiFba || 0),
+    totalDays: Math.round(forecastData?.total_days || selectedRow?.doiTotal || 0),
+    forecast: Math.round(forecastData?.forecast_days || selectedRow?.forecast || 0),
     adjustment: Math.round(forecastData?.forecast_adjustment || 0)
+  };
+
+  // Sales data from API or selectedRow fallback
+  const salesData = {
+    sales7Day: forecastData?.sales_7_day || selectedRow?.sales7Day || 0,
+    sales30Day: forecastData?.sales_30_day || selectedRow?.sales30Day || 0,
+    weeklyForecast: forecastData?.weekly_forecast || selectedRow?.weeklyForecast || selectedRow?.forecast || 0,
   };
 
   // Calculate progress bar flex values based on timeline
@@ -133,24 +162,36 @@ const NgoosModal = ({ isOpen, onClose, selectedRow }) => {
 
   // Prepare chart data for visualization
   const chartDisplayData = useMemo(() => {
-    if (!chartData || !forecastData) return [];
+    // Allow chart to render with just chartData, using selectedRow fallbacks for forecast info
+    console.log('chartDisplayData useMemo - chartData:', chartData);
+    
+    if (!chartData) {
+      console.log('chartData is null/undefined');
+      return [];
+    }
 
-    const historical = chartData.historical || [];
-    const forecast = chartData.forecast || [];
+    const historical = Array.isArray(chartData.historical) ? chartData.historical : [];
+    const forecast = Array.isArray(chartData.forecast) ? chartData.forecast : [];
     
-    // Get current date and DOI goal date from forecast
-    const currentDate = new Date(forecastData.current_date || Date.now());
-    const doiGoalDate = new Date(forecastData.doi_goal_date || Date.now());
+    console.log('Processing historical:', historical.length, 'forecast:', forecast.length);
     
-    // Calculate runout dates
-    const fbaAvailableDays = forecastData.fba_available_days || 0;
-    const totalDays = forecastData.total_days || 0;
+    // Get current date and DOI goal date from forecast or use fallbacks
+    const currentDate = new Date(forecastData?.current_date || Date.now());
     
-    const runoutDate = forecastData.runout_date 
+    // Use selectedRow data as fallback for DOI calculations
+    const fbaAvailableDays = forecastData?.fba_available_days || selectedRow?.doiFba || 0;
+    const totalDays = forecastData?.total_days || selectedRow?.doiTotal || 0;
+    
+    // Calculate DOI goal date (default to 120 days from now if not available)
+    const doiGoalDate = forecastData?.doi_goal_date 
+      ? new Date(forecastData.doi_goal_date)
+      : new Date(currentDate.getTime() + 120 * 24 * 60 * 60 * 1000);
+    
+    const runoutDate = forecastData?.runout_date 
       ? new Date(forecastData.runout_date)
       : new Date(currentDate.getTime() + fbaAvailableDays * 24 * 60 * 60 * 1000);
     
-    const totalRunoutDate = forecastData.total_runout_date 
+    const totalRunoutDate = forecastData?.total_runout_date 
       ? new Date(forecastData.total_runout_date)
       : new Date(currentDate.getTime() + totalDays * 24 * 60 * 60 * 1000);
     
@@ -162,6 +203,9 @@ const NgoosModal = ({ isOpen, onClose, selectedRow }) => {
     forecast.forEach(item => {
       maxValue = Math.max(maxValue, item.forecast_base || 0, item.forecast_adjusted || 0);
     });
+    
+    // If no max value found, use a default
+    if (maxValue === 0) maxValue = 100;
     
     const barHeight = maxValue * 1.1;
     
@@ -203,8 +247,13 @@ const NgoosModal = ({ isOpen, onClose, selectedRow }) => {
       });
     });
     
+    // Sort by date
+    combinedData.sort((a, b) => a.timestamp - b.timestamp);
+    
+    console.log('Chart data prepared:', combinedData.length, 'points', combinedData.slice(0, 3));
+    
     return combinedData;
-  }, [chartData, forecastData]);
+  }, [chartData, forecastData, selectedRow]);
 
   // Custom tooltip
   const CustomTooltip = ({ active, payload, label }) => {
@@ -323,7 +372,7 @@ const NgoosModal = ({ isOpen, onClose, selectedRow }) => {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            {productDetails?.inventory && (
+            {(productDetails?.inventory || selectedRow) && (
               <>
                 <button
                   type="button"
@@ -347,19 +396,28 @@ const NgoosModal = ({ isOpen, onClose, selectedRow }) => {
                       width: '16px',
                       height: '16px',
                       borderRadius: '9999px',
-                      backgroundColor: '#DC2626',
+                      backgroundColor: labelsAvailable !== null && labelsAvailable < 100 ? '#DC2626' : '#22C55E',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       flexShrink: 0,
                     }}
                   >
-                    <span style={{ color: '#FFFFFF', fontSize: '10px', fontWeight: 700 }}>!</span>
+                    <span style={{ color: '#FFFFFF', fontSize: '10px', fontWeight: 700 }}>
+                      {labelsAvailable !== null && labelsAvailable < 100 ? '!' : '✓'}
+                    </span>
                   </span>
-                  <span>Label Inventory: {inventoryData.fba.total + inventoryData.awd.total}</span>
+                  <span>Label Inventory: {labelsAvailable !== null ? labelsAvailable.toLocaleString() : (selectedRow?.labelsAvailable || 0).toLocaleString()}</span>
                 </button>
                 <button
                   type="button"
+                  onClick={() => {
+                    if (onAddUnits) {
+                      const unitsToAdd = forecastData?.units_to_make || salesData.weeklyForecast || 0;
+                      onAddUnits(selectedRow, unitsToAdd);
+                      onClose();
+                    }
+                  }}
                   style={{
                     padding: '0 0.75rem',
                     borderRadius: '4px',
@@ -373,9 +431,10 @@ const NgoosModal = ({ isOpen, onClose, selectedRow }) => {
                     alignItems: 'center',
                     justifyContent: 'center',
                     whiteSpace: 'nowrap',
+                    cursor: 'pointer',
                   }}
                 >
-                  Add Units ({forecastData?.units_to_make || 0})
+                  Add Units ({(forecastData?.units_to_make || salesData.weeklyForecast || 0).toLocaleString()})
                 </button>
               </>
             )}
@@ -874,7 +933,7 @@ const NgoosModal = ({ isOpen, onClose, selectedRow }) => {
             <div
               style={{
                 flex: 1,
-                minHeight: '190px',
+                height: '220px',
                 borderRadius: '0.75rem',
                 border: `1px dashed ${isDarkMode ? '#374151' : '#D1D5DB'}`,
                 padding: '0.5rem',
@@ -885,7 +944,7 @@ const NgoosModal = ({ isOpen, onClose, selectedRow }) => {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
                 </div>
               ) : chartDisplayData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height={200}>
                   <ComposedChart
                     data={chartDisplayData}
                     margin={{ top: 5, right: 20, left: 10, bottom: 20 }}
@@ -972,8 +1031,11 @@ const NgoosModal = ({ isOpen, onClose, selectedRow }) => {
                   </ComposedChart>
                 </ResponsiveContainer>
               ) : (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: '0.8rem' }} className={themeClasses.textSecondary}>
-                  No chart data available
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: '0.8rem', gap: '0.5rem' }} className={themeClasses.textSecondary}>
+                  <span>No chart data available</span>
+                  <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>
+                    {chartData ? `Raw data: ${chartData.historical?.length || 0} historical, ${chartData.forecast?.length || 0} forecast points` : 'chartData is null'}
+                  </span>
                 </div>
               )}
             </div>

@@ -360,6 +360,35 @@ export const getShipmentProducts = async (shipmentId) => {
 };
 
 /**
+ * Get labels availability across all label_locations
+ * Calculates available labels by subtracting committed labels in active shipments
+ * @param {string} excludeShipmentId - Optional shipment ID to exclude from calculation (current shipment)
+ * @returns {Promise<Object>} Labels availability data with by_location lookup map
+ */
+export const getLabelsAvailability = async (excludeShipmentId = null) => {
+  try {
+    const url = excludeShipmentId 
+      ? `${API_BASE_URL}/production/labels/availability?exclude_shipment_id=${excludeShipmentId}`
+      : `${API_BASE_URL}/production/labels/availability`;
+    
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to fetch labels availability');
+    }
+    
+    return {
+      data: data.data,
+      byLocation: data.by_location
+    };
+  } catch (error) {
+    console.error('Error fetching labels availability:', error);
+    throw error;
+  }
+};
+
+/**
  * Get formula check data for shipment
  * @param {number} shipmentId - Shipment ID
  * @returns {Promise<Array>} Formula aggregation with availability

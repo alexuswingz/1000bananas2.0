@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../../context/ThemeContext';
 import PlanningHeader from './components/PlanningHeader';
 import PlanningTable from './components/PlanningTable';
@@ -11,6 +11,7 @@ import { getAllShipments, createShipment } from '../../../services/productionApi
 const Planning = () => {
   const { isDarkMode } = useTheme();
   const location = useLocation();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('shipments');
   const [activeFilters, setActiveFilters] = useState([]);
   const [showNewShipmentModal, setShowNewShipmentModal] = useState(false);
@@ -371,6 +372,44 @@ const Planning = () => {
     console.log('Search:', searchTerm);
   };
 
+  // Determine which step to navigate to based on shipment status
+  const getNextIncompleteStep = (row) => {
+    // Return the first incomplete step
+    if (row.addProducts !== 'completed') return 'add-products';
+    if (row.formulaCheck !== 'completed') return 'formula-check';
+    if (row.labelCheck !== 'completed') return 'label-check';
+    if (row.bookShipment !== 'completed') return 'book-shipment';
+    if (row.sortProducts !== 'completed') return 'sort-products';
+    if (row.sortFormulas !== 'completed') return 'sort-formulas';
+    return 'completed'; // All steps completed
+  };
+
+  const handleRowClick = (row) => {
+    const nextStep = getNextIncompleteStep(row);
+    
+    // Navigate to shipment order page with shipment data and step
+    navigate('/dashboard/production/shipment/new', {
+      state: {
+        shipmentId: row.id,
+        shipmentNumber: row.shipment,
+        marketplace: row.marketplace,
+        account: row.account,
+        shipmentType: row.shipment?.includes('AWD') ? 'AWD' : row.shipment?.includes('FBA') ? 'FBA' : 'AWD',
+        initialAction: nextStep,
+        existingShipment: true,
+        // Pass the current status of each step
+        stepStatuses: {
+          addProducts: row.addProducts,
+          formulaCheck: row.formulaCheck,
+          labelCheck: row.labelCheck,
+          bookShipment: row.bookShipment,
+          sortProducts: row.sortProducts,
+          sortFormulas: row.sortFormulas,
+        }
+      }
+    });
+  };
+
   return (
     <div className={`min-h-screen ${themeClasses.pageBg}`}>
       <PlanningHeader
@@ -399,6 +438,7 @@ const Planning = () => {
                 rows={shipments}
                 activeFilters={activeFilters}
                 onFilterToggle={toggleFilter}
+                onRowClick={handleRowClick}
               />
             )}
           </>

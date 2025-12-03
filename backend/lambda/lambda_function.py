@@ -2263,9 +2263,21 @@ def get_label_inventory(event):
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
+        # Join with catalog and sales_metrics to get sales data for sorting
+        # Priority: Items with sales activity first, then by higher sales, then by lower inventory
         cursor.execute("""
-            SELECT * FROM label_inventory
-            ORDER BY brand_name, product_name, bottle_size
+            SELECT 
+                li.*,
+                COALESCE(sm.units_sold_30_days, 0) as units_sold_30_days,
+                COALESCE(sm.units_sold_30_days / 30.0, 0) as daily_sales_rate
+            FROM label_inventory li
+            LEFT JOIN catalog c ON li.product_name = c.product_name AND li.bottle_size = c.size
+            LEFT JOIN sales_metrics sm ON c.id = sm.catalog_id
+            ORDER BY 
+                CASE WHEN COALESCE(sm.units_sold_30_days, 0) > 0 THEN 0 ELSE 1 END ASC,
+                COALESCE(sm.units_sold_30_days, 0) DESC,
+                COALESCE(li.warehouse_inventory, 0) ASC,
+                li.brand_name, li.product_name, li.bottle_size
         """)
         inventory = cursor.fetchall()
         return cors_response(200, {'success': True, 'data': [dict(row) for row in inventory]})
@@ -3817,9 +3829,14 @@ def get_production_planning(event):
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
         # Use the v_production_planning view
+        # Priority: Items with sales activity first, then by higher sales, then by lower inventory
         cursor.execute("""
             SELECT * FROM v_production_planning
-            ORDER BY product_name
+            ORDER BY 
+                CASE WHEN COALESCE(units_sold_30_days, 0) > 0 THEN 0 ELSE 1 END ASC,
+                COALESCE(units_sold_30_days, 0) DESC,
+                COALESCE(bottle_current_inventory, 0) ASC,
+                product_name
         """)
         planning_data = cursor.fetchall()
         return cors_response(200, {'success': True, 'data': [dict(row) for row in planning_data]})
@@ -4099,6 +4116,21 @@ def update_shipment(event):
         shipment_id = event['pathParameters']['id']
         body = json.loads(event.get('body', '{}'))
         
+        # Check if we're booking the shipment (4th tab completion)
+        # This is when we should deduct inventory
+        booking_shipment = body.get('book_shipment_completed') == True
+        
+        if booking_shipment:
+            # First check if shipment is already booked to prevent double deduction
+            cursor.execute("""
+                SELECT book_shipment_completed FROM shipments WHERE id = %s
+            """, (shipment_id,))
+            current_shipment = cursor.fetchone()
+            
+            if current_shipment and current_shipment['book_shipment_completed']:
+                # Already booked, don't deduct again
+                booking_shipment = False
+        
         # Build dynamic UPDATE query
         update_fields = []
         values = []
@@ -4108,7 +4140,7 @@ def update_shipment(event):
             'marketplace', 'account', 'location', 'status',
             'add_products_completed', 'formula_check_completed',
             'label_check_completed', 'sort_products_completed',
-            'sort_formulas_completed', 'notes'
+            'sort_formulas_completed', 'book_shipment_completed', 'notes'
         ]
         
         for field in allowed_fields:
@@ -4133,11 +4165,75 @@ def update_shipment(event):
         
         cursor.execute(query, values)
         shipment = cursor.fetchone()
+        
+        # If booking shipment, deduct inventory for all products
+        if booking_shipment:
+            # Get all products in this shipment
+            cursor.execute("""
+                SELECT 
+                    sp.quantity,
+                    sp.label_location,
+                    sp.bottle_name,
+                    sp.closure_name,
+                    sp.formula_name,
+                    sp.formula_gallons_needed,
+                    sp.boxes_needed,
+                    sp.box_type
+                FROM shipment_products sp
+                WHERE sp.shipment_id = %s
+            """, (shipment_id,))
+            
+            products = cursor.fetchall()
+            
+            for product in products:
+                quantity = product['quantity'] or 0
+                
+                # Deduct labels from label_inventory
+                if product['label_location']:
+                    cursor.execute("""
+                        UPDATE label_inventory 
+                        SET warehouse_inventory = GREATEST(0, warehouse_inventory - %s)
+                        WHERE label_location = %s
+                    """, (quantity, product['label_location']))
+                
+                # Deduct bottles from bottle_inventory
+                if product['bottle_name']:
+                    cursor.execute("""
+                        UPDATE bottle_inventory 
+                        SET warehouse_quantity = GREATEST(0, warehouse_quantity - %s)
+                        WHERE bottle_name = %s
+                    """, (quantity, product['bottle_name']))
+                
+                # Deduct closures from closure_inventory
+                if product['closure_name']:
+                    cursor.execute("""
+                        UPDATE closure_inventory 
+                        SET warehouse_quantity = GREATEST(0, warehouse_quantity - %s)
+                        WHERE closure_name = %s
+                    """, (quantity, product['closure_name']))
+                
+                # Deduct formula from formula_inventory
+                if product['formula_name'] and product['formula_gallons_needed']:
+                    cursor.execute("""
+                        UPDATE formula_inventory 
+                        SET gallons_available = GREATEST(0, gallons_available - %s)
+                        WHERE formula_name = %s
+                    """, (product['formula_gallons_needed'], product['formula_name']))
+                
+                # Deduct boxes from box_inventory
+                if product['box_type'] and product['boxes_needed']:
+                    cursor.execute("""
+                        UPDATE box_inventory 
+                        SET warehouse_quantity = GREATEST(0, warehouse_quantity - %s)
+                        WHERE box_type = %s
+                    """, (product['boxes_needed'], product['box_type']))
+        
         conn.commit()
         
         return cors_response(200, {
             'success': True,
-            'data': shipment
+            'data': shipment,
+            'inventory_deducted': booking_shipment
         })
     except Exception as e:
         conn.rollback()
@@ -4369,6 +4465,109 @@ def get_shipment_formula_check(event):
         cursor.close()
         conn.close()
 
+def get_labels_availability(event):
+    """GET /production/labels/availability - Get available labels for all label_locations
+    
+    Calculates: Total Labels - Labels Committed in Active Shipments
+    Active shipments = status NOT IN ('shipped', 'received', 'archived')
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # Get optional exclude_shipment_id to exclude current shipment from calculation
+        query_params = event.get('queryStringParameters') or {}
+        exclude_shipment_id = query_params.get('exclude_shipment_id')
+        
+        # Debug: Log what's committed in active shipments
+        cursor.execute("""
+            SELECT 
+                sp.label_location,
+                sp.labels_needed,
+                sp.quantity,
+                sp.product_name,
+                s.id as shipment_id,
+                s.status as shipment_status
+            FROM shipment_products sp
+            JOIN shipments s ON sp.shipment_id = s.id
+            WHERE s.status NOT IN ('shipped', 'received', 'archived')
+            AND sp.label_location IS NOT NULL
+            ORDER BY sp.label_location
+        """)
+        debug_committed = cursor.fetchall()
+        print(f"DEBUG - Committed labels in active shipments: {len(debug_committed)} records")
+        for row in debug_committed[:10]:  # Log first 10
+            print(f"  {row['label_location']}: {row['labels_needed']} labels for {row['product_name']} (shipment {row['shipment_id']}, status: {row['shipment_status']})")
+        
+        # Get all label_locations with their total inventory and committed labels
+        cursor.execute("""
+            WITH committed_labels AS (
+                SELECT 
+                    sp.label_location,
+                    SUM(COALESCE(sp.labels_needed, sp.quantity)) as total_committed
+                FROM shipment_products sp
+                JOIN shipments s ON sp.shipment_id = s.id
+                WHERE s.status NOT IN ('shipped', 'received', 'archived')
+                AND sp.label_location IS NOT NULL
+                """ + (f"AND s.id != %s" if exclude_shipment_id else "") + """
+                GROUP BY sp.label_location
+            )
+            SELECT 
+                li.id,
+                li.label_location,
+                li.brand_name,
+                li.product_name,
+                li.bottle_size,
+                li.warehouse_inventory as total_inventory,
+                COALESCE(cl.total_committed, 0) as labels_committed,
+                li.warehouse_inventory - COALESCE(cl.total_committed, 0) as labels_available
+            FROM label_inventory li
+            LEFT JOIN committed_labels cl ON li.label_location = cl.label_location
+            WHERE li.label_location IS NOT NULL
+            ORDER BY li.brand_name, li.product_name, li.bottle_size
+        """, (exclude_shipment_id,) if exclude_shipment_id else ())
+        
+        labels = cursor.fetchall()
+        
+        # Debug logging
+        print(f"DEBUG - Labels availability: {len(labels)} label_locations found")
+        for lbl in labels[:5]:
+            print(f"  {lbl['label_location']}: total={lbl['total_inventory']}, committed={lbl['labels_committed']}, available={lbl['labels_available']}")
+        
+        # Create a lookup map by label_location
+        availability_map = {}
+        for label in labels:
+            loc = label['label_location']
+            if loc:
+                if loc not in availability_map:
+                    availability_map[loc] = {
+                        'label_location': loc,
+                        'total_inventory': label['total_inventory'] or 0,
+                        'labels_committed': label['labels_committed'] or 0,
+                        'labels_available': label['labels_available'] or 0,
+                        'products_using': []
+                    }
+                availability_map[loc]['products_using'].append({
+                    'brand_name': label['brand_name'],
+                    'product_name': label['product_name'],
+                    'bottle_size': label['bottle_size']
+                })
+        
+        return cors_response(200, {
+            'success': True,
+            'data': list(availability_map.values()),
+            'by_location': availability_map
+        })
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
 def get_shipment_products(event):
     """GET /production/shipments/{id}/products - Get shipment products"""
     conn = get_db_connection()
@@ -4376,19 +4575,34 @@ def get_shipment_products(event):
     try:
         shipment_id = event['pathParameters']['id']
         
+        # Get products with available inventory (accounting for other shipments)
         cursor.execute("""
+            WITH committed_labels AS (
+                SELECT 
+                    sp.label_location,
+                    SUM(COALESCE(sp.labels_needed, sp.quantity)) as total_committed
+                FROM shipment_products sp
+                JOIN shipments s ON sp.shipment_id = s.id
+                WHERE s.status NOT IN ('shipped', 'received', 'archived')
+                AND s.id != %s
+                AND sp.label_location IS NOT NULL
+                GROUP BY sp.label_location
+            )
             SELECT 
                 sp.*,
                 bi.warehouse_quantity as bottles_available,
                 ci.warehouse_quantity as closures_available,
-                li.warehouse_inventory as labels_available
+                li.warehouse_inventory as labels_total,
+                COALESCE(cl.total_committed, 0) as labels_committed_other_shipments,
+                li.warehouse_inventory - COALESCE(cl.total_committed, 0) as labels_available
             FROM shipment_products sp
             LEFT JOIN bottle_inventory bi ON sp.bottle_name = bi.bottle_name
             LEFT JOIN closure_inventory ci ON sp.closure_name = ci.closure_name
             LEFT JOIN label_inventory li ON sp.label_location = li.label_location
+            LEFT JOIN committed_labels cl ON sp.label_location = cl.label_location
             WHERE sp.shipment_id = %s
             ORDER BY sp.brand_name, sp.product_name, sp.size
-        """, (shipment_id,))
+        """, (shipment_id, shipment_id))
         
         products = cursor.fetchall()
         
@@ -4731,7 +4945,11 @@ def get_products_inventory(event):
             LEFT JOIN closure_inventory ci ON c.closure_name = ci.closure_name
             LEFT JOIN label_inventory li ON c.label_location = li.label_location
             WHERE c.child_asin IS NOT NULL
-            ORDER BY c.brand_name, c.product_name, c.size
+            ORDER BY 
+                CASE WHEN COALESCE(sm.units_sold_30_days, 0) > 0 THEN 0 ELSE 1 END ASC,
+                COALESCE(sm.units_sold_30_days, 0) DESC,
+                COALESCE(bi.warehouse_quantity, 0) ASC,
+                c.brand_name, c.product_name, c.size
         """)
         
         products = cursor.fetchall()
@@ -5016,6 +5234,10 @@ def lambda_handler(event, context):
         
         elif http_method == 'GET' and path.endswith('/production/floor-inventory/unused-formulas'):
             return get_unused_formulas(event)
+        
+        # Labels availability endpoint
+        elif http_method == 'GET' and path.endswith('/production/labels/availability'):
+            return get_labels_availability(event)
         
         # Shipment endpoints
         elif http_method == 'GET' and '/production/shipments/' in path and '/formula-check' in path:

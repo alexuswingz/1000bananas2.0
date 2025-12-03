@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
-const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyChange, onAddedRowsChange }) => {
+const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyChange, onAddedRowsChange, labelsAvailabilityMap = {} }) => {
   const { isDarkMode } = useTheme();
   const [selectedRows, setSelectedRows] = useState(new Set());
   const [addedRows, setAddedRows] = useState(new Set());
@@ -15,6 +15,45 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
   const [openFilterIndex, setOpenFilterIndex] = useState(null);
   const filterRefs = useRef({});
   const filterModalRefs = useRef({});
+  
+  // Filter state
+  const [activeFilters, setActiveFilters] = useState({
+    popularFilter: '',
+    sortField: '',
+    sortOrder: '',
+    filterField: '',
+    filterCondition: '',
+    filterValue: '',
+  });
+
+  // Calculate available labels for a product, accounting for other products with same label_location
+  const getAvailableLabelsForRow = (row, rowIndex) => {
+    if (!row?.label_location) return row?.labelsAvailable || 0;
+    
+    const labelLoc = row.label_location;
+    const baseAvailable = labelsAvailabilityMap[labelLoc]?.labels_available || row?.labelsAvailable || 0;
+    
+    // Subtract labels used by OTHER products with same label_location in current shipment
+    const usedByOthers = rows.reduce((sum, otherRow, idx) => {
+      if (idx !== rowIndex && otherRow.label_location === labelLoc) {
+        const qty = qtyValues?.[idx] || 0;
+        return sum + (typeof qty === 'number' ? qty : parseInt(qty, 10) || 0);
+      }
+      return sum;
+    }, 0);
+    
+    return Math.max(0, baseAvailable - usedByOthers);
+  };
+
+  // Check if a row's qty exceeds available labels
+  const isQtyExceedingLabels = (row, rowIndex) => {
+    const qty = qtyValues?.[rowIndex] || 0;
+    const numQty = typeof qty === 'number' ? qty : parseInt(qty, 10) || 0;
+    if (numQty === 0) return false;
+    
+    const available = getAvailableLabelsForRow(row, rowIndex);
+    return numQty > available;
+  };
 
   // Use local state if props not provided (for backward compatibility)
   const [internalQtyValues, setInternalQtyValues] = useState(() => {
@@ -40,10 +79,128 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
     }
   }, [rows.length]);
 
+  // Apply filters to rows - preserve original index for qtyValues mapping
+  const filteredRows = useMemo(() => {
+    // First, attach original index to each row
+    let result = rows.map((row, index) => ({ ...row, _originalIndex: index }));
+    
+    // Apply popular filter
+    if (activeFilters.popularFilter) {
+      switch (activeFilters.popularFilter) {
+        case 'bestSellers':
+          // Top revenue - sort by sales30Day * some average price or just by sales
+          result = result.filter(r => (r.sales30Day || 0) > 0);
+          result.sort((a, b) => (b.sales30Day || 0) - (a.sales30Day || 0));
+          result = result.slice(0, 50); // Top 50
+          break;
+        case 'fastestMovers':
+          // Highest unit velocity - sort by daily sales rate
+          result = result.filter(r => (r.sales30Day || 0) > 0);
+          result.sort((a, b) => ((b.sales30Day || 0) / 30) - ((a.sales30Day || 0) / 30));
+          result = result.slice(0, 50);
+          break;
+        case 'topProfit':
+          // Top profit - sort by margin or profit if available
+          result = result.filter(r => (r.profit || r.margin || r.sales30Day || 0) > 0);
+          result.sort((a, b) => (b.profit || b.margin || b.sales30Day || 0) - (a.profit || a.margin || a.sales30Day || 0));
+          result = result.slice(0, 50);
+          break;
+        case 'topTraffic':
+          // Top traffic - sort by sessions or CTR
+          result = result.filter(r => (r.sessions || r.pageViews || 0) > 0);
+          result.sort((a, b) => (b.sessions || b.pageViews || 0) - (a.sessions || a.pageViews || 0));
+          result = result.slice(0, 50);
+          break;
+        case 'outOfStock':
+          // Out of stock - where FBA available is 0 or very low
+          result = result.filter(r => (r.fbaAvailable || 0) === 0 && (r.sales30Day || 0) > 0);
+          break;
+        case 'overstock':
+          // Overstock - where DOI is very high (e.g., > 120 days)
+          result = result.filter(r => (r.doiTotal || r.daysOfInventory || 0) > 120);
+          break;
+        default:
+          break;
+      }
+    }
+    
+    // Apply custom filter condition
+    if (activeFilters.filterField && activeFilters.filterCondition && activeFilters.filterValue) {
+      const fieldMap = {
+        'brand': 'brand',
+        'product': 'product',
+        'size': 'size',
+        'fbaAvailable': 'fbaAvailable',
+        'totalInventory': 'totalInventory',
+        'forecast': 'weeklyForecast',
+        'qty': 'qty',
+      };
+      const field = fieldMap[activeFilters.filterField] || activeFilters.filterField;
+      const value = activeFilters.filterValue.toLowerCase();
+      
+      result = result.filter(row => {
+        const rowValue = row[field];
+        const strValue = String(rowValue || '').toLowerCase();
+        const numValue = parseFloat(rowValue) || 0;
+        const filterNum = parseFloat(activeFilters.filterValue) || 0;
+        
+        switch (activeFilters.filterCondition) {
+          case 'equals':
+            return strValue === value;
+          case 'contains':
+            return strValue.includes(value);
+          case 'greaterThan':
+            return numValue > filterNum;
+          case 'lessThan':
+            return numValue < filterNum;
+          default:
+            return true;
+        }
+      });
+    }
+    
+    // Apply sorting
+    if (activeFilters.sortField && activeFilters.sortOrder) {
+      const fieldMap = {
+        'fbaAvailable': 'fbaAvailable',
+        'totalInventory': 'totalInventory',
+        'forecast': 'weeklyForecast',
+        'sales7': 'sales7Day',
+        'sales30': 'sales30Day',
+      };
+      const field = fieldMap[activeFilters.sortField] || activeFilters.sortField;
+      
+      result.sort((a, b) => {
+        const aVal = parseFloat(a[field]) || 0;
+        const bVal = parseFloat(b[field]) || 0;
+        return activeFilters.sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+      });
+    }
+    
+    return result;
+  }, [rows, activeFilters]);
+  
+  // Handle filter apply
+  const handleFilterApply = (filterSettings) => {
+    setActiveFilters(filterSettings);
+  };
+  
+  // Handle filter reset
+  const handleFilterReset = () => {
+    setActiveFilters({
+      popularFilter: '',
+      sortField: '',
+      sortOrder: '',
+      filterField: '',
+      filterCondition: '',
+      filterValue: '',
+    });
+  };
+
   // Check if all rows are selected
   const allSelected = useMemo(() => {
-    return rows.length > 0 && selectedRows.size === rows.length;
-  }, [rows.length, selectedRows.size]);
+    return filteredRows.length > 0 && selectedRows.size === filteredRows.length;
+  }, [filteredRows.length, selectedRows.size]);
 
   // Check if some rows are selected (for indeterminate state)
   const someSelected = useMemo(() => {
@@ -342,7 +499,11 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                       }}
                       src="/assets/Vector (1).png"
                       alt="Filter"
-                      className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
+                      className={`w-3 h-3 transition-opacity ${
+                        activeFilters.popularFilter || activeFilters.sortField || activeFilters.filterField 
+                          ? 'opacity-100' 
+                          : 'opacity-0 group-hover:opacity-100'
+                      }`}
                       style={{ 
                         width: '12px', 
                         height: '12px',
@@ -351,6 +512,9 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                         top: '50%',
                         transform: 'translateY(-50%)',
                         cursor: 'pointer',
+                        filter: activeFilters.popularFilter || activeFilters.sortField || activeFilters.filterField 
+                          ? 'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)' 
+                          : undefined,
                       }}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -415,7 +579,9 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row, index) => (
+                {filteredRows.map((row) => {
+                  const index = row._originalIndex;
+                  return (
                   <tr key={row.id} className="border-t border-gray-200" style={{ height: '40px', maxHeight: '40px' }}>
                     <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }} className={themeClasses.text}>
                       {row.brand}
@@ -577,12 +743,15 @@ Current Inventory:
                           }
                         }}
                         placeholder="0"
-                        className={`${themeClasses.cardBg} ${themeClasses.border} border rounded-md text-xs ${themeClasses.text}`}
+                        title={isQtyExceedingLabels(row, index) ? `Exceeds available labels (${getAvailableLabelsForRow(row, index).toLocaleString()} available)` : ''}
+                        className={`${themeClasses.cardBg} border rounded-md text-xs ${themeClasses.text}`}
                         style={{
                           padding: '0.25rem 0.5rem',
                           width: '90px',
                           textAlign: 'center',
                           cursor: 'text',
+                          borderColor: isQtyExceedingLabels(row, index) ? '#EF4444' : (isDarkMode ? '#374151' : '#D1D5DB'),
+                          backgroundColor: isQtyExceedingLabels(row, index) ? (isDarkMode ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.05)') : undefined,
                         }}
                       />
                     </td>
@@ -739,11 +908,61 @@ Current Inventory:
                       </div>
                     </td>
                   </tr>
-                ))}
+                ); })}
               </tbody>
             </table>
           </div>
         </div>
+
+        {/* Filter status indicator */}
+        {(activeFilters.popularFilter || activeFilters.sortField || activeFilters.filterField) && (
+          <div
+            style={{
+              padding: '0.5rem 1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: '#EFF6FF',
+              borderBottom: '1px solid #BFDBFE',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.875rem', color: '#1D4ED8', fontWeight: 500 }}>
+                🔍 Showing {filteredRows.length} of {rows.length} products
+              </span>
+              {activeFilters.popularFilter && (
+                <span style={{ 
+                  fontSize: '0.75rem', 
+                  backgroundColor: '#3B82F6', 
+                  color: 'white', 
+                  padding: '2px 8px', 
+                  borderRadius: '12px' 
+                }}>
+                  {activeFilters.popularFilter === 'bestSellers' && 'Best Sellers'}
+                  {activeFilters.popularFilter === 'fastestMovers' && 'Fastest Movers'}
+                  {activeFilters.popularFilter === 'topProfit' && 'Top Profit'}
+                  {activeFilters.popularFilter === 'topTraffic' && 'Top Traffic'}
+                  {activeFilters.popularFilter === 'outOfStock' && 'Out of Stock'}
+                  {activeFilters.popularFilter === 'overstock' && 'Overstock'}
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={handleFilterReset}
+              style={{
+                fontSize: '0.75rem',
+                color: '#3B82F6',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                textDecoration: 'underline',
+              }}
+            >
+              Clear filters
+            </button>
+          </div>
+        )}
 
         {/* Legend */}
         <div
@@ -973,6 +1192,9 @@ Current Inventory:
             }}
             filterIconRef={filterRefs.current['doi-goal']}
             onClose={() => setOpenFilterIndex(null)}
+            onApply={handleFilterApply}
+            onReset={handleFilterReset}
+            currentFilters={activeFilters}
           />
         )}
       </>
@@ -1456,7 +1678,9 @@ Current Inventory:
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, index) => (
+            {filteredRows.map((row) => {
+              const index = row._originalIndex;
+              return (
               <tr key={row.id} style={{ height: '40px', maxHeight: '40px' }}>
                 {/* Sticky columns */}
                 <td style={{ 
@@ -1559,14 +1783,15 @@ Current Inventory:
                       }}
                       onMouseEnter={() => setHoveredQtyIndex(index)}
                       onMouseLeave={() => setHoveredQtyIndex(null)}
+                      title={isQtyExceedingLabels(row, index) ? `Exceeds available labels (${getAvailableLabelsForRow(row, index).toLocaleString()} available)` : ''}
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '4px',
-                        backgroundColor: '#FFFFFF',
+                        backgroundColor: isQtyExceedingLabels(row, index) ? 'rgba(239, 68, 68, 0.05)' : '#FFFFFF',
                         borderRadius: '8px',
-                        border: '1px solid #E5E7EB',
+                        border: isQtyExceedingLabels(row, index) ? '1px solid #EF4444' : '1px solid #E5E7EB',
                         padding: '4px 6px',
                         width: '107px',
                         height: '24px',
@@ -1664,7 +1889,7 @@ Current Inventory:
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          const labelsAvailable = row.labelsAvailable || 0;
+                          const labelsAvailable = getAvailableLabelsForRow(row, index);
                           const labelsNeeded = effectiveQtyValues[index] ?? 0;
                           // Only show popup if labels needed exceed available
                           if (labelsNeeded > labelsAvailable) {
@@ -1830,7 +2055,7 @@ Current Inventory:
                         </div>
                       )}
                       {(() => {
-                        const labelsAvailable = row.labelsAvailable || 0;
+                        const labelsAvailable = getAvailableLabelsForRow(row, index);
                         const labelsNeeded = effectiveQtyValues[index] ?? 0;
                         // Only show exclamation if labels needed exceed available
                         if (labelsNeeded > labelsAvailable) {
@@ -1860,7 +2085,7 @@ Current Inventory:
                       })()}
                     </div>
                     {clickedQtyIndex === index && (() => {
-                      const labelsAvailable = row.labelsAvailable || 0;
+                      const labelsAvailable = getAvailableLabelsForRow(row, index);
                       const labelsNeeded = effectiveQtyValues[index] ?? 0;
                       return labelsNeeded > labelsAvailable;
                     })() && (
@@ -1910,7 +2135,7 @@ Current Inventory:
                             color: '#6B7280',
                             lineHeight: '1.4',
                           }}>
-                            Labels Available: {row.labelsAvailable || 0}
+                            Labels Available: {getAvailableLabelsForRow(row, index).toLocaleString()}
                           </p>
                           <p style={{
                             fontSize: '14px',
@@ -1951,7 +2176,7 @@ Current Inventory:
                               e.stopPropagation();
                               e.preventDefault();
                               // Set QTY to available labels only (removes excess units)
-                              const labelsAvailable = row.labelsAvailable || 0;
+                              const labelsAvailable = getAvailableLabelsForRow(row, index);
                               
                               // Update state - React will re-render with new value
                               effectiveSetQtyValues(prev => {
@@ -2110,27 +2335,41 @@ Current Inventory:
                   </button>
                 </td>
               </tr>
-            ))}
+            ); })}
           </tbody>
         </table>
       </div>
     </div>
+    
+    {/* Timeline Filter Modal for Table Mode */}
+    {openFilterIndex === 'doi-goal' && (
+      <TimelineFilterDropdown
+        ref={(el) => {
+          if (el) filterModalRefs.current['doi-goal'] = el;
+        }}
+        filterIconRef={filterRefs.current['doi-goal']}
+        onClose={() => setOpenFilterIndex(null)}
+        onApply={handleFilterApply}
+        onReset={handleFilterReset}
+        currentFilters={activeFilters}
+      />
+    )}
     </>
   );
 };
 
 // Timeline Filter Dropdown Component
-const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose }, ref) => {
+const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApply, onReset, currentFilters = {} }, ref) => {
   const [position, setPosition] = useState({ top: 0, left: 0 });
-  const [popularFilter, setPopularFilter] = useState('');
+  const [popularFilter, setPopularFilter] = useState(currentFilters.popularFilter || '');
   const [isPopularFilterOpen, setIsPopularFilterOpen] = useState(false);
-  const [sortField, setSortField] = useState('');
+  const [sortField, setSortField] = useState(currentFilters.sortField || '');
   const [isSortFieldOpen, setIsSortFieldOpen] = useState(false);
-  const [sortOrder, setSortOrder] = useState('');
+  const [sortOrder, setSortOrder] = useState(currentFilters.sortOrder || '');
   const [isFilterConditionExpanded, setIsFilterConditionExpanded] = useState(true);
-  const [filterField, setFilterField] = useState('');
-  const [filterCondition, setFilterCondition] = useState('');
-  const [filterValue, setFilterValue] = useState('');
+  const [filterField, setFilterField] = useState(currentFilters.filterField || '');
+  const [filterCondition, setFilterCondition] = useState(currentFilters.filterCondition || '');
+  const [filterValue, setFilterValue] = useState(currentFilters.filterValue || '');
   const popularFilterRef = useRef(null);
   const sortFieldRef = useRef(null);
 
@@ -2205,10 +2444,23 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose }, ref
     setFilterField('');
     setFilterCondition('');
     setFilterValue('');
+    if (onReset) {
+      onReset();
+    }
+    onClose();
   };
 
   const handleApply = () => {
-    // Apply filter logic here
+    if (onApply) {
+      onApply({
+        popularFilter,
+        sortField,
+        sortOrder,
+        filterField,
+        filterCondition,
+        filterValue,
+      });
+    }
     onClose();
   };
 
@@ -2356,6 +2608,18 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose }, ref
                   onClick={() => {
                     setPopularFilter(filter.value);
                     setIsPopularFilterOpen(false);
+                    // Apply immediately when selecting a popular filter
+                    if (onApply) {
+                      onApply({
+                        popularFilter: filter.value,
+                        sortField,
+                        sortOrder,
+                        filterField,
+                        filterCondition,
+                        filterValue,
+                      });
+                    }
+                    onClose();
                   }}
                   style={{
                     width: '100%',

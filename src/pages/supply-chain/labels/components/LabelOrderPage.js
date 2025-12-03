@@ -77,9 +77,25 @@ const LabelOrderPage = () => {
                 added: recommendedQty > 0, // Auto-add if forecast suggests ordering
                 recommendedQty: recommendedQty,
                 forecastedUnitsNeeded: Math.round(forecast.forecasted_units_needed || 0),
+                unitsSold30Days: label.units_sold_30_days || 0,
               };
             });
-            setAllLines(transformed);
+            
+            // Sort: items with sales activity first, then by higher sales, then by lower inventory
+            const sorted = transformed.sort((a, b) => {
+              // First: items with sales > 0 come first
+              const aHasSales = a.unitsSold30Days > 0 ? 0 : 1;
+              const bHasSales = b.unitsSold30Days > 0 ? 0 : 1;
+              if (aHasSales !== bHasSales) return aHasSales - bHasSales;
+              
+              // Second: higher sales first
+              if (a.unitsSold30Days !== b.unitsSold30Days) return b.unitsSold30Days - a.unitsSold30Days;
+              
+              // Third: lower inventory first
+              return a.inventory - b.inventory;
+            });
+            
+            setAllLines(sorted);
           }
         } catch (err) {
           console.error('Error fetching labels:', err);

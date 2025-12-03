@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
+import { exportShipmentTemplate } from '../../../../utils/shipmentExport';
+import { toast } from 'sonner';
 
-const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck }) => {
+const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck, products, shipmentData }) => {
   const { isDarkMode } = useTheme();
   const [selectedType, setSelectedType] = useState(null);
   const [showExportComplete, setShowExportComplete] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   if (!isOpen) return null;
 
@@ -72,9 +75,25 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck })
     },
   ];
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (selectedType) {
-      setShowExportComplete(true);
+      try {
+        setIsExporting(true);
+        
+        // Call the export function with the selected template type, products, and shipment data
+        await exportShipmentTemplate(selectedType, products || [], shipmentData || {});
+        
+        toast.success(`${selectedType.toUpperCase()} template exported successfully!`);
+        
+        // Show export complete popup
+        setShowExportComplete(true);
+        
+      } catch (error) {
+        console.error('Export failed:', error);
+        toast.error('Failed to export template. Please try again.');
+      } finally {
+        setIsExporting(false);
+      }
     }
   };
 
@@ -439,35 +458,46 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck })
             <button
               type="button"
               onClick={handleExport}
-              disabled={!selectedType}
+              disabled={!selectedType || isExporting}
               style={{
                 padding: '0 10px',
                 borderRadius: '6px',
                 border: 'none',
-                backgroundColor: selectedType ? '#3B82F6' : '#9CA3AF',
+                backgroundColor: (selectedType && !isExporting) ? '#3B82F6' : '#9CA3AF',
                 color: '#FFFFFF',
                 fontSize: '14px',
                 fontWeight: 500,
-                cursor: selectedType ? 'pointer' : 'not-allowed',
+                cursor: (selectedType && !isExporting) ? 'pointer' : 'not-allowed',
                 transition: 'background-color 0.2s',
+                minWidth: isExporting ? '120px' : '110px',
                 height: '31px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 boxSizing: 'border-box',
+                gap: '6px',
               }}
               onMouseEnter={(e) => {
-                if (selectedType) {
+                if (selectedType && !isExporting) {
                   e.currentTarget.style.backgroundColor = '#2563EB';
                 }
               }}
               onMouseLeave={(e) => {
-                if (selectedType) {
+                if (selectedType && !isExporting) {
                   e.currentTarget.style.backgroundColor = '#3B82F6';
                 }
               }}
             >
-              Export for Upload
+              {isExporting ? (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ animation: 'spin 1s linear infinite' }}>
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="31.4 31.4" />
+                  </svg>
+                  Exporting...
+                </>
+              ) : (
+                'Export for Upload'
+              )}
             </button>
           </div>
         </div>

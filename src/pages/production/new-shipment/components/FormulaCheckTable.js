@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 import { getShipmentFormulaCheck } from '../../../../services/productionApi';
 
-const FormulaCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRowIds = [] }) => {
+const FormulaCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRowIds = [], onFormulaDataChange }) => {
   const { isDarkMode } = useTheme();
   const [selectedRows, setSelectedRows] = useState(new Set());
   const [formulas, setFormulas] = useState([]);
@@ -52,6 +52,17 @@ const FormulaCheckTable = ({ shipmentId, isRecountMode = false, varianceExceeded
 
   // Only use real data from API - no dummy data
   const displayFormulas = formulas;
+
+  // Report formula data changes to parent
+  useEffect(() => {
+    if (onFormulaDataChange) {
+      onFormulaDataChange({
+        total: formulas.length,
+        completed: selectedRows.size,
+        remaining: formulas.length - selectedRows.size,
+      });
+    }
+  }, [formulas.length, selectedRows.size, onFormulaDataChange]);
 
   // Close filter dropdown when clicking outside
   useEffect(() => {

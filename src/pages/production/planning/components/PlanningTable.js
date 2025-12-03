@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 
-const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
+const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick }) => {
   const { isDarkMode } = useTheme();
   const [openFilterColumn, setOpenFilterColumn] = useState(null);
   const filterIconRefs = useRef({});
@@ -714,10 +714,13 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle }) => {
           {displayRows.map((row) => (
             <tr
               key={row.id}
+              onClick={() => onRowClick && onRowClick(row)}
               style={{
                 backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
                 height: '40px',
+                cursor: 'pointer',
               }}
+              className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
               <td
                 style={{
