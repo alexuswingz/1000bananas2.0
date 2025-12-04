@@ -693,15 +693,15 @@ const InventoryTable = forwardRef(({
       {/* Edit Inventory Modal */}
       {isEditInventoryOpen && editingLabel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-            {/* Modal header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Edit Label Inventory - {editingLabel.product} ({editingLabel.size})
+          <div className="bg-white rounded-lg shadow-2xl flex flex-col" style={{ width: '600px', maxHeight: '90vh' }}>
+            {/* Modal header - Dark navy */}
+            <div className="flex items-center justify-between px-5 py-3.5 rounded-t-lg" style={{ backgroundColor: '#2C3544' }}>
+              <h2 className="text-base font-medium text-white">
+                Edit Label Inventory
               </h2>
               <button
                 type="button"
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-white transition-colors"
                 onClick={() => {
                   setIsEditInventoryOpen(false);
                   setEditingLabel(null);
@@ -715,104 +715,116 @@ const InventoryTable = forwardRef(({
             </div>
 
             {/* Modal body */}
-            <div className="px-6 py-5 space-y-6 overflow-y-auto flex-1">
-              {/* Header section */}
-              <div>
-                <h3 className="text-base font-bold text-gray-900 mb-1">Update Label Inventory</h3>
-                <p className="text-sm text-gray-600">
-                  Enter the current inventory for full and partial label rolls to verify or update the count.
-                </p>
-              </div>
-
-              {/* Two column layout */}
-              <div className="grid grid-cols-2 gap-6">
-                {/* Full Label Roll Count */}
-                <div>
-                  <h4 className="text-sm font-bold text-gray-900 mb-1">Full Label Roll Count</h4>
-                  <p className="text-xs text-gray-600 mb-3">
-                    Enter the quantity of complete, unused label rolls.
-                  </p>
-                  <div className="space-y-2">
-                    {fullRolls.map((roll, index) => (
-                      <input
-                        key={index}
-                        type="number"
-                        placeholder="Enter roll quantity..."
-                        value={roll}
-                        onChange={(e) => {
-                          const newRolls = [...fullRolls];
-                          newRolls[index] = e.target.value;
-                          setFullRolls(newRolls);
-                        }}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
-                      />
-                    ))}
+            <div className="overflow-y-auto flex-1">
+              {/* Product Name and Label Location - Light blue/gray card */}
+              <div className="px-5 py-4" style={{ backgroundColor: '#F8FAFC' }}>
+                <div className="grid grid-cols-2 gap-8">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Product Name</label>
+                    <div className="text-sm text-gray-900 font-medium">
+                      {editingLabel.product} ({editingLabel.size})
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleAddFullRoll}
-                    className="mt-2 text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center gap-1"
-                  >
-                    <span>+</span>
-                    <span>Add Another Roll</span>
-                  </button>
-                </div>
-
-                {/* Partial Roll Weight */}
-                <div>
-                  <h4 className="text-sm font-bold text-gray-900 mb-1">Partial Roll Weight (g)</h4>
-                  <p className="text-xs text-gray-600 mb-3">
-                    Enter the weight in grams for each partially used roll.
-                  </p>
-                  <div className="space-y-2">
-                    {partialWeights.map((weight, index) => (
-                      <input
-                        key={index}
-                        type="number"
-                        placeholder="Enter roll weight..."
-                        value={weight}
-                        onChange={(e) => {
-                          const newWeights = [...partialWeights];
-                          newWeights[index] = e.target.value;
-                          setPartialWeights(newWeights);
-                        }}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
-                      />
-                    ))}
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Label Location</label>
+                    <div className="text-sm text-gray-900 font-medium">
+                      {editingLabel.labelLocation || 'N/A'}
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleAddPartialWeight}
-                    className="mt-2 text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center gap-1"
-                  >
-                    <span>+</span>
-                    <span>Add Another Weight</span>
-                  </button>
                 </div>
               </div>
 
-              {/* Calculated Total Labels */}
-              <div className="flex items-start justify-between pt-4 border-t border-gray-200">
+              {/* Two column layout for inputs */}
+              <div className="px-5 py-5">
+                <div className="grid grid-cols-2 gap-8">
+                  {/* Full Roll Label Count */}
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-900 mb-0.5">Full Roll Label Count</h4>
+                    <p className="text-xs text-gray-500 mb-3">
+                      Enter the quantity of complete, unused label rolls.
+                    </p>
+                    <div className="space-y-2">
+                      {fullRolls.map((roll, index) => (
+                        <input
+                          key={index}
+                          type="number"
+                          placeholder="Enter roll quantity..."
+                          value={roll}
+                          onChange={(e) => {
+                            const newRolls = [...fullRolls];
+                            newRolls[index] = e.target.value;
+                            setFullRolls(newRolls);
+                          }}
+                          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
+                        />
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddFullRoll}
+                      className="mt-3 text-blue-500 hover:text-blue-600 text-sm font-medium flex items-center gap-1"
+                    >
+                      <span>+</span>
+                      <span>Add Another Roll</span>
+                    </button>
+                  </div>
+
+                  {/* Partial Roll Weight */}
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-900 mb-0.5">Partial Roll Weight (g)</h4>
+                    <p className="text-xs text-gray-500 mb-3">
+                      Enter the weight in grams for each partially used roll.
+                    </p>
+                    <div className="space-y-2">
+                      {partialWeights.map((weight, index) => (
+                        <input
+                          key={index}
+                          type="number"
+                          placeholder="Enter roll weight..."
+                          value={weight}
+                          onChange={(e) => {
+                            const newWeights = [...partialWeights];
+                            newWeights[index] = e.target.value;
+                            setPartialWeights(newWeights);
+                          }}
+                          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
+                        />
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddPartialWeight}
+                      className="mt-3 text-blue-500 hover:text-blue-600 text-sm font-medium flex items-center gap-1"
+                    >
+                      <span>+</span>
+                      <span>Add Another Weight</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Calculated Total Labels - Light blue background */}
+              <div className="flex items-center justify-between px-5 py-4" style={{ backgroundColor: '#F0F7FF' }}>
                 <div>
-                  <h4 className="text-base font-bold text-gray-900 mb-1">Calculated Total Labels</h4>
-                  <p className="text-sm text-gray-500">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-0.5">Calculated Total Labels</h4>
+                  <p className="text-xs text-gray-500">
                     Current Label Inventory: {editingLabel.inventory.toLocaleString()}
                   </p>
                 </div>
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-gray-900 mb-1">
+                  <div className="text-xl font-bold text-gray-900">
                     {calculateTotalLabels().toLocaleString()}
                   </div>
                   {(() => {
                     const discrepancy = calculateTotalLabels() - editingLabel.inventory;
                     if (discrepancy !== 0) {
                       return (
-                        <div className={`flex items-center gap-1 ${discrepancy < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={discrepancy < 0 ? "M19 9l-7 7-7-7" : "M5 15l7-7 7 7"} />
+                        <div className={`flex items-center justify-end gap-1 ${discrepancy < 0 ? 'text-red-500' : 'text-green-600'}`}>
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d={discrepancy < 0 ? "M19 9l-7 7-7-7" : "M5 15l7-7 7 7"} />
                           </svg>
-                          <span className="text-sm font-medium">
-                            {discrepancy > 0 ? '+' : ''}{discrepancy} Discrepancy
+                          <span className="text-xs font-medium">
+                            {discrepancy} Discrepancy
                           </span>
                         </div>
                       );
@@ -824,10 +836,10 @@ const InventoryTable = forwardRef(({
             </div>
 
             {/* Modal footer */}
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+            <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200">
               <button
                 type="button"
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
                 onClick={() => {
                   setIsEditInventoryOpen(false);
                   setEditingLabel(null);
@@ -837,10 +849,11 @@ const InventoryTable = forwardRef(({
               </button>
               <button
                 type="button"
-                className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                className="px-5 py-2 text-sm font-medium text-white rounded-md hover:opacity-90"
+                style={{ backgroundColor: '#3B82F6' }}
                 onClick={handleSaveInventory}
               >
-                Save Changes
+                Save
               </button>
             </div>
           </div>

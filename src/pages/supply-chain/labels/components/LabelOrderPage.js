@@ -20,6 +20,55 @@ const LabelOrderPage = () => {
   const [allLines, setAllLines] = useState(state.lines || []);
   const [loadingLabels, setLoadingLabels] = useState(false);
   
+  // Calculate suggested order quantity based on Excel Label Order Formula
+  // Excel Formula:
+  // =IF(A3 = 0, 0,
+  //  IF(A3 < 100, 500,
+  //  IF(A3 <= 250, 500,
+  //  IF(A3 <= 500, 500,
+  //  IF(A3 <= 2000, MAX(500, CEILING(A3, 500)),
+  //  MAX(500, CEILING(A3, 1000)))))))
+  const calculateSuggestedOrderQty = (label) => {
+    const DOI_GOAL_DAYS = 196; // DOI goal in days (~6.5 months)
+    const currentInventory = label.warehouse_inventory || 0;
+    const inboundQuantity = label.inbound_quantity || 0;
+    
+    // Daily sales rate = units_sold_30_days / 30 (from API)
+    const dailySalesRate = label.daily_sales_rate || 0;
+    
+    // If no sales data, return 0 (user can manually enter)
+    if (dailySalesRate <= 0) {
+      return 0;
+    }
+    
+    // Total available inventory (current + inbound)
+    const totalAvailable = currentInventory + inboundQuantity;
+    
+    // Calculate label forecast = target inventory - current available
+    const targetInventory = dailySalesRate * DOI_GOAL_DAYS;
+    const labelForecast = targetInventory - totalAvailable;
+    
+    // Apply Excel formula for rounding
+    if (labelForecast <= 0) {
+      return 0;
+    }
+    if (labelForecast < 100) {
+      return 500;
+    }
+    if (labelForecast <= 250) {
+      return 500;
+    }
+    if (labelForecast <= 500) {
+      return 500;
+    }
+    if (labelForecast <= 2000) {
+      // Round UP to nearest 500, minimum 500
+      return Math.max(500, Math.ceil(labelForecast / 500) * 500);
+    }
+    // forecast > 2000: Round UP to nearest 1000, minimum 500
+    return Math.max(500, Math.ceil(labelForecast / 1000) * 1000);
+  };
+
   // Fetch labels from API on mount if creating new order
   useEffect(() => {
     if (!state.lines && isCreateMode) {
@@ -28,19 +77,53 @@ const LabelOrderPage = () => {
           setLoadingLabels(true);
           const response = await labelsApi.getInventory();
           if (response.success) {
-            const transformed = response.data.map(label => ({
-              id: label.id,
-              brand: label.brand_name,
-              product: label.product_name,
-              size: label.bottle_size,
-              labelSize: label.label_size,
-              qty: 0,
-              labelStatus: label.label_status || 'Up to Date',
-              inventory: label.warehouse_inventory || 0,
-              toOrder: 0,
-              googleDriveLink: label.google_drive_link,
-              added: false,
-            }));
+            // Debug: Log first few labels to see label_size and sales data
+            console.log('🏷️ Label inventory sample (first 5):', response.data.slice(0, 5).map(l => ({
+              product: l.product_name,
+              bottle_size: l.bottle_size,
+              label_size: l.label_size,
+              inventory: l.warehouse_inventory,
+              daily_sales_rate: l.daily_sales_rate,
+            })));
+            
+            // Map bottle_size to label_size based on FinishedGoodsDatabase
+            const getLabelSizeFromBottleSize = (bottleSize) => {
+              const size = (bottleSize || '').toLowerCase();
+              if (size.includes('8oz') || size === '8oz') return '5" x 8"';
+              if (size.includes('quart') || size === 'quart') return '5" x 8"';
+              if (size.includes('gallon') || size === 'gallon' || size === '1 gallon') return '5" x 8"';
+              if (size.includes('3oz') || size === '3oz spray') return '4.5" x 3.375"';
+              if (size.includes('6oz') || size === '6oz spray') return '5.375" x 4.5"';
+              if (size.includes('16oz')) return '5" x 8"';
+              return '5" x 8"'; // Default
+            };
+            
+            const transformed = response.data
+              .map(label => {
+                // Calculate suggested order quantity using the formula
+                const suggestedQty = calculateSuggestedOrderQty(label);
+                
+                // Use label_size from API, or derive from bottle_size
+                const labelSize = label.label_size || getLabelSizeFromBottleSize(label.bottle_size);
+                
+                return {
+                  id: label.id,
+                  brand: label.brand_name,
+                  product: label.product_name,
+                  size: label.bottle_size,
+                  labelSize: labelSize,
+                  qty: suggestedQty, // Auto-populate with calculated quantity
+                  labelStatus: label.label_status || 'Up to Date',
+                  inventory: label.warehouse_inventory || 0,
+                  toOrder: suggestedQty, // Also set toOrder
+                  googleDriveLink: label.google_drive_link,
+                  added: false,
+                  dailySalesRate: label.daily_sales_rate || 0, // Store for reference
+                  suggestedQty: suggestedQty, // Store original suggestion
+                };
+              })
+              // Filter out items with 0 quantity (already have enough inventory)
+              .filter(label => label.suggestedQty > 0);
             setAllLines(transformed);
           }
         } catch (err) {
@@ -144,63 +227,125 @@ const LabelOrderPage = () => {
   }, [orderLines, searchQuery, isEditOrderMode, activeTab]);
 
   // Calculate summary based on added items (or all lines in receivePO)
-  const summary = useMemo(() => {
-    // In receivePO tab, use all orderLines (or only added if in edit mode); otherwise use only added lines
-    let linesToUse;
-    if (activeTab === 'receivePO') {
-      // In edit mode, show only added items; otherwise show all orderLines
-      linesToUse = isEditOrderMode ? addedLines : orderLines;
-    } else {
-      linesToUse = addedLines;
+  // Calculate label cost based on Excel LabelCosts sheet pricing tiers
+  const calculateLabelCost = (labelSize, quantity, productCount) => {
+    // Price per thousand based on label size and quantity tier
+    const pricingTiers = {
+      '5x8': [
+        { maxQty: 3000, price: 334.91 },
+        { maxQty: 6000, price: 240.15 },
+        { maxQty: 12000, price: 181.15 },
+        { maxQty: 25000, price: 158.48 },
+        { maxQty: 50000, price: 148.14 },
+        { maxQty: Infinity, price: 136.41 },
+      ],
+      '5.375x4.5': [
+        { maxQty: 3000, price: 251.94 },
+        { maxQty: 6000, price: 170.23 },
+        { maxQty: 12000, price: 128.63 },
+        { maxQty: 25000, price: 104.18 },
+        { maxQty: 50000, price: 95.50 },
+        { maxQty: Infinity, price: 91.87 },
+      ],
+      '3.375x4.5': [
+        { maxQty: 3000, price: 230.09 },
+        { maxQty: 6000, price: 145.96 },
+        { maxQty: 12000, price: 103.21 },
+        { maxQty: 25000, price: 77.98 },
+        { maxQty: 50000, price: 67.09 },
+        { maxQty: Infinity, price: 72.74 },
+      ],
+      '6x7.5': [
+        { maxQty: 3000, price: 310.08 },
+        { maxQty: 6000, price: 223.57 },
+        { maxQty: 12000, price: 179.44 },
+        { maxQty: 25000, price: 153.76 },
+        { maxQty: 50000, price: 145.47 },
+        { maxQty: Infinity, price: 143.84 },
+      ],
+    };
+    
+    // Determine which pricing tier to use based on label size
+    let sizeKey = '5x8'; // default
+    if (labelSize) {
+      if (labelSize.includes('5.375') && labelSize.includes('4.5')) sizeKey = '5.375x4.5';
+      else if (labelSize.includes('3.375') && labelSize.includes('4.5')) sizeKey = '3.375x4.5';
+      else if (labelSize.includes('6') && labelSize.includes('7.5')) sizeKey = '6x7.5';
+      else if (labelSize.includes('5') && labelSize.includes('8')) sizeKey = '5x8';
     }
+    
+    const tiers = pricingTiers[sizeKey] || pricingTiers['5x8'];
+    const tier = tiers.find(t => quantity <= t.maxQty) || tiers[tiers.length - 1];
+    
+    // Price is per thousand
+    return (quantity / 1000) * tier.price;
+  };
+
+  const summary = useMemo(() => {
+    // Only count items that have been ADDED (clicked Add button)
+    const linesToUse = addedLines.filter(line => (line.qty || 0) > 0);
+    
     const totalLabels = linesToUse.reduce((sum, line) => sum + (line.qty || 0), 0);
     
-    // Get inventory data to find labelSize if not in line
-    let inventoryData = [];
-    try {
-      const stored = window.localStorage.getItem('labelsInventory');
-      inventoryData = stored ? JSON.parse(stored) : [];
-    } catch {}
-    
-    // Calculate label size counts
+    // Calculate label size counts - use labelSize directly from line data
+    // Match various formats: "5" x 8"", "5 x 8", "5x8", etc.
     const size5x8 = linesToUse.reduce((sum, line) => {
-      // Try to get labelSize from line, or find it in inventory by matching brand/product/size
-      let labelSize = line.labelSize;
-      if (!labelSize && inventoryData.length > 0) {
-        const inventoryItem = inventoryData.find(
-          inv => inv.brand === line.brand && 
-                 inv.product === line.product && 
-                 inv.size === line.size
-        );
-        labelSize = inventoryItem?.labelSize || '';
-      }
-      
-      if (labelSize && labelSize.includes('5"') && labelSize.includes('8"')) {
+      const labelSize = (line.labelSize || '').toLowerCase().replace(/["\s]/g, '');
+      // Match 5x8 pattern
+      if ((labelSize.includes('5x8') || labelSize.includes('5"x8"')) ||
+          (labelSize.includes('5') && labelSize.includes('8') && !labelSize.includes('5.375'))) {
         return sum + (line.qty || 0);
       }
       return sum;
     }, 0);
     
     const size5375x45 = linesToUse.reduce((sum, line) => {
-      // Try to get labelSize from line, or find it in inventory by matching brand/product/size
-      let labelSize = line.labelSize;
-      if (!labelSize && inventoryData.length > 0) {
-        const inventoryItem = inventoryData.find(
-          inv => inv.brand === line.brand && 
-                 inv.product === line.product && 
-                 inv.size === line.size
-        );
-        labelSize = inventoryItem?.labelSize || '';
-      }
-      
-      if (labelSize && labelSize.includes('5.375') && labelSize.includes('4.5')) {
+      const labelSize = (line.labelSize || '').toLowerCase().replace(/["\s]/g, '');
+      if (labelSize.includes('5.375') && labelSize.includes('4.5')) {
         return sum + (line.qty || 0);
       }
       return sum;
     }, 0);
     
-    // Calculate estimated cost (assuming $0.2045 per label based on $562.25 / 2750 labels)
-    const estCost = totalLabels * 0.2045;
+    const size3375x45 = linesToUse.reduce((sum, line) => {
+      const labelSize = (line.labelSize || '').toLowerCase().replace(/["\s]/g, '');
+      if (labelSize.includes('3.375') && labelSize.includes('4.5')) {
+        return sum + (line.qty || 0);
+      }
+      return sum;
+    }, 0);
+    
+    const size6x75 = linesToUse.reduce((sum, line) => {
+      const labelSize = (line.labelSize || '').toLowerCase().replace(/["\s]/g, '');
+      if (labelSize.includes('6') && labelSize.includes('7.5')) {
+        return sum + (line.qty || 0);
+      }
+      return sum;
+    }, 0);
+    
+    // Debug: log label sizes
+    if (linesToUse.length > 0) {
+      console.log('📊 Summary - Added lines:', linesToUse.map(l => ({
+        product: l.product,
+        labelSize: l.labelSize,
+        qty: l.qty
+      })));
+    }
+    
+    // Calculate estimated cost based on Excel pricing tiers
+    const productCount = linesToUse.length;
+    let estCost = 0;
+    
+    // Calculate cost per label size group
+    if (size5x8 > 0) estCost += calculateLabelCost('5" x 8"', size5x8, productCount);
+    if (size5375x45 > 0) estCost += calculateLabelCost('5.375" x 4.5"', size5375x45, productCount);
+    if (size3375x45 > 0) estCost += calculateLabelCost('3.375" x 4.5"', size3375x45, productCount);
+    if (size6x75 > 0) estCost += calculateLabelCost('6" x 7.5"', size6x75, productCount);
+    
+    // Add prepress fees: $80 first product + $35 each additional
+    if (productCount > 0) {
+      estCost += 80 + (Math.max(0, productCount - 1) * 35);
+    }
     
     return {
       products: linesToUse.length,
@@ -208,8 +353,10 @@ const LabelOrderPage = () => {
       estCost,
       size5x8,
       size5375x45,
+      size3375x45,
+      size6x75,
     };
-  }, [addedLines, orderLines, activeTab]);
+  }, [addedLines]);
 
   // Initialize edit mode and store original order
   useEffect(() => {
@@ -309,14 +456,17 @@ const LabelOrderPage = () => {
       }
       
       // This item was NOT in the original order - user must decide to add it
+      // Use suggested quantity based on formula (rounded to 5000)
+      const suggestedQty = inv.suggestedQty || 5000;
       return {
         id: inv.id,
         brand: inv.brand,
         product: inv.product,
         size: inv.size,
-        qty: 2000, // Start with 2000 qty for new items in edit mode (user can adjust)
+        qty: suggestedQty, // Use calculated suggested qty
         labelStatus: inv.status,
         inventory: inv.inventory,
+        suggestedQty: suggestedQty, // Store for reference
         toOrder: inv.inventory,
         labelSize: inv.labelSize,
         added: false, // New items are NOT added by default - user decides
@@ -459,36 +609,39 @@ const LabelOrderPage = () => {
     };
   }, [isEditMode, originalOrder, addedLines]);
 
-  // Timeline calculation helpers
-  const getTimelineData = (inventory, toOrder, index) => {
-    const today = new Date('2025-11-11');
-    const doiGoal = new Date('2026-04-13'); // Updated to 4/13/25 (April 2026)
-    const totalDays = Math.ceil((doiGoal - today) / (1000 * 60 * 60 * 24)); // ~154 days
+  // Timeline calculation helpers - calculates DOI coverage percentages
+  const getTimelineData = (line) => {
+    const DOI_GOAL_DAYS = 196; // Target DOI in days
+    const inventory = line.inventory || 0;
+    const orderQty = line.qty || 0;
+    const dailySalesRate = line.dailySalesRate || 0;
     
-    // Based on the image, the bars show:
-    // Row 1: green extends to ~30% (middle of Jan), blue fills to goal
-    // Row 2: green extends to ~50% (middle of Feb), blue fills to goal  
-    // Row 3: green extends to ~50% (middle of Feb), blue fills to goal with +5 indicator
-    
-    let inventoryPercent, orderPercent;
-    if (index === 0) {
-      // First row: green to middle of Jan (~30%)
-      inventoryPercent = 30;
-      orderPercent = 70; // Blue fills rest
-    } else if (index === 1) {
-      // Second row: green to middle of Feb (~50%)
-      inventoryPercent = 50;
-      orderPercent = 50;
-    } else {
-      // Third row: green to middle of Feb (~50%)
-      inventoryPercent = 50;
-      orderPercent = 50;
+    // If no sales data, show default
+    if (dailySalesRate <= 0) {
+      return {
+        totalDays: DOI_GOAL_DAYS,
+        inventoryPercent: inventory > 0 ? 50 : 0,
+        orderPercent: orderQty > 0 ? 50 : 0,
+      };
     }
     
+    // Calculate days of inventory coverage
+    const inventoryDays = inventory / dailySalesRate;
+    const orderDays = orderQty / dailySalesRate;
+    const totalCoverageDays = inventoryDays + orderDays;
+    
+    // Calculate percentages relative to DOI goal
+    // Cap at 100% each to prevent overflow
+    const inventoryPercent = Math.min(100, (inventoryDays / DOI_GOAL_DAYS) * 100);
+    const orderPercent = Math.min(100 - inventoryPercent, (orderDays / DOI_GOAL_DAYS) * 100);
+    
     return {
-      totalDays,
-      inventoryPercent,
-      orderPercent,
+      totalDays: DOI_GOAL_DAYS,
+      inventoryPercent: Math.round(inventoryPercent),
+      orderPercent: Math.round(orderPercent),
+      inventoryDays: Math.round(inventoryDays),
+      orderDays: Math.round(orderDays),
+      totalCoverageDays: Math.round(totalCoverageDays),
     };
   };
 
@@ -513,20 +666,40 @@ const LabelOrderPage = () => {
       prev.map((line) => {
         if (line.id === id) {
           const newAdded = !line.added;
-          // When adding an item in edit mode, set qty to 2000 if it's 0
-          const newQty = (newAdded && isEditOrderMode && (line.qty === 0 || !line.qty)) ? 2000 : line.qty;
-          return { ...line, added: newAdded, qty: newQty };
+          // When adding an item, use the suggested quantity if qty is 0
+          // In edit mode, default to 5000 if no suggestion available
+          let newQty = line.qty;
+          if (newAdded && (line.qty === 0 || !line.qty)) {
+            newQty = line.suggestedQty || 5000; // Use calculated suggestion or default to 5000
+          }
+          return { ...line, added: newAdded, qty: newQty, toOrder: newQty };
         }
         return line;
       })
     );
   };
 
-  const handleQtyChange = (id, newQty) => {
+  // Round quantity according to Excel formula
+  // =IF(A3 = 0, 0, IF(A3 < 100, 500, IF(A3 <= 250, 500, IF(A3 <= 500, 500,
+  //  IF(A3 <= 2000, MAX(500, CEILING(A3, 500)), MAX(500, CEILING(A3, 1000)))))))
+  const roundQtyByFormula = (qty) => {
+    const numQty = parseInt(qty) || 0;
+    if (numQty === 0) return 0;
+    if (numQty < 100) return 500;
+    if (numQty <= 250) return 500;
+    if (numQty <= 500) return 500;
+    if (numQty <= 2000) {
+      return Math.max(500, Math.ceil(numQty / 500) * 500);
+    }
+    return Math.max(500, Math.ceil(numQty / 1000) * 1000);
+  };
+
+  const handleQtyChange = (id, newQty, shouldRound = false) => {
     const numQty = parseInt(newQty) || 0;
+    const finalQty = shouldRound ? roundQtyByFormula(numQty) : numQty;
     setOrderLines((prev) =>
       prev.map((line) =>
-        line.id === id ? { ...line, qty: numQty } : line
+        line.id === id ? { ...line, qty: finalQty, toOrder: finalQty } : line
       )
     );
   };
@@ -541,7 +714,8 @@ const LabelOrderPage = () => {
 
   const handleDoneEditing = (id) => {
     const qtyValue = parseInt(editingQtyValue) || 0;
-    handleQtyChange(id, qtyValue);
+    // Round the quantity when done editing
+    handleQtyChange(id, qtyValue, true);
     setEditingRowId(null);
     setEditingQtyValue('');
   };
@@ -1700,7 +1874,7 @@ const LabelOrderPage = () => {
               </tr>
             ) : (
               filteredLines.map((line, index) => {
-                const timelineData = (!isViewMode || isEditOrderMode) ? getTimelineData(line.inventory, line.toOrder, index) : null;
+                const timelineData = (!isViewMode || isEditOrderMode) ? getTimelineData(line) : null;
                 const displayedRows = filteredLines;
                 
                 return (
@@ -1892,21 +2066,15 @@ const LabelOrderPage = () => {
                       }}
                     >
                       <input
-                              ref={editingRowId === line.id ? qtyInputRef : null}
                               type="text"
                               inputMode="numeric"
-                              value={editingRowId === line.id ? editingQtyValue : String(line.qty || 0)}
+                              value={String(line.qty || 0)}
                               onChange={(e) => {
                                 e.stopPropagation();
-                                if (editingRowId !== line.id) return;
                                 const newValue = e.target.value.replace(/[^0-9]/g, '');
-                                setEditingQtyValue(newValue);
                                 const numValue = newValue === '' ? 0 : parseInt(newValue) || 0;
-                                setOrderLines((prev) =>
-                                  prev.map((l) =>
-                                    l.id === line.id ? { ...l, qty: numValue } : l
-                                  )
-                                );
+                                // Update without rounding while typing
+                                handleQtyChange(line.id, numValue, false);
                               }}
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1918,19 +2086,14 @@ const LabelOrderPage = () => {
                               onBlur={(e) => {
                                 e.stopPropagation();
                                 const value = parseInt(e.target.value) || 0;
-                                handleQtyChange(line.id, value);
-                                setEditingQtyValue(String(value));
+                                // Round the quantity when leaving the field
+                                handleQtyChange(line.id, value, true);
                               }}
                               onKeyDown={(e) => {
                                 e.stopPropagation();
                                 if (e.key === 'Enter') {
                                   e.preventDefault();
-                                  handleDoneEditing(line.id);
-                                }
-                                if (e.key === 'Escape') {
-                                  e.preventDefault();
-                                  setEditingRowId(null);
-                                  setEditingQtyValue('');
+                                  e.target.blur(); // Trigger blur to round
                                 }
                               }}
                               style={{ 
@@ -1948,10 +2111,7 @@ const LabelOrderPage = () => {
                                 cursor: 'text',
                                 WebkitAppearance: 'none',
                                 MozAppearance: 'textfield',
-                                pointerEvents: 'auto',
-                                zIndex: 1000,
                               }}
-                              autoFocus
                       />
                     </div>
                         ) : (
@@ -2003,16 +2163,22 @@ const LabelOrderPage = () => {
                           <input
                             type="number"
                             value={line.qty || 0}
-                            onChange={(e) => handleQtyChange(line.id, e.target.value)}
+                            onChange={(e) => handleQtyChange(line.id, e.target.value, false)}
                             onBlur={(e) => {
                               const value = parseInt(e.target.value) || 0;
-                              handleQtyChange(line.id, value);
+                              // Round the quantity when leaving the field
+                              handleQtyChange(line.id, value, true);
                             }}
-                            readOnly={!isEditOrderMode}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                e.target.blur(); // Trigger blur to round
+                              }
+                            }}
                             style={{ 
-                              color: editingRowId === line.id ? '#92400E' : '#000000', 
+                              color: '#000000', 
                               fontSize: '14px', 
-                              fontWeight: editingRowId === line.id ? 500 : 400,
+                              fontWeight: 400,
                               fontFamily: 'system-ui, -apple-system, sans-serif',
                               border: 'none',
                               background: 'transparent',
@@ -2022,7 +2188,7 @@ const LabelOrderPage = () => {
                               padding: 0,
                               margin: 0,
                               MozAppearance: 'textfield',
-                              cursor: isEditOrderMode ? 'text' : 'default',
+                              cursor: 'text',
                             }}
                             className="[&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             min="0"

@@ -2263,20 +2263,36 @@ def get_label_inventory(event):
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Join with catalog and sales_metrics to get sales data for sorting
-        # Priority: Items with sales activity first, then by higher sales, then by lower inventory
+        # Query labels with sales data only, sorted by lowest inventory with highest sales first
+        # Get label_size from label_inventory first, fallback to catalog
         cursor.execute("""
             SELECT 
-                li.*,
+                li.id,
+                li.brand_name,
+                li.product_name,
+                li.bottle_size,
+                COALESCE(li.label_size, c.label_size) as label_size,
+                li.label_location,
+                li.label_status,
+                li.warehouse_inventory,
+                li.inbound_quantity,
+                li.supplier,
+                li.moq,
+                li.lead_time_weeks,
+                li.last_count_date,
+                li.google_drive_link,
+                li.created_at,
+                li.updated_at,
+                li.notes,
                 COALESCE(sm.units_sold_30_days, 0) as units_sold_30_days,
                 COALESCE(sm.units_sold_30_days / 30.0, 0) as daily_sales_rate
             FROM label_inventory li
-            LEFT JOIN catalog c ON li.product_name = c.product_name AND li.bottle_size = c.size
+            LEFT JOIN catalog c ON c.label_location = li.label_location
             LEFT JOIN sales_metrics sm ON c.id = sm.catalog_id
+            WHERE COALESCE(sm.units_sold_30_days, 0) > 0
             ORDER BY 
-                CASE WHEN COALESCE(sm.units_sold_30_days, 0) > 0 THEN 0 ELSE 1 END ASC,
-                COALESCE(sm.units_sold_30_days, 0) DESC,
-                COALESCE(li.warehouse_inventory, 0) ASC,
+                sm.units_sold_30_days DESC,
+                li.warehouse_inventory ASC,
                 li.brand_name, li.product_name, li.bottle_size
         """)
         inventory = cursor.fetchall()
