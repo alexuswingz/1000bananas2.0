@@ -5218,8 +5218,8 @@ def lambda_handler(event, context):
         elif http_method == 'GET' and '/production/calculate-time' in path:
             return calculate_production_time(event)
         
-        # Products inventory endpoint
-        elif http_method == 'GET' and path.endswith('/production/products/inventory'):
+        # Products inventory endpoint (support both URL patterns)
+        elif http_method == 'GET' and (path.endswith('/production/products/inventory') or path.endswith('/production/products-inventory')):
             return get_products_inventory(event)
         
         # Floor Inventory endpoints
@@ -5235,8 +5235,8 @@ def lambda_handler(event, context):
         elif http_method == 'GET' and path.endswith('/production/floor-inventory/unused-formulas'):
             return get_unused_formulas(event)
         
-        # Labels availability endpoint
-        elif http_method == 'GET' and path.endswith('/production/labels/availability'):
+        # Labels availability endpoint (support both URL patterns)
+        elif http_method == 'GET' and (path.endswith('/production/labels/availability') or path.endswith('/production/labels-availability')):
             return get_labels_availability(event)
         
         # Shipment endpoints

@@ -19,83 +19,29 @@ const LabelOrderPage = () => {
   // Get lines from state or default empty
   const [allLines, setAllLines] = useState(state.lines || []);
   const [loadingLabels, setLoadingLabels] = useState(false);
-  const [doiData, setDoiData] = useState(null);
-  const [doiGoalValue, setDoiGoalValue] = useState(120); // Default DOI goal (changed from 196 to 120 for consistency)
-  const [safetyBuffer, setSafetyBuffer] = useState(85); // Safety buffer percentage
-  const [showDoiDropdown, setShowDoiDropdown] = useState(false);
-  const [showSafetyDropdown, setShowSafetyDropdown] = useState(false);
-  const [forecastRequirements, setForecastRequirements] = useState({});
   
-  // DOI goal settings modal state
-  const [isLabelsSettingsModalOpen, setIsLabelsSettingsModalOpen] = useState(false);
-  const [doiGoal, setDoiGoal] = useState('196'); // Local state for input field
-  const [showDoiTooltip, setShowDoiTooltip] = useState(false);
-  
-  // Edit mode state - declare early so useEffect can access it
-  const [isEditOrderMode, setIsEditOrderMode] = useState(false);
-  
-  // Track if Add Products step is complete (moved to Submit PO)
-  const [addProductsComplete, setAddProductsComplete] = useState(false);
-  
-  // Fetch labels and forecast requirements from API on mount if creating new order
+  // Fetch labels from API on mount if creating new order
   useEffect(() => {
     if (!state.lines && isCreateMode) {
       const fetchLabels = async () => {
         try {
           setLoadingLabels(true);
           const response = await labelsApi.getInventory();
-          const forecastData = await labelsApi.getForecastRequirements(doiGoalValue, safetyBuffer / 100);
-          
-          // Build forecast map by product_name + bottle_size
-          const forecastMap = {};
-          if (forecastData.success && forecastData.data) {
-            forecastData.data.forEach(forecast => {
-              const key = `${forecast.product_name}|${forecast.bottle_size}`;
-              forecastMap[key] = forecast;
-            });
-          }
-          setForecastRequirements(forecastMap);
-          
           if (response.success) {
-            const transformed = response.data.map(label => {
-              const forecastKey = `${label.product_name}|${label.bottle_size}`;
-              const forecast = forecastMap[forecastKey] || {};
-              const recommendedQty = Math.round(forecast.recommended_order_qty || 0);
-              
-              return {
-                id: label.id,
-                brand: label.brand_name,
-                product: label.product_name,
-                size: label.bottle_size,
-                labelSize: label.label_size,
-                qty: recommendedQty,
-                labelStatus: label.label_status || 'Up to Date',
-                inventory: label.warehouse_inventory || 0,
-                inbound: label.inbound_quantity || 0,
-                toOrder: recommendedQty,
-                googleDriveLink: label.google_drive_link,
-                added: recommendedQty > 0, // Auto-add if forecast suggests ordering
-                recommendedQty: recommendedQty,
-                forecastedUnitsNeeded: Math.round(forecast.forecasted_units_needed || 0),
-                unitsSold30Days: label.units_sold_30_days || 0,
-              };
-            });
-            
-            // Sort: items with sales activity first, then by higher sales, then by lower inventory
-            const sorted = transformed.sort((a, b) => {
-              // First: items with sales > 0 come first
-              const aHasSales = a.unitsSold30Days > 0 ? 0 : 1;
-              const bHasSales = b.unitsSold30Days > 0 ? 0 : 1;
-              if (aHasSales !== bHasSales) return aHasSales - bHasSales;
-              
-              // Second: higher sales first
-              if (a.unitsSold30Days !== b.unitsSold30Days) return b.unitsSold30Days - a.unitsSold30Days;
-              
-              // Third: lower inventory first
-              return a.inventory - b.inventory;
-            });
-            
-            setAllLines(sorted);
+            const transformed = response.data.map(label => ({
+              id: label.id,
+              brand: label.brand_name,
+              product: label.product_name,
+              size: label.bottle_size,
+              labelSize: label.label_size,
+              qty: 0,
+              labelStatus: label.label_status || 'Up to Date',
+              inventory: label.warehouse_inventory || 0,
+              toOrder: 0,
+              googleDriveLink: label.google_drive_link,
+              added: false,
+            }));
+            setAllLines(transformed);
           }
         } catch (err) {
           console.error('Error fetching labels:', err);
@@ -105,47 +51,8 @@ const LabelOrderPage = () => {
       };
       fetchLabels();
     }
-  }, [state.lines, isCreateMode, doiGoalValue, safetyBuffer]);
+  }, [state.lines, isCreateMode]);
 
-  // Initialize doiGoal from doiGoalValue
-  useEffect(() => {
-    setDoiGoal(doiGoalValue.toString());
-  }, []);
-
-  // Update doiGoal when modal opens to reflect current doiGoalValue
-  useEffect(() => {
-    if (isLabelsSettingsModalOpen) {
-      setDoiGoal(doiGoalValue.toString());
-    }
-  }, [isLabelsSettingsModalOpen, doiGoalValue]);
-
-  // Fetch DOI data from API when in create/edit mode
-  useEffect(() => {
-    if (isCreateMode || isEditOrderMode) {
-      const fetchDOI = async () => {
-        try {
-          const response = await labelsApi.getDOI(doiGoalValue);
-          if (response.success) {
-            // Create a map of label ID to DOI data for quick lookup
-            const doiMap = {};
-            response.data.forEach(item => {
-              doiMap[item.id] = {
-                doi: item.doi,
-                status: item.status,
-                shortage: item.shortage,
-                dailyUsage: item.daily_usage
-              };
-            });
-            setDoiData(doiMap);
-          }
-        } catch (err) {
-          console.error('Error fetching DOI data:', err);
-        }
-      };
-      fetchDOI();
-    }
-  }, [isCreateMode, isEditOrderMode, doiGoalValue]);
-  
   // Navigation tab state - default to 'receivePO' when viewing, 'addProducts' when creating
   const [activeTab, setActiveTab] = useState(isViewMode ? 'receivePO' : 'addProducts');
   const [tableMode, setTableMode] = useState(false);
@@ -177,26 +84,12 @@ const LabelOrderPage = () => {
       }, 0);
     }
   }, [editingRowId]);
-
-  // Close dropdowns when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (showDoiDropdown && !event.target.closest('.doi-dropdown-container')) {
-        setShowDoiDropdown(false);
-      }
-      if (showSafetyDropdown && !event.target.closest('.safety-dropdown-container')) {
-        setShowSafetyDropdown(false);
-      }
-    };
-    
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showDoiDropdown, showSafetyDropdown]);
   
   // Edit and change tracking state
   const [originalOrder, setOriginalOrder] = useState(null); // Store original order for comparison
   const [originalOrderLines, setOriginalOrderLines] = useState([]); // Store original order lines with qty
   const [previousRecipients, setPreviousRecipients] = useState([]); // Store previous recipients
+  const [isEditOrderMode, setIsEditOrderMode] = useState(false); // Track if we're editing an existing order
   const [isEditMode, setIsEditMode] = useState(false); // Track if we're editing an existing order (legacy)
   const [selectedRecipients, setSelectedRecipients] = useState([]); // Selected recipients for update
   const [newRecipientEmail, setNewRecipientEmail] = useState(''); // New recipient email input
@@ -206,16 +99,6 @@ const LabelOrderPage = () => {
   const [statusDropdownId, setStatusDropdownId] = useState(null);
   const statusButtonRefs = useRef({});
   const statusMenuRefs = useRef({});
-  
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [searchFilter, setSearchFilter] = useState('');
-  const itemsPerPage = 50;
-  
-  // Reset to page 1 when tab changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [activeTab]);
 
   // Initialize order lines - items in view mode are already "added", new orders start with all items not added
   const [orderLines, setOrderLines] = useState([]);
@@ -250,23 +133,15 @@ const LabelOrderPage = () => {
       linesToFilter = orderLines.filter((line) => line.added);
     }
     
-    // On Submit PO tab, only show added items
-    if (activeTab === 'submitPO') {
-      linesToFilter = orderLines.filter((line) => line.added);
-    }
-    
-    // Apply search queries
-    const combinedQuery = (searchQuery + ' ' + searchFilter).trim();
-    if (!combinedQuery) return linesToFilter;
-    const query = combinedQuery.toLowerCase();
+    if (!searchQuery.trim()) return linesToFilter;
+    const query = searchQuery.toLowerCase();
     return linesToFilter.filter(
       (line) =>
-        line.brand?.toLowerCase().includes(query) ||
-        line.product?.toLowerCase().includes(query) ||
-        line.size?.toLowerCase().includes(query) ||
-        line.labelSize?.toLowerCase().includes(query)
+        line.brand.toLowerCase().includes(query) ||
+        line.product.toLowerCase().includes(query) ||
+        line.size.toLowerCase().includes(query)
     );
-  }, [orderLines, searchQuery, searchFilter, isEditOrderMode, activeTab]);
+  }, [orderLines, searchQuery, isEditOrderMode, activeTab]);
 
   // Calculate summary based on added items (or all lines in receivePO)
   const summary = useMemo(() => {
@@ -280,18 +155,45 @@ const LabelOrderPage = () => {
     }
     const totalLabels = linesToUse.reduce((sum, line) => sum + (line.qty || 0), 0);
     
-    // Calculate label size counts (labelSize should already be in line from API)
+    // Get inventory data to find labelSize if not in line
+    let inventoryData = [];
+    try {
+      const stored = window.localStorage.getItem('labelsInventory');
+      inventoryData = stored ? JSON.parse(stored) : [];
+    } catch {}
+    
+    // Calculate label size counts
     const size5x8 = linesToUse.reduce((sum, line) => {
-      const labelSize = line.labelSize || '';
-      if (labelSize.includes('5"') && labelSize.includes('8"')) {
+      // Try to get labelSize from line, or find it in inventory by matching brand/product/size
+      let labelSize = line.labelSize;
+      if (!labelSize && inventoryData.length > 0) {
+        const inventoryItem = inventoryData.find(
+          inv => inv.brand === line.brand && 
+                 inv.product === line.product && 
+                 inv.size === line.size
+        );
+        labelSize = inventoryItem?.labelSize || '';
+      }
+      
+      if (labelSize && labelSize.includes('5"') && labelSize.includes('8"')) {
         return sum + (line.qty || 0);
       }
       return sum;
     }, 0);
     
     const size5375x45 = linesToUse.reduce((sum, line) => {
-      const labelSize = line.labelSize || '';
-      if (labelSize.includes('5.375') && labelSize.includes('4.5')) {
+      // Try to get labelSize from line, or find it in inventory by matching brand/product/size
+      let labelSize = line.labelSize;
+      if (!labelSize && inventoryData.length > 0) {
+        const inventoryItem = inventoryData.find(
+          inv => inv.brand === line.brand && 
+                 inv.product === line.product && 
+                 inv.size === line.size
+        );
+        labelSize = inventoryItem?.labelSize || '';
+      }
+      
+      if (labelSize && labelSize.includes('5.375') && labelSize.includes('4.5')) {
         return sum + (line.qty || 0);
       }
       return sum;
@@ -309,59 +211,9 @@ const LabelOrderPage = () => {
     };
   }, [addedLines, orderLines, activeTab]);
 
-  // Fetch order from API when viewing an existing order
+  // Initialize edit mode and store original order
   useEffect(() => {
-    if (isViewMode && orderId) {
-      const fetchOrder = async () => {
-        try {
-          setLoadingLabels(true);
-          const response = await labelsApi.getOrder(orderId);
-          if (response.success) {
-            const order = response.data;
-            
-            // Transform order lines from API to match our format
-            const transformedLines = order.lines.map(line => ({
-              id: line.id,
-              brand: line.brand_name,
-              product: line.product_name,
-              size: line.bottle_size,
-              labelSize: line.label_size,
-              qty: line.quantity_ordered,
-              labelStatus: 'Up to Date', // Default
-              inventory: 0, // Will be updated if needed
-              inbound: 0,
-              toOrder: line.quantity_ordered,
-              googleDriveLink: line.google_drive_link,
-              added: true, // Items from the order are already added
-              costPerLabel: line.cost_per_label,
-            }));
-            
-            setAllLines(transformedLines);
-            setOrderStatus(order.status);
-            
-            // Store original order for comparison
-            setOriginalOrder({
-              orderNumber: order.order_number,
-              lines: transformedLines,
-            });
-            setOriginalOrderLines(transformedLines.map(line => ({
-              ...line,
-              originalQty: line.qty,
-            })));
-          }
-        } catch (err) {
-          console.error('Error fetching order:', err);
-        } finally {
-          setLoadingLabels(false);
-        }
-      };
-      fetchOrder();
-    }
-  }, [isViewMode, orderId]);
-
-  // Initialize edit mode and store original order (legacy from navigation state)
-  useEffect(() => {
-    if (isViewMode && orderId && state.lines && !allLines.length) {
+    if (isViewMode && orderId && state.lines) {
       setIsEditMode(true);
       // Set order status from state if available
       if (state.status) {
@@ -387,101 +239,97 @@ const LabelOrderPage = () => {
         setCurrentRecipients(recipients);
       }
     }
-  }, [isViewMode, orderId, orderNumber, state.lines, state.status, allLines.length]);
+  }, [isViewMode, orderId, orderNumber, state.lines, state.status]);
 
   // Handle Edit Order - load all inventory items and mark existing order items
-  const handleEditOrder = async () => {
+  const handleEditOrder = () => {
+    // Get all inventory items from localStorage
+    let inventoryData = [];
     try {
-      // Fetch all inventory items from API
-      const response = await labelsApi.getInventory();
-      if (!response.success) {
-        console.error('Failed to fetch inventory');
-        return;
-      }
-      
-      const inventoryData = response.data.map(label => ({
-        id: label.id,
-        status: label.label_status || 'Up to Date',
-        brand: label.brand_name,
-        product: label.product_name,
-        size: label.bottle_size,
-        labelLink: label.google_drive_link,
-        labelSize: label.label_size,
-        inventory: label.warehouse_inventory || 0,
-        inbound: label.inbound_quantity || 0,
+      const stored = window.localStorage.getItem('labelsInventory');
+      inventoryData = stored ? JSON.parse(stored) : [];
+    } catch {}
+    
+    // If no inventory data, create default data (same as InventoryTable)
+    if (inventoryData.length === 0) {
+      inventoryData = Array.from({ length: 15 }, (_, i) => ({
+        id: i + 1,
+        status: i === 9 || i === 14 ? 'Needs Proofing' : 'Up to Date',
+        brand: 'Total Pest Spray',
+        product: 'Cherry Tree Fertilizer',
+        size: 'Gallon',
+        labelLink: 'https://drive.google.com/file/d/1a2b3c4d5e6f7g8h9i0j/view',
+        labelSize: '5.375" x 4.5"',
+        inventory: 25000,
       }));
+    }
+    
+    // Get the original order items - use originalOrderLines if available, otherwise use state.lines
+    // When viewing an order, state.lines contains ONLY the items that were in the order (saved as addedLines)
+    // So all items in state.lines should be considered as "in the order"
+    const originalOrderItems = originalOrderLines.length > 0 
+      ? originalOrderLines.filter(line => line.added !== false) // Filter to only added items
+      : (state.lines || []); // state.lines already contains only order items when viewing
+    
+    console.log('📦 Edit Order - Inventory loaded:', inventoryData.length, 'items');
+    console.log('📋 Original order items (added only):', originalOrderItems.length, 'items');
+    
+    // Create a map of original order items by ID for quick lookup
+    // Only match items that have the exact same ID as items in the original order
+    const originalOrderItemsById = new Map();
+    originalOrderItems.forEach(item => {
+      if (item.id != null) {
+        originalOrderItemsById.set(item.id, item);
+      }
+    });
+    
+    console.log('📋 Original order item IDs:', Array.from(originalOrderItemsById.keys()));
+    
+    // Map inventory items and mark items already in the order
+    const allInventoryLines = inventoryData.map((inv) => {
+      // Only match by ID - this ensures we only mark the exact items that were in the order
+      const existingLine = originalOrderItemsById.get(inv.id);
       
-      // Get the original order items - use originalOrderLines if available, otherwise use state.lines
-      // When viewing an order, state.lines contains ONLY the items that were in the order (saved as addedLines)
-      // So all items in state.lines should be considered as "in the order"
-      const originalOrderItems = originalOrderLines.length > 0 
-        ? originalOrderLines.filter(line => line.added !== false) // Filter to only added items
-        : (state.lines || []); // state.lines already contains only order items when viewing
-      
-      console.log('📦 Edit Order - Inventory loaded:', inventoryData.length, 'items');
-      console.log('📋 Original order items (added only):', originalOrderItems.length, 'items');
-      
-      // Create a map of original order items by ID for quick lookup
-      // Only match items that have the exact same ID as items in the original order
-      const originalOrderItemsById = new Map();
-      originalOrderItems.forEach(item => {
-        if (item.id != null) {
-          originalOrderItemsById.set(item.id, item);
-        }
-      });
-      
-      console.log('📋 Original order item IDs:', Array.from(originalOrderItemsById.keys()));
-      
-      // Map inventory items and mark items already in the order
-      const allInventoryLines = inventoryData.map((inv) => {
-        // Only match by ID - this ensures we only mark the exact items that were in the order
-        const existingLine = originalOrderItemsById.get(inv.id);
-        
-        if (existingLine) {
-          // This item was in the original order (matched by ID) - mark it as added
-          return {
-            id: inv.id,
-            brand: inv.brand,
-            product: inv.product,
-            size: inv.size,
-            qty: existingLine.qty || existingLine.originalQty || 0,
-            labelStatus: inv.status,
-            inventory: inv.inventory,
-            inbound: inv.inbound,
-            toOrder: inv.inventory,
-            labelSize: inv.labelSize,
-            added: true, // Only items originally in the order are marked as added
-            originalQty: existingLine.qty || existingLine.originalQty || 0,
-            isOriginalItem: true,
-          };
-        }
-        
-        // This item was NOT in the original order - user must decide to add it
+      if (existingLine) {
+        // This item was in the original order (matched by ID) - mark it as added
         return {
           id: inv.id,
           brand: inv.brand,
           product: inv.product,
           size: inv.size,
-          qty: 2000, // Start with 2000 qty for new items in edit mode (user can adjust)
+          qty: existingLine.qty || existingLine.originalQty || 0,
           labelStatus: inv.status,
           inventory: inv.inventory,
-          inbound: inv.inbound,
           toOrder: inv.inventory,
           labelSize: inv.labelSize,
-          added: false, // New items are NOT added by default - user decides
-          originalQty: 0,
-          isOriginalItem: false,
+          added: true, // Only items originally in the order are marked as added
+          originalQty: existingLine.qty || existingLine.originalQty || 0,
+          isOriginalItem: true,
         };
-      });
+      }
       
-      console.log('✅ All inventory lines prepared:', allInventoryLines.length, 'items');
-      
-      setOrderLines(allInventoryLines);
-      setIsEditOrderMode(true);
-      setActiveTab('addProducts'); // Switch to addProducts tab when editing order
-    } catch (err) {
-      console.error('Error loading inventory for edit:', err);
-    }
+      // This item was NOT in the original order - user must decide to add it
+      return {
+        id: inv.id,
+        brand: inv.brand,
+        product: inv.product,
+        size: inv.size,
+        qty: 2000, // Start with 2000 qty for new items in edit mode (user can adjust)
+        labelStatus: inv.status,
+        inventory: inv.inventory,
+        toOrder: inv.inventory,
+        labelSize: inv.labelSize,
+        added: false, // New items are NOT added by default - user decides
+        originalQty: 0,
+        isOriginalItem: false,
+      };
+    });
+    
+    console.log('✅ All inventory lines prepared:', allInventoryLines.length, 'items');
+    
+    setOrderLines(allInventoryLines);
+    setIsEditOrderMode(true);
+    setActiveTab('addProducts'); // Switch to addProducts tab when editing order
   };
 
   // Handle Cancel Edit - restore original order lines
@@ -612,44 +460,35 @@ const LabelOrderPage = () => {
   }, [isEditMode, originalOrder, addedLines]);
 
   // Timeline calculation helpers
-  const getTimelineData = (labelId, inventory, toOrder) => {
-    // Get DOI data for this label
-    const labelDoi = doiData && doiData[labelId];
+  const getTimelineData = (inventory, toOrder, index) => {
+    const today = new Date('2025-11-11');
+    const doiGoal = new Date('2026-04-13'); // Updated to 4/13/25 (April 2026)
+    const totalDays = Math.ceil((doiGoal - today) / (1000 * 60 * 60 * 24)); // ~154 days
     
-    // Calculate days based on real data
-    let inventoryDays = 0;
-    let orderDays = 0;
+    // Based on the image, the bars show:
+    // Row 1: green extends to ~30% (middle of Jan), blue fills to goal
+    // Row 2: green extends to ~50% (middle of Feb), blue fills to goal  
+    // Row 3: green extends to ~50% (middle of Feb), blue fills to goal with +5 indicator
     
-    if (labelDoi && labelDoi.dailyUsage > 0) {
-      // Calculate days of inventory from warehouse stock
-      inventoryDays = Math.ceil(inventory / labelDoi.dailyUsage);
-      // Calculate days covered by the order quantity
-      orderDays = Math.ceil(toOrder / labelDoi.dailyUsage);
-    }
-    
-    // Calculate percentages based on DOI goal
-    const totalDays = inventoryDays + orderDays;
-    const goalDays = doiGoalValue; // Use the DOI goal (e.g., 196 days)
-    
-    // Calculate percentages - cap at 100%
-    let inventoryPercent = goalDays > 0 ? Math.min((inventoryDays / goalDays) * 100, 100) : 0;
-    let orderPercent = goalDays > 0 ? Math.min((orderDays / goalDays) * 100, 100 - inventoryPercent) : 0;
-    
-    // If total exceeds goal, scale down proportionally
-    if (inventoryPercent + orderPercent > 100) {
-      const scale = 100 / (inventoryPercent + orderPercent);
-      inventoryPercent *= scale;
-      orderPercent *= scale;
+    let inventoryPercent, orderPercent;
+    if (index === 0) {
+      // First row: green to middle of Jan (~30%)
+      inventoryPercent = 30;
+      orderPercent = 70; // Blue fills rest
+    } else if (index === 1) {
+      // Second row: green to middle of Feb (~50%)
+      inventoryPercent = 50;
+      orderPercent = 50;
+    } else {
+      // Third row: green to middle of Feb (~50%)
+      inventoryPercent = 50;
+      orderPercent = 50;
     }
     
     return {
       totalDays,
-      inventoryDays,
-      orderDays,
       inventoryPercent,
       orderPercent,
-      goalDays,
-      shortage: goalDays - totalDays,
     };
   };
 
@@ -674,16 +513,9 @@ const LabelOrderPage = () => {
       prev.map((line) => {
         if (line.id === id) {
           const newAdded = !line.added;
-          
-          // Check if trying to add item with 0 quantity
-          if (newAdded && (!line.qty || line.qty === 0)) {
-            alert(`Cannot add ${line.brand} ${line.product} (${line.size}) with 0 quantity. Please set a quantity first.`);
-            return line; // Don't change anything
-          }
-          
           // When adding an item in edit mode, set qty to 2000 if it's 0
           const newQty = (newAdded && isEditOrderMode && (line.qty === 0 || !line.qty)) ? 2000 : line.qty;
-          return { ...line, added: newAdded, qty: newQty, toOrder: newQty };
+          return { ...line, added: newAdded, qty: newQty };
         }
         return line;
       })
@@ -694,7 +526,7 @@ const LabelOrderPage = () => {
     const numQty = parseInt(newQty) || 0;
     setOrderLines((prev) =>
       prev.map((line) =>
-        line.id === id ? { ...line, qty: numQty, toOrder: numQty } : line
+        line.id === id ? { ...line, qty: numQty } : line
       )
     );
   };
@@ -882,92 +714,6 @@ const LabelOrderPage = () => {
     } catch (err) {
       console.error('Error creating label order:', err);
       alert('Failed to create order. Please try again.');
-    }
-  };
-
-  // Handle moving from Add Products to Submit PO
-  const handleMoveToSubmitPO = () => {
-    // Validation: Check if any products are added
-    if (addedLines.length === 0) {
-      alert('Please add at least one product to the order');
-      return;
-    }
-    
-    // Validation: Check if all added items have quantity > 0
-    const itemsWithZeroQty = addedLines.filter(line => !line.qty || line.qty === 0);
-    if (itemsWithZeroQty.length > 0) {
-      const productNames = itemsWithZeroQty.map(line => `${line.brand} ${line.product} (${line.size})`).join('\n');
-      alert(`Cannot complete order. The following items have 0 quantity:\n\n${productNames}\n\nPlease set a quantity or remove them from the order.`);
-      return;
-    }
-    
-    // Mark Add Products as complete and move to Submit PO tab
-    setAddProductsComplete(true);
-    setActiveTab('submitPO');
-  };
-
-  // Handle submitting the order from Submit PO tab
-  const handleSubmitOrder = async () => {
-    // Final validation
-    if (addedLines.length === 0) {
-      alert('Please add at least one product to the order');
-      return;
-    }
-    
-    const itemsWithZeroQty = addedLines.filter(line => !line.qty || line.qty === 0);
-    if (itemsWithZeroQty.length > 0) {
-      alert('Cannot submit order with items that have 0 quantity. Please go back and fix quantities.');
-      return;
-    }
-    
-    try {
-      // Calculate totals
-      const totalQuantity = addedLines.reduce((sum, line) => sum + (line.qty || 0), 0);
-      const totalCost = addedLines.reduce((sum, line) => {
-        const qty = line.qty || 0;
-        const cost = line.costPerLabel || 0;
-        return sum + (qty * cost);
-      }, 0);
-
-      // Create order via API
-      const response = await labelsApi.createOrder({
-        orderNumber: orderNumber,
-        supplier: supplier.name,
-        orderDate: new Date().toISOString().split('T')[0],
-        totalQuantity: totalQuantity,
-        totalCost: totalCost,
-        status: 'pending',
-        lines: addedLines.map(line => ({
-          brand: line.brand,
-          product: line.product,
-          size: line.size,
-          labelSize: line.labelSize,
-          quantityOrdered: line.qty || 0,
-          costPerLabel: line.costPerLabel || 0,
-          lineTotal: (line.qty || 0) * (line.costPerLabel || 0),
-          googleDriveLink: line.googleDriveLink,
-        })),
-      });
-
-      if (response.success) {
-        // Navigate back to labels page with success state
-        navigate('/dashboard/supply-chain/labels', {
-          state: {
-            newLabelOrder: {
-              orderNumber,
-              supplierName: supplier.name,
-              lines: addedLines,
-              status: 'Submitted',
-            },
-          },
-          replace: false,
-        });
-      } else {
-        alert(`Failed to create order: ${response.error}`);
-      }
-    } catch (err) {
-      console.error('Error submitting order:', err);
-      alert('Failed to submit order. Please try again.');
     }
   };
 
@@ -1443,7 +1189,6 @@ const LabelOrderPage = () => {
             {/* Settings Button */}
             <button
               type="button"
-              onClick={() => setIsLabelsSettingsModalOpen(true)}
               style={{
                 width: '32px',
                 height: '32px',
@@ -1479,13 +1224,7 @@ const LabelOrderPage = () => {
         }}>
                 <button
                   type="button"
-            onClick={() => {
-              // Only allow navigation if not viewing an order OR if in edit mode
-              if (!isViewMode || isEditOrderMode) {
-                setActiveTab('addProducts');
-              }
-            }}
-            disabled={isViewMode && !isEditOrderMode}
+            onClick={() => setActiveTab('addProducts')}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -1497,13 +1236,12 @@ const LabelOrderPage = () => {
               backgroundColor: activeTab === 'addProducts' ? (isDarkMode ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.05)') : 'transparent',
               border: 'none',
               borderBottom: activeTab === 'addProducts' ? '2px solid #007AFF' : '2px solid transparent',
-              cursor: (isViewMode && !isEditOrderMode) ? 'not-allowed' : 'pointer',
-              opacity: (isViewMode && !isEditOrderMode) ? 0.6 : 1,
+              cursor: 'pointer',
               transition: 'all 0.2s',
               whiteSpace: 'nowrap',
             }}
           >
-            {(isViewMode && orderId && !isEditOrderMode) || showExportModal || isEditOrderMode || addProductsComplete ? (
+            {(isViewMode && orderId && !isEditOrderMode) || showExportModal || isEditOrderMode ? (
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10B981' }} />
             ) : (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1514,12 +1252,7 @@ const LabelOrderPage = () => {
                 </button>
                 <button
                   type="button"
-            onClick={() => {
-              // Only allow navigation if not viewing an order
-              if (!isViewMode) {
-                setActiveTab('submitPO');
-              }
-            }}
+            onClick={() => !isViewMode && setActiveTab('submitPO')}
             disabled={isViewMode}
             style={{
               display: 'flex',
@@ -1533,12 +1266,12 @@ const LabelOrderPage = () => {
               border: 'none',
               borderBottom: activeTab === 'submitPO' ? '2px solid #007AFF' : '2px solid transparent',
               cursor: isViewMode ? 'not-allowed' : 'pointer',
-              opacity: isViewMode ? 0.6 : 1,
+              opacity: isViewMode ? 0.5 : 1,
               transition: 'all 0.2s',
               whiteSpace: 'nowrap',
             }}
           >
-            {showExportModal ? (
+            {(isViewMode && orderId && !isEditOrderMode) || showExportModal || isEditOrderMode ? (
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10B981' }} />
             ) : (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1547,8 +1280,6 @@ const LabelOrderPage = () => {
             )}
             <span>Submit PO</span>
           </button>
-          {/* Only show Receive PO tab when viewing an existing order */}
-          {isViewMode && orderId && (
           <button
             type="button"
             onClick={() => setActiveTab('receivePO')}
@@ -1568,7 +1299,7 @@ const LabelOrderPage = () => {
               whiteSpace: 'nowrap',
             }}
           >
-            {!isEditOrderMode ? (
+            {(isViewMode && orderId && !isEditOrderMode) ? (
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10B981' }} />
             ) : (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1577,7 +1308,6 @@ const LabelOrderPage = () => {
             )}
             <span>Receive PO</span>
                 </button>
-          )}
               </div>
             </div>
 
@@ -1658,36 +1388,6 @@ const LabelOrderPage = () => {
           </div>
         </div>
       </div>
-
-      {/* Search Bar - only show in Add Products tab */}
-      {activeTab === 'addProducts' && (
-        <div className={`${themeClasses.cardBg} rounded-lg border ${themeClasses.border} shadow-sm mx-6 mb-4 p-4`}>
-          <div className="flex items-center gap-4">
-            <div className="flex-1">
-              <input
-                type="text"
-                placeholder="Search by brand, product, size, or label size..."
-                value={searchFilter}
-                onChange={(e) => {
-                  setSearchFilter(e.target.value);
-                  setCurrentPage(1); // Reset to first page on search
-                }}
-                className={`w-full px-4 py-2 border ${themeClasses.border} rounded-lg ${isDarkMode ? 'bg-dark-bg-tertiary' : 'bg-white'} ${themeClasses.textPrimary} focus:outline-none focus:ring-2 focus:ring-blue-500`}
-              />
-            </div>
-            <div className={`text-sm ${themeClasses.textSecondary}`}>
-              {filteredLines.filter(line => {
-                if (!searchFilter.trim()) return true;
-                const search = searchFilter.toLowerCase();
-                return line.brand?.toLowerCase().includes(search) ||
-                       line.product?.toLowerCase().includes(search) ||
-                       line.size?.toLowerCase().includes(search) ||
-                       line.labelSize?.toLowerCase().includes(search);
-              }).length} items found
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Table */}
       <div className={`${themeClasses.cardBg} rounded-xl border ${themeClasses.border} shadow-lg mx-6`} style={{ marginTop: '0' }}>
@@ -1999,11 +1699,9 @@ const LabelOrderPage = () => {
                 </td>
               </tr>
             ) : (
-              filteredLines
-                .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-                .map((line, index) => {
-                const timelineData = (!isViewMode || isEditOrderMode) ? getTimelineData(line.id, line.inventory, line.toOrder) : null;
-                const displayedRows = filteredLines.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+              filteredLines.map((line, index) => {
+                const timelineData = (!isViewMode || isEditOrderMode) ? getTimelineData(line.inventory, line.toOrder, index) : null;
+                const displayedRows = filteredLines;
                 
                 return (
                   <tr 
@@ -2310,7 +2008,7 @@ const LabelOrderPage = () => {
                               const value = parseInt(e.target.value) || 0;
                               handleQtyChange(line.id, value);
                             }}
-                            readOnly={isViewMode && !isEditOrderMode}
+                            readOnly={!isEditOrderMode}
                             style={{ 
                               color: editingRowId === line.id ? '#92400E' : '#000000', 
                               fontSize: '14px', 
@@ -2324,7 +2022,7 @@ const LabelOrderPage = () => {
                               padding: 0,
                               margin: 0,
                               MozAppearance: 'textfield',
-                              cursor: (isViewMode && !isEditOrderMode) ? 'default' : 'text',
+                              cursor: isEditOrderMode ? 'text' : 'default',
                             }}
                             className="[&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             min="0"
@@ -2576,129 +2274,6 @@ const LabelOrderPage = () => {
           </tbody>
         </table>
         </div>
-        
-        {/* Pagination Controls - only show in Add Products tab */}
-        {activeTab === 'addProducts' && filteredLines.length > 0 && (() => {
-          const totalPages = Math.ceil(filteredLines.length / itemsPerPage);
-          const startItem = (currentPage - 1) * itemsPerPage + 1;
-          const endItem = Math.min(currentPage * itemsPerPage, filteredLines.length);
-          
-          const getPageNumbers = () => {
-            const pages = [];
-            const maxVisible = 5;
-            
-            if (totalPages <= maxVisible) {
-              for (let i = 1; i <= totalPages; i++) {
-                pages.push(i);
-              }
-            } else {
-              if (currentPage <= 3) {
-                for (let i = 1; i <= 4; i++) pages.push(i);
-                pages.push('...');
-                pages.push(totalPages);
-              } else if (currentPage >= totalPages - 2) {
-                pages.push(1);
-                pages.push('...');
-                for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
-              } else {
-                pages.push(1);
-                pages.push('...');
-                pages.push(currentPage - 1);
-                pages.push(currentPage);
-                pages.push(currentPage + 1);
-                pages.push('...');
-                pages.push(totalPages);
-              }
-            }
-            return pages;
-          };
-          
-          return (
-            <div className={`flex items-center justify-between px-6 py-4 border-t ${themeClasses.border}`}>
-              {/* Left side - Items info */}
-              <div className="flex items-center gap-2">
-                <span className={`text-sm font-medium ${themeClasses.textPrimary}`}>
-                  {startItem}-{endItem}
-                </span>
-                <span className={`text-sm ${themeClasses.textSecondary}`}>
-                  of {filteredLines.length}
-                </span>
-              </div>
-
-              {/* Center - Pagination controls */}
-              <div className="flex items-center gap-1">
-                {/* Previous button */}
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all border ${
-                    currentPage === 1
-                      ? `cursor-not-allowed ${themeClasses.textSecondary} ${themeClasses.border} opacity-50`
-                      : `${themeClasses.textPrimary} ${themeClasses.border} hover:bg-gray-100 ${isDarkMode ? 'hover:bg-dark-bg-tertiary' : ''} hover:border-blue-400`
-                  }`}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-
-                {/* Page numbers */}
-                <div className="flex gap-1 mx-2">
-                  {getPageNumbers().map((page, index) => (
-                    page === '...' ? (
-                      <span
-                        key={`ellipsis-${index}`}
-                        className={`px-3 py-2 text-sm font-medium ${themeClasses.textSecondary}`}
-                      >
-                        ...
-                      </span>
-                    ) : (
-                      <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all border ${
-                          currentPage === page
-                            ? 'bg-blue-600 text-white border-transparent hover:bg-blue-700 shadow-md'
-                            : `${themeClasses.textPrimary} ${themeClasses.border} hover:bg-gray-100 ${isDarkMode ? 'hover:bg-dark-bg-tertiary' : ''} hover:border-blue-400`
-                        }`}
-                        style={{ minWidth: '2.75rem' }}
-                      >
-                        {page}
-                      </button>
-                    )
-                  ))}
-                </div>
-
-                {/* Next button */}
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all border ${
-                    currentPage === totalPages
-                      ? `cursor-not-allowed ${themeClasses.textSecondary} ${themeClasses.border} opacity-50`
-                      : `${themeClasses.textPrimary} ${themeClasses.border} hover:bg-gray-100 ${isDarkMode ? 'hover:bg-dark-bg-tertiary' : ''} hover:border-blue-400`
-                  }`}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Right side - Page info */}
-              <div className="flex items-center gap-2">
-                <span className={`text-sm ${themeClasses.textSecondary}`}>Page</span>
-                <span className={`text-sm font-medium ${themeClasses.textPrimary}`}>
-                  {currentPage}
-                </span>
-                <span className={`text-sm ${themeClasses.textSecondary}`}>of</span>
-                <span className={`text-sm font-medium ${themeClasses.textPrimary}`}>
-                  {totalPages}
-                </span>
-              </div>
-            </div>
-          );
-        })()}
                     </div>
 
       {/* Legend */}
@@ -2955,14 +2530,10 @@ const LabelOrderPage = () => {
                   </button>
                 )}
                 
-                {/* Complete/Submit/Receive Order button */}
+                {/* Complete/Receive Order button */}
                 <button
                   type="button"
-                  onClick={
-                    isViewMode && activeTab === 'receivePO' ? handleReceiveClick :
-                    activeTab === 'submitPO' ? handleSubmitOrder :
-                    handleMoveToSubmitPO
-                  }
+                  onClick={isViewMode ? handleReceiveClick : handleCompleteOrder}
                   disabled={isViewMode && activeTab === 'receivePO' && selectedItems.size === 0}
                   className="inline-flex items-center gap-2 text-xs font-semibold rounded-lg px-4 py-2 transition-colors"
                   style={{
@@ -2982,9 +2553,7 @@ const LabelOrderPage = () => {
                     }
                   }}
                 >
-                  {activeTab === 'receivePO' ? 'Receive Order' : 
-                   activeTab === 'submitPO' ? 'Submit Order' : 
-                   'Complete Order'}
+                  {activeTab === 'receivePO' ? 'Receive Order' : 'Complete Order'}
                 </button>
               </>
             )}
@@ -3262,145 +2831,6 @@ const LabelOrderPage = () => {
               >
                 Confirm & Receive
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Labels Settings Modal */}
-      {isLabelsSettingsModalOpen && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center" 
-          style={{ backgroundColor: 'rgba(0, 0, 0, 0.4)' }} 
-          onClick={() => setIsLabelsSettingsModalOpen(false)}
-        >
-          <div 
-            className="bg-white rounded-lg"
-            style={{ 
-              width: '420px',
-              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-                Labels Settings
-              </h2>
-              <button
-                type="button"
-                onClick={() => setIsLabelsSettingsModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 transition"
-                aria-label="Close"
-                style={{ padding: '4px' }}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Modal Content */}
-            <div className="p-5">
-              {/* DOI Goal Input - Two Column Layout */}
-              <div className="mb-5">
-                <div className="flex items-center justify-between gap-4">
-                  {/* Left Column: Label and Info Icon */}
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-                      DOI Goal
-                    </label>
-                    <div 
-                      className="relative"
-                      onMouseEnter={() => setShowDoiTooltip(true)}
-                      onMouseLeave={() => setShowDoiTooltip(false)}
-                    >
-                      <svg 
-                        className="w-4 h-4 text-gray-600 cursor-help" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        viewBox="0 0 24 24"
-                      >
-                        <path 
-                          strokeLinecap="round" 
-                          strokeLinejoin="round" 
-                          strokeWidth={2} 
-                          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" 
-                        />
-                      </svg>
-                      
-                      {/* Tooltip */}
-                      {showDoiTooltip && (
-                        <div 
-                          className="absolute left-0 bottom-full mb-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-10"
-                          style={{ 
-                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                            fontFamily: 'system-ui, -apple-system, sans-serif'
-                          }}
-                        >
-                          <h3 className="text-sm font-semibold text-gray-900 mb-2">
-                            DOI Goal = Days of Inventory Goal
-                          </h3>
-                          <p className="text-sm text-gray-700 mb-2" style={{ lineHeight: '1.5' }}>
-                            Your total label DOI combines three pieces: days of finished goods at Amazon, days of raw labels in your warehouse, and the days covered by the labels you plan to order.
-                          </p>
-                          <p className="text-sm text-gray-700" style={{ lineHeight: '1.5' }}>
-                            Simply put: Total DOI = Amazon + warehouse + your next label order
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Right Column: Input Field */}
-                  <div className="flex-1" style={{ maxWidth: '180px' }}>
-                    <input
-                      type="number"
-                      value={doiGoal}
-                      onChange={(e) => setDoiGoal(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      style={{ 
-                        fontFamily: 'system-ui, -apple-system, sans-serif',
-                        borderRadius: '8px'
-                      }}
-                      placeholder="196"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Modal Buttons */}
-              <div className="flex justify-end gap-3 mt-5">
-                <button
-                  type="button"
-                  onClick={() => setIsLabelsSettingsModalOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition"
-                  style={{ 
-                    fontFamily: 'system-ui, -apple-system, sans-serif',
-                    borderRadius: '8px'
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const newDoiGoal = parseInt(doiGoal, 10);
-                    if (!isNaN(newDoiGoal) && newDoiGoal > 0) {
-                      setDoiGoalValue(newDoiGoal);
-                    }
-                    setIsLabelsSettingsModalOpen(false);
-                  }}
-                  className="px-4 py-2 text-sm font-medium text-white rounded-lg transition"
-                  style={{ 
-                    backgroundColor: '#9CA3AF',
-                    borderRadius: '8px',
-                    fontFamily: 'system-ui, -apple-system, sans-serif'
-                  }}
-                >
-                  Save
-                </button>
-              </div>
             </div>
           </div>
         </div>

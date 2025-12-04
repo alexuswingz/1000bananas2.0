@@ -260,8 +260,8 @@ export const getAllShipments = async ({ status } = {}) => {
 };
 
 /**
- * Get shipment by ID with products
- * @param {number} shipmentId - Shipment ID
+ * Get a specific shipment by ID
+ * @param {string|number} shipmentId - The shipment ID
  * @returns {Promise<Object>} Shipment object with products
  */
 export const getShipmentById = async (shipmentId) => {
@@ -281,8 +281,8 @@ export const getShipmentById = async (shipmentId) => {
 };
 
 /**
- * Update shipment
- * @param {number} shipmentId - Shipment ID
+ * Update a shipment
+ * @param {string|number} shipmentId - The shipment ID
  * @param {Object} updates - Fields to update
  * @returns {Promise<Object>} Updated shipment object
  */
@@ -310,10 +310,10 @@ export const updateShipment = async (shipmentId, updates) => {
 };
 
 /**
- * Add products to shipment
- * @param {number} shipmentId - Shipment ID
+ * Add products to a shipment
+ * @param {string|number} shipmentId - The shipment ID
  * @param {Array} products - Array of products with catalog_id and quantity
- * @returns {Promise<Array>} Added products
+ * @returns {Promise<Object>} Result with products and supply_warnings
  */
 export const addShipmentProducts = async (shipmentId, products) => {
   try {
@@ -339,9 +339,9 @@ export const addShipmentProducts = async (shipmentId, products) => {
 };
 
 /**
- * Get shipment products with inventory levels
- * @param {number} shipmentId - Shipment ID
- * @returns {Promise<Array>} Products with inventory availability
+ * Get products for a shipment (for label check)
+ * @param {string|number} shipmentId - The shipment ID
+ * @returns {Promise<Array>} Array of products with label info
  */
 export const getShipmentProducts = async (shipmentId) => {
   try {
@@ -360,38 +360,9 @@ export const getShipmentProducts = async (shipmentId) => {
 };
 
 /**
- * Get labels availability across all label_locations
- * Calculates available labels by subtracting committed labels in active shipments
- * @param {string} excludeShipmentId - Optional shipment ID to exclude from calculation (current shipment)
- * @returns {Promise<Object>} Labels availability data with by_location lookup map
- */
-export const getLabelsAvailability = async (excludeShipmentId = null) => {
-  try {
-    const url = excludeShipmentId 
-      ? `${API_BASE_URL}/production/labels/availability?exclude_shipment_id=${excludeShipmentId}`
-      : `${API_BASE_URL}/production/labels/availability`;
-    
-    const response = await fetch(url);
-    const data = await response.json();
-    
-    if (!data.success) {
-      throw new Error(data.error || 'Failed to fetch labels availability');
-    }
-    
-    return {
-      data: data.data,
-      byLocation: data.by_location
-    };
-  } catch (error) {
-    console.error('Error fetching labels availability:', error);
-    throw error;
-  }
-};
-
-/**
- * Get formula check data for shipment
- * @param {number} shipmentId - Shipment ID
- * @returns {Promise<Array>} Formula aggregation with availability
+ * Get formula check data for a shipment
+ * @param {string|number} shipmentId - The shipment ID
+ * @returns {Promise<Array>} Array of formulas with availability info
  */
 export const getShipmentFormulaCheck = async (shipmentId) => {
   try {
@@ -410,8 +381,35 @@ export const getShipmentFormulaCheck = async (shipmentId) => {
 };
 
 /**
- * Get inventory levels for all products with supply chain dependencies
- * @returns {Promise<Array>} Products with inventory, DOI, and supply chain data
+ * Get labels availability, optionally excluding a specific shipment
+ * @param {string|number} excludeShipmentId - Optional shipment ID to exclude from calculations
+ * @returns {Promise<Object>} Object with byLocation map of label availability
+ */
+export const getLabelsAvailability = async (excludeShipmentId = null) => {
+  try {
+    const params = new URLSearchParams();
+    if (excludeShipmentId) {
+      params.append('exclude_shipment', excludeShipmentId);
+    }
+    
+    const url = `${API_BASE_URL}/production/labels/availability${params.toString() ? '?' + params.toString() : ''}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to fetch labels availability');
+    }
+    
+    return data.data;
+  } catch (error) {
+    console.error('Error fetching labels availability:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get products inventory for production supply chain
+ * @returns {Promise<Array>} Array of product inventory items
  */
 export const getProductsInventory = async () => {
   try {
@@ -422,21 +420,16 @@ export const getProductsInventory = async () => {
       throw new Error(data.error || 'Failed to fetch products inventory');
     }
     
-    return data.data || [];
+    return data.data;
   } catch (error) {
     console.error('Error fetching products inventory:', error);
-    // Return empty array on error instead of throwing
-    return [];
+    throw error;
   }
 };
 
-// ============================================
-// FLOOR INVENTORY
-// ============================================
-
 /**
- * Get sellable products (all components in stock)
- * @returns {Promise<Array>} Products ready to manufacture/ship
+ * Get sellable products (products with all components in stock)
+ * @returns {Promise<Array>} Array of sellable products
  */
 export const getSellables = async () => {
   try {
@@ -447,16 +440,16 @@ export const getSellables = async () => {
       throw new Error(data.error || 'Failed to fetch sellables');
     }
     
-    return data.data || [];
+    return data.data;
   } catch (error) {
     console.error('Error fetching sellables:', error);
-    return [];
+    throw error;
   }
 };
 
 /**
- * Get shiners (damaged/cosmetic issue products)
- * @returns {Promise<Array>} Shiners grouped by formula
+ * Get shiners data (products grouped by formula with issues)
+ * @returns {Promise<Array>} Array of formula groups with shiner products
  */
 export const getShiners = async () => {
   try {
@@ -467,51 +460,16 @@ export const getShiners = async () => {
       throw new Error(data.error || 'Failed to fetch shiners');
     }
     
-    return data.data || [];
+    return data.data;
   } catch (error) {
     console.error('Error fetching shiners:', error);
-    return [];
-  }
-};
-
-/**
- * Add a damaged product to shiners inventory
- * @param {Object} shinerData - Shiner details
- * @param {number} shinerData.catalog_id - Product catalog ID
- * @param {number} shinerData.quantity - Quantity of damaged units
- * @param {string} shinerData.issue_type - Type of issue
- * @param {string} shinerData.severity - Severity level
- * @param {string} shinerData.location - Warehouse location
- * @param {string} shinerData.notes - Additional notes
- * @param {boolean} shinerData.can_rework - Can be reworked?
- * @returns {Promise<Object>} Created shiner record
- */
-export const addShiner = async (shinerData) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/production/floor-inventory/shiners`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(shinerData),
-    });
-    
-    const data = await response.json();
-    
-    if (!data.success) {
-      throw new Error(data.error || 'Failed to add shiner');
-    }
-    
-    return data;
-  } catch (error) {
-    console.error('Error adding shiner:', error);
     throw error;
   }
 };
 
 /**
- * Get unused formulas (excess formula inventory)
- * @returns {Promise<Array>} Formulas with excess inventory
+ * Get unused formulas (formulas with unallocated inventory)
+ * @returns {Promise<Array>} Array of formulas with unused gallons
  */
 export const getUnusedFormulas = async () => {
   try {
@@ -522,10 +480,10 @@ export const getUnusedFormulas = async () => {
       throw new Error(data.error || 'Failed to fetch unused formulas');
     }
     
-    return data.data || [];
+    return data.data;
   } catch (error) {
     console.error('Error fetching unused formulas:', error);
-    return [];
+    throw error;
   }
 };
 
@@ -575,14 +533,12 @@ export default {
   addShipmentProducts,
   getShipmentProducts,
   getShipmentFormulaCheck,
+  getLabelsAvailability,
   
-  // Products Inventory
+  // Products & Inventory
   getProductsInventory,
-  
-  // Floor Inventory
   getSellables,
   getShiners,
-  addShiner,
   getUnusedFormulas,
   
   // Helpers
