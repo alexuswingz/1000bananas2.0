@@ -1119,6 +1119,7 @@ const NewShipment = () => {
                     onQtyChange={setQtyValues}
                     onAddedRowsChange={setAddedRows}
                     labelsAvailabilityMap={labelsAvailabilityMap}
+                    forecastRange={parseInt(forecastRange) || 120}
                   />
                 )}
               </>

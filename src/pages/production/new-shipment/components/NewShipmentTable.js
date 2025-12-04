@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
-const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyChange, onAddedRowsChange, labelsAvailabilityMap = {} }) => {
+const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyChange, onAddedRowsChange, labelsAvailabilityMap = {}, forecastRange = 120 }) => {
   const { isDarkMode } = useTheme();
   const [selectedRows, setSelectedRows] = useState(new Set());
   const [addedRows, setAddedRows] = useState(new Set());
@@ -116,8 +116,8 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
           result = result.filter(r => (r.fbaAvailable || 0) === 0 && (r.sales30Day || 0) > 0);
           break;
         case 'overstock':
-          // Overstock - where DOI is very high (e.g., > 120 days)
-          result = result.filter(r => (r.doiTotal || r.daysOfInventory || 0) > 120);
+          // Overstock - where DOI is higher than the forecast range goal
+          result = result.filter(r => (r.doiTotal || r.daysOfInventory || 0) > forecastRange);
           break;
         default:
           break;
@@ -489,7 +489,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                       <div style={{ textAlign: 'left', marginLeft: '40px' }}>
                         <div style={{ fontWeight: 600 }}>DOI Goal</div>
                         <div style={{ opacity: 0.85 }}>
-                          {new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}
+                          {new Date(Date.now() + forecastRange * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}
                         </div>
                       </div>
                     </div>
@@ -528,25 +528,33 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                         marginTop: '-4px',
                       }}
                     >
-                      {[
-                        { label: 'Dec', left: '20%' },
-                        { label: 'Jan', left: '40%' },
-                        { label: 'Feb', left: '60%' },
-                        { label: 'Mar', left: '80%' },
-                      ].map((m) => (
-                        <span
-                          key={m.label}
-                          style={{
-                            position: 'absolute',
-                            top: -14,
-                            left: m.left,
-                            transform: 'translateX(-50%)',
-                            fontSize: '0.6rem',
-                          }}
-                        >
-                          {m.label}
-                        </span>
-                      ))}
+                      {(() => {
+                        // Generate dynamic month labels based on forecastRange
+                        const months = [];
+                        const today = new Date();
+                        const daysPerMonth = forecastRange / 4; // Divide timeline into 4 segments
+                        
+                        for (let i = 1; i <= 4; i++) {
+                          const futureDate = new Date(today.getTime() + (daysPerMonth * i) * 24 * 60 * 60 * 1000);
+                          const monthLabel = futureDate.toLocaleDateString('en-US', { month: 'short' });
+                          months.push({ label: monthLabel, left: `${i * 20}%` });
+                        }
+                        
+                        return months.map((m) => (
+                          <span
+                            key={m.left}
+                            style={{
+                              position: 'absolute',
+                              top: -14,
+                              left: m.left,
+                              transform: 'translateX(-50%)',
+                              fontSize: '0.6rem',
+                            }}
+                          >
+                            {m.label}
+                          </span>
+                        ));
+                      })()}
                       <div
                         style={{
                           position: 'absolute',
@@ -801,9 +809,9 @@ Current Inventory:
                             }}
                             title={`FBA: ${row.fbaAvailable || 0}, Total: ${row.totalInventory || 0}, Forecast: ${Math.round(row.weeklyForecast || row.forecast || 0)}/week, DOI: ${row.daysOfInventory || 0}d | Double-click for N-GOOS details`}
                           >
-                            {/* DOI Timeline Visualization (120-day goal) - Stacked segments */}
+                            {/* DOI Timeline Visualization - uses forecastRange */}
                             {(() => {
-                              const doiGoal = 120; // 120 days goal
+                              const doiGoal = forecastRange; // Use forecast range as DOI goal
                               const fba = row.fbaAvailable || 0;
                               const total = row.totalInventory || 0;
                               const weeklyForecast = row.weeklyForecast || row.forecast || 0;
@@ -820,7 +828,7 @@ Current Inventory:
                                 calculatedDoiTotal = total / dailySales;
                               }
                               
-                              // Calculate bar widths as percentage of 120-day timeline
+                              // Calculate bar widths as percentage of forecastRange timeline
                               const fbaWidth = Math.min((calculatedDoiFba / doiGoal) * 100, 100);
                               const totalWidth = Math.min((calculatedDoiTotal / doiGoal) * 100, 100);
                               
