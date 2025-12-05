@@ -184,7 +184,7 @@ const SortFormulasTable = () => {
   const handleMenuAction = (action, formula) => {
     if (action === 'split') {
       setSelectedFormula(formula);
-      setFirstBatchQty(formula.qty || 1);
+      setFirstBatchQty(1); // Always set first batch to 1
       setIsSplitModalOpen(true);
     }
     setOpenMenuIndex(null);
@@ -199,6 +199,8 @@ const SortFormulasTable = () => {
   const handleConfirmSplit = () => {
     if (!selectedFormula) return;
     
+    // First quantity is always 1, second is the remaining
+    const firstBatchQty = 1;
     const secondBatchQty = (selectedFormula.qty || 1) - firstBatchQty;
     
     // Find the index of the formula to split
@@ -210,7 +212,7 @@ const SortFormulasTable = () => {
     const firstBatch = {
       ...selectedFormula,
       id: Date.now(), // New ID for first batch
-      qty: firstBatchQty,
+      qty: firstBatchQty, // Always 1
       splitTag: '1/2', // Tag to indicate it's part of a split
       originalId: selectedFormula.id, // Keep reference to original
     };
@@ -218,7 +220,7 @@ const SortFormulasTable = () => {
     const secondBatch = {
       ...selectedFormula,
       id: Date.now() + 1, // New ID for second batch
-      qty: secondBatchQty,
+      qty: secondBatchQty, // Remaining quantity
       splitTag: '2/2', // Tag to indicate it's part of a split
       originalId: selectedFormula.id, // Keep reference to original
     };
@@ -231,7 +233,8 @@ const SortFormulasTable = () => {
     handleCloseSplitModal();
   };
 
-  const secondBatchQty = selectedFormula ? (selectedFormula.qty || 1) - firstBatchQty : 0;
+  // Second batch quantity is always the remaining (total - 1)
+  const secondBatchQty = selectedFormula ? (selectedFormula.qty || 1) - 1 : 0;
 
   const handleFilterClick = (columnKey, event) => {
     event.stopPropagation();
@@ -746,28 +749,26 @@ const SortFormulasTable = () => {
                     color: '#6B7280',
                     margin: '0 0 12px 0',
                   }}>
-                    Enter the quantity of totes for the first batch.
+                    The first batch quantity is always 1.
                   </p>
                   <input
                     type="number"
                     min="1"
-                    value={firstBatchQty}
-                    onChange={(e) => {
-                      const value = Math.max(1, parseInt(e.target.value) || 1);
-                      const maxValue = selectedFormula?.qty || 1;
-                      setFirstBatchQty(Math.min(value, maxValue));
-                    }}
+                    max="1"
+                    value={1}
+                    readOnly
                     style={{
                       width: '100%',
                       height: '40px',
                       padding: '0 12px',
                       borderRadius: '6px',
-                      border: '1px solid #3B82F6',
-                      backgroundColor: '#FFFFFF',
-                      color: '#374151',
+                      border: '1px solid #D1D5DB',
+                      backgroundColor: '#F9FAFB',
+                      color: '#6B7280',
                       fontSize: '14px',
                       fontWeight: 400,
                       outline: 'none',
+                      cursor: 'not-allowed',
                       boxSizing: 'border-box',
                     }}
                   />
@@ -850,25 +851,25 @@ const SortFormulasTable = () => {
                 <button
                   type="button"
                   onClick={handleConfirmSplit}
-                  disabled={firstBatchQty <= 0 || firstBatchQty >= (selectedFormula?.qty || 1)}
+                  disabled={!selectedFormula || (selectedFormula?.qty || 1) <= 1}
                   style={{
                     padding: '8px 16px',
                     borderRadius: '6px',
                     border: 'none',
-                    backgroundColor: (firstBatchQty <= 0 || firstBatchQty >= (selectedFormula?.qty || 1)) ? '#9CA3AF' : '#3B82F6',
+                    backgroundColor: (!selectedFormula || (selectedFormula?.qty || 1) <= 1) ? '#9CA3AF' : '#3B82F6',
                     color: '#FFFFFF',
                     fontSize: '14px',
                     fontWeight: 500,
-                    cursor: (firstBatchQty <= 0 || firstBatchQty >= (selectedFormula?.qty || 1)) ? 'not-allowed' : 'pointer',
+                    cursor: (!selectedFormula || (selectedFormula?.qty || 1) <= 1) ? 'not-allowed' : 'pointer',
                     transition: 'background-color 0.2s',
                   }}
                   onMouseEnter={(e) => {
-                    if (firstBatchQty > 0 && firstBatchQty < (selectedFormula?.qty || 1)) {
+                    if (selectedFormula && (selectedFormula?.qty || 1) > 1) {
                       e.currentTarget.style.backgroundColor = '#2563EB';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (firstBatchQty > 0 && firstBatchQty < (selectedFormula?.qty || 1)) {
+                    if (selectedFormula && (selectedFormula?.qty || 1) > 1) {
                       e.currentTarget.style.backgroundColor = '#3B82F6';
                     }
                   }}

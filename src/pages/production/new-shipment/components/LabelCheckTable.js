@@ -108,28 +108,29 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
 
   const handleSave = () => {
     if (selectedRow && selectedRow.id) {
-      const discrepancy = calculateDiscrepancy();
-      const lblCurrentInv = selectedRow.lblCurrentInv || 0;
+      const calculatedTotal = calculateTotalLabels();
+      const labelsNeeded = selectedRow.quantity || 0;
+      const discrepancy = calculatedTotal - labelsNeeded;
       
-      // Check if variance still exceeds after saving
-      const varianceStillExceeds = checkVarianceExceeded(discrepancy, lblCurrentInv);
+      // Check if variance exceeds threshold
+      const varianceExceeds = checkVarianceExceeded(discrepancy, labelsNeeded);
       
-      if (varianceStillExceeds) {
+      if (varianceExceeds) {
         // Show the variance still exceeded modal
         setIsVarianceStillExceededOpen(true);
         // Don't close the edit modal yet - user might want to go back and edit
         return;
       }
       
-      // Only save if there's a discrepancy (positive or negative)
-      if (discrepancy !== 0) {
-        const updatedRows = rows.map(row => 
-          row.id === selectedRow.id 
-            ? { ...row, totalCount: discrepancy }
-            : row
-        );
-        setRows(updatedRows);
-      }
+      // Save the calculated total (not discrepancy) for display
+      // The discrepancy will be calculated as: totalCount - labelsNeeded
+      const updatedRows = rows.map(row => 
+        row.id === selectedRow.id 
+          ? { ...row, totalCount: calculatedTotal }
+          : row
+      );
+      setRows(updatedRows);
+      
       // Mark the row as completed
       setCompletedRows(prev => new Set(prev).add(selectedRow.id));
       handleCloseModal();
@@ -144,17 +145,15 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
   const handleVarianceConfirm = () => {
     // User confirmed the variance - save the data and close both modals
     if (selectedRow && selectedRow.id) {
-      const discrepancy = calculateDiscrepancy();
-      // Save the discrepancy even though variance exceeds
-      if (discrepancy !== 0) {
-        const updatedRows = rows.map(row => 
-          row.id === selectedRow.id 
-            ? { ...row, totalCount: discrepancy }
-            : row
-        );
-        setRows(updatedRows);
-      }
-      // Mark the row as completed
+      const calculatedTotal = calculateTotalLabels();
+      // Save the calculated total even though variance exceeds
+      const updatedRows = rows.map(row => 
+        row.id === selectedRow.id 
+          ? { ...row, totalCount: calculatedTotal }
+          : row
+      );
+      setRows(updatedRows);
+      // Mark the row as completed (but it will need recount)
       setCompletedRows(prev => new Set(prev).add(selectedRow.id));
     }
     setIsVarianceStillExceededOpen(false);
@@ -182,35 +181,38 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
   };
 
   const calculateTotalLabels = () => {
-    // Calculate based on full rolls and partial weights
+    // Label Weight Calculation Formula:
+    // - Each full roll = 1000 labels
+    // - Each gram of partial roll = 10 labels
     const fullRollTotal = fullRolls.reduce((sum, roll) => {
-      const num = parseInt(roll) || 0;
-      return sum + num;
+      const numRolls = parseInt(roll) || 0;
+      return sum + (numRolls * 1000); // Each roll = 1000 labels
     }, 0);
-    // Partial weights calculation would need conversion logic
-    // For now, assuming partial weights need to be converted to labels
+    
     const partialWeightTotal = partialWeights.reduce((sum, weight) => {
-      const num = parseFloat(weight) || 0;
-      // Placeholder: convert weight to labels (would need actual conversion formula)
-      return sum + Math.floor(num / 10); // Example: 10g per label
+      const numGrams = parseFloat(weight) || 0;
+      return sum + (numGrams * 10); // Each gram = 10 labels
     }, 0);
+    
     return fullRollTotal + partialWeightTotal;
   };
 
   const calculateDiscrepancy = () => {
     if (!selectedRow) return 0;
     const calculatedTotal = calculateTotalLabels();
-    const currentInventory = selectedRow.lblCurrentInv || 0;
-    return calculatedTotal - currentInventory;
+    // Compare against labels needed for shipment (not current inventory)
+    const labelsNeeded = selectedRow.quantity || 0;
+    return calculatedTotal - labelsNeeded;
   };
 
   // Check if variance exceeds threshold
-  const checkVarianceExceeded = (discrepancy, lblCurrentInv) => {
+  // Variance is the difference between calculated total and labels needed
+  const checkVarianceExceeded = (discrepancy, labelsNeeded) => {
     const varianceThreshold = 10; // Minimum threshold in units
     const varianceThresholdPercent = 0.05; // 5% threshold
     
     const absVariance = Math.abs(discrepancy);
-    const percentThreshold = Math.abs(lblCurrentInv * varianceThresholdPercent);
+    const percentThreshold = Math.abs(labelsNeeded * varianceThresholdPercent);
     const threshold = Math.max(varianceThreshold, percentThreshold);
     
     return absVariance > threshold;
@@ -651,25 +653,32 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
                     height: '40px',
                   }}>
                     {row.totalCount !== undefined && row.totalCount !== null && row.totalCount !== '' ? (
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                      }}>
-                        <span>{formatNumber(row.lblCurrentInv)}</span>
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          padding: '2px 8px',
-                          borderRadius: '4px',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          backgroundColor: row.totalCount < 0 ? '#FEE2E2' : '#D1FAE5',
-                          color: row.totalCount < 0 ? '#DC2626' : '#059669',
-                        }}>
-                          {row.totalCount > 0 ? '+' : ''}{row.totalCount}
-                        </span>
-                      </div>
+                      (() => {
+                        const calculatedTotal = typeof row.totalCount === 'number' ? row.totalCount : parseFloat(row.totalCount) || 0;
+                        const labelsNeeded = row.quantity || 0;
+                        const discrepancy = calculatedTotal - labelsNeeded;
+                        return (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                          }}>
+                            <span>{formatNumber(calculatedTotal)}</span>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              backgroundColor: discrepancy < 0 ? '#FEE2E2' : '#D1FAE5',
+                              color: discrepancy < 0 ? '#DC2626' : '#059669',
+                            }}>
+                              {discrepancy > 0 ? '+' : ''}{discrepancy}
+                            </span>
+                          </div>
+                        );
+                      })()
                     ) : ''}
                   </td>
                 </tr>
@@ -953,7 +962,7 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
                   color: isDarkMode ? '#9CA3AF' : '#6B7280',
                   margin: 0,
                 }}>
-                  Current Inventory: {formatNumber(selectedRow.lblCurrentInv)}
+                  Labels Needed: {formatNumber(selectedRow.quantity || 0)}
                 </p>
               </div>
               <div style={{
@@ -969,30 +978,35 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
                 }}>
                   {calculateTotalLabels()}
                 </div>
-                {calculateDiscrepancy() !== 0 && (
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    color: calculateDiscrepancy() < 0 ? '#EF4444' : '#10B981',
-                    fontSize: '14px',
-                    fontWeight: 500,
-                  }}>
-                    {calculateDiscrepancy() < 0 && (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M19 9l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    )}
-                    {calculateDiscrepancy() > 0 && (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M5 15l7-7 7 7" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    )}
-                    <span>
-                      {calculateDiscrepancy() > 0 ? '+' : ''}{calculateDiscrepancy()} Discrepancy
-                    </span>
-                  </div>
-                )}
+                {(() => {
+                  const calculatedTotal = calculateTotalLabels();
+                  const labelsNeeded = selectedRow.quantity || 0;
+                  const discrepancy = calculatedTotal - labelsNeeded;
+                  return discrepancy !== 0 && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      color: discrepancy < 0 ? '#EF4444' : '#10B981',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                    }}>
+                      {discrepancy < 0 && (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M19 9l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                      {discrepancy > 0 && (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M5 15l7-7 7 7" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                      <span>
+                        {discrepancy > 0 ? '+' : ''}{discrepancy} {discrepancy < 0 ? 'Short' : 'Surplus'}
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 

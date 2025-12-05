@@ -12,13 +12,47 @@ const FormulaCheckTable = ({ shipmentId, isRecountMode = false, varianceExceeded
   const filterDropdownRef = useRef(null);
   const [filters, setFilters] = useState({});
   const [sortConfig, setSortConfig] = useState({ field: '', order: '' });
+  const [notes, setNotes] = useState({}); // Store notes by formula ID
+  const [notesModalOpen, setNotesModalOpen] = useState(false);
+  const [selectedFormulaForNotes, setSelectedFormulaForNotes] = useState(null);
 
   // Load formula data from API
   useEffect(() => {
     if (shipmentId) {
       loadFormulaData();
+      loadNotes();
     }
   }, [shipmentId]);
+
+  // Load notes from localStorage
+  const loadNotes = () => {
+    if (shipmentId) {
+      try {
+        const storedNotes = localStorage.getItem(`formula_notes_${shipmentId}`);
+        if (storedNotes) {
+          setNotes(JSON.parse(storedNotes));
+        }
+      } catch (error) {
+        console.error('Error loading notes:', error);
+      }
+    }
+  };
+
+  // Save notes to localStorage
+  const saveNotes = (formulaId, noteText) => {
+    const updatedNotes = {
+      ...notes,
+      [formulaId]: noteText
+    };
+    setNotes(updatedNotes);
+    if (shipmentId) {
+      try {
+        localStorage.setItem(`formula_notes_${shipmentId}`, JSON.stringify(updatedNotes));
+      } catch (error) {
+        console.error('Error saving notes:', error);
+      }
+    }
+  };
 
   const loadFormulaData = async () => {
     try {
@@ -131,6 +165,24 @@ const FormulaCheckTable = ({ shipmentId, isRecountMode = false, varianceExceeded
       }
       return newSet;
     });
+  };
+
+  const handleNotesClick = (formula) => {
+    setSelectedFormulaForNotes(formula);
+    setNotesModalOpen(true);
+  };
+
+  const handleNotesSave = (noteText) => {
+    if (selectedFormulaForNotes) {
+      saveNotes(selectedFormulaForNotes.id, noteText);
+      setNotesModalOpen(false);
+      setSelectedFormulaForNotes(null);
+    }
+  };
+
+  const handleNotesClose = () => {
+    setNotesModalOpen(false);
+    setSelectedFormulaForNotes(null);
   };
 
   const columns = [
@@ -381,6 +433,7 @@ const FormulaCheckTable = ({ shipmentId, isRecountMode = false, varianceExceeded
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                     <button
                       type="button"
+                      onClick={() => handleNotesClick(formula)}
                       style={{
                         background: 'transparent',
                         border: 'none',
@@ -389,11 +442,19 @@ const FormulaCheckTable = ({ shipmentId, isRecountMode = false, varianceExceeded
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
+                        transition: 'opacity 0.2s',
                       }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.opacity = '0.8';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.opacity = '1';
+                      }}
+                      title={notes[formula.id] ? 'Edit notes' : 'Add notes'}
                     >
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="#3B82F6">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill={notes[formula.id] ? "#10B981" : "#3B82F6"}>
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                        <polyline points="14 2 14 8 20 8" fill="#3B82F6"/>
+                        <polyline points="14 2 14 8 20 8" fill={notes[formula.id] ? "#10B981" : "#3B82F6"}/>
                         <line x1="16" y1="13" x2="8" y2="13" stroke="white" strokeWidth="2"/>
                         <line x1="16" y1="17" x2="8" y2="17" stroke="white" strokeWidth="2"/>
                         <polyline points="10 9 9 9 8 9" stroke="white" strokeWidth="2"/>
@@ -437,6 +498,18 @@ const FormulaCheckTable = ({ shipmentId, isRecountMode = false, varianceExceeded
           onReset={handleResetFilter}
           currentSort={sortConfig}
           currentFilters={filters}
+          isDarkMode={isDarkMode}
+        />
+      )}
+
+      {/* Notes Modal */}
+      {notesModalOpen && selectedFormulaForNotes && (
+        <NotesModal
+          isOpen={notesModalOpen}
+          onClose={handleNotesClose}
+          onSave={handleNotesSave}
+          formula={selectedFormulaForNotes}
+          currentNote={notes[selectedFormulaForNotes.id] || ''}
           isDarkMode={isDarkMode}
         />
       )}
@@ -742,6 +815,207 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
 });
 
 FilterDropdown.displayName = 'FilterDropdown';
+
+// Notes Modal Component
+const NotesModal = ({ isOpen, onClose, onSave, formula, currentNote, isDarkMode }) => {
+  const [noteText, setNoteText] = useState(currentNote);
+  const textareaRef = useRef(null);
+
+  useEffect(() => {
+    setNoteText(currentNote);
+  }, [currentNote]);
+
+  useEffect(() => {
+    if (isOpen && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [isOpen]);
+
+  const handleSave = () => {
+    onSave(noteText);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          zIndex: 10000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+        onClick={onClose}
+      >
+        {/* Modal */}
+        <div
+          style={{
+            backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+            borderRadius: '12px',
+            width: '500px',
+            maxWidth: '90vw',
+            border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            zIndex: 10001,
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            maxHeight: '90vh',
+            overflow: 'hidden',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div style={{ 
+            padding: '16px 24px',
+            borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+            borderTopLeftRadius: '12px',
+            borderTopRightRadius: '12px',
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            backgroundColor: '#1C2634',
+          }}>
+            <div>
+              <h2 style={{
+                fontSize: '18px',
+                fontWeight: 600,
+                color: '#FFFFFF',
+                margin: 0,
+                marginBottom: '4px',
+              }}>
+                Notes
+              </h2>
+              <p style={{
+                fontSize: '12px',
+                color: '#9CA3AF',
+                margin: 0,
+              }}>
+                {formula.formula}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#FFFFFF',
+                width: '24px',
+                height: '24px',
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Content */}
+          <div style={{ 
+            flex: '1 1 auto',
+            minHeight: 0,
+            overflowY: 'auto',
+            padding: '24px',
+          }}>
+            <textarea
+              ref={textareaRef}
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              placeholder="Enter notes for this formula..."
+              style={{
+                width: '100%',
+                minHeight: '200px',
+                padding: '12px',
+                borderRadius: '6px',
+                border: isDarkMode ? '1px solid #374151' : '1px solid #D1D5DB',
+                backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                color: isDarkMode ? '#E5E7EB' : '#374151',
+                fontSize: '14px',
+                fontWeight: 400,
+                fontFamily: 'inherit',
+                outline: 'none',
+                resize: 'vertical',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
+
+          {/* Footer */}
+          <div style={{ 
+            padding: '16px 24px',
+            borderTop: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+            display: 'flex', 
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            gap: '12px',
+            backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+          }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '6px',
+                border: isDarkMode ? '1px solid #374151' : '1px solid #D1D5DB',
+                backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                color: isDarkMode ? '#E5E7EB' : '#374151',
+                fontSize: '14px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = isDarkMode ? '#4B5563' : '#F9FAFB';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#FFFFFF';
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: '#3B82F6',
+                color: '#FFFFFF',
+                fontSize: '14px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'background-color 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#2563EB';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#3B82F6';
+              }}
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
 
 export default FormulaCheckTable;
 

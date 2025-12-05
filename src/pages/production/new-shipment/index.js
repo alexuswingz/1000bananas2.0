@@ -62,8 +62,36 @@ const NewShipment = () => {
   const [exportCompleted, setExportCompleted] = useState(false);
   const [forecastRange, setForecastRange] = useState('150');
   const [showDOITooltip, setShowDOITooltip] = useState(false);
+  const [isTooltipPinned, setIsTooltipPinned] = useState(false);
+  const [showDateCalculationInfo, setShowDateCalculationInfo] = useState(false);
   const doiIconRef = useRef(null);
   const doiTooltipRef = useRef(null);
+
+  // Close tooltip when clicking outside if it's pinned
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (isTooltipPinned && showDOITooltip) {
+        const isClickInsideIcon = doiIconRef.current?.contains(event.target);
+        const isClickInsideTooltip = doiTooltipRef.current?.contains(event.target);
+        
+        if (!isClickInsideIcon && !isClickInsideTooltip) {
+          setShowDOITooltip(false);
+          setIsTooltipPinned(false);
+        }
+      }
+    };
+
+    if (isTooltipPinned && showDOITooltip) {
+      const timeoutId = setTimeout(() => {
+        document.addEventListener('click', handleClickOutside);
+      }, 0);
+      
+      return () => {
+        clearTimeout(timeoutId);
+        document.removeEventListener('click', handleClickOutside);
+      };
+    }
+  }, [isTooltipPinned, showDOITooltip]);
   
   // Generate unique shipment number
   const generateShipmentNumber = () => {
@@ -76,8 +104,31 @@ const NewShipment = () => {
     shipmentType: 'AWD',
     location: '',
     account: 'TPS Nutrients',
+    amazonShipmentNumber: 'STAR-XXXXXXXXXXXXX', // Default for AWD
+    amazonRefId: 'XXXXXXXX',
   });
   const [dataAsOfDate, setDataAsOfDate] = useState(new Date()); // Track when data was loaded
+  
+  // Helper function to get Amazon Shipment # format based on shipment type
+  const getAmazonShipmentFormat = (type) => {
+    if (type === 'FBA' || type === 'Parcel') {
+      return 'FBAXXXXXXXXX';
+    } else if (type === 'AWD') {
+      return 'STAR-XXXXXXXXXXXXX';
+    }
+    return 'FBAXXXXXXXXX'; // Default
+  };
+  
+  // Update Amazon Shipment # format when shipment type changes
+  useEffect(() => {
+    const format = getAmazonShipmentFormat(shipmentData.shipmentType);
+    if (shipmentData.amazonShipmentNumber !== format && shipmentData.shipmentType) {
+      setShipmentData(prev => ({
+        ...prev,
+        amazonShipmentNumber: format,
+      }));
+    }
+  }, [shipmentData.shipmentType]);
 
   // Load products from catalog - reload when shipment ID changes (new shipment vs editing)
   useEffect(() => {
@@ -515,8 +566,8 @@ const NewShipment = () => {
     // For label-check and formula-check actions, check if there are products with variance exceeded
     if (activeAction === 'label-check') {
       // Check rows from LabelCheckTable
-      // Variance is exceeded when totalCount exists and exceeds a threshold
-      // Threshold: absolute value > 5% of lblCurrentInv or > 10 units (whichever is larger)
+      // Variance is exceeded when discrepancy between calculated total and labels needed exceeds threshold
+      // Threshold: absolute value > 5% of labels needed or > 10 units (whichever is larger)
       const varianceThreshold = 10; // Minimum threshold in units
       const varianceThresholdPercent = 0.05; // 5% threshold
       
@@ -526,14 +577,15 @@ const NewShipment = () => {
           return false;
         }
         
-        const totalCount = typeof row.totalCount === 'number' ? row.totalCount : parseFloat(row.totalCount) || 0;
-        const lblCurrentInv = row.lblCurrentInv || 0;
+        const calculatedTotal = typeof row.totalCount === 'number' ? row.totalCount : parseFloat(row.totalCount) || 0;
+        const labelsNeeded = row.quantity || 0;
         
-        // Calculate absolute variance
-        const absVariance = Math.abs(totalCount);
+        // Calculate discrepancy: calculated total - labels needed
+        const discrepancy = calculatedTotal - labelsNeeded;
+        const absVariance = Math.abs(discrepancy);
         
         // Check if variance exceeds threshold (either absolute or percentage)
-        const percentThreshold = Math.abs(lblCurrentInv * varianceThresholdPercent);
+        const percentThreshold = Math.abs(labelsNeeded * varianceThresholdPercent);
         const threshold = Math.max(varianceThreshold, percentThreshold);
         
         return absVariance > threshold;
@@ -965,7 +1017,16 @@ const NewShipment = () => {
                       viewBox="0 0 24 24" 
                       fill="none" 
                       xmlns="http://www.w3.org/2000/svg"
-                      onClick={() => setShowDOITooltip(!showDOITooltip)}
+                      onMouseEnter={() => setShowDOITooltip(true)}
+                      onMouseLeave={() => {
+                        if (!isTooltipPinned) {
+                          setShowDOITooltip(false);
+                        }
+                      }}
+                      onClick={() => {
+                        setIsTooltipPinned(!isTooltipPinned);
+                        setShowDOITooltip(true);
+                      }}
                       style={{ cursor: 'pointer' }}
                     >
                       <circle cx="12" cy="12" r="10" stroke="#9CA3AF" strokeWidth="2" fill="none"/>
@@ -976,47 +1037,206 @@ const NewShipment = () => {
                     </span>
                   </div>
                   
-                  {/* DOI Tooltip */}
+                  {/* Forecast Range Tooltip */}
                   {showDOITooltip && (
                     <div
                       ref={doiTooltipRef}
+                      onMouseEnter={() => setShowDOITooltip(true)}
+                      onMouseLeave={() => {
+                        if (!isTooltipPinned) {
+                          setShowDOITooltip(false);
+                        }
+                      }}
                       style={{
                         position: 'absolute',
-                        bottom: '40px',
-                        left: '8px',
-                        transform: 'translateX(-50%)',
-                        backgroundColor: '#F3F4F6',
-                        borderRadius: '8px',
+                        top: '100%',
+                        left: '0',
+                        marginTop: '8px',
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: '6px',
                         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
                         padding: '12px',
-                        width: '296px',
+                        width: '304px',
                         zIndex: 10000,
                         boxSizing: 'border-box',
+                        border: '1px solid #E5E7EB',
                       }}
                     >
-                      {/* Arrow pointing down - centered on tooltip */}
+                      {/* Arrow pointing up - aligned with icon center */}
                       <div
                         style={{
                           position: 'absolute',
-                          bottom: '-6px',
-                          left: '50%',
+                          top: '-6px',
+                          left: '8px',
                           transform: 'translateX(-50%) rotate(45deg)',
                           width: '12px',
                           height: '12px',
-                          backgroundColor: '#F3F4F6',
+                          backgroundColor: '#FFFFFF',
+                          borderLeft: '1px solid #E5E7EB',
+                          borderTop: '1px solid #E5E7EB',
                         }}
                       />
-                      <div style={{ fontSize: '13px', color: '#6B7280', lineHeight: '1.4', position: 'relative' }}>
-                        <p style={{ fontWeight: 400, margin: '0 0 8px 0', color: '#6B7280' }}>
-                          DOI Goal = Days of Inventory Goal
+                      
+                      {/* Header with icon and title */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                        <svg 
+                          width="20" 
+                          height="20" 
+                          viewBox="0 0 24 24" 
+                          fill="none" 
+                          xmlns="http://www.w3.org/2000/svg"
+                          style={{ flexShrink: 0 }}
+                        >
+                          {/* Calendar */}
+                          <rect x="3" y="4" width="18" height="18" rx="2" stroke="#2563EB" strokeWidth="2" fill="none"/>
+                          <line x1="8" y1="2" x2="8" y2="6" stroke="#2563EB" strokeWidth="2" strokeLinecap="round"/>
+                          <line x1="16" y1="2" x2="16" y2="6" stroke="#2563EB" strokeWidth="2" strokeLinecap="round"/>
+                          <line x1="3" y1="10" x2="21" y2="10" stroke="#2563EB" strokeWidth="2"/>
+                          {/* Clock inside calendar */}
+                          <circle cx="12" cy="15" r="4" stroke="#2563EB" strokeWidth="1.5" fill="none"/>
+                          <line x1="12" y1="15" x2="12" y2="13" stroke="#2563EB" strokeWidth="1.5" strokeLinecap="round"/>
+                          <line x1="12" y1="15" x2="13.5" y2="15" stroke="#2563EB" strokeWidth="1.5" strokeLinecap="round"/>
+                        </svg>
+                        <h3 style={{ 
+                          fontSize: '16px', 
+                          fontWeight: 600, 
+                          color: '#111827', 
+                          margin: 0 
+                        }}>
+                          Forecast Range Guide
+                        </h3>
+                      </div>
+                      
+                      {/* Body text */}
+                      <div style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5', marginBottom: '4px' }}>
+                        <p style={{ margin: 0 }}>
+                          The Forecast Range determines the future period for calculating inventory needs. It sets the target date for your{' '}
+                          <span style={{ color: '#2563EB', fontWeight: 500 }}>DOI Goal</span>
+                          {' '}(Days of Inventory), the number of days your inventory will last based on sales data.
                         </p>
-                        <p style={{ margin: '0 0 8px 0', color: '#6B7280' }}>
-                          Your total label DOI combines three pieces: days of finished goods at Amazon, days of raw labels in your warehouse, and the days covered by the labels you plan to order.
-                        </p>
-                        <p style={{ margin: 0, color: '#6B7280' }}>
-                          Simply put: Total DOI = Amazon + warehouse + your next label order
+                        <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#6B7280' }}>
+                          This range actively manipulates the DOI Goal and products react accordingly to help you maintain optimal inventory levels.
                         </p>
                       </div>
+                      
+                      {/* Recommended Range section */}
+                      <div style={{ marginBottom: '4px' }}>
+                        <span style={{ 
+                          fontSize: '14px', 
+                          fontWeight: 600, 
+                          color: '#2563EB'
+                        }}>
+                          Recommended Range:{' '}
+                        </span>
+                        <span style={{ 
+                          fontSize: '14px', 
+                          color: '#2563EB',
+                          lineHeight: '1.5'
+                        }}>
+                          90-180 days for optimal coverage and planning flexibility.
+                        </span>
+                      </div>
+                      
+                      {/* View Date Calculation Info */}
+                      <div 
+                        onClick={() => setShowDateCalculationInfo(!showDateCalculationInfo)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          cursor: 'pointer',
+                          color: '#6B7280',
+                          fontSize: '14px',
+                          paddingTop: '4px',
+                          marginTop: '4px',
+                          borderTop: '1px solid #E5E7EB',
+                        }}
+                      >
+                        <span>View Date Calculation Info</span>
+                        <svg 
+                          width="16" 
+                          height="16" 
+                          viewBox="0 0 24 24" 
+                          fill="none" 
+                          xmlns="http://www.w3.org/2000/svg"
+                          style={{
+                            transform: showDateCalculationInfo ? 'rotate(180deg)' : 'rotate(0deg)',
+                            transition: 'transform 0.2s',
+                          }}
+                        >
+                          <path 
+                            d="M6 9L12 15L18 9" 
+                            stroke="currentColor" 
+                            strokeWidth="2" 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </div>
+                      
+                      {/* Expanded Date Calculation Info */}
+                      {showDateCalculationInfo && (
+                        <div style={{ 
+                          marginTop: '12px',
+                        }}>
+                          {/* Formula */}
+                          <div style={{
+                            fontSize: '14px',
+                            color: '#111827',
+                            fontWeight: 400,
+                            marginBottom: '12px',
+                            lineHeight: '1.5'
+                          }}>
+                            DOI Goal Date = Current Date + Forecast Range
+                          </div>
+                          
+                          {/* Pro Tip Box */}
+                          <div style={{
+                            backgroundColor: '#F3E8FF',
+                            borderRadius: '8px',
+                            padding: '12px',
+                            border: '1px solid #E9D5FF'
+                          }}>
+                            {/* Pro Tip Header */}
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              marginBottom: '8px'
+                            }}>
+                              <svg 
+                                width="16" 
+                                height="16" 
+                                viewBox="0 0 24 24" 
+                                fill="none" 
+                                xmlns="http://www.w3.org/2000/svg"
+                                style={{ flexShrink: 0 }}
+                              >
+                                <path 
+                                  d="M9 21c0 .5.4 1 1 1h4c.6 0 1-.5 1-1v-1H9v1zm3-19C8.1 2 5 5.1 5 9c0 2.4 1.2 4.5 3 5.7V17c0 .5.4 1 1 1h6c.6 0 1-.5 1-1v-2.3c1.8-1.3 3-3.4 3-5.7 0-3.9-3.1-7-7-7z" 
+                                  fill="#9333EA"
+                                />
+                              </svg>
+                              <span style={{
+                                fontSize: '14px',
+                                fontWeight: 600,
+                                color: '#9333EA'
+                              }}>
+                                Pro Tip:
+                              </span>
+                            </div>
+                            
+                            {/* Pro Tip Body */}
+                            <div style={{
+                              fontSize: '14px',
+                              color: '#9333EA',
+                              lineHeight: '1.5'
+                            }}>
+                              Set your range to cover <strong>Lead Time</strong> + <strong>Manufacturing Cycle</strong> + <strong>Safety Buffer</strong>. This ensures you never run out of stock before the next shipment arrives.
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                   <input
@@ -1229,13 +1449,15 @@ const NewShipment = () => {
                     Shipment Type<span style={{ color: '#EF4444' }}>*</span>
                   </label>
                   <select
+                    value={shipmentData.shipmentType}
+                    onChange={(e) => setShipmentData({ ...shipmentData, shipmentType: e.target.value })}
                     style={{
                       width: '100%',
                       padding: '10px 12px',
                       borderRadius: '6px',
                       border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
                       backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
-                      color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                      color: shipmentData.shipmentType ? (isDarkMode ? '#FFFFFF' : '#111827') : '#9CA3AF',
                       fontSize: '14px',
                       outline: 'none',
                       boxSizing: 'border-box',
@@ -1249,6 +1471,7 @@ const NewShipment = () => {
                     <option value="">Select Shipment Type</option>
                     <option value="FBA">FBA</option>
                     <option value="AWD">AWD</option>
+                    <option value="Parcel">Parcel</option>
                   </select>
                 </div>
               </div>
@@ -1261,7 +1484,9 @@ const NewShipment = () => {
                   </label>
                   <input
                     type="text"
-                    placeholder="FBAXXXXXXXXX"
+                    value={shipmentData.amazonShipmentNumber}
+                    onChange={(e) => setShipmentData({ ...shipmentData, amazonShipmentNumber: e.target.value })}
+                    placeholder={getAmazonShipmentFormat(shipmentData.shipmentType)}
                     style={{
                       width: '100%',
                       padding: '10px 12px',
@@ -1281,6 +1506,8 @@ const NewShipment = () => {
                   </label>
                   <input
                     type="text"
+                    value={shipmentData.amazonRefId || ''}
+                    onChange={(e) => setShipmentData({ ...shipmentData, amazonRefId: e.target.value })}
                     placeholder="XXXXXXXX"
                     style={{
                       width: '100%',

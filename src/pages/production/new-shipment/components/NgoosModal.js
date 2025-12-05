@@ -3,20 +3,14 @@ import { useTheme } from '../../../../context/ThemeContext';
 import { toast } from 'sonner';
 import NgoosAPI from '../../../../services/ngoosApi';
 import { 
-  LineChart, 
   Line, 
-  BarChart, 
   Bar, 
   XAxis, 
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  Legend, 
   ResponsiveContainer,
-  ComposedChart,
-  Area,
-  ReferenceArea,
-  Brush
+  ComposedChart
 } from 'recharts';
 
 const NgoosModal = ({ 
@@ -28,6 +22,7 @@ const NgoosModal = ({
   currentQty = 0,  // Current qty already added for this product
 }) => {
   const { isDarkMode } = useTheme();
+  const [activeTab, setActiveTab] = useState('Inventory');
   const [allVariations, setAllVariations] = useState(true);
   const [forecastView, setForecastView] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -35,7 +30,12 @@ const NgoosModal = ({
   const [forecastData, setForecastData] = useState(null);
   const [chartData, setChartData] = useState(null);
   const [selectedView, setSelectedView] = useState('2 Years');
-  const [salesDays, setSalesDays] = useState(30);
+  const [metricsDays] = useState(30);
+  const [metrics, setMetrics] = useState(null);
+  const [salesChartData, setSalesChartData] = useState(null);
+  const [adsChartData, setAdsChartData] = useState(null);
+  const [visibleSalesMetrics, setVisibleSalesMetrics] = useState(['units_sold', 'sales']);
+  const [visibleAdsMetrics, setVisibleAdsMetrics] = useState(['total_sales', 'tacos']);
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -79,27 +79,41 @@ const NgoosModal = ({
         const results = await Promise.allSettled([
           NgoosAPI.getProductDetails(childAsin),
           NgoosAPI.getForecast(childAsin),
-          NgoosAPI.getChartData(childAsin, weeks)
+          NgoosAPI.getChartData(childAsin, weeks),
+          NgoosAPI.getMetrics(childAsin, metricsDays),
+          NgoosAPI.getSalesChart(childAsin, metricsDays),
+          NgoosAPI.getAdsChart(childAsin, metricsDays)
         ]);
 
         const details = results[0].status === 'fulfilled' ? results[0].value : null;
         const forecast = results[1].status === 'fulfilled' ? results[1].value : null;
         const chart = results[2].status === 'fulfilled' ? results[2].value : null;
+        const metricsData = results[3].status === 'fulfilled' ? results[3].value : null;
+        const salesChart = results[4].status === 'fulfilled' ? results[4].value : null;
+        const adsChart = results[5].status === 'fulfilled' ? results[5].value : null;
 
         console.log('N-GOOS API responses:', { 
           details: results[0].status, 
           forecast: results[1].status, 
           chart: results[2].status,
-          chartValue: chart
+          metrics: results[3].status,
+          salesChart: results[4].status,
+          adsChart: results[5].status
         });
         
         if (results[0].status === 'rejected') console.error('Details API failed:', results[0].reason);
         if (results[1].status === 'rejected') console.error('Forecast API failed:', results[1].reason);
         if (results[2].status === 'rejected') console.error('Chart API failed:', results[2].reason);
+        if (results[3].status === 'rejected') console.error('Metrics API failed:', results[3].reason);
+        if (results[4].status === 'rejected') console.error('Sales Chart API failed:', results[4].reason);
+        if (results[5].status === 'rejected') console.error('Ads Chart API failed:', results[5].reason);
 
         setProductDetails(details);
         setForecastData(forecast);
         setChartData(chart);
+        setMetrics(metricsData);
+        setSalesChartData(salesChart);
+        setAdsChartData(adsChart);
       } catch (error) {
         console.error('Error fetching N-GOOS data:', error);
         toast.error('Failed to load N-GOOS data', {
@@ -111,7 +125,7 @@ const NgoosModal = ({
     };
 
     fetchNgoosData();
-  }, [isOpen, selectedRow, selectedView]);
+  }, [isOpen, selectedRow, selectedView, metricsDays]);
 
   // Extract inventory data from API response or use selectedRow fallback
   const inventoryData = productDetails?.inventory || {
@@ -255,6 +269,104 @@ const NgoosModal = ({
     return combinedData;
   }, [chartData, forecastData, selectedRow]);
 
+  // Sales Metrics Configuration
+  const SALES_METRICS = [
+    { id: 'units_sold', label: 'Units Sold', color: '#4169E1', valueKey: 'units_sold', formatType: 'number', defaultVisible: true },
+    { id: 'sales', label: 'Sales', color: '#FF8C00', valueKey: 'sales', formatType: 'currency', defaultVisible: true },
+    { id: 'sessions', label: 'Sessions', color: '#32CD32', valueKey: 'sessions', formatType: 'number', defaultVisible: false },
+    { id: 'conversion_rate', label: 'Conversion Rate', color: '#9370DB', valueKey: 'conversion_rate', formatType: 'percentage', defaultVisible: false },
+    { id: 'price', label: 'Price', color: '#FFD700', valueKey: 'price', formatType: 'currency', defaultVisible: false },
+    { id: 'profit', label: 'Profit', color: '#228B22', valueKey: 'profit', formatType: 'currency', defaultVisible: false },
+    { id: 'profit_margin', label: 'Profit %', color: '#20B2AA', valueKey: 'profit_margin', formatType: 'percentage', defaultVisible: false },
+    { id: 'profit_total', label: 'Profit Total', color: '#3CB371', valueKey: 'profit_total', formatType: 'currency', defaultVisible: false }
+  ];
+
+  // Ads Metrics Configuration
+  const ADS_METRICS = [
+    { id: 'total_sales', label: 'Total Sales', color: '#4169E1', valueKey: 'total_sales', formatType: 'currency', defaultVisible: true },
+    { id: 'tacos', label: 'TACOS', color: '#FF8C00', valueKey: 'tacos', formatType: 'percentage', defaultVisible: true },
+    { id: 'ad_spend', label: 'Ad Spend', color: '#DC143C', valueKey: 'ad_spend', formatType: 'currency', defaultVisible: false },
+    { id: 'ad_sales', label: 'Ad Sales', color: '#32CD32', valueKey: 'ad_sales', formatType: 'currency', defaultVisible: false },
+    { id: 'acos', label: 'ACOS', color: '#FF69B4', valueKey: 'acos', formatType: 'percentage', defaultVisible: false },
+    { id: 'cpc', label: 'CPC', color: '#FFD700', valueKey: 'cpc', formatType: 'currency', defaultVisible: false },
+    { id: 'ad_clicks', label: 'Ad Clicks', color: '#20B2AA', valueKey: 'ad_clicks', formatType: 'number', defaultVisible: false },
+    { id: 'ad_impressions', label: 'Impressions', color: '#778899', valueKey: 'ad_impressions', formatType: 'number', defaultVisible: false },
+    { id: 'ad_units', label: 'Ad Units', color: '#9370DB', valueKey: 'ad_units', formatType: 'number', defaultVisible: false }
+  ];
+
+  // Format chart values based on type
+  const formatChartValue = (value, formatType) => {
+    if (value === null || value === undefined) return 'N/A';
+    switch(formatType) {
+      case 'currency':
+        return `$${value.toFixed(2)}`;
+      case 'percentage':
+        return `${value.toFixed(2)}%`;
+      case 'number':
+        return Math.round(value).toLocaleString();
+      default:
+        return String(value);
+    }
+  };
+
+  // Toggle visible metrics
+  const toggleSalesMetric = (metricId) => {
+    setVisibleSalesMetrics(prev => 
+      prev.includes(metricId) ? prev.filter(id => id !== metricId) : [...prev, metricId]
+    );
+  };
+
+  const toggleAdsMetric = (metricId) => {
+    setVisibleAdsMetrics(prev => 
+      prev.includes(metricId) ? prev.filter(id => id !== metricId) : [...prev, metricId]
+    );
+  };
+
+  // Get metric value helper
+  const getMetricValue = (metricId) => {
+    const current = metrics?.current_period;
+    const changes = metrics?.changes;
+
+    switch(metricId) {
+      case 'units_sold':
+        return { value: current?.units_sold || 0, change: changes?.units_sold || 0, format: 'number' };
+      case 'sales':
+        return { value: current?.sales || 0, change: changes?.sales || 0, format: 'currency' };
+      case 'sessions':
+        return { value: current?.sessions || 0, change: changes?.sessions || 0, format: 'number' };
+      case 'conversion_rate':
+        return { value: current?.conversion_rate || 0, change: changes?.conversion_rate || 0, format: 'percentage' };
+      case 'price':
+        return { value: current?.price || 0, change: changes?.price || 0, format: 'currency' };
+      case 'profit':
+        return { value: current?.profit || 0, change: changes?.profit || 0, format: 'currency' };
+      case 'profit_margin':
+        return { value: current?.profit_margin || 0, change: changes?.profit_margin || 0, format: 'percentage' };
+      case 'profit_total':
+        return { value: current?.profit_total || 0, change: changes?.profit_total || 0, format: 'currency' };
+      case 'total_sales':
+        return { value: current?.total_sales || 0, change: changes?.total_sales || 0, format: 'currency' };
+      case 'tacos':
+        return { value: current?.tacos || 0, change: changes?.tacos || 0, format: 'percentage' };
+      case 'ad_spend':
+        return { value: current?.ad_spend || 0, change: changes?.ad_spend || 0, format: 'currency' };
+      case 'ad_sales':
+        return { value: current?.ad_sales || 0, change: changes?.ad_sales || 0, format: 'currency' };
+      case 'ad_units':
+        return { value: current?.ad_units || 0, change: changes?.ad_units || 0, format: 'number' };
+      case 'acos':
+        return { value: current?.acos || 0, change: changes?.acos || 0, format: 'percentage' };
+      case 'cpc':
+        return { value: current?.cpc || 0, change: changes?.cpc || 0, format: 'currency' };
+      case 'ad_clicks':
+        return { value: current?.ad_clicks || 0, change: changes?.ad_clicks || 0, format: 'number' };
+      case 'ad_impressions':
+        return { value: current?.ad_impressions || 0, change: changes?.ad_impressions || 0, format: 'number' };
+      default:
+        return { value: 0, change: 0, format: 'number' };
+    }
+  };
+
   // Custom tooltip
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -328,10 +440,11 @@ const NgoosModal = ({
       <div
         className={themeClasses.cardBg}
         style={{
-          width: '100%',
-          maxWidth: '1120px',
+          width: '984px',
+          maxWidth: '984px',
+          minHeight: '684px',
           maxHeight: '94vh',
-          borderRadius: '0.9rem',
+          borderRadius: '12px',
           boxShadow: '0 24px 80px rgba(15,23,42,0.75)',
           border: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`,
           padding: '1.25rem 1.5rem 1.5rem',
@@ -478,24 +591,35 @@ const NgoosModal = ({
             overflow: 'hidden',
           }}
         >
-          {['Inventory', 'Sales', 'Ads'].map((tab, idx) => (
+          {['Inventory', 'Sales', 'Ads'].map((tab) => (
             <button
               key={tab}
               type="button"
+              onClick={() => setActiveTab(tab)}
               style={{
                 padding: '4px 24px',
                 borderRadius: '4px',
                 border: 'none',
                 fontSize: '0.75rem',
                 fontWeight: 500,
-                backgroundColor: idx === 0 ? '#2563EB' : 'transparent',
-                color: idx === 0 ? '#FFFFFF' : '#9CA3AF',
+                backgroundColor: activeTab === tab ? '#2563EB' : 'transparent',
+                color: activeTab === tab ? '#FFFFFF' : '#9CA3AF',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 height: '23px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+              }}
+              onMouseEnter={(e) => {
+                if (activeTab !== tab) {
+                  e.currentTarget.style.backgroundColor = 'rgba(37, 99, 235, 0.2)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (activeTab !== tab) {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }
               }}
             >
               {tab}
@@ -514,6 +638,9 @@ const NgoosModal = ({
           </div>
         ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* Inventory Tab Content */}
+          {activeTab === 'Inventory' && (
+          <>
           {/* Top cards row */}
           <div
             style={{
@@ -1040,6 +1167,552 @@ const NgoosModal = ({
               )}
             </div>
           </div>
+          </>
+          )}
+
+          {/* Sales Tab Content */}
+          {activeTab === 'Sales' && (
+            <div>
+              {/* Header with Controls */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1rem', gap: '1rem' }}>
+                {/* Metric Controller */}
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', flex: 1 }}>
+                  <span style={{ fontSize: '0.75rem', color: '#94a3b8', alignSelf: 'center', marginRight: '0.5rem', fontWeight: '600', textTransform: 'uppercase' }}>
+                    Metrics:
+                  </span>
+                  {SALES_METRICS.map(metric => {
+                    const isVisible = visibleSalesMetrics.includes(metric.id);
+                    return (
+                      <button
+                        key={metric.id}
+                        onClick={() => toggleSalesMetric(metric.id)}
+                        style={{
+                          padding: '0.375rem 0.75rem',
+                          borderRadius: '0.375rem',
+                          backgroundColor: isVisible ? metric.color + '20' : 'transparent',
+                          border: `2px solid ${isVisible ? metric.color : '#475569'}`,
+                          color: isVisible ? metric.color : '#94a3b8',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.375rem',
+                          opacity: isVisible ? 1 : 0.6
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                          e.currentTarget.style.opacity = '1';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.opacity = isVisible ? '1' : '0.6';
+                        }}
+                      >
+                        <div style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          backgroundColor: isVisible ? metric.color : '#475569'
+                        }} />
+                        {metric.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Period Selectors */}
+                <div style={{ display: 'flex', gap: '0.75rem', flexShrink: 0 }}>
+                  <select 
+                    value={metricsDays}
+                    style={{ 
+                      padding: '0.5rem 1rem', 
+                      borderRadius: '0.5rem', 
+                      backgroundColor: isDarkMode ? '#1e293b' : '#F3F4F6', 
+                      color: isDarkMode ? '#fff' : '#111827',
+                      border: `1px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      minWidth: '100px'
+                    }}
+                  >
+                    <option value={7}>7 Days</option>
+                    <option value={30}>30 Days</option>
+                    <option value={60}>60 Days</option>
+                    <option value={90}>90 Days</option>
+                  </select>
+                  
+                  <select 
+                    style={{ 
+                      padding: '0.5rem 1rem', 
+                      borderRadius: '0.5rem', 
+                      backgroundColor: isDarkMode ? '#1e293b' : '#F3F4F6', 
+                      color: isDarkMode ? '#fff' : '#111827',
+                      border: `1px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      minWidth: '120px'
+                    }}
+                  >
+                    <option value="prior">Prior Period</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Graph Section: 70% Graph + 30% Banana Factors */}
+              <div style={{ display: 'grid', gridTemplateColumns: '70% 30%', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                {/* Left: Graph (70%) */}
+                <div style={{ borderRadius: '0.75rem', border: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`, padding: '1.5rem', backgroundColor: isDarkMode ? '#0f172a' : '#FFFFFF' }}>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <ComposedChart data={salesChartData?.chart_data || []}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? '#334155' : '#e5e7eb'} vertical={false} />
+                      <XAxis 
+                        dataKey="date" 
+                        stroke={isDarkMode ? '#64748b' : '#6b7280'}
+                        style={{ fontSize: '0.75rem' }}
+                        tickLine={false}
+                        tickFormatter={(value) => {
+                          const date = new Date(value);
+                          return `${date.getMonth() + 1}/${date.getDate()}`;
+                        }}
+                      />
+                      <YAxis 
+                        stroke={isDarkMode ? '#64748b' : '#6b7280'}
+                        style={{ fontSize: '0.75rem' }}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: isDarkMode ? '#0f172a' : '#FFFFFF', 
+                          border: `1px solid ${isDarkMode ? '#334155' : '#E5E7EB'}`,
+                          borderRadius: '0.5rem',
+                          color: isDarkMode ? '#fff' : '#111827',
+                          fontSize: '0.875rem'
+                        }}
+                        formatter={(value, name) => {
+                          const metric = SALES_METRICS.find(m => m.label === name);
+                          if (metric) {
+                            return [formatChartValue(value, metric.formatType), name];
+                          }
+                          return [value, name];
+                        }}
+                      />
+                      {/* Dynamically render visible metrics */}
+                      {visibleSalesMetrics.length > 0 && SALES_METRICS
+                        .filter(metric => visibleSalesMetrics.includes(metric.id))
+                        .map((metric) => (
+                          <Line 
+                            key={metric.id}
+                            type="monotone" 
+                            dataKey={metric.valueKey} 
+                            stroke={metric.color} 
+                            strokeWidth={2.5}
+                            name={metric.label}
+                            dot={false}
+                            connectNulls
+                          />
+                        ))}
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Right: Banana Factors (30%) */}
+                <div style={{ borderRadius: '0.75rem', border: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`, padding: '1.5rem', display: 'flex', flexDirection: 'column', backgroundColor: isDarkMode ? '#0f172a' : '#FFFFFF' }}>
+                  <h3 className={themeClasses.text} style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '1.5rem' }}>Banana Factors</h3>
+                  
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {/* Sessions */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: `1px solid ${isDarkMode ? '#334155' : '#E5E7EB'}` }}>
+                      <span className={themeClasses.textSecondary} style={{ fontSize: '0.875rem' }}>Sessions</span>
+                      <span style={{ fontSize: '0.875rem', fontWeight: '600', color: metrics?.changes?.sessions >= 0 ? '#22c55e' : '#ef4444' }}>
+                        {metrics?.current_period?.sessions?.toLocaleString() || '0'}
+                      </span>
+                    </div>
+
+                    {/* Conversion Rate */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: `1px solid ${isDarkMode ? '#334155' : '#E5E7EB'}` }}>
+                      <span className={themeClasses.textSecondary} style={{ fontSize: '0.875rem' }}>Conversion Rate</span>
+                      <span style={{ fontSize: '0.875rem', fontWeight: '600', color: metrics?.changes?.conversion_rate >= 0 ? '#22c55e' : '#ef4444' }}>
+                        {metrics?.current_period?.conversion_rate?.toFixed(2) || '0.00'}%
+                      </span>
+                    </div>
+
+                    {/* TACOS */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: `1px solid ${isDarkMode ? '#334155' : '#E5E7EB'}` }}>
+                      <span className={themeClasses.textSecondary} style={{ fontSize: '0.875rem' }}>TACOS</span>
+                      <span style={{ fontSize: '0.875rem', fontWeight: '600', color: metrics?.changes?.tacos <= 0 ? '#22c55e' : '#ef4444' }}>
+                        {metrics?.current_period?.tacos?.toFixed(2) || '0.00'}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Perform Analysis Button */}
+                  <button 
+                    style={{
+                      marginTop: 'auto',
+                      padding: '0.75rem',
+                      backgroundColor: '#3b82f6',
+                      color: '#fff',
+                      borderRadius: '0.5rem',
+                      border: 'none',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <svg style={{ width: '1rem', height: '1rem' }} fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/>
+                    </svg>
+                    Perform Analysis
+                  </button>
+                  <div style={{ fontSize: '0.625rem', color: '#64748b', textAlign: 'center', marginTop: '0.5rem' }}>
+                    Powered by Banana Brain AI
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Section: Metrics Grid */}
+              <div style={{ position: 'relative' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(128.5px, 1fr))', gap: '4px' }}>
+                  {SALES_METRICS.map((metricConfig) => {
+                    const metricId = metricConfig.id;
+                    const metricData = getMetricValue(metricId);
+                    const chartMetric = SALES_METRICS.find(m => m.id === metricId);
+                    const isVisibleOnChart = chartMetric && visibleSalesMetrics.includes(metricId);
+                    const borderColor = isVisibleOnChart ? chartMetric.color : '#334155';
+                    
+                    return (
+                      <div 
+                        key={metricId} 
+                        onClick={() => chartMetric && toggleSalesMetric(metricId)}
+                        style={{ 
+                          padding: '16px', 
+                          backgroundColor: isDarkMode ? '#0f1729' : '#F9FAFB', 
+                          borderRadius: '12px', 
+                          border: `1px solid ${borderColor}`, 
+                          textAlign: 'left',
+                          cursor: chartMetric ? 'pointer' : 'default',
+                          transition: 'all 0.2s',
+                          position: 'relative',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px',
+                          minHeight: '72px'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (chartMetric) {
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = `0 4px 12px ${borderColor}40`;
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (chartMetric) {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }
+                        }}
+                      >
+                        {isVisibleOnChart && (
+                          <div style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', fontSize: '0.625rem', color: chartMetric.color, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <svg style={{ width: '12px', height: '12px' }} fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 0l-2 2a1 1 0 101.414 1.414L8 10.414l1.293 1.293a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                            On chart
+                          </div>
+                        )}
+                        <div className={themeClasses.text} style={{ fontSize: '1.5rem', fontWeight: '600', lineHeight: '1.2' }}>
+                          {formatChartValue(metricData.value, metricData.format)}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: metricData.change >= 0 ? '#22c55e' : '#ef4444', fontWeight: '500' }}>
+                          {chartMetric?.label || metricId.replace('_', ' ')} {metricData.change >= 0 ? '+' : ''}{metricData.change.toFixed(1)}%
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Ads Tab Content */}
+          {activeTab === 'Ads' && (
+            <div>
+              {/* Header with Controls */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1rem', gap: '1rem' }}>
+                {/* Metric Controller */}
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', flex: 1 }}>
+                  <span style={{ fontSize: '0.75rem', color: '#94a3b8', alignSelf: 'center', marginRight: '0.5rem', fontWeight: '600', textTransform: 'uppercase' }}>
+                    Metrics:
+                  </span>
+                  {ADS_METRICS.map(metric => {
+                    const isVisible = visibleAdsMetrics.includes(metric.id);
+                    return (
+                      <button
+                        key={metric.id}
+                        onClick={() => toggleAdsMetric(metric.id)}
+                        style={{
+                          padding: '0.375rem 0.75rem',
+                          borderRadius: '0.375rem',
+                          backgroundColor: isVisible ? metric.color + '20' : 'transparent',
+                          border: `2px solid ${isVisible ? metric.color : '#475569'}`,
+                          color: isVisible ? metric.color : '#94a3b8',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.375rem',
+                          opacity: isVisible ? 1 : 0.6
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                          e.currentTarget.style.opacity = '1';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.opacity = isVisible ? '1' : '0.6';
+                        }}
+                      >
+                        <div style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          backgroundColor: isVisible ? metric.color : '#475569'
+                        }} />
+                        {metric.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Period Selectors */}
+                <div style={{ display: 'flex', gap: '0.75rem', flexShrink: 0 }}>
+                  <select 
+                    value={metricsDays}
+                    style={{ 
+                      padding: '0.5rem 1rem', 
+                      borderRadius: '0.5rem', 
+                      backgroundColor: isDarkMode ? '#1e293b' : '#F3F4F6', 
+                      color: isDarkMode ? '#fff' : '#111827',
+                      border: `1px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      minWidth: '100px'
+                    }}
+                  >
+                    <option value={7}>7 Days</option>
+                    <option value={30}>30 Days</option>
+                    <option value={60}>60 Days</option>
+                    <option value={90}>90 Days</option>
+                  </select>
+                  
+                  <select 
+                    style={{ 
+                      padding: '0.5rem 1rem', 
+                      borderRadius: '0.5rem', 
+                      backgroundColor: isDarkMode ? '#1e293b' : '#F3F4F6', 
+                      color: isDarkMode ? '#fff' : '#111827',
+                      border: `1px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      minWidth: '120px'
+                    }}
+                  >
+                    <option value="prior">Prior Period</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Graph Section: 70% Graph + 30% Banana Factors */}
+              <div style={{ display: 'grid', gridTemplateColumns: '70% 30%', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                {/* Left: Graph (70%) */}
+                <div style={{ borderRadius: '0.75rem', border: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`, padding: '1.5rem', backgroundColor: isDarkMode ? '#0f172a' : '#FFFFFF' }}>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <ComposedChart data={adsChartData?.chart_data || []}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? '#334155' : '#e5e7eb'} vertical={false} />
+                      <XAxis 
+                        dataKey="date" 
+                        stroke={isDarkMode ? '#64748b' : '#6b7280'}
+                        style={{ fontSize: '0.75rem' }}
+                        tickLine={false}
+                        tickFormatter={(value) => {
+                          const date = new Date(value);
+                          return `${date.getMonth() + 1}/${date.getDate()}`;
+                        }}
+                      />
+                      <YAxis 
+                        stroke={isDarkMode ? '#64748b' : '#6b7280'}
+                        style={{ fontSize: '0.75rem' }}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: isDarkMode ? '#0f172a' : '#FFFFFF', 
+                          border: `1px solid ${isDarkMode ? '#334155' : '#E5E7EB'}`,
+                          borderRadius: '0.5rem',
+                          color: isDarkMode ? '#fff' : '#111827',
+                          fontSize: '0.875rem'
+                        }}
+                        formatter={(value, name) => {
+                          const metric = ADS_METRICS.find(m => m.label === name);
+                          if (metric) {
+                            return [formatChartValue(value, metric.formatType), name];
+                          }
+                          return [value, name];
+                        }}
+                      />
+                      {/* Dynamically render visible metrics */}
+                      {visibleAdsMetrics.length > 0 && ADS_METRICS
+                        .filter(metric => visibleAdsMetrics.includes(metric.id))
+                        .map((metric) => (
+                          <Line 
+                            key={metric.id}
+                            type="monotone" 
+                            dataKey={metric.valueKey} 
+                            stroke={metric.color} 
+                            strokeWidth={2.5}
+                            name={metric.label}
+                            dot={false}
+                            connectNulls
+                          />
+                        ))}
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Right: Banana Factors (30%) */}
+                <div style={{ borderRadius: '0.75rem', border: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`, padding: '1.5rem', display: 'flex', flexDirection: 'column', backgroundColor: isDarkMode ? '#0f172a' : '#FFFFFF' }}>
+                  <h3 className={themeClasses.text} style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '1.5rem' }}>Banana Factors</h3>
+                  
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {/* Sessions */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: `1px solid ${isDarkMode ? '#334155' : '#E5E7EB'}` }}>
+                      <span className={themeClasses.textSecondary} style={{ fontSize: '0.875rem' }}>Sessions</span>
+                      <span style={{ fontSize: '0.875rem', fontWeight: '600', color: metrics?.changes?.sessions >= 0 ? '#22c55e' : '#ef4444' }}>
+                        {metrics?.changes?.sessions >= 0 ? '+' : ''}{metrics?.changes?.sessions?.toFixed(1) || '0.0'}%
+                      </span>
+                    </div>
+
+                    {/* Conversion Rate */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: `1px solid ${isDarkMode ? '#334155' : '#E5E7EB'}` }}>
+                      <span className={themeClasses.textSecondary} style={{ fontSize: '0.875rem' }}>Conversion Rate</span>
+                      <span style={{ fontSize: '0.875rem', fontWeight: '600', color: metrics?.changes?.conversion_rate >= 0 ? '#22c55e' : '#ef4444' }}>
+                        {metrics?.changes?.conversion_rate >= 0 ? '+' : ''}{metrics?.changes?.conversion_rate?.toFixed(1) || '0.0'}%
+                      </span>
+                    </div>
+
+                    {/* TACOS */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: `1px solid ${isDarkMode ? '#334155' : '#E5E7EB'}` }}>
+                      <span className={themeClasses.textSecondary} style={{ fontSize: '0.875rem' }}>TACOS</span>
+                      <span style={{ fontSize: '0.875rem', fontWeight: '600', color: metrics?.changes?.tacos <= 0 ? '#22c55e' : '#ef4444' }}>
+                        {metrics?.changes?.tacos >= 0 ? '+' : ''}{metrics?.changes?.tacos?.toFixed(1) || '0.0'}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Perform Analysis Button */}
+                  <button 
+                    style={{
+                      marginTop: 'auto',
+                      padding: '0.75rem',
+                      backgroundColor: '#3b82f6',
+                      color: '#fff',
+                      borderRadius: '0.5rem',
+                      border: 'none',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <svg style={{ width: '1rem', height: '1rem' }} fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/>
+                    </svg>
+                    Perform Analysis
+                  </button>
+                  <div style={{ fontSize: '0.625rem', color: '#64748b', textAlign: 'center', marginTop: '0.5rem' }}>
+                    Powered by Banana Brain AI
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Section: Metrics Grid */}
+              <div style={{ position: 'relative' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(128.5px, 1fr))', gap: '4px' }}>
+                  {ADS_METRICS.map((metricConfig) => {
+                    const metricId = metricConfig.id;
+                    const metricData = getMetricValue(metricId);
+                    const chartMetric = ADS_METRICS.find(m => m.id === metricId);
+                    const isVisibleOnChart = chartMetric && visibleAdsMetrics.includes(metricId);
+                    const borderColor = isVisibleOnChart ? chartMetric.color : '#334155';
+                    
+                    return (
+                      <div 
+                        key={metricId} 
+                        onClick={() => chartMetric && toggleAdsMetric(metricId)}
+                        style={{ 
+                          padding: '16px', 
+                          backgroundColor: isDarkMode ? '#0f1729' : '#F9FAFB', 
+                          borderRadius: '12px', 
+                          border: `1px solid ${borderColor}`, 
+                          textAlign: 'left',
+                          cursor: chartMetric ? 'pointer' : 'default',
+                          transition: 'all 0.2s',
+                          position: 'relative',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px',
+                          minHeight: '72px'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (chartMetric) {
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = `0 4px 12px ${borderColor}40`;
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (chartMetric) {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }
+                        }}
+                      >
+                        {isVisibleOnChart && (
+                          <div style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', fontSize: '0.625rem', color: chartMetric.color, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <svg style={{ width: '12px', height: '12px' }} fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 0l-2 2a1 1 0 101.414 1.414L8 10.414l1.293 1.293a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                            On chart
+                          </div>
+                        )}
+                        <div className={themeClasses.text} style={{ fontSize: '1.5rem', fontWeight: '600', lineHeight: '1.2' }}>
+                          {formatChartValue(metricData.value, metricData.format)}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: (metricId === 'tacos' || metricId === 'acos') ? (metricData.change <= 0 ? '#22c55e' : '#ef4444') : (metricData.change >= 0 ? '#22c55e' : '#ef4444'), fontWeight: '500' }}>
+                          {chartMetric?.label || metricId.replace('_', ' ')} {metricData.change >= 0 ? '+' : ''}{metricData.change.toFixed(1)}%
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         )}
       </div>
