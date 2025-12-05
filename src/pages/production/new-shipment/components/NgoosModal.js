@@ -36,6 +36,9 @@ const NgoosModal = ({
   const [adsChartData, setAdsChartData] = useState(null);
   const [visibleSalesMetrics, setVisibleSalesMetrics] = useState(['units_sold', 'sales']);
   const [visibleAdsMetrics, setVisibleAdsMetrics] = useState(['total_sales', 'tacos']);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [comparisonPeriod, setComparisonPeriod] = useState('prior'); // 'prior' or 'prior-year'
+  const [showComparison, setShowComparison] = useState(true);
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -269,6 +272,31 @@ const NgoosModal = ({
     return combinedData;
   }, [chartData, forecastData, selectedRow]);
 
+  // When Forecast View is on, zoom to the forecast inventory period (blue bars)
+  const displayedChartData = useMemo(() => {
+    if (!chartDisplayData || chartDisplayData.length === 0) return [];
+    if (!forecastView) return chartDisplayData;
+
+    // Find the range where forecastInv bars exist (the blue forecast period)
+    const forecastInvPoints = chartDisplayData
+      .map((d, idx) => ({ ...d, originalIndex: idx }))
+      .filter((d) => d.forecastInv !== null && d.forecastInv > 0);
+    
+    if (forecastInvPoints.length === 0) return chartDisplayData;
+
+    // Get the first and last index of forecast inventory period
+    const firstForecastInvIdx = forecastInvPoints[0].originalIndex;
+    const lastForecastInvIdx = forecastInvPoints[forecastInvPoints.length - 1].originalIndex;
+
+    // Include some context before and after the forecast period
+    const contextBefore = 8; // ~2 months of weekly data before
+    const contextAfter = 4;  // ~1 month after
+    const startIdx = Math.max(0, firstForecastInvIdx - contextBefore);
+    const endIdx = Math.min(chartDisplayData.length - 1, lastForecastInvIdx + contextAfter);
+
+    return chartDisplayData.slice(startIdx, endIdx + 1);
+  }, [chartDisplayData, forecastView]);
+
   // Sales Metrics Configuration
   const SALES_METRICS = [
     { id: 'units_sold', label: 'Units Sold', color: '#4169E1', valueKey: 'units_sold', formatType: 'number', defaultVisible: true },
@@ -403,8 +431,18 @@ const NgoosModal = ({
 
   const childAsin = selectedRow?.child_asin || selectedRow?.childAsin || selectedRow?.asin;
   const hasAsin = !!childAsin;
+  const labelInventoryCount = labelsAvailable !== null ? labelsAvailable : (selectedRow?.labelsAvailable || 0);
+  const forecastUnits = forecastData?.units_to_make || salesData.weeklyForecast || 0;
   
   const progressValues = calculateProgressBarValues();
+
+  const handleConfirmUnits = (units) => {
+    if (onAddUnits) {
+      onAddUnits(selectedRow, units);
+    }
+    setShowConfirmModal(false);
+    onClose();
+  };
 
   return (
     <div
@@ -524,13 +562,7 @@ const NgoosModal = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (onAddUnits) {
-                      const unitsToAdd = forecastData?.units_to_make || salesData.weeklyForecast || 0;
-                      onAddUnits(selectedRow, unitsToAdd);
-                      onClose();
-                    }
-                  }}
+                  onClick={() => setShowConfirmModal(true)}
                   style={{
                     padding: '0 0.75rem',
                     borderRadius: '4px',
@@ -547,7 +579,7 @@ const NgoosModal = ({
                     cursor: 'pointer',
                   }}
                 >
-                  Add Units ({(forecastData?.units_to_make || salesData.weeklyForecast || 0).toLocaleString()})
+                  Add Units ({forecastUnits.toLocaleString()})
                 </button>
               </>
             )}
@@ -1070,15 +1102,17 @@ const NgoosModal = ({
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
                 </div>
-              ) : chartDisplayData.length > 0 ? (
+              ) : displayedChartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={200}>
                   <ComposedChart
-                    data={chartDisplayData}
+                    data={displayedChartData}
                     margin={{ top: 5, right: 20, left: 10, bottom: 20 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? '#1e293b' : '#e5e7eb'} vertical={false} />
                     <XAxis 
-                      dataKey="date" 
+                      dataKey="timestamp"
+                      type="number"
+                      domain={['auto', 'auto']}
                       stroke={isDarkMode ? '#475569' : '#6b7280'}
                       tick={{ fill: isDarkMode ? '#64748b' : '#6b7280', fontSize: 10 }}
                       tickFormatter={(value) => {
@@ -1102,7 +1136,7 @@ const NgoosModal = ({
                       fill="#a855f7" 
                       fillOpacity={0.9}
                       name="FBA Avail"
-                      barSize={20}
+                      barSize={forecastView ? 30 : 20}
                       stackId="inventory"
                     />
                     <Bar 
@@ -1110,7 +1144,7 @@ const NgoosModal = ({
                       fill="#22c55e" 
                       fillOpacity={0.9}
                       name="Total Inv"
-                      barSize={20}
+                      barSize={forecastView ? 30 : 20}
                       stackId="inventory"
                     />
                     <Bar 
@@ -1118,7 +1152,7 @@ const NgoosModal = ({
                       fill="#3b82f6" 
                       fillOpacity={0.9}
                       name="Forecast"
-                      barSize={20}
+                      barSize={forecastView ? 30 : 20}
                       stackId="inventory"
                     />
                     
@@ -1174,8 +1208,84 @@ const NgoosModal = ({
           {activeTab === 'Sales' && (
             <div>
               {/* Header with Controls */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1rem', gap: '1rem' }}>
-                {/* Metric Controller */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', paddingBottom: '1rem' }}>
+                {/* Top Row: Comparison Toggle and Period Selectors */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.75rem', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
+                      Parent View
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowComparison(!showComparison)}
+                      style={{
+                        width: '38px',
+                        height: '20px',
+                        borderRadius: '9999px',
+                        border: 'none',
+                        backgroundColor: showComparison ? '#2563EB' : '#9CA3AF',
+                        padding: '0 2px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: showComparison ? 'flex-end' : 'flex-start',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: '16px',
+                          height: '16px',
+                          borderRadius: '9999px',
+                          backgroundColor: '#FFFFFF',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                        }}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Period Selectors */}
+                  <select 
+                    value={metricsDays}
+                    style={{ 
+                      padding: '0.5rem 1rem', 
+                      borderRadius: '0.5rem', 
+                      backgroundColor: isDarkMode ? '#1e293b' : '#F3F4F6', 
+                      color: isDarkMode ? '#fff' : '#111827',
+                      border: `1px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      minWidth: '100px'
+                    }}
+                  >
+                    <option value={7}>7 Days</option>
+                    <option value={30}>30 Days</option>
+                    <option value={60}>60 Days</option>
+                    <option value={90}>90 Days</option>
+                  </select>
+                  
+                  <select 
+                    value={comparisonPeriod}
+                    onChange={(e) => setComparisonPeriod(e.target.value)}
+                    style={{ 
+                      padding: '0.5rem 1rem', 
+                      borderRadius: '0.5rem', 
+                      backgroundColor: isDarkMode ? '#1e293b' : '#F3F4F6', 
+                      color: isDarkMode ? '#fff' : '#111827',
+                      border: `1px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      minWidth: '120px'
+                    }}
+                  >
+                    <option value="prior">{comparisonPeriod === 'prior' ? '✓ ' : ''}Prior Period</option>
+                    <option value="prior-year">{comparisonPeriod === 'prior-year' ? '✓ ' : ''}Prior Year</option>
+                  </select>
+                </div>
+
+                {/* Bottom Row: Metric Controller */}
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', flex: 1 }}>
                   <span style={{ fontSize: '0.75rem', color: '#94a3b8', alignSelf: 'center', marginRight: '0.5rem', fontWeight: '600', textTransform: 'uppercase' }}>
                     Metrics:
@@ -1220,45 +1330,6 @@ const NgoosModal = ({
                       </button>
                     );
                   })}
-                </div>
-
-                {/* Period Selectors */}
-                <div style={{ display: 'flex', gap: '0.75rem', flexShrink: 0 }}>
-                  <select 
-                    value={metricsDays}
-                    style={{ 
-                      padding: '0.5rem 1rem', 
-                      borderRadius: '0.5rem', 
-                      backgroundColor: isDarkMode ? '#1e293b' : '#F3F4F6', 
-                      color: isDarkMode ? '#fff' : '#111827',
-                      border: `1px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
-                      fontSize: '0.875rem',
-                      fontWeight: '500',
-                      cursor: 'pointer',
-                      minWidth: '100px'
-                    }}
-                  >
-                    <option value={7}>7 Days</option>
-                    <option value={30}>30 Days</option>
-                    <option value={60}>60 Days</option>
-                    <option value={90}>90 Days</option>
-                  </select>
-                  
-                  <select 
-                    style={{ 
-                      padding: '0.5rem 1rem', 
-                      borderRadius: '0.5rem', 
-                      backgroundColor: isDarkMode ? '#1e293b' : '#F3F4F6', 
-                      color: isDarkMode ? '#fff' : '#111827',
-                      border: `1px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
-                      fontSize: '0.875rem',
-                      fontWeight: '500',
-                      cursor: 'pointer',
-                      minWidth: '120px'
-                    }}
-                  >
-                    <option value="prior">Prior Period</option>
-                  </select>
                 </div>
               </div>
 
@@ -1379,66 +1450,221 @@ const NgoosModal = ({
                 </div>
               </div>
 
-              {/* Bottom Section: Metrics Grid */}
-              <div style={{ position: 'relative' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(128.5px, 1fr))', gap: '4px' }}>
-                  {SALES_METRICS.map((metricConfig) => {
-                    const metricId = metricConfig.id;
-                    const metricData = getMetricValue(metricId);
-                    const chartMetric = SALES_METRICS.find(m => m.id === metricId);
-                    const isVisibleOnChart = chartMetric && visibleSalesMetrics.includes(metricId);
-                    const borderColor = isVisibleOnChart ? chartMetric.color : '#334155';
-                    
-                    return (
-                      <div 
-                        key={metricId} 
-                        onClick={() => chartMetric && toggleSalesMetric(metricId)}
-                        style={{ 
-                          padding: '16px', 
-                          backgroundColor: isDarkMode ? '#0f1729' : '#F9FAFB', 
-                          borderRadius: '12px', 
-                          border: `1px solid ${borderColor}`, 
-                          textAlign: 'left',
-                          cursor: chartMetric ? 'pointer' : 'default',
-                          transition: 'all 0.2s',
-                          position: 'relative',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '4px',
-                          minHeight: '72px'
-                        }}
-                        onMouseEnter={(e) => {
-                          if (chartMetric) {
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                            e.currentTarget.style.boxShadow = `0 4px 12px ${borderColor}40`;
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (chartMetric) {
-                            e.currentTarget.style.transform = 'translateY(0)';
-                            e.currentTarget.style.boxShadow = 'none';
-                          }
-                        }}
-                      >
-                        {isVisibleOnChart && (
-                          <div style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', fontSize: '0.625rem', color: chartMetric.color, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                            <svg style={{ width: '12px', height: '12px' }} fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 0l-2 2a1 1 0 101.414 1.414L8 10.414l1.293 1.293a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                            </svg>
-                            On chart
-                          </div>
-                        )}
-                        <div className={themeClasses.text} style={{ fontSize: '1.5rem', fontWeight: '600', lineHeight: '1.2' }}>
-                          {formatChartValue(metricData.value, metricData.format)}
+              {/* Bottom Section: Product Info + Metrics */}
+              {!showComparison ? (
+                // Child View: Product Card + Metrics
+                <>
+                  <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+                    {/* Left: Product Card */}
+                    <div style={{ 
+                      flex: '0 0 280px',
+                      borderRadius: '12px', 
+                      border: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`, 
+                      padding: '1.25rem',
+                      backgroundColor: isDarkMode ? '#0f172a' : '#FFFFFF',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '1rem'
+                    }}>
+                      <div style={{
+                        width: '80px',
+                        height: '80px',
+                        borderRadius: '12px',
+                        backgroundColor: '#F3F4F6',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        overflow: 'hidden'
+                      }}>
+                        <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Product</span>
+                      </div>
+                      <div style={{ textAlign: 'center', width: '100%' }}>
+                        <div className={themeClasses.text} style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.75rem' }}>
+                          {productDetails?.product?.name || selectedRow.product}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: metricData.change >= 0 ? '#22c55e' : '#ef4444', fontWeight: '500' }}>
-                          {chartMetric?.label || metricId.replace('_', ' ')} {metricData.change >= 0 ? '+' : ''}{metricData.change.toFixed(1)}%
+                        <div style={{ fontSize: '0.75rem', color: isDarkMode ? '#9CA3AF' : '#6B7280', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                          <div>SIZE: <span className={themeClasses.text}>{productDetails?.product?.size || selectedRow.size}</span></div>
+                          <div>ASIN: <span className={themeClasses.text}>{productDetails?.product?.asin || childAsin || 'N/A'}</span></div>
+                          <div>BRAND: <span className={themeClasses.text}>{productDetails?.product?.brand || selectedRow.brand}</span></div>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
+                    </div>
+
+                    {/* Right: Metrics Grid (2 rows x 4 columns) */}
+                    <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gridTemplateRows: 'repeat(2, 1fr)', gap: '0.75rem' }}>
+                      {SALES_METRICS.slice(0, 8).map((metricConfig) => {
+                        const metricId = metricConfig.id;
+                        const metricData = getMetricValue(metricId);
+                        const changeColor = metricData.change >= 0 ? '#22c55e' : '#ef4444';
+                        
+                        return (
+                          <div 
+                            key={metricId}
+                            style={{ 
+                              padding: '1rem', 
+                              backgroundColor: isDarkMode ? '#0f172a' : '#FFFFFF', 
+                              borderRadius: '12px', 
+                              border: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`,
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'space-between'
+                            }}
+                          >
+                            <div className={themeClasses.text} style={{ fontSize: '1.75rem', fontWeight: '700', lineHeight: '1.2', marginBottom: '0.25rem' }}>
+                              {formatChartValue(metricData.value, metricData.format)}
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: '500', marginBottom: '0.25rem' }}>
+                              {metricConfig.label}
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: changeColor, fontWeight: '600' }}>
+                              {metricData.change >= 0 ? '+' : ''}{metricData.change.toFixed(1)}%
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Additional Metrics Row */}
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <div style={{ 
+                      flex: '0 0 280px',
+                      borderRadius: '12px', 
+                      border: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`, 
+                      padding: '1.25rem',
+                      backgroundColor: isDarkMode ? '#0f172a' : '#FFFFFF',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
+                      alignItems: 'center'
+                    }}>
+                      <div className={themeClasses.text} style={{ fontSize: '2.5rem', fontWeight: '700', lineHeight: '1' }}>
+                        {metrics?.current_period?.organic_sales_percent?.toFixed(0) || '0'}%
+                      </div>
+                      <div style={{ fontSize: '0.875rem', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginTop: '0.5rem' }}>
+                        Organic Sales %
+                      </div>
+                    </div>
+
+                    <div style={{ 
+                      flex: '0 0 280px',
+                      borderRadius: '12px', 
+                      border: `2px dashed ${isDarkMode ? '#374151' : '#D1D5DB'}`, 
+                      padding: '1.25rem',
+                      backgroundColor: 'transparent',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#2563EB';
+                      e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(37, 99, 235, 0.05)' : 'rgba(37, 99, 235, 0.02)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = isDarkMode ? '#374151' : '#D1D5DB';
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                    >
+                      <div style={{ fontSize: '2rem', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '0.5rem' }}>+</div>
+                      <div style={{ fontSize: '0.875rem', color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: '500' }}>
+                        Add Metric
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                // Parent View: Just Metrics Grid
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                    {SALES_METRICS.slice(0, 8).map((metricConfig) => {
+                      const metricId = metricConfig.id;
+                      const metricData = getMetricValue(metricId);
+                      const changeColor = metricData.change >= 0 ? '#22c55e' : '#ef4444';
+                      const isVisibleOnChart = visibleSalesMetrics.includes(metricId);
+                      const borderColor = isVisibleOnChart ? metricConfig.color : (isDarkMode ? '#1F2937' : '#E5E7EB');
+                      
+                      return (
+                        <div 
+                          key={metricId}
+                          style={{ 
+                            padding: '16px', 
+                            backgroundColor: isDarkMode ? '#0f172a' : '#1a2332', 
+                            borderRadius: '12px', 
+                            border: `2px solid ${borderColor}`,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px',
+                            height: '72px',
+                            justifyContent: 'flex-start'
+                          }}
+                        >
+                          <div style={{ color: '#E5E7EB', fontSize: '1.75rem', fontWeight: '700', lineHeight: '1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                            {formatChartValue(metricData.value, metricData.format)}
+                          </div>
+                          <div style={{ fontSize: '0.625rem', color: '#9CA3AF', fontWeight: '500', lineHeight: '1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 'auto' }}>
+                            {metricConfig.label}
+                          </div>
+                          <div style={{ fontSize: '0.625rem', color: changeColor, fontWeight: '600', lineHeight: '1', whiteSpace: 'nowrap' }}>
+                            {metricData.change >= 0 ? '+' : ''}{metricData.change.toFixed(1)}%
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Additional Metrics Row */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.75rem' }}>
+                    <div style={{ 
+                      borderRadius: '12px', 
+                      border: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`, 
+                      padding: '1.25rem',
+                      backgroundColor: isDarkMode ? '#0f172a' : '#1a2332',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
+                      alignItems: 'center'
+                    }}>
+                      <div style={{ color: '#E5E7EB', fontSize: '2rem', fontWeight: '700', lineHeight: '1' }}>
+                        {metrics?.current_period?.organic_sales_percent?.toFixed(0) || '39'}%
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#9CA3AF', marginTop: '0.5rem' }}>
+                        Organic Sales %
+                      </div>
+                    </div>
+
+                    <div style={{ 
+                      borderRadius: '12px', 
+                      border: `2px dashed ${isDarkMode ? '#374151' : '#475569'}`, 
+                      padding: '1.25rem',
+                      backgroundColor: 'transparent',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#2563EB';
+                      e.currentTarget.style.backgroundColor = 'rgba(37, 99, 235, 0.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = isDarkMode ? '#374151' : '#475569';
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                    >
+                      <div style={{ fontSize: '2rem', color: '#9CA3AF', marginBottom: '0.25rem' }}>+</div>
+                      <div style={{ fontSize: '0.75rem', color: '#9CA3AF', fontWeight: '500' }}>
+                        Add Metric
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -1446,8 +1672,84 @@ const NgoosModal = ({
           {activeTab === 'Ads' && (
             <div>
               {/* Header with Controls */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1rem', gap: '1rem' }}>
-                {/* Metric Controller */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', paddingBottom: '1rem' }}>
+                {/* Top Row: Comparison Toggle and Period Selectors */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.75rem', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
+                      Parent View
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowComparison(!showComparison)}
+                      style={{
+                        width: '38px',
+                        height: '20px',
+                        borderRadius: '9999px',
+                        border: 'none',
+                        backgroundColor: showComparison ? '#2563EB' : '#9CA3AF',
+                        padding: '0 2px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: showComparison ? 'flex-end' : 'flex-start',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: '16px',
+                          height: '16px',
+                          borderRadius: '9999px',
+                          backgroundColor: '#FFFFFF',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                        }}
+                      />
+                    </button>
+                  </div>
+
+                  {/* Period Selectors */}
+                  <select 
+                    value={metricsDays}
+                    style={{ 
+                      padding: '0.5rem 1rem', 
+                      borderRadius: '0.5rem', 
+                      backgroundColor: isDarkMode ? '#1e293b' : '#F3F4F6', 
+                      color: isDarkMode ? '#fff' : '#111827',
+                      border: `1px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      minWidth: '100px'
+                    }}
+                  >
+                    <option value={7}>7 Days</option>
+                    <option value={30}>30 Days</option>
+                    <option value={60}>60 Days</option>
+                    <option value={90}>90 Days</option>
+                  </select>
+                  
+                  <select 
+                    value={comparisonPeriod}
+                    onChange={(e) => setComparisonPeriod(e.target.value)}
+                    style={{ 
+                      padding: '0.5rem 1rem', 
+                      borderRadius: '0.5rem', 
+                      backgroundColor: isDarkMode ? '#1e293b' : '#F3F4F6', 
+                      color: isDarkMode ? '#fff' : '#111827',
+                      border: `1px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
+                      fontSize: '0.875rem',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      minWidth: '120px'
+                    }}
+                  >
+                    <option value="prior">{comparisonPeriod === 'prior' ? '✓ ' : ''}Prior Period</option>
+                    <option value="prior-year">{comparisonPeriod === 'prior-year' ? '✓ ' : ''}Prior Year</option>
+                  </select>
+                </div>
+
+                {/* Bottom Row: Metric Controller */}
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', flex: 1 }}>
                   <span style={{ fontSize: '0.75rem', color: '#94a3b8', alignSelf: 'center', marginRight: '0.5rem', fontWeight: '600', textTransform: 'uppercase' }}>
                     Metrics:
@@ -1492,45 +1794,6 @@ const NgoosModal = ({
                       </button>
                     );
                   })}
-                </div>
-
-                {/* Period Selectors */}
-                <div style={{ display: 'flex', gap: '0.75rem', flexShrink: 0 }}>
-                  <select 
-                    value={metricsDays}
-                    style={{ 
-                      padding: '0.5rem 1rem', 
-                      borderRadius: '0.5rem', 
-                      backgroundColor: isDarkMode ? '#1e293b' : '#F3F4F6', 
-                      color: isDarkMode ? '#fff' : '#111827',
-                      border: `1px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
-                      fontSize: '0.875rem',
-                      fontWeight: '500',
-                      cursor: 'pointer',
-                      minWidth: '100px'
-                    }}
-                  >
-                    <option value={7}>7 Days</option>
-                    <option value={30}>30 Days</option>
-                    <option value={60}>60 Days</option>
-                    <option value={90}>90 Days</option>
-                  </select>
-                  
-                  <select 
-                    style={{ 
-                      padding: '0.5rem 1rem', 
-                      borderRadius: '0.5rem', 
-                      backgroundColor: isDarkMode ? '#1e293b' : '#F3F4F6', 
-                      color: isDarkMode ? '#fff' : '#111827',
-                      border: `1px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
-                      fontSize: '0.875rem',
-                      fontWeight: '500',
-                      cursor: 'pointer',
-                      minWidth: '120px'
-                    }}
-                  >
-                    <option value="prior">Prior Period</option>
-                  </select>
                 </div>
               </div>
 
@@ -1651,71 +1914,331 @@ const NgoosModal = ({
                 </div>
               </div>
 
-              {/* Bottom Section: Metrics Grid */}
-              <div style={{ position: 'relative' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(128.5px, 1fr))', gap: '4px' }}>
-                  {ADS_METRICS.map((metricConfig) => {
-                    const metricId = metricConfig.id;
-                    const metricData = getMetricValue(metricId);
-                    const chartMetric = ADS_METRICS.find(m => m.id === metricId);
-                    const isVisibleOnChart = chartMetric && visibleAdsMetrics.includes(metricId);
-                    const borderColor = isVisibleOnChart ? chartMetric.color : '#334155';
-                    
-                    return (
-                      <div 
-                        key={metricId} 
-                        onClick={() => chartMetric && toggleAdsMetric(metricId)}
-                        style={{ 
-                          padding: '16px', 
-                          backgroundColor: isDarkMode ? '#0f1729' : '#F9FAFB', 
-                          borderRadius: '12px', 
-                          border: `1px solid ${borderColor}`, 
-                          textAlign: 'left',
-                          cursor: chartMetric ? 'pointer' : 'default',
-                          transition: 'all 0.2s',
-                          position: 'relative',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '4px',
-                          minHeight: '72px'
-                        }}
-                        onMouseEnter={(e) => {
-                          if (chartMetric) {
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                            e.currentTarget.style.boxShadow = `0 4px 12px ${borderColor}40`;
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (chartMetric) {
-                            e.currentTarget.style.transform = 'translateY(0)';
-                            e.currentTarget.style.boxShadow = 'none';
-                          }
-                        }}
-                      >
-                        {isVisibleOnChart && (
-                          <div style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', fontSize: '0.625rem', color: chartMetric.color, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                            <svg style={{ width: '12px', height: '12px' }} fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 0l-2 2a1 1 0 101.414 1.414L8 10.414l1.293 1.293a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                            </svg>
-                            On chart
-                          </div>
-                        )}
-                        <div className={themeClasses.text} style={{ fontSize: '1.5rem', fontWeight: '600', lineHeight: '1.2' }}>
-                          {formatChartValue(metricData.value, metricData.format)}
+              {/* Bottom Section: Product Info + Metrics */}
+              {!showComparison ? (
+                // Child View: Product Card + Metrics
+                <>
+                  <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+                    {/* Left: Product Card */}
+                    <div style={{ 
+                      flex: '0 0 280px',
+                      borderRadius: '12px', 
+                      border: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`, 
+                      padding: '1.25rem',
+                      backgroundColor: isDarkMode ? '#0f172a' : '#FFFFFF',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '1rem'
+                    }}>
+                      <div style={{
+                        width: '80px',
+                        height: '80px',
+                        borderRadius: '12px',
+                        backgroundColor: '#F3F4F6',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        overflow: 'hidden'
+                      }}>
+                        <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>Product</span>
+                      </div>
+                      <div style={{ textAlign: 'center', width: '100%' }}>
+                        <div className={themeClasses.text} style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.75rem' }}>
+                          {productDetails?.product?.name || selectedRow.product}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: (metricId === 'tacos' || metricId === 'acos') ? (metricData.change <= 0 ? '#22c55e' : '#ef4444') : (metricData.change >= 0 ? '#22c55e' : '#ef4444'), fontWeight: '500' }}>
-                          {chartMetric?.label || metricId.replace('_', ' ')} {metricData.change >= 0 ? '+' : ''}{metricData.change.toFixed(1)}%
+                        <div style={{ fontSize: '0.75rem', color: isDarkMode ? '#9CA3AF' : '#6B7280', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                          <div>SIZE: <span className={themeClasses.text}>{productDetails?.product?.size || selectedRow.size}</span></div>
+                          <div>ASIN: <span className={themeClasses.text}>{productDetails?.product?.asin || childAsin || 'N/A'}</span></div>
+                          <div>BRAND: <span className={themeClasses.text}>{productDetails?.product?.brand || selectedRow.brand}</span></div>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
+                    </div>
+
+                    {/* Right: Metrics Grid (2 rows x 4 columns) */}
+                    <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gridTemplateRows: 'repeat(2, 1fr)', gap: '0.75rem' }}>
+                      {ADS_METRICS.slice(0, 8).map((metricConfig) => {
+                        const metricId = metricConfig.id;
+                        const metricData = getMetricValue(metricId);
+                        const changeColor = (metricId === 'tacos' || metricId === 'acos') 
+                          ? (metricData.change <= 0 ? '#22c55e' : '#ef4444')
+                          : (metricData.change >= 0 ? '#22c55e' : '#ef4444');
+                        
+                        return (
+                          <div 
+                            key={metricId}
+                            style={{ 
+                              padding: '1rem', 
+                              backgroundColor: isDarkMode ? '#0f172a' : '#FFFFFF', 
+                              borderRadius: '12px', 
+                              border: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`,
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'space-between'
+                            }}
+                          >
+                            <div className={themeClasses.text} style={{ fontSize: '1.75rem', fontWeight: '700', lineHeight: '1.2', marginBottom: '0.25rem' }}>
+                              {formatChartValue(metricData.value, metricData.format)}
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: '500', marginBottom: '0.25rem' }}>
+                              {metricConfig.label}
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: changeColor, fontWeight: '600' }}>
+                              {metricData.change >= 0 ? '+' : ''}{metricData.change.toFixed(1)}%
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Additional Metrics Row */}
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <div style={{ 
+                      flex: '0 0 280px',
+                      borderRadius: '12px', 
+                      border: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`, 
+                      padding: '1.25rem',
+                      backgroundColor: isDarkMode ? '#0f172a' : '#FFFFFF',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
+                      alignItems: 'center'
+                    }}>
+                      <div className={themeClasses.text} style={{ fontSize: '2.5rem', fontWeight: '700', lineHeight: '1' }}>
+                        {metrics?.current_period?.organic_sales_percent?.toFixed(0) || '0'}%
+                      </div>
+                      <div style={{ fontSize: '0.875rem', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginTop: '0.5rem' }}>
+                        Organic Sales %
+                      </div>
+                    </div>
+
+                    <div style={{ 
+                      flex: '0 0 280px',
+                      borderRadius: '12px', 
+                      border: `2px dashed ${isDarkMode ? '#374151' : '#D1D5DB'}`, 
+                      padding: '1.25rem',
+                      backgroundColor: 'transparent',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#2563EB';
+                      e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(37, 99, 235, 0.05)' : 'rgba(37, 99, 235, 0.02)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = isDarkMode ? '#374151' : '#D1D5DB';
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                    >
+                      <div style={{ fontSize: '2rem', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '0.5rem' }}>+</div>
+                      <div style={{ fontSize: '0.875rem', color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: '500' }}>
+                        Add Metric
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                // Parent View: Just Metrics Grid
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                    {ADS_METRICS.slice(0, 8).map((metricConfig) => {
+                      const metricId = metricConfig.id;
+                      const metricData = getMetricValue(metricId);
+                      const changeColor = (metricId === 'tacos' || metricId === 'acos') 
+                        ? (metricData.change <= 0 ? '#22c55e' : '#ef4444')
+                        : (metricData.change >= 0 ? '#22c55e' : '#ef4444');
+                      const isVisibleOnChart = visibleAdsMetrics.includes(metricId);
+                      const borderColor = isVisibleOnChart ? metricConfig.color : (isDarkMode ? '#1F2937' : '#E5E7EB');
+                      
+                      return (
+                        <div 
+                          key={metricId}
+                          style={{ 
+                            padding: '16px', 
+                            backgroundColor: isDarkMode ? '#0f172a' : '#1a2332', 
+                            borderRadius: '12px', 
+                            border: `2px solid ${borderColor}`,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px',
+                            height: '72px',
+                            justifyContent: 'flex-start'
+                          }}
+                        >
+                          <div style={{ color: '#E5E7EB', fontSize: '1.75rem', fontWeight: '700', lineHeight: '1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                            {formatChartValue(metricData.value, metricData.format)}
+                          </div>
+                          <div style={{ fontSize: '0.625rem', color: '#9CA3AF', fontWeight: '500', lineHeight: '1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 'auto' }}>
+                            {metricConfig.label}
+                          </div>
+                          <div style={{ fontSize: '0.625rem', color: changeColor, fontWeight: '600', lineHeight: '1', whiteSpace: 'nowrap' }}>
+                            {metricData.change >= 0 ? '+' : ''}{metricData.change.toFixed(1)}%
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Additional Metrics Row */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.75rem' }}>
+                    <div style={{ 
+                      borderRadius: '12px', 
+                      border: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`, 
+                      padding: '1.25rem',
+                      backgroundColor: isDarkMode ? '#0f172a' : '#1a2332',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
+                      alignItems: 'center'
+                    }}>
+                      <div style={{ color: '#E5E7EB', fontSize: '2rem', fontWeight: '700', lineHeight: '1' }}>
+                        {metrics?.current_period?.organic_sales_percent?.toFixed(0) || '39'}%
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#9CA3AF', marginTop: '0.5rem' }}>
+                        Organic Sales %
+                      </div>
+                    </div>
+
+                    <div style={{ 
+                      borderRadius: '12px', 
+                      border: `2px dashed ${isDarkMode ? '#374151' : '#475569'}`, 
+                      padding: '1.25rem',
+                      backgroundColor: 'transparent',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#2563EB';
+                      e.currentTarget.style.backgroundColor = 'rgba(37, 99, 235, 0.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = isDarkMode ? '#374151' : '#475569';
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                    >
+                      <div style={{ fontSize: '2rem', color: '#9CA3AF', marginBottom: '0.25rem' }}>+</div>
+                      <div style={{ fontSize: '0.75rem', color: '#9CA3AF', fontWeight: '500' }}>
+                        Add Metric
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
         )}
       </div>
+
+      {showConfirmModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 60,
+            padding: '1rem',
+          }}
+        >
+          <div
+            style={{
+              width: '360px',
+              maxWidth: '90vw',
+              backgroundColor: isDarkMode ? '#0f172a' : '#0f172a',
+              color: '#e2e8f0',
+              borderRadius: '14px',
+              boxShadow: '0 25px 70px rgba(0,0,0,0.35)',
+              padding: '20px 20px 16px',
+              border: `1px solid ${isDarkMode ? '#1f2937' : '#1f2937'}`,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: 700, margin: 0, color: '#e5e7eb' }}>Confirm Unit Quantity</h3>
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '9999px',
+                  border: 'none',
+                  backgroundColor: 'rgba(255,255,255,0.08)',
+                  color: '#cbd5e1',
+                  cursor: 'pointer',
+                  fontSize: '18px',
+                  lineHeight: 1,
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ marginBottom: '10px', fontSize: '15px', lineHeight: 1.5 }}>
+              <div style={{ marginBottom: '8px' }}>
+                Label Inventory: <span style={{ color: '#f59e0b', fontWeight: 700 }}>{labelInventoryCount.toLocaleString()} units</span>
+              </div>
+              <div>
+                Forecast: <span style={{ fontWeight: 700 }}>{forecastUnits.toLocaleString()} Units</span>
+              </div>
+            </div>
+
+            <p style={{ margin: '12px 0 18px', color: '#cbd5e1', fontSize: '14px' }}>
+              Please choose how you would like to proceed:
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => handleConfirmUnits(labelInventoryCount)}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0',
+                  backgroundColor: '#f8fafc',
+                  color: '#0f172a',
+                  fontWeight: 600,
+                  fontSize: '15px',
+                  cursor: 'pointer',
+                }}
+              >
+                Match Label Inventory ({labelInventoryCount.toLocaleString()})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleConfirmUnits(forecastUnits)}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: '#0b6bff',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  fontSize: '15px',
+                  cursor: 'pointer',
+                  boxShadow: '0 12px 20px rgba(11,107,255,0.35)',
+                }}
+              >
+                Proceed with {forecastUnits.toLocaleString()} units
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
