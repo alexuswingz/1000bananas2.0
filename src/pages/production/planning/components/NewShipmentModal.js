@@ -372,7 +372,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                     zIndex: 100,
                   }}
                 >
-                  {['TPS Nutrients', 'Green Earth Co', 'Total Pest Spray'].map((option) => (
+                  {['TPS Nutrients', 'Total Pest Spray'].map((option) => (
                     <button
                       key={option}
                       type="button"
