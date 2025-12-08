@@ -4279,50 +4279,101 @@ def add_shipment_products(event):
             catalog_id = product['catalog_id']
             quantity = product['quantity']
             
+            # Determine if catalog_id is an integer ID or an ASIN string
+            # ASINs start with 'B0' and are alphanumeric, IDs are integers
+            is_asin = isinstance(catalog_id, str) and (catalog_id.startswith('B0') or not catalog_id.isdigit())
+            
             # Get catalog data with inventory levels
-            cursor.execute("""
-                SELECT 
-                    c.id,
-                    c.product_name,
-                    c.brand_name,
-                    c.size,
-                    c.child_asin,
-                    c.child_sku_final,
-                    c.units_per_case,
-                    c.packaging_name as bottle_name,
-                    c.formula_name,
-                    c.closure_name,
-                    c.label_location,
-                    c.case_size as box_type,
-                    b.size_oz,
-                    b.bottles_per_minute,
-                    -- Inventory levels
-                    COALESCE(bi.warehouse_quantity, 0) as bottle_inventory,
-                    COALESCE(ci.warehouse_quantity, 0) as closure_inventory,
-                    COALESCE(li.warehouse_inventory, 0) as label_inventory,
-                    COALESCE(fi.gallons_available, 0) as formula_gallons_available,
-                    -- Calculate max producible
-                    LEAST(
-                        COALESCE(bi.warehouse_quantity, 0),
-                        COALESCE(ci.warehouse_quantity, 0),
-                        COALESCE(li.warehouse_inventory, 0),
-                        CASE 
-                            WHEN c.size = '8oz' THEN FLOOR(COALESCE(fi.gallons_available, 0) / 0.0625)
-                            WHEN c.size = '16oz' THEN FLOOR(COALESCE(fi.gallons_available, 0) / 0.125)
-                            WHEN c.size IN ('Quart', '32oz') THEN FLOOR(COALESCE(fi.gallons_available, 0) / 0.25)
-                            WHEN c.size = 'Gallon' THEN FLOOR(COALESCE(fi.gallons_available, 0) / 1.0)
-                            WHEN c.size = '5 Gallon' THEN FLOOR(COALESCE(fi.gallons_available, 0) / 5.0)
-                            ELSE FLOOR(COALESCE(fi.gallons_available, 0) / 0.25)
-                        END
-                    ) as max_units_producible
-                FROM catalog c
-                LEFT JOIN bottle b ON c.packaging_name = b.bottle_name
-                LEFT JOIN bottle_inventory bi ON c.packaging_name = bi.bottle_name
-                LEFT JOIN closure_inventory ci ON c.closure_name = ci.closure_name
-                LEFT JOIN label_inventory li ON c.label_location = li.label_location
-                LEFT JOIN formula_inventory fi ON c.formula_name = fi.formula_name
-                WHERE c.id = %s
-            """, (catalog_id,))
+            if is_asin:
+                # Look up by child_asin
+                cursor.execute("""
+                    SELECT 
+                        c.id,
+                        c.product_name,
+                        c.brand_name,
+                        c.size,
+                        c.child_asin,
+                        c.child_sku_final,
+                        c.units_per_case,
+                        c.packaging_name as bottle_name,
+                        c.formula_name,
+                        c.closure_name,
+                        c.label_location,
+                        c.case_size as box_type,
+                        b.size_oz,
+                        b.bottles_per_minute,
+                        -- Inventory levels
+                        COALESCE(bi.warehouse_quantity, 0) as bottle_inventory,
+                        COALESCE(ci.warehouse_quantity, 0) as closure_inventory,
+                        COALESCE(li.warehouse_inventory, 0) as label_inventory,
+                        COALESCE(fi.gallons_available, 0) as formula_gallons_available,
+                        -- Calculate max producible
+                        LEAST(
+                            COALESCE(bi.warehouse_quantity, 0),
+                            COALESCE(ci.warehouse_quantity, 0),
+                            COALESCE(li.warehouse_inventory, 0),
+                            CASE 
+                                WHEN c.size = '8oz' THEN FLOOR(COALESCE(fi.gallons_available, 0) / 0.0625)
+                                WHEN c.size = '16oz' THEN FLOOR(COALESCE(fi.gallons_available, 0) / 0.125)
+                                WHEN c.size IN ('Quart', '32oz') THEN FLOOR(COALESCE(fi.gallons_available, 0) / 0.25)
+                                WHEN c.size = 'Gallon' THEN FLOOR(COALESCE(fi.gallons_available, 0) / 1.0)
+                                WHEN c.size = '5 Gallon' THEN FLOOR(COALESCE(fi.gallons_available, 0) / 5.0)
+                                ELSE FLOOR(COALESCE(fi.gallons_available, 0) / 0.25)
+                            END
+                        ) as max_units_producible
+                    FROM catalog c
+                    LEFT JOIN bottle b ON c.packaging_name = b.bottle_name
+                    LEFT JOIN bottle_inventory bi ON c.packaging_name = bi.bottle_name
+                    LEFT JOIN closure_inventory ci ON c.closure_name = ci.closure_name
+                    LEFT JOIN label_inventory li ON c.label_location = li.label_location
+                    LEFT JOIN formula_inventory fi ON c.formula_name = fi.formula_name
+                    WHERE c.child_asin = %s
+                """, (catalog_id,))
+            else:
+                # Look up by integer ID
+                cursor.execute("""
+                    SELECT 
+                        c.id,
+                        c.product_name,
+                        c.brand_name,
+                        c.size,
+                        c.child_asin,
+                        c.child_sku_final,
+                        c.units_per_case,
+                        c.packaging_name as bottle_name,
+                        c.formula_name,
+                        c.closure_name,
+                        c.label_location,
+                        c.case_size as box_type,
+                        b.size_oz,
+                        b.bottles_per_minute,
+                        -- Inventory levels
+                        COALESCE(bi.warehouse_quantity, 0) as bottle_inventory,
+                        COALESCE(ci.warehouse_quantity, 0) as closure_inventory,
+                        COALESCE(li.warehouse_inventory, 0) as label_inventory,
+                        COALESCE(fi.gallons_available, 0) as formula_gallons_available,
+                        -- Calculate max producible
+                        LEAST(
+                            COALESCE(bi.warehouse_quantity, 0),
+                            COALESCE(ci.warehouse_quantity, 0),
+                            COALESCE(li.warehouse_inventory, 0),
+                            CASE 
+                                WHEN c.size = '8oz' THEN FLOOR(COALESCE(fi.gallons_available, 0) / 0.0625)
+                                WHEN c.size = '16oz' THEN FLOOR(COALESCE(fi.gallons_available, 0) / 0.125)
+                                WHEN c.size IN ('Quart', '32oz') THEN FLOOR(COALESCE(fi.gallons_available, 0) / 0.25)
+                                WHEN c.size = 'Gallon' THEN FLOOR(COALESCE(fi.gallons_available, 0) / 1.0)
+                                WHEN c.size = '5 Gallon' THEN FLOOR(COALESCE(fi.gallons_available, 0) / 5.0)
+                                ELSE FLOOR(COALESCE(fi.gallons_available, 0) / 0.25)
+                            END
+                        ) as max_units_producible
+                    FROM catalog c
+                    LEFT JOIN bottle b ON c.packaging_name = b.bottle_name
+                    LEFT JOIN bottle_inventory bi ON c.packaging_name = bi.bottle_name
+                    LEFT JOIN closure_inventory ci ON c.closure_name = ci.closure_name
+                    LEFT JOIN label_inventory li ON c.label_location = li.label_location
+                    LEFT JOIN formula_inventory fi ON c.formula_name = fi.formula_name
+                    WHERE c.id = %s
+                """, (int(catalog_id),))
             
             catalog_data = cursor.fetchone()
             
@@ -4355,7 +4406,9 @@ def add_shipment_products(event):
             bpm = float(catalog_data['bottles_per_minute'] or 30)
             production_minutes = quantity / bpm if bpm > 0 else 0
             
-            # Insert product
+            # Insert product - use the actual database ID from catalog_data, not the passed-in ID/ASIN
+            actual_catalog_id = catalog_data['id']
+            
             cursor.execute("""
                 INSERT INTO shipment_products (
                     shipment_id,
@@ -4386,7 +4439,7 @@ def add_shipment_products(event):
                 RETURNING *
             """, (
                 shipment_id,
-                catalog_id,
+                actual_catalog_id,
                 catalog_data['product_name'],
                 catalog_data['brand_name'],
                 catalog_data['size'],

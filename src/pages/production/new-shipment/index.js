@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTheme } from '../../../context/ThemeContext';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
@@ -277,25 +277,66 @@ const NewShipment = () => {
       
       console.log('Loaded products with supply chain:', formattedProducts.length, 'Sample:', formattedProducts[0]);
       
-      // Sort: items with sales activity first, then by higher sales, then by lower inventory
-      const sortedProducts = formattedProducts.sort((a, b) => {
+      // Calculate suggested qty for each product based on forecast
+      // Formula: unitsNeeded = (targetDOI - currentDOI) * dailySalesRate
+      // Then round up to nearest units_per_case
+      const productsWithSuggestedQty = formattedProducts.map(product => {
+        const dailySalesRate = (product.sales30Day || 0) / 30;
+        const currentDOI = product.doiTotal || product.daysOfInventory || 0;
+        const targetDOI = parseInt(forecastRange) || 120;
+        const unitsPerCase = product.units_per_case || 60;
+        
+        let suggestedQty = 0;
+        
+        // Only calculate if there are sales and we're below target DOI
+        if (dailySalesRate > 0 && currentDOI < targetDOI) {
+          const daysNeeded = targetDOI - currentDOI;
+          const rawUnitsNeeded = daysNeeded * dailySalesRate;
+          
+          // Round up to nearest units_per_case (case pack)
+          suggestedQty = Math.ceil(rawUnitsNeeded / unitsPerCase) * unitsPerCase;
+          
+          // Ensure minimum of 1 case if there's any need
+          if (suggestedQty === 0 && rawUnitsNeeded > 0) {
+            suggestedQty = unitsPerCase;
+          }
+        }
+        
+        return {
+          ...product,
+          suggestedQty,
+        };
+      });
+      
+      // Sort by DOI ascending (lowest DOI first = most urgent)
+      // Products with sales but low DOI need to be prioritized
+      const sortedProducts = productsWithSuggestedQty.sort((a, b) => {
         // First: items with sales > 0 come first
         const aHasSales = a.sales30Day > 0 ? 0 : 1;
         const bHasSales = b.sales30Day > 0 ? 0 : 1;
         if (aHasSales !== bHasSales) return aHasSales - bHasSales;
         
-        // Second: higher sales first
-        if (a.sales30Day !== b.sales30Day) return b.sales30Day - a.sales30Day;
+        // Second: sort by DOI ascending (lowest DOI = most urgent)
+        const aDOI = a.doiTotal || a.daysOfInventory || 999;
+        const bDOI = b.doiTotal || b.daysOfInventory || 999;
+        if (aDOI !== bDOI) return aDOI - bDOI;
         
-        // Third: lower inventory first
-        return a.totalInventory - b.totalInventory;
+        // Third: higher sales first (as tiebreaker)
+        return (b.sales30Day || 0) - (a.sales30Day || 0);
       });
       
       setProducts(sortedProducts);
       setDataAsOfDate(new Date()); // Mark data as fresh
       
-      // Initialize qty values as empty - only populate when Add is clicked
-      setQtyValues({});
+      // Initialize qty values with suggested quantities for products that need restocking
+      const initialQtyValues = {};
+      sortedProducts.forEach((product, index) => {
+        // Auto-populate qty with suggested qty if product needs restocking
+        if (product.suggestedQty > 0) {
+          initialQtyValues[index] = product.suggestedQty;
+        }
+      });
+      setQtyValues(initialQtyValues);
     } catch (error) {
       console.error('Error loading products:', error);
       alert('Failed to load products: ' + error.message);
@@ -410,6 +451,84 @@ const NewShipment = () => {
       }
     }
   }, [shipmentProducts, products]);
+
+  // Recalculate suggested quantities when forecastRange changes
+  useEffect(() => {
+    if (products.length > 0 && !shipmentId) {
+      // Don't recalculate for existing shipments (they have their own quantities)
+      const targetDOI = parseInt(forecastRange) || 120;
+      
+      const newQtyValues = {};
+      products.forEach((product, index) => {
+        // Only update qty for products that haven't been manually added yet
+        if (!addedRows.has(product.id)) {
+          const dailySalesRate = (product.sales30Day || 0) / 30;
+          const currentDOI = product.doiTotal || product.daysOfInventory || 0;
+          const unitsPerCase = product.units_per_case || 60;
+          
+          let suggestedQty = 0;
+          
+          if (dailySalesRate > 0 && currentDOI < targetDOI) {
+            const daysNeeded = targetDOI - currentDOI;
+            const rawUnitsNeeded = daysNeeded * dailySalesRate;
+            
+            // Round up to nearest units_per_case (case pack)
+            suggestedQty = Math.ceil(rawUnitsNeeded / unitsPerCase) * unitsPerCase;
+            
+            if (suggestedQty === 0 && rawUnitsNeeded > 0) {
+              suggestedQty = unitsPerCase;
+            }
+          }
+          
+          if (suggestedQty > 0) {
+            newQtyValues[index] = suggestedQty;
+          }
+        } else {
+          // Keep existing quantity for already added products
+          if (qtyValues[index] !== undefined) {
+            newQtyValues[index] = qtyValues[index];
+          }
+        }
+      });
+      
+      setQtyValues(newQtyValues);
+    }
+  }, [forecastRange, products.length]); // Only re-run when forecastRange or products change
+
+  // Compute the list of products for Sort Products and Sort Formulas tabs
+  // This ensures all added products are included regardless of data source
+  const productsForSortTabs = useMemo(() => {
+    // If we have shipmentProducts from an existing shipment, use them directly
+    if (shipmentProducts && shipmentProducts.length > 0) {
+      // Transform shipment products to match the expected format
+      return shipmentProducts.map(sp => ({
+        id: sp.catalog_id,
+        catalogId: sp.catalog_id,
+        brand: sp.brand_name || '',
+        product: sp.product_name || '',
+        size: sp.size || '',
+        qty: sp.quantity || 0,
+        formula: sp.formula_name || '',
+        formula_name: sp.formula_name || '',
+        childAsin: sp.child_asin || '',
+        childSku: sp.child_sku || '',
+        bottle_name: sp.bottle_name || '',
+        closure_name: sp.closure_name || '',
+        label_location: sp.label_location || '',
+        formulaGallonsPerUnit: sp.formula_gallons_needed ? (sp.formula_gallons_needed / (sp.quantity || 1)) : 0,
+        units_per_case: sp.units_per_case || 60,
+      }));
+    }
+    
+    // Otherwise, use filtered products from the products list
+    // Only include products that are in addedRows AND have qty > 0
+    return products
+      .map((product, index) => ({
+        ...product,
+        qty: qtyValues[index] || 0,
+      }))
+      .filter(p => addedRows.has(p.id) && p.qty > 0);
+  }, [shipmentProducts, products, addedRows, qtyValues]);
 
   // Calculate total units from qtyValues - only for products that have been added
   const totalUnits = products.reduce((sum, product, index) => {
@@ -1337,6 +1456,7 @@ const NewShipment = () => {
                     onProductClick={handleProductClick}
                     qtyValues={qtyValues}
                     onQtyChange={setQtyValues}
+                    addedRows={addedRows}
                     onAddedRowsChange={setAddedRows}
                     labelsAvailabilityMap={labelsAvailabilityMap}
                     forecastRange={parseInt(forecastRange) || 120}
@@ -1370,13 +1490,18 @@ const NewShipment = () => {
 
         {activeAction === 'sort-products' && (
           <div style={{ marginTop: '1.5rem' }}>
-            <SortProductsTable />
+            <SortProductsTable 
+              shipmentProducts={productsForSortTabs}
+              shipmentType={shipmentData.shipmentType}
+            />
           </div>
         )}
 
         {activeAction === 'sort-formulas' && (
           <div style={{ marginTop: '1.5rem' }}>
-            <SortFormulasTable />
+            <SortFormulasTable 
+              shipmentProducts={productsForSortTabs}
+            />
           </div>
         )}
 
@@ -2068,10 +2193,15 @@ const NewShipment = () => {
               setLoading(true);
               
               // Validate: Must have products selected
+              // Only include products that are BOTH in addedRows AND have qty > 0
               const productsToAdd = Object.keys(qtyValues)
-                .filter(idx => qtyValues[idx] > 0)
+                .filter(idx => {
+                  const product = products[idx];
+                  const qty = qtyValues[idx];
+                  return product && addedRows.has(product.id) && qty > 0;
+                })
                 .map(idx => ({
-                  catalog_id: products[idx].catalogId,
+                  catalog_id: products[idx].catalogId || products[idx].id,
                   quantity: qtyValues[idx],
                 }));
               
@@ -2140,7 +2270,7 @@ const NewShipment = () => {
         products={products.map((product, index) => ({
           ...product,
           qty: qtyValues[index] || 0
-        })).filter(p => p.qty > 0)}
+        })).filter(p => addedRows.has(p.id) && p.qty > 0)}
         shipmentData={shipmentData}
       />
 

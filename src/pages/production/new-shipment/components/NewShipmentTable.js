@@ -2,10 +2,27 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
-const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyChange, onAddedRowsChange, labelsAvailabilityMap = {}, forecastRange = 120 }) => {
+const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyChange, onAddedRowsChange, addedRows: parentAddedRows, labelsAvailabilityMap = {}, forecastRange = 120 }) => {
   const { isDarkMode } = useTheme();
   const [selectedRows, setSelectedRows] = useState(new Set());
-  const [addedRows, setAddedRows] = useState(new Set());
+  // Use parent's addedRows if provided, otherwise use local state
+  const [localAddedRows, setLocalAddedRows] = useState(new Set());
+  
+  // Sync local state with parent's addedRows prop when it changes
+  useEffect(() => {
+    if (parentAddedRows && parentAddedRows instanceof Set) {
+      setLocalAddedRows(new Set(parentAddedRows));
+    }
+  }, [parentAddedRows]);
+  
+  // Use either parent-controlled or local state
+  const addedRows = parentAddedRows instanceof Set ? parentAddedRows : localAddedRows;
+  const setAddedRows = (newRows) => {
+    setLocalAddedRows(newRows);
+    if (onAddedRowsChange) {
+      onAddedRowsChange(newRows);
+    }
+  };
   const selectAllCheckboxRef = useRef(null);
   const [clickedQtyIndex, setClickedQtyIndex] = useState(null);
   const [hoveredQtyIndex, setHoveredQtyIndex] = useState(null);
@@ -370,11 +387,8 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
       // User should have already entered qty before clicking Add
       newAdded.add(row.id);
     }
+    // This will update local state and notify parent
     setAddedRows(newAdded);
-    // Notify parent component of added rows change
-    if (onAddedRowsChange) {
-      onAddedRowsChange(newAdded);
-    }
   };
 
   const themeClasses = {

@@ -106,6 +106,15 @@ const LabelOrderPage = () => {
                 // Use label_size from API, or derive from bottle_size
                 const labelSize = label.label_size || getLabelSizeFromBottleSize(label.bottle_size);
                 
+                // Calculate current DOI (Days of Inventory)
+                // DOI = current_inventory / daily_sales_rate
+                // Lower DOI = more urgent to order
+                const currentInventory = label.warehouse_inventory || 0;
+                const dailySalesRate = label.daily_sales_rate || 0;
+                const currentDOI = dailySalesRate > 0 
+                  ? Math.round(currentInventory / dailySalesRate)
+                  : currentInventory > 0 ? 999 : 0; // If no sales data but has inventory, put at end; if no inventory, prioritize
+                
                 return {
                   id: label.id,
                   brand: label.brand_name,
@@ -118,8 +127,9 @@ const LabelOrderPage = () => {
                   toOrder: suggestedQty, // Also set toOrder
                   googleDriveLink: label.google_drive_link,
                   added: false,
-                  dailySalesRate: label.daily_sales_rate || 0, // Store for reference
+                  dailySalesRate: dailySalesRate, // Store for reference
                   suggestedQty: suggestedQty, // Store original suggestion
+                  currentDOI: currentDOI, // Store current DOI for sorting
                 };
               })
               // Filter out items with 0 quantity (already have enough inventory)
@@ -206,7 +216,8 @@ const LabelOrderPage = () => {
     return orderLines.filter((line) => line.added);
   }, [orderLines]);
 
-  // Filter lines based on search
+  // Filter and sort lines based on search
+  // Default sort: by DOI ascending (lowest DOI first = most urgent to order)
   const filteredLines = useMemo(() => {
     // In edit mode on receivePO tab, show only added items (the order items)
     // As users add more items, they will appear in receivePO
@@ -216,14 +227,24 @@ const LabelOrderPage = () => {
       linesToFilter = orderLines.filter((line) => line.added);
     }
     
-    if (!searchQuery.trim()) return linesToFilter;
-    const query = searchQuery.toLowerCase();
-    return linesToFilter.filter(
-      (line) =>
-        line.brand.toLowerCase().includes(query) ||
-        line.product.toLowerCase().includes(query) ||
-        line.size.toLowerCase().includes(query)
-    );
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      linesToFilter = linesToFilter.filter(
+        (line) =>
+          line.brand.toLowerCase().includes(query) ||
+          line.product.toLowerCase().includes(query) ||
+          line.size.toLowerCase().includes(query)
+      );
+    }
+    
+    // Sort by DOI ascending (lowest DOI first = most urgent to order)
+    // Products with lowest Days of Inventory should appear first
+    return [...linesToFilter].sort((a, b) => {
+      const doiA = a.currentDOI ?? 999;
+      const doiB = b.currentDOI ?? 999;
+      return doiA - doiB;
+    });
   }, [orderLines, searchQuery, isEditOrderMode, activeTab]);
 
   // Calculate summary based on added items (or all lines in receivePO)

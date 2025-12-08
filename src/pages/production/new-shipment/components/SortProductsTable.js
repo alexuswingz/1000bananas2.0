@@ -1,8 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 import SortProductsFilterDropdown from './SortProductsFilterDropdown';
 
-const SortProductsTable = () => {
+const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
   const { isDarkMode } = useTheme();
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [lockedProductIds, setLockedProductIds] = useState(() => new Set());
@@ -11,99 +11,25 @@ const SortProductsTable = () => {
   const [filters, setFilters] = useState({});
   const [sortConfig, setSortConfig] = useState({});
 
-  // Sample data matching the image
-  const [products, setProducts] = useState([
-    {
-      id: 1,
-      type: 'AWD',
-      brand: 'TPS Plant Foods',
-      product: 'Cherry Tree Fertilizer',
-      size: 'Gallon',
-      qty: 96,
-      formula: 'F.Ultra Grow',
-      productType: 'Liquid',
-    },
-    {
-      id: 2,
-      type: 'AWD',
-      brand: 'TPS Plant Foods',
-      product: 'Cherry Tree Fertilizer',
-      size: 'Gallon',
-      qty: 96,
-      formula: 'F.Indoor Plant Food',
-      productType: 'Liquid',
-    },
-    {
-      id: 3,
-      type: 'AWD',
-      brand: 'TPS Plant Foods',
-      product: 'Cherry Tree Fertilizer',
-      size: 'Gallon',
-      qty: 96,
-      formula: 'F.Indoor Plant Food',
-      productType: 'Liquid',
-    },
-    {
-      id: 4,
-      type: 'AWD',
-      brand: 'TPS Plant Foods',
-      product: 'Cherry Tree Fertilizer',
-      size: 'Gallon',
-      qty: 96,
-      formula: 'F.Indoor Plant Food',
-      productType: 'Liquid',
-    },
-    {
-      id: 5,
-      type: 'AWD',
-      brand: 'TPS Plant Foods',
-      product: 'Cherry Tree Fertilizer',
-      size: 'Gallon',
-      qty: 96,
-      formula: 'F.Indoor Plant Food',
-      productType: 'Liquid',
-    },
-    {
-      id: 6,
-      type: 'AWD',
-      brand: 'TPS Plant Foods',
-      product: 'Cherry Tree Fertilizer',
-      size: 'Gallon',
-      qty: 96,
-      formula: 'F.Indoor Plant Food',
-      productType: 'Liquid',
-    },
-    {
-      id: 7,
-      type: 'AWD',
-      brand: 'TPS Plant Foods',
-      product: 'Cherry Tree Fertilizer',
-      size: 'Gallon',
-      qty: 96,
-      formula: 'F.Indoor Plant Food',
-      productType: 'Liquid',
-    },
-    {
-      id: 8,
-      type: 'AWD',
-      brand: 'TPS Plant Foods',
-      product: 'Cherry Tree Fertilizer',
-      size: 'Gallon',
-      qty: 96,
-      formula: 'F.Indoor Plant Food',
-      productType: 'Liquid',
-    },
-    {
-      id: 9,
-      type: 'AWD',
-      brand: 'TPS Plant Foods',
-      product: 'Cherry Tree Fertilizer',
-      size: 'Gallon',
-      qty: 96,
-      formula: 'F.Indoor Plant Food',
-      productType: 'Liquid',
-    },
-  ]);
+  // Transform shipment products into table format
+  const [products, setProducts] = useState([]);
+
+  // Update products when shipmentProducts prop changes
+  useEffect(() => {
+    if (shipmentProducts && shipmentProducts.length > 0) {
+      const transformedProducts = shipmentProducts.map((product, index) => ({
+        id: product.id || product.catalogId || index + 1,
+        type: shipmentType,
+        brand: product.brand || '',
+        product: product.product || '',
+        size: product.size || '',
+        qty: product.qty || 0,
+        formula: product.formula_name || product.formula || '',
+        productType: 'Liquid', // Default to Liquid for fertilizers
+      }));
+      setProducts(transformedProducts);
+    }
+  }, [shipmentProducts, shipmentType]);
 
   const columns = [
     { key: 'drag', label: '', width: '50px' },
@@ -195,15 +121,78 @@ const SortProductsTable = () => {
     setOpenFilterColumn(null);
   };
 
-  // Get unique values for a column
+  // Get unique values for a column (handles all data types)
   const getColumnValues = (columnKey) => {
     const values = new Set();
     products.forEach(product => {
-      if (product[columnKey]) {
-        values.add(product[columnKey]);
+      const val = product[columnKey];
+      if (val !== undefined && val !== null && val !== '') {
+        values.add(val);
       }
     });
-    return Array.from(values).sort();
+    // Sort values - handle numbers and strings differently
+    const sortedValues = Array.from(values).sort((a, b) => {
+      if (typeof a === 'number' && typeof b === 'number') {
+        return a - b;
+      }
+      return String(a).localeCompare(String(b));
+    });
+    return sortedValues;
+  };
+  
+  // Check if a column has active filters
+  const hasActiveFilter = (columnKey) => {
+    const filter = filters[columnKey];
+    if (!filter) return false;
+    
+    const hasSort = sortConfig[columnKey];
+    const hasValues = filter.selectedValues && filter.selectedValues.size > 0;
+    const hasCondition = filter.conditionType && filter.conditionType !== '';
+    
+    return hasSort || hasValues || hasCondition;
+  };
+
+  // Apply condition filter to a value
+  const applyConditionFilter = (value, conditionType, conditionValue, isNumeric = false) => {
+    if (!conditionType) return true;
+    
+    const strValue = String(value || '').toLowerCase();
+    const strCondition = String(conditionValue || '').toLowerCase();
+    
+    switch (conditionType) {
+      case 'contains':
+        return strValue.includes(strCondition);
+      case 'notContains':
+        return !strValue.includes(strCondition);
+      case 'equals':
+        if (isNumeric) {
+          return Number(value) === Number(conditionValue);
+        }
+        return strValue === strCondition;
+      case 'notEquals':
+        if (isNumeric) {
+          return Number(value) !== Number(conditionValue);
+        }
+        return strValue !== strCondition;
+      case 'startsWith':
+        return strValue.startsWith(strCondition);
+      case 'endsWith':
+        return strValue.endsWith(strCondition);
+      case 'isEmpty':
+        return !value || strValue === '';
+      case 'isNotEmpty':
+        return value && strValue !== '';
+      case 'greaterThan':
+        return Number(value) > Number(conditionValue);
+      case 'lessThan':
+        return Number(value) < Number(conditionValue);
+      case 'greaterOrEqual':
+        return Number(value) >= Number(conditionValue);
+      case 'lessOrEqual':
+        return Number(value) <= Number(conditionValue);
+      default:
+        return true;
+    }
   };
 
   // Apply filters and sorting to products
@@ -227,11 +216,27 @@ const SortProductsTable = () => {
     
     Object.keys(filters).forEach(columnKey => {
       const filter = filters[columnKey];
+      const isNumericColumn = columnKey === 'qty';
       
       // Apply value filters (checkbox selections)
       if (filter.selectedValues && filter.selectedValues.size > 0) {
         filteredUnlocked = filteredUnlocked.filter(product => {
-          return filter.selectedValues.has(product[columnKey]);
+          const productValue = product[columnKey];
+          // Check if value matches (handle both string and number comparisons)
+          return filter.selectedValues.has(productValue) || 
+                 filter.selectedValues.has(String(productValue));
+        });
+      }
+      
+      // Apply condition filters
+      if (filter.conditionType) {
+        filteredUnlocked = filteredUnlocked.filter(product => {
+          return applyConditionFilter(
+            product[columnKey],
+            filter.conditionType,
+            filter.conditionValue,
+            isNumericColumn
+          );
         });
       }
     });
@@ -299,7 +304,9 @@ const SortProductsTable = () => {
               borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
               height: '40px',
             }}>
-              {columns.map((column) => (
+              {columns.map((column) => {
+                const isActive = hasActiveFilter(column.key);
+                return (
                 <th
                   key={column.key}
                   className={column.key === 'drag' ? undefined : 'group'}
@@ -308,7 +315,7 @@ const SortProductsTable = () => {
                     textAlign: column.key === 'drag' ? 'center' : 'center',
                     fontSize: '11px',
                     fontWeight: 600,
-                    color: '#9CA3AF',
+                    color: isActive ? '#3B82F6' : '#9CA3AF',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
                     width: column.width,
@@ -316,6 +323,7 @@ const SortProductsTable = () => {
                     borderRight: column.key === 'drag' ? 'none' : '1px solid #FFFFFF',
                     height: '40px',
                     position: column.key === 'drag' ? 'static' : 'relative',
+                    backgroundColor: isActive ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
                   }}
                 >
                   {column.key === 'drag' ? (
@@ -329,29 +337,60 @@ const SortProductsTable = () => {
                         gap: '0.5rem',
                       }}
                     >
-                      <span>{column.label}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {column.label}
+                        {isActive && (
+                          <span style={{ 
+                            display: 'inline-block',
+                            width: '6px', 
+                            height: '6px', 
+                            borderRadius: '50%', 
+                            backgroundColor: '#10B981',
+                          }} />
+                        )}
+                      </span>
                       <img
                         src="/assets/Vector (1).png"
                         alt="Filter"
-                        className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
+                        className={`w-3 h-3 transition-opacity ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                         ref={(el) => {
                           if (el) {
                             filterIconRefs.current[column.key] = el;
                           }
                         }}
                         onClick={(e) => handleFilterClick(column.key, e)}
-                        style={{ width: '12px', height: '12px', cursor: 'pointer' }}
+                        style={{ 
+                          width: '12px', 
+                          height: '12px', 
+                          cursor: 'pointer',
+                          filter: isActive ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                        }}
                       />
                     </div>
                   )}
                 </th>
-              ))}
+                );
+              })}
             </tr>
           </thead>
 
           {/* Body */}
           <tbody>
-            {filteredProducts.map((product, index) => (
+            {filteredProducts.length === 0 ? (
+              <tr>
+                <td 
+                  colSpan={columns.length} 
+                  style={{
+                    padding: '48px 16px',
+                    textAlign: 'center',
+                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                    fontSize: '14px',
+                  }}
+                >
+                  No products to sort. Add products to the shipment first.
+                </td>
+              </tr>
+            ) : filteredProducts.map((product, index) => (
               <tr
                 key={product.id}
                 onDragOver={(e) => handleDragOver(e, index)}

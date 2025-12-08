@@ -69,6 +69,22 @@ const BottleOrderPage = () => {
             const forecast = forecastMap[bottle.bottle_name] || {};
             const recommendedQty = Math.round(forecast.recommended_order_qty || 0);
             
+            // Calculate total daily sales rate from products using this bottle
+            let totalDailySalesRate = 0;
+            if (forecast.products_using_bottle && Array.isArray(forecast.products_using_bottle)) {
+              totalDailySalesRate = forecast.products_using_bottle.reduce((sum, product) => {
+                return sum + (product.daily_sales_rate || 0);
+              }, 0);
+            }
+            
+            // Calculate current DOI (Days of Inventory)
+            // DOI = current_inventory / daily_sales_rate
+            // Lower DOI = more urgent to order
+            const currentInventory = bottle.warehouse_quantity || 0;
+            const currentDOI = totalDailySalesRate > 0 
+              ? Math.round(currentInventory / totalDailySalesRate)
+              : currentInventory > 0 ? 999 : 0; // If no sales data but has inventory, put at end; if no inventory, prioritize
+            
             const bottleData = {
               fullName: bottle.bottle_name,
               unitsPerPallet: bottle.units_per_pallet || 1,
@@ -78,6 +94,8 @@ const BottleOrderPage = () => {
               supplier: bottle.supplier || '',
               recommendedQty: recommendedQty,
               forecastedUnitsNeeded: forecast.forecasted_units_needed || 0,
+              totalDailySalesRate: totalDailySalesRate,
+              currentDOI: currentDOI,
             };
             
             // Store by full name
@@ -106,6 +124,8 @@ const BottleOrderPage = () => {
               warehouseQuantity: bottle.warehouse_quantity || 0,
               unitsPerPallet: bottle.units_per_pallet || 1,
               recommendedQty: recommendedQty,
+              totalDailySalesRate: totalDailySalesRate,
+              currentDOI: currentDOI,
             });
           });
           
@@ -246,7 +266,8 @@ const BottleOrderPage = () => {
     inputBg: isDarkMode ? 'bg-dark-bg-tertiary' : 'bg-white',
   };
 
-  // Filter lines based on search query and active tab
+  // Filter and sort lines based on search query and active tab
+  // Default sort: by DOI ascending (lowest DOI first = most urgent to order)
   const filteredLines = useMemo(() => {
     let linesToFilter = orderLines;
     
@@ -255,12 +276,22 @@ const BottleOrderPage = () => {
       linesToFilter = orderLines.filter((line) => line.added);
     }
     
-    if (!searchQuery.trim()) return linesToFilter;
-    const query = searchQuery.toLowerCase();
-    return linesToFilter.filter((line) => 
-      line.name.toLowerCase().includes(query) ||
-      line.supplierInventory.toLowerCase().includes(query)
-    );
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      linesToFilter = linesToFilter.filter((line) => 
+        line.name.toLowerCase().includes(query) ||
+        (line.supplierInventory && line.supplierInventory.toString().toLowerCase().includes(query))
+      );
+    }
+    
+    // Sort by DOI ascending (lowest DOI first = most urgent to order)
+    // Products with lowest Days of Inventory should appear first
+    return [...linesToFilter].sort((a, b) => {
+      const doiA = a.currentDOI ?? 999;
+      const doiB = b.currentDOI ?? 999;
+      return doiA - doiB;
+    });
   }, [orderLines, searchQuery, isViewMode, activeTab]);
 
   // Get added lines

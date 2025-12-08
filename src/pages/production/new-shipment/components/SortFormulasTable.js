@@ -2,7 +2,20 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 import SortFormulasFilterDropdown from './SortFormulasFilterDropdown';
 
-const SortFormulasTable = () => {
+// Helper: Convert product size to gallons per unit
+const sizeToGallons = (size) => {
+  const sizeLower = (size || '').toLowerCase();
+  if (sizeLower.includes('8oz') || sizeLower.includes('8 oz')) return 0.0625;
+  if (sizeLower.includes('16oz') || sizeLower.includes('16 oz') || sizeLower.includes('pint')) return 0.125;
+  if (sizeLower.includes('32oz') || sizeLower.includes('32 oz') || sizeLower.includes('quart')) return 0.25;
+  if (sizeLower.includes('gallon') && !sizeLower.includes('5')) return 1.0;
+  if (sizeLower.includes('5 gallon') || sizeLower.includes('5gallon')) return 5.0;
+  return 0;
+};
+
+const GALLONS_PER_TOTE = 275;
+
+const SortFormulasTable = ({ shipmentProducts = [] }) => {
   const { isDarkMode } = useTheme();
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [openMenuIndex, setOpenMenuIndex] = useState(null);
@@ -12,100 +25,68 @@ const SortFormulasTable = () => {
   const [firstBatchQty, setFirstBatchQty] = useState(1);
   const [openFilterColumn, setOpenFilterColumn] = useState(null);
   const filterIconRefs = useRef({});
+  
+  // Locking state
+  const [lockedFormulaIds, setLockedFormulaIds] = useState(() => new Set());
+  
+  // Filter and sort state
+  const [filters, setFilters] = useState({});
+  const [sortConfig, setSortConfig] = useState({});
 
-  // Sample data matching the image
-  const [formulas, setFormulas] = useState([
-    {
-      id: 1,
-      formula: 'F.UltraGrow',
-      size: 'Tote',
-      qty: 3,
-      tote: 'Clean',
-      volume: 275,
-      measure: 'Gallon',
-      type: 'Liquid',
-    },
-    {
-      id: 2,
-      formula: 'F.UltraGrow',
-      size: 'Tote',
-      qty: 1,
-      tote: 'Clean',
-      volume: 275,
-      measure: 'Gallon',
-      type: 'Liquid',
-    },
-    {
-      id: 3,
-      formula: 'F.UltraGrow',
-      size: 'Tote',
-      qty: 1,
-      tote: 'Clean',
-      volume: 275,
-      measure: 'Gallon',
-      type: 'Liquid',
-    },
-    {
-      id: 4,
-      formula: 'F.UltraGrow',
-      size: 'Tote',
-      qty: 1,
-      tote: 'Clean',
-      volume: 275,
-      measure: 'Gallon',
-      type: 'Liquid',
-    },
-    {
-      id: 5,
-      formula: 'F.UltraGrow',
-      size: 'Tote',
-      qty: 1,
-      tote: 'Clean',
-      volume: 275,
-      measure: 'Gallon',
-      type: 'Liquid',
-    },
-    {
-      id: 6,
-      formula: 'F.UltraGrow',
-      size: 'Tote',
-      qty: 1,
-      tote: 'Clean',
-      volume: 275,
-      measure: 'Gallon',
-      type: 'Liquid',
-    },
-    {
-      id: 7,
-      formula: 'F.UltraGrow',
-      size: 'Tote',
-      qty: 1,
-      tote: 'Clean',
-      volume: 275,
-      measure: 'Gallon',
-      type: 'Liquid',
-    },
-    {
-      id: 8,
-      formula: 'F.UltraGrow',
-      size: 'Tote',
-      qty: 1,
-      tote: 'Clean',
-      volume: 275,
-      measure: 'Gallon',
-      type: 'Liquid',
-    },
-    {
-      id: 9,
-      formula: 'F.UltraGrow',
-      size: 'Tote',
-      qty: 1,
-      tote: 'Clean',
-      volume: 275,
-      measure: 'Gallon',
-      type: 'Liquid',
-    },
-  ]);
+  // Transform shipment products into formula data
+  const [formulas, setFormulas] = useState([]);
+
+  // Update formulas when shipmentProducts prop changes
+  useEffect(() => {
+    if (shipmentProducts && shipmentProducts.length > 0) {
+      // Group products by formula and calculate total gallons needed
+      const formulaMap = {};
+      
+      shipmentProducts.forEach((product) => {
+        const formulaName = product.formula_name || product.formula || 'Unknown';
+        const gallonsPerUnit = product.formulaGallonsPerUnit || sizeToGallons(product.size);
+        const qty = product.qty || 0;
+        const totalGallons = gallonsPerUnit * qty;
+        
+        if (!formulaMap[formulaName]) {
+          formulaMap[formulaName] = {
+            formula: formulaName,
+            totalGallons: 0,
+            products: [],
+          };
+        }
+        formulaMap[formulaName].totalGallons += totalGallons;
+        formulaMap[formulaName].products.push(product);
+      });
+
+      // Convert to array of formula objects for the table
+      // Each row represents a formula with qty = number of totes needed
+      const transformedFormulas = [];
+      let idCounter = 1;
+
+      Object.values(formulaMap).forEach((formulaData) => {
+        const totesNeeded = Math.ceil(formulaData.totalGallons / GALLONS_PER_TOTE);
+        
+        // Skip formulas that don't need any totes
+        if (totesNeeded <= 0) return;
+        
+        // Create one row per formula with qty = total totes needed
+        // This allows split functionality when qty > 1
+        transformedFormulas.push({
+          id: idCounter++,
+          formula: formulaData.formula,
+          size: 'Tote',
+          qty: totesNeeded, // Number of totes needed for this formula
+          tote: 'Clean',
+          volume: Math.round(formulaData.totalGallons * 100) / 100, // Total gallons needed
+          measure: 'Gallon',
+          type: 'Liquid',
+        });
+      });
+
+      setFormulas(transformedFormulas);
+    }
+  }, [shipmentProducts]);
 
   const columns = [
     { key: 'drag', label: '', width: '50px' },
@@ -138,14 +119,26 @@ const SortFormulasTable = () => {
       return;
     }
 
+    // Work with filtered formulas for display, but update the original formulas array
+    const filteredList = filteredFormulas;
+    const draggedItem = filteredList[draggedIndex];
+    const dropItem = filteredList[dropIndex];
+    
+    // Find these items in the original formulas array
+    const draggedOriginalIndex = formulas.findIndex(f => f.id === draggedItem.id);
+    const dropOriginalIndex = formulas.findIndex(f => f.id === dropItem.id);
+    
     const newFormulas = [...formulas];
-    const draggedItem = newFormulas[draggedIndex];
     
     // Remove the dragged item
-    newFormulas.splice(draggedIndex, 1);
+    newFormulas.splice(draggedOriginalIndex, 1);
+    
+    // Find new position after removal
+    const newDropIndex = newFormulas.findIndex(f => f.id === dropItem.id);
+    const insertIndex = draggedOriginalIndex < dropOriginalIndex ? newDropIndex + 1 : newDropIndex;
     
     // Insert it at the new position
-    newFormulas.splice(dropIndex, 0, draggedItem);
+    newFormulas.splice(insertIndex, 0, draggedItem);
     
     setFormulas(newFormulas);
     setDraggedIndex(null);
@@ -199,9 +192,16 @@ const SortFormulasTable = () => {
   const handleConfirmSplit = () => {
     if (!selectedFormula) return;
     
-    // First quantity is always 1, second is the remaining
+    // First quantity is always 1 tote, second is the remaining totes
+    const originalQty = selectedFormula.qty || 1;
     const firstBatchQty = 1;
-    const secondBatchQty = (selectedFormula.qty || 1) - firstBatchQty;
+    const secondBatchQty = originalQty - firstBatchQty;
+    
+    // Calculate volume proportionally
+    const totalVolume = selectedFormula.volume || 0;
+    const volumePerTote = originalQty > 0 ? totalVolume / originalQty : 0;
+    const firstBatchVolume = Math.round(volumePerTote * firstBatchQty * 100) / 100;
+    const secondBatchVolume = Math.round(volumePerTote * secondBatchQty * 100) / 100;
     
     // Find the index of the formula to split
     const formulaIndex = formulas.findIndex(f => f.id === selectedFormula.id);
@@ -212,7 +212,8 @@ const SortFormulasTable = () => {
     const firstBatch = {
       ...selectedFormula,
       id: Date.now(), // New ID for first batch
-      qty: firstBatchQty, // Always 1
+      qty: firstBatchQty, // Always 1 tote
+      volume: firstBatchVolume, // Proportional volume
       splitTag: '1/2', // Tag to indicate it's part of a split
       originalId: selectedFormula.id, // Keep reference to original
     };
@@ -220,7 +221,8 @@ const SortFormulasTable = () => {
     const secondBatch = {
       ...selectedFormula,
       id: Date.now() + 1, // New ID for second batch
-      qty: secondBatchQty, // Remaining quantity
+      qty: secondBatchQty, // Remaining totes
+      volume: secondBatchVolume, // Proportional volume
       splitTag: '2/2', // Tag to indicate it's part of a split
       originalId: selectedFormula.id, // Keep reference to original
     };
@@ -235,11 +237,205 @@ const SortFormulasTable = () => {
 
   // Second batch quantity is always the remaining (total - 1)
   const secondBatchQty = selectedFormula ? (selectedFormula.qty || 1) - 1 : 0;
+  
+  // Calculate volume per tote for display in modal
+  const volumePerTote = selectedFormula && selectedFormula.qty > 0 
+    ? Math.round((selectedFormula.volume / selectedFormula.qty) * 100) / 100 
+    : 0;
+  const firstBatchVolume = volumePerTote; // 1 tote
+  const secondBatchVolume = Math.round(volumePerTote * secondBatchQty * 100) / 100;
 
   const handleFilterClick = (columnKey, event) => {
     event.stopPropagation();
     setOpenFilterColumn((prev) => (prev === columnKey ? null : columnKey));
   };
+
+  // Locking a formula means it will NOT be affected by filters
+  const handleToggleLock = (formulaId) => {
+    setLockedFormulaIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(formulaId)) {
+        next.delete(formulaId);
+      } else {
+        next.add(formulaId);
+      }
+      return next;
+    });
+  };
+
+  const handleApplyFilter = (columnKey, filterData) => {
+    setFilters(prev => ({
+      ...prev,
+      [columnKey]: filterData,
+    }));
+    setSortConfig(prev => ({
+      ...prev,
+      [columnKey]: filterData.sortOrder,
+    }));
+    setOpenFilterColumn(null);
+  };
+
+  // Get unique values for a column
+  const getColumnValues = (columnKey) => {
+    const values = new Set();
+    formulas.forEach(formula => {
+      const val = formula[columnKey];
+      if (val !== undefined && val !== null && val !== '') {
+        values.add(val);
+      }
+    });
+    // Sort values
+    const sortedValues = Array.from(values).sort((a, b) => {
+      if (typeof a === 'number' && typeof b === 'number') {
+        return a - b;
+      }
+      return String(a).localeCompare(String(b));
+    });
+    return sortedValues;
+  };
+
+  // Check if a column has active filters
+  const hasActiveFilter = (columnKey) => {
+    const filter = filters[columnKey];
+    if (!filter) return false;
+    
+    const hasSort = sortConfig[columnKey];
+    const hasValues = filter.selectedValues && filter.selectedValues.size > 0;
+    const hasCondition = filter.conditionType && filter.conditionType !== '';
+    
+    return hasSort || hasValues || hasCondition;
+  };
+
+  // Apply condition filter to a value
+  const applyConditionFilter = (value, conditionType, conditionValue, isNumeric = false) => {
+    if (!conditionType) return true;
+    
+    const strValue = String(value || '').toLowerCase();
+    const strCondition = String(conditionValue || '').toLowerCase();
+    
+    switch (conditionType) {
+      case 'contains':
+        return strValue.includes(strCondition);
+      case 'notContains':
+        return !strValue.includes(strCondition);
+      case 'equals':
+        if (isNumeric) {
+          return Number(value) === Number(conditionValue);
+        }
+        return strValue === strCondition;
+      case 'notEquals':
+        if (isNumeric) {
+          return Number(value) !== Number(conditionValue);
+        }
+        return strValue !== strCondition;
+      case 'startsWith':
+        return strValue.startsWith(strCondition);
+      case 'endsWith':
+        return strValue.endsWith(strCondition);
+      case 'isEmpty':
+        return !value || strValue === '';
+      case 'isNotEmpty':
+        return value && strValue !== '';
+      case 'greaterThan':
+        return Number(value) > Number(conditionValue);
+      case 'lessThan':
+        return Number(value) < Number(conditionValue);
+      case 'greaterOrEqual':
+        return Number(value) >= Number(conditionValue);
+      case 'lessOrEqual':
+        return Number(value) <= Number(conditionValue);
+      default:
+        return true;
+    }
+  };
+
+  // Apply filters and sorting to formulas
+  // Locked items maintain their positions and are not affected by filters/sorting
+  const getFilteredAndSortedFormulas = () => {
+    // Separate locked and unlocked formulas
+    const lockedFormulas = [];
+    const unlockedFormulas = [];
+    
+    formulas.forEach((formula, index) => {
+      if (lockedFormulaIds.has(formula.id)) {
+        lockedFormulas.push({ formula, originalIndex: index });
+      } else {
+        unlockedFormulas.push(formula);
+      }
+    });
+
+    // Apply filters to unlocked formulas only
+    let filteredUnlocked = [...unlockedFormulas];
+    
+    Object.keys(filters).forEach(columnKey => {
+      const filter = filters[columnKey];
+      const isNumericColumn = columnKey === 'qty' || columnKey === 'volume';
+      
+      // Apply value filters (checkbox selections)
+      if (filter.selectedValues && filter.selectedValues.size > 0) {
+        filteredUnlocked = filteredUnlocked.filter(formula => {
+          const formulaValue = formula[columnKey];
+          // Check if value matches (handle both string and number comparisons)
+          return filter.selectedValues.has(formulaValue) || 
+                 filter.selectedValues.has(String(formulaValue));
+        });
+      }
+      
+      // Apply condition filters
+      if (filter.conditionType) {
+        filteredUnlocked = filteredUnlocked.filter(formula => {
+          return applyConditionFilter(
+            formula[columnKey],
+            filter.conditionType,
+            filter.conditionValue,
+            isNumericColumn
+          );
+        });
+      }
+    });
+
+    // Apply sorting to unlocked formulas only
+    const sortColumn = Object.keys(sortConfig).find(key => sortConfig[key]);
+    if (sortColumn && sortConfig[sortColumn]) {
+      filteredUnlocked.sort((a, b) => {
+        const aVal = a[sortColumn];
+        const bVal = b[sortColumn];
+        
+        // Handle numeric values
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+          return sortConfig[sortColumn] === 'asc' ? aVal - bVal : bVal - aVal;
+        }
+        
+        // Handle string values
+        const aStr = String(aVal || '').toLowerCase();
+        const bStr = String(bVal || '').toLowerCase();
+        
+        if (sortConfig[sortColumn] === 'asc') {
+          return aStr.localeCompare(bStr);
+        } else {
+          return bStr.localeCompare(aStr);
+        }
+      });
+    }
+
+    // Rebuild the array: locked items at their original positions, unlocked items fill the rest
+    const result = [];
+    let unlockedIndex = 0;
+    
+    for (let i = 0; i < formulas.length; i++) {
+      const lockedItem = lockedFormulas.find(lf => lf.originalIndex === i);
+      if (lockedItem) {
+        result.push(lockedItem.formula);
+      } else if (unlockedIndex < filteredUnlocked.length) {
+        result.push(filteredUnlocked[unlockedIndex]);
+        unlockedIndex++;
+      }
+    }
+
+    return result;
+  };
+
+  const filteredFormulas = getFilteredAndSortedFormulas();
 
   return (
     <div style={{
@@ -263,22 +459,24 @@ const SortFormulasTable = () => {
                 height: '40px',
               }}
             >
-              {columns.map((column) => (
+              {columns.map((column) => {
+                const isActive = hasActiveFilter(column.key);
+                return (
                 <th
                   key={column.key}
                   className={
                     column.key === 'drag' || column.key === 'menu'
                       ? undefined
-                      : 'group cursor-pointer'
+                      : 'group'
                   }
                   style={{
                     padding:
-                      column.key === 'drag' || column.key === 'menu' ? '0 8px' : '0 16px',
+                      column.key === 'drag' || column.key === 'menu' ? '0 8px' : '12px 16px',
                     textAlign:
-                      column.key === 'drag' || column.key === 'menu' ? 'center' : 'left',
+                      column.key === 'drag' || column.key === 'menu' ? 'center' : 'center',
                     fontSize: '11px',
                     fontWeight: 600,
-                    color: '#9CA3AF',
+                    color: isActive ? '#3B82F6' : '#9CA3AF',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
                     width: column.width,
@@ -290,46 +488,76 @@ const SortFormulasTable = () => {
                     height: '40px',
                     position:
                       column.key === 'drag' || column.key === 'menu' ? 'static' : 'relative',
+                    backgroundColor: isActive ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
                   }}
                 >
-                  {column.label}
-                  {column.key !== 'drag' && column.key !== 'menu' && (
-                    <img
-                      ref={(el) => {
-                        if (el) filterIconRefs.current[column.key] = el;
-                      }}
-                      src="/assets/Vector (1).png"
-                      alt="Filter"
-                      className={`w-3 h-3 transition-opacity cursor-pointer ${
-                        openFilterColumn === column.key
-                          ? 'opacity-100'
-                          : 'opacity-0 group-hover:opacity-100'
-                      }`}
-                      onClick={(e) => handleFilterClick(column.key, e)}
+                  {column.key === 'drag' || column.key === 'menu' ? (
+                    column.label
+                  ) : (
+                    <div
                       style={{
-                        position: 'absolute',
-                        top: '50%',
-                        right: '8px',
-                        transform: 'translateY(-50%)',
-                        width: '12px',
-                        height: '12px',
-                        ...(openFilterColumn === column.key
-                          ? {
-                              filter:
-                                'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
-                            }
-                          : undefined),
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '0.5rem',
                       }}
-                    />
+                    >
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {column.label}
+                        {isActive && (
+                          <span style={{ 
+                            display: 'inline-block',
+                            width: '6px', 
+                            height: '6px', 
+                            borderRadius: '50%', 
+                            backgroundColor: '#10B981',
+                          }} />
+                        )}
+                      </span>
+                      <img
+                        src="/assets/Vector (1).png"
+                        alt="Filter"
+                        className={`w-3 h-3 transition-opacity ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                        ref={(el) => {
+                          if (el) {
+                            filterIconRefs.current[column.key] = el;
+                          }
+                        }}
+                        onClick={(e) => handleFilterClick(column.key, e)}
+                        style={{ 
+                          width: '12px', 
+                          height: '12px', 
+                          cursor: 'pointer',
+                          filter: isActive ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                        }}
+                      />
+                    </div>
                   )}
                 </th>
-              ))}
+                );
+              })}
             </tr>
           </thead>
 
           {/* Body */}
           <tbody>
-            {formulas.map((formula, index) => (
+            {filteredFormulas.length === 0 ? (
+              <tr>
+                <td 
+                  colSpan={columns.length} 
+                  style={{
+                    padding: '48px 16px',
+                    textAlign: 'center',
+                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                    fontSize: '14px',
+                  }}
+                >
+                  No formulas to sort. Add products to the shipment first.
+                </td>
+              </tr>
+            ) : filteredFormulas.map((formula, index) => {
+              const isLocked = lockedFormulaIds.has(formula.id);
+              return (
               <tr
                 key={formula.id}
                 onDragOver={(e) => handleDragOver(e, index)}
@@ -364,24 +592,73 @@ const SortFormulasTable = () => {
                   height: '40px',
                 }}>
                   <div
-                    draggable
-                    onDragStart={() => handleDragStart(index)}
-                    onDragEnd={handleDragEnd}
                     style={{
-                      cursor: draggedIndex === index ? 'grabbing' : 'grab',
-                      padding: '4px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      margin: '0 auto',
-                      width: 'fit-content',
+                      gap: '6px',
                     }}
                   >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <rect x="2" y="3" width="12" height="2" rx="1" fill={isDarkMode ? '#9CA3AF' : '#6B7280'}/>
-                      <rect x="2" y="7" width="12" height="2" rx="1" fill={isDarkMode ? '#9CA3AF' : '#6B7280'}/>
-                      <rect x="2" y="11" width="12" height="2" rx="1" fill={isDarkMode ? '#9CA3AF' : '#6B7280'}/>
-                    </svg>
+                    <div
+                      draggable
+                      onDragStart={() => handleDragStart(index)}
+                      onDragEnd={handleDragEnd}
+                      style={{
+                        cursor: draggedIndex === index ? 'grabbing' : 'grab',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 'fit-content',
+                      }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <rect x="2" y="3" width="12" height="2" rx="1" fill={isDarkMode ? '#9CA3AF' : '#6B7280'}/>
+                        <rect x="2" y="7" width="12" height="2" rx="1" fill={isDarkMode ? '#9CA3AF' : '#6B7280'}/>
+                        <rect x="2" y="11" width="12" height="2" rx="1" fill={isDarkMode ? '#9CA3AF' : '#6B7280'}/>
+                      </svg>
+                    </div>
+
+                    {/* Lock / Unlock icon beside hamburger */}
+                    <div
+                      style={{
+                        width: '20px',
+                        height: '20px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => handleToggleLock(formula.id)}
+                    >
+                      {isLocked ? (
+                        <img
+                          src="/assets/lock.png"
+                          alt="Lock"
+                          style={{
+                            width: '12px',
+                            height: '15.75px',
+                            display: 'block',
+                            position: 'relative',
+                            top: '0.75px',
+                            left: '3px',
+                          }}
+                        />
+                      ) : (
+                        <img
+                          src="/assets/unlock.png"
+                          alt="Unlock"
+                          style={{
+                            width: '12px',
+                            height: '15.75px',
+                            display: 'block',
+                            position: 'relative',
+                            top: '0.75px',
+                            left: '3px',
+                          }}
+                        />
+                      )}
+                    </div>
                   </div>
                 </td>
                 <td style={{
@@ -634,7 +911,8 @@ const SortFormulasTable = () => {
                   )}
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -644,6 +922,10 @@ const SortFormulasTable = () => {
         <SortFormulasFilterDropdown
           filterIconRef={filterIconRefs.current[openFilterColumn]}
           columnKey={openFilterColumn}
+          availableValues={getColumnValues(openFilterColumn)}
+          currentFilter={filters[openFilterColumn] || {}}
+          currentSort={sortConfig[openFilterColumn] || ''}
+          onApply={(filterData) => handleApplyFilter(openFilterColumn, filterData)}
           onClose={() => setOpenFilterColumn(null)}
         />
       )}
@@ -733,8 +1015,25 @@ const SortFormulasTable = () => {
                 overflowY: 'auto',
                 padding: '24px',
               }}>
-                {/* First Batch Quantity */}
-                <div style={{ marginBottom: '24px' }}>
+                {/* Formula Info */}
+                {selectedFormula && (
+                  <div style={{
+                    backgroundColor: '#F3F4F6',
+                    borderRadius: '8px',
+                    padding: '12px 16px',
+                    marginBottom: '20px',
+                  }}>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827', marginBottom: '4px' }}>
+                      {selectedFormula.formula}
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#6B7280' }}>
+                      Total: {selectedFormula.qty} tote{selectedFormula.qty > 1 ? 's' : ''} • {selectedFormula.volume} gallons
+                    </div>
+                  </div>
+                )}
+
+                {/* First Batch */}
+                <div style={{ marginBottom: '20px' }}>
                   <label style={{
                     display: 'block',
                     fontSize: '14px',
@@ -742,39 +1041,68 @@ const SortFormulasTable = () => {
                     color: '#374151',
                     marginBottom: '8px',
                   }}>
-                    First Batch Quantity (Tote)
+                    First Batch
                   </label>
                   <p style={{
                     fontSize: '12px',
                     color: '#6B7280',
                     margin: '0 0 12px 0',
                   }}>
-                    The first batch quantity is always 1.
+                    The first batch is always 1 tote.
                   </p>
-                  <input
-                    type="number"
-                    min="1"
-                    max="1"
-                    value={1}
-                    readOnly
-                    style={{
-                      width: '100%',
-                      height: '40px',
-                      padding: '0 12px',
-                      borderRadius: '6px',
-                      border: '1px solid #D1D5DB',
-                      backgroundColor: '#F9FAFB',
-                      color: '#6B7280',
-                      fontSize: '14px',
-                      fontWeight: 400,
-                      outline: 'none',
-                      cursor: 'not-allowed',
-                      boxSizing: 'border-box',
-                    }}
-                  />
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '11px', color: '#6B7280', marginBottom: '4px', display: 'block' }}>
+                        Totes
+                      </label>
+                      <input
+                        type="number"
+                        value={1}
+                        readOnly
+                        style={{
+                          width: '100%',
+                          height: '40px',
+                          padding: '0 12px',
+                          borderRadius: '6px',
+                          border: '1px solid #D1D5DB',
+                          backgroundColor: '#F9FAFB',
+                          color: '#6B7280',
+                          fontSize: '14px',
+                          fontWeight: 400,
+                          outline: 'none',
+                          cursor: 'not-allowed',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '11px', color: '#6B7280', marginBottom: '4px', display: 'block' }}>
+                        Volume (Gallons)
+                      </label>
+                      <input
+                        type="text"
+                        value={firstBatchVolume}
+                        readOnly
+                        style={{
+                          width: '100%',
+                          height: '40px',
+                          padding: '0 12px',
+                          borderRadius: '6px',
+                          border: '1px solid #D1D5DB',
+                          backgroundColor: '#F9FAFB',
+                          color: '#6B7280',
+                          fontSize: '14px',
+                          fontWeight: 400,
+                          outline: 'none',
+                          cursor: 'not-allowed',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                {/* Second Batch Quantity */}
+                {/* Second Batch */}
                 <div>
                   <label style={{
                     display: 'block',
@@ -783,35 +1111,65 @@ const SortFormulasTable = () => {
                     color: '#374151',
                     marginBottom: '8px',
                   }}>
-                    Second Batch Quantity (Tote)
+                    Second Batch
                   </label>
                   <p style={{
                     fontSize: '12px',
                     color: '#6B7280',
                     margin: '0 0 12px 0',
                   }}>
-                    Auto-calculated from the first batch quantity.
+                    The remaining totes after the split.
                   </p>
-                  <input
-                    type="number"
-                    value={secondBatchQty}
-                    readOnly
-                    disabled
-                    style={{
-                      width: '100%',
-                      height: '40px',
-                      padding: '0 12px',
-                      borderRadius: '6px',
-                      border: '1px solid #D1D5DB',
-                      backgroundColor: '#F9FAFB',
-                      color: '#6B7280',
-                      fontSize: '14px',
-                      fontWeight: 400,
-                      outline: 'none',
-                      cursor: 'not-allowed',
-                      boxSizing: 'border-box',
-                    }}
-                  />
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '11px', color: '#6B7280', marginBottom: '4px', display: 'block' }}>
+                        Totes
+                      </label>
+                      <input
+                        type="number"
+                        value={secondBatchQty}
+                        readOnly
+                        style={{
+                          width: '100%',
+                          height: '40px',
+                          padding: '0 12px',
+                          borderRadius: '6px',
+                          border: '1px solid #D1D5DB',
+                          backgroundColor: '#F9FAFB',
+                          color: '#6B7280',
+                          fontSize: '14px',
+                          fontWeight: 400,
+                          outline: 'none',
+                          cursor: 'not-allowed',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '11px', color: '#6B7280', marginBottom: '4px', display: 'block' }}>
+                        Volume (Gallons)
+                      </label>
+                      <input
+                        type="text"
+                        value={secondBatchVolume}
+                        readOnly
+                        style={{
+                          width: '100%',
+                          height: '40px',
+                          padding: '0 12px',
+                          borderRadius: '6px',
+                          border: '1px solid #D1D5DB',
+                          backgroundColor: '#F9FAFB',
+                          color: '#6B7280',
+                          fontSize: '14px',
+                          fontWeight: 400,
+                          outline: 'none',
+                          cursor: 'not-allowed',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -886,4 +1244,3 @@ const SortFormulasTable = () => {
 };
 
 export default SortFormulasTable;
-

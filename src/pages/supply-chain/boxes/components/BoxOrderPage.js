@@ -107,12 +107,29 @@ const BoxOrderPage = () => {
               const recommendedQty = Math.round(forecast.recommended_order_qty || 0);
               const calculatedPallets = calculatePallets(recommendedQty, box.unitsPerPallet || 1);
               
+              // Calculate total daily sales rate from products using this box
+              let totalDailySalesRate = 0;
+              if (forecast.products_using_box && Array.isArray(forecast.products_using_box)) {
+                totalDailySalesRate = forecast.products_using_box.reduce((sum, product) => {
+                  return sum + (product.daily_sales_rate || 0);
+                }, 0);
+              }
+              
+              // Calculate current DOI (Days of Inventory)
+              // DOI = current_inventory / daily_sales_rate
+              // Lower DOI = more urgent to order
+              const currentInventory = forecast.current_inventory || 0;
+              const currentDOI = totalDailySalesRate > 0 
+                ? Math.round(currentInventory / totalDailySalesRate)
+                : currentInventory > 0 ? 999 : 0; // If no sales data but has inventory, put at end; if no inventory, prioritize
+              
               console.log(`Creating line for ${box.name}:`, {
                 unitsPerPallet: box.unitsPerPallet,
                 recommendedQty,
                 forecastedNeeded: forecast.forecasted_cases_needed,
                 currentInventory: forecast.current_inventory,
-                calculatedPallets
+                calculatedPallets,
+                currentDOI
               });
               
               return {
@@ -127,10 +144,20 @@ const BoxOrderPage = () => {
                 selected: recommendedQty > 0, // Auto-select only if forecast suggests ordering
                 recommendedQty: recommendedQty,
                 forecastedCasesNeeded: Math.round(forecast.forecasted_cases_needed || 0),
-                currentInventory: forecast.current_inventory || 0,
+                currentInventory: currentInventory,
+                totalDailySalesRate: totalDailySalesRate,
+                currentDOI: currentDOI,
               };
             });
-            console.log('Created order lines:', allBoxLines.length, allBoxLines);
+            
+            // Sort by DOI ascending (lowest DOI first = most urgent to order)
+            allBoxLines.sort((a, b) => {
+              const doiA = a.currentDOI ?? 999;
+              const doiB = b.currentDOI ?? 999;
+              return doiA - doiB;
+            });
+            
+            console.log('Created order lines (sorted by DOI):', allBoxLines.length, allBoxLines);
             setOrderLines(allBoxLines);
           }
         } catch (err) {

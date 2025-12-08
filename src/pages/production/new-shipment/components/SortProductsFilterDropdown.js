@@ -12,14 +12,50 @@ const SortProductsFilterDropdown = ({
 }) => {
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [sortOrder, setSortOrder] = useState(currentSort); // 'asc' or 'desc'
-  const [filterConditionExpanded, setFilterConditionExpanded] = useState(false);
+  const [filterConditionExpanded, setFilterConditionExpanded] = useState(true);
   const [filterValuesExpanded, setFilterValuesExpanded] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedValues, setSelectedValues] = useState(
     currentFilter.selectedValues ? new Set(currentFilter.selectedValues) : new Set()
   );
+  
+  // Condition filter state
+  const [conditionType, setConditionType] = useState(currentFilter.conditionType || '');
+  const [conditionValue, setConditionValue] = useState(currentFilter.conditionValue || '');
+  
+  // Check if column is numeric
+  const isNumericColumn = columnKey === 'qty';
+  
+  // Available conditions based on column type
+  const textConditions = [
+    { value: '', label: 'None' },
+    { value: 'contains', label: 'Contains' },
+    { value: 'notContains', label: 'Does not contain' },
+    { value: 'equals', label: 'Equals' },
+    { value: 'notEquals', label: 'Does not equal' },
+    { value: 'startsWith', label: 'Starts with' },
+    { value: 'endsWith', label: 'Ends with' },
+    { value: 'isEmpty', label: 'Is empty' },
+    { value: 'isNotEmpty', label: 'Is not empty' },
+  ];
+  
+  const numericConditions = [
+    { value: '', label: 'None' },
+    { value: 'equals', label: 'Equals' },
+    { value: 'notEquals', label: 'Does not equal' },
+    { value: 'greaterThan', label: 'Greater than' },
+    { value: 'lessThan', label: 'Less than' },
+    { value: 'greaterOrEqual', label: 'Greater than or equal' },
+    { value: 'lessOrEqual', label: 'Less than or equal' },
+    { value: 'between', label: 'Between' },
+  ];
+  
+  const conditions = isNumericColumn ? numericConditions : textConditions;
 
-  const filteredValues = availableValues.filter(value =>
+  // Convert values to strings for filtering
+  const stringValues = availableValues.map(v => String(v));
+  
+  const filteredValues = stringValues.filter(value =>
     value.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -71,10 +107,14 @@ const SortProductsFilterDropdown = ({
     setSortOrder('');
     setSearchTerm('');
     setSelectedValues(new Set());
+    setConditionType('');
+    setConditionValue('');
     if (onApply) {
       onApply({
         sortOrder: '',
         selectedValues: new Set(),
+        conditionType: '',
+        conditionValue: '',
       });
     }
   };
@@ -84,6 +124,8 @@ const SortProductsFilterDropdown = ({
       onApply({
         sortOrder,
         selectedValues,
+        conditionType,
+        conditionValue,
       });
     }
     onClose?.();
@@ -216,8 +258,8 @@ const SortProductsFilterDropdown = ({
             userSelect: 'none',
           }}
         >
-          <span style={{ fontSize: '12px', color: '#6B7280', fontWeight: 400 }}>
-            Filter by condition:
+          <span style={{ fontSize: '12px', color: conditionType ? '#3B82F6' : '#6B7280', fontWeight: conditionType ? 500 : 400 }}>
+            Filter by condition: {conditionType && <span style={{ color: '#10B981' }}>●</span>}
           </span>
           <svg
             width="10"
@@ -240,10 +282,49 @@ const SortProductsFilterDropdown = ({
         </div>
         {filterConditionExpanded && (
           <div style={{ padding: '0 12px 8px 12px' }}>
-            {/* Add condition filters here if needed */}
-            <div style={{ fontSize: '11px', color: '#9CA3AF', fontStyle: 'italic' }}>
-              No conditions available
-            </div>
+            {/* Condition type selector */}
+            <select
+              value={conditionType}
+              onChange={(e) => setConditionType(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '6px 8px',
+                border: '1px solid #E5E7EB',
+                borderRadius: '4px',
+                fontSize: '12px',
+                outline: 'none',
+                marginBottom: '8px',
+                backgroundColor: '#FFFFFF',
+                cursor: 'pointer',
+              }}
+              onFocus={(e) => { e.target.style.borderColor = '#3B82F6'; }}
+              onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
+            >
+              {conditions.map(c => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+            
+            {/* Condition value input - show for most conditions except isEmpty/isNotEmpty */}
+            {conditionType && conditionType !== 'isEmpty' && conditionType !== 'isNotEmpty' && (
+              <input
+                type={isNumericColumn ? 'number' : 'text'}
+                value={conditionValue}
+                onChange={(e) => setConditionValue(e.target.value)}
+                placeholder={isNumericColumn ? 'Enter number...' : 'Enter value...'}
+                style={{
+                  width: '100%',
+                  padding: '6px 8px',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+                onFocus={(e) => { e.target.style.borderColor = '#3B82F6'; }}
+                onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
+              />
+            )}
           </div>
         )}
       </div>
