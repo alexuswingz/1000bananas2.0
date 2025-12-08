@@ -267,8 +267,7 @@ const Labels = () => {
   };
 
   return (
-    <div className={`min-h-screen ${themeClasses.pageBg}`}>
-      <div className="p-6">
+    <div className={`min-h-screen ${themeClasses.pageBg}`} style={{ padding: '24px' }}>
       {/* Green notification popup - for create new order and receive order */}
       {notification && (
         <div
@@ -361,18 +360,13 @@ const Labels = () => {
         </div>
       )}
 
-      {/* Header: title + tabs + search + actions */}
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {/* Home icon - simple outlined */}
-          <button
-            type="button"
-            onClick={() => navigate('/dashboard')}
-            className="text-gray-600 hover:text-gray-900"
-            aria-label="Home"
-          >
+      {/* Header section */}
+      <div className="flex items-center justify-between" style={{ paddingBottom: '16px' }}>
+        <div className="flex items-center space-x-4">
+          {/* Home icon in dark pill */}
+          <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-[#1f2937] text-white shadow-sm">
             <svg
-              className="w-5 h-5"
+              className="w-4 h-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -381,15 +375,17 @@ const Labels = () => {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                d="M3 10.5L12 4l9 6.5M5 10.5V20h5v-4h4v4h5v-9.5"
               />
             </svg>
-          </button>
+          </div>
           
-          <h1 className="text-xl font-semibold text-gray-900">Labels</h1>
-          
-          {/* Tabs as pill group - matching closures header */}
-          <div className="flex items-center rounded-full border border-gray-200 bg-white/70 dark:bg-dark-bg-tertiary ml-4">
+          {/* Title + tabs group */}
+          <div className="flex items-center space-x-5">
+            <h1 className="text-xl font-semibold text-gray-900">Labels</h1>
+            
+            {/* Tabs as pill group */}
+            <div className="flex items-center rounded-full border border-gray-200 bg-white/70 dark:bg-dark-bg-tertiary">
             {['inventory', 'orders', 'archive'].map((tabKey, index) => {
               const labelMap = {
                 inventory: 'Inventory',
@@ -414,6 +410,7 @@ const Labels = () => {
                 </button>
               );
             })}
+            </div>
           </div>
         </div>
 
@@ -574,7 +571,6 @@ const Labels = () => {
       {/* Always render ArchivedOrdersTable (hidden when not active) so ref is available */}
       <div style={{ display: activeTab === 'archive' ? 'block' : 'none' }}>
         <ArchivedOrdersTable ref={archivedOrdersTableRef} themeClasses={themeClasses} />
-      </div>
       </div>
       
       {/* New Label Order Modal */}

@@ -5,16 +5,12 @@ const LabelsHeader = ({ activeTab, onTabChange, search, onSearchChange, onNewOrd
   const navigate = useNavigate();
 
   return (
-    <div className="mb-6 flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => navigate('/dashboard')}
-          className="text-gray-600 hover:text-gray-900"
-          aria-label="Home"
-        >
+    <div className="flex items-center justify-between" style={{ paddingBottom: '16px' }}>
+      <div className="flex items-center space-x-4">
+        {/* Home icon in dark pill */}
+        <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-[#1f2937] text-white shadow-sm">
           <svg
-            className="w-5 h-5"
+            className="w-4 h-4"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -23,14 +19,17 @@ const LabelsHeader = ({ activeTab, onTabChange, search, onSearchChange, onNewOrd
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+              d="M3 10.5L12 4l9 6.5M5 10.5V20h5v-4h4v4h5v-9.5"
             />
           </svg>
-        </button>
-        <h1 className="text-xl font-semibold text-gray-900">Labels</h1>
+        </div>
         
-        {/* Tabs as pill group - matching closures header */}
-        <div className="flex items-center rounded-full border border-gray-200 bg-white/70 dark:bg-dark-bg-tertiary ml-4">
+        {/* Title + tabs group */}
+        <div className="flex items-center space-x-5">
+          <h1 className="text-xl font-semibold text-gray-900">Labels</h1>
+          
+          {/* Tabs as pill group */}
+          <div className="flex items-center rounded-full border border-gray-200 bg-white/70 dark:bg-dark-bg-tertiary">
           {['inventory', 'orders', 'archive'].map((tab, index) => {
             const labelMap = {
               inventory: 'Inventory',
@@ -53,21 +52,23 @@ const LabelsHeader = ({ activeTab, onTabChange, search, onSearchChange, onNewOrd
               </button>
             );
           })}
+          </div>
         </div>
       </div>
 
-      {/* Search bar and New Order button */}
-      <div className="flex items-center gap-3">
-        <div className="relative">
+      {/* Right: Search + Buttons */}
+      <div className="flex items-center space-x-4">
+        {/* Search */}
+        <div className="relative w-80">
           <input
             type="text"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Find an order..."
-            className="w-64 rounded-full border border-gray-300 px-10 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
+            className="w-full rounded-full border border-gray-300 px-9 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-all shadow-sm"
           />
           <svg
-            className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -79,39 +80,20 @@ const LabelsHeader = ({ activeTab, onTabChange, search, onSearchChange, onNewOrd
               d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
             />
           </svg>
-          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col">
-            <svg
-              className="w-3 h-3 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 15l7-7 7 7"
-              />
-            </svg>
-            <svg
-              className="w-3 h-3 text-gray-400 -mt-0.5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
-          </div>
+          {/* Dropdown caret */}
+          <svg
+            className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
         </div>
         <button
           type="button"
           onClick={onNewOrderClick}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
+          className="inline-flex items-center gap-2 bg-gray-900 hover:bg-black text-white text-sm font-medium rounded-lg px-5 py-2 shadow-md transition"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path

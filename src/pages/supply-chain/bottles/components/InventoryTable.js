@@ -277,7 +277,7 @@ const InventoryTable = forwardRef(({
               { key: 'name', label: 'BOTTLE NAME' },
               { key: 'warehouseInventory', label: 'WAREHOUSE INVENTORY' },
               { key: 'supplierInventory', label: 'SUPPLIER INVENTORY' },
-            ].map(({ key, label }) => (
+            ].map(({ key, label }, idx) => (
               <div
                 key={label}
                 className="h-full text-xs font-bold text-white uppercase tracking-wider group cursor-pointer"
@@ -288,7 +288,9 @@ const InventoryTable = forwardRef(({
                   paddingRight: '16px',
                   paddingBottom: '12px',
                   paddingLeft: '16px',
-                  textAlign: 'left',
+                  gap: '10px',
+                  justifyContent: idx === 0 ? 'flex-start' : 'flex-end',
+                  textAlign: idx === 0 ? 'left' : 'right',
                   borderRight: `1px solid ${dividerColor}`,
                 }}
               >
@@ -391,17 +393,35 @@ const InventoryTable = forwardRef(({
                   </button>
                 </div>
 
-                <div
-                  className="px-3 py-3 text-center"
+                <div 
+                  className="flex items-center justify-end" 
+                  style={{ 
+                    width: '253px',
+                    height: '40px',
+                    paddingTop: '12px',
+                    paddingRight: '16px',
+                    paddingBottom: '12px',
+                    paddingLeft: '16px',
+                    gap: '10px',
+                  }}
                 >
                   {/* Warehouse inventory is read-only - updated automatically when orders are received */}
-                  <span className={themeClasses.textPrimary} title="Warehouse inventory is updated automatically when orders are received">
-                    {bottle.warehouseInventory}
+                  <span 
+                    className={themeClasses.textPrimary} 
+                    title="Warehouse inventory is updated automatically when orders are received" 
+                    style={{ 
+                      fontSize: '14px', 
+                      textAlign: 'right',
+                      display: 'block',
+                      width: '100%',
+                    }}
+                  >
+                    {typeof bottle.warehouseInventory === 'number' ? bottle.warehouseInventory.toLocaleString() : bottle.warehouseInventory}
                   </span>
                 </div>
 
                 <div 
-                  className="flex items-center justify-start" 
+                  className="flex items-center justify-end" 
                   style={{ 
                     width: '253px',
                     height: '40px',
@@ -426,8 +446,16 @@ const InventoryTable = forwardRef(({
                       className="w-28 rounded-full border border-blue-300 px-3 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
                     />
                   ) : (
-                    <span className={`${themeClasses.textPrimary} text-left`} style={{ fontSize: '14px' }}>
-                      {bottle.supplierInventory.toLocaleString()}
+                    <span 
+                      className={themeClasses.textPrimary} 
+                      style={{ 
+                        fontSize: '14px', 
+                        textAlign: 'right',
+                        display: 'block',
+                        width: '100%',
+                      }}
+                    >
+                      {typeof bottle.supplierInventory === 'number' ? bottle.supplierInventory.toLocaleString() : bottle.supplierInventory}
                     </span>
                   )}
                 </div>

@@ -5,6 +5,15 @@ import OrdersTable from './OrdersTable';
 import ArchivedOrdersTable from './ArchivedOrdersTable';
 import InventoryTable from './InventoryTable';
 
+// Helper function to format box size with spaces (e.g., "12x10x12" -> "12 x 10 x 12")
+const formatBoxSize = (boxSize) => {
+  if (!boxSize) return boxSize;
+  // Check if it's already formatted or if it matches the pattern "numberxnumberxnumber"
+  if (boxSize.includes(' x ')) return boxSize; // Already formatted
+  // Replace 'x' with ' x ' (with spaces)
+  return boxSize.replace(/x/gi, ' x ');
+};
+
 const Boxes = () => {
   const { isDarkMode } = useTheme();
   const navigate = useNavigate();
@@ -20,6 +29,16 @@ const Boxes = () => {
   // Row actions & settings
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
 
+  // Box details modal state
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [activeDetailsTab, setActiveDetailsTab] = useState('core');
+  const [selectedBox, setSelectedBox] = useState(null);
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [editedCoreInfo, setEditedCoreInfo] = useState({});
+  const [editedSupplierInfo, setEditedSupplierInfo] = useState({});
+  const [editedInventoryInfo, setEditedInventoryInfo] = useState({});
+  const [detailsSearch, setDetailsSearch] = useState('');
+
   // Create bottle modal state
   const [isCreateBottleOpen, setIsCreateBottleOpen] = useState(false);
   const [newBottleName, setNewBottleName] = useState('');
@@ -34,6 +53,98 @@ const Boxes = () => {
     const v = (value ?? '').toString().toLowerCase();
     const q = createBottleSearch.toLowerCase();
     return v && v.includes(q) ? ' border-blue-400 ring-2 ring-blue-200' : '';
+  };
+
+  const getDetailsHighlightClass = (value) => {
+    if (!detailsSearch) return '';
+    const v = (value ?? '').toString().toLowerCase();
+    const q = detailsSearch.toLowerCase();
+    return v && v.includes(q) ? ' border-blue-400 ring-2 ring-blue-200' : '';
+  };
+
+  const openBoxDetails = (box) => {
+    // Use actual box data from API
+    const originalData = box._original || {};
+    const details = {
+      core: {
+        boxName: box.name,
+        imageLink: originalData.image_link || '',
+        shape: originalData.shape || '',
+        color: originalData.color || '',
+        threadType: originalData.thread_type || '',
+        capSize: originalData.cap_size || '',
+        material: originalData.material || '',
+        supplier: box.supplier || '',
+        packagingPart: originalData.packaging_part_number || '',
+        description: originalData.description || '',
+        brand: originalData.brand || '',
+      },
+      supplier: {
+        leadTimeWeeks: box.leadTimeWeeks || 0,
+        moq: box.moq || 0,
+        unitsPerPallet: box.unitsPerPallet || 0,
+        unitsPerCase: box.unitsPerCase || 0,
+        casesPerPallet: box.casesPerPallet || 0,
+      },
+      inventory: {
+        supplierInventory: box.supplierInventory || 0,
+        warehouseInventory: box.warehouseInventory || 0,
+        maxWarehouseInventory: originalData.max_warehouse_inventory || 0,
+      }
+    };
+    
+    setSelectedBox({
+      id: box.id,
+      name: box.name,
+      details,
+      rawData: originalData,
+    });
+    setActiveDetailsTab('core');
+    setIsDetailsOpen(true);
+    setDetailsSearch('');
+    setIsEditingDetails(false);
+    setEditedCoreInfo({});
+    setEditedSupplierInfo({});
+    setEditedInventoryInfo({});
+  };
+
+  const handleSaveDetails = () => {
+    if (!selectedBox || !selectedBox.details) return;
+    
+    // Update the selectedBox state with all edited sections
+    const updatedDetails = {
+      ...selectedBox.details,
+      core: {
+        ...selectedBox.details.core,
+        ...editedCoreInfo,
+      },
+      supplier: {
+        ...selectedBox.details.supplier,
+        ...editedSupplierInfo,
+      },
+      inventory: {
+        ...selectedBox.details.inventory,
+        ...editedInventoryInfo,
+      },
+    };
+    
+    setSelectedBox({
+      ...selectedBox,
+      details: updatedDetails,
+    });
+    
+    setIsEditingDetails(false);
+    setEditedCoreInfo({});
+    setEditedSupplierInfo({});
+    setEditedInventoryInfo({});
+    // TODO: Call API to save changes
+  };
+
+  const handleCancelDetailsEdit = () => {
+    setIsEditingDetails(false);
+    setEditedCoreInfo({});
+    setEditedSupplierInfo({});
+    setEditedInventoryInfo({});
   };
 
   // Refs for table components
@@ -99,66 +210,59 @@ const Boxes = () => {
   };
 
   return (
-    <div className={`p-8 ${themeClasses.pageBg}`}>
-      {/* Main card with header + tabs + search + table */}
-      <div className={`${themeClasses.cardBg} rounded-xl border ${themeClasses.border} shadow-lg`}>
-        {/* Card header: title + tabs + search + actions */}
-        <div
-          className="flex items-center justify-between px-6 py-4 border-b"
-          style={{
-            borderColor: isDarkMode ? '#374151' : '#e5e7eb',
-          }}
-        >
-          {/* Left: Icon, title and tabs */}
-          <div className="flex items-center space-x-4">
-            {/* Home icon in dark pill */}
-            <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-[#1f2937] text-white shadow-sm">
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 10.5L12 4l9 6.5M5 10.5V20h5v-4h4v4h5v-9.5"
-                />
-              </svg>
-            </div>
+    <>
+    <div className={`min-h-screen ${themeClasses.pageBg}`} style={{ padding: '24px' }}>
+      {/* Header section */}
+      <div className="flex items-center justify-between" style={{ paddingBottom: '16px' }}>
+        <div className="flex items-center space-x-4">
+          {/* Home icon in dark pill */}
+          <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-[#1f2937] text-white shadow-sm">
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 10.5L12 4l9 6.5M5 10.5V20h5v-4h4v4h5v-9.5"
+              />
+            </svg>
+          </div>
 
-            {/* Title + tabs group */}
-            <div className="flex items-center space-x-5">
-              <h1 className={`text-xl font-semibold ${themeClasses.textPrimary}`}>Boxes</h1>
+          {/* Title + tabs group */}
+          <div className="flex items-center space-x-5">
+            <h1 className={`text-xl font-semibold ${themeClasses.textPrimary}`}>Boxes</h1>
 
-              {/* Tabs as pill group */}
-              <div className={`flex items-center rounded-full border ${themeClasses.border} bg-white/70 dark:bg-dark-bg-tertiary`}>
-                {['inventory', 'orders', 'archive'].map((tabKey, index) => {
-                  const label =
-                    tabKey === 'inventory' ? 'Inventory' : 
-                    tabKey === 'orders' ? 'Orders' : 
-                    'Archive';
-                  const isActive = activeTab === tabKey;
+            {/* Tabs as pill group */}
+            <div className={`flex items-center rounded-full border ${themeClasses.border} bg-white/70 dark:bg-dark-bg-tertiary`}>
+              {['inventory', 'orders', 'archive'].map((tabKey, index) => {
+                const label =
+                  tabKey === 'inventory' ? 'Inventory' : 
+                  tabKey === 'orders' ? 'Orders' : 
+                  'Archive';
+                const isActive = activeTab === tabKey;
 
-                  return (
-                    <button
-                      key={tabKey}
-                      type="button"
-                      onClick={() => setActiveTab(tabKey)}
-                      className={`px-3 py-1 text-xs rounded-full transition-colors ${
-                        isActive
-                          ? 'bg-gray-900 text-white font-semibold shadow-sm'
-                          : 'text-gray-600 hover:bg-gray-100 font-medium'
-                      } ${index === 0 ? 'ml-1' : ''} ${index === 2 ? 'mr-1' : ''}`}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
+                return (
+                  <button
+                    key={tabKey}
+                    type="button"
+                    onClick={() => setActiveTab(tabKey)}
+                    className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                      isActive
+                        ? 'bg-gray-900 text-white font-semibold shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-100 font-medium'
+                    } ${index === 0 ? 'ml-1' : ''} ${index === 2 ? 'mr-1' : ''}`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
           </div>
+        </div>
 
           {/* Right: Search + Settings + New Order */}
           <div className="flex items-center space-x-4">
@@ -304,6 +408,7 @@ const Boxes = () => {
               ref={inventoryTableRef}
               searchQuery={search}
               themeClasses={themeClasses}
+              onBoxClick={openBoxDetails}
             />
           )}
           {/* Always render OrdersTable (hidden when not active) so state persists */}
@@ -715,7 +820,722 @@ const Boxes = () => {
           </div>
         </div>
       )}
-    </div>
+
+      {/* Box Details Modal */}
+      {isDetailsOpen && selectedBox && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[80vh] flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className={`${themeClasses.headerBg} flex items-center justify-between px-6 py-3`}>
+              <div className="flex items-center gap-3">
+                <h2 className="text-sm font-semibold text-white">
+                  Box Details - {formatBoxSize(selectedBox.name)}
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="text-gray-300 hover:text-white"
+                onClick={() => setIsDetailsOpen(false)}
+                aria-label="Close"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Tabs + search */}
+            <div className="px-6 pt-4 flex items-center justify-between gap-4 border-b border-gray-200">
+              <div className="flex items-center gap-4">
+                {['core', 'supplier', 'inventory'].map((key) => {
+                  const labelMap = {
+                    core: 'Core Info',
+                    supplier: 'Supplier Info',
+                    inventory: 'Inventory',
+                  };
+                  const isActive = activeDetailsTab === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setActiveDetailsTab(key)}
+                      className={`px-4 py-1.5 text-xs font-medium rounded-full border ${
+                        isActive
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      {labelMap[key]}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="w-64 relative">
+                <input
+                  type="text"
+                  value={detailsSearch}
+                  onChange={(e) => setDetailsSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const query = detailsSearch.trim().toLowerCase();
+                      if (!query || !selectedBox) return;
+                      const details = selectedBox.details;
+                      if (!details) return;
+
+                      const sectionsInOrder = ['core', 'supplier', 'inventory'];
+
+                      for (const section of sectionsInOrder) {
+                        const sectionData = details[section];
+                        if (!sectionData) continue;
+                        const hasMatch = Object.values(sectionData).some((val) =>
+                          (val ?? '').toString().toLowerCase().includes(query)
+                        );
+                        if (hasMatch) {
+                          setActiveDetailsTab(section);
+                          break;
+                        }
+                      }
+                    }
+                  }}
+                  placeholder="Search and find..."
+                  className="w-full rounded-full border border-gray-300 px-8 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
+                />
+                <svg
+                  className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+                <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex flex-col gap-0.5">
+                  <svg className="w-2 h-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                  </svg>
+                  <svg className="w-2 h-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="px-6 py-5 overflow-y-auto" style={{ minHeight: '500px', height: '500px' }}>
+              {activeDetailsTab === 'core' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+                    <h3 className="text-sm font-semibold text-gray-900">Core Info</h3>
+                    {!isEditingDetails && (
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingDetails(true)}
+                        className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-xs font-medium"
+                      >
+                        <svg
+                          className="w-3.5 h-3.5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                          />
+                        </svg>
+                        Edit Info
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-12 gap-4">
+                    <div className="col-span-6">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Box Name
+                      </label>
+                      <input
+                        value={
+                          isEditingDetails
+                            ? editedCoreInfo.boxName !== undefined
+                              ? editedCoreInfo.boxName
+                              : formatBoxSize(selectedBox.details?.core.boxName || selectedBox.name)
+                            : formatBoxSize(selectedBox.details?.core.boxName || selectedBox.name)
+                        }
+                        onChange={(e) =>
+                          setEditedCoreInfo({ ...editedCoreInfo, boxName: e.target.value })
+                        }
+                        readOnly={!isEditingDetails}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingDetails
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(
+                          selectedBox.details?.core.boxName || selectedBox.name
+                        )}`}
+                      />
+                    </div>
+                    <div className="col-span-6">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Box Image Link
+                      </label>
+                      <input
+                        value={
+                          isEditingDetails
+                            ? editedCoreInfo.imageLink !== undefined
+                              ? editedCoreInfo.imageLink
+                              : selectedBox.details?.core.imageLink || ''
+                            : selectedBox.details?.core.imageLink || ''
+                        }
+                        onChange={(e) =>
+                          setEditedCoreInfo({ ...editedCoreInfo, imageLink: e.target.value })
+                        }
+                        readOnly={!isEditingDetails}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingDetails
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(selectedBox.details?.core.imageLink || '')}`}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Shape</label>
+                      <input
+                        value={
+                          isEditingDetails
+                            ? editedCoreInfo.shape !== undefined
+                              ? editedCoreInfo.shape
+                              : selectedBox.details?.core.shape || ''
+                            : selectedBox.details?.core.shape || ''
+                        }
+                        onChange={(e) =>
+                          setEditedCoreInfo({ ...editedCoreInfo, shape: e.target.value })
+                        }
+                        readOnly={!isEditingDetails}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingDetails
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(selectedBox.details?.core.shape || '')}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Color</label>
+                      <input
+                        value={
+                          isEditingDetails
+                            ? editedCoreInfo.color !== undefined
+                              ? editedCoreInfo.color
+                              : selectedBox.details?.core.color || ''
+                            : selectedBox.details?.core.color || ''
+                        }
+                        onChange={(e) =>
+                          setEditedCoreInfo({ ...editedCoreInfo, color: e.target.value })
+                        }
+                        readOnly={!isEditingDetails}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingDetails
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(selectedBox.details?.core.color || '')}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Thread Type
+                      </label>
+                      <input
+                        value={
+                          isEditingDetails
+                            ? editedCoreInfo.threadType !== undefined
+                              ? editedCoreInfo.threadType
+                              : selectedBox.details?.core.threadType || ''
+                            : selectedBox.details?.core.threadType || ''
+                        }
+                        onChange={(e) =>
+                          setEditedCoreInfo({ ...editedCoreInfo, threadType: e.target.value })
+                        }
+                        readOnly={!isEditingDetails}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingDetails
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(selectedBox.details?.core.threadType || '')}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Cap Size
+                      </label>
+                      <input
+                        value={
+                          isEditingDetails
+                            ? editedCoreInfo.capSize !== undefined
+                              ? editedCoreInfo.capSize
+                              : selectedBox.details?.core.capSize || ''
+                            : selectedBox.details?.core.capSize || ''
+                        }
+                        onChange={(e) =>
+                          setEditedCoreInfo({ ...editedCoreInfo, capSize: e.target.value })
+                        }
+                        readOnly={!isEditingDetails}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingDetails
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(selectedBox.details?.core.capSize || '')}`}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Material
+                      </label>
+                      <input
+                        value={
+                          isEditingDetails
+                            ? editedCoreInfo.material !== undefined
+                              ? editedCoreInfo.material
+                              : selectedBox.details?.core.material || ''
+                            : selectedBox.details?.core.material || ''
+                        }
+                        onChange={(e) =>
+                          setEditedCoreInfo({ ...editedCoreInfo, material: e.target.value })
+                        }
+                        readOnly={!isEditingDetails}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingDetails
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(selectedBox.details?.core.material || '')}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Supplier
+                      </label>
+                      <input
+                        value={
+                          isEditingDetails
+                            ? editedCoreInfo.supplier !== undefined
+                              ? editedCoreInfo.supplier
+                              : selectedBox.details?.core.supplier || ''
+                            : selectedBox.details?.core.supplier || ''
+                        }
+                        onChange={(e) =>
+                          setEditedCoreInfo({ ...editedCoreInfo, supplier: e.target.value })
+                        }
+                        readOnly={!isEditingDetails}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingDetails
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(selectedBox.details?.core.supplier || '')}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Packaging Part #
+                      </label>
+                      <input
+                        value={
+                          isEditingDetails
+                            ? editedCoreInfo.packagingPart !== undefined
+                              ? editedCoreInfo.packagingPart
+                              : selectedBox.details?.core.packagingPart || ''
+                            : selectedBox.details?.core.packagingPart || ''
+                        }
+                        onChange={(e) =>
+                          setEditedCoreInfo({ ...editedCoreInfo, packagingPart: e.target.value })
+                        }
+                        readOnly={!isEditingDetails}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingDetails
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(selectedBox.details?.core.packagingPart || '')}`}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Description
+                      </label>
+                      <input
+                        value={
+                          isEditingDetails
+                            ? editedCoreInfo.description !== undefined
+                              ? editedCoreInfo.description
+                              : selectedBox.details?.core.description || ''
+                            : selectedBox.details?.core.description || ''
+                        }
+                        onChange={(e) =>
+                          setEditedCoreInfo({ ...editedCoreInfo, description: e.target.value })
+                        }
+                        readOnly={!isEditingDetails}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingDetails
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(selectedBox.details?.core.description || '')}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Brand</label>
+                      <input
+                        value={
+                          isEditingDetails
+                            ? editedCoreInfo.brand !== undefined
+                              ? editedCoreInfo.brand
+                              : selectedBox.details?.core.brand || ''
+                            : selectedBox.details?.core.brand || ''
+                        }
+                        onChange={(e) =>
+                          setEditedCoreInfo({ ...editedCoreInfo, brand: e.target.value })
+                        }
+                        readOnly={!isEditingDetails}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingDetails
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(selectedBox.details?.core.brand || '')}`}
+                      />
+                    </div>
+                  </div>
+
+                  {isEditingDetails && (
+                    <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+                      <button
+                        type="button"
+                        onClick={handleCancelDetailsEdit}
+                        className="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveDetails}
+                        className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                      >
+                        Save Changes
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeDetailsTab === 'supplier' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+                    <h3 className="text-sm font-semibold text-gray-900">Supplier Info</h3>
+                    {!isEditingDetails && (
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingDetails(true)}
+                        className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-xs font-medium"
+                      >
+                        <svg
+                          className="w-3.5 h-3.5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                          />
+                        </svg>
+                        Edit Info
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Lead Time (Weeks)
+                      </label>
+                      <input
+                        value={
+                          isEditingDetails
+                            ? editedSupplierInfo.leadTimeWeeks !== undefined
+                              ? editedSupplierInfo.leadTimeWeeks
+                              : selectedBox.details?.supplier.leadTimeWeeks || ''
+                            : selectedBox.details?.supplier.leadTimeWeeks || ''
+                        }
+                        onChange={(e) =>
+                          setEditedSupplierInfo({ ...editedSupplierInfo, leadTimeWeeks: e.target.value })
+                        }
+                        readOnly={!isEditingDetails}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingDetails
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(
+                          selectedBox.details?.supplier.leadTimeWeeks || ''
+                        )}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">MOQ</label>
+                      <input
+                        value={
+                          isEditingDetails
+                            ? editedSupplierInfo.moq !== undefined
+                              ? editedSupplierInfo.moq
+                              : selectedBox.details?.supplier.moq || ''
+                            : selectedBox.details?.supplier.moq || ''
+                        }
+                        onChange={(e) =>
+                          setEditedSupplierInfo({ ...editedSupplierInfo, moq: e.target.value })
+                        }
+                        readOnly={!isEditingDetails}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingDetails
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(selectedBox.details?.supplier.moq || '')}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Units per Pallet
+                      </label>
+                      <input
+                        value={
+                          isEditingDetails
+                            ? editedSupplierInfo.unitsPerPallet !== undefined
+                              ? editedSupplierInfo.unitsPerPallet
+                              : selectedBox.details?.supplier.unitsPerPallet || ''
+                            : selectedBox.details?.supplier.unitsPerPallet || ''
+                        }
+                        onChange={(e) =>
+                          setEditedSupplierInfo({ ...editedSupplierInfo, unitsPerPallet: e.target.value })
+                        }
+                        readOnly={!isEditingDetails}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingDetails
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(
+                          selectedBox.details?.supplier.unitsPerPallet || ''
+                        )}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Units per Case
+                      </label>
+                      <input
+                        value={
+                          isEditingDetails
+                            ? editedSupplierInfo.unitsPerCase !== undefined
+                              ? editedSupplierInfo.unitsPerCase
+                              : selectedBox.details?.supplier.unitsPerCase || ''
+                            : selectedBox.details?.supplier.unitsPerCase || ''
+                        }
+                        onChange={(e) =>
+                          setEditedSupplierInfo({ ...editedSupplierInfo, unitsPerCase: e.target.value })
+                        }
+                        readOnly={!isEditingDetails}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingDetails
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(
+                          selectedBox.details?.supplier.unitsPerCase || ''
+                        )}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Cases per Pallet
+                      </label>
+                      <input
+                        value={
+                          isEditingDetails
+                            ? editedSupplierInfo.casesPerPallet !== undefined
+                              ? editedSupplierInfo.casesPerPallet
+                              : selectedBox.details?.supplier.casesPerPallet || ''
+                            : selectedBox.details?.supplier.casesPerPallet || ''
+                        }
+                        onChange={(e) =>
+                          setEditedSupplierInfo({ ...editedSupplierInfo, casesPerPallet: e.target.value })
+                        }
+                        readOnly={!isEditingDetails}
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingDetails
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(
+                          selectedBox.details?.supplier.casesPerPallet || ''
+                        )}`}
+                      />
+                    </div>
+                  </div>
+                  {isEditingDetails && (
+                    <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+                      <button
+                        type="button"
+                        onClick={handleCancelDetailsEdit}
+                        className="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveDetails}
+                        className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                      >
+                        Save Changes
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeDetailsTab === 'inventory' && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+                    <h3 className="text-sm font-semibold text-gray-900">Inventory</h3>
+                    {!isEditingDetails && (
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingDetails(true)}
+                        className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-xs font-medium"
+                      >
+                        <svg
+                          className="w-3.5 h-3.5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                          />
+                        </svg>
+                        Edit Info
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Supplier Inventory
+                      </label>
+                      <input
+                        value={
+                          isEditingDetails
+                            ? editedInventoryInfo.supplierInventory !== undefined
+                              ? editedInventoryInfo.supplierInventory
+                              : selectedBox.details?.inventory.supplierInventory || ''
+                            : selectedBox.details?.inventory.supplierInventory || ''
+                        }
+                        onChange={(e) =>
+                          setEditedInventoryInfo({ ...editedInventoryInfo, supplierInventory: e.target.value })
+                        }
+                        readOnly={!isEditingDetails}
+                        className={`w-full rounded-lg border border-gray-200 px-3 py-2 text-sm ${
+                          isEditingDetails
+                            ? 'bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : 'bg-gray-50'
+                        }${getDetailsHighlightClass(
+                          selectedBox.details?.inventory.supplierInventory || ''
+                        )}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Warehouse Inventory
+                      </label>
+                      <input
+                        value={
+                          isEditingDetails
+                            ? editedInventoryInfo.warehouseInventory !== undefined
+                              ? editedInventoryInfo.warehouseInventory
+                              : selectedBox.details?.inventory.warehouseInventory || ''
+                            : selectedBox.details?.inventory.warehouseInventory || ''
+                        }
+                        onChange={(e) =>
+                          setEditedInventoryInfo({ ...editedInventoryInfo, warehouseInventory: e.target.value })
+                        }
+                        readOnly={!isEditingDetails}
+                        className={`w-full rounded-lg border border-gray-200 px-3 py-2 text-sm ${
+                          isEditingDetails
+                            ? 'bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : 'bg-gray-50'
+                        }${getDetailsHighlightClass(
+                          selectedBox.details?.inventory.warehouseInventory || ''
+                        )}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Max Warehouse Inventory
+                      </label>
+                      <input
+                        value={
+                          isEditingDetails
+                            ? editedInventoryInfo.maxWarehouseInventory !== undefined
+                              ? editedInventoryInfo.maxWarehouseInventory
+                              : selectedBox.details?.inventory.maxWarehouseInventory || ''
+                            : selectedBox.details?.inventory.maxWarehouseInventory || ''
+                        }
+                        onChange={(e) =>
+                          setEditedInventoryInfo({ ...editedInventoryInfo, maxWarehouseInventory: e.target.value })
+                        }
+                        readOnly={!isEditingDetails}
+                        className={`w-full rounded-lg border border-gray-200 px-3 py-2 text-sm ${
+                          isEditingDetails
+                            ? 'bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : 'bg-gray-50'
+                        }${getDetailsHighlightClass(
+                          selectedBox.details?.inventory.maxWarehouseInventory || ''
+                        )}`}
+                      />
+                    </div>
+                  </div>
+                  {isEditingDetails && (
+                    <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+                      <button
+                        type="button"
+                        onClick={handleCancelDetailsEdit}
+                        className="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveDetails}
+                        className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                      >
+                        Save Changes
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

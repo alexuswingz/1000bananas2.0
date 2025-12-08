@@ -1587,6 +1587,239 @@ const LabelOrderPage = () => {
       {/* Table */}
       <div className={`${themeClasses.cardBg} rounded-xl border ${themeClasses.border} shadow-lg mx-6`} style={{ marginTop: '0' }}>
         <div style={{ overflowX: 'auto', overflowY: 'visible' }}>
+          {/* Table Mode - Show when tableMode is true and in addProducts tab */}
+          {tableMode && activeTab === 'addProducts' && (!isViewMode || isEditOrderMode) ? (
+            <table style={{ width: '100%', borderCollapse: 'collapse', borderSpacing: 0, margin: 0, padding: 0 }}>
+              <thead className={themeClasses.headerBg}>
+                <tr style={{ height: '40px', minHeight: '40px' }}>
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: '1px solid #3C4656', width: 50 }}>
+                    <input 
+                      type="checkbox" 
+                      style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                      checked={orderLines.length > 0 && orderLines.every(l => l.added)}
+                      onChange={(e) => {
+                        setOrderLines(prev => prev.map(line => ({ ...line, added: e.target.checked })));
+                      }}
+                    />
+                  </th>
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                    height: '40px',
+                    paddingTop: '12px',
+                    paddingRight: '24px',
+                    paddingBottom: '12px',
+                    paddingLeft: '24px',
+                    textAlign: 'left',
+                    borderRight: '1px solid #3C4656',
+                  }}>
+                    PACKAGING NAME
+                  </th>
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                    height: '40px',
+                    paddingTop: '12px',
+                    paddingRight: '24px',
+                    paddingBottom: '12px',
+                    paddingLeft: '24px',
+                    textAlign: 'left',
+                    borderRight: '1px solid #3C4656',
+                  }}>
+                    SUPPLIER INVENTORY
+                  </th>
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                    height: '40px',
+                    paddingTop: '12px',
+                    paddingRight: '24px',
+                    paddingBottom: '12px',
+                    paddingLeft: '24px',
+                    textAlign: 'right',
+                    borderRight: '1px solid #3C4656',
+                  }}>
+                    CURRENT INVENTORY
+                  </th>
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                    height: '40px',
+                    paddingTop: '12px',
+                    paddingRight: '24px',
+                    paddingBottom: '12px',
+                    paddingLeft: '24px',
+                    textAlign: 'right',
+                    borderRight: '1px solid #3C4656',
+                  }}>
+                    UNITS NEEDED
+                  </th>
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                    height: '40px',
+                    paddingTop: '12px',
+                    paddingRight: '24px',
+                    paddingBottom: '12px',
+                    paddingLeft: '24px',
+                    textAlign: 'right',
+                    borderRight: '1px solid #3C4656',
+                  }}>
+                    QTY
+                  </th>
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                    height: '40px',
+                    paddingTop: '12px',
+                    paddingRight: '24px',
+                    paddingBottom: '12px',
+                    paddingLeft: '24px',
+                    textAlign: 'right',
+                  }}>
+                    PALLETS
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {loadingLabels ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-6 text-center text-sm italic text-gray-400">
+                      Loading labels...
+                    </td>
+                  </tr>
+                ) : filteredLines.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-6 text-center text-sm italic text-gray-400">
+                      No items available.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredLines.map((line) => {
+                    const currentInventory = line.currentInventory || 0;
+                    const unitsNeeded = line.forecastedUnitsNeeded || line.recommendedQty || 0;
+                    const labelName = `${line.brand} - ${line.product} ${line.size}`;
+                    
+                    return (
+                      <tr 
+                        key={line.id}
+                        style={{
+                          borderTop: '1px solid #e5e7eb',
+                        }}
+                      >
+                        <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle' }}>
+                          <input 
+                            type="checkbox" 
+                            style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                            checked={line.added || false}
+                            onChange={(e) => {
+                              setOrderLines(prev => prev.map(l => 
+                                l.id === line.id ? { ...l, added: e.target.checked } : l
+                              ));
+                            }}
+                          />
+                        </td>
+                        <td style={{ 
+                          height: '40px',
+                          paddingTop: '12px',
+                          paddingRight: '24px',
+                          paddingBottom: '12px',
+                          paddingLeft: '24px',
+                          fontSize: '0.875rem',
+                          verticalAlign: 'middle',
+                          textAlign: 'left',
+                        }} className={themeClasses.textPrimary}>
+                          {labelName}
+                        </td>
+                        <td style={{ 
+                          height: '40px',
+                          paddingTop: '12px',
+                          paddingRight: '24px',
+                          paddingBottom: '12px',
+                          paddingLeft: '24px',
+                          fontSize: '0.875rem',
+                          verticalAlign: 'middle',
+                          textAlign: 'left',
+                        }} className={themeClasses.textPrimary}>
+                          Auto Replenishment
+                        </td>
+                        <td style={{ 
+                          height: '40px',
+                          paddingTop: '12px',
+                          paddingRight: '24px',
+                          paddingBottom: '12px',
+                          paddingLeft: '24px',
+                          fontSize: '0.875rem',
+                          verticalAlign: 'middle',
+                          textAlign: 'right',
+                        }} className={themeClasses.textPrimary}>
+                          {currentInventory.toLocaleString()}
+                        </td>
+                        <td style={{ 
+                          height: '40px',
+                          paddingTop: '12px',
+                          paddingRight: '24px',
+                          paddingBottom: '12px',
+                          paddingLeft: '24px',
+                          fontSize: '0.875rem',
+                          verticalAlign: 'middle',
+                          textAlign: 'right',
+                        }} className={themeClasses.textPrimary}>
+                          {unitsNeeded.toLocaleString()}
+                        </td>
+                        <td style={{ 
+                          height: '40px',
+                          paddingTop: '12px',
+                          paddingRight: '24px',
+                          paddingBottom: '12px',
+                          paddingLeft: '24px',
+                          textAlign: 'right',
+                          verticalAlign: 'middle',
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <input
+                              type="number"
+                              value={line.qty || ''}
+                              onChange={(e) => handleQtyChange(line.id, e.target.value)}
+                              style={{
+                                width: '120px',
+                                padding: '6px 12px',
+                                fontSize: '14px',
+                                textAlign: 'right',
+                                border: '1px solid #D1D5DB',
+                                borderRadius: '6px',
+                                backgroundColor: '#FFFFFF',
+                                color: '#000000',
+                                cursor: 'text',
+                              }}
+                            />
+                          </div>
+                        </td>
+                        <td style={{ 
+                          height: '40px',
+                          paddingTop: '12px',
+                          paddingRight: '24px',
+                          paddingBottom: '12px',
+                          paddingLeft: '24px',
+                          textAlign: 'right',
+                          verticalAlign: 'middle',
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <input
+                              type="number"
+                              step="0.1"
+                              value={line.pallets ? line.pallets.toFixed(1) : ''}
+                              readOnly
+                              style={{
+                                width: '120px',
+                                padding: '6px 12px',
+                                fontSize: '14px',
+                                textAlign: 'right',
+                                border: '1px solid #D1D5DB',
+                                borderRadius: '6px',
+                                backgroundColor: '#F3F4F6',
+                                color: '#6B7280',
+                                cursor: 'default',
+                              }}
+                              title="Auto-calculated from quantity"
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          ) : (
           <table
               style={{
               width: '100%',
@@ -2460,6 +2693,7 @@ const LabelOrderPage = () => {
             )}
           </tbody>
         </table>
+        )}
         </div>
                     </div>
 

@@ -182,10 +182,12 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
     } else if (status === 'partial') {
       return (
         <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-600">
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="12" cy="12" r="10" stroke="#F97316" strokeWidth="2" fill="none"/>
-            <path d="M12 2 A 10 10 0 0 1 12 22" fill="#F97316"/>
-          </svg>
+          <img 
+            src="/assets/Icons (2).png" 
+            alt="Partially Received" 
+            className="w-3.5 h-3.5"
+            style={{ objectFit: 'contain' }}
+          />
           Partially Received
         </span>
       );

@@ -30,6 +30,7 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
             orderDate: order.order_date,
             quantityOrdered: order.quantity_ordered,
             quantityReceived: order.quantity_received || 0,
+            isEdited: order.is_edited || false,
           }));
           
           // Group orders by base order number (before timestamp)
@@ -51,21 +52,24 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
             grouped[baseOrderNumber].lineItems.push(order);
           });
           
-          // Filter: Only show groups that have at least one 'pending' or 'partial' line item
+          // Filter: Only show groups that have at least one 'pending', 'submitted', or 'partial' line item
           // Exclude groups where ALL items are 'received' or 'archived'
           const activeGroupedOrders = Object.values(grouped)
             .filter(group => {
-              // Include if at least one line item is pending or partial
+              // Include if at least one line item is pending, submitted, or partial
               return group.lineItems.some(item => 
-                item.status === 'pending' || item.status === 'partial'
+                item.status === 'pending' || item.status === 'submitted' || item.status === 'partial'
               );
             })
             .map(group => {
-              // Determine group status: if any partial, show partial; otherwise pending
+              // Determine group status: if any partial, show partial; if any submitted, show submitted; otherwise pending
               const hasPartial = group.lineItems.some(item => item.status === 'partial');
+              const hasSubmitted = group.lineItems.some(item => item.status === 'submitted');
+              const isEdited = group.lineItems.some(item => item.isEdited);
               return {
                 ...group,
-                status: hasPartial ? 'partial' : 'pending'
+                status: hasPartial ? 'partial' : (hasSubmitted ? 'submitted' : 'pending'),
+                isEdited: isEdited
               };
             });
           
@@ -118,6 +122,7 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
               orderDate: order.order_date,
               quantityOrdered: order.quantity_ordered,
               quantityReceived: order.quantity_received || 0,
+              isEdited: order.is_edited || false,
             }));
             
             // Group orders by base order number
@@ -143,14 +148,17 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
             const activeGroupedOrders = Object.values(grouped)
               .filter(group => {
                 return group.lineItems.some(item => 
-                  item.status === 'pending' || item.status === 'partial'
+                  item.status === 'pending' || item.status === 'submitted' || item.status === 'partial'
                 );
               })
               .map(group => {
                 const hasPartial = group.lineItems.some(item => item.status === 'partial');
+                const hasSubmitted = group.lineItems.some(item => item.status === 'submitted');
+                const isEdited = group.lineItems.some(item => item.isEdited);
                 return {
                   ...group,
-                  status: hasPartial ? 'partial' : 'pending'
+                  status: hasPartial ? 'partial' : (hasSubmitted ? 'submitted' : 'pending'),
+                  isEdited: isEdited
                 };
               });
             
@@ -260,6 +268,7 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
               orderDate: order.order_date,
               quantityOrdered: order.quantity_ordered,
               quantityReceived: order.quantity_received || 0,
+              isEdited: order.is_edited || false,
             }));
             
             // Only archive and switch tab if order is FULLY received (not partial)
@@ -310,14 +319,17 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
             const activeGroupedOrders = Object.values(grouped)
               .filter(group => {
                 return group.lineItems.some(item => 
-                  item.status === 'pending' || item.status === 'partial'
+                  item.status === 'pending' || item.status === 'submitted' || item.status === 'partial'
                 );
               })
               .map(group => {
                 const hasPartial = group.lineItems.some(item => item.status === 'partial');
+                const hasSubmitted = group.lineItems.some(item => item.status === 'submitted');
+                const isEdited = group.lineItems.some(item => item.isEdited);
                 return {
                   ...group,
-                  status: hasPartial ? 'partial' : 'pending'
+                  status: hasPartial ? 'partial' : (hasSubmitted ? 'submitted' : 'pending'),
+                  isEdited: isEdited
                 };
               });
             
@@ -379,7 +391,10 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
     let displayStatus = 'Pending';
     let style = { bg: 'bg-blue-100', text: 'text-blue-700' };
     
-    if (backendStatus === 'partial') {
+    if (backendStatus === 'submitted') {
+      displayStatus = 'Submitted';
+      style = { bg: 'bg-purple-100', text: 'text-purple-700' };
+    } else if (backendStatus === 'partial') {
       displayStatus = 'Partially Received';
       style = { bg: 'bg-orange-100', text: 'text-orange-700' };
     } else {
@@ -389,11 +404,20 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
 
     return (
       <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${style.bg} ${style.text}`}>
-        {displayStatus === 'Partially Received' ? (
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="12" cy="12" r="10" stroke="#F97316" strokeWidth="1.5" fill="none"/>
-            <path d="M 2 12 A 10 10 0 0 1 22 12 L 12 12 Z" fill="#F97316"/>
-          </svg>
+        {displayStatus === 'Submitted' ? (
+          <img 
+            src="/assets/Icons (1).png" 
+            alt="Submitted" 
+            className="w-3.5 h-3.5"
+            style={{ objectFit: 'contain' }}
+          />
+        ) : displayStatus === 'Partially Received' ? (
+          <img 
+            src="/assets/Icons (2).png" 
+            alt="Partially Received" 
+            className="w-3.5 h-3.5"
+            style={{ objectFit: 'contain' }}
+          />
         ) : (
           <svg className="w-3.5 h-3.5" fill="#3B82F6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" fill="#3B82F6"/>
@@ -517,13 +541,26 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
                   </div>
                   <div className="px-6 py-3 flex items-center gap-2">
                     <div className="flex flex-col">
-                      <button
-                        type="button"
-                        className="text-xs font-medium text-blue-600 hover:text-blue-700 underline-offset-2 hover:underline text-left"
-                        onClick={() => onViewOrder(order)}
-                      >
-                        {order.orderNumber}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="text-xs font-medium text-blue-600 hover:text-blue-700 underline-offset-2 hover:underline text-left"
+                          onClick={() => onViewOrder(order)}
+                        >
+                          {order.orderNumber}
+                        </button>
+                        {order.isEdited && (
+                          <span 
+                            className="text-[10px] font-medium px-2 py-0.5 rounded"
+                            style={{
+                              backgroundColor: '#FEF3C7',
+                              color: '#92400E',
+                            }}
+                          >
+                            edited
+                          </span>
+                        )}
+                      </div>
                       {order.orderCount > 1 && (
                         <span className="text-[10px] text-gray-400">
                           {order.orderCount} bottle types

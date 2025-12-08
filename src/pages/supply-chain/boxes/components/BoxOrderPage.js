@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 import { calculatePallets } from '../../../../utils/palletCalculations';
@@ -13,19 +13,30 @@ const BoxOrderPage = () => {
   const orderNumber = state.orderNumber || '';
   const supplier = state.supplier || null;
   const mode = state.mode || 'create';
+  const isCreateMode = mode === 'create';
+  const isViewMode = mode === 'view' || mode === 'receive';
   const isReceiveMode = mode === 'receive';
   const orderId = state.orderId || null;
+
+  // Navigation tab state
+  const [activeTab, setActiveTab] = useState(() => {
+    // Automatically set to receivePO when viewing an order
+    return (mode === 'view' || mode === 'receive') ? 'receivePO' : 'addProducts';
+  });
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Fetch available boxes from API
   const [availableBoxes, setAvailableBoxes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [orderLines, setOrderLines] = useState([]);
   const [isReceiveConfirmOpen, setIsReceiveConfirmOpen] = useState(false);
-  const [showAddBoxModal, setShowAddBoxModal] = useState(false);
+  const [tableMode, setTableMode] = useState(true);
   const [doiGoal, setDoiGoal] = useState(120); // Days of Inventory goal for forecasting
   const [safetyBuffer, setSafetyBuffer] = useState(85); // Safety buffer percentage
   const [showDoiDropdown, setShowDoiDropdown] = useState(false);
   const [showSafetyDropdown, setShowSafetyDropdown] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [selectedItems, setSelectedItems] = useState(new Set());
 
   // Fetch order details if viewing/receiving existing order
   useEffect(() => {
@@ -137,16 +148,19 @@ const BoxOrderPage = () => {
                 name: box.name,
                 boxType: box.name,
                 unitsNeeded: recommendedQty,
-                qty: recommendedQty,
-                pallets: calculatedPallets,
+                qty: 0, // Start with 0, will be set when user clicks Add
+                pallets: 0, // Start with 0, will be calculated when user clicks Add
                 unitsPerPallet: box.unitsPerPallet || 1,
                 supplier: box.supplier,
-                selected: recommendedQty > 0, // Auto-select only if forecast suggests ordering
-                recommendedQty: recommendedQty,
-                forecastedCasesNeeded: Math.round(forecast.forecasted_cases_needed || 0),
+                supplierInventory: box.supplierInventory || 0,
+                maxInventory: box.maxInventory || 0,
                 currentInventory: currentInventory,
                 totalDailySalesRate: totalDailySalesRate,
                 currentDOI: currentDOI,
+                selected: false, // Start unselected
+                recommendedQty: recommendedQty,
+                forecastedCasesNeeded: Math.round(forecast.forecasted_cases_needed || 0),
+                added: false, // Default to not added - user must click Add button
               };
             });
             
@@ -173,6 +187,7 @@ const BoxOrderPage = () => {
   const themeClasses = {
     pageBg: isDarkMode ? 'bg-dark-bg-primary' : 'bg-light-bg-primary',
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
+    headerBg: isDarkMode ? 'bg-[#2C3544]' : 'bg-[#2C3544]',
     border: isDarkMode ? 'border-dark-border-primary' : 'border-gray-200',
     textPrimary: isDarkMode ? 'text-dark-text-primary' : 'text-gray-900',
   };
@@ -181,9 +196,27 @@ const BoxOrderPage = () => {
     navigate('/dashboard/supply-chain/boxes');
   };
 
+  const handleAddProduct = (lineId) => {
+    setOrderLines((prev) =>
+      prev.map((line) => {
+        if (line.id === lineId) {
+          const isAdding = !line.added;
+          return {
+            ...line,
+            added: isAdding,
+            selected: isAdding,
+            qty: isAdding ? (line.recommendedQty || 0) : 0,
+            pallets: isAdding ? calculatePallets(line.recommendedQty || 0, line.unitsPerPallet || 1) : 0,
+          };
+        }
+        return line;
+      })
+    );
+  };
+
   const handleCreateOrder = async () => {
     try {
-      const selectedLines = orderLines.filter(l => l.selected);
+      const selectedLines = orderLines.filter(l => l.added && l.qty > 0);
       const timestamp = Date.now();
       
       // Create separate order for each box type
@@ -218,31 +251,72 @@ const BoxOrderPage = () => {
     }
   };
 
-  const handleAddBox = (box) => {
-    const nextId = orderLines.length ? Math.max(...orderLines.map(l => l.id)) + 1 : 1;
-    const defaultQty = box.unitsPerPallet || 1000;
-    const newLine = {
-      id: nextId,
-      name: box.name,
-      boxType: box.name,
-      unitsNeeded: defaultQty,
-      qty: defaultQty,
-      pallets: calculatePallets(defaultQty, box.unitsPerPallet || 1),
-      unitsPerPallet: box.unitsPerPallet || 1,
-      supplier: box.supplier,
-      selected: true,
-    };
-    setOrderLines([...orderLines, newLine]);
-    setShowAddBoxModal(false);
-  };
 
   const handleRemoveLine = (lineId) => {
     setOrderLines(prev => prev.filter(l => l.id !== lineId));
   };
 
+  // Handle checkbox selection
+  const handleCheckboxChange = (lineId, checked) => {
+    setSelectedItems((prev) => {
+      const newSet = new Set(prev);
+      if (checked) {
+        newSet.add(lineId);
+      } else {
+        newSet.delete(lineId);
+      }
+      return newSet;
+    });
+  };
+
+  // Handle select all checkbox
+  const handleSelectAll = (checked) => {
+    if (checked) {
+      setSelectedItems(new Set(orderLines.map(line => line.id)));
+    } else {
+      setSelectedItems(new Set());
+    }
+  };
+
+  // Calculate summary
+  const summary = useMemo(() => {
+    const linesToUse = isViewMode && activeTab === 'receivePO' ? orderLines : orderLines.filter(line => line.added);
+    const totalQty = linesToUse.reduce((sum, line) => sum + (line.qty || 0), 0);
+    const totalPallets = linesToUse.reduce((sum, line) => sum + (line.pallets || 0), 0);
+    const units = totalQty; // Units is the same as total qty
+    
+    return {
+      totalQty,
+      totalPallets,
+      units,
+    };
+  }, [orderLines, isViewMode, activeTab]);
+
+  // Handle receive button click - check if partial order
+  const handleReceiveClick = () => {
+    if (!isViewMode || !orderId) return;
+    
+    const totalItems = orderLines.length;
+    const selectedCount = selectedItems.size;
+    
+    // If all items selected, show confirmation modal
+    if (selectedCount === totalItems && totalItems > 0) {
+      setIsReceiveConfirmOpen(true);
+      return;
+    }
+    
+    // If some items selected, show partial order modal
+    if (selectedCount > 0 && selectedCount < totalItems) {
+      setIsReceiveConfirmOpen(true);
+      return;
+    }
+    
+    // If no items selected, do nothing
+  };
+
   const handleReceiveComplete = async (isPartial = false) => {
     try {
-      const selectedLines = orderLines.filter(l => l.selected);
+      const selectedLines = orderLines.filter(l => selectedItems.has(l.id));
       
       if (selectedLines.length === 0) {
         alert('Please select at least one line to receive');
@@ -331,102 +405,273 @@ const BoxOrderPage = () => {
   }
 
   return (
-    <div className={`p-8 ${themeClasses.pageBg}`}>
-      <div className={`${themeClasses.cardBg} rounded-xl border ${themeClasses.border} shadow-lg`}>
-        {/* Header row */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <div className="flex items-center gap-4">
+    <div className={`min-h-screen ${themeClasses.pageBg}`} style={{ paddingBottom: '100px' }}>
+      {/* Header Section */}
+      <div style={{ 
+        backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+        padding: '16px 24px',
+        borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+      }}>
+        {/* Top Row - Back button and Order Info */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
             <button
               type="button"
-              className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-full hover:bg-gray-100"
               onClick={handleBack}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                border: isDarkMode ? '1px solid #4B5563' : '1px solid #E5E7EB',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                padding: '8px 16px',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = isDarkMode ? '#4B5563' : '#F9FAFB';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#FFFFFF';
+              }}
             >
-              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-gray-400">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
+              <svg 
+                style={{ width: '16px', height: '16px' }} 
+                className={isDarkMode ? 'text-white' : 'text-gray-900'}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              <span style={{ 
+                fontSize: '14px', 
+                fontWeight: 400,
+                color: isDarkMode ? '#FFFFFF' : '#000000',
+              }}>
+                Back
               </span>
-              Back
             </button>
 
-            <div className="flex flex-col gap-1 text-xs text-gray-500">
-              <div className="flex items-center gap-8">
-                <div>
-                  <div className="uppercase tracking-wide text-[10px] text-gray-400">Box Order #</div>
-                  <div className="text-sm font-semibold text-gray-900">{orderNumber}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ 
+                  fontSize: '10px', 
+                  fontWeight: 400,
+                  letterSpacing: '0.05em',
+                  color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                }}>
+                  BOXES ORDER #
                 </div>
-                <div className="flex flex-col items-start gap-1">
-                  <div className="uppercase tracking-wide text-[10px] text-gray-400">Supplier</div>
-                  <div className="flex items-center gap-2">
-                    <img
-                      src={supplier.logoSrc}
-                      alt={supplier.logoAlt}
-                      className="h-6 object-contain"
-                    />
-                    <span className="text-sm font-semibold text-gray-900">{supplier.name}</span>
-                  </div>
+                <div style={{ 
+                  fontSize: '16px', 
+                  fontWeight: 400,
+                  color: isDarkMode ? '#FFFFFF' : '#000000',
+                }}>
+                  {orderNumber}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ 
+                  fontSize: '10px', 
+                  fontWeight: 400,
+                  letterSpacing: '0.05em',
+                  color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                }}>
+                  SUPPLIER
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <img
+                    src={supplier.logoSrc}
+                    alt={supplier.logoAlt}
+                    style={{ height: '24px', objectFit: 'contain' }}
+                  />
+                  <span style={{ 
+                    fontSize: '16px', 
+                    fontWeight: 400,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                  }}>
+                    {supplier.name}
+                  </span>
                 </div>
               </div>
             </div>
           </div>
 
-          {!isReceiveMode ? (
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg px-4 py-2 shadow-sm"
-              onClick={handleCreateOrder}
-            >
-              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-white/60">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
+          {/* Right side - Table Mode Toggle and Settings */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {/* Table Mode Toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ 
+                fontSize: '14px', 
+                fontWeight: 500, 
+                color: isDarkMode ? '#FFFFFF' : '#000000',
+              }}>
+                Table Mode
               </span>
-              Create Order
-            </button>
-          ) : (
+              <button
+                type="button"
+                onClick={() => setTableMode(!tableMode)}
+                style={{
+                  width: '48px',
+                  height: '28px',
+                  borderRadius: '14px',
+                  backgroundColor: tableMode ? '#007AFF' : (isDarkMode ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.1)'),
+                  border: 'none',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  transition: 'background-color 0.2s',
+                  padding: 0,
+                }}
+                aria-label="Toggle Table Mode"
+              >
+                <div
+                  style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    backgroundColor: '#FFFFFF',
+                    position: 'absolute',
+                    top: '2px',
+                    left: tableMode ? '22px' : '2px',
+                    transition: 'left 0.2s',
+                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+                  }}
+                />
+              </button>
+            </div>
+
+            {/* Settings Button */}
             <button
               type="button"
-              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg px-4 py-2 shadow-sm"
-              onClick={() => {
-                const selectedLines = orderLines.filter((line) => line.selected);
-                if (selectedLines.length === 0) {
-                  alert('Please select at least one line to receive');
-                  return;
-                }
-                
-                const allChecked = orderLines.every((line) => line.selected);
-                const allFullQty = selectedLines.every((line) => {
-                  // Check if received qty equals original ordered qty
-                  return line.qty >= (line.originalQty || line.qty);
-                });
-                
-                if (allChecked && allFullQty) {
-                  // Full receive – all lines, full quantities
-                  handleReceiveComplete(false);
-                } else {
-                  // Partial receive – show confirmation popup
-                  setIsReceiveConfirmOpen(true);
-                }
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '32px',
+                height: '32px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: isDarkMode ? '#9CA3AF' : '#6B7280',
               }}
+              aria-label="Settings"
             >
-              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-white/60">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </span>
-              Receive
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <circle cx="12" cy="12" r="2" fill="currentColor"/>
+                <line x1="12" y1="2" x2="12" y2="8"/>
+                <line x1="12" y1="16" x2="12" y2="22"/>
+                <line x1="2" y1="12" x2="8" y2="12"/>
+                <line x1="16" y1="12" x2="22" y2="12"/>
+                <line x1="4.343" y1="4.343" x2="8.485" y2="8.485"/>
+                <line x1="15.515" y1="15.515" x2="19.657" y2="19.657"/>
+                <line x1="19.657" y1="4.343" x2="15.515" y2="8.485"/>
+                <line x1="8.485" y1="15.515" x2="4.343" y2="19.657"/>
+              </svg>
             </button>
-          )}
+          </div>
         </div>
 
-        {/* Forecast Controls - Only show in create mode */}
-        {!isReceiveMode && (
-          <div className="px-6 py-4 flex items-center gap-6 border-b border-gray-200">
-            {/* DOI Goal Selector */}
-            <div className="flex items-center gap-3">
-              <span style={{ fontSize: '14px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
-                Forecast Period:
-              </span>
+        {/* Tabs */}
+        {isViewMode && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0' }}>
+            <button
+              type="button"
+              disabled
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '12px 16px',
+                fontSize: '14px',
+                fontWeight: 500,
+                color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderBottom: '2px solid transparent',
+                cursor: 'not-allowed',
+                opacity: 0.7,
+                transition: 'all 0.2s',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" fill="#22C55E"/>
+              </svg>
+              <span>Add Products</span>
+            </button>
+            <button
+              type="button"
+              disabled
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '12px 16px',
+                fontSize: '14px',
+                fontWeight: 500,
+                color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderBottom: '2px solid transparent',
+                cursor: 'not-allowed',
+                opacity: 0.7,
+                transition: 'all 0.2s',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" fill="#22C55E"/>
+              </svg>
+              <span>Submit PO</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('receivePO')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '12px 16px',
+                fontSize: '14px',
+                fontWeight: 500,
+                color: activeTab === 'receivePO' ? '#007AFF' : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+                backgroundColor: activeTab === 'receivePO' ? (isDarkMode ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.05)') : 'transparent',
+                border: 'none',
+                borderBottom: activeTab === 'receivePO' ? '2px solid #007AFF' : '2px solid transparent',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {activeTab === 'receivePO' ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" fill="#007AFF"/>
+                  <path d="M12 8v8M8 12h8" stroke="white" strokeWidth="2"/>
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10"/>
+                </svg>
+              )}
+              <span>Receive PO</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Search bar and forecast controls - above table */}
+        <div className="px-6 py-4 flex justify-between items-center" style={{ marginTop: '0' }}>
+          {/* Forecast Controls */}
+          {!isReceiveMode && (
+            <div className="flex items-center gap-6" style={{ flex: 1 }}>
+              {/* DOI Goal Selector */}
+              <div className="flex items-center gap-3">
+                <span style={{ fontSize: '14px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
+                  Forecast Period:
+                </span>
               <div className="relative doi-dropdown-container">
                 <button
                   type="button"
@@ -531,197 +776,704 @@ const BoxOrderPage = () => {
             </div>
           </div>
         )}
-
-        {/* Table */}
-        <div className="px-6 py-4">
-          <div className="rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            {/* Table header */}
-            <div className="bg-[#1f2937] text-white text-[11px] font-semibold uppercase tracking-wide">
-              <div
-                className="grid items-center"
-                style={{ gridTemplateColumns: '2fr 1.2fr 1.2fr 40px 40px' }}
-              >
-                <div className="px-4 py-2 border-r border-gray-700 text-center">Box Size</div>
-                <div className="px-4 py-2 border-r border-gray-700 text-center">Qty</div>
-                <div className="px-4 py-2 border-r border-gray-700 text-center">Pallets</div>
-                <div className="px-4 py-2 border-r border-gray-700 text-center"></div>
-                <div className="px-4 py-2 text-center"></div>
-              </div>
-            </div>
-
-            {/* Table rows */}
-            <div className="bg-white">
-              {loading ? (
-                <div className="px-4 py-6 text-center text-gray-500">Loading boxes...</div>
-              ) : orderLines.length === 0 ? (
-                <div className="px-4 py-6 text-center text-gray-500">No boxes added yet</div>
-              ) : (
-                orderLines.map((line) => (
-                <div
-                  key={line.id}
-                  className="grid items-center text-sm border-t border-gray-100"
-                  style={{ gridTemplateColumns: '2fr 1.2fr 1.2fr 40px 40px' }}
-                >
-                  <div className="px-4 py-2 text-sm text-gray-900">{line.name}</div>
-                  <div className="px-4 py-2 relative">
-                    {!isReceiveMode && line.recommendedQty > 0 && (
-                      <div 
-                        className="absolute -top-1 -right-1 bg-blue-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center z-10"
-                        title="Forecast-based quantity"
-                      >
-                        F
-                      </div>
-                    )}
-                    <input
-                      type="number"
-                      min="0"
-                      max={isReceiveMode && line.originalQty ? (line.originalQty - (line.receivedQty || 0)) : undefined}
-                      className={`w-full text-sm px-2 py-1 text-center bg-white shadow-inner rounded-none ${
-                        !isReceiveMode && line.recommendedQty > 0 
-                          ? 'border-2 border-blue-500 ring-1 ring-blue-200' 
-                          : 'border border-gray-200'
-                      }`}
-                      value={line.qty}
-                      title={!isReceiveMode && line.recommendedQty > 0 
-                        ? `Forecast-based: ${line.recommendedQty.toLocaleString()} cases (${doiGoal} days)\nCurrent: ${line.currentInventory?.toLocaleString() || 0} cases\nNeeded: ${line.forecastedCasesNeeded?.toLocaleString() || 0} cases` 
-                        : ''
-                      }
-                      onChange={(e) => {
-                        const val = Number(e.target.value) || 0;
-                        
-                        // Only validate max quantity when receiving (originalQty exists)
-                        if (isReceiveMode && line.originalQty) {
-                          const maxQty = line.originalQty - (line.receivedQty || 0);
-                          const clampedVal = Math.min(val, maxQty);
-                          
-                          if (val > maxQty) {
-                            alert(`Cannot receive more than ${maxQty} units (${line.originalQty} ordered - ${line.receivedQty || 0} already received)`);
-                          }
-                          
-                          // Use clamped value for receive mode
-                          const finalVal = clampedVal;
-                          const unitsPerPallet = line.unitsPerPallet || 1;
-                          const newPallets = calculatePallets(finalVal, unitsPerPallet);
-                          
-                          setOrderLines((prev) =>
-                            prev.map((l) => {
-                              if (l.id === line.id) {
-                                return { ...l, qty: finalVal, pallets: newPallets };
-                              }
-                              return l;
-                            })
-                          );
-                        } else {
-                          // Create mode: allow any positive quantity, no max limit
-                          const unitsPerPallet = line.unitsPerPallet || 1;
-                          const newPallets = calculatePallets(val, unitsPerPallet);
-                          
-                          setOrderLines((prev) =>
-                            prev.map((l) => {
-                              if (l.id === line.id) {
-                                return { ...l, qty: val, pallets: newPallets };
-                              }
-                              return l;
-                            })
-                          );
-                        }
-                      }}
-                    />
-                  </div>
-                  <div className="px-4 py-2">
-                    <div className="text-sm px-2 py-1 text-right text-gray-700 font-medium" title={`Auto-calculated: ${line.qty} ÷ ${line.unitsPerPallet || 'N/A'} units/pallet = ${line.pallets} pallet${line.pallets !== 1 ? 's' : ''}`}>
-                      {line.pallets}
-                    </div>
-                  </div>
-                  <div className="px-4 py-2 flex items-center justify-center">
-                    <input
-                      type="checkbox"
-                      className="form-checkbox h-3.5 w-3.5 rounded border-gray-400"
-                      checked={line.selected}
-                      onChange={(e) =>
-                        setOrderLines((prev) =>
-                          prev.map((l) =>
-                            l.id === line.id ? { ...l, selected: e.target.checked } : l
-                          )
-                        )
-                      }
-                    />
-                  </div>
-                  <div className="px-4 py-2 flex items-center justify-center">
-                    <button
-                      type="button"
-                      className="text-red-500 hover:text-red-700 text-xs"
-                      onClick={() => handleRemoveLine(line.id)}
-                      title="Remove line"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              )))}
-            </div>
-            
-            {/* Add box button */}
-            {!isReceiveMode && (
-              <div className="bg-gray-50 border-t border-gray-200 px-4 py-3">
-                <button
-                  type="button"
-                  className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
-                  onClick={() => setShowAddBoxModal(true)}
-                >
-                  <span className="text-lg">+</span> Add Box
-                </button>
-              </div>
-            )}
-          </div>
+        
+        {/* Search Bar */}
+        <div className="relative" style={{ maxWidth: '300px', width: '100%', marginLeft: 'auto', marginRight: '24px' }}>
+          <input
+            type="text"
+            placeholder="Search..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-10 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            style={{
+              backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+              color: isDarkMode ? '#F9FAFB' : '#000000',
+              borderColor: isDarkMode ? '#4B5563' : '#D1D5DB',
+            }}
+          />
+          <svg
+            className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
+          </svg>
+          <svg
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
         </div>
       </div>
 
-      {/* Add Box Modal */}
-      {showAddBoxModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Add Box to Order</h2>
-            </div>
-            <div className="px-6 py-4 max-h-[60vh] overflow-y-auto">
-              <div className="grid grid-cols-1 gap-2">
-                {availableBoxes.map((box) => {
-                  const alreadyAdded = orderLines.some(l => l.name === box.name);
-                  return (
-                    <button
-                      key={box.id}
-                      type="button"
-                      className={`text-left px-4 py-3 rounded-lg border transition-colors ${
-                        alreadyAdded 
-                          ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
-                          : 'border-gray-300 hover:border-blue-500 hover:bg-blue-50'
-                      }`}
-                      onClick={() => !alreadyAdded && handleAddBox(box)}
-                      disabled={alreadyAdded}
-                    >
-                      <div className="font-semibold text-sm">{box.name}</div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {box.unitsPerPallet} units/pallet • {box.supplier}
-                        {alreadyAdded && ' • Already added'}
-                      </div>
-                    </button>
-                  );
-                })}
+      {/* Table - Show in all tabs */}
+      <div className={`${themeClasses.cardBg} border ${themeClasses.border} shadow-lg mx-6`} style={{ marginTop: '0', borderRadius: '8px', overflow: 'hidden' }}>
+        <div className="overflow-x-auto">
+          {/* Table Mode - Show different table structure for addProducts tab when tableMode is true */}
+          {tableMode && activeTab === 'addProducts' && !isViewMode ? (
+            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
+              <thead style={{ backgroundColor: '#2C3544', borderRadius: '8px 8px 0 0' }}>
+                <tr style={{ height: '40px', maxHeight: '40px' }}>
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: '1px solid #3C4656', width: 50 }}>
+                    <input 
+                      type="checkbox" 
+                      style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                      checked={orderLines.length > 0 && orderLines.every(l => l.added)}
+                      onChange={(e) => {
+                        setOrderLines(prev => prev.map(line => ({ ...line, added: e.target.checked })));
+                      }}
+                    />
+                  </th>
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                    height: '40px',
+                    paddingTop: '12px',
+                    paddingRight: '24px',
+                    paddingBottom: '12px',
+                    paddingLeft: '24px',
+                    textAlign: 'left',
+                    borderRight: '1px solid #3C4656',
+                  }}>
+                    PACKAGING NAME
+                  </th>
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                    height: '40px',
+                    paddingTop: '12px',
+                    paddingRight: '24px',
+                    paddingBottom: '12px',
+                    paddingLeft: '24px',
+                    textAlign: 'left',
+                    borderRight: '1px solid #3C4656',
+                  }}>
+                    SUPPLIER INVENTORY
+                  </th>
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                    height: '40px',
+                    paddingTop: '12px',
+                    paddingRight: '24px',
+                    paddingBottom: '12px',
+                    paddingLeft: '24px',
+                    textAlign: 'right',
+                    borderRight: '1px solid #3C4656',
+                  }}>
+                    CURRENT INVENTORY
+                  </th>
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                    height: '40px',
+                    paddingTop: '12px',
+                    paddingRight: '24px',
+                    paddingBottom: '12px',
+                    paddingLeft: '24px',
+                    textAlign: 'right',
+                    borderRight: '1px solid #3C4656',
+                  }}>
+                    UNITS NEEDED
+                  </th>
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                    height: '40px',
+                    paddingTop: '12px',
+                    paddingRight: '24px',
+                    paddingBottom: '12px',
+                    paddingLeft: '24px',
+                    textAlign: 'right',
+                    borderRight: '1px solid #3C4656',
+                  }}>
+                    QTY
+                  </th>
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                    height: '40px',
+                    paddingTop: '12px',
+                    paddingRight: '24px',
+                    paddingBottom: '12px',
+                    paddingLeft: '24px',
+                    textAlign: 'right',
+                  }}>
+                    PALLETS
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-6 text-center text-sm italic text-gray-400">
+                      Loading boxes...
+                    </td>
+                  </tr>
+                ) : orderLines.filter(line => {
+                    if (!searchQuery.trim()) return true;
+                    const query = searchQuery.toLowerCase();
+                    return line.name?.toLowerCase().includes(query);
+                  }).length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-6 text-center text-sm italic text-gray-400">
+                      No items available.
+                    </td>
+                  </tr>
+                ) : (
+                  orderLines
+                    .filter(line => {
+                      if (!searchQuery.trim()) return true;
+                      const query = searchQuery.toLowerCase();
+                      return line.name?.toLowerCase().includes(query);
+                    })
+                    .map((line) => {
+                      const currentInventory = line.currentInventory || 0;
+                      const unitsNeeded = line.forecastedUnitsNeeded || line.recommendedQty || 0;
+                      
+                      return (
+                        <tr 
+                          key={line.id}
+                          style={{
+                            borderTop: '1px solid #e5e7eb',
+                          }}
+                        >
+                          <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle' }}>
+                            <input 
+                              type="checkbox" 
+                              style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                              checked={line.added || false}
+                              onChange={(e) => {
+                                setOrderLines(prev => prev.map(l => 
+                                  l.id === line.id ? { ...l, added: e.target.checked } : l
+                                ));
+                              }}
+                            />
+                          </td>
+                          <td style={{ 
+                            height: '40px',
+                            paddingTop: '12px',
+                            paddingRight: '24px',
+                            paddingBottom: '12px',
+                            paddingLeft: '24px',
+                            fontSize: '0.875rem',
+                            verticalAlign: 'middle',
+                            textAlign: 'left',
+                          }} className={themeClasses.textPrimary}>
+                            {line.name}
+                          </td>
+                          <td style={{ 
+                            height: '40px',
+                            paddingTop: '12px',
+                            paddingRight: '24px',
+                            paddingBottom: '12px',
+                            paddingLeft: '24px',
+                            fontSize: '0.875rem',
+                            verticalAlign: 'middle',
+                            textAlign: 'left',
+                          }} className={themeClasses.textPrimary}>
+                            Auto Replenishment
+                          </td>
+                          <td style={{ 
+                            height: '40px',
+                            paddingTop: '12px',
+                            paddingRight: '24px',
+                            paddingBottom: '12px',
+                            paddingLeft: '24px',
+                            fontSize: '0.875rem',
+                            verticalAlign: 'middle',
+                            textAlign: 'right',
+                          }} className={themeClasses.textPrimary}>
+                            {currentInventory.toLocaleString()}
+                          </td>
+                          <td style={{ 
+                            height: '40px',
+                            paddingTop: '12px',
+                            paddingRight: '24px',
+                            paddingBottom: '12px',
+                            paddingLeft: '24px',
+                            fontSize: '0.875rem',
+                            verticalAlign: 'middle',
+                            textAlign: 'right',
+                          }} className={themeClasses.textPrimary}>
+                            {unitsNeeded.toLocaleString()}
+                          </td>
+                          <td style={{ 
+                            height: '40px',
+                            paddingTop: '12px',
+                            paddingRight: '24px',
+                            paddingBottom: '12px',
+                            paddingLeft: '24px',
+                            textAlign: 'right',
+                            verticalAlign: 'middle',
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                              <input
+                                type="number"
+                                value={line.qty || ''}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value) || 0;
+                                  const unitsPerPallet = line.unitsPerPallet || 1;
+                                  const newPallets = calculatePallets(val, unitsPerPallet);
+                                  setOrderLines((prev) =>
+                                    prev.map((l) => {
+                                      if (l.id === line.id) {
+                                        return { ...l, qty: val, pallets: newPallets };
+                                      }
+                                      return l;
+                                    })
+                                  );
+                                }}
+                                style={{
+                                  width: '120px',
+                                  padding: '6px 12px',
+                                  fontSize: '14px',
+                                  textAlign: 'right',
+                                  border: '1px solid #D1D5DB',
+                                  borderRadius: '6px',
+                                  backgroundColor: '#FFFFFF',
+                                  color: '#000000',
+                                  cursor: 'text',
+                                }}
+                              />
+                            </div>
+                          </td>
+                          <td style={{ 
+                            height: '40px',
+                            paddingTop: '12px',
+                            paddingRight: '24px',
+                            paddingBottom: '12px',
+                            paddingLeft: '24px',
+                            textAlign: 'right',
+                            verticalAlign: 'middle',
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                              <input
+                                type="number"
+                                step="0.1"
+                                value={line.pallets ? line.pallets.toFixed(1) : ''}
+                                readOnly
+                                style={{
+                                  width: '120px',
+                                  padding: '6px 12px',
+                                  fontSize: '14px',
+                                  textAlign: 'right',
+                                  border: '1px solid #D1D5DB',
+                                  borderRadius: '6px',
+                                  backgroundColor: '#F3F4F6',
+                                  color: '#6B7280',
+                                  cursor: 'default',
+                                }}
+                                title="Auto-calculated from quantity"
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                )}
+              </tbody>
+            </table>
+          ) : (
+          <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
+            <thead style={{ backgroundColor: '#2C3544', borderRadius: '8px 8px 0 0' }}>
+              <tr style={{ height: '40px', maxHeight: '40px' }}>
+                {/* Checkbox column - show when viewing an order in receivePO tab */}
+                {isViewMode && activeTab === 'receivePO' && (
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: '1px solid #3C4656', width: 50 }}>
+                    <input
+                      type="checkbox"
+                      style={{ cursor: 'pointer' }}
+                      checked={selectedItems.size === orderLines.length && orderLines.length > 0}
+                      onChange={(e) => handleSelectAll(e.target.checked)}
+                    />
+                  </th>
+                )}
+                <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                  padding: '0 1rem', 
+                  height: '40px', 
+                  textAlign: 'left', 
+                  borderRight: '1px solid #3C4656',
+                  width: isViewMode && activeTab === 'receivePO' ? 300 : 350
+                }}>
+                  PACKAGING NAME
+                </th>
+                {/* SUPPLIER INV column - only show in addProducts tab when creating new order (not viewing) */}
+                {(activeTab === 'addProducts' && !isViewMode) && (
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'left', borderRight: '1px solid #3C4656', width: 200 }}>
+                    SUPPLIER INV
+                  </th>
+                )}
+                {/* ADD column - only show in addProducts tab when creating new order (not viewing) */}
+                {(activeTab === 'addProducts' && !isViewMode) && (
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: '1px solid #3C4656', width: 120 }}>
+                    ADD
+                  </th>
+                )}
+                <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                  padding: '0 1rem', 
+                  height: '40px', 
+                  textAlign: 'center', 
+                  borderRight: '1px solid #3C4656',
+                  width: 150
+                }}>
+                  QTY
+                </th>
+                <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                  padding: '0 1rem', 
+                  height: '40px', 
+                  textAlign: 'center', 
+                  borderRight: '1px solid #3C4656',
+                  width: 120
+                }}>
+                  PALLETS
+                </th>
+                {/* INVENTORY PERCENTAGE column - only show in addProducts tab when creating new order (not viewing) */}
+                {(activeTab === 'addProducts' && !isViewMode) && (
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'left', width: 300 }}>
+                    INVENTORY PERCENTAGE
+                  </th>
+                )}
+                {/* Ellipsis column - show when viewing an order in receivePO tab */}
+                {isViewMode && activeTab === 'receivePO' && (
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'center', width: 50 }}>
+                  </th>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={(isViewMode && activeTab === 'receivePO') ? 4 : ((activeTab === 'addProducts' && !isViewMode) ? 6 : 4)} className="px-6 py-6 text-center text-sm italic text-gray-400">
+                    Loading boxes...
+                  </td>
+                </tr>
+              ) : orderLines.filter(line => {
+                  if (!searchQuery.trim()) return true;
+                  const query = searchQuery.toLowerCase();
+                  return line.name?.toLowerCase().includes(query);
+                }).length === 0 ? (
+                <tr>
+                  <td colSpan={(isViewMode && activeTab === 'receivePO') ? 4 : ((activeTab === 'addProducts' && !isViewMode) ? 6 : 4)} className="px-6 py-6 text-center text-sm italic text-gray-400">
+                    No items available.
+                  </td>
+                </tr>
+              ) : (
+                orderLines
+                  .filter(line => {
+                    if (!searchQuery.trim()) return true;
+                    const query = searchQuery.toLowerCase();
+                    return line.name?.toLowerCase().includes(query);
+                  })
+                  .map((line) => {
+                    const inventoryPercentage = line.maxInventory > 0 
+                      ? Math.round((line.currentInventory / line.maxInventory) * 100) 
+                      : 0;
+                    
+                    return (
+                      <tr key={line.id} style={{ borderBottom: '1px solid #E5E7EB' }}>
+                        {/* Checkbox - show when viewing an order in receivePO tab */}
+                        {isViewMode && activeTab === 'receivePO' && (
+                          <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle' }}>
+                            <input
+                              type="checkbox"
+                              style={{ cursor: 'pointer' }}
+                              checked={selectedItems.has(line.id)}
+                              onChange={(e) => handleCheckboxChange(line.id, e.target.checked)}
+                            />
+                          </td>
+                        )}
+                        <td style={{ 
+                          padding: '0.65rem 1rem', 
+                          fontSize: '0.85rem', 
+                          height: '40px', 
+                          verticalAlign: 'middle' 
+                        }} className={themeClasses.textPrimary}>
+                          {line.name}
+                        </td>
+                        {/* SUPPLIER INV - only show in addProducts tab when creating new order (not viewing) */}
+                        {(activeTab === 'addProducts' && !isViewMode) && (
+                          <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle' }} className={themeClasses.textPrimary}>
+                            {line.supplierInventory?.toLocaleString() || 'Auto Replenishment'}
+                          </td>
+                        )}
+                        {/* ADD button - only show in addProducts tab when creating new order (not viewing) */}
+                        {(activeTab === 'addProducts' && !isViewMode) && (
+                          <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleAddProduct(line.id)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                width: '100%',
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                whiteSpace: 'nowrap',
+                                transition: 'all 0.2s',
+                                backgroundColor: line.added ? '#22C55E' : '#007AFF',
+                                color: '#FFFFFF',
+                              }}
+                            >
+                              {line.added ? (
+                                <>
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                  </svg>
+                                  Added
+                                </>
+                              ) : (
+                                <>
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                  </svg>
+                                  Add
+                                </>
+                              )}
+                            </button>
+                          </td>
+                        )}
+                        <td style={{ 
+                          padding: '0.65rem 1rem', 
+                          fontSize: '0.85rem', 
+                          height: '40px', 
+                          verticalAlign: 'middle' 
+                        }}>
+                          <input
+                            type="number"
+                            min="0"
+                            max={isReceiveMode && line.originalQty ? (line.originalQty - (line.receivedQty || 0)) : undefined}
+                            disabled={!line.added && !isReceiveMode}
+                            className={`w-full text-sm px-2 py-1 text-center bg-white shadow-inner rounded-none border ${
+                              !isReceiveMode && line.recommendedQty > 0 
+                                ? 'border-2 border-blue-500 ring-1 ring-blue-200' 
+                                : 'border-gray-200'
+                            } ${!line.added && !isReceiveMode ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            value={line.qty}
+                            onChange={(e) => {
+                              if (!line.added && !isReceiveMode) return;
+                              
+                              const val = Number(e.target.value) || 0;
+                              
+                              if (isReceiveMode && line.originalQty) {
+                                const maxQty = line.originalQty - (line.receivedQty || 0);
+                                const clampedVal = Math.min(val, maxQty);
+                                
+                                if (val > maxQty) {
+                                  alert(`Cannot receive more than ${maxQty} units (${line.originalQty} ordered - ${line.receivedQty || 0} already received)`);
+                                }
+                                
+                                const finalVal = clampedVal;
+                                const unitsPerPallet = line.unitsPerPallet || 1;
+                                const newPallets = calculatePallets(finalVal, unitsPerPallet);
+                                
+                                setOrderLines((prev) =>
+                                  prev.map((l) => {
+                                    if (l.id === line.id) {
+                                      return { ...l, qty: finalVal, pallets: newPallets };
+                                    }
+                                    return l;
+                                  })
+                                );
+                              } else {
+                                const unitsPerPallet = line.unitsPerPallet || 1;
+                                const newPallets = calculatePallets(val, unitsPerPallet);
+                                
+                                setOrderLines((prev) =>
+                                  prev.map((l) => {
+                                    if (l.id === line.id) {
+                                      return { ...l, qty: val, pallets: newPallets };
+                                    }
+                                    return l;
+                                  })
+                                );
+                              }
+                            }}
+                          />
+                        </td>
+                        <td style={{ 
+                          padding: '0.65rem 1rem', 
+                          fontSize: '0.85rem', 
+                          height: '40px', 
+                          verticalAlign: 'middle',
+                          textAlign: 'center'
+                        }} className={themeClasses.textPrimary}>
+                          {line.pallets.toFixed(2)}
+                        </td>
+                        {/* INVENTORY PERCENTAGE - only show in addProducts tab when creating new order (not viewing) */}
+                        {(activeTab === 'addProducts' && !isViewMode) && (
+                          <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle' }}>
+                            <div style={{ width: '100%', height: '24px', backgroundColor: '#E5E7EB', borderRadius: '4px', overflow: 'hidden', position: 'relative' }}>
+                              <div 
+                                style={{ 
+                                  width: `${Math.min(inventoryPercentage, 100)}%`, 
+                                  height: '100%', 
+                                  backgroundColor: '#22C55E',
+                                  transition: 'width 0.3s ease'
+                                }}
+                              />
+                              <div style={{ 
+                                position: 'absolute', 
+                                top: '50%', 
+                                left: '50%', 
+                                transform: 'translate(-50%, -50%)', 
+                                fontSize: '11px', 
+                                fontWeight: 600,
+                                color: inventoryPercentage > 50 ? '#FFFFFF' : '#1F2937'
+                              }}>
+                                {inventoryPercentage}%
+                              </div>
+                            </div>
+                          </td>
+                        )}
+                        {/* Ellipsis - show when viewing an order in receivePO tab */}
+                        {isViewMode && activeTab === 'receivePO' && (
+                          <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle' }}>
+                            <button
+                              type="button"
+                              className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                              style={{
+                                color: '#6B7280',
+                                backgroundColor: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                              }}
+                              aria-label="Row actions"
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="12" cy="6" r="1.5" fill="currentColor"/>
+                                <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+                                <circle cx="12" cy="18" r="1.5" fill="currentColor"/>
+                              </svg>
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })
+              )}
+            </tbody>
+          </table>
+          )}
+        </div>
+      </div>
+
+      {/* Footer - Sticky */}
+      <div
+        className="fixed bottom-0 left-64 right-0 z-50"
+        style={{ 
+          backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+          borderTop: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+          padding: '16px 24px',
+        }}
+      >
+        <div className="flex items-center justify-between gap-6">
+          {/* Summary - Left side */}
+          {(activeTab === 'addProducts' || activeTab === 'receivePO') && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 500, color: isDarkMode ? '#9CA3AF' : '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  PALETTES
+                </div>
+                <div style={{ fontSize: '16px', fontWeight: 700, color: isDarkMode ? '#F9FAFB' : '#1F2937' }}>
+                  {summary.totalPallets.toFixed(1)}
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 500, color: isDarkMode ? '#9CA3AF' : '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  TOTAL BOXES
+                </div>
+                <div style={{ fontSize: '16px', fontWeight: 700, color: isDarkMode ? '#F9FAFB' : '#1F2937' }}>
+                  {summary.totalQty.toLocaleString()}
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 500, color: isDarkMode ? '#9CA3AF' : '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  UNITS
+                </div>
+                <div style={{ fontSize: '16px', fontWeight: 700, color: isDarkMode ? '#F9FAFB' : '#1F2937' }}>
+                  {summary.units.toLocaleString()}
+                </div>
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+          )}
+          
+          {/* Action Buttons - Right side */}
+          <div className="flex items-center gap-3">
+            {/* Export button */}
+            <button
+              type="button"
+              onClick={() => setShowExportModal(true)}
+              className="inline-flex items-center gap-2 text-xs font-semibold transition-colors"
+              style={{
+                backgroundColor: 'transparent',
+                color: '#3B82F6',
+                padding: '8px 12px',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.opacity = '0.8';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.opacity = '1';
+              }}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+              </svg>
+              Export
+            </button>
+            
+            {/* Edit Order button - only show when viewing */}
+            {isViewMode && activeTab === 'receivePO' && (
               <button
                 type="button"
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100"
-                onClick={() => setShowAddBoxModal(false)}
+                onClick={() => {
+                  // Handle edit order - could navigate or set edit mode
+                }}
+                className="inline-flex items-center gap-2 text-xs font-semibold rounded-lg px-4 py-2 transition-colors"
+                style={{
+                  backgroundColor: '#F3F4F6',
+                  color: '#374151',
+                  border: '1px solid #D1D5DB',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#E5E7EB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#F3F4F6';
+                }}
               >
-                Close
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Edit Order
               </button>
-            </div>
+            )}
+            
+            {/* Receive Order / Complete Order button */}
+            <button
+              type="button"
+              onClick={isViewMode && activeTab === 'receivePO' ? handleReceiveClick : handleCreateOrder}
+              disabled={!isViewMode && orderLines.filter(l => l.added && l.qty > 0).length === 0}
+              className="inline-flex items-center gap-2 text-xs font-semibold rounded-lg px-4 py-2 transition-colors"
+              style={{
+                backgroundColor: (isViewMode || orderLines.filter(l => l.added && l.qty > 0).length > 0) ? '#007AFF' : (isDarkMode ? '#374151' : '#D1D5DB'),
+                color: '#FFFFFF',
+                cursor: (isViewMode || orderLines.filter(l => l.added && l.qty > 0).length > 0) ? 'pointer' : 'not-allowed',
+              }}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              {activeTab === 'receivePO' ? 'Receive Order' : 'Complete Order'}
+            </button>
           </div>
         </div>
-      )}
+      </div>
 
       {isReceiveMode && isReceiveConfirmOpen && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">

@@ -4,6 +4,15 @@ import { showSuccessToast } from '../../../../utils/notifications';
 import { calculatePallets } from '../../../../utils/palletCalculations';
 import { boxesApi, transformInventoryData, transformToBackendFormat } from '../../../../services/supplyChainApi';
 
+// Helper function to format box size with spaces (e.g., "12x10x12" -> "12 x 10 x 12")
+const formatBoxSize = (boxSize) => {
+  if (!boxSize) return boxSize;
+  // Check if it's already formatted or if it matches the pattern "numberxnumberxnumber"
+  if (boxSize.includes(' x ')) return boxSize; // Already formatted
+  // Replace 'x' with ' x ' (with spaces)
+  return boxSize.replace(/x/gi, ' x ');
+};
+
 const InventoryTable = forwardRef(({
   searchQuery = '',
   themeClasses,
@@ -12,10 +21,31 @@ const InventoryTable = forwardRef(({
 }, ref) => {
   const { isDarkMode } = useTheme();
 
+  // Create theme classes object with fallbacks
+  const effectiveThemeClasses = themeClasses || {
+    cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
+    textPrimary: isDarkMode ? 'text-dark-text-primary' : 'text-gray-900',
+    textSecondary: isDarkMode ? 'text-dark-text-secondary' : 'text-gray-600',
+    inputBg: isDarkMode ? 'bg-dark-bg-tertiary' : 'bg-white',
+    border: isDarkMode ? 'border-dark-border-primary' : 'border-gray-200',
+    rowHover: isDarkMode ? 'hover:bg-dark-bg-tertiary' : 'hover:bg-gray-50',
+  };
+
   // Boxes data - fetch from API
   const [boxes, setBoxes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Inline inventory editing (single row) - only for supplier inventory
+  const [editingBoxId, setEditingBoxId] = useState(null);
+  const [editSupplierInv, setEditSupplierInv] = useState('');
+
+  // Bulk inventory editing (multiple rows)
+  const [isBulkEditing, setIsBulkEditing] = useState(false);
+  const [bulkEdits, setBulkEdits] = useState({}); // { [id]: { supplierInventory } }
+
+  // Action menu state
+  const [actionMenuBoxId, setActionMenuBoxId] = useState(null);
 
   // Fetch boxes from API on mount
   useEffect(() => {
@@ -40,23 +70,26 @@ const InventoryTable = forwardRef(({
     fetchBoxes();
   }, []);
 
+  // Close action menu when clicking outside
+  useEffect(() => {
+    if (actionMenuBoxId === null) return;
+
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.action-menu-container')) {
+        setActionMenuBoxId(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [actionMenuBoxId]);
+
   // Filter boxes based on search query
   const filteredData = useMemo(() => {
     if (!searchQuery.trim()) return boxes;
     const query = searchQuery.toLowerCase();
     return boxes.filter((box) => box.name.toLowerCase().includes(query));
   }, [boxes, searchQuery]);
-
-  // Inline inventory editing (single row) - only for supplier inventory
-  const [editingBoxId, setEditingBoxId] = useState(null);
-  const [editSupplierInv, setEditSupplierInv] = useState('');
-
-  // Bulk inventory editing (multiple rows)
-  const [isBulkEditing, setIsBulkEditing] = useState(false);
-  const [bulkEdits, setBulkEdits] = useState({}); // { [id]: { supplierInventory } }
-
-  // Action menu state
-  const [actionMenuBoxId, setActionMenuBoxId] = useState(null);
 
   // Calculate bulk unsaved count (only for supplier inventory)
   const bulkUnsavedCount = useMemo(() => {
@@ -191,6 +224,11 @@ const InventoryTable = forwardRef(({
     setIsBulkEditing(false);
   };
 
+  // Handle action menu toggle
+  const handleActionMenuToggle = (boxId) => {
+    setActionMenuBoxId((prev) => (prev === boxId ? null : boxId));
+  };
+
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
     startBulkEdit: () => setIsBulkEditing(true),
@@ -226,153 +264,307 @@ const InventoryTable = forwardRef(({
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse">
-        <thead>
-          <tr
-            className="text-xs font-semibold text-white"
-            style={{ backgroundColor: '#2C3544' }}
+    <>
+      <div
+        className={`w-full ${effectiveThemeClasses.cardBg}`}
+        style={{ 
+          borderRadius: '8px',
+          border: '1px solid #E5E7EB',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Table header row */}
+        <div 
+          className="bg-[#2C3544] border-b border-[#3C4656] w-full"
+          style={{ height: '40px', borderRadius: '8px 8px 0 0' }}
+        >
+          <div
+            className="grid h-full"
+            style={{
+              gridTemplateColumns: '300px 280px 280px 1fr',
+              gap: '0',
+            }}
           >
-            <th className="px-6 py-3 text-left border-r-2 border-white">BOX SIZE</th>
-            <th className="px-6 py-3 text-left border-r-2 border-white">WAREHOUSE INVENTORY</th>
-            <th className="px-6 py-3 text-left border-r-2 border-white">SUPPLIER INVENTORY</th>
-            <th className="px-6 py-3 text-left">ACTIONS</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredData.map((box) => {
-            const isEditing = editingBoxId === box.id;
-            const bulkEdit = bulkEdits[box.id];
+            {['BOX SIZE', 'WAREHOUSE INVENTORY', 'SUPPLIER INVENTORY'].map((label, idx) => (
+              <div
+                key={label}
+                className={`h-full text-xs font-bold text-white uppercase tracking-wider flex items-center`}
+                style={{
+                  width: idx === 0 ? '300px' : '280px',
+                  height: '40px',
+                  paddingTop: '12px',
+                  paddingRight: '24px',
+                  paddingBottom: '12px',
+                  paddingLeft: '24px',
+                  gap: '10px',
+                  justifyContent: idx === 0 ? 'flex-start' : 'flex-end',
+                  textAlign: idx === 0 ? 'left' : 'right',
+                }}
+              >
+                <span>{label}</span>
+              </div>
+            ))}
+            <div className="h-full flex items-center justify-end" style={{ paddingRight: '24px' }}>
+              {/* Empty space for ellipsis icon */}
+            </div>
+          </div>
+        </div>
+
+        {/* Table body */}
+        <div
+          className="w-full"
+          style={{ minHeight: '360px' }}
+        >
+          {loading ? (
+            <div className={`px-6 py-6 text-center text-sm ${effectiveThemeClasses.textSecondary}`}>
+              Loading inventory...
+            </div>
+          ) : error ? (
+            <div className="px-6 py-6 text-center text-sm text-red-500">
+              Error: {error}
+            </div>
+          ) : filteredData.length === 0 ? (
+            <div className={`px-6 py-6 text-center text-sm italic ${effectiveThemeClasses.textSecondary}`}>
+              No boxes match your search.
+            </div>
+          ) : (
+            filteredData.map((box, index) => {
+            const isRowEditing = editingBoxId === box.id;
+            const isBulkRow = isBulkEditing;
+            const showInputs = isBulkRow || isRowEditing;
+
+            const bulkValues = bulkEdits[box.id] || {};
+            const supplierValue = isBulkRow
+              ? bulkValues.supplierInventory ?? box.supplierInventory
+              : editSupplierInv;
 
             return (
-              <tr
+              <div
                 key={box.id}
-                className={`border-b ${tableThemeClasses.border} ${tableThemeClasses.rowHover} ${tableThemeClasses.bgPrimary}`}
+                className={`grid text-sm ${effectiveThemeClasses.cardBg}`}
+                style={{
+                  gridTemplateColumns: '300px 280px 280px 1fr',
+                  gap: '0',
+                  borderBottom:
+                    index === filteredData.length - 1
+                      ? 'none'
+                      : '1px solid #e5e7eb',
+                  minHeight: '40px',
+                  borderRadius: index === filteredData.length - 1 ? '0 0 8px 8px' : '0',
+                }}
               >
-                <td className={`px-6 py-3 text-sm ${tableThemeClasses.textPrimary}`}>
+                <div 
+                  className="flex items-center" 
+                  style={{ 
+                    width: '300px',
+                    height: '40px',
+                    paddingTop: '12px',
+                    paddingRight: '24px',
+                    paddingBottom: '12px',
+                    paddingLeft: '24px',
+                    gap: '10px',
+                  }}
+                >
                   <button
+                    type="button"
+                    className="text-left text-blue-600 hover:text-blue-700 underline cursor-pointer font-normal"
                     onClick={() => onBoxClick && onBoxClick(box)}
-                    className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer transition-colors"
-                    style={{ 
-                      background: 'none', 
-                      border: 'none', 
-                      padding: 0, 
-                      font: 'inherit',
-                      cursor: 'pointer'
+                    style={{
+                      fontSize: '14px',
                     }}
                   >
-                    {box.name}
+                    {formatBoxSize(box.name)}
                   </button>
-                </td>
-                <td className="px-6 py-3">
+                </div>
+
+                <div 
+                  className="flex items-center justify-end" 
+                  style={{ 
+                    width: '280px',
+                    height: '40px',
+                    paddingTop: '12px',
+                    paddingRight: '24px',
+                    paddingBottom: '12px',
+                    paddingLeft: '24px',
+                    gap: '10px',
+                  }}
+                >
                   {/* Warehouse inventory is read-only - updated automatically when orders are received */}
-                  <span className={`text-sm ${tableThemeClasses.textPrimary}`} title="Warehouse inventory is updated automatically when orders are received">
-                    {box.warehouseInventory}
+                  <span 
+                    className={effectiveThemeClasses.textPrimary} 
+                    title="Warehouse inventory is updated automatically when orders are received" 
+                    style={{ 
+                      fontSize: '14px', 
+                      textAlign: 'right',
+                      display: 'block',
+                      width: '100%',
+                    }}
+                  >
+                    {typeof box.warehouseInventory === 'number' ? box.warehouseInventory.toLocaleString() : box.warehouseInventory}
                   </span>
-                </td>
-                <td className="px-6 py-3">
-                  {isBulkEditing ? (
+                </div>
+
+                <div 
+                  className="flex items-center justify-end" 
+                  style={{ 
+                    width: '280px',
+                    height: '40px',
+                    paddingTop: '12px',
+                    paddingRight: '24px',
+                    paddingBottom: '12px',
+                    paddingLeft: '24px',
+                    gap: '10px',
+                  }}
+                >
+                  {showInputs ? (
                     <input
                       type="number"
-                      value={
-                        bulkEdit?.supplierInventory !== undefined
-                          ? bulkEdit.supplierInventory
-                          : box.supplierInventory
-                      }
-                      onChange={(e) =>
-                        handleBulkEditChange(box.id, 'supplierInventory', e.target.value)
-                      }
-                      className={`w-24 rounded border ${tableThemeClasses.inputBorder} ${tableThemeClasses.inputBg} ${tableThemeClasses.inputText} px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50`}
-                    />
-                  ) : isEditing ? (
-                    <input
-                      type="number"
-                      value={editSupplierInv !== undefined && editSupplierInv !== null && editSupplierInv !== '' ? editSupplierInv : box.supplierInventory}
+                      value={supplierValue}
                       onChange={(e) => {
-                        setEditSupplierInv(e.target.value);
-                      }}
-                      onBlur={() => handleSaveEdit(box.id, editSupplierInv, box.name)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleSaveEdit(box.id, editSupplierInv, box.name);
-                        }
-                        if (e.key === 'Escape') {
-                          e.preventDefault();
-                          handleCancelEdit();
+                        if (isBulkRow) {
+                          handleBulkEditChange(box.id, 'supplierInventory', e.target.value);
+                        } else {
+                          setEditSupplierInv(e.target.value);
                         }
                       }}
-                      autoFocus
-                      className={`w-24 rounded border ${tableThemeClasses.inputBorder} ${tableThemeClasses.inputBg} ${tableThemeClasses.inputText} px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50`}
+                      className="w-28 rounded-full border border-blue-300 px-3 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
                     />
                   ) : (
+                    <span 
+                      className={effectiveThemeClasses.textPrimary} 
+                      style={{ 
+                        fontSize: '14px', 
+                        textAlign: 'right',
+                        display: 'block',
+                        width: '100%',
+                      }}
+                    >
+                      {typeof box.supplierInventory === 'number' ? box.supplierInventory.toLocaleString() : box.supplierInventory}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-end relative action-menu-container" style={{ paddingTop: '12px', paddingBottom: '12px', paddingRight: '24px' }}>
+                  {isBulkRow ? (
+                    <span className={`text-xs ${effectiveThemeClasses.textSecondary}`}>Bulk editing</span>
+                  ) : isRowEditing ? (
                     <div className="flex items-center gap-2">
-                      <span className={`text-sm ${tableThemeClasses.textPrimary}`}>{box.supplierInventory}</span>
                       <button
                         type="button"
-                        onClick={() => handleStartEdit(box)}
-                        className={`${tableThemeClasses.textSecondary} ${isDarkMode ? 'hover:text-dark-text-primary' : 'hover:text-gray-900'}`}
-                        aria-label="Edit supplier inventory"
+                        className={`px-3 py-1 text-xs font-medium ${effectiveThemeClasses.textPrimary} ${effectiveThemeClasses.inputBg} border ${effectiveThemeClasses.border} rounded-full ${effectiveThemeClasses.rowHover}`}
+                        onClick={handleCancelEdit}
                       >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-                          />
-                        </svg>
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="px-3 py-1 text-xs font-semibold text-white bg-blue-600 rounded-full hover:bg-blue-700"
+                        onClick={() => {
+                          handleSaveEdit(box.id, editSupplierInv, box.name);
+                        }}
+                      >
+                        Save
                       </button>
                     </div>
-                  )}
-                </td>
-                <td className="px-6 py-3">
-                  <div className="flex items-center gap-2">
-                    {onDeleteClick && (
+                  ) : (
+                    <>
                       <button
-                        onClick={() => onDeleteClick(box)}
-                        className="text-red-600 hover:text-red-800"
-                        aria-label="Delete box"
+                        type="button"
+                        className="rounded transition-colors"
+                        onClick={() => handleActionMenuToggle(box.id)}
+                        aria-label="More actions"
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F3F4F6'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        style={{
+                          color: '#6B7280',
+                          padding: '4px 8px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '3px',
+                          backgroundColor: 'transparent',
+                        }}
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        <svg width="4" height="14" viewBox="0 0 4 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <circle cx="2" cy="2" r="1.5" fill="currentColor" />
+                          <circle cx="2" cy="7" r="1.5" fill="currentColor" />
+                          <circle cx="2" cy="12" r="1.5" fill="currentColor" />
                         </svg>
                       </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
+
+                      {actionMenuBoxId === box.id && (
+                        <div className={`absolute right-4 top-9 z-20 w-32 ${effectiveThemeClasses.cardBg} border ${effectiveThemeClasses.border} rounded-md shadow-lg text-xs`}>
+                          <button
+                            type="button"
+                            className="w-full text-left px-3 py-2 hover:bg-gray-50 text-blue-600"
+                            onClick={() => handleStartEdit(box)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="w-full text-left px-3 py-2 hover:bg-gray-50 text-red-600"
+                            onClick={() => {
+                              if (onDeleteClick) {
+                                onDeleteClick(box);
+                              }
+                              setActionMenuBoxId(null);
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
             );
-          })}
-        </tbody>
-      </table>
+          }))}
+        </div>
+      </div>
+
+      {/* Bulk edit bar - inline under table */}
       {isBulkEditing && (
-        <div className={`px-6 py-4 border-t ${tableThemeClasses.border} flex items-center justify-center gap-4`}>
-          <span className={`text-sm ${tableThemeClasses.textSecondary}`}>
-            {bulkUnsavedCount} Unsaved Changes
-          </span>
-          <button
-            type="button"
-            onClick={handleDiscardBulkEdits}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-          >
-            Discard
-          </button>
-          <button
-            type="button"
-            onClick={handleBulkEditSave}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
-          >
-            Save
-          </button>
+        <div className="flex items-center justify-center mt-4 mb-1">
+          <div className="inline-flex items-center gap-4 bg-[#2C3544] text-white px-4 py-2 rounded-full shadow-md">
+            <div className="flex items-center gap-2">
+              <span className="w-5 h-5 rounded-full border border-blue-300 flex items-center justify-center bg-blue-600">
+                <svg
+                  className="w-3 h-3 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z"
+                  />
+                </svg>
+              </span>
+              <span className="text-xs font-medium">{bulkUnsavedCount} Unsaved Changes</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleDiscardBulkEdits}
+              className="px-3 py-1 text-xs font-medium text-white bg-red-600 rounded-full hover:bg-red-700 transition-colors"
+            >
+              Discard
+            </button>
+            <button
+              type="button"
+              onClick={handleBulkEditSave}
+              className="px-3 py-1 text-xs font-semibold text-white bg-blue-600 rounded-full hover:bg-blue-700 transition-colors"
+            >
+              Save All
+            </button>
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 });
 

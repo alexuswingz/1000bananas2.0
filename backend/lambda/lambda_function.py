@@ -1647,10 +1647,11 @@ def update_bottle_order(event):
             UPDATE bottle_orders 
             SET status = COALESCE(%s, status),
                 actual_delivery_date = COALESCE(%s, actual_delivery_date),
-                quantity_received = COALESCE(%s, quantity_received)
+                quantity_received = COALESCE(%s, quantity_received),
+                is_edited = COALESCE(%s, is_edited)
             WHERE id = %s RETURNING *
         """, (new_status, data.get('actual_delivery_date'), 
-              qty_received, order_id))
+              qty_received, data.get('is_edited'), order_id))
         
         order = cursor.fetchone()
         conn.commit()

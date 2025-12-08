@@ -1123,8 +1123,8 @@ const Bottles = () => {
 
       {/* Bottle Details Modal */}
       {isDetailsOpen && selectedBottle && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/40">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[80vh] flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] my-auto flex flex-col overflow-hidden">
             {/* Header */}
             <div className={`${themeClasses.headerBg} flex items-center justify-between px-6 py-3`}>
               <div className="flex items-center gap-3">
@@ -1219,7 +1219,7 @@ const Bottles = () => {
             </div>
 
             {/* Content */}
-            <div className="px-6 py-5 overflow-y-auto min-h-[360px]">
+            <div className="px-6 py-5 overflow-y-auto flex-1" style={{ minHeight: '500px', height: '500px' }}>
               {activeDetailsTab === 'core' && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between border-b border-gray-200 pb-3">
@@ -1562,6 +1562,7 @@ const Bottles = () => {
                       </label>
                       <input
                         defaultValue={selectedBottle.details?.supplier.leadTimeWeeks || ''}
+                        placeholder={!selectedBottle.details?.supplier.leadTimeWeeks ? "Enter lead time" : ""}
                         className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
                           selectedBottle.details?.supplier.leadTimeWeeks || ''
                         )}`}
@@ -1571,6 +1572,7 @@ const Bottles = () => {
                       <label className="block text-xs font-medium text-gray-500 mb-1">MOQ</label>
                       <input
                         defaultValue={selectedBottle.details?.supplier.moq || ''}
+                        placeholder={!selectedBottle.details?.supplier.moq ? "Enter MOQ" : ""}
                         className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
                           selectedBottle.details?.supplier.moq || ''
                         )}`}
@@ -1582,6 +1584,7 @@ const Bottles = () => {
                       </label>
                       <input
                         defaultValue={selectedBottle.details?.supplier.unitsPerPallet || ''}
+                        placeholder={!selectedBottle.details?.supplier.unitsPerPallet ? "Enter units per pallet" : ""}
                         className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
                           selectedBottle.details?.supplier.unitsPerPallet || ''
                         )}`}
@@ -1593,6 +1596,7 @@ const Bottles = () => {
                       </label>
                       <input
                         defaultValue={selectedBottle.details?.supplier.unitsPerCase || ''}
+                        placeholder={!selectedBottle.details?.supplier.unitsPerCase ? "Enter units per case" : ""}
                         className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
                           selectedBottle.details?.supplier.unitsPerCase || ''
                         )}`}
@@ -1604,6 +1608,7 @@ const Bottles = () => {
                       </label>
                       <input
                         defaultValue={selectedBottle.details?.supplier.casesPerPallet || ''}
+                        placeholder={!selectedBottle.details?.supplier.casesPerPallet ? "Enter cases per pallet" : ""}
                         className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
                           selectedBottle.details?.supplier.casesPerPallet || ''
                         )}`}
@@ -1616,13 +1621,14 @@ const Bottles = () => {
               {activeDetailsTab === 'dimensions' && (
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold text-gray-900">Dimensions</h3>
-                  <div className="grid grid-cols-5 gap-4">
+                  <div className="grid grid-cols-4 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">
                         Length (in)
                       </label>
                       <input
                         defaultValue={selectedBottle.details?.dimensions.lengthIn || ''}
+                        placeholder={!selectedBottle.details?.dimensions.lengthIn ? "Enter length" : ""}
                         className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
                           selectedBottle.details?.dimensions.lengthIn || ''
                         )}`}
@@ -1634,6 +1640,7 @@ const Bottles = () => {
                       </label>
                       <input
                         defaultValue={selectedBottle.details?.dimensions.widthIn || ''}
+                        placeholder={!selectedBottle.details?.dimensions.widthIn ? "Enter width" : ""}
                         className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
                           selectedBottle.details?.dimensions.widthIn || ''
                         )}`}
@@ -1645,6 +1652,7 @@ const Bottles = () => {
                       </label>
                       <input
                         defaultValue={selectedBottle.details?.dimensions.heightIn || ''}
+                        placeholder={!selectedBottle.details?.dimensions.heightIn ? "Enter height" : ""}
                         className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
                           selectedBottle.details?.dimensions.heightIn || ''
                         )}`}
@@ -1656,17 +1664,21 @@ const Bottles = () => {
                       </label>
                       <input
                         defaultValue={selectedBottle.details?.dimensions.weightLbs || ''}
+                        placeholder={!selectedBottle.details?.dimensions.weightLbs ? "Enter weight" : ""}
                         className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
                           selectedBottle.details?.dimensions.weightLbs || ''
                         )}`}
                       />
                     </div>
+                  </div>
+                  <div className="grid grid-cols-4 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">
                         Label Size
                       </label>
                       <input
                         defaultValue={selectedBottle.details?.dimensions.labelSize || ''}
+                        placeholder={!selectedBottle.details?.dimensions.labelSize ? "Enter label size" : ""}
                         className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
                           selectedBottle.details?.dimensions.labelSize || ''
                         )}`}

@@ -47,21 +47,22 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
             grouped[baseOrderNumber].lineItems.push(order);
           });
           
-          // Filter: Only show groups that have at least one 'pending' or 'partial' line item
+          // Filter: Only show groups that have at least one 'pending', 'submitted', or 'partial' line item
           // Exclude groups where ALL items are 'received' or 'archived'
           const activeGroupedOrders = Object.values(grouped)
             .filter(group => {
-              // Include if at least one line item is pending or partial
+              // Include if at least one line item is pending, submitted, or partial
               return group.lineItems.some(item => 
-                item.status === 'pending' || item.status === 'partial'
+                item.status === 'pending' || item.status === 'submitted' || item.status === 'partial'
               );
             })
             .map(group => {
-              // Determine group status: if any partial, show partial; otherwise pending
+              // Determine group status: if any partial, show partial; if any submitted, show submitted; otherwise pending
               const hasPartial = group.lineItems.some(item => item.status === 'partial');
+              const hasSubmitted = group.lineItems.some(item => item.status === 'submitted');
               return {
                 ...group,
-                status: hasPartial ? 'partial' : 'pending'
+                status: hasPartial ? 'partial' : (hasSubmitted ? 'submitted' : 'pending')
               };
             });
           
@@ -127,18 +128,19 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
               grouped[baseOrderNumber].lineItems.push(order);
             });
             
-            // Filter: Only show groups that have at least one 'pending' or 'partial' line item
+            // Filter: Only show groups that have at least one 'pending', 'submitted', or 'partial' line item
             const activeGroupedOrders = Object.values(grouped)
               .filter(group => {
                 return group.lineItems.some(item => 
-                  item.status === 'pending' || item.status === 'partial'
+                  item.status === 'pending' || item.status === 'submitted' || item.status === 'partial'
                 );
               })
               .map(group => {
                 const hasPartial = group.lineItems.some(item => item.status === 'partial');
+                const hasSubmitted = group.lineItems.some(item => item.status === 'submitted');
                 return {
                   ...group,
-                  status: hasPartial ? 'partial' : 'pending'
+                  status: hasPartial ? 'partial' : (hasSubmitted ? 'submitted' : 'pending')
                 };
               });
             
@@ -264,18 +266,19 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
               grouped[baseOrderNumber].lineItems.push(order);
             });
             
-            // Filter: Only show groups that have at least one 'pending' or 'partial' line item
+            // Filter: Only show groups that have at least one 'pending', 'submitted', or 'partial' line item
             const activeGroupedOrders = Object.values(grouped)
               .filter(group => {
                 return group.lineItems.some(item => 
-                  item.status === 'pending' || item.status === 'partial'
+                  item.status === 'pending' || item.status === 'submitted' || item.status === 'partial'
                 );
               })
               .map(group => {
                 const hasPartial = group.lineItems.some(item => item.status === 'partial');
+                const hasSubmitted = group.lineItems.some(item => item.status === 'submitted');
                 return {
                   ...group,
-                  status: hasPartial ? 'partial' : 'pending'
+                  status: hasPartial ? 'partial' : (hasSubmitted ? 'submitted' : 'pending')
                 };
               });
             
@@ -337,7 +340,10 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
     let displayStatus = 'Pending';
     let style = { bg: 'bg-blue-100', text: 'text-blue-700' };
     
-    if (backendStatus === 'partial') {
+    if (backendStatus === 'submitted') {
+      displayStatus = 'Submitted';
+      style = { bg: 'bg-purple-100', text: 'text-purple-700' };
+    } else if (backendStatus === 'partial') {
       displayStatus = 'Partially Received';
       style = { bg: 'bg-orange-100', text: 'text-orange-700' };
     } else {
@@ -347,11 +353,20 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
 
     return (
       <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${style.bg} ${style.text}`}>
-        {displayStatus === 'Partially Received' ? (
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="12" cy="12" r="10" stroke="#F97316" strokeWidth="1.5" fill="none"/>
-            <path d="M 2 12 A 10 10 0 0 1 22 12 L 12 12 Z" fill="#F97316"/>
-          </svg>
+        {displayStatus === 'Submitted' ? (
+          <img 
+            src="/assets/Icons (1).png" 
+            alt="Submitted" 
+            className="w-3.5 h-3.5"
+            style={{ objectFit: 'contain' }}
+          />
+        ) : displayStatus === 'Partially Received' ? (
+          <img 
+            src="/assets/Icons (2).png" 
+            alt="Partially Received" 
+            className="w-3.5 h-3.5"
+            style={{ objectFit: 'contain' }}
+          />
         ) : (
           <svg className="w-3.5 h-3.5" fill="#3B82F6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" fill="#3B82F6"/>
@@ -375,17 +390,31 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
         <div
           className="grid"
           style={{
-            gridTemplateColumns: '140px 2fr 2fr',
+            gridTemplateColumns: '222px 222px 222px 120px 120px 120px 1fr',
           }}
         >
           <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center">
             Status
           </div>
           <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center">
-            Box Order #
+            Boxes Order #
           </div>
-          <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider text-center">
+          <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center">
             Supplier
+          </div>
+          <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.2' }}>
+            <div>ADD</div>
+            <div>PRODUCTS</div>
+          </div>
+          <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.2' }}>
+            <div>SUBMIT</div>
+            <div>PO</div>
+          </div>
+          <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] text-center" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.2' }}>
+            <div>RECEIVE</div>
+            <div>PO</div>
+          </div>
+          <div className="px-6 py-3 text-xs font-bold text-white uppercase tracking-wider text-center" style={{ textAlign: 'right', position: 'relative', paddingRight: '16px', paddingLeft: '0px', paddingTop: '12px', paddingBottom: '12px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
           </div>
         </div>
       </div>
@@ -398,60 +427,108 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
           </div>
         ) : (
           <>
-            {filteredOrders.map((order, index) => (
-              <div
-                key={order.id}
-                className={`grid text-sm ${themeClasses.rowHover} transition-colors`}
-                style={{
-                  gridTemplateColumns: '140px 2fr 2fr',
+            {filteredOrders.map((order, index) => {
+              // Determine status for each stage
+              const addProductsStatus = true; // Always completed (order exists)
+              const submitPOStatus = true; // Always completed (order was submitted)
+              // RECEIVE PO: Only green if order is actually received
+              // Check both order status and line items - must have at least one 'received' status
+              const hasReceivedLineItem = order.lineItems?.some(item => item.status === 'received') || false;
+              const orderStatusIsReceived = order.status === 'received';
+              const receivePOStatus = hasReceivedLineItem || orderStatusIsReceived;
+              
+              return (
+                <div
+                  key={order.id}
+                  className={`grid text-sm ${themeClasses.rowHover} transition-colors`}
+                  style={{
+                    gridTemplateColumns: '222px 222px 222px 120px 120px 120px 1fr',
                     borderBottom:
                       index === filteredOrders.length - 1
                         ? 'none'
                         : isDarkMode
                         ? '1px solid rgba(75,85,99,0.3)'
                         : '1px solid #e5e7eb',
-                }}
-              >
-                <div className="px-6 py-3 flex items-center justify-center">
-                  {renderStatusPill(order)}
-                </div>
-                <div className="px-6 py-3 flex items-center gap-2">
-                  <div className="flex flex-col">
-                    <button
-                      type="button"
-                      className="text-xs font-medium text-blue-600 hover:text-blue-700 underline-offset-2 hover:underline text-left"
-                      onClick={() => onViewOrder(order)}
-                    >
-                      {order.orderNumber}
-                    </button>
-                    {order.orderCount > 1 && (
-                      <span className="text-[10px] text-gray-400">
-                        {order.orderCount} box types
-                      </span>
-                    )}
+                  }}
+                >
+                  <div className="px-6 py-3 flex items-center justify-center">
+                    {renderStatusPill(order)}
                   </div>
-                </div>
-                <div className="px-6 py-3 flex items-center justify-between relative">
-                  <span className={themeClasses.textPrimary}>{order.supplier}</span>
-
-                  <div className="relative">
-                    <button
-                      ref={(el) => (buttonRefs.current[order.id] = el)}
-                      type="button"
-                      data-menu-button={order.id}
-                      className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors ml-2"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOrderActionMenuId((prev) => (prev === order.id ? null : order.id));
+                  <div className="px-6 py-3 flex items-center gap-2">
+                    <div className="flex flex-col">
+                      <button
+                        type="button"
+                        className="text-xs font-medium text-blue-600 hover:text-blue-700 underline-offset-2 hover:underline text-left"
+                        onClick={() => onViewOrder(order)}
+                      >
+                        {order.orderNumber}
+                      </button>
+                      {order.orderCount > 1 && (
+                        <span className="text-[10px] text-gray-400">
+                          {order.orderCount} box types
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="px-6 py-3 flex items-center">
+                    <span className={themeClasses.textPrimary}>{order.supplier}</span>
+                  </div>
+                  {/* ADD PRODUCTS Circle */}
+                  <div className="px-6 py-3 flex items-center justify-center">
+                    <div
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '50%',
+                        backgroundColor: addProductsStatus ? '#22C55E' : 'transparent',
+                        border: addProductsStatus ? 'none' : '2px solid #9CA3AF',
                       }}
-                      aria-label="Order actions"
-                    >
-                      <span className={themeClasses.textSecondary}>⋮</span>
-                    </button>
+                    />
+                  </div>
+                  {/* SUBMIT PO Circle */}
+                  <div className="px-6 py-3 flex items-center justify-center">
+                    <div
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '50%',
+                        backgroundColor: submitPOStatus ? '#22C55E' : 'transparent',
+                        border: submitPOStatus ? 'none' : '2px solid #9CA3AF',
+                      }}
+                    />
+                  </div>
+                  {/* RECEIVE PO Circle */}
+                  <div className="px-6 py-3 flex items-center justify-center">
+                    <div
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '50%',
+                        backgroundColor: receivePOStatus ? '#22C55E' : 'transparent',
+                        border: receivePOStatus ? 'none' : '2px solid #9CA3AF',
+                      }}
+                    />
+                  </div>
+                  <div className="px-6 py-3 flex items-center justify-end relative">
+                    <div className="relative">
+                      <button
+                        ref={(el) => (buttonRefs.current[order.id] = el)}
+                        type="button"
+                        data-menu-button={order.id}
+                        className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-dark-bg-tertiary transition-colors ml-2"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOrderActionMenuId((prev) => (prev === order.id ? null : order.id));
+                        }}
+                        aria-label="Order actions"
+                      >
+                        <span className={themeClasses.textSecondary}>⋮</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {filteredOrders.length === 0 && (
               <div className="px-6 py-6 text-center text-sm italic text-gray-400">

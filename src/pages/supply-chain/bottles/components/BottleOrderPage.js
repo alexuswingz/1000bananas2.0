@@ -27,6 +27,7 @@ const BottleOrderPage = () => {
     return (mode === 'view' || mode === 'receive') ? 'receivePO' : 'addProducts';
   });
   const [searchQuery, setSearchQuery] = useState('');
+  const [tableMode, setTableMode] = useState(false);
   const [bottleInventoryData, setBottleInventoryData] = useState({});
   const [bottleForecastRequirements, setBottleForecastRequirements] = useState({});
   const [doiGoal, setDoiGoal] = useState(120); // Days of Inventory goal for forecasting
@@ -212,13 +213,19 @@ const BottleOrderPage = () => {
             const orderLinesFormatted = (order.lines || []).map(item => {
               const bottleName = item.bottle_name;
               const bottleInfo = bottleInventoryData[bottleName] || {};
+              const originalQty = item.quantity_ordered || 0;
+              const receivedQty = item.quantity_received || 0;
+              const qtyToReceive = originalQty - receivedQty; // Remaining to receive
               
               return {
                 id: item.id,
                 name: bottleInfo.fullName || bottleName,
                 supplierInventory: bottleInfo.supplierQuantity || 0,
-                qty: item.quantity_ordered || 0,
-                pallets: calculatePallets(item.quantity_ordered || 0, bottleInfo.unitsPerPallet || 1),
+                qty: qtyToReceive, // Default to remaining quantity to receive
+                initialQty: qtyToReceive, // Store initial receive quantity for comparison
+                originalQty: originalQty, // Store original ordered quantity
+                receivedQty: receivedQty, // Store already received quantity
+                pallets: calculatePallets(qtyToReceive, bottleInfo.unitsPerPallet || 1),
                 added: true, // Mark as added since it's from the order
                 maxWarehouseInventory: bottleInfo.maxWarehouseInventory,
                 warehouseQuantity: bottleInfo.warehouseQuantity || 0,
@@ -242,6 +249,9 @@ const BottleOrderPage = () => {
   const [showReceiveConfirmModal, setShowReceiveConfirmModal] = useState(false);
   const [showPartialOrderModal, setShowPartialOrderModal] = useState(false);
   const [showAddBottleModal, setShowAddBottleModal] = useState(false);
+  const [showQuantityChangedModal, setShowQuantityChangedModal] = useState(false);
+  const [showInventoryConfirmModal, setShowInventoryConfirmModal] = useState(false);
+  const [pendingSaveLineId, setPendingSaveLineId] = useState(null);
   
   // Checkbox selection state for partial orders
   const [selectedItems, setSelectedItems] = useState(new Set());
@@ -417,14 +427,32 @@ const BottleOrderPage = () => {
   const handleStartEdit = (lineId) => {
     const line = orderLines.find(l => l.id === lineId);
     if (line) {
+      // Try both fullName and name to get bottle data
+      const bottleData = bottleInventoryData[line.fullName] || bottleInventoryData[line.name] || {};
+      const currentWarehouseQty = bottleData.warehouseQuantity !== undefined 
+        ? bottleData.warehouseQuantity 
+        : (line.warehouseQuantity !== undefined ? line.warehouseQuantity : 0);
+      
+      const currentSupplierQty = bottleData.supplierQuantity !== undefined
+        ? bottleData.supplierQuantity
+        : (line.supplierInventory !== undefined 
+          ? (typeof line.supplierInventory === 'number' 
+            ? line.supplierInventory 
+            : Number(String(line.supplierInventory).replace(/,/g, '')))
+          : 0);
+      
       setEditingLineId(lineId);
       setOriginalValues({
         qty: line.qty || 0,
         pallets: line.pallets || 0,
+        warehouseQuantity: currentWarehouseQty,
+        supplierQuantity: currentSupplierQty,
       });
       setEditedValues({
         qty: line.qty || 0,
         pallets: line.pallets || 0,
+        warehouseQuantity: currentWarehouseQty !== undefined && currentWarehouseQty !== null ? String(currentWarehouseQty) : '',
+        supplierQuantity: currentSupplierQty !== undefined && currentSupplierQty !== null ? String(currentSupplierQty) : '',
       });
       setEllipsisMenuId(null);
     }
@@ -436,7 +464,91 @@ const BottleOrderPage = () => {
     setEditedValues({});
   };
 
-  const handleDoneEdit = (lineId) => {
+  const handleDoneEdit = async (lineId) => {
+    const line = orderLines.find(l => l.id === lineId);
+    const newQty = editedValues.qty || 0;
+    const originalQty = originalValues.qty || 0;
+    const newWarehouseQty = Number(editedValues.warehouseQuantity) || 0;
+    const originalWarehouseQty = Number(originalValues.warehouseQuantity) || 0;
+    
+    // Check if warehouse inventory was changed
+    const warehouseChanged = newWarehouseQty !== originalWarehouseQty;
+    
+    // If warehouse inventory changed, show confirmation modal
+    if (warehouseChanged) {
+      setPendingSaveLineId(lineId);
+      setShowInventoryConfirmModal(true);
+      return;
+    }
+    
+    // Otherwise, save immediately (including supplier inventory changes)
+    await saveEditChanges(lineId);
+  };
+
+  const saveEditChanges = async (lineId) => {
+    const line = orderLines.find(l => l.id === lineId);
+    const newQty = editedValues.qty || 0;
+    const originalQty = originalValues.qty || 0;
+    const newWarehouseQty = Number(editedValues.warehouseQuantity) || 0;
+    const originalWarehouseQty = Number(originalValues.warehouseQuantity) || 0;
+    const newSupplierQty = Number(editedValues.supplierQuantity) || 0;
+    const originalSupplierQty = Number(originalValues.supplierQuantity) || 0;
+    
+    // Check if quantity was actually changed
+    const wasEdited = newQty !== originalQty;
+    
+    // Check if inventory was changed
+    const warehouseChanged = newWarehouseQty !== originalWarehouseQty;
+    const supplierChanged = newSupplierQty !== originalSupplierQty;
+    
+    // Update inventory if changed
+    if (warehouseChanged || supplierChanged) {
+      try {
+        // Find inventory ID from API
+        const inventoryResponse = await bottlesApi.getInventory();
+        if (inventoryResponse.success) {
+          const bottleName = line?.fullName || line?.name;
+          const inventoryItem = inventoryResponse.data.find(
+            item => item.bottle_name === bottleName
+          );
+          if (inventoryItem?.id) {
+            // Send both warehouse and supplier quantities to match backend expectations
+            await bottlesApi.updateInventory(inventoryItem.id, {
+              warehouse_quantity: newWarehouseQty,
+              supplier_quantity: newSupplierQty,
+            });
+            // Update local state
+            setBottleInventoryData(prev => {
+              const updated = { ...prev };
+              if (line.name) {
+                updated[line.name] = {
+                  ...(prev[line.name] || {}),
+                  warehouseQuantity: newWarehouseQty,
+                  supplierQuantity: newSupplierQty,
+                };
+              }
+              if (line.fullName) {
+                updated[line.fullName] = {
+                  ...(prev[line.fullName] || {}),
+                  warehouseQuantity: newWarehouseQty,
+                  supplierQuantity: newSupplierQty,
+                };
+              }
+              return updated;
+            });
+          } else {
+            console.error('Inventory item not found for:', bottleName);
+            alert('Failed to find inventory item. Please try again.');
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Error updating inventory:', error);
+        alert('Failed to update inventory. Please try again.');
+        return;
+      }
+    }
+    
     setOrderLines((prev) =>
       prev.map((line) =>
         line.id === lineId
@@ -444,13 +556,28 @@ const BottleOrderPage = () => {
               ...line,
               qty: editedValues.qty || 0,
               pallets: editedValues.pallets || 0,
+              warehouseQuantity: newWarehouseQty,
             }
           : line
       )
     );
+    
+    // If quantity was changed, mark the order as edited in the database
+    if (wasEdited && isViewMode && orderId) {
+      try {
+        await bottlesApi.updateOrder(lineId, {
+          is_edited: true,
+        });
+      } catch (error) {
+        console.error('Error marking order as edited:', error);
+      }
+    }
+    
     setEditingLineId(null);
     setOriginalValues({});
     setEditedValues({});
+    setShowInventoryConfirmModal(false);
+    setPendingSaveLineId(null);
   };
 
   const handleEditQtyChange = (lineId, delta) => {
@@ -526,6 +653,19 @@ const BottleOrderPage = () => {
     const totalItems = orderLines.length;
     const selectedCount = selectedItems.size;
     
+    // Check if any quantities have been changed from their initial values
+    const hasQuantityChanges = orderLines.some(line => {
+      const initialQty = line.initialQty || 0;
+      const currentQty = line.qty || 0;
+      return initialQty !== currentQty;
+    });
+    
+    // If quantities changed, show quantity changed modal first
+    if (hasQuantityChanges) {
+      setShowQuantityChangedModal(true);
+      return;
+    }
+    
     // If all items selected, show confirmation modal
     if (selectedCount === totalItems && totalItems > 0) {
       setShowReceiveConfirmModal(true);
@@ -541,17 +681,34 @@ const BottleOrderPage = () => {
     // If no items selected, do nothing
   };
 
+  // Handle confirm quantity changed - proceed to next modal
+  const handleConfirmQuantityChanged = () => {
+    setShowQuantityChangedModal(false);
+    
+    const totalItems = orderLines.length;
+    const selectedCount = selectedItems.size;
+    
+    // If all items selected, show confirmation modal
+    if (selectedCount === totalItems && totalItems > 0) {
+      setShowReceiveConfirmModal(true);
+      return;
+    }
+    
+    // If some items selected, show partial order modal
+    if (selectedCount > 0 && selectedCount < totalItems) {
+      setShowPartialOrderModal(true);
+      return;
+    }
+    
+    // If no items selected, proceed to receive all
+    setShowReceiveConfirmModal(true);
+  };
+
   // Handle confirm partial order
-  const handleConfirmPartialOrder = () => {
+  const handleConfirmPartialOrder = async () => {
     setShowPartialOrderModal(false);
-    navigate('/dashboard/supply-chain/bottles', {
-      state: {
-        receivedOrderId: orderId,
-        receivedOrderNumber: orderNumber,
-        isPartial: true,
-      },
-      replace: false,
-    });
+    // Process the partial receive
+    await handleCompleteOrder();
   };
 
   const handleCompleteOrder = async () => {
@@ -562,23 +719,50 @@ const BottleOrderPage = () => {
         const selectedLines = orderLines.filter(line => line.added && selectedItems.has(line.id));
         
         // If no items selected, select all
-        const linesToReceive = selectedLines.length > 0 ? selectedLines : orderLines.filter(line => line.added);
+        const allAddedLines = orderLines.filter(line => line.added);
+        const linesToReceive = selectedLines.length > 0 ? selectedLines : allAddedLines;
         
         if (linesToReceive.length === 0) {
           alert('No items to receive');
           return;
         }
         
-        // Update each line item to mark as received
+        // Determine if this is a partial receive (not all items selected)
+        const isPartialReceive = selectedLines.length > 0 && selectedLines.length < allAddedLines.length;
+        
+        // Update each line item to mark as received or partial
         for (const line of linesToReceive) {
+          // Calculate total received: already received + new received
+          const alreadyReceived = line.receivedQty || 0;
+          const newReceived = line.qty || 0;
+          const totalReceived = alreadyReceived + newReceived;
+          const originalQty = line.originalQty || totalReceived;
+          
+          // Check if this line is fully received (total received equals original ordered)
+          const isFullyReceived = totalReceived >= originalQty;
+          
           const updateData = {
-            quantity_received: line.qty,
+            quantity_received: totalReceived, // Total received (previous + new)
             bottle_name: line.name,
-            status: 'received',
+            status: (isPartialReceive || !isFullyReceived) ? 'partial' : 'received',
             actual_delivery_date: today,
           };
           
           await bottlesApi.updateOrder(line.id, updateData);
+        }
+        
+        // Also mark unselected items as partial if this is a partial receive
+        if (isPartialReceive) {
+          const unselectedLines = allAddedLines.filter(line => !selectedItems.has(line.id));
+          for (const line of unselectedLines) {
+            const updateData = {
+              quantity_received: line.receivedQty || 0,
+              bottle_name: line.name,
+              status: 'partial',
+            };
+            
+            await bottlesApi.updateOrder(line.id, updateData);
+          }
         }
         
         // Navigate back with success message
@@ -586,6 +770,7 @@ const BottleOrderPage = () => {
           state: {
             receivedOrderId: orderId,
             receivedOrderNumber: orderNumber,
+            isPartial: isPartialReceive,
           },
           replace: false,
         });
@@ -649,7 +834,7 @@ const BottleOrderPage = () => {
           quantity_ordered: line.qty || 0,
           cost_per_unit: null,
           total_cost: null,
-          status: 'pending',
+          status: 'submitted',
           notes: `${line.qty} units (${line.pallets} pallets)`,
         })),
       };
@@ -824,6 +1009,70 @@ const BottleOrderPage = () => {
             </div>
           </div>
 
+          {/* Right side - Table Mode Toggle and Settings */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {/* Table Mode Toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ 
+                fontSize: '14px', 
+                fontWeight: 500, 
+                color: '#007AFF',
+              }}>
+                Table Mode
+              </span>
+              <button
+                type="button"
+                onClick={() => setTableMode(!tableMode)}
+                style={{
+                  width: '48px',
+                  height: '28px',
+                  borderRadius: '14px',
+                  backgroundColor: tableMode ? '#007AFF' : (isDarkMode ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.1)'),
+                  border: 'none',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  transition: 'background-color 0.2s',
+                  padding: 0,
+                }}
+                aria-label="Toggle Table Mode"
+              >
+                <div
+                  style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    backgroundColor: '#FFFFFF',
+                    position: 'absolute',
+                    top: '2px',
+                    left: tableMode ? '22px' : '2px',
+                    transition: 'left 0.2s',
+                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+                  }}
+                />
+              </button>
+            </div>
+
+            {/* Settings Button */}
+            <button
+              type="button"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '32px',
+                height: '32px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: isDarkMode ? '#9CA3AF' : '#6B7280',
+              }}
+              aria-label="Settings"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5a3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97c0-.33-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.4-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1c0 .33.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.66Z"/>
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -943,7 +1192,7 @@ const BottleOrderPage = () => {
       <div className="px-6 py-4 flex justify-between items-center" style={{ marginTop: '0' }}>
         {/* Forecast Controls */}
         {!isViewMode && (
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-6" style={{ flex: 1 }}>
             {/* DOI Goal Selector */}
             <div className="flex items-center gap-3">
               <span style={{ fontSize: '14px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
@@ -1093,9 +1342,246 @@ const BottleOrderPage = () => {
       </div>
 
       {/* Table - Show in all tabs */}
-      {(
-        <div className={`${themeClasses.cardBg} border ${themeClasses.border} shadow-lg mx-6`} style={{ marginTop: '0', borderRadius: '8px', overflow: 'hidden' }}>
+      <div className={`${themeClasses.cardBg} border ${themeClasses.border} shadow-lg mx-6`} style={{ marginTop: '0', borderRadius: '8px', overflow: 'hidden' }}>
           <div className="overflow-x-auto">
+            {/* Table Mode - Show different table structure for addProducts tab when tableMode is true */}
+            {tableMode && activeTab === 'addProducts' && !isViewMode ? (
+              <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
+                <thead className={themeClasses.headerBg} style={{ borderRadius: '8px 8px 0 0' }}>
+                  <tr style={{ height: '40px', maxHeight: '40px' }}>
+                    <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: '1px solid #3C4656', width: 50 }}>
+                      <input 
+                        type="checkbox" 
+                        style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                        checked={filteredLines.length > 0 && filteredLines.every(l => l.added)}
+                        onChange={(e) => {
+                          setOrderLines(prev => prev.map(line => {
+                            if (filteredLines.some(fl => fl.id === line.id)) {
+                              return { ...line, added: e.target.checked };
+                            }
+                            return line;
+                          }));
+                        }}
+                      />
+                    </th>
+                    <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                      height: '40px',
+                      paddingTop: '12px',
+                      paddingRight: '24px',
+                      paddingBottom: '12px',
+                      paddingLeft: '24px',
+                      textAlign: 'left',
+                      borderRight: '1px solid #3C4656',
+                    }}>
+                      PACKAGING NAME
+                    </th>
+                    <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                      height: '40px',
+                      paddingTop: '12px',
+                      paddingRight: '24px',
+                      paddingBottom: '12px',
+                      paddingLeft: '24px',
+                      textAlign: 'left',
+                      borderRight: '1px solid #3C4656',
+                    }}>
+                      SUPPLIER INVENTORY
+                    </th>
+                    <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                      height: '40px',
+                      paddingTop: '12px',
+                      paddingRight: '24px',
+                      paddingBottom: '12px',
+                      paddingLeft: '24px',
+                      textAlign: 'right',
+                      borderRight: '1px solid #3C4656',
+                    }}>
+                      CURRENT INVENTORY
+                    </th>
+                    <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                      height: '40px',
+                      paddingTop: '12px',
+                      paddingRight: '24px',
+                      paddingBottom: '12px',
+                      paddingLeft: '24px',
+                      textAlign: 'right',
+                      borderRight: '1px solid #3C4656',
+                    }}>
+                      UNITS NEEDED
+                    </th>
+                    <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                      height: '40px',
+                      paddingTop: '12px',
+                      paddingRight: '24px',
+                      paddingBottom: '12px',
+                      paddingLeft: '24px',
+                      textAlign: 'right',
+                      borderRight: '1px solid #3C4656',
+                    }}>
+                      QTY
+                    </th>
+                    <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                      height: '40px',
+                      paddingTop: '12px',
+                      paddingRight: '24px',
+                      paddingBottom: '12px',
+                      paddingLeft: '24px',
+                      textAlign: 'right',
+                    }}>
+                      PALLETS
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredLines.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-6 text-center text-sm italic text-gray-400">
+                        No items available.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredLines.map((line, index) => {
+                      const bottleData = bottleInventoryData[line.name] || bottleInventoryData[line.fullName] || {};
+                      const currentInventory = bottleData.warehouseQuantity || 0;
+                      const unitsNeeded = line.forecastedUnitsNeeded || line.recommendedQty || 0;
+                      
+                      return (
+                        <tr 
+                          key={line.id}
+                          className={`text-sm ${themeClasses.rowHover} transition-colors border-t`}
+                          style={{
+                            height: '40px',
+                            maxHeight: '40px',
+                            minHeight: '40px',
+                            borderTop: index === 0 ? 'none' : (isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid #e5e7eb'),
+                          }}
+                        >
+                          <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle' }}>
+                            <input 
+                              type="checkbox" 
+                              style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                              checked={line.added || false}
+                              onChange={(e) => {
+                                setOrderLines(prev => prev.map(l => 
+                                  l.id === line.id ? { ...l, added: e.target.checked } : l
+                                ));
+                              }}
+                            />
+                          </td>
+                          <td style={{ 
+                            height: '40px',
+                            paddingTop: '12px',
+                            paddingRight: '24px',
+                            paddingBottom: '12px',
+                            paddingLeft: '24px',
+                            fontSize: '0.875rem',
+                            verticalAlign: 'middle',
+                            textAlign: 'left',
+                          }} className={themeClasses.textPrimary}>
+                            {line.fullName || line.name}
+                          </td>
+                          <td style={{ 
+                            height: '40px',
+                            paddingTop: '12px',
+                            paddingRight: '24px',
+                            paddingBottom: '12px',
+                            paddingLeft: '24px',
+                            fontSize: '0.875rem',
+                            verticalAlign: 'middle',
+                            textAlign: 'left',
+                          }} className={themeClasses.textPrimary}>
+                            Auto Replenishment
+                          </td>
+                          <td style={{ 
+                            height: '40px',
+                            paddingTop: '12px',
+                            paddingRight: '24px',
+                            paddingBottom: '12px',
+                            paddingLeft: '24px',
+                            fontSize: '0.875rem',
+                            verticalAlign: 'middle',
+                            textAlign: 'right',
+                          }} className={themeClasses.textPrimary}>
+                            {currentInventory.toLocaleString()}
+                          </td>
+                          <td style={{ 
+                            height: '40px',
+                            paddingTop: '12px',
+                            paddingRight: '24px',
+                            paddingBottom: '12px',
+                            paddingLeft: '24px',
+                            fontSize: '0.875rem',
+                            verticalAlign: 'middle',
+                            textAlign: 'right',
+                          }} className={themeClasses.textPrimary}>
+                            {unitsNeeded.toLocaleString()}
+                          </td>
+                          <td style={{ 
+                            height: '40px',
+                            paddingTop: '12px',
+                            paddingRight: '24px',
+                            paddingBottom: '12px',
+                            paddingLeft: '24px',
+                            textAlign: 'right',
+                            verticalAlign: 'middle',
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                              <input
+                                type="number"
+                                value={line.qty || ''}
+                                onChange={(e) => handleQtyChange(line.id, e.target.value)}
+                                style={{
+                                  width: '120px',
+                                  padding: '6px 12px',
+                                  fontSize: '14px',
+                                  textAlign: 'right',
+                                  border: '1px solid #D1D5DB',
+                                  borderRadius: '6px',
+                                  backgroundColor: '#FFFFFF',
+                                  color: '#000000',
+                                  cursor: 'text',
+                                }}
+                              />
+                            </div>
+                          </td>
+                          <td style={{ 
+                            height: '40px',
+                            paddingTop: '12px',
+                            paddingRight: '24px',
+                            paddingBottom: '12px',
+                            paddingLeft: '24px',
+                            textAlign: 'right',
+                            verticalAlign: 'middle',
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                              <input
+                                type="number"
+                                step="0.1"
+                                value={line.pallets ? line.pallets.toFixed(1) : ''}
+                                onChange={(e) => {
+                                  const newPallets = parseFloat(e.target.value) || 0;
+                                  handlePalletsChange(line.id, newPallets);
+                                }}
+                                style={{
+                                  width: '120px',
+                                  padding: '6px 12px',
+                                  fontSize: '14px',
+                                  textAlign: 'right',
+                                  border: '1px solid #D1D5DB',
+                                  borderRadius: '6px',
+                                  backgroundColor: '#FFFFFF',
+                                  color: '#000000',
+                                  cursor: 'text',
+                                }}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            ) : (
             <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
               <thead className={themeClasses.headerBg} style={{ borderRadius: '8px 8px 0 0' }}>
                 <tr style={{ height: '40px', maxHeight: '40px' }}>
@@ -1156,11 +1642,43 @@ const BottleOrderPage = () => {
                     paddingBottom: '12px',
                     paddingLeft: '16px',
                     textAlign: 'center',
-                    borderRight: (isViewMode && activeTab === 'receivePO') ? '1px solid #3C4656' : '1px solid #3C4656',
+                    borderRight: '1px solid #3C4656',
                     gap: '10px',
                   }}>
                     PALLETS
                   </th>
+                  {/* WAREHOUSE INVENTORY column - show when viewing an order in receivePO tab */}
+                  {isViewMode && activeTab === 'receivePO' && (
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                    width: '180px',
+                    height: '40px',
+                    paddingTop: '12px',
+                    paddingRight: '16px',
+                    paddingBottom: '12px',
+                    paddingLeft: '16px',
+                    textAlign: 'center',
+                    borderRight: '1px solid #3C4656',
+                    gap: '10px',
+                  }}>
+                    WAREHOUSE INVENTORY
+                  </th>
+                  )}
+                  {/* SUPPLIER INVENTORY column - show when viewing an order in receivePO tab */}
+                  {isViewMode && activeTab === 'receivePO' && (
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                    width: '180px',
+                    height: '40px',
+                    paddingTop: '12px',
+                    paddingRight: '16px',
+                    paddingBottom: '12px',
+                    paddingLeft: '16px',
+                    textAlign: 'center',
+                    borderRight: '1px solid #3C4656',
+                    gap: '10px',
+                  }}>
+                    SUPPLIER INVENTORY
+                  </th>
+                  )}
                   {/* INVENTORY PERCENTAGE column - only show in addProducts tab when creating new order (not viewing) */}
                   {(activeTab === 'addProducts' && !isViewMode) && (
                   <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'left', width: 300 }}>
@@ -1177,7 +1695,7 @@ const BottleOrderPage = () => {
               <tbody>
                 {filteredLines.length === 0 ? (
                   <tr>
-                    <td colSpan={(isViewMode && activeTab === 'receivePO') ? 4 : ((activeTab === 'addProducts' && !isViewMode) ? 6 : 4)} className="px-6 py-6 text-center text-sm italic text-gray-400">
+                    <td colSpan={(isViewMode && activeTab === 'receivePO') ? 7 : ((activeTab === 'addProducts' && !isViewMode) ? 6 : 4)} className="px-6 py-6 text-center text-sm italic text-gray-400">
                       No items available.
                     </td>
                   </tr>
@@ -1598,36 +2116,168 @@ const BottleOrderPage = () => {
                         </div>
                       </td>
                       )}
+                      {/* WAREHOUSE INVENTORY column - show when viewing an order in receivePO tab */}
+                      {isViewMode && activeTab === 'receivePO' && (
+                      <td style={{ 
+                        width: '180px',
+                        height: '40px',
+                        paddingTop: '12px',
+                        paddingRight: '16px',
+                        paddingBottom: '12px',
+                        paddingLeft: '16px',
+                        textAlign: 'center',
+                        verticalAlign: 'middle',
+                        gap: '10px',
+                      }}>
+                        {editingLineId === line.id ? (
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', width: '100%', paddingRight: '16px' }}>
+                            <input
+                              type="number"
+                              value={editedValues.warehouseQuantity ?? ''}
+                              onChange={(e) => {
+                                setEditedValues(prev => ({ 
+                                  ...prev, 
+                                  warehouseQuantity: e.target.value
+                                }));
+                              }}
+                              onFocus={(e) => {
+                                e.target.select();
+                              }}
+                              onMouseDown={(e) => {
+                                e.stopPropagation();
+                              }}
+                              className="rounded-full border border-blue-300 px-3 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
+                              style={{
+                                backgroundColor: '#FFFFFF',
+                                color: '#000000',
+                                cursor: 'text',
+                                width: '112px',
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <span className={themeClasses.textPrimary} style={{ display: 'block', width: '100%', textAlign: 'right' }}>
+                            {(() => {
+                              const bottleData = bottleInventoryData[line.fullName] || bottleInventoryData[line.name] || {};
+                              const warehouseQty = bottleData.warehouseQuantity !== undefined 
+                                ? bottleData.warehouseQuantity 
+                                : (line.warehouseQuantity !== undefined ? line.warehouseQuantity : 0);
+                              return warehouseQty.toLocaleString();
+                            })()}
+                          </span>
+                        )}
+                      </td>
+                      )}
+                      {/* SUPPLIER INVENTORY column - show when viewing an order in receivePO tab */}
+                      {isViewMode && activeTab === 'receivePO' && (
+                      <td style={{ 
+                        width: '180px',
+                        height: '40px',
+                        paddingTop: '12px',
+                        paddingRight: '16px',
+                        paddingBottom: '12px',
+                        paddingLeft: '16px',
+                        textAlign: 'center',
+                        verticalAlign: 'middle',
+                        gap: '10px',
+                      }}>
+                        {editingLineId === line.id ? (
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', width: '100%', paddingRight: '16px' }}>
+                            <input
+                              type="number"
+                              value={editedValues.supplierQuantity ?? ''}
+                              onChange={(e) => {
+                                setEditedValues(prev => ({ 
+                                  ...prev, 
+                                  supplierQuantity: e.target.value
+                                }));
+                              }}
+                              onFocus={(e) => {
+                                e.target.select();
+                              }}
+                              onMouseDown={(e) => {
+                                e.stopPropagation();
+                              }}
+                              className="rounded-full border border-blue-300 px-3 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
+                              style={{
+                                backgroundColor: '#FFFFFF',
+                                color: '#000000',
+                                cursor: 'text',
+                                width: '112px',
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <span className={themeClasses.textPrimary} style={{ display: 'block', width: '100%', textAlign: 'right' }}>
+                            {(() => {
+                              const bottleData = bottleInventoryData[line.fullName] || bottleInventoryData[line.name] || {};
+                              const supplierQty = bottleData.supplierQuantity !== undefined 
+                                ? bottleData.supplierQuantity 
+                                : (line.supplierInventory !== undefined ? (typeof line.supplierInventory === 'number' ? line.supplierInventory : Number(line.supplierInventory.replace(/,/g, ''))) : 0);
+                              return supplierQty.toLocaleString();
+                            })()}
+                          </span>
+                        )}
+                      </td>
+                      )}
                       {/* Ellipsis column - show when viewing an order in receivePO tab */}
                       {isViewMode && activeTab === 'receivePO' && (
                       <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', position: 'relative' }}>
                         {editingLineId === line.id ? (
-                          <button
-                            type="button"
-                            onClick={() => handleDoneEdit(line.id)}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              padding: '6px 12px',
-                              backgroundColor: '#3B82F6',
-                              color: '#FFFFFF',
-                              border: 'none',
-                              borderRadius: '6px',
-                              fontSize: '14px',
-                              fontWeight: 500,
-                              cursor: 'pointer',
-                              transition: 'background-color 0.2s',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#2563EB';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = '#3B82F6';
-                            }}
-                          >
-                            Done
-                          </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={handleCancelEdit}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '6px 12px',
+                                backgroundColor: '#FFFFFF',
+                                color: '#374151',
+                                border: '1px solid #D1D5DB',
+                                borderRadius: '6px',
+                                fontSize: '14px',
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                                transition: 'background-color 0.2s',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#F9FAFB';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = '#FFFFFF';
+                              }}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDoneEdit(line.id)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '6px 12px',
+                                backgroundColor: '#3B82F6',
+                                color: '#FFFFFF',
+                                border: 'none',
+                                borderRadius: '6px',
+                                fontSize: '14px',
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                                transition: 'background-color 0.2s',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#2563EB';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = '#3B82F6';
+                              }}
+                            >
+                              Save
+                            </button>
+                          </div>
                         ) : (
                           <>
                             <button
@@ -1720,9 +2370,9 @@ const BottleOrderPage = () => {
                 )}
               </tbody>
             </table>
+            )}
           </div>
         </div>
-      )}
 
       {/* Footer - Sticky */}
       <div 
@@ -1846,6 +2496,70 @@ const BottleOrderPage = () => {
           </div>
         </div>
         </div>
+
+      {/* Quantity Changed Warning Modal */}
+      {showQuantityChangedModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowQuantityChangedModal(false)}>
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-md px-6 py-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-col items-center mb-4">
+              <div className="mb-4 flex items-center justify-center w-16 h-16 rounded-full bg-yellow-100">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2L2 20h20L12 2z" fill="#F59E0B" stroke="#F59E0B" strokeWidth="2" strokeLinejoin="round"/>
+                  <circle cx="12" cy="17" r="1" fill="white"/>
+                  <line x1="12" y1="9" x2="12" y2="14" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </div>
+              <h2 className="text-lg font-bold text-gray-900 mb-2" style={{ color: '#374151' }}>Bottle Amount Changed</h2>
+            </div>
+            <p className="text-sm text-gray-700 mb-6" style={{ color: '#374151', textAlign: 'center' }}>
+              {(() => {
+                const changedCount = orderLines.filter(line => {
+                  const initialQty = line.initialQty || 0;
+                  const currentQty = line.qty || 0;
+                  return initialQty !== currentQty;
+                }).length;
+                return `${changedCount} item${changedCount > 1 ? 's have' : ' has had a'} quantity change${changedCount > 1 ? 's' : ''}. Please carefully review your order.`;
+              })()}
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowQuantityChangedModal(false)}
+                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  color: '#374151',
+                  border: '1px solid #D1D5DB',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#F9FAFB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                }}
+              >
+                Go Back
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmQuantityChanged}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors"
+                style={{
+                  backgroundColor: '#3B82F6',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#2563EB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#3B82F6';
+                }}
+              >
+                Confirm & Receive
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Receive Confirmation Modal */}
       {showReceiveConfirmModal && (
@@ -2223,6 +2937,64 @@ const BottleOrderPage = () => {
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inventory Update Confirmation Modal */}
+      {showInventoryConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => {
+          setShowInventoryConfirmModal(false);
+          setPendingSaveLineId(null);
+        }}>
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-md px-6 py-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold text-gray-900 mb-4" style={{ color: '#374151' }}>Are you sure?</h2>
+            <p className="text-sm text-gray-700 mb-6" style={{ color: '#374151' }}>
+              This will overwrite the current inventory. Make sure your new count is accurate before confirming.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowInventoryConfirmModal(false);
+                  setPendingSaveLineId(null);
+                }}
+                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  color: '#374151',
+                  border: '1px solid #D1D5DB',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#F9FAFB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (pendingSaveLineId) {
+                    saveEditChanges(pendingSaveLineId);
+                  }
+                }}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors"
+                style={{
+                  backgroundColor: '#3B82F6',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#2563EB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#3B82F6';
+                }}
+              >
+                Complete
               </button>
             </div>
           </div>
