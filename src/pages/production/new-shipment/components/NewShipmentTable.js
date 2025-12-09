@@ -9,7 +9,7 @@ const NewShipmentTable = ({
   qtyValues,
   onQtyChange,
   onAddedRowsChange,
-  addedRows: externalAddedRows = new Set(),
+  addedRows: externalAddedRows = null,
   labelsAvailabilityMap = {},
   forecastRange = 120,
 }) => {
@@ -531,29 +531,6 @@ const NewShipmentTable = ({
                       borderTopRightRadius: '16px',
                     }}
                   >
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        fontSize: '0.6rem',
-                        marginBottom: '2px',
-                        paddingRight: '24px',
-                        lineHeight: '1.2',
-                      }}
-                    >
-                      <div style={{ marginLeft: '20px' }}>
-                        <div style={{ fontWeight: 600 }}>Today</div>
-                        <div style={{ opacity: 0.85 }}>
-                          {new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}
-                        </div>
-                      </div>
-                      <div style={{ textAlign: 'left', marginLeft: '40px' }}>
-                        <div style={{ fontWeight: 600 }}>DOI Goal</div>
-                        <div style={{ opacity: 0.85 }}>
-                          {new Date(Date.now() + forecastRange * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}
-                        </div>
-                      </div>
-                    </div>
                     <img
                       ref={(el) => {
                         if (el) filterRefs.current['doi-goal'] = el;
@@ -942,22 +919,6 @@ Current Inventory:
                               );
                             })()}
                           </div>
-                          {row.daysOfInventory > 0 && (
-                            <span
-                              style={{
-                                position: 'absolute',
-                                right: '-28px',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                fontSize: '0.7rem',
-                                fontWeight: 600,
-                                color: row.daysOfInventory < 30 ? '#EF4444' : row.daysOfInventory < 60 ? '#F59E0B' : '#10B981',
-                              }}
-                              title={`${row.daysOfInventory} days of inventory`}
-                            >
-                              {row.daysOfInventory}d
-                            </span>
-                          )}
                           {index === 2 && (
                             <span
                               style={{

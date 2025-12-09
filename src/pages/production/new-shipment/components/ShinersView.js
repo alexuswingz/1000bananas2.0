@@ -742,23 +742,6 @@ const ShinersView = () => {
                           position: 'relative',
                         }}
                       >
-                        <div style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          fontSize: '0.6rem',
-                          marginBottom: '2px',
-                          paddingRight: '24px',
-                          lineHeight: '1.2',
-                        }}>
-                          <div style={{ marginLeft: '20px' }}>
-                            <div style={{ fontWeight: 600 }}>Today</div>
-                            <div style={{ opacity: 0.85 }}>11/11/25</div>
-                          </div>
-                          <div style={{ textAlign: 'left', marginLeft: '40px' }}>
-                            <div style={{ fontWeight: 600 }}>DOI Goal</div>
-                            <div style={{ opacity: 0.85 }}>4/13/25</div>
-                          </div>
-                        </div>
                         <img
                           ref={(el) => {
                             if (el) filterRefs.current[`${formula.id}:timeline`] = el;

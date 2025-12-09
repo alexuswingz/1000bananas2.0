@@ -2,7 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 import { getShipmentFormulaCheck } from '../../../../services/productionApi';
 
-const FormulaCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRowIds = [], onFormulaDataChange }) => {
+const FormulaCheckTable = ({
+  shipmentId,
+  isRecountMode = false,
+  varianceExceededRowIds = [],
+  onFormulaDataChange,
+  selectedRows: externalSelectedRows = null,
+  onSelectedRowsChange,
+}) => {
   const { isDarkMode } = useTheme();
   const [selectedRows, setSelectedRows] = useState(new Set());
   const [formulas, setFormulas] = useState([]);
@@ -15,6 +22,15 @@ const FormulaCheckTable = ({ shipmentId, isRecountMode = false, varianceExceeded
   const [notes, setNotes] = useState({}); // Store notes by formula ID
   const [notesModalOpen, setNotesModalOpen] = useState(false);
   const [selectedFormulaForNotes, setSelectedFormulaForNotes] = useState(null);
+
+  // Keep selected rows in sync with parent so navigating away preserves checkmarks
+  useEffect(() => {
+    if (externalSelectedRows instanceof Set) {
+      setSelectedRows(new Set(externalSelectedRows));
+    } else if (Array.isArray(externalSelectedRows)) {
+      setSelectedRows(new Set(externalSelectedRows));
+    }
+  }, [externalSelectedRows]);
 
   // Load formula data from API
   useEffect(() => {
@@ -163,6 +179,7 @@ const FormulaCheckTable = ({ shipmentId, isRecountMode = false, varianceExceeded
       } else {
         newSet.add(id);
       }
+      if (onSelectedRowsChange) onSelectedRowsChange(newSet);
       return newSet;
     });
   };

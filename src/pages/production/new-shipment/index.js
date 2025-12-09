@@ -21,6 +21,8 @@ import ExportTemplateModal from './components/ExportTemplateModal';
 import SortProductsCompleteModal from './components/SortProductsCompleteModal';
 import SortFormulasCompleteModal from './components/SortFormulasCompleteModal';
 import VarianceExceededModal from './components/VarianceExceededModal';
+import UncheckedFormulaModal from './components/UncheckedFormulaModal';
+import FormulaCheckCommentModal from './components/FormulaCheckCommentModal';
 
 const NewShipment = () => {
   const { isDarkMode } = useTheme();
@@ -39,10 +41,14 @@ const NewShipment = () => {
   const [isBookShipmentCompleteOpen, setIsBookShipmentCompleteOpen] = useState(false);
   const [isVarianceExceededOpen, setIsVarianceExceededOpen] = useState(false);
   const [varianceCount, setVarianceCount] = useState(0);
+  const [isUncheckedFormulaOpen, setIsUncheckedFormulaOpen] = useState(false);
+  const [uncheckedFormulaCount, setUncheckedFormulaCount] = useState(0);
+  const [isFormulaCheckCommentOpen, setIsFormulaCheckCommentOpen] = useState(false);
   const [isRecountMode, setIsRecountMode] = useState(false);
   const [varianceExceededRowIds, setVarianceExceededRowIds] = useState([]);
   const [labelCheckRows, setLabelCheckRows] = useState([]);
   const [formulaCheckData, setFormulaCheckData] = useState({ total: 0, completed: 0, remaining: 0 });
+  const [formulaSelectedRows, setFormulaSelectedRows] = useState(new Set());
   const [labelCheckData, setLabelCheckData] = useState({ total: 0, completed: 0, remaining: 0 });
   const [shipmentProducts, setShipmentProducts] = useState([]); // Products loaded from existing shipment
   const [tableMode, setTableMode] = useState(false);
@@ -361,6 +367,9 @@ const NewShipment = () => {
 
   // Load existing shipment when shipmentId is set
   useEffect(() => {
+    // Reset per-shipment selections when switching shipments
+    setFormulaSelectedRows(new Set());
+
     if (shipmentId) {
       loadShipment();
     } else if (location.state?.shipmentData) {
@@ -748,6 +757,35 @@ const NewShipment = () => {
     }
   };
 
+  const completeFormulaStep = async (comment = '') => {
+    const updateData = {
+      formula_check_completed: true,
+      status: 'label_check',
+    };
+    
+    // Add comment to notes if provided
+    if (comment && comment.trim()) {
+      // Get existing notes and append the comment
+      try {
+        const shipment = await getShipmentById(shipmentId);
+        const existingNotes = shipment?.notes || '';
+        const newNotes = existingNotes 
+          ? `${existingNotes}\n\nFormula Check Comment: ${comment.trim()}`
+          : `Formula Check Comment: ${comment.trim()}`;
+        updateData.notes = newNotes;
+      } catch (error) {
+        console.error('Error fetching shipment notes:', error);
+        // If we can't fetch, just set the comment
+        updateData.notes = `Formula Check Comment: ${comment.trim()}`;
+      }
+    }
+    
+    await updateShipment(shipmentId, updateData);
+    setCompletedTabs(prev => new Set(prev).add('formula-check'));
+    setActiveAction('label-check');
+    toast.success('Formula Check completed! Moving to Label Check');
+  };
+
   const handleCompleteClick = async () => {
     try {
       if (!shipmentId) {
@@ -760,13 +798,14 @@ const NewShipment = () => {
 
       if (activeAction === 'formula-check') {
         // Formula Check: Verify formulas are reviewed, then move to Label Check
-        await updateShipment(shipmentId, {
-          formula_check_completed: true,
-          status: 'label_check',
-        });
-        setCompletedTabs(prev => new Set(prev).add('formula-check'));
-        setActiveAction('label-check');
-        toast.success('Formula Check completed! Moving to Label Check');
+        if (formulaCheckData?.remaining > 0) {
+          setUncheckedFormulaCount(formulaCheckData.remaining);
+          setIsUncheckedFormulaOpen(true);
+          return;
+        }
+
+        // If all formulas are checked, show comment modal directly
+        setIsFormulaCheckCommentOpen(true);
         return;
       }
 
@@ -1461,6 +1500,7 @@ const NewShipment = () => {
                     onProductClick={handleProductClick}
                     qtyValues={qtyValues}
                     onQtyChange={setQtyValues}
+                    addedRows={addedRows}
                     onAddedRowsChange={setAddedRows}
                     labelsAvailabilityMap={labelsAvailabilityMap}
                     forecastRange={parseInt(forecastRange) || 120}
@@ -1516,6 +1556,8 @@ const NewShipment = () => {
               isRecountMode={isRecountMode}
               varianceExceededRowIds={varianceExceededRowIds}
               onFormulaDataChange={setFormulaCheckData}
+              selectedRows={formulaSelectedRows}
+              onSelectedRowsChange={setFormulaSelectedRows}
             />
           </div>
         )}
@@ -1813,7 +1855,7 @@ const NewShipment = () => {
                     padding: '0 16px',
                     borderRadius: '6px',
                     border: 'none',
-                    backgroundColor: '#9CA3AF',
+                    backgroundColor: '#007AFF',
                     color: '#FFFFFF',
                     fontSize: '14px',
                     fontWeight: 500,
@@ -1824,10 +1866,10 @@ const NewShipment = () => {
                     justifyContent: 'center',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#6B7280';
+                    e.currentTarget.style.backgroundColor = '#0056CC';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#9CA3AF';
+                    e.currentTarget.style.backgroundColor = '#007AFF';
                   }}
                 >
                   Complete
@@ -1899,7 +1941,7 @@ const NewShipment = () => {
                     padding: '0 16px',
                     borderRadius: '6px',
                     border: 'none',
-                    backgroundColor: '#9CA3AF',
+                    backgroundColor: '#007AFF',
                     color: '#FFFFFF',
                     fontSize: '14px',
                     fontWeight: 500,
@@ -1910,10 +1952,10 @@ const NewShipment = () => {
                     justifyContent: 'center',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#6B7280';
+                    e.currentTarget.style.backgroundColor = '#0056CC';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#9CA3AF';
+                    e.currentTarget.style.backgroundColor = '#007AFF';
                   }}
                 >
                   Complete
@@ -1935,7 +1977,7 @@ const NewShipment = () => {
                     padding: '0 16px',
                     borderRadius: '6px',
                     border: 'none',
-                    backgroundColor: '#9CA3AF',
+                    backgroundColor: '#007AFF',
                     color: '#FFFFFF',
                     fontSize: '14px',
                     fontWeight: 500,
@@ -1946,10 +1988,10 @@ const NewShipment = () => {
                     justifyContent: 'center',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#6B7280';
+                    e.currentTarget.style.backgroundColor = '#0056CC';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#9CA3AF';
+                    e.currentTarget.style.backgroundColor = '#007AFF';
                   }}
                 >
                   Book Shipment
@@ -2309,6 +2351,26 @@ const NewShipment = () => {
         onGoBack={handleVarianceGoBack}
         onRecount={handleVarianceRecount}
         varianceCount={varianceCount}
+      />
+
+      <UncheckedFormulaModal
+        isOpen={isUncheckedFormulaOpen}
+        remainingCount={uncheckedFormulaCount}
+        onCancel={() => setIsUncheckedFormulaOpen(false)}
+        onConfirm={() => {
+          setIsUncheckedFormulaOpen(false);
+          setIsFormulaCheckCommentOpen(true);
+        }}
+      />
+
+      <FormulaCheckCommentModal
+        isOpen={isFormulaCheckCommentOpen}
+        onClose={() => setIsFormulaCheckCommentOpen(false)}
+        onComplete={async (comment) => {
+          setIsFormulaCheckCommentOpen(false);
+          await completeFormulaStep(comment);
+        }}
+        isDarkMode={isDarkMode}
       />
 
       {/* Book Shipment Complete Modal */}
