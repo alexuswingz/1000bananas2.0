@@ -942,6 +942,22 @@ Current Inventory:
                               );
                             })()}
                           </div>
+                          {row.daysOfInventory > 0 && (
+                            <span
+                              style={{
+                                position: 'absolute',
+                                right: '-28px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                fontSize: '0.7rem',
+                                fontWeight: 600,
+                                color: row.daysOfInventory < 30 ? '#EF4444' : row.daysOfInventory < 60 ? '#F59E0B' : '#10B981',
+                              }}
+                              title={`${row.daysOfInventory} days of inventory`}
+                            >
+                              {row.daysOfInventory}d
+                            </span>
+                          )}
                           {index === 2 && (
                             <span
                               style={{
