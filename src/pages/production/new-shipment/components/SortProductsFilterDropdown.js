@@ -133,6 +133,7 @@ const SortProductsFilterDropdown = ({
 
   return createPortal(
     <div
+      data-filter-dropdown={columnKey}
       style={{
         position: 'fixed',
         top: `${position.top}px`,

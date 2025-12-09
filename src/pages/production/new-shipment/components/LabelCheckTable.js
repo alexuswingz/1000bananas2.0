@@ -84,7 +84,6 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
     { key: 'quantity', label: 'QUANTITY', width: '120px' },
     { key: 'lblCurrentInv', label: 'LBL CURRENT INV', width: '150px' },
     { key: 'labelLocation', label: 'LABEL LOCATION', width: '150px' },
-    { key: 'totalCount', label: 'TOTAL COUNT', width: '120px' },
   ];
 
   const formatNumber = (num) => {
@@ -645,42 +644,6 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
                   }}>
                     {row.labelLocation}
                   </td>
-                  <td style={{
-                    padding: '0 16px',
-                    fontSize: '14px',
-                    fontWeight: 400,
-                    color: isDarkMode ? '#E5E7EB' : '#374151',
-                    height: '40px',
-                  }}>
-                    {row.totalCount !== undefined && row.totalCount !== null && row.totalCount !== '' ? (
-                      (() => {
-                        const calculatedTotal = typeof row.totalCount === 'number' ? row.totalCount : parseFloat(row.totalCount) || 0;
-                        const labelsNeeded = row.quantity || 0;
-                        const discrepancy = calculatedTotal - labelsNeeded;
-                        return (
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                          }}>
-                            <span>{formatNumber(calculatedTotal)}</span>
-                            <span style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              fontSize: '12px',
-                              fontWeight: 600,
-                              backgroundColor: discrepancy < 0 ? '#FEE2E2' : '#D1FAE5',
-                              color: discrepancy < 0 ? '#DC2626' : '#059669',
-                            }}>
-                              {discrepancy > 0 ? '+' : ''}{discrepancy}
-                            </span>
-                          </div>
-                        );
-                      })()
-                    ) : ''}
-                  </td>
                 </tr>
                 );
               })}
@@ -1161,7 +1124,6 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, is
     { value: 'quantity', label: 'Quantity' },
     { value: 'lblCurrentInv', label: 'LBL Current Inv' },
     { value: 'labelLocation', label: 'Label Location' },
-    { value: 'totalCount', label: 'Total Count' },
   ];
 
   const sortOrders = [
@@ -1177,7 +1139,6 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, is
     { value: 'quantity', label: 'Quantity' },
     { value: 'lblCurrentInv', label: 'LBL Current Inv' },
     { value: 'labelLocation', label: 'Label Location' },
-    { value: 'totalCount', label: 'Total Count' },
   ];
 
   const filterConditions = [

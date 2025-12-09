@@ -5,11 +5,15 @@ import SortProductsFilterDropdown from './SortProductsFilterDropdown';
 const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
   const { isDarkMode } = useTheme();
   const [draggedIndex, setDraggedIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+  const [dropPosition, setDropPosition] = useState(null); // { index: number, position: 'above' | 'below' }
   const [lockedProductIds, setLockedProductIds] = useState(() => new Set());
-  const [openFilterColumn, setOpenFilterColumn] = useState(null);
+  const [openFilterColumns, setOpenFilterColumns] = useState(() => new Set());
   const filterIconRefs = useRef({});
   const [filters, setFilters] = useState({});
-  const [sortConfig, setSortConfig] = useState({});
+  // sortConfig is now an array of sort objects: [{column: 'size', order: 'asc'}, {column: 'formula', order: 'asc'}]
+  // The order in the array determines the sort priority (first = primary, second = secondary, etc.)
+  const [sortConfig, setSortConfig] = useState([]);
 
   // Transform shipment products into table format
   const [products, setProducts] = useState([]);
@@ -31,6 +35,37 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
     }
   }, [shipmentProducts, shipmentType]);
 
+  // Close filter dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (openFilterColumns.size > 0) {
+        // Check if click is on any filter icon
+        const clickedOnFilterIcon = Object.values(filterIconRefs.current).some(ref => 
+          ref && ref.contains(event.target)
+        );
+        
+        // Check if click is inside any dropdown (they use portals, so we check by class or data attribute)
+        // Since dropdowns are portals, we need to check if the click target is within a dropdown
+        const clickedInsideDropdown = event.target.closest('[data-filter-dropdown]');
+        
+        if (!clickedOnFilterIcon && !clickedInsideDropdown) {
+          setOpenFilterColumns(new Set());
+        }
+      }
+    };
+
+    if (openFilterColumns.size > 0) {
+      const timeoutId = setTimeout(() => {
+        document.addEventListener('click', handleClickOutside);
+      }, 0);
+      
+      return () => {
+        clearTimeout(timeoutId);
+        document.removeEventListener('click', handleClickOutside);
+      };
+    }
+  }, [openFilterColumns]);
+
   const columns = [
     { key: 'drag', label: '', width: '50px' },
     { key: 'type', label: 'TYPE', width: '80px' },
@@ -43,14 +78,39 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
     { key: 'notes', label: 'NOTES', width: '80px' },
   ];
 
-  const handleDragStart = (index) => {
+  const handleDragStart = (e, index) => {
     setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    // Set a simple data transfer to enable drag
+    e.dataTransfer.setData('text/plain', index.toString());
   };
 
   const handleDragOver = (e, index) => {
     e.preventDefault();
     if (draggedIndex === null || draggedIndex === index) {
+      setDragOverIndex(null);
+      setDropPosition(null);
       return;
+    }
+    setDragOverIndex(index);
+    
+    // Determine if we're in the top or bottom half of the row
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const rowHeight = rect.height;
+    const midpoint = rowHeight / 2;
+    
+    // If dragging from above, place below; if dragging from below, place above
+    // But also consider mouse position within the row
+    if (draggedIndex < index) {
+      // Dragging down - place below the current row
+      setDropPosition({ index, position: 'below' });
+    } else if (draggedIndex > index) {
+      // Dragging up - place above the current row
+      setDropPosition({ index, position: 'above' });
+    } else {
+      // Use mouse position to determine
+      setDropPosition({ index, position: y < midpoint ? 'above' : 'below' });
     }
   };
 
@@ -58,6 +118,9 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
     e.preventDefault();
     
     if (draggedIndex === null || draggedIndex === dropIndex) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      setDropPosition(null);
       return;
     }
 
@@ -77,17 +140,34 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
     
     // Find new position after removal
     const newDropIndex = newProducts.findIndex(p => p.id === dropItem.id);
-    const insertIndex = draggedOriginalIndex < dropOriginalIndex ? newDropIndex + 1 : newDropIndex;
+    
+    // Use drop position to determine insert index
+    let insertIndex;
+    if (dropPosition && dropPosition.index === dropIndex) {
+      insertIndex = dropPosition.position === 'above' ? newDropIndex : newDropIndex + 1;
+    } else {
+      // Fallback to original logic
+      insertIndex = draggedOriginalIndex < dropOriginalIndex ? newDropIndex + 1 : newDropIndex;
+    }
     
     // Insert it at the new position
     newProducts.splice(insertIndex, 0, draggedItem);
     
-    setProducts(newProducts);
-    setDraggedIndex(null);
+    // Clear drag states first for smooth transition
+    setDragOverIndex(null);
+    setDropPosition(null);
+    
+    // Small delay to allow drop line to fade out smoothly
+    setTimeout(() => {
+      setProducts(newProducts);
+      setDraggedIndex(null);
+    }, 50);
   };
 
   const handleDragEnd = () => {
     setDraggedIndex(null);
+    setDragOverIndex(null);
+    setDropPosition(null);
   };
 
   // Locking a product means it will NOT be affected by filters,
@@ -106,7 +186,15 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
 
   const handleFilterClick = (columnKey, event) => {
     event.stopPropagation();
-    setOpenFilterColumn((prev) => (prev === columnKey ? null : columnKey));
+    setOpenFilterColumns((prev) => {
+      const next = new Set(prev);
+      if (next.has(columnKey)) {
+        next.delete(columnKey);
+      } else {
+        next.add(columnKey);
+      }
+      return next;
+    });
   };
 
   const handleApplyFilter = (columnKey, filterData) => {
@@ -114,11 +202,33 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
       ...prev,
       [columnKey]: filterData,
     }));
-    setSortConfig(prev => ({
-      ...prev,
-      [columnKey]: filterData.sortOrder,
-    }));
-    setOpenFilterColumn(null);
+    
+    // Update sort config: if sortOrder is set, add/update this column in the sort array
+    // If sortOrder is empty, remove this column from the sort array
+    setSortConfig(prev => {
+      if (filterData.sortOrder) {
+        // Check if this column already has a sort
+        const existingIndex = prev.findIndex(sort => sort.column === columnKey);
+        if (existingIndex >= 0) {
+          // Update existing sort
+          const newConfig = [...prev];
+          newConfig[existingIndex] = { column: columnKey, order: filterData.sortOrder };
+          return newConfig;
+        } else {
+          // Add new sort (appends to end, making it the lowest priority)
+          return [...prev, { column: columnKey, order: filterData.sortOrder }];
+        }
+      } else {
+        // Remove sort for this column
+        return prev.filter(sort => sort.column !== columnKey);
+      }
+    });
+    // Keep the dropdown open so user can continue configuring multiple filters
+    // setOpenFilterColumns((prev) => {
+    //   const next = new Set(prev);
+    //   next.delete(columnKey);
+    //   return next;
+    // });
   };
 
   // Get unique values for a column (handles all data types)
@@ -140,16 +250,28 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
     return sortedValues;
   };
   
-  // Check if a column has active filters
+  // Check if a column has active filters (excludes sort - only checks for Filter by Values and Filter by Conditions)
   const hasActiveFilter = (columnKey) => {
     const filter = filters[columnKey];
     if (!filter) return false;
     
-    const hasSort = sortConfig[columnKey];
+    // Only check for custom filters, not sort
     const hasValues = filter.selectedValues && filter.selectedValues.size > 0;
     const hasCondition = filter.conditionType && filter.conditionType !== '';
     
-    return hasSort || hasValues || hasCondition;
+    return hasValues || hasCondition;
+  };
+
+  // Get sort priority for a column (1 = primary, 2 = secondary, etc., or null if not sorted)
+  const getSortPriority = (columnKey) => {
+    const index = sortConfig.findIndex(sort => sort.column === columnKey);
+    return index >= 0 ? index + 1 : null;
+  };
+
+  // Get sort order for a column
+  const getSortOrder = (columnKey) => {
+    const sort = sortConfig.find(sort => sort.column === columnKey);
+    return sort ? sort.order : '';
   };
 
   // Apply condition filter to a value
@@ -241,27 +363,41 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
       }
     });
 
-    // Apply sorting to unlocked products only
-    const sortColumn = Object.keys(sortConfig).find(key => sortConfig[key]);
-    if (sortColumn && sortConfig[sortColumn]) {
+    // Apply hierarchical sorting to unlocked products only
+    // Sort by each column in priority order (primary first, then secondary, etc.)
+    if (sortConfig.length > 0) {
       filteredUnlocked.sort((a, b) => {
-        const aVal = a[sortColumn];
-        const bVal = b[sortColumn];
-        
-        // Handle numeric values
-        if (typeof aVal === 'number' && typeof bVal === 'number') {
-          return sortConfig[sortColumn] === 'asc' ? aVal - bVal : bVal - aVal;
+        // Try each sort level in order
+        for (const sort of sortConfig) {
+          const aVal = a[sort.column];
+          const bVal = b[sort.column];
+          
+          let comparison = 0;
+          
+          // Handle numeric values
+          if (typeof aVal === 'number' && typeof bVal === 'number') {
+            comparison = sort.order === 'asc' ? aVal - bVal : bVal - aVal;
+          } else {
+            // Handle string values
+            const aStr = String(aVal || '').toLowerCase();
+            const bStr = String(bVal || '').toLowerCase();
+            
+            if (sort.order === 'asc') {
+              comparison = aStr.localeCompare(bStr);
+            } else {
+              comparison = bStr.localeCompare(aStr);
+            }
+          }
+          
+          // If values are different at this level, return the comparison
+          // Otherwise, continue to the next sort level
+          if (comparison !== 0) {
+            return comparison;
+          }
         }
         
-        // Handle string values
-        const aStr = String(aVal || '').toLowerCase();
-        const bStr = String(bVal || '').toLowerCase();
-        
-        if (sortConfig[sortColumn] === 'asc') {
-          return aStr.localeCompare(bStr);
-        } else {
-          return bStr.localeCompare(aStr);
-        }
+        // If all sort levels are equal, maintain original order
+        return 0;
       });
     }
 
@@ -285,12 +421,25 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
   const filteredProducts = getFilteredAndSortedProducts();
 
   return (
-    <div style={{
-      backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-      borderRadius: '12px',
-      border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
-      overflow: 'hidden',
-    }}>
+    <>
+      <style>{`
+        @keyframes dropLineFadeIn {
+          from {
+            opacity: 0;
+            transform: scaleX(0);
+          }
+          to {
+            opacity: 1;
+            transform: scaleX(1);
+          }
+        }
+      `}</style>
+      <div style={{
+        backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+        borderRadius: '12px',
+        border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+        overflow: 'hidden',
+      }}>
       {/* Table Container */}
       <div style={{ overflowX: 'auto' }}>
         <table style={{
@@ -339,15 +488,40 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
                     >
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         {column.label}
-                        {isActive && (
-                          <span style={{ 
-                            display: 'inline-block',
-                            width: '6px', 
-                            height: '6px', 
-                            borderRadius: '50%', 
-                            backgroundColor: '#10B981',
-                          }} />
-                        )}
+                        {(() => {
+                          const sortPriority = getSortPriority(column.key);
+                          if (sortPriority) {
+                            return (
+                              <span style={{ 
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                minWidth: '16px',
+                                height: '16px',
+                                borderRadius: '50%', 
+                                backgroundColor: '#3B82F6',
+                                color: '#FFFFFF',
+                                fontSize: '10px',
+                                fontWeight: 600,
+                                padding: '0 4px',
+                              }}>
+                                {sortPriority}
+                              </span>
+                            );
+                          }
+                          if (isActive) {
+                            return (
+                              <span style={{ 
+                                display: 'inline-block',
+                                width: '6px', 
+                                height: '6px', 
+                                borderRadius: '50%', 
+                                backgroundColor: '#10B981',
+                              }} />
+                            );
+                          }
+                          return null;
+                        })()}
                       </span>
                       <img
                         src="/assets/Vector (1).png"
@@ -375,7 +549,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
           </thead>
 
           {/* Body */}
-          <tbody>
+          <tbody style={{ position: 'relative' }}>
             {filteredProducts.length === 0 ? (
               <tr>
                 <td 
@@ -390,35 +564,75 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
                   No products to sort. Add products to the shipment first.
                 </td>
               </tr>
-            ) : filteredProducts.map((product, index) => (
-              <tr
-                key={product.id}
-                onDragOver={(e) => handleDragOver(e, index)}
-                onDrop={(e) => handleDrop(e, index)}
-                style={{
-                  backgroundColor: draggedIndex === index
-                    ? (isDarkMode ? '#4B5563' : '#E5E7EB')
-                    : index % 2 === 0
-                    ? (isDarkMode ? '#1F2937' : '#FFFFFF')
-                    : (isDarkMode ? '#1A1F2E' : '#F9FAFB'),
-                  borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
-                  transition: 'background-color 0.2s',
-                  height: '40px',
-                  opacity: draggedIndex === index ? 0.5 : 1,
-                }}
-                onMouseEnter={(e) => {
-                  if (draggedIndex !== index) {
-                    e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (draggedIndex !== index) {
-                    e.currentTarget.style.backgroundColor = index % 2 === 0
-                      ? (isDarkMode ? '#1F2937' : '#FFFFFF')
-                      : (isDarkMode ? '#1A1F2E' : '#F9FAFB');
-                  }
-                }}
-              >
+            ) : filteredProducts.map((product, index) => {
+              const isDragging = draggedIndex === index;
+              const isDragOver = dragOverIndex === index;
+              const showDropLineAbove = dropPosition && dropPosition.index === index && dropPosition.position === 'above';
+              const showDropLineBelow = dropPosition && dropPosition.index === index && dropPosition.position === 'below';
+              
+              return (
+                <React.Fragment key={product.id}>
+                  {/* Drop line above the row */}
+                  {showDropLineAbove && (
+                    <tr>
+                      <td
+                        colSpan={columns.length}
+                        style={{
+                          padding: 0,
+                          height: '2px',
+                          backgroundColor: '#3B82F6',
+                          border: 'none',
+                          position: 'relative',
+                        }}
+                      >
+                        <div
+                          style={{
+                            position: 'absolute',
+                            left: 0,
+                            right: 0,
+                            top: 0,
+                            height: '2px',
+                            backgroundColor: '#3B82F6',
+                            boxShadow: '0 0 4px rgba(59, 130, 246, 0.6)',
+                          }}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                  <tr
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, index)}
+                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDrop={(e) => handleDrop(e, index)}
+                    onDragEnd={handleDragEnd}
+                    style={{
+                      backgroundColor: isDragging
+                        ? (isDarkMode ? '#4B5563' : '#E5E7EB')
+                        : index % 2 === 0
+                        ? (isDarkMode ? '#1F2937' : '#FFFFFF')
+                        : (isDarkMode ? '#1A1F2E' : '#F9FAFB'),
+                      borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                      transition: isDragging ? 'none' : 'background-color 0.2s',
+                      height: '40px',
+                      opacity: isDragging ? 0.5 : 1,
+                      cursor: isDragging ? 'grabbing' : 'grab',
+                      boxShadow: isDragging ? '0 4px 12px rgba(0, 0, 0, 0.15)' : 'none',
+                      zIndex: isDragging ? 1000 : 'auto',
+                      position: isDragging ? 'relative' : 'static',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isDragging && draggedIndex === null) {
+                        e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isDragging && draggedIndex === null) {
+                        e.currentTarget.style.backgroundColor = index % 2 === 0
+                          ? (isDarkMode ? '#1F2937' : '#FFFFFF')
+                          : (isDarkMode ? '#1A1F2E' : '#F9FAFB');
+                      }
+                    }}
+                  >
                 {(() => {
                   const isLocked = lockedProductIds.has(product.id);
                   return (
@@ -436,17 +650,14 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
                     }}
                   >
                     <div
-                      draggable
-                      onDragStart={() => handleDragStart(index)}
-                      onDragEnd={handleDragEnd}
                       style={{
-                        cursor: draggedIndex === index ? 'grabbing' : 'grab',
+                        cursor: isDragging ? 'grabbing' : 'grab',
                         padding: '4px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        margin: '0 auto',
                         width: 'fit-content',
+                        pointerEvents: 'none', // Prevent double drag events
                       }}
                     >
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -464,8 +675,14 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
+                        cursor: 'pointer',
+                        pointerEvents: 'auto',
                       }}
-                      onClick={() => handleToggleLock(product.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleLock(product.id);
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
                     >
                       {isLocked ? (
                         <img
@@ -594,6 +811,8 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
                   >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="#3B82F6">
                       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -604,25 +823,65 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
                     </svg>
                   </button>
                 </td>
-              </tr>
-            ))}
+                  </tr>
+                  {/* Drop line below the row */}
+                  {showDropLineBelow && (
+                    <tr>
+                      <td
+                        colSpan={columns.length}
+                        style={{
+                          padding: 0,
+                          height: '2px',
+                          backgroundColor: '#3B82F6',
+                          border: 'none',
+                          position: 'relative',
+                        }}
+                      >
+                        <div
+                          style={{
+                            position: 'absolute',
+                            left: 0,
+                            right: 0,
+                            top: 0,
+                            height: '2px',
+                            backgroundColor: '#3B82F6',
+                            boxShadow: '0 0 4px rgba(59, 130, 246, 0.6)',
+                          }}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
-      {/* Column Filter Dropdown */}
-      {openFilterColumn && filterIconRefs.current[openFilterColumn] && (
-        <SortProductsFilterDropdown
-          filterIconRef={filterIconRefs.current[openFilterColumn]}
-          columnKey={openFilterColumn}
-          availableValues={getColumnValues(openFilterColumn)}
-          currentFilter={filters[openFilterColumn] || {}}
-          currentSort={sortConfig[openFilterColumn] || ''}
-          onApply={(filterData) => handleApplyFilter(openFilterColumn, filterData)}
-          onClose={() => setOpenFilterColumn(null)}
-        />
-      )}
-    </div>
+      {/* Column Filter Dropdowns - Multiple can be open at once */}
+      {Array.from(openFilterColumns).map((columnKey) => {
+        if (!filterIconRefs.current[columnKey]) return null;
+        return (
+          <SortProductsFilterDropdown
+            key={columnKey}
+            filterIconRef={filterIconRefs.current[columnKey]}
+            columnKey={columnKey}
+            availableValues={getColumnValues(columnKey)}
+            currentFilter={filters[columnKey] || {}}
+            currentSort={getSortOrder(columnKey)}
+            onApply={(filterData) => handleApplyFilter(columnKey, filterData)}
+            onClose={() => {
+              setOpenFilterColumns((prev) => {
+                const next = new Set(prev);
+                next.delete(columnKey);
+                return next;
+              });
+            }}
+          />
+        );
+      })}
+      </div>
+    </>
   );
 };
 
