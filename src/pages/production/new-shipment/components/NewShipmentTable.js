@@ -2,27 +2,21 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
-const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyChange, onAddedRowsChange, addedRows: parentAddedRows, labelsAvailabilityMap = {}, forecastRange = 120 }) => {
+const NewShipmentTable = ({
+  rows,
+  tableMode,
+  onProductClick,
+  qtyValues,
+  onQtyChange,
+  onAddedRowsChange,
+  addedRows: externalAddedRows = new Set(),
+  labelsAvailabilityMap = {},
+  forecastRange = 120,
+}) => {
   const { isDarkMode } = useTheme();
   const [selectedRows, setSelectedRows] = useState(new Set());
-  // Use parent's addedRows if provided, otherwise use local state
-  const [localAddedRows, setLocalAddedRows] = useState(new Set());
-  
-  // Sync local state with parent's addedRows prop when it changes
-  useEffect(() => {
-    if (parentAddedRows && parentAddedRows instanceof Set) {
-      setLocalAddedRows(new Set(parentAddedRows));
-    }
-  }, [parentAddedRows]);
-  
-  // Use either parent-controlled or local state
-  const addedRows = parentAddedRows instanceof Set ? parentAddedRows : localAddedRows;
-  const setAddedRows = (newRows) => {
-    setLocalAddedRows(newRows);
-    if (onAddedRowsChange) {
-      onAddedRowsChange(newRows);
-    }
-  };
+  const [addedRows, setAddedRows] = useState(new Set());
+  const [selectionFilter, setSelectionFilter] = useState('all'); // all | checked | unchecked
   const selectAllCheckboxRef = useRef(null);
   const [clickedQtyIndex, setClickedQtyIndex] = useState(null);
   const [hoveredQtyIndex, setHoveredQtyIndex] = useState(null);
@@ -196,6 +190,29 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
     
     return result;
   }, [rows, activeFilters]);
+
+  // Apply selection filter only in table mode
+  const filteredRowsWithSelection = useMemo(() => {
+    if (selectionFilter === 'checked') {
+      return filteredRows.filter((row) => addedRows.has(row.id));
+    }
+    if (selectionFilter === 'unchecked') {
+      return filteredRows.filter((row) => !addedRows.has(row.id));
+    }
+    return filteredRows;
+  }, [filteredRows, selectionFilter, addedRows]);
+
+  // Keep local addedRows/selectedRows in sync with parent state so toggling views preserves selections
+  useEffect(() => {
+    if (externalAddedRows instanceof Set) {
+      setAddedRows(new Set(externalAddedRows));
+      setSelectedRows(new Set(externalAddedRows));
+    } else if (Array.isArray(externalAddedRows)) {
+      const synced = new Set(externalAddedRows);
+      setAddedRows(synced);
+      setSelectedRows(synced);
+    }
+  }, [externalAddedRows]);
   
   // Handle filter apply
   const handleFilterApply = (filterSettings) => {
@@ -214,15 +231,17 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
     });
   };
 
-  // Check if all rows are selected
+  const currentRows = filteredRowsWithSelection;
+
+  // Check if all rows are selected (respect current view/filter)
   const allSelected = useMemo(() => {
-    return filteredRows.length > 0 && selectedRows.size === filteredRows.length;
-  }, [filteredRows.length, selectedRows.size]);
+    return currentRows.length > 0 && selectedRows.size === currentRows.length;
+  }, [currentRows.length, selectedRows.size]);
 
   // Check if some rows are selected (for indeterminate state)
   const someSelected = useMemo(() => {
-    return selectedRows.size > 0 && selectedRows.size < rows.length;
-  }, [selectedRows.size, rows.length]);
+    return selectedRows.size > 0 && selectedRows.size < currentRows.length;
+  }, [selectedRows.size, currentRows.length]);
 
   // Set indeterminate state for select all checkbox
   useEffect(() => {
@@ -358,9 +377,19 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
   // Handle select all checkbox
   const handleSelectAll = (e) => {
     if (e.target.checked) {
-      setSelectedRows(new Set(rows.map(row => row.id)));
+      setSelectedRows(new Set(currentRows.map(row => row.id)));
+      if (tableMode) {
+        const newAdded = new Set(currentRows.map(row => row.id));
+        setAddedRows(newAdded);
+        if (onAddedRowsChange) onAddedRowsChange(newAdded);
+      }
     } else {
       setSelectedRows(new Set());
+      if (tableMode) {
+        const newAdded = new Set();
+        setAddedRows(newAdded);
+        if (onAddedRowsChange) onAddedRowsChange(newAdded);
+      }
     }
   };
 
@@ -373,6 +402,17 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
       newSelected.delete(rowId);
     }
     setSelectedRows(newSelected);
+
+    if (tableMode) {
+      const newAdded = new Set(addedRows);
+      if (e.target.checked) {
+        newAdded.add(rowId);
+      } else {
+        newAdded.delete(rowId);
+      }
+      setAddedRows(newAdded);
+      if (onAddedRowsChange) onAddedRowsChange(newAdded);
+    }
   };
 
   // Handle Add button click
@@ -389,6 +429,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
     }
     // This will update local state and notify parent
     setAddedRows(newAdded);
+    if (onAddedRowsChange) onAddedRowsChange(newAdded);
   };
 
   const themeClasses = {
@@ -398,6 +439,12 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
     border: isDarkMode ? 'border-dark-border-primary' : 'border-gray-200',
     headerBg: 'bg-[#2C3544]',
   };
+
+  const legendItems = [
+    { label: 'FBA Avail.', color: '#A855F7' },
+    { label: 'Total Inv.', color: '#22C55E' },
+    { label: 'Forecast', color: '#3B82F6' },
+  ];
 
   if (!tableMode) {
     // Normal view with timeline
@@ -601,7 +648,7 @@ const NewShipmentTable = ({ rows, tableMode, onProductClick, qtyValues, onQtyCha
                 </tr>
               </thead>
               <tbody>
-                {filteredRows.map((row) => {
+                {currentRows.map((row) => {
                   const index = row._originalIndex;
                   return (
                   <tr key={row.id} className="border-t border-gray-200" style={{ height: '40px', maxHeight: '40px' }}>
@@ -861,7 +908,7 @@ Current Inventory:
                                       position: 'absolute',
                                       left: 0,
                                       top: 0,
-                                      borderRadius: greenWidth > 0 ? '9999px 0 0 9999px' : '9999px',
+                                      borderRadius: greenWidth === 0 && (totalWidth >= 100 || weeklyForecast === 0) ? '9999px' : '9999px 0 0 9999px',
                                     }} />
                                   )}
                                   
@@ -874,7 +921,7 @@ Current Inventory:
                                       position: 'absolute',
                                       left: `${fbaWidth}%`,
                                       top: 0,
-                                      borderRadius: '0 9999px 9999px 0',
+                                      borderRadius: 0,
                                     }} />
                                   )}
                                   
@@ -895,22 +942,6 @@ Current Inventory:
                               );
                             })()}
                           </div>
-                          {row.daysOfInventory > 0 && (
-                            <span
-                              style={{
-                                position: 'absolute',
-                                right: '-28px',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                fontSize: '0.7rem',
-                                fontWeight: 600,
-                                color: row.daysOfInventory < 30 ? '#EF4444' : row.daysOfInventory < 60 ? '#F59E0B' : '#10B981',
-                              }}
-                              title={`${row.daysOfInventory} days of inventory`}
-                            >
-                              {row.daysOfInventory}d
-                            </span>
-                          )}
                           {index === 2 && (
                             <span
                               style={{
@@ -950,7 +981,7 @@ Current Inventory:
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '0.875rem', color: '#1D4ED8', fontWeight: 500 }}>
-                🔍 Showing {filteredRows.length} of {rows.length} products
+                🔍 Showing {currentRows.length} of {rows.length} products
               </span>
               {activeFilters.popularFilter && (
                 <span style={{ 
@@ -986,38 +1017,56 @@ Current Inventory:
           </div>
         )}
 
-        {/* Legend */}
-        <div
-          style={{
-            padding: '0.5rem 1.5rem 0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-            gap: '1.5rem',
-          }}
-        >
-          {[
-            { label: 'FBA Avail.', color: '#A855F7' },
-            { label: 'Total Inv.', color: '#22C55E' },
-            { label: 'Forecast', color: '#3B82F6' },
-          ].map((item) => (
+        {/* Floating Legend */}
+        {typeof document !== 'undefined' &&
+          createPortal(
             <div
-              key={item.label}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem' }}
-              className={themeClasses.textSecondary}
+              style={{
+                position: 'fixed',
+                bottom: '112px',
+                right: '16px',
+                zIndex: 1200,
+                padding: '0.5rem 0.85rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.9rem',
+                borderRadius: '10px',
+                backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
+                border: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`,
+                boxShadow: isDarkMode
+                  ? '0 8px 18px rgba(0, 0, 0, 0.35)'
+                  : '0 8px 18px rgba(0, 0, 0, 0.08)',
+                pointerEvents: 'none',
+                userSelect: 'none',
+              }}
+              className={themeClasses.text}
             >
-              <span
-                style={{
-                  width: '0.75rem',
-                  height: '0.75rem',
-                  borderRadius: '9999px',
-                  backgroundColor: item.color,
-                }}
-              />
-              <span>{item.label}</span>
-            </div>
-          ))}
-        </div>
+              {legendItems.map((item) => (
+                <div
+                  key={item.label}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    fontSize: '0.8rem',
+                    whiteSpace: 'nowrap',
+                    color: isDarkMode ? '#E5E7EB' : '#111827',
+                  }}
+                >
+                  <span
+                    style={{
+                      width: '0.85rem',
+                      height: '0.85rem',
+                      borderRadius: 0,
+                      backgroundColor: item.color,
+                    }}
+                  />
+                  <span>{item.label}</span>
+                </div>
+              ))}
+            </div>,
+            document.body
+          )}
 
         {/* Filter Modals */}
         {['normal-0', 'normal-1', 'normal-2', 'normal-3', 'normal-4'].map((filterKey) => (
@@ -1236,6 +1285,26 @@ Current Inventory:
           -moz-appearance: textfield;
         }
       `}</style>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '12px' }}>
+        <label style={{ fontSize: '0.85rem', color: isDarkMode ? '#D1D5DB' : '#4B5563' }}>Show:</label>
+        <select
+          value={selectionFilter}
+          onChange={(e) => setSelectionFilter(e.target.value)}
+          style={{
+            height: '32px',
+            borderRadius: '6px',
+            border: '1px solid #D1D5DB',
+            backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
+            color: isDarkMode ? '#F9FAFB' : '#111827',
+            padding: '6px 10px',
+            fontSize: '0.85rem',
+          }}
+        >
+          <option value="all">All</option>
+          <option value="checked">Checked</option>
+          <option value="unchecked">Unchecked</option>
+        </select>
+      </div>
       <div
       className={`${themeClasses.cardBg} ${themeClasses.border} border shadow-sm`}
       style={{ marginTop: '1.25rem', borderRadius: '6px', overflow: 'hidden' }}
@@ -1270,7 +1339,7 @@ Current Inventory:
                 textAlign: 'center',
                 position: 'sticky',
                 left: 0,
-                zIndex: 20,
+                zIndex: 6,
                 backgroundColor: '#1C2634',
                 boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
                 borderTopLeftRadius: '16px',
@@ -1291,7 +1360,7 @@ Current Inventory:
                   textAlign: 'center',
                   position: 'sticky',
                   left: '40px',
-                  zIndex: 20,
+                  zIndex: 6,
                   backgroundColor: '#1C2634',
                   width: '150px',
                   minWidth: '150px',
@@ -1327,7 +1396,7 @@ Current Inventory:
                   textAlign: 'center',
                   position: 'sticky',
                   left: '190px',
-                  zIndex: 20,
+                  zIndex: 6,
                   backgroundColor: '#1C2634',
                   width: '200px',
                   minWidth: '200px',
@@ -1363,7 +1432,7 @@ Current Inventory:
                   textAlign: 'center',
                   position: 'sticky',
                   left: '390px',
-                  zIndex: 20,
+                  zIndex: 6,
                   backgroundColor: '#1C2634',
                   width: '120px',
                   minWidth: '120px',
@@ -1689,7 +1758,7 @@ Current Inventory:
                 textAlign: 'center',
                 position: 'sticky',
                 right: 0,
-                zIndex: 20,
+                zIndex: 6,
                 backgroundColor: '#1C2634',
                 boxShadow: '-2px 0 4px rgba(0,0,0,0.1)',
                 borderRight: '1px solid #FFFFFF',
@@ -1700,7 +1769,7 @@ Current Inventory:
             </tr>
           </thead>
           <tbody>
-            {filteredRows.map((row) => {
+            {currentRows.map((row) => {
               const index = row._originalIndex;
               return (
               <tr key={row.id} style={{ height: '40px', maxHeight: '40px' }}>
@@ -1710,7 +1779,7 @@ Current Inventory:
                   textAlign: 'center',
                   position: 'sticky',
                   left: 0,
-                  zIndex: 15,
+                  zIndex: 5,
                   backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
                   width: '40px',
                   minWidth: '40px',
@@ -1733,7 +1802,7 @@ Current Inventory:
                   textAlign: 'center',
                   position: 'sticky',
                   left: '40px',
-                  zIndex: 15,
+                  zIndex: 5,
                   backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
                   width: '150px',
                   minWidth: '150px',
@@ -1751,7 +1820,7 @@ Current Inventory:
                   textAlign: 'center',
                   position: 'sticky',
                   left: '190px',
-                  zIndex: 15,
+                  zIndex: 5,
                   backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
                   height: '40px',
                   verticalAlign: 'middle',
@@ -1776,7 +1845,7 @@ Current Inventory:
                   textAlign: 'center',
                   position: 'sticky',
                   left: '390px',
-                  zIndex: 15,
+                  zIndex: 5,
                   backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
                   width: '120px',
                   minWidth: '120px',
@@ -2336,7 +2405,7 @@ Current Inventory:
                   textAlign: 'center',
                   position: 'sticky',
                   right: 0,
-                  zIndex: 15,
+                  zIndex: 5,
                   backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
                   height: '40px',
                   verticalAlign: 'middle',

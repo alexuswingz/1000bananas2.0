@@ -550,24 +550,20 @@ const NewShipment = () => {
     const qty = qtyValues[index] ?? 0;
     const numQty = typeof qty === 'number' ? qty : (qty === '' || qty === null || qty === undefined ? 0 : parseInt(qty, 10) || 0);
     
-    // Use units_per_case from catalog if available, otherwise calculate based on size
-    let boxesNeeded = 0;
-    if (product.units_per_case && product.units_per_case > 0) {
-      boxesNeeded = numQty / product.units_per_case;
-    } else {
-      // Fallback to size-based calculation
-      let boxesPerUnit = 0;
-      const size = product.size?.toLowerCase() || '';
-      
-      if (size.includes('8oz')) {
-        boxesPerUnit = 1 / 60; // 60 units = 1 box
-      } else if (size.toLowerCase().includes('quart')) {
-        boxesPerUnit = 1 / 12; // 12 units = 1 box
-      } else if (size.toLowerCase().includes('gallon')) {
-        boxesPerUnit = 1 / 4; // 4 units = 1 box
-      }
-      boxesNeeded = numQty * boxesPerUnit;
+    // Prefer known size-based case sizes; fall back to catalog units_per_case
+    const size = product.size?.toLowerCase() || '';
+    let unitsPerCase = 0;
+    if (size.includes('8oz')) {
+      unitsPerCase = 60; // 60 units = 1 box
+    } else if (size.includes('quart')) {
+      unitsPerCase = 12; // 12 units = 1 box
+    } else if (size.includes('gallon')) {
+      unitsPerCase = 4; // 4 units = 1 box
+    } else if (product.units_per_case && product.units_per_case > 0) {
+      unitsPerCase = product.units_per_case;
     }
+
+    const boxesNeeded = unitsPerCase > 0 ? Math.ceil(numQty / unitsPerCase) : 0;
     
     return sum + boxesNeeded;
   }, 0);
@@ -1129,12 +1125,12 @@ const NewShipment = () => {
                 {/* Forecast Range */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', position: 'relative' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <svg 
+                    <svg
                       ref={doiIconRef}
-                      width="16" 
-                      height="16" 
-                      viewBox="0 0 24 24" 
-                      fill="none" 
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
                       xmlns="http://www.w3.org/2000/svg"
                       onMouseEnter={() => setShowDOITooltip(true)}
                       onMouseLeave={() => {
@@ -1146,10 +1142,19 @@ const NewShipment = () => {
                         setIsTooltipPinned(!isTooltipPinned);
                         setShowDOITooltip(true);
                       }}
-                      style={{ cursor: 'pointer' }}
+                      style={{ cursor: 'pointer', flexShrink: 0, display: 'block' }}
+                      role="button"
+                      aria-label="Forecast Range info"
                     >
-                      <circle cx="12" cy="12" r="10" stroke="#9CA3AF" strokeWidth="2" fill="none"/>
-                      <circle cx="12" cy="12" r="2" fill="#9CA3AF"/>
+                      <defs>
+                        <linearGradient id="infoGradient" x1="12" y1="0" x2="12" y2="24" gradientUnits="userSpaceOnUse">
+                          <stop stopColor="#3B82F6" />
+                          <stop offset="1" stopColor="#1D4ED8" />
+                        </linearGradient>
+                      </defs>
+                      <circle cx="12" cy="12" r="11" fill="url(#infoGradient)" stroke="#1E3A8A" strokeWidth="1" />
+                      <rect x="11.25" y="10" width="1.5" height="6" rx="0.75" fill="#FFFFFF" />
+                      <rect x="11.25" y="6" width="1.5" height="1.5" rx="0.75" fill="#FFFFFF" />
                     </svg>
                     <span style={{ fontSize: '14px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
                       Forecast Range
@@ -1175,7 +1180,7 @@ const NewShipment = () => {
                         borderRadius: '6px',
                         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
                         padding: '12px',
-                        width: '304px',
+                        width: '360px',
                         zIndex: 10000,
                         boxSizing: 'border-box',
                         border: '1px solid #E5E7EB',
@@ -1456,7 +1461,6 @@ const NewShipment = () => {
                     onProductClick={handleProductClick}
                     qtyValues={qtyValues}
                     onQtyChange={setQtyValues}
-                    addedRows={addedRows}
                     onAddedRowsChange={setAddedRows}
                     labelsAvailabilityMap={labelsAvailabilityMap}
                     forecastRange={parseInt(forecastRange) || 120}
