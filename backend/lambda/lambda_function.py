@@ -11,6 +11,9 @@ from datetime import datetime, date
 from decimal import Decimal
 import os
 import time
+import urllib.request
+import urllib.error
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Database configuration
 DB_CONFIG = {
@@ -21,9 +24,35 @@ DB_CONFIG = {
     'password': 'postgres'
 }
 
+# Forecast API configuration
+FORECAST_API_URL = os.environ.get('FORECAST_API_URL', 'https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com')
+
 def get_db_connection():
     """Create database connection"""
     return psycopg2.connect(**DB_CONFIG)
+
+def get_forecast_data(asin):
+    """
+    Fetch forecast data from the forecast API endpoint
+    Returns dict with avg_daily_sales and weekly_forecast_avg
+    """
+    try:
+        url = f"{FORECAST_API_URL}/forecast/{asin}"
+        with urllib.request.urlopen(url, timeout=5) as response:
+            data = json.loads(response.read().decode())
+            return {
+                'avg_daily_sales': data.get('avg_daily_sales', 0),
+                'weekly_forecast_avg': data.get('weekly_forecast_avg', 0),
+                'daily_forecast_avg': data.get('daily_forecast_avg', 0)
+            }
+    except (urllib.error.URLError, urllib.error.HTTPError, Exception) as e:
+        # If forecast API fails, return 0 (will use fallback in queries)
+        print(f"Forecast API error for {asin}: {str(e)}")
+        return {
+            'avg_daily_sales': 0,
+            'weekly_forecast_avg': 0,
+            'daily_forecast_avg': 0
+        }
 
 def decimal_default(obj):
     """JSON serializer for objects not serializable by default json code"""
@@ -1369,7 +1398,7 @@ def get_bottle_inventory(event):
         conn.close()
 
 def get_bottle_forecast_requirements(event):
-    """GET /supply-chain/bottles/forecast-requirements - Calculate bottle requirements based on product forecasts"""
+    """GET /supply-chain/bottles/forecast-requirements - Calculate bottle requirements based on forecast API"""
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -1378,80 +1407,93 @@ def get_bottle_forecast_requirements(event):
         doi_goal = int(query_params.get('doi_goal', 120))
         safety_buffer = float(query_params.get('safety_buffer', 0.85))  # Default 85% max capacity
         
-        # Calculate bottle requirements based on product forecasts from sales_metrics table
+        # Get all products grouped by bottle type
         cursor.execute("""
             SELECT 
                 c.packaging_name as bottle_name,
+                c.child_asin,
+                c.product_name,
+                c.size,
                 b.max_warehouse_inventory,
-                bi.warehouse_quantity as current_inventory,
-                
-                -- Calculate total units forecasted for this bottle type
-                SUM(
-                    CASE 
-                        WHEN sm.units_sold_30_days > 0 
-                        THEN (sm.units_sold_30_days / 30.0) * %s  -- daily_rate * doi_goal
-                        ELSE 0
-                    END
-                ) as forecasted_units_needed,
-                
-                -- Calculate available space in warehouse (with safety buffer)
-                CASE 
-                    WHEN b.max_warehouse_inventory > 0 
-                    THEN GREATEST(0, (b.max_warehouse_inventory * %s) - COALESCE(bi.warehouse_quantity, 0))
-                    ELSE 999999
-                END as available_capacity,
-                
-                -- Calculate recommended order quantity (forecasted need - current inventory, capped at available capacity with safety buffer)
-                CASE 
-                    WHEN b.max_warehouse_inventory > 0 THEN
-                        LEAST(
-                            GREATEST(0, 
-                                SUM(
-                                    CASE 
-                                        WHEN sm.units_sold_30_days > 0 
-                                        THEN (sm.units_sold_30_days / 30.0) * %s
-                                        ELSE 0
-                                    END
-                                ) - COALESCE(bi.warehouse_quantity, 0)
-                            ),
-                            GREATEST(0, (b.max_warehouse_inventory * %s) - COALESCE(bi.warehouse_quantity, 0))
-                        )
-                    ELSE 
-                        GREATEST(0, 
-                            SUM(
-                                CASE 
-                                    WHEN sm.units_sold_30_days > 0 
-                                    THEN (sm.units_sold_30_days / 30.0) * %s
-                                    ELSE 0
-                                END
-                            ) - COALESCE(bi.warehouse_quantity, 0)
-                        )
-                END as recommended_order_qty,
-                
-                -- List all products using this bottle
-                json_agg(
-                    json_build_object(
-                        'product_name', c.product_name,
-                        'size', c.size,
-                        'units_sold_30_days', sm.units_sold_30_days,
-                        'daily_sales_rate', CASE WHEN sm.units_sold_30_days > 0 THEN sm.units_sold_30_days / 30.0 ELSE 0 END
-                    )
-                ) as products_using_bottle
-                
+                bi.warehouse_quantity as current_inventory
             FROM catalog c
-            LEFT JOIN sales_metrics sm ON c.id = sm.catalog_id
             LEFT JOIN bottle b ON c.packaging_name = b.bottle_name
             LEFT JOIN bottle_inventory bi ON c.packaging_name = bi.bottle_name
             WHERE c.packaging_name IS NOT NULL
-            GROUP BY c.packaging_name, b.max_warehouse_inventory, bi.warehouse_quantity
             ORDER BY c.packaging_name
-        """, (doi_goal, safety_buffer, doi_goal, safety_buffer, doi_goal))
+        """)
         
-        requirements = cursor.fetchall()
+        products = cursor.fetchall()
+        
+        # Fetch forecast data CONCURRENTLY for all ASINs
+        forecast_cache = {}
+        unique_asins = [p.get('child_asin') for p in products if p.get('child_asin')]
+        
+        with ThreadPoolExecutor(max_workers=20) as executor:
+            future_to_asin = {executor.submit(get_forecast_data, asin): asin for asin in unique_asins}
+            for future in as_completed(future_to_asin):
+                asin = future_to_asin[future]
+                try:
+                    forecast_cache[asin] = future.result()
+                except Exception:
+                    forecast_cache[asin] = {'daily_forecast_avg': 0, 'weekly_forecast_avg': 0}
+        
+        # Group by bottle and calculate forecasts from cached data
+        bottle_data = {}
+        for product in products:
+            bottle_name = product['bottle_name']
+            asin = product['child_asin']
+            
+            if bottle_name not in bottle_data:
+                bottle_data[bottle_name] = {
+                    'bottle_name': bottle_name,
+                    'max_warehouse_inventory': product['max_warehouse_inventory'],
+                    'current_inventory': product['current_inventory'] or 0,
+                    'forecasted_units_needed': 0,
+                    'products': []
+                }
+            
+            # Get forecast from cache
+            if asin and asin in forecast_cache:
+                forecast = forecast_cache[asin]
+                daily_forecast = forecast.get('daily_forecast_avg', 0) or forecast.get('avg_daily_sales', 0)
+                units_needed = daily_forecast * doi_goal
+                
+                bottle_data[bottle_name]['forecasted_units_needed'] += units_needed
+                bottle_data[bottle_name]['products'].append({
+                    'product_name': product['product_name'],
+                    'size': product['size'],
+                    'daily_forecast_rate': round(daily_forecast, 2)
+                })
+        
+        # Calculate recommended order quantities
+        results = []
+        for bottle_name, data in bottle_data.items():
+            current_inv = data['current_inventory']
+            forecasted = data['forecasted_units_needed']
+            max_inventory = data['max_warehouse_inventory'] or 999999
+            
+            # Calculate available capacity
+            available_capacity = max(0, (max_inventory * safety_buffer) - current_inv) if max_inventory < 999999 else 999999
+            
+            # Calculate recommended order quantity (capped by available capacity)
+            recommended_qty = max(0, forecasted - current_inv)
+            if max_inventory < 999999:
+                recommended_qty = min(recommended_qty, available_capacity)
+            
+            results.append({
+                'bottle_name': bottle_name,
+                'max_warehouse_inventory': max_inventory,
+                'current_inventory': current_inv,
+                'forecasted_units_needed': round(forecasted, 2),
+                'available_capacity': available_capacity,
+                'recommended_order_qty': round(recommended_qty, 2),
+                'products_using_bottle': data['products']
+            })
         
         return cors_response(200, {
             'success': True,
-            'data': [dict(row) for row in requirements],
+            'data': results,
             'doi_goal': doi_goal,
             'safety_buffer': safety_buffer,
             'safety_buffer_pct': int(safety_buffer * 100)
@@ -1708,7 +1750,7 @@ def get_closure_inventory(event):
         conn.close()
 
 def get_closure_forecast_requirements(event):
-    """GET /supply-chain/closures/forecast-requirements - Calculate closure requirements based on product forecasts"""
+    """GET /supply-chain/closures/forecast-requirements - Calculate closure requirements based on forecast API"""
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -1717,58 +1759,89 @@ def get_closure_forecast_requirements(event):
         doi_goal = int(query_params.get('doi_goal', 120))
         safety_buffer = float(query_params.get('safety_buffer', 0.85))  # Default 85% max capacity
         
-        # Calculate closure requirements based on product forecasts from sales_metrics table
+        # Get all products grouped by closure type
         cursor.execute("""
             SELECT 
                 c.closure_name,
+                c.child_asin,
+                c.product_name,
+                c.size,
                 cl.moq,
                 cl.lead_time_weeks,
-                ci.warehouse_quantity as current_inventory,
-                
-                -- Calculate total units forecasted for this closure type
-                SUM(
-                    CASE 
-                        WHEN sm.units_sold_30_days > 0 
-                        THEN (sm.units_sold_30_days / 30.0) * %s  -- daily_rate * doi_goal
-                        ELSE 0
-                    END
-                ) as forecasted_units_needed,
-                
-                -- Calculate recommended order quantity (forecasted need - current inventory)
-                GREATEST(0, 
-                    SUM(
-                        CASE 
-                            WHEN sm.units_sold_30_days > 0 
-                            THEN (sm.units_sold_30_days / 30.0) * %s
-                            ELSE 0
-                        END
-                    ) - COALESCE(ci.warehouse_quantity, 0)
-                ) as recommended_order_qty,
-                
-                -- List all products using this closure
-                json_agg(
-                    json_build_object(
-                        'product_name', c.product_name,
-                        'size', c.size,
-                        'units_sold_30_days', sm.units_sold_30_days,
-                        'daily_sales_rate', CASE WHEN sm.units_sold_30_days > 0 THEN sm.units_sold_30_days / 30.0 ELSE 0 END
-                    )
-                ) as products_using_closure
-                
+                ci.warehouse_quantity as current_inventory
             FROM catalog c
-            LEFT JOIN sales_metrics sm ON c.id = sm.catalog_id
             LEFT JOIN closure cl ON c.closure_name = cl.closure_name
             LEFT JOIN closure_inventory ci ON c.closure_name = ci.closure_name
             WHERE c.closure_name IS NOT NULL
-            GROUP BY c.closure_name, cl.moq, cl.lead_time_weeks, ci.warehouse_quantity
             ORDER BY c.closure_name
-        """, (doi_goal, doi_goal))
+        """)
         
-        requirements = cursor.fetchall()
+        products = cursor.fetchall()
+        
+        # Fetch forecast data CONCURRENTLY for all ASINs
+        forecast_cache = {}
+        unique_asins = [p.get('child_asin') for p in products if p.get('child_asin')]
+        
+        with ThreadPoolExecutor(max_workers=20) as executor:
+            future_to_asin = {executor.submit(get_forecast_data, asin): asin for asin in unique_asins}
+            for future in as_completed(future_to_asin):
+                asin = future_to_asin[future]
+                try:
+                    forecast_cache[asin] = future.result()
+                except Exception:
+                    forecast_cache[asin] = {'daily_forecast_avg': 0, 'weekly_forecast_avg': 0}
+        
+        # Group by closure and calculate forecasts from cached data
+        closure_data = {}
+        for product in products:
+            closure_name = product['closure_name']
+            asin = product['child_asin']
+            
+            if closure_name not in closure_data:
+                closure_data[closure_name] = {
+                    'closure_name': closure_name,
+                    'moq': product['moq'],
+                    'lead_time_weeks': product['lead_time_weeks'],
+                    'current_inventory': product['current_inventory'] or 0,
+                    'forecasted_units_needed': 0,
+                    'products': []
+                }
+            
+            # Get forecast from cache
+            if asin and asin in forecast_cache:
+                forecast = forecast_cache[asin]
+                daily_forecast = forecast.get('daily_forecast_avg', 0) or forecast.get('avg_daily_sales', 0)
+                weekly_forecast = forecast.get('weekly_forecast_avg', 0)
+                units_needed = daily_forecast * doi_goal
+                
+                closure_data[closure_name]['forecasted_units_needed'] += units_needed
+                closure_data[closure_name]['products'].append({
+                    'product_name': product['product_name'],
+                    'size': product['size'],
+                    'avg_weekly_forecast': round(weekly_forecast, 2),
+                    'daily_forecast_rate': round(daily_forecast, 2)
+                })
+        
+        # Calculate recommended order quantities
+        results = []
+        for closure_name, data in closure_data.items():
+            current_inv = data['current_inventory']
+            forecasted = data['forecasted_units_needed']
+            recommended_qty = max(0, forecasted - current_inv)
+            
+            results.append({
+                'closure_name': closure_name,
+                'moq': data['moq'],
+                'lead_time_weeks': data['lead_time_weeks'],
+                'current_inventory': current_inv,
+                'forecasted_units_needed': round(forecasted, 2),
+                'recommended_order_qty': round(recommended_qty, 2),
+                'products_using_closure': data['products']
+            })
         
         return cors_response(200, {
             'success': True,
-            'data': [dict(row) for row in requirements],
+            'data': results,
             'doi_goal': doi_goal,
             'safety_buffer': safety_buffer,
             'safety_buffer_pct': int(safety_buffer * 100)
@@ -1969,7 +2042,7 @@ def get_box_inventory(event):
         conn.close()
 
 def get_box_forecast_requirements(event):
-    """GET /supply-chain/boxes/forecast-requirements - Calculate box requirements based on total case production needs"""
+    """GET /supply-chain/boxes/forecast-requirements - Calculate box requirements based on forecast API"""
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -1978,41 +2051,77 @@ def get_box_forecast_requirements(event):
         doi_goal = int(query_params.get('doi_goal', 120))
         safety_buffer = float(query_params.get('safety_buffer', 0.85))  # Default 85% max capacity
         
-        # Calculate box requirements based on estimated case production needs
-        # Assumption: Each product unit = 1 case that needs a box
+        # Get all products and box inventory
+        cursor.execute("""
+            SELECT 
+                c.child_asin,
+                b.box_size as box_type,
+                b.moq,
+                b.lead_time_weeks,
+                bi.warehouse_quantity as current_inventory
+            FROM catalog c
+            CROSS JOIN box b
+            LEFT JOIN box_inventory bi ON b.box_size = bi.box_type
+            ORDER BY b.box_size
+        """)
+        
+        rows = cursor.fetchall()
+        
+        # Get all unique ASINs
+        cursor.execute("SELECT DISTINCT child_asin FROM catalog WHERE child_asin IS NOT NULL")
+        asins = [row['child_asin'] for row in cursor.fetchall()]
+        
+        # Fetch forecast data CONCURRENTLY for all ASINs
+        forecast_cache = {}
+        with ThreadPoolExecutor(max_workers=20) as executor:
+            future_to_asin = {executor.submit(get_forecast_data, asin): asin for asin in asins}
+            for future in as_completed(future_to_asin):
+                asin = future_to_asin[future]
+                try:
+                    forecast_cache[asin] = future.result()
+                except Exception:
+                    forecast_cache[asin] = {'daily_forecast_avg': 0, 'weekly_forecast_avg': 0}
+        
+        # Calculate total forecasted units from cached data
+        total_forecasted_units = 0
+        for asin, forecast in forecast_cache.items():
+            daily_forecast = forecast.get('daily_forecast_avg', 0) or forecast.get('avg_daily_sales', 0)
+            total_forecasted_units += daily_forecast * doi_goal
+        
+        # Estimate cases needed (assuming 6 units per case on average)
+        forecasted_cases = total_forecasted_units / 6.0
+        
+        # Get unique box types and calculate requirements
         cursor.execute("""
             SELECT 
                 b.box_size as box_type,
                 b.moq,
                 b.lead_time_weeks,
-                bi.warehouse_quantity as current_inventory,
-                
-                -- Estimate total cases needed (based on all product sales)
-                -- Simple estimation: total units sold / average units per case
-                -- This is a rough estimate since boxes aren't product-specific
-                ROUND(
-                    (SELECT SUM(COALESCE(sm.units_sold_30_days, 0)) / 30.0 * %s / 6.0
-                     FROM sales_metrics sm), 0
-                ) as forecasted_cases_needed,
-                
-                -- Recommended order quantity (forecasted need - current inventory)
-                GREATEST(0, 
-                    ROUND(
-                        (SELECT SUM(COALESCE(sm.units_sold_30_days, 0)) / 30.0 * %s / 6.0
-                         FROM sales_metrics sm), 0
-                    ) - COALESCE(bi.warehouse_quantity, 0)
-                ) as recommended_order_qty
-                
+                bi.warehouse_quantity as current_inventory
             FROM box b
             LEFT JOIN box_inventory bi ON b.box_size = bi.box_type
             ORDER BY b.box_size
-        """, (doi_goal, doi_goal))
+        """)
         
-        requirements = cursor.fetchall()
+        boxes = cursor.fetchall()
+        results = []
+        
+        for box in boxes:
+            current_inv = box['current_inventory'] or 0
+            recommended_qty = max(0, round(forecasted_cases - current_inv))
+            
+            results.append({
+                'box_type': box['box_type'],
+                'moq': box['moq'],
+                'lead_time_weeks': box['lead_time_weeks'],
+                'current_inventory': current_inv,
+                'forecasted_cases_needed': round(forecasted_cases),
+                'recommended_order_qty': recommended_qty
+            })
         
         return cors_response(200, {
             'success': True,
-            'data': [dict(row) for row in requirements],
+            'data': results,
             'doi_goal': doi_goal,
             'safety_buffer': safety_buffer,
             'safety_buffer_pct': int(safety_buffer * 100),
@@ -2190,7 +2299,7 @@ def update_box_inventory(event):
 # ============================================
 
 def get_label_forecast_requirements(event):
-    """GET /supply-chain/labels/forecast-requirements - Calculate label requirements based on product forecasts"""
+    """GET /supply-chain/labels/forecast-requirements - Calculate label requirements based on forecast API (CONCURRENT)"""
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -2199,8 +2308,7 @@ def get_label_forecast_requirements(event):
         doi_goal = int(query_params.get('doi_goal', 120))
         safety_buffer = float(query_params.get('safety_buffer', 0.85))  # Default 85% max capacity
         
-        # Calculate label requirements based on product forecasts from sales_metrics table
-        # Labels are identified by product_name + bottle_size combination
+        # Get all labels with their product mappings
         cursor.execute("""
             SELECT 
                 li.product_name,
@@ -2210,40 +2318,63 @@ def get_label_forecast_requirements(event):
                 li.moq,
                 li.lead_time_weeks,
                 li.warehouse_inventory as current_inventory,
-                
-                -- Calculate forecasted units needed for this specific product + size
-                COALESCE(
-                    (sm.units_sold_30_days / 30.0) * %s,
-                    0
-                ) as forecasted_units_needed,
-                
-                -- Calculate recommended order quantity (forecasted need - current inventory)
-                GREATEST(0, 
-                    COALESCE(
-                        (sm.units_sold_30_days / 30.0) * %s,
-                        0
-                    ) - COALESCE(li.warehouse_inventory, 0)
-                ) as recommended_order_qty,
-                
-                -- Include sales data for reference
-                sm.units_sold_30_days,
-                CASE 
-                    WHEN sm.units_sold_30_days > 0 
-                    THEN sm.units_sold_30_days / 30.0 
-                    ELSE 0 
-                END as daily_sales_rate
-                
+                c.child_asin
             FROM label_inventory li
             LEFT JOIN catalog c ON li.product_name = c.product_name AND li.bottle_size = c.size
-            LEFT JOIN sales_metrics sm ON c.id = sm.catalog_id
             ORDER BY li.product_name, li.bottle_size
-        """, (doi_goal, doi_goal))
+        """)
         
-        requirements = cursor.fetchall()
+        labels = cursor.fetchall()
+        
+        # Fetch forecast data CONCURRENTLY
+        forecast_cache = {}
+        unique_asins = [label.get('child_asin') for label in labels if label.get('child_asin')]
+        
+        with ThreadPoolExecutor(max_workers=20) as executor:
+            future_to_asin = {executor.submit(get_forecast_data, asin): asin for asin in unique_asins}
+            for future in as_completed(future_to_asin):
+                asin = future_to_asin[future]
+                try:
+                    forecast_cache[asin] = future.result()
+                except Exception:
+                    forecast_cache[asin] = {'daily_forecast_avg': 0, 'weekly_forecast_avg': 0}
+        
+        # Build results with cached forecast data
+        results = []
+        for label in labels:
+            asin = label.get('child_asin')
+            current_inventory = label.get('current_inventory') or 0
+            
+            # Get forecast data from cache
+            if asin and asin in forecast_cache:
+                forecast = forecast_cache[asin]
+                daily_forecast = forecast.get('daily_forecast_avg', 0) or forecast.get('avg_daily_sales', 0)
+                weekly_forecast = forecast.get('weekly_forecast_avg', 0)
+            else:
+                daily_forecast = 0
+                weekly_forecast = 0
+            
+            # Calculate forecasted units needed for DOI goal
+            forecasted_units_needed = daily_forecast * doi_goal
+            recommended_order_qty = max(0, forecasted_units_needed - current_inventory)
+            
+            results.append({
+                'product_name': label.get('product_name'),
+                'bottle_size': label.get('bottle_size'),
+                'label_location': label.get('label_location'),
+                'supplier': label.get('supplier'),
+                'moq': label.get('moq'),
+                'lead_time_weeks': label.get('lead_time_weeks'),
+                'current_inventory': current_inventory,
+                'forecasted_units_needed': round(forecasted_units_needed, 2),
+                'recommended_order_qty': round(recommended_order_qty, 2),
+                'avg_weekly_forecast': round(weekly_forecast, 2),
+                'daily_sales_rate': round(daily_forecast, 2)
+            })
         
         return cors_response(200, {
             'success': True,
-            'data': [dict(row) for row in requirements],
+            'data': results,
             'doi_goal': doi_goal,
             'safety_buffer': safety_buffer,
             'safety_buffer_pct': int(safety_buffer * 100)
@@ -2260,12 +2391,11 @@ def get_label_forecast_requirements(event):
         conn.close()
 
 def get_label_inventory(event):
-    """GET /supply-chain/labels/inventory - Get all label inventory"""
+    """GET /supply-chain/labels/inventory - Get all label inventory sorted by lowest inventory first"""
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Query labels with sales data only, sorted by lowest inventory with highest sales first
-        # Get label_size from label_inventory first, fallback to catalog
+        # Query labels sorted by warehouse_inventory ascending (lowest first)
         cursor.execute("""
             SELECT 
                 li.id,
@@ -2285,19 +2415,39 @@ def get_label_inventory(event):
                 li.created_at,
                 li.updated_at,
                 li.notes,
-                COALESCE(sm.units_sold_30_days, 0) as units_sold_30_days,
-                COALESCE(sm.units_sold_30_days / 30.0, 0) as daily_sales_rate
+                c.child_asin
             FROM label_inventory li
             LEFT JOIN catalog c ON c.label_location = li.label_location
-            LEFT JOIN sales_metrics sm ON c.id = sm.catalog_id
-            WHERE COALESCE(sm.units_sold_30_days, 0) > 0
-            ORDER BY 
-                sm.units_sold_30_days DESC,
-                li.warehouse_inventory ASC,
-                li.brand_name, li.product_name, li.bottle_size
+            ORDER BY li.warehouse_inventory ASC, li.brand_name, li.product_name, li.bottle_size
         """)
-        inventory = cursor.fetchall()
-        return cors_response(200, {'success': True, 'data': [dict(row) for row in inventory]})
+        
+        labels = cursor.fetchall()
+        
+        # Convert to list of dicts
+        results = []
+        for label in labels:
+            results.append({
+                'id': label.get('id'),
+                'brand_name': label.get('brand_name'),
+                'product_name': label.get('product_name'),
+                'bottle_size': label.get('bottle_size'),
+                'label_size': label.get('label_size'),
+                'label_location': label.get('label_location'),
+                'label_status': label.get('label_status'),
+                'warehouse_inventory': label.get('warehouse_inventory'),
+                'inbound_quantity': label.get('inbound_quantity'),
+                'supplier': label.get('supplier'),
+                'moq': label.get('moq'),
+                'lead_time_weeks': label.get('lead_time_weeks'),
+                'last_count_date': label.get('last_count_date'),
+                'google_drive_link': label.get('google_drive_link'),
+                'created_at': label.get('created_at'),
+                'updated_at': label.get('updated_at'),
+                'notes': label.get('notes'),
+                'child_asin': label.get('child_asin')
+            })
+        
+        return cors_response(200, {'success': True, 'data': results})
     except Exception as e:
         import traceback
         return cors_response(500, {
@@ -2382,17 +2532,31 @@ def get_label_orders(event):
         query_params = event.get('queryStringParameters') or {}
         status_filter = query_params.get('status')
         
+        print(f"Fetching label orders, status_filter: {status_filter}")
+        
         if status_filter:
             cursor.execute("SELECT * FROM label_orders WHERE status = %s ORDER BY order_date DESC", (status_filter,))
         else:
             cursor.execute("SELECT * FROM label_orders ORDER BY order_date DESC")
         orders = cursor.fetchall()
+        
+        print(f"Found {len(orders)} label orders")
+        
         return cors_response(200, {'success': True, 'data': [dict(row) for row in orders]})
     except Exception as e:
         import traceback
+        error_msg = str(e)
+        print(f"ERROR in get_label_orders: {error_msg}")
+        print(f"Traceback: {traceback.format_exc()}")
+        
+        # If table doesn't exist, return empty array instead of error
+        if 'does not exist' in error_msg or 'relation' in error_msg:
+            print("Table label_orders doesn't exist yet, returning empty array")
+            return cors_response(200, {'success': True, 'data': []})
+        
         return cors_response(500, {
             'success': False,
-            'error': str(e),
+            'error': error_msg,
             'traceback': traceback.format_exc()
         })
     finally:
@@ -4968,6 +5132,13 @@ def get_products_inventory(event):
                 b.size_oz as bottle_size_oz,
                 bi.warehouse_quantity as bottle_inventory,
                 b.max_warehouse_inventory as bottle_max_inventory,
+                
+                -- Packaging calculation fields (for pallets, weight, time)
+                b.box_weight_lbs,
+                b.boxes_per_pallet,
+                b.single_box_pallet_share,
+                b.bottles_per_minute,
+                b.finished_units_per_case,
                 
                 -- Closure details
                 c.closure_name,
