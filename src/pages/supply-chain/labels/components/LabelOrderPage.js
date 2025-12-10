@@ -217,7 +217,7 @@ const LabelOrderPage = () => {
   }, [orderLines]);
 
   // Filter and sort lines based on search
-  // Default sort: by DOI ascending (lowest DOI first = most urgent to order)
+  // Default sort: by inventory ascending (lowest inventory first = most urgent to order)
   const filteredLines = useMemo(() => {
     // In edit mode on receivePO tab, show only added items (the order items)
     // As users add more items, they will appear in receivePO
@@ -238,12 +238,12 @@ const LabelOrderPage = () => {
       );
     }
     
-    // Sort by DOI ascending (lowest DOI first = most urgent to order)
-    // Products with lowest Days of Inventory should appear first
+    // Sort by inventory ascending (lowest inventory first = most urgent to order)
+    // Products with lowest inventory should appear first
     return [...linesToFilter].sort((a, b) => {
-      const doiA = a.currentDOI ?? 999;
-      const doiB = b.currentDOI ?? 999;
-      return doiA - doiB;
+      const invA = a.inventory ?? 0;
+      const invB = b.inventory ?? 0;
+      return invA - invB;
     });
   }, [orderLines, searchQuery, isEditOrderMode, activeTab]);
 

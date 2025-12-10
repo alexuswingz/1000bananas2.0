@@ -52,15 +52,23 @@ const InventoryTable = forwardRef(({
     fetchLabels();
   }, []);
 
-  // Filter labels based on search query
+  // Filter and sort labels based on search query
+  // Default sort: by inventory ascending (lowest inventory first)
   const filteredData = useMemo(() => {
-    if (!searchQuery.trim()) return labels;
-    const query = searchQuery.toLowerCase();
-    return labels.filter((label) =>
-      label.brand.toLowerCase().includes(query) ||
-      label.product.toLowerCase().includes(query) ||
-      label.size.toLowerCase().includes(query)
-    );
+    let result = labels;
+    
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter((label) =>
+        label.brand.toLowerCase().includes(query) ||
+        label.product.toLowerCase().includes(query) ||
+        label.size.toLowerCase().includes(query)
+      );
+    }
+    
+    // Sort by inventory ascending (lowest inventory first)
+    return [...result].sort((a, b) => (a.inventory || 0) - (b.inventory || 0));
   }, [labels, searchQuery]);
 
   // Action menu state

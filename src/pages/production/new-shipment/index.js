@@ -268,7 +268,7 @@ const NewShipment = () => {
           label_location: supplyChain.label_location || '',
           label_size: supplyChain.label_size || '',
           case_size: '',
-          units_per_case: supplyChain.units_per_case || 60,
+          units_per_case: supplyChain.units_per_case || supplyChain.finished_units_per_case || 60,
           // Supply chain inventory levels
           bottleInventory: supplyChain.bottle_inventory || 0,
           closureInventory: supplyChain.closure_inventory || 0,
@@ -276,12 +276,15 @@ const NewShipment = () => {
           formulaGallonsAvailable: supplyChain.formula_gallons_available || 0,
           formulaGallonsPerUnit: supplyChain.gallons_per_unit || 0,
           maxUnitsProducible: supplyChain.max_units_producible || 0,
-          bottle_name: supplyChain.bottle_name || '',
-          closure_name: supplyChain.closure_name || '',
+          // Packaging calculation fields (for pallets, weight, time)
+          box_weight_lbs: parseFloat(supplyChain.box_weight_lbs) || 0,
+          boxes_per_pallet: parseFloat(supplyChain.boxes_per_pallet) || 50,
+          single_box_pallet_share: parseFloat(supplyChain.single_box_pallet_share) || 0.02,
+          bottles_per_minute: parseInt(supplyChain.bottles_per_minute) || 20,
         };
       });
       
-      console.log('Loaded products with supply chain:', formattedProducts.length, 'Sample:', formattedProducts[0]);
+      console.log('Loaded products with supply chain:', formattedProducts.length);
       
       // Calculate suggested qty for each product based on forecast
       // Formula: unitsNeeded = (targetDOI - currentDOI) * dailySalesRate
@@ -577,14 +580,70 @@ const NewShipment = () => {
     return sum + boxesNeeded;
   }, 0);
 
-  // Calculate palettes (assuming ~50 boxes per palette, can be adjusted)
-  const totalPalettes = Math.ceil(Math.ceil(totalBoxes) / 50);
+  // Calculate palettes based on single_box_pallet_share or boxes_per_pallet
+  // Each box takes up a fraction of a pallet (e.g., 0.028 = 2.8% of a pallet per box)
+  const totalPalettes = products.reduce((sum, product, index) => {
+    if (!addedRows || !(addedRows instanceof Set) || !addedRows.has(product.id)) {
+      return sum;
+    }
+    const qty = qtyValues[index] ?? 0;
+    const numQty = typeof qty === 'number' ? qty : (qty === '' || qty === null || qty === undefined ? 0 : parseInt(qty, 10) || 0);
+    
+    // Calculate boxes needed - use finished_units_per_case (for finished products) or units_per_case (fallback)
+    const unitsPerCase = product.finished_units_per_case || product.units_per_case || 60;
+    const boxesNeeded = numQty / unitsPerCase;
+    
+    // Calculate pallet share using single_box_pallet_share or boxes_per_pallet
+    let palletShare = 0;
+    if (product.single_box_pallet_share && product.single_box_pallet_share > 0) {
+      // Each box takes this fraction of a pallet (e.g., 0.027778 = 1/36 of a pallet per box)
+      palletShare = boxesNeeded * product.single_box_pallet_share;
+    } else if (product.boxes_per_pallet && product.boxes_per_pallet > 0) {
+      // boxes_per_pallet is max boxes that fit on one pallet
+      palletShare = boxesNeeded / product.boxes_per_pallet;
+    } else {
+      // Fallback: assume 50 boxes per pallet
+      palletShare = boxesNeeded / 50;
+    }
+    
+    return sum + palletShare;
+  }, 0);
 
-  // Calculate time in hours (placeholder - can be calculated based on production time)
-  const totalTimeHours = 0;
+  // Calculate time in hours based on bottles_per_minute (BPM)
+  // Time (hours) = Total Units / BPM / 60
+  const totalTimeHours = products.reduce((sum, product, index) => {
+    if (!addedRows || !(addedRows instanceof Set) || !addedRows.has(product.id)) {
+      return sum;
+    }
+    const qty = qtyValues[index] ?? 0;
+    const numQty = typeof qty === 'number' ? qty : (qty === '' || qty === null || qty === undefined ? 0 : parseInt(qty, 10) || 0);
+    
+    const bpm = product.bottles_per_minute || 20; // Default 20 BPM if not specified
+    const minutes = numQty / bpm;
+    const hours = minutes / 60;
+    
+    return sum + hours;
+  }, 0);
 
-  // Calculate weight in lbs (placeholder - can be calculated based on product weights)
-  const totalWeightLbs = 0;
+  // Calculate weight in lbs based on box_weight_lbs
+  // Weight (lbs) = Number of Boxes × Box Weight (lbs)
+  const totalWeightLbs = products.reduce((sum, product, index) => {
+    if (!addedRows || !(addedRows instanceof Set) || !addedRows.has(product.id)) {
+      return sum;
+    }
+    const qty = qtyValues[index] ?? 0;
+    const numQty = typeof qty === 'number' ? qty : (qty === '' || qty === null || qty === undefined ? 0 : parseInt(qty, 10) || 0);
+    
+    // Calculate boxes needed
+    const unitsPerCase = product.units_per_case || 60;
+    const boxesNeeded = numQty / unitsPerCase;
+    
+    // Calculate weight: boxes × box_weight_lbs
+    const boxWeight = product.box_weight_lbs || 0;
+    const weight = boxesNeeded * boxWeight;
+    
+    return sum + weight;
+  }, 0);
 
   const handleProductClick = (row) => {
     setSelectedRow(row);
@@ -2051,7 +2110,7 @@ const NewShipment = () => {
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
                   }}>
-                    {totalPalettes}
+                    {totalPalettes.toFixed(2)}
                   </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -2067,7 +2126,7 @@ const NewShipment = () => {
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
                   }}>
-                    {Math.ceil(totalBoxes)}
+                    {Math.ceil(totalBoxes).toLocaleString()}
                   </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -2083,7 +2142,7 @@ const NewShipment = () => {
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
                   }}>
-                    {totalUnits}
+                    {totalUnits.toLocaleString()}
                   </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -2099,7 +2158,7 @@ const NewShipment = () => {
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
                   }}>
-                    {totalTimeHours}
+                    {totalTimeHours.toFixed(1)}
                   </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -2115,7 +2174,7 @@ const NewShipment = () => {
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
                   }}>
-                    {totalWeightLbs}
+                    {Math.round(totalWeightLbs).toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -2160,6 +2219,7 @@ const NewShipment = () => {
           setSelectedRow(null);
         }}
         selectedRow={selectedRow}
+        forecastRange={parseInt(forecastRange) || 150}
         labelsAvailable={(() => {
           if (!selectedRow?.label_location) return null;
           const labelLoc = selectedRow.label_location;
@@ -2204,6 +2264,9 @@ const NewShipment = () => {
               ...prev,
               [productIndex]: finalUnits
             }));
+            
+            // Also add the row to addedRows so button shows "Added"
+            setAddedRows(prev => new Set([...prev, row.id]));
             
             toast.success(`Added ${finalUnits.toLocaleString()} units of ${row.product}`);
           }

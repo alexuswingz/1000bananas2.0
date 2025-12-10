@@ -21,7 +21,7 @@ import {
   Brush
 } from 'recharts';
 
-const Ngoos = ({ data }) => {
+const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
   const { isDarkMode } = useTheme();
   const [selectedView, setSelectedView] = useState('2 Years');
   const [loading, setLoading] = useState(true);
@@ -195,8 +195,11 @@ const Ngoos = ({ data }) => {
     forecast = forecast.slice(0, maxForecastWeeks);
     
     // Get current date and DOI goal date from forecast
+    // When doiGoalDays is provided (from production planning), calculate DOI goal date from it
     const currentDate = new Date(forecastData.current_date || Date.now());
-    const doiGoalDate = new Date(forecastData.doi_goal_date || Date.now());
+    const doiGoalDate = doiGoalDays 
+      ? new Date(currentDate.getTime() + doiGoalDays * 24 * 60 * 60 * 1000)
+      : new Date(forecastData.doi_goal_date || Date.now());
     
     // Calculate runout dates based on DOI days from current date
     // Per CALCULATIONS.md: Runout Date = Current Date + DOI (days)
@@ -276,12 +279,19 @@ const Ngoos = ({ data }) => {
   }, [chartData, forecastData, selectedView]);
 
   // Get timeline period boundaries for highlighting
+  // Use doiGoalDays when provided (from production planning modal)
   const timelinePeriods = useMemo(() => {
     if (!forecastData) return null;
     
+    // Calculate DOI goal date based on doiGoalDays if provided
+    const currentDate = forecastData.current_date || new Date().toISOString();
+    const calculatedDoiGoalDate = doiGoalDays 
+      ? new Date(new Date(currentDate).getTime() + doiGoalDays * 24 * 60 * 60 * 1000).toISOString()
+      : forecastData.doi_goal_date;
+    
     return {
       fbaAvailable: {
-        start: forecastData.current_date,
+        start: currentDate,
         end: forecastData.runout_date,
         color: '#a855f7',
         label: 'FBA Available'
@@ -294,12 +304,12 @@ const Ngoos = ({ data }) => {
       },
       forecast: {
         start: forecastData.total_runout_date,
-        end: forecastData.doi_goal_date,
+        end: calculatedDoiGoalDate,
         color: '#3b82f6',
         label: 'Forecast'
       }
     };
-  }, [forecastData]);
+  }, [forecastData, doiGoalDays]);
 
   // Handle zoom reset
   const handleZoomReset = () => {
@@ -812,259 +822,308 @@ const Ngoos = ({ data }) => {
 
   return (
     <div className={`${themeClasses.bg} rounded-xl border ${themeClasses.border} shadow-sm`}>
-      {/* Tab Navigation */}
-      <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #334155' }}>
-        <button
-          onClick={() => setActiveTab('forecast')}
-          style={{
-            padding: '1rem 2rem',
-            fontSize: '0.875rem',
-            fontWeight: '600',
-            color: activeTab === 'forecast' ? '#fff' : '#94a3b8',
-            backgroundColor: activeTab === 'forecast' ? '#1e293b' : 'transparent',
-            border: 'none',
-            borderBottom: activeTab === 'forecast' ? '2px solid #3b82f6' : '2px solid transparent',
-            cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}
-        >
-          Inventory
-        </button>
-        <button
-          onClick={() => setActiveTab('sales')}
-          style={{
-            padding: '1rem 2rem',
-            fontSize: '0.875rem',
-            fontWeight: '600',
-            color: activeTab === 'sales' ? '#fff' : '#94a3b8',
-            backgroundColor: activeTab === 'sales' ? '#1e293b' : 'transparent',
-            border: 'none',
-            borderBottom: activeTab === 'sales' ? '2px solid #3b82f6' : '2px solid transparent',
-            cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}
-        >
-          Sales
-        </button>
-        <button
-          onClick={() => setActiveTab('ads')}
-          style={{
-            padding: '1rem 2rem',
-            fontSize: '0.875rem',
-            fontWeight: '600',
-            color: activeTab === 'ads' ? '#fff' : '#94a3b8',
-            backgroundColor: activeTab === 'ads' ? '#1e293b' : 'transparent',
-            border: 'none',
-            borderBottom: activeTab === 'ads' ? '2px solid #3b82f6' : '2px solid transparent',
-            cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}
-        >
-          Ads
-        </button>
-      </div>
+      {/* Tab Navigation - Hidden when inventoryOnly is true */}
+      {!inventoryOnly && (
+        <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #334155' }}>
+          <button
+            onClick={() => setActiveTab('forecast')}
+            style={{
+              padding: '1rem 2rem',
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              color: activeTab === 'forecast' ? '#fff' : '#94a3b8',
+              backgroundColor: activeTab === 'forecast' ? '#1e293b' : 'transparent',
+              border: 'none',
+              borderBottom: activeTab === 'forecast' ? '2px solid #3b82f6' : '2px solid transparent',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            Inventory
+          </button>
+          <button
+            onClick={() => setActiveTab('sales')}
+            style={{
+              padding: '1rem 2rem',
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              color: activeTab === 'sales' ? '#fff' : '#94a3b8',
+              backgroundColor: activeTab === 'sales' ? '#1e293b' : 'transparent',
+              border: 'none',
+              borderBottom: activeTab === 'sales' ? '2px solid #3b82f6' : '2px solid transparent',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            Sales
+          </button>
+          <button
+            onClick={() => setActiveTab('ads')}
+            style={{
+              padding: '1rem 2rem',
+              fontSize: '0.875rem',
+              fontWeight: '600',
+              color: activeTab === 'ads' ? '#fff' : '#94a3b8',
+              backgroundColor: activeTab === 'ads' ? '#1e293b' : 'transparent',
+              border: 'none',
+              borderBottom: activeTab === 'ads' ? '2px solid #3b82f6' : '2px solid transparent',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            Ads
+          </button>
+        </div>
+      )}
 
       {/* Inventory Tab Content */}
       {activeTab === 'forecast' && (
         <div>
-      {/* Header */}
-      <div className={`px-6 py-4 border-b ${themeClasses.border}`}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <h2 className={`text-lg font-semibold ${themeClasses.text}`}>N-GOOS Inventory</h2>
-            <span className="px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 text-xs font-medium">
-              Never Go Out Of Stock
-            </span>
-          </div>
-          {productDetails?.inventory && (
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <div className="px-3 py-1 rounded-md bg-red-500/10 border border-red-500/20" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: '600' }}>●</span>
-                <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#ef4444' }}>
-                  Label Inventory: {inventoryData.fba.total + inventoryData.awd.total}
-                </span>
-              </div>
-              <button className="px-4 py-1.5 rounded-md bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 transition-colors">
-                Add Units ({forecastData?.units_to_make || 0})
-              </button>
+      {/* Header - Hidden when inventoryOnly (shown in parent modal) */}
+      {!inventoryOnly && (
+        <div className={`px-6 py-4 border-b ${themeClasses.border}`}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <h2 className={`text-lg font-semibold ${themeClasses.text}`}>N-GOOS Inventory</h2>
+              <span className="px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 text-xs font-medium">
+                Never Go Out Of Stock
+              </span>
             </div>
-          )}
+            {productDetails?.inventory && (
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                <div className="px-3 py-1 rounded-md bg-red-500/10 border border-red-500/20" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: '600' }}>●</span>
+                  <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#ef4444' }}>
+                    Label Inventory: {inventoryData.fba.total + inventoryData.awd.total}
+                  </span>
+                </div>
+                <button className="px-4 py-1.5 rounded-md bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 transition-colors">
+                  Add Units ({forecastData?.units_to_make || 0})
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Content */}
-      <div className="px-6 pb-6" style={{ paddingTop: '1.5rem' }}>
-        {/* Main Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem', marginBottom: '2rem' }}>
+      {/* Content - More compact padding when inventoryOnly */}
+      <div className={inventoryOnly ? "" : "px-6 pb-6"} style={{ padding: inventoryOnly ? '0.5rem 0.75rem' : '1.5rem' }}>
+        {/* Main Grid - Horizontal layout when inventoryOnly */}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: inventoryOnly ? '1fr 1fr 1fr' : '1fr 2fr', 
+          gap: inventoryOnly ? '0.75rem' : '1.5rem', 
+          marginBottom: inventoryOnly ? '0.75rem' : '2rem' 
+        }}>
           {/* Left: Product Info */}
-          <div className={themeClasses.cardBg} style={{ borderRadius: '0.75rem', padding: '1.5rem' }}>
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
-              <div style={{ width: '80px', height: '120px', backgroundColor: '#fff', borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+          <div className={themeClasses.cardBg} style={{ borderRadius: '0.5rem', padding: inventoryOnly ? '0.75rem' : '1.5rem' }}>
+            <div style={{ display: 'flex', gap: inventoryOnly ? '0.5rem' : '1rem', marginBottom: inventoryOnly ? '0' : '1.5rem' }}>
+              <div style={{ 
+                width: inventoryOnly ? '50px' : '80px', 
+                height: inventoryOnly ? '75px' : '120px', 
+                backgroundColor: '#fff', 
+                borderRadius: '0.375rem', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                overflow: 'hidden',
+                flexShrink: 0
+              }}>
                 {data?.mainImage ? (
                   <img src={data.mainImage} alt={data.product} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
                 ) : (
-                  <svg style={{ width: '3rem', height: '3rem', color: '#9ca3af' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg style={{ width: inventoryOnly ? '1.5rem' : '3rem', height: inventoryOnly ? '1.5rem' : '3rem', color: '#9ca3af' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 )}
               </div>
-              <div style={{ flex: 1 }}>
-                <h3 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#fff', marginBottom: '0.5rem' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h3 style={{ 
+                  fontSize: inventoryOnly ? '0.8rem' : '1.125rem', 
+                  fontWeight: '600', 
+                  color: '#fff', 
+                  marginBottom: inventoryOnly ? '0.2rem' : '0.5rem',
+                  lineHeight: 1.2,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: inventoryOnly ? 'nowrap' : 'normal'
+                }}>
                   {productDetails?.product?.name || data?.product || 'Product Name'}
                 </h3>
-                <div style={{ fontSize: '0.875rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
-                  SIZE: {productDetails?.product?.size || data?.variations?.[0] || 'N/A'}
+                <div style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8', marginBottom: '0.15rem' }}>
+                  SIZE: {productDetails?.product?.size || data?.size || data?.variations?.[0] || 'N/A'}
                 </div>
-                <div style={{ fontSize: '0.875rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
+                <div style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8', marginBottom: '0.15rem' }}>
                   ASIN: {productDetails?.product?.asin || data?.child_asin || data?.childAsin || 'N/A'}
                 </div>
-                <div style={{ fontSize: '0.875rem', color: '#94a3b8' }}>
+                <div style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>
                   BRAND: {productDetails?.product?.brand || data?.brand || 'N/A'}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Right: Inventory Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            {/* FBA Card */}
-            <div className={themeClasses.cardBg} style={{ borderRadius: '0.75rem', padding: '1.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#22c55e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <svg style={{ width: '18px', height: '18px', color: '#fff' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                  </svg>
-                </div>
-                <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#fff' }}>FBA</span>
+          {/* FBA Card */}
+          <div className={themeClasses.cardBg} style={{ borderRadius: '0.5rem', padding: inventoryOnly ? '0.75rem' : '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: inventoryOnly ? '0.5rem' : '1rem' }}>
+              <div style={{ 
+                width: inventoryOnly ? '24px' : '32px', 
+                height: inventoryOnly ? '24px' : '32px', 
+                borderRadius: '50%', 
+                backgroundColor: '#22c55e', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center' 
+              }}>
+                <svg style={{ width: inventoryOnly ? '14px' : '18px', height: inventoryOnly ? '14px' : '18px', color: '#fff' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Total:</span>
-                  <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fba.total}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Available:</span>
-                  <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fba.available}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Reserved:</span>
-                  <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fba.reserved}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Inbound:</span>
-                  <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fba.inbound}</span>
-                </div>
-              </div>
+              <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>FBA</span>
             </div>
-
-            {/* AWD Card */}
-            <div className={themeClasses.cardBg} style={{ borderRadius: '0.75rem', padding: '1.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <svg style={{ width: '18px', height: '18px', color: '#fff' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                  </svg>
-                </div>
-                <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#fff' }}>AWD</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: inventoryOnly ? '0.25rem' : '0.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Total:</span>
+                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fba.total}</span>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Total:</span>
-                  <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.awd.total}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Outbound to FBA:</span>
-                  <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.awd.outbound_to_fba || 0}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Available:</span>
-                  <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.awd.available}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Reserved:</span>
-                  <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.awd.reserved}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Inbound:</span>
-                  <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.awd.inbound}</span>
-                </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Available:</span>
+                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fba.available}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Reserved:</span>
+                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fba.reserved}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Inbound:</span>
+                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fba.inbound}</span>
               </div>
             </div>
           </div>
+
+          {/* AWD Card */}
+          <div className={themeClasses.cardBg} style={{ borderRadius: '0.5rem', padding: inventoryOnly ? '0.75rem' : '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: inventoryOnly ? '0.5rem' : '1rem' }}>
+              <div style={{ 
+                width: inventoryOnly ? '24px' : '32px', 
+                height: inventoryOnly ? '24px' : '32px', 
+                borderRadius: '50%', 
+                backgroundColor: '#3b82f6', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center' 
+              }}>
+                <svg style={{ width: inventoryOnly ? '14px' : '18px', height: inventoryOnly ? '14px' : '18px', color: '#fff' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                </svg>
+              </div>
+              <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>AWD</span>
+            </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: inventoryOnly ? '0.25rem' : '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Total:</span>
+                  <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.awd.total}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Outbound:</span>
+                  <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.awd.outbound_to_fba || 0}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Available:</span>
+                  <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.awd.available}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Reserved:</span>
+                  <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.awd.reserved}</span>
+                </div>
+              </div>
+            </div>
         </div>
 
-        {/* Timeline Bar */}
-        <div className={themeClasses.cardBg} style={{ borderRadius: '0.75rem', padding: '1.5rem', marginBottom: '2rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+        {/* Timeline Bar - Compact when inventoryOnly */}
+        <div className={themeClasses.cardBg} style={{ borderRadius: '0.5rem', padding: inventoryOnly ? '0.75rem' : '1.5rem', marginBottom: inventoryOnly ? '0.75rem' : '2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: inventoryOnly ? '0.5rem' : '1rem' }}>
+            <div style={{ fontSize: inventoryOnly ? '0.65rem' : '0.75rem', color: '#94a3b8' }}>
               Today<br />{forecastData?.current_date ? new Date(forecastData.current_date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : '11/11/25'}
             </div>
-            <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Dec</div>
-            <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Jan</div>
-            <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Feb</div>
-            <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Mar</div>
-            <div style={{ fontSize: '0.75rem', color: '#94a3b8', textAlign: 'right' }}>
-              DOI Goal<br />{forecastData?.doi_goal_date ? new Date(forecastData.doi_goal_date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : '4/13/25'}
+            <div style={{ fontSize: inventoryOnly ? '0.65rem' : '0.75rem', color: '#94a3b8' }}>Dec</div>
+            <div style={{ fontSize: inventoryOnly ? '0.65rem' : '0.75rem', color: '#94a3b8' }}>Jan</div>
+            <div style={{ fontSize: inventoryOnly ? '0.65rem' : '0.75rem', color: '#94a3b8' }}>Feb</div>
+            <div style={{ fontSize: inventoryOnly ? '0.65rem' : '0.75rem', color: '#94a3b8' }}>Mar</div>
+            <div style={{ fontSize: inventoryOnly ? '0.65rem' : '0.75rem', color: '#94a3b8', textAlign: 'right' }}>
+              DOI Goal{doiGoalDays ? ` (${doiGoalDays}d)` : ''}<br />
+              {(() => {
+                if (doiGoalDays) {
+                  const goalDate = new Date(Date.now() + doiGoalDays * 24 * 60 * 60 * 1000);
+                  return goalDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
+                }
+                return forecastData?.doi_goal_date 
+                  ? new Date(forecastData.doi_goal_date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) 
+                  : '4/13/25';
+              })()}
             </div>
           </div>
           
-          <div style={{ display: 'flex', height: '60px', borderRadius: '0.5rem', overflow: 'hidden', position: 'relative' }}>
+          <div style={{ display: 'flex', height: inventoryOnly ? '40px' : '60px', borderRadius: '0.375rem', overflow: 'hidden', position: 'relative' }}>
             <div style={{ 
               width: '20%', 
               backgroundColor: '#a855f7', 
               display: 'flex', 
-              flexDirection: 'column', 
+              flexDirection: inventoryOnly ? 'row' : 'column', 
               alignItems: 'center', 
               justifyContent: 'center',
+              gap: inventoryOnly ? '0.25rem' : 0,
               color: '#fff',
-              fontSize: '0.875rem',
+              fontSize: inventoryOnly ? '0.7rem' : '0.875rem',
               fontWeight: '600'
             }}>
               <div>{timeline.fbaAvailable} Days</div>
-              <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>FBA Available</div>
+              <div style={{ fontSize: inventoryOnly ? '0.6rem' : '0.75rem', opacity: 0.8 }}>FBA</div>
             </div>
             <div style={{ 
               width: '35%', 
               backgroundColor: '#22c55e', 
               display: 'flex', 
-              flexDirection: 'column', 
+              flexDirection: inventoryOnly ? 'row' : 'column', 
               alignItems: 'center', 
               justifyContent: 'center',
+              gap: inventoryOnly ? '0.25rem' : 0,
               color: '#fff',
-              fontSize: '0.875rem',
+              fontSize: inventoryOnly ? '0.7rem' : '0.875rem',
               fontWeight: '600'
             }}>
               <div>{timeline.totalDays} Days</div>
-              <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>Total</div>
+              <div style={{ fontSize: inventoryOnly ? '0.6rem' : '0.75rem', opacity: 0.8 }}>Total</div>
             </div>
             <div style={{ 
               width: '45%', 
               backgroundColor: '#3b82f6', 
               display: 'flex', 
-              flexDirection: 'column', 
+              flexDirection: inventoryOnly ? 'row' : 'column', 
               alignItems: 'center', 
               justifyContent: 'center',
+              gap: inventoryOnly ? '0.25rem' : 0,
               color: '#fff',
-              fontSize: '0.875rem',
+              fontSize: inventoryOnly ? '0.7rem' : '0.875rem',
               fontWeight: '600',
               position: 'relative'
             }}>
               <div>{timeline.forecast} Days</div>
-              <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>Forecast</div>
+              <div style={{ fontSize: inventoryOnly ? '0.6rem' : '0.75rem', opacity: 0.8 }}>Forecast</div>
               {timeline.adjustment !== 0 && (
                 <div style={{ 
                   position: 'absolute', 
-                  right: '-20px', 
-                  top: '-20px',
-                  width: '40px',
-                  height: '40px',
+                  right: inventoryOnly ? '-12px' : '-20px', 
+                  top: inventoryOnly ? '-12px' : '-20px',
+                  width: inventoryOnly ? '28px' : '40px',
+                  height: inventoryOnly ? '28px' : '40px',
                   borderRadius: '50%',
                   backgroundColor: timeline.adjustment > 0 ? '#f59e0b' : '#ef4444',
-                  border: '3px solid #1e293b',
+                  border: '2px solid #1e293b',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '0.875rem',
+                  fontSize: inventoryOnly ? '0.65rem' : '0.875rem',
                   fontWeight: '700'
                 }}>
                   {timeline.adjustment > 0 ? `+${timeline.adjustment}` : timeline.adjustment}
@@ -1074,13 +1133,13 @@ const Ngoos = ({ data }) => {
           </div>
         </div>
 
-        {/* Unit Forecast Chart */}
-        <div className={themeClasses.cardBg} style={{ borderRadius: '0.75rem', padding: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+        {/* Unit Forecast Chart - Compact when inventoryOnly */}
+        <div className={themeClasses.cardBg} style={{ borderRadius: '0.5rem', padding: inventoryOnly ? '0.75rem' : '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: inventoryOnly ? '0.5rem' : '1rem' }}>
             <div>
-              <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#fff', marginBottom: '0.25rem' }}>Unit Forecast</h3>
-              <p style={{ fontSize: '0.875rem', color: '#94a3b8' }}>
-                {productDetails?.product?.size || data?.variations?.[0] || '8oz'} Forecast
+              <h3 style={{ fontSize: inventoryOnly ? '0.85rem' : '1rem', fontWeight: '600', color: '#fff', marginBottom: '0.15rem' }}>Unit Forecast</h3>
+              <p style={{ fontSize: inventoryOnly ? '0.75rem' : '0.875rem', color: '#94a3b8' }}>
+                {productDetails?.product?.size || data?.size || data?.variations?.[0] || '8oz'} Forecast
               </p>
             </div>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
@@ -1246,8 +1305,8 @@ const Ngoos = ({ data }) => {
             </button>
           </div>
 
-          {/* Chart Area */}
-          <div style={{ height: '320px', width: '100%', marginTop: '0.25rem' }}>
+          {/* Chart Area - More compact height when inventoryOnly */}
+          <div style={{ height: inventoryOnly ? '240px' : '320px', width: '100%', marginTop: '0.25rem' }}>
             {chartDisplayData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart

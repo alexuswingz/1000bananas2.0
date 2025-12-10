@@ -642,58 +642,6 @@ const NewShipmentTable = ({
                         >
                           {row.product}...
                         </button>
-                        {/* Supply chain warning indicator */}
-                        {(() => {
-                          const qty = effectiveQtyValues[index] || 0;
-                          const maxUnits = row.maxUnitsProducible || 0;
-                          const hasSupplyIssue = qty > maxUnits;
-                          
-                          // Identify bottleneck component
-                          let bottleneck = '';
-                          if (hasSupplyIssue) {
-                            const bottles = row.bottleInventory || 0;
-                            const closures = row.closureInventory || 0;
-                            const labels = row.labelsAvailable || 0;
-                            const formulaUnits = Math.floor((row.formulaGallonsAvailable || 0) / (row.formulaGallonsPerUnit || 0.25));
-                            const min = Math.min(bottles, closures, labels, formulaUnits);
-                            
-                            if (bottles === min) bottleneck = 'Bottles';
-                            else if (closures === min) bottleneck = 'Closures';
-                            else if (labels === min) bottleneck = 'Labels';
-                            else bottleneck = 'Formula';
-                          }
-                          
-                          return hasSupplyIssue && qty > 0 ? (
-                            <span
-                              title={`⚠️ Supply Chain Warning
-Requested: ${qty} units
-Max Available: ${maxUnits} units
-Bottleneck: ${bottleneck}
-
-Current Inventory:
-• Bottles (${row.bottle_name || 'N/A'}): ${row.bottleInventory || 0}
-• Closures (${row.closure_name || 'N/A'}): ${row.closureInventory || 0}
-• Labels: ${row.labelsAvailable || 0}
-• Formula: ${row.formulaGallonsAvailable || 0} gal (${Math.floor((row.formulaGallonsAvailable || 0) / (row.formulaGallonsPerUnit || 0.25))} units)`}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                width: '16px',
-                                height: '16px',
-                                borderRadius: '50%',
-                                backgroundColor: '#FEE2E2',
-                                color: '#DC2626',
-                                fontSize: '11px',
-                                fontWeight: 'bold',
-                                cursor: 'help',
-                                marginLeft: '6px',
-                              }}
-                            >
-                              ⚠
-                            </span>
-                          ) : null;
-                        })()}
                       </div>
                     </td>
                     <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }} className={themeClasses.textSecondary}>
@@ -747,59 +695,177 @@ Current Inventory:
                       </div>
                     </td>
                     <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }}>
-                      <input
-                        type="number"
-                        step={(() => {
-                          const size = row.size?.toLowerCase() || '';
-                          if (size.includes('8oz')) return 60;
-                          if (size.includes('quart')) return 12;
-                          if (size.includes('gallon')) return 4;
-                          return 1;
-                        })()}
-                        value={effectiveQtyValues[index] !== undefined && effectiveQtyValues[index] !== null && effectiveQtyValues[index] !== '' ? String(effectiveQtyValues[index]) : ''}
-                        onChange={(e) => {
-                          const inputValue = e.target.value;
-                          // Allow empty string while typing, or parse the number
-                          if (inputValue === '' || inputValue === '-') {
-                            effectiveSetQtyValues(prev => ({
-                              ...prev,
-                              [index]: ''
-                            }));
-                          } else {
-                            const numValue = parseInt(inputValue, 10);
-                            if (!isNaN(numValue) && numValue >= 0) {
-                              // Determine increment based on size
-                              let increment = 1;
-                              const size = row.size?.toLowerCase() || '';
-                              if (size.includes('8oz')) {
-                                increment = 60;
-                              } else if (size.includes('quart')) {
-                                increment = 12;
-                              } else if (size.includes('gallon')) {
-                                increment = 4;
-                              }
-                              
-                              // Round immediately as user types
-                              const rounded = Math.round(numValue / increment) * increment;
+                      <div style={{ position: 'relative', display: 'inline-block' }}>
+                        <input
+                          type="number"
+                          step={(() => {
+                            const size = row.size?.toLowerCase() || '';
+                            if (size.includes('8oz')) return 60;
+                            if (size.includes('quart')) return 12;
+                            if (size.includes('gallon')) return 4;
+                            return 1;
+                          })()}
+                          value={effectiveQtyValues[index] !== undefined && effectiveQtyValues[index] !== null && effectiveQtyValues[index] !== '' ? String(effectiveQtyValues[index]) : ''}
+                          onChange={(e) => {
+                            const inputValue = e.target.value;
+                            // Allow empty string while typing, or parse the number
+                            if (inputValue === '' || inputValue === '-') {
                               effectiveSetQtyValues(prev => ({
                                 ...prev,
-                                [index]: rounded > 0 ? rounded : increment
+                                [index]: ''
                               }));
+                            } else {
+                              const numValue = parseInt(inputValue, 10);
+                              if (!isNaN(numValue) && numValue >= 0) {
+                                // Determine increment based on size
+                                let increment = 1;
+                                const size = row.size?.toLowerCase() || '';
+                                if (size.includes('8oz')) {
+                                  increment = 60;
+                                } else if (size.includes('quart')) {
+                                  increment = 12;
+                                } else if (size.includes('gallon')) {
+                                  increment = 4;
+                                }
+                                
+                                // Round immediately as user types
+                                const rounded = Math.round(numValue / increment) * increment;
+                                effectiveSetQtyValues(prev => ({
+                                  ...prev,
+                                  [index]: rounded > 0 ? rounded : increment
+                                }));
+                              }
                             }
-                          }
-                        }}
-                        placeholder="0"
-                        title={isQtyExceedingLabels(row, index) ? `Exceeds available labels (${getAvailableLabelsForRow(row, index).toLocaleString()} available)` : ''}
-                        className={`${themeClasses.cardBg} border rounded-md text-xs ${themeClasses.text}`}
-                        style={{
-                          padding: '0.25rem 0.5rem',
-                          width: '90px',
-                          textAlign: 'center',
-                          cursor: 'text',
-                          borderColor: isQtyExceedingLabels(row, index) ? '#EF4444' : (isDarkMode ? '#374151' : '#D1D5DB'),
-                          backgroundColor: isQtyExceedingLabels(row, index) ? (isDarkMode ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.05)') : undefined,
-                        }}
-                      />
+                          }}
+                          placeholder="0"
+                          className={`${themeClasses.cardBg} border rounded-md text-xs ${themeClasses.text}`}
+                          style={{
+                            padding: '0.25rem 0.5rem',
+                            width: '90px',
+                            textAlign: 'center',
+                            cursor: 'text',
+                            borderColor: isQtyExceedingLabels(row, index) ? '#EF4444' : (isDarkMode ? '#374151' : '#D1D5DB'),
+                            backgroundColor: isQtyExceedingLabels(row, index) ? (isDarkMode ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.05)') : undefined,
+                          }}
+                        />
+                        {/* Label warning icon - positioned absolutely to not affect alignment */}
+                        {isQtyExceedingLabels(row, index) && (effectiveQtyValues[index] ?? 0) > 0 && (
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setClickedQtyIndex(clickedQtyIndex === index ? null : index);
+                            }}
+                            style={{
+                              position: 'absolute',
+                              right: '-22px',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '18px',
+                              height: '18px',
+                              borderRadius: '50%',
+                              backgroundColor: '#FEE2E2',
+                              color: '#DC2626',
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            !
+                          </span>
+                        )}
+                        {/* Popup for "Use Available" */}
+                        {clickedQtyIndex === index && isQtyExceedingLabels(row, index) && (
+                          <div
+                            ref={(el) => {
+                              if (el) popupRefs.current[index] = el;
+                            }}
+                            style={{
+                              position: 'absolute',
+                              top: '100%',
+                              left: '50%',
+                              transform: 'translateX(-50%)',
+                              marginTop: '8px',
+                              backgroundColor: '#FFFFFF',
+                              borderRadius: '12px',
+                              padding: '14px 16px',
+                              minWidth: '220px',
+                              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                              zIndex: 9999,
+                              border: '1px solid #E5E7EB',
+                              pointerEvents: 'auto',
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                            }}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onMouseUp={(e) => e.stopPropagation()}
+                          >
+                            <div style={{ marginBottom: '10px' }}>
+                              <h3 style={{
+                                fontSize: '14px',
+                                fontWeight: 600,
+                                color: '#111827',
+                                marginBottom: '4px',
+                                lineHeight: '1.3',
+                              }}>
+                                Order exceeds available labels
+                              </h3>
+                              <p style={{
+                                fontSize: '13px',
+                                fontWeight: 400,
+                                color: '#9CA3AF',
+                                lineHeight: '1.4',
+                              }}>
+                                Labels Available: {getAvailableLabelsForRow(row, index).toLocaleString()}
+                              </p>
+                            </div>
+                            <button
+                              style={{
+                                width: '100%',
+                                height: '32px',
+                                backgroundColor: '#3B82F6',
+                                color: '#FFFFFF',
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                borderRadius: '6px',
+                                border: 'none',
+                                cursor: 'pointer',
+                                transition: 'background-color 0.2s',
+                              }}
+                              onMouseEnter={(e) => e.target.style.backgroundColor = '#2563EB'}
+                              onMouseLeave={(e) => e.target.style.backgroundColor = '#3B82F6'}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                const labelsAvailable = getAvailableLabelsForRow(row, index);
+                                
+                                // Round down to nearest case pack increment
+                                let increment = 1;
+                                const size = row.size?.toLowerCase() || '';
+                                if (size.includes('8oz')) increment = 60;
+                                else if (size.includes('quart')) increment = 12;
+                                else if (size.includes('gallon')) increment = 4;
+                                
+                                const maxQty = Math.floor(labelsAvailable / increment) * increment;
+                                
+                                effectiveSetQtyValues(prev => ({
+                                  ...prev,
+                                  [index]: maxQty
+                                }));
+                                
+                                setTimeout(() => setClickedQtyIndex(null), 100);
+                              }}
+                              onMouseDown={(e) => e.stopPropagation()}
+                            >
+                              Use Available
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td style={{ padding: '0.65rem 1rem', minWidth: '380px', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }}>
                       <div
@@ -2122,36 +2188,41 @@ Current Inventory:
                         </button>
                         </div>
                       )}
-                      {(() => {
-                        const labelsAvailable = getAvailableLabelsForRow(row, index);
-                        const labelsNeeded = effectiveQtyValues[index] ?? 0;
-                        // Only show exclamation if labels needed exceed available
-                        if (labelsNeeded > labelsAvailable) {
-                          return (
-                            <span
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                width: '16px',
-                                height: '16px',
-                                borderRadius: '50%',
-                                backgroundColor: '#EF4444',
-                                color: '#FFFFFF',
-                                fontSize: '10px',
-                                fontWeight: 700,
-                                flexShrink: 0,
-                                position: 'absolute',
-                                right: '6px',
-                              }}
-                            >
-                              !
-                            </span>
-                          );
-                        }
-                        return null;
-                      })()}
                     </div>
+                    {/* Label warning icon - shown when QTY exceeds labels */}
+                    {(() => {
+                      const labelsAvailable = getAvailableLabelsForRow(row, index);
+                      const labelsNeeded = effectiveQtyValues[index] ?? 0;
+                      // Only show warning if labels needed exceed available
+                      if (labelsNeeded > labelsAvailable && labelsNeeded > 0) {
+                        return (
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setClickedQtyIndex(clickedQtyIndex === index ? null : index);
+                            }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '18px',
+                              height: '18px',
+                              borderRadius: '50%',
+                              backgroundColor: '#FEE2E2',
+                              color: '#DC2626',
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              marginLeft: '6px',
+                              cursor: 'pointer',
+                              flexShrink: 0,
+                            }}
+                          >
+                            !
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
                     {clickedQtyIndex === index && (() => {
                       const labelsAvailable = getAvailableLabelsForRow(row, index);
                       const labelsNeeded = effectiveQtyValues[index] ?? 0;
@@ -2162,13 +2233,16 @@ Current Inventory:
                           if (el) popupRefs.current[index] = el;
                         }}
                         style={{
-                          position: 'fixed',
+                          position: 'absolute',
+                          top: '100%',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          marginTop: '8px',
                           backgroundColor: '#FFFFFF',
                           borderRadius: '12px',
-                          padding: '16px',
-                          minWidth: '280px',
-                          maxWidth: '320px',
-                          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                          padding: '14px 16px',
+                          minWidth: '220px',
+                          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
                           zIndex: 9999,
                           border: '1px solid #E5E7EB',
                           pointerEvents: 'auto',
@@ -2176,112 +2250,69 @@ Current Inventory:
                         onClick={(e) => {
                           e.stopPropagation();
                           e.preventDefault();
-                          // Keep popup open when clicking inside it
                         }}
-                        onMouseDown={(e) => {
-                          e.stopPropagation();
-                          // Prevent closing when clicking inside popup
-                        }}
-                        onMouseUp={(e) => {
-                          e.stopPropagation();
-                          // Prevent closing when clicking inside popup
-                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onMouseUp={(e) => e.stopPropagation()}
                       >
-                        <div style={{ marginBottom: '12px' }}>
+                        <div style={{ marginBottom: '10px' }}>
                           <h3 style={{
-                            fontSize: '20px',
-                            fontWeight: 700,
+                            fontSize: '14px',
+                            fontWeight: 600,
                             color: '#111827',
-                            marginBottom: '8px',
-                            lineHeight: '1.2',
+                            marginBottom: '4px',
+                            lineHeight: '1.3',
                           }}>
                             Order exceeds available labels
                           </h3>
                           <p style={{
-                            fontSize: '14px',
+                            fontSize: '13px',
                             fontWeight: 400,
-                            color: '#6B7280',
+                            color: '#9CA3AF',
                             lineHeight: '1.4',
                           }}>
                             Labels Available: {getAvailableLabelsForRow(row, index).toLocaleString()}
                           </p>
-                          <p style={{
-                            fontSize: '14px',
-                            fontWeight: 400,
-                            color: '#6B7280',
-                            lineHeight: '1.4',
-                            marginTop: '4px',
-                          }}>
-                            Labels Needed: {effectiveQtyValues[index] ?? 0}
-                          </p>
                         </div>
-                        <div style={{
-                          display: 'flex',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                        }}>
-                          <button
-                            style={{
-                              width: '175px',
-                              height: '23px',
-                              backgroundColor: '#3B82F6',
-                              color: '#FFFFFF',
-                              fontSize: '14px',
-                              fontWeight: 600,
-                              padding: 0,
-                              borderRadius: '4px',
-                              border: 'none',
-                              cursor: 'pointer',
-                              transition: 'background-color 0.2s',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              boxSizing: 'border-box',
-                            }}
-                            onMouseEnter={(e) => e.target.style.backgroundColor = '#2563EB'}
-                            onMouseLeave={(e) => e.target.style.backgroundColor = '#3B82F6'}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              // Set QTY to available labels only (removes excess units)
-                              const labelsAvailable = getAvailableLabelsForRow(row, index);
-                              
-                              // Update state - React will re-render with new value
-                              effectiveSetQtyValues(prev => {
-                                const updated = { ...prev };
-                                updated[index] = labelsAvailable;
-                                return updated;
-                              });
-                              
-                              // Close the popup after updating (with small delay to prevent immediate outside click detection)
-                              setTimeout(() => {
-                                setClickedQtyIndex(null);
-                              }, 200);
-                            }}
-                            onMouseDown={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              // Prevent the click outside handler from firing
-                            }}
-                            onMouseUp={(e) => {
-                              e.stopPropagation();
-                              // Prevent the click outside handler from firing
-                            }}
-                          >
-                            Use Available
-                          </button>
-                        </div>
-                        <div style={{
-                          position: 'absolute',
-                          bottom: '-8px',
-                          left: '50%',
-                          transform: 'translateX(-50%)',
-                          width: '0',
-                          height: '0',
-                          borderLeft: '8px solid transparent',
-                          borderRight: '8px solid transparent',
-                          borderTop: '8px solid #FFFFFF',
-                        }} />
+                        <button
+                          style={{
+                            width: '100%',
+                            height: '32px',
+                            backgroundColor: '#3B82F6',
+                            color: '#FFFFFF',
+                            fontSize: '13px',
+                            fontWeight: 600,
+                            borderRadius: '6px',
+                            border: 'none',
+                            cursor: 'pointer',
+                            transition: 'background-color 0.2s',
+                          }}
+                          onMouseEnter={(e) => e.target.style.backgroundColor = '#2563EB'}
+                          onMouseLeave={(e) => e.target.style.backgroundColor = '#3B82F6'}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            const labelsAvailable = getAvailableLabelsForRow(row, index);
+                            
+                            // Round down to nearest case pack increment
+                            let increment = 1;
+                            const size = row.size?.toLowerCase() || '';
+                            if (size.includes('8oz')) increment = 60;
+                            else if (size.includes('quart')) increment = 12;
+                            else if (size.includes('gallon')) increment = 4;
+                            
+                            const maxQty = Math.floor(labelsAvailable / increment) * increment;
+                            
+                            effectiveSetQtyValues(prev => ({
+                              ...prev,
+                              [index]: maxQty
+                            }));
+                            
+                            setTimeout(() => setClickedQtyIndex(null), 100);
+                          }}
+                          onMouseDown={(e) => e.stopPropagation()}
+                        >
+                          Use Available
+                        </button>
                       </div>
                     )}
                   </div>
