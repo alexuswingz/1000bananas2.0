@@ -70,26 +70,45 @@ const FormulaCheckTable = ({
     }
   };
 
+  // Calculate manufacturing volume with spillage and rounding
+  // Formula: Round to nearest 5 gallons after adding 8% spillage factor
+  const calculateManufacturingVolume = (rawGallons) => {
+    if (!rawGallons || rawGallons <= 0) return 0;
+    
+    const SPILLAGE_FACTOR = 1.08; // 8% spillage adjustment
+    const adjustedVolume = rawGallons * SPILLAGE_FACTOR;
+    
+    // Round to nearest 5 gallons
+    return Math.round(adjustedVolume / 5) * 5;
+  };
+
   const loadFormulaData = async () => {
     try {
       setLoading(true);
       const data = await getShipmentFormulaCheck(shipmentId);
       
       // Transform API data to match table format
-      const formattedFormulas = data.map(formula => ({
-        id: formula.id,
-        formula: formula.formula_name,
-        vessel: formula.vessel_type,
-        qty: formula.vessel_quantity,
-        vesselType: 'Clean',
-        totalVolume: formula.total_gallons_needed,
-        measure: 'Gallon',
-        formulaType: 'Liquid',
-        gallonsAvailable: formula.gallons_available,
-        gallonsFree: formula.gallons_free,
-        hasShortage: formula.has_shortage,
-        shortageAmount: formula.shortage_amount,
-      }));
+      // Apply manufacturing volume formula: spillage + round to nearest 5
+      const formattedFormulas = data.map(formula => {
+        const rawVolume = formula.total_gallons_needed || 0;
+        const manufacturingVolume = calculateManufacturingVolume(rawVolume);
+        
+        return {
+          id: formula.id,
+          formula: formula.formula_name,
+          vessel: formula.vessel_type,
+          qty: formula.vessel_quantity,
+          vesselType: 'Clean',
+          totalVolume: manufacturingVolume, // Manufacturing volume (with spillage + rounded to 5)
+          rawVolume: rawVolume, // Keep raw volume for reference
+          measure: 'Gallon',
+          formulaType: 'Liquid',
+          gallonsAvailable: formula.gallons_available,
+          gallonsFree: formula.gallons_free,
+          hasShortage: formula.has_shortage,
+          shortageAmount: formula.shortage_amount,
+        };
+      });
       
       setFormulas(formattedFormulas);
     } catch (error) {

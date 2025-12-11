@@ -628,7 +628,7 @@ const NewShipmentTable = ({
                 {currentRows.map((row) => {
                   const index = row._originalIndex;
                   return (
-                  <tr key={row.id} className="border-t border-gray-200" style={{ height: '40px', maxHeight: '40px' }}>
+                  <tr key={`${row.id}-${index}`} className="border-t border-gray-200" style={{ height: '40px', maxHeight: '40px' }}>
                     <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }} className={themeClasses.text}>
                       {row.brand}
                     </td>
@@ -1815,7 +1815,7 @@ const NewShipmentTable = ({
             {currentRows.map((row) => {
               const index = row._originalIndex;
               return (
-              <tr key={row.id} style={{ height: '40px', maxHeight: '40px' }}>
+              <tr key={`${row.id}-${index}`} style={{ height: '40px', maxHeight: '40px' }}>
                 {/* Sticky columns */}
                 <td style={{ 
                   padding: '0.65rem 0.75rem', 

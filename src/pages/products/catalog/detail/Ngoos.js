@@ -126,26 +126,69 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
         
               const weeks = getWeeksForView(selectedView);
               
-              // Fetch all N-GOOS data in parallel
-              const [details, forecast, chart, metricsData, salesChart, adsChart] = await Promise.all([
-                NgoosAPI.getProductDetails(childAsin),
-                NgoosAPI.getForecast(childAsin),
-                NgoosAPI.getChartData(childAsin, weeks, salesVelocityWeight, svVelocityWeight),
-                NgoosAPI.getMetrics(childAsin, metricsDays),
-                NgoosAPI.getSalesChart(childAsin, metricsDays),
-                NgoosAPI.getAdsChart(childAsin, metricsDays)
-              ]);
+              // When inventoryOnly is true (production planning modal), only fetch essential data
+              // Skip metrics/sales/ads APIs that may fail and aren't needed for inventory forecast
+              if (inventoryOnly) {
+                const results = await Promise.allSettled([
+                  NgoosAPI.getProductDetails(childAsin),
+                  NgoosAPI.getForecast(childAsin),
+                  NgoosAPI.getChartData(childAsin, weeks, salesVelocityWeight, svVelocityWeight)
+                ]);
 
-              setProductDetails(details);
-              setForecastData(forecast);
-              setChartData(chart);
-              setMetrics(metricsData);
-              setSalesChartData(salesChart);
-              setAdsChartData(adsChart);
-              
-              // Debug logging
-              console.log('Ads Chart Response:', adsChart);
-              console.log('Chart Data Array:', adsChart?.chart_data);
+                const details = results[0].status === 'fulfilled' ? results[0].value : null;
+                const forecast = results[1].status === 'fulfilled' ? results[1].value : null;
+                const chart = results[2].status === 'fulfilled' ? results[2].value : null;
+
+                // Log any failed requests for debugging
+                results.forEach((result, index) => {
+                  if (result.status === 'rejected') {
+                    const apiNames = ['ProductDetails', 'Forecast', 'ChartData'];
+                    console.warn(`N-GOOS ${apiNames[index]} failed for ${childAsin}:`, result.reason?.message || result.reason);
+                  }
+                });
+
+                setProductDetails(details);
+                setForecastData(forecast);
+                setChartData(chart);
+                // Don't set metrics/salesChart/adsChart - not needed for inventory-only mode
+              } else {
+                // Full mode - fetch all data including metrics/sales/ads
+                const results = await Promise.allSettled([
+                  NgoosAPI.getProductDetails(childAsin),
+                  NgoosAPI.getForecast(childAsin),
+                  NgoosAPI.getChartData(childAsin, weeks, salesVelocityWeight, svVelocityWeight),
+                  NgoosAPI.getMetrics(childAsin, metricsDays),
+                  NgoosAPI.getSalesChart(childAsin, metricsDays),
+                  NgoosAPI.getAdsChart(childAsin, metricsDays)
+                ]);
+
+                // Extract values safely - use null if the request failed
+                const details = results[0].status === 'fulfilled' ? results[0].value : null;
+                const forecast = results[1].status === 'fulfilled' ? results[1].value : null;
+                const chart = results[2].status === 'fulfilled' ? results[2].value : null;
+                const metricsData = results[3].status === 'fulfilled' ? results[3].value : null;
+                const salesChart = results[4].status === 'fulfilled' ? results[4].value : null;
+                const adsChart = results[5].status === 'fulfilled' ? results[5].value : null;
+
+                // Log any failed requests for debugging
+                results.forEach((result, index) => {
+                  if (result.status === 'rejected') {
+                    const apiNames = ['ProductDetails', 'Forecast', 'ChartData', 'Metrics', 'SalesChart', 'AdsChart'];
+                    console.warn(`N-GOOS ${apiNames[index]} failed for ${childAsin}:`, result.reason?.message || result.reason);
+                  }
+                });
+
+                setProductDetails(details);
+                setForecastData(forecast);
+                setChartData(chart);
+                setMetrics(metricsData);
+                setSalesChartData(salesChart);
+                setAdsChartData(adsChart);
+                
+                // Debug logging
+                console.log('Ads Chart Response:', adsChart);
+                console.log('Chart Data Array:', adsChart?.chart_data);
+              }
       } catch (error) {
         console.error('Error fetching N-GOOS data:', error);
         toast.error('Failed to load N-GOOS data', {
@@ -157,7 +200,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
     };
 
       fetchNgoosData();
-    }, [data?.child_asin, data?.childAsin, selectedView, metricsDays, salesVelocityWeight, svVelocityWeight]);
+    }, [data?.child_asin, data?.childAsin, selectedView, metricsDays, salesVelocityWeight, svVelocityWeight, inventoryOnly]);
 
   // Extract inventory data from API response or use fallback
   const inventoryData = productDetails?.inventory || {

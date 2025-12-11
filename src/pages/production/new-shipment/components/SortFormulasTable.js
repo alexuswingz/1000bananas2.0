@@ -13,6 +13,18 @@ const sizeToGallons = (size) => {
   return 0;
 };
 
+// Calculate manufacturing volume with spillage and rounding
+// Formula: Round to nearest 5 gallons after adding 8% spillage factor
+const calculateManufacturingVolume = (rawGallons) => {
+  if (!rawGallons || rawGallons <= 0) return 0;
+  
+  const SPILLAGE_FACTOR = 1.08; // 8% spillage adjustment
+  const adjustedVolume = rawGallons * SPILLAGE_FACTOR;
+  
+  // Round to nearest 5 gallons
+  return Math.round(adjustedVolume / 5) * 5;
+};
+
 const GALLONS_PER_TOTE = 275;
 
 const SortFormulasTable = ({ shipmentProducts = [] }) => {
@@ -69,10 +81,14 @@ const SortFormulasTable = ({ shipmentProducts = [] }) => {
       let idCounter = 1;
 
       Object.values(formulaMap).forEach((formulaData) => {
-        const totesNeeded = Math.ceil(formulaData.totalGallons / GALLONS_PER_TOTE);
+        // Apply manufacturing volume formula (8% spillage + round to nearest 5)
+        const manufacturingVolume = calculateManufacturingVolume(formulaData.totalGallons);
+        
+        // Calculate totes needed based on manufacturing volume
+        const totesNeeded = Math.ceil(manufacturingVolume / GALLONS_PER_TOTE);
         
         // Skip formulas that don't need any totes
-        if (totesNeeded <= 0) return;
+        if (totesNeeded <= 0 && manufacturingVolume <= 0) return;
         
         // Create one row per formula with qty = total totes needed
         // This allows split functionality when qty > 1
@@ -80,9 +96,10 @@ const SortFormulasTable = ({ shipmentProducts = [] }) => {
           id: idCounter++,
           formula: formulaData.formula,
           size: 'Tote',
-          qty: totesNeeded, // Number of totes needed for this formula
+          qty: Math.max(1, totesNeeded), // At least 1 tote if there's any volume
           tote: 'Clean',
-          volume: Math.round(formulaData.totalGallons * 100) / 100, // Total gallons needed
+          volume: manufacturingVolume, // Manufacturing volume (with spillage + rounded to 5)
+          rawVolume: Math.round(formulaData.totalGallons * 100) / 100, // Keep raw for reference
           measure: 'Gallon',
           type: 'Liquid',
         });

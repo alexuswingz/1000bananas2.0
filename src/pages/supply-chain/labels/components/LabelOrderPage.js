@@ -132,8 +132,8 @@ const LabelOrderPage = () => {
                   currentDOI: currentDOI, // Store current DOI for sorting
                 };
               })
-              // Filter out items with 0 quantity (already have enough inventory)
-              .filter(label => label.suggestedQty > 0);
+              // Sort by inventory ascending (lowest inventory first = most urgent)
+              .sort((a, b) => (a.inventory || 0) - (b.inventory || 0));
             setAllLines(transformed);
           }
         } catch (err) {

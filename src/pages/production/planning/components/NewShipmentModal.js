@@ -2,6 +2,20 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
+// Account to Brand mapping based on Amazon Seller Account Structure
+const ACCOUNT_OPTIONS = [
+  {
+    name: 'TPS Nutrients',
+    brands: ['TPS Nutrients', 'Bloom City', 'TPS Plant Foods'],
+    description: 'Plant nutrients and fertilizers',
+  },
+  {
+    name: 'Total Pest Spray',
+    brands: ['NatureStop', 'GreenThumbs'],
+    description: 'Pest control products',
+  },
+];
+
 const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
   const { isDarkMode } = useTheme();
   const navigate = useNavigate();
@@ -370,30 +384,69 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
                     overflow: 'hidden',
                     zIndex: 100,
+                    maxHeight: '300px',
+                    overflowY: 'auto',
                   }}
                 >
-                  {['TPS Nutrients', 'Total Pest Spray'].map((option) => (
+                  {ACCOUNT_OPTIONS.map((option) => (
                     <button
-                      key={option}
+                      key={option.name}
                       type="button"
                       onClick={() => {
-                        setNewShipment((prev) => ({ ...prev, account: option }));
+                        setNewShipment((prev) => ({ ...prev, account: option.name }));
                         setAccountOpen(false);
                       }}
                       style={{
                         width: '100%',
                         textAlign: 'left',
-                        padding: '10px 12px',
+                        padding: '12px 14px',
                         fontSize: '14px',
                         color: '#111827',
-                        backgroundColor: newShipment.account === option ? '#F3F4F6' : '#FFFFFF',
+                        backgroundColor: newShipment.account === option.name ? '#EBF5FF' : '#FFFFFF',
                         border: 'none',
+                        borderBottom: '1px solid #F3F4F6',
                         cursor: 'pointer',
                       }}
-                      onMouseEnter={(e) => e.target.style.backgroundColor = '#F3F4F6'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = newShipment.account === option ? '#F3F4F6' : '#FFFFFF'}
+                      onMouseEnter={(e) => {
+                        if (newShipment.account !== option.name) {
+                          e.currentTarget.style.backgroundColor = '#F9FAFB';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (newShipment.account !== option.name) {
+                          e.currentTarget.style.backgroundColor = '#FFFFFF';
+                        }
+                      }}
                     >
-                      {option}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontWeight: 500 }}>{option.name}</span>
+                        {newShipment.account === option.name && (
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path d="M13.3332 4L5.99984 11.3333L2.6665 8" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                      </div>
+                      <div style={{ 
+                        display: 'flex', 
+                        flexWrap: 'wrap', 
+                        gap: '4px', 
+                        marginTop: '6px' 
+                      }}>
+                        {option.brands.map(brand => (
+                          <span
+                            key={brand}
+                            style={{
+                              fontSize: '11px',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              backgroundColor: '#F3F4F6',
+                              color: '#6B7280',
+                            }}
+                          >
+                            {brand}
+                          </span>
+                        ))}
+                      </div>
                     </button>
                   ))}
                 </div>
