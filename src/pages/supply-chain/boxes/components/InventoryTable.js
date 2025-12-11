@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useImperativeHandle, forwardRef, useEffect } from 'react';
+import React, { useState, useMemo, useImperativeHandle, forwardRef, useEffect, useRef } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 import { showSuccessToast } from '../../../../utils/notifications';
 import { calculatePallets } from '../../../../utils/palletCalculations';
@@ -46,6 +46,29 @@ const InventoryTable = forwardRef(({
 
   // Action menu state
   const [actionMenuBoxId, setActionMenuBoxId] = useState(null);
+
+  // Header filter state (match bottles behavior)
+  const [openFilterColumn, setOpenFilterColumn] = useState(null);
+  const filterIconRefs = useRef({});
+  const filterDropdownRef = useRef(null);
+
+  useEffect(() => {
+    if (openFilterColumn === null) return;
+    const handleClickOutside = (event) => {
+      const icon = filterIconRefs.current[openFilterColumn];
+      const dropdown = filterDropdownRef.current;
+      const inIcon = icon && icon.contains(event.target);
+      const inDropdown = dropdown && dropdown.contains(event.target);
+      if (!inIcon && !inDropdown) setOpenFilterColumn(null);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [openFilterColumn]);
+
+  const handleFilterClick = (columnKey, e) => {
+    e.stopPropagation();
+    setOpenFilterColumn((prev) => (prev === columnKey ? null : columnKey));
+  };
 
   // Fetch boxes from API on mount
   useEffect(() => {
@@ -231,7 +254,10 @@ const InventoryTable = forwardRef(({
 
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
+    // Preferred API
     startBulkEdit: () => setIsBulkEditing(true),
+    // Backwards-compatible alias (boxes settings menu calls enableBulkEdit)
+    enableBulkEdit: () => setIsBulkEditing(true),
     isBulkEditing: isBulkEditing,
     bulkUnsavedCount: bulkUnsavedCount,
   }));
@@ -285,10 +311,14 @@ const InventoryTable = forwardRef(({
               gap: '0',
             }}
           >
-            {['BOX SIZE', 'WAREHOUSE INVENTORY', 'SUPPLIER INVENTORY'].map((label, idx) => (
+            {[
+              { key: 'name', label: 'BOX SIZE' },
+              { key: 'warehouseInventory', label: 'WAREHOUSE INVENTORY' },
+              { key: 'supplierInventory', label: 'SUPPLIER INVENTORY' },
+            ].map(({ key, label }, idx) => (
               <div
                 key={label}
-                className={`h-full text-xs font-bold text-white uppercase tracking-wider flex items-center`}
+                className="h-full text-xs font-bold text-white uppercase tracking-wider flex items-center group"
                 style={{
                   width: idx === 0 ? '300px' : '280px',
                   height: '40px',
@@ -299,9 +329,34 @@ const InventoryTable = forwardRef(({
                   gap: '10px',
                   justifyContent: idx === 0 ? 'flex-start' : 'flex-end',
                   textAlign: idx === 0 ? 'left' : 'right',
+                  position: 'relative',
                 }}
               >
-                <span>{label}</span>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '0.5rem',
+                    width: '100%',
+                  }}
+                >
+                  <span style={{ color: openFilterColumn === key ? '#007AFF' : '#FFFFFF' }}>{label}</span>
+                  <img
+                    ref={(el) => {
+                      if (el) {
+                        filterIconRefs.current[key] = el;
+                      }
+                    }}
+                    src="/assets/Vector (1).png"
+                    alt="Filter"
+                    className={`w-3 h-3 transition-opacity cursor-pointer ${
+                      openFilterColumn === key ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                    }`}
+                    onClick={(e) => handleFilterClick(key, e)}
+                    style={{ width: '12px', height: '12px' }}
+                  />
+                </div>
               </div>
             ))}
             <div className="h-full flex items-center justify-end" style={{ paddingRight: '24px' }}>
@@ -564,7 +619,186 @@ const InventoryTable = forwardRef(({
           </div>
         </div>
       )}
+
+      {openFilterColumn !== null && (
+        <FilterDropdown
+          ref={filterDropdownRef}
+          columnKey={openFilterColumn}
+          filterIconRef={filterIconRefs.current[openFilterColumn]}
+          onClose={() => setOpenFilterColumn(null)}
+        />
+      )}
     </>
+  );
+});
+
+// FilterDropdown (aligned with supply chain design)
+const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose }, ref) => {
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [sortField, setSortField] = useState('');
+  const [sortOrder, setSortOrder] = useState('');
+  const [filterField, setFilterField] = useState('');
+  const [filterCondition, setFilterCondition] = useState('');
+  const [filterValue, setFilterValue] = useState('');
+
+  useEffect(() => {
+    if (filterIconRef) {
+      const rect = filterIconRef.getBoundingClientRect();
+      const dropdownWidth = 320;
+      const dropdownHeight = 360;
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      let left = rect.left;
+      let top = rect.bottom + 8;
+
+      if (left + dropdownWidth > viewportWidth) left = viewportWidth - dropdownWidth - 16;
+      if (top + dropdownHeight > viewportHeight) top = rect.top - dropdownHeight - 8;
+      if (left < 16) left = 16;
+      if (top < 16) top = 16;
+
+      setPosition({ top, left });
+    }
+  }, [filterIconRef]);
+
+  const handleClear = () => {
+    setSortField('');
+    setSortOrder('');
+    setFilterField('');
+    setFilterCondition('');
+    setFilterValue('');
+  };
+
+  const handleReset = () => {
+    setFilterField('');
+    setFilterCondition('');
+    setFilterValue('');
+  };
+
+  const handleApply = () => {
+    onClose();
+  };
+
+  const sortFields = [
+    { value: 'name', label: 'Box Size' },
+    { value: 'warehouseInventory', label: 'Warehouse Inventory' },
+    { value: 'supplierInventory', label: 'Supplier Inventory' },
+  ];
+
+  const sortOrders = [
+    { value: 'asc', label: 'Ascending' },
+    { value: 'desc', label: 'Descending' },
+  ];
+
+  const filterFields = [{ value: '', label: 'Select field' }, ...sortFields];
+
+  const filterConditions = [
+    { value: '', label: 'Select condition' },
+    { value: 'equals', label: 'Equals' },
+    { value: 'contains', label: 'Contains' },
+    { value: 'greaterThan', label: 'Greater than' },
+    { value: 'lessThan', label: 'Less than' },
+  ];
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        position: 'fixed',
+        top: `${position.top}px`,
+        left: `${position.left}px`,
+        width: '320px',
+        backgroundColor: '#FFFFFF',
+        borderRadius: '12px',
+        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+        border: '1px solid #E5E7EB',
+        zIndex: 10000,
+        padding: '16px',
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex items-center justify-between mb-3 text-sm font-semibold text-gray-700">
+        <span>SORT BY:</span>
+        <button type="button" className="text-blue-600 text-sm" onClick={handleClear}>
+          Clear
+        </button>
+      </div>
+
+      <div className="space-y-3 mb-5">
+        <select
+          value={sortField}
+          onChange={(e) => setSortField(e.target.value)}
+          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
+        >
+          <option value="">Select field</option>
+          {sortFields.map((f) => (
+            <option key={f.value} value={f.value}>{f.label}</option>
+          ))}
+        </select>
+
+        <select
+          value={sortOrder}
+          onChange={(e) => setSortOrder(e.target.value)}
+          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
+        >
+          <option value="">Select order</option>
+          {sortOrders.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="text-sm font-semibold text-gray-700 mb-3">
+        FILTER BY CONDITION:
+      </div>
+
+      <div className="space-y-3 mb-5">
+        <select
+          value={filterField}
+          onChange={(e) => setFilterField(e.target.value)}
+          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
+        >
+          {filterFields.map((f) => (
+            <option key={f.value} value={f.value}>{f.label}</option>
+          ))}
+        </select>
+
+        <select
+          value={filterCondition}
+          onChange={(e) => setFilterCondition(e.target.value)}
+          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
+        >
+          {filterConditions.map((c) => (
+            <option key={c.value} value={c.value}>{c.label}</option>
+          ))}
+        </select>
+
+        <input
+          type="text"
+          value={filterValue}
+          onChange={(e) => setFilterValue(e.target.value)}
+          placeholder="Value here..."
+          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
+        />
+      </div>
+
+      <div className="flex items-center justify-end gap-3">
+        <button
+          type="button"
+          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded"
+          onClick={handleReset}
+        >
+          Reset
+        </button>
+        <button
+          type="button"
+          className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded shadow-sm hover:bg-blue-700"
+          onClick={handleApply}
+        >
+          Apply
+        </button>
+      </div>
+    </div>
   );
 });
 

@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
-<<<<<<< Updated upstream
 const NewShipmentHeader = ({
   tableMode,
   onTableModeToggle,
@@ -17,10 +16,8 @@ const NewShipmentHeader = ({
   completedTabs = new Set(),
   formulaCheckHasComment = false,
   labelCheckHasComment = false,
+  hideActionsDropdown = false,
 }) => {
-=======
-const NewShipmentHeader = ({ tableMode, onTableModeToggle, onReviewShipmentClick, onCompleteClick, shipmentData, dataAsOfDate, totalUnits = 0, totalBoxes = 0, activeAction = 'add-products', onActionChange, completedTabs = new Set(), hideActionsDropdown = false }) => {
->>>>>>> Stashed changes
   const navigate = useNavigate();
   const { isDarkMode } = useTheme();
   const [showDropdown, setShowDropdown] = useState(false);

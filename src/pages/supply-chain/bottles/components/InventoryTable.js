@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useImperativeHandle, forwardRef, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 import { showSuccessToast } from '../../../../utils/notifications';
 import { calculatePallets } from '../../../../utils/palletCalculations';
@@ -11,6 +12,8 @@ const InventoryTable = forwardRef(({
   onDeleteClick,
 }, ref) => {
   const { isDarkMode } = useTheme();
+  const location = useLocation();
+  const isPlanningView = location.pathname.includes('planning');
   const dividerColor = isDarkMode ? '#3C4656' : '#E5E7EB';
   const [openFilterColumn, setOpenFilterColumn] = useState(null);
   const filterIconRefs = useRef({});
@@ -70,6 +73,7 @@ const InventoryTable = forwardRef(({
   }, [openFilterColumn]);
 
   const handleFilterClick = (columnKey, e) => {
+    if (isPlanningView) return;
     e.stopPropagation();
     setOpenFilterColumn(openFilterColumn === columnKey ? null : columnKey);
   };
@@ -81,9 +85,10 @@ const InventoryTable = forwardRef(({
     return bottles.filter((bottle) => bottle.name.toLowerCase().includes(query));
   }, [bottles, searchQuery]);
 
-  // Inline inventory editing (single row) - only for supplier inventory
+  // Inline inventory editing (single row) - for both warehouse and supplier inventory
   const [editingBottleId, setEditingBottleId] = useState(null);
   const [editSupplierInv, setEditSupplierInv] = useState('');
+  const [editWarehouseInv, setEditWarehouseInv] = useState('');
 
   // Bulk inventory editing (multiple rows)
   const [isBulkEditing, setIsBulkEditing] = useState(false);
@@ -92,7 +97,10 @@ const InventoryTable = forwardRef(({
   // Action menu state
   const [actionMenuBottleId, setActionMenuBottleId] = useState(null);
 
-  // Calculate bulk unsaved count (only for supplier inventory)
+  // Confirm overwrite modal state
+  const [confirmData, setConfirmData] = useState(null); // { id, supplierInv, warehouseInv, name }
+
+  // Calculate bulk unsaved count (for both warehouse and supplier inventory)
   const bulkUnsavedCount = useMemo(() => {
     if (!isBulkEditing) return 0;
     let count = 0;
@@ -101,8 +109,10 @@ const InventoryTable = forwardRef(({
       const original = bottles.find((b) => b.id === Number(id));
       if (!original) return;
       const s = values.supplierInventory;
-      const changed = s !== undefined && Number(s) !== original.supplierInventory;
-      if (changed) count += 1;
+      const w = values.warehouseInventory;
+      const supplierChanged = s !== undefined && Number(s) !== original.supplierInventory;
+      const warehouseChanged = w !== undefined && Number(w) !== original.warehouseInventory;
+      if (supplierChanged || warehouseChanged) count += 1;
     });
 
     return count;
@@ -119,19 +129,20 @@ const InventoryTable = forwardRef(({
     }));
   };
 
-  // Handle start edit (only for supplier inventory)
+  // Handle start edit (for both warehouse and supplier inventory)
   const handleStartEdit = (bottle) => {
     setEditingBottleId(bottle.id);
     setEditSupplierInv(String(bottle.supplierInventory ?? ''));
+    setEditWarehouseInv(String(bottle.warehouseInventory ?? ''));
     setActionMenuBottleId(null);
   };
 
-  // Handle save edit (only updates supplier inventory, warehouse is read-only)
-  const handleSaveEdit = async (bottleId, supplierInv, bottleName) => {
+  // Handle save edit (updates both warehouse and supplier inventory)
+  const handleSaveEdit = async (bottleId, supplierInv, warehouseInv, bottleName) => {
     try {
       const response = await bottlesApi.updateInventory(bottleId, {
         supplier_quantity: Number(supplierInv) || 0,
-        // warehouse_quantity is not updated - it's read-only and updated automatically when orders are received
+        warehouse_quantity: Number(warehouseInv) || 0,
       });
 
       if (response.success) {
@@ -141,13 +152,15 @@ const InventoryTable = forwardRef(({
               ? {
                   ...b,
                   supplierInventory: Number(supplierInv) || 0,
+                  warehouseInventory: Number(warehouseInv) || 0,
                 }
               : b
           )
         );
-        showSuccessToast(`${bottleName} Supplier inventory updated`);
+        showSuccessToast(`${bottleName} Inventory updated`);
         setEditingBottleId(null);
         setEditSupplierInv('');
+        setEditWarehouseInv('');
       } else {
         throw new Error(response.error || 'Failed to update');
       }
@@ -161,9 +174,10 @@ const InventoryTable = forwardRef(({
   const handleCancelEdit = () => {
     setEditingBottleId(null);
     setEditSupplierInv('');
+    setEditWarehouseInv('');
   };
 
-  // Handle bulk edit save (only updates supplier inventory)
+  // Handle bulk edit save (updates both warehouse and supplier inventory)
   const handleBulkEditSave = async () => {
     const updates = [];
     
@@ -176,11 +190,17 @@ const InventoryTable = forwardRef(({
           ? Number(edits.supplierInventory) || 0
           : b.supplierInventory;
       
-      // Only update if supplier inventory changed (warehouse is read-only)
-      if (nextSupplier !== b.supplierInventory) {
+      const nextWarehouse =
+        edits.warehouseInventory !== undefined
+          ? Number(edits.warehouseInventory) || 0
+          : b.warehouseInventory;
+      
+      // Update if either supplier or warehouse inventory changed
+      if (nextSupplier !== b.supplierInventory || nextWarehouse !== b.warehouseInventory) {
         updates.push({
           id: b.id,
           supplier_quantity: nextSupplier,
+          warehouse_quantity: nextWarehouse,
         });
       }
     });
@@ -190,7 +210,7 @@ const InventoryTable = forwardRef(({
         updates.map(update =>
           bottlesApi.updateInventory(update.id, {
             supplier_quantity: update.supplier_quantity,
-            // warehouse_quantity is not updated - it's read-only
+            warehouse_quantity: update.warehouse_quantity,
           })
         )
       );
@@ -202,6 +222,7 @@ const InventoryTable = forwardRef(({
             return {
               ...b,
               supplierInventory: update.supplier_quantity,
+              warehouseInventory: update.warehouse_quantity,
             };
           }
           return b;
@@ -209,7 +230,7 @@ const InventoryTable = forwardRef(({
       );
 
       if (updates.length > 0) {
-        showSuccessToast(`${updates.length} bottle(s) supplier inventory updated`);
+        showSuccessToast(`${updates.length} bottle(s) inventory updated`);
       }
       setIsBulkEditing(false);
       setBulkEdits({});
@@ -283,6 +304,7 @@ const InventoryTable = forwardRef(({
                 className="h-full text-xs font-bold text-white uppercase tracking-wider group cursor-pointer"
                 style={{
                   width: '253px',
+                  minWidth: '253px',
                   height: '40px',
                   paddingTop: '12px',
                   paddingRight: '16px',
@@ -303,20 +325,22 @@ const InventoryTable = forwardRef(({
                   }}
                 >
                   <span style={{ color: openFilterColumn === key ? '#007AFF' : '#FFFFFF' }}>{label}</span>
-                  <img
-                    ref={(el) => {
-                      if (el) {
-                        filterIconRefs.current[key] = el;
-                      }
-                    }}
-                    src="/assets/Vector (1).png"
-                    alt="Filter"
-                    className={`w-3 h-3 transition-opacity cursor-pointer ${
-                      openFilterColumn === key ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                    }`}
-                    onClick={(e) => handleFilterClick(key, e)}
-                    style={{ width: '12px', height: '12px' }}
-                  />
+                  {!isPlanningView && (
+                    <img
+                      ref={(el) => {
+                        if (el) {
+                          filterIconRefs.current[key] = el;
+                        }
+                      }}
+                      src="/assets/Vector (1).png"
+                      alt="Filter"
+                      className={`w-3 h-3 transition-opacity cursor-pointer ${
+                        openFilterColumn === key ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                      }`}
+                      onClick={(e) => handleFilterClick(key, e)}
+                      style={{ width: '12px', height: '12px' }}
+                    />
+                  )}
                 </div>
               </div>
             ))}
@@ -373,6 +397,7 @@ const InventoryTable = forwardRef(({
                   className="flex items-center" 
                   style={{ 
                     width: '253px',
+                    minWidth: '253px',
                     height: '40px',
                     paddingTop: '12px',
                     paddingRight: '16px',
@@ -397,33 +422,7 @@ const InventoryTable = forwardRef(({
                   className="flex items-center justify-end" 
                   style={{ 
                     width: '253px',
-                    height: '40px',
-                    paddingTop: '12px',
-                    paddingRight: '16px',
-                    paddingBottom: '12px',
-                    paddingLeft: '16px',
-                    gap: '10px',
-                  }}
-                >
-                  {/* Warehouse inventory is read-only - updated automatically when orders are received */}
-                  <span 
-                    className={themeClasses.textPrimary} 
-                    title="Warehouse inventory is updated automatically when orders are received" 
-                    style={{ 
-                      fontSize: '14px', 
-                      textAlign: 'right',
-                      display: 'block',
-                      width: '100%',
-                    }}
-                  >
-                    {typeof bottle.warehouseInventory === 'number' ? bottle.warehouseInventory.toLocaleString() : bottle.warehouseInventory}
-                  </span>
-                </div>
-
-                <div 
-                  className="flex items-center justify-end" 
-                  style={{ 
-                    width: '253px',
+                    minWidth: '253px',
                     height: '40px',
                     paddingTop: '12px',
                     paddingRight: '16px',
@@ -433,18 +432,68 @@ const InventoryTable = forwardRef(({
                   }}
                 >
                   {showInputs ? (
-                    <input
-                      type="number"
-                      value={supplierValue}
-                      onChange={(e) => {
-                        if (isBulkRow) {
-                          handleBulkEditChange(bottle.id, 'supplierInventory', e.target.value);
-                        } else {
-                          setEditSupplierInv(e.target.value);
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
+                      <input
+                        type="number"
+                        value={isBulkRow 
+                          ? (bulkEdits[bottle.id]?.warehouseInventory ?? bottle.warehouseInventory)
+                          : editWarehouseInv
                         }
+                        onChange={(e) => {
+                          if (isBulkRow) {
+                            handleBulkEditChange(bottle.id, 'warehouseInventory', e.target.value);
+                          } else {
+                            setEditWarehouseInv(e.target.value);
+                          }
+                        }}
+                        className="w-28 rounded-full border border-blue-300 px-3 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
+                        style={{ maxWidth: '112px' }}
+                      />
+                    </div>
+                  ) : (
+                    <span 
+                      className={themeClasses.textPrimary} 
+                      style={{ 
+                        fontSize: '14px', 
+                        textAlign: 'right',
+                        display: 'block',
+                        width: '100%',
                       }}
-                      className="w-28 rounded-full border border-blue-300 px-3 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
-                    />
+                    >
+                      {typeof bottle.warehouseInventory === 'number' ? bottle.warehouseInventory.toLocaleString() : bottle.warehouseInventory}
+                    </span>
+                  )}
+                </div>
+
+                <div 
+                  className="flex items-center justify-end" 
+                  style={{ 
+                    width: '253px',
+                    minWidth: '253px',
+                    height: '40px',
+                    paddingTop: '12px',
+                    paddingRight: '16px',
+                    paddingBottom: '12px',
+                    paddingLeft: '16px',
+                    gap: '10px',
+                  }}
+                >
+                  {showInputs ? (
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
+                      <input
+                        type="number"
+                        value={supplierValue}
+                        onChange={(e) => {
+                          if (isBulkRow) {
+                            handleBulkEditChange(bottle.id, 'supplierInventory', e.target.value);
+                          } else {
+                            setEditSupplierInv(e.target.value);
+                          }
+                        }}
+                        className="w-28 rounded-full border border-blue-300 px-3 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
+                        style={{ maxWidth: '112px' }}
+                      />
+                    </div>
                   ) : (
                     <span 
                       className={themeClasses.textPrimary} 
@@ -476,7 +525,12 @@ const InventoryTable = forwardRef(({
                         type="button"
                         className="px-3 py-1 text-xs font-semibold text-white bg-blue-600 rounded-full hover:bg-blue-700"
                         onClick={() => {
-                          handleSaveEdit(bottle.id, editSupplierInv, bottle.name);
+                          setConfirmData({
+                            id: bottle.id,
+                            supplierInv: editSupplierInv,
+                            warehouseInv: editWarehouseInv,
+                            name: bottle.name,
+                          });
                         }}
                       >
                         Save
@@ -586,7 +640,7 @@ const InventoryTable = forwardRef(({
       )}
 
       {/* Filter Dropdown */}
-      {openFilterColumn !== null && (
+      {(!isPlanningView && openFilterColumn !== null) && (
         <FilterDropdown
           ref={filterDropdownRef}
           columnKey={openFilterColumn}
@@ -594,6 +648,36 @@ const InventoryTable = forwardRef(({
           onClose={() => setOpenFilterColumn(null)}
           isDarkMode={isDarkMode}
         />
+      )}
+
+      {confirmData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-xl shadow-2xl p-6 w-[340px]">
+            <h2 className="text-lg font-semibold text-gray-900 mb-3 text-center">Are you sure?</h2>
+            <p className="text-sm text-gray-700 text-center mb-4">
+              This will overwrite the current inventory. Make sure your new count is accurate before confirming.
+            </p>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                type="button"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded"
+                onClick={() => setConfirmData(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded shadow-sm hover:bg-blue-700"
+                onClick={() => {
+                  handleSaveEdit(confirmData.id, confirmData.supplierInv, confirmData.warehouseInv, confirmData.name);
+                  setConfirmData(null);
+                }}
+              >
+                Complete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

@@ -23,3 +23,5 @@ COMMENT ON COLUMN closure_orders.is_edited IS 'Indicates if the order has been e
 COMMENT ON COLUMN box_orders.is_edited IS 'Indicates if the order has been edited after creation';
 COMMENT ON COLUMN label_orders.is_edited IS 'Indicates if the order has been edited after creation';
 
+
+

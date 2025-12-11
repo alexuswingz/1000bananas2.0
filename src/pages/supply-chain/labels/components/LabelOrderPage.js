@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 import { labelsApi } from '../../../../services/supplyChainApi';
@@ -18,7 +18,14 @@ const LabelOrderPage = () => {
   
   // Get lines from state or default empty
   const [allLines, setAllLines] = useState(state.lines || []);
+  const [inventoryLabels, setInventoryLabels] = useState([]);
   const [loadingLabels, setLoadingLabels] = useState(false);
+
+  // Settings / DOI goal
+  const [isLabelsSettingsModalOpen, setIsLabelsSettingsModalOpen] = useState(false);
+  const [showDoiTooltip, setShowDoiTooltip] = useState(false);
+  const [doiGoal, setDoiGoal] = useState(196);
+  const [doiGoalInput, setDoiGoalInput] = useState('196');
   
   // Calculate suggested order quantity based on Excel Label Order Formula
   // Excel Formula:
@@ -28,8 +35,8 @@ const LabelOrderPage = () => {
   //  IF(A3 <= 500, 500,
   //  IF(A3 <= 2000, MAX(500, CEILING(A3, 500)),
   //  MAX(500, CEILING(A3, 1000)))))))
-  const calculateSuggestedOrderQty = (label) => {
-    const DOI_GOAL_DAYS = 196; // DOI goal in days (~6.5 months)
+  const calculateSuggestedOrderQty = useCallback((label) => {
+    const doiGoalDays = Number.isFinite(Number(doiGoal)) ? Number(doiGoal) : 196;
     const currentInventory = label.warehouse_inventory || 0;
     const inboundQuantity = label.inbound_quantity || 0;
     
@@ -45,7 +52,7 @@ const LabelOrderPage = () => {
     const totalAvailable = currentInventory + inboundQuantity;
     
     // Calculate label forecast = target inventory - current available
-    const targetInventory = dailySalesRate * DOI_GOAL_DAYS;
+    const targetInventory = dailySalesRate * doiGoalDays;
     const labelForecast = targetInventory - totalAvailable;
     
     // Apply Excel formula for rounding
@@ -67,6 +74,61 @@ const LabelOrderPage = () => {
     }
     // forecast > 2000: Round UP to nearest 1000, minimum 500
     return Math.max(500, Math.ceil(labelForecast / 1000) * 1000);
+  }, [doiGoal]);
+
+  const transformLabelsToLines = useCallback((labels = []) => {
+    const getLabelSizeFromBottleSize = (bottleSize) => {
+      const size = (bottleSize || '').toLowerCase();
+      if (size.includes('8oz') || size === '8oz') return '5" x 8"';
+      if (size.includes('quart') || size === 'quart') return '5" x 8"';
+      if (size.includes('gallon') || size === 'gallon' || size === '1 gallon') return '5" x 8"';
+      if (size.includes('3oz') || size === '3oz spray') return '4.5" x 3.375"';
+      if (size.includes('6oz') || size === '6oz spray') return '5.375" x 4.5"';
+      if (size.includes('16oz')) return '5" x 8"';
+      return '5" x 8"';
+    };
+
+    return labels
+      .map(label => {
+        const suggestedQty = calculateSuggestedOrderQty(label);
+        const currentInventory = label.warehouse_inventory || 0;
+        const dailySalesRate = label.daily_sales_rate || 0;
+        const currentDOI = dailySalesRate > 0 
+          ? Math.round(currentInventory / dailySalesRate)
+          : currentInventory > 0 ? 999 : 0;
+
+        return {
+          id: label.id,
+          brand: label.brand_name,
+          product: label.product_name,
+          size: label.bottle_size,
+          labelSize: label.label_size || getLabelSizeFromBottleSize(label.bottle_size),
+          qty: suggestedQty,
+          labelStatus: label.label_status || 'Up to Date',
+          inventory: currentInventory,
+          toOrder: suggestedQty,
+          googleDriveLink: label.google_drive_link,
+          added: false,
+          dailySalesRate: dailySalesRate,
+          suggestedQty: suggestedQty,
+          currentDOI: currentDOI,
+        };
+      })
+      .filter(label => label.suggestedQty > 0);
+  }, [calculateSuggestedOrderQty]);
+
+  useEffect(() => {
+    if (isLabelsSettingsModalOpen) {
+      setDoiGoalInput(String(doiGoal));
+    }
+  }, [isLabelsSettingsModalOpen, doiGoal]);
+
+  const handleSaveDoiGoal = () => {
+    const parsedGoal = Number(doiGoalInput);
+    if (Number.isFinite(parsedGoal) && parsedGoal > 0) {
+      setDoiGoal(parsedGoal);
+    }
+    setIsLabelsSettingsModalOpen(false);
   };
 
   // Fetch labels from API on mount if creating new order
@@ -98,6 +160,7 @@ const LabelOrderPage = () => {
               return '5" x 8"'; // Default
             };
             
+<<<<<<< Updated upstream
             const transformed = response.data
               .map(label => {
                 // Calculate suggested order quantity using the formula
@@ -134,6 +197,10 @@ const LabelOrderPage = () => {
               })
               // Sort by inventory ascending (lowest inventory first = most urgent)
               .sort((a, b) => (a.inventory || 0) - (b.inventory || 0));
+=======
+            const transformed = transformLabelsToLines(response.data);
+            setInventoryLabels(response.data);
+>>>>>>> Stashed changes
             setAllLines(transformed);
           }
         } catch (err) {
@@ -145,6 +212,13 @@ const LabelOrderPage = () => {
       fetchLabels();
     }
   }, [state.lines, isCreateMode]);
+
+  // Recalculate suggestions when DOI goal changes (create mode only)
+  useEffect(() => {
+    if (!isCreateMode || !inventoryLabels.length) return;
+    const transformed = transformLabelsToLines(inventoryLabels);
+    setAllLines(transformed);
+  }, [doiGoal, inventoryLabels, isCreateMode, transformLabelsToLines]);
 
   // Navigation tab state - default to 'receivePO' when viewing, 'addProducts' when creating
   const [activeTab, setActiveTab] = useState(isViewMode ? 'receivePO' : 'addProducts');
@@ -877,7 +951,7 @@ const LabelOrderPage = () => {
         orderDate: new Date().toISOString().split('T')[0],
         totalQuantity: totalQuantity,
         totalCost: totalCost,
-        status: 'pending',
+        status: 'Submitted',
         lines: addedLines.map(line => ({
           brand: line.brand,
           product: line.product,
@@ -1158,6 +1232,35 @@ const LabelOrderPage = () => {
 
   return (
     <div className={`min-h-screen ${themeClasses.pageBg}`} style={{ paddingBottom: '100px' }}>
+      {/* Floating legend (single instance near footer) - hide when viewing an order */}
+      {!isViewMode && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '88px',
+            right: '24px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '12px',
+            backgroundColor: '#FFFFFF',
+            borderRadius: '8px',
+            padding: '6px 10px',
+            boxShadow: '0 6px 14px rgba(0,0,0,0.12)',
+            border: '1px solid #E5E7EB',
+            pointerEvents: 'none',
+            zIndex: 30,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ width: '12px', height: '12px', borderRadius: '2px', backgroundColor: '#22C55E' }} />
+            <span style={{ fontSize: '12px', color: '#111827', fontWeight: 500 }}>Total Inv.</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ width: '12px', height: '12px', borderRadius: '2px', backgroundColor: '#2563EB' }} />
+            <span style={{ fontSize: '12px', color: '#111827', fontWeight: 500 }}># to Order</span>
+          </div>
+        </div>
+      )}
       {/* Header Section */}
       <div style={{ 
         backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
@@ -1396,6 +1499,10 @@ const LabelOrderPage = () => {
                 transition: 'all 0.2s',
               }}
               aria-label="Settings"
+              onClick={() => {
+                setDoiGoalInput(String(doiGoal));
+                setIsLabelsSettingsModalOpen(true);
+              }}
             >
               <svg 
                 style={{ width: '20px', height: '20px' }} 
@@ -1508,52 +1615,7 @@ const LabelOrderPage = () => {
 
       {/* Search bar - above table */}
       <div className="px-6 py-4 flex items-center justify-end" style={{ marginTop: '0' }}>
-        {/* Legend and Search bar grouped together */}
-        <div className="flex items-center gap-4">
-          {/* Legend - show when creating or editing an order */}
-          {(isCreateMode || isEditOrderMode) && (
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2.5">
-                <div 
-                  style={{
-                    width: '16px',
-                    height: '16px',
-                    backgroundColor: '#22C55E',
-                    borderRadius: '3px',
-                    flexShrink: 0,
-                  }}
-                />
-                <span style={{ 
-                  color: isDarkMode ? '#D1D5DB' : '#374151',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  lineHeight: '1.5',
-                }}>
-                  Inventory
-                </span>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <div 
-                  style={{
-                    width: '16px',
-                    height: '16px',
-                    backgroundColor: '#2563EB',
-                    borderRadius: '3px',
-                    flexShrink: 0,
-                  }}
-                />
-                <span style={{ 
-                  color: isDarkMode ? '#D1D5DB' : '#374151',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  lineHeight: '1.5',
-                  whiteSpace: 'nowrap',
-                }}>
-                  # to Order
-                </span>
-              </div>
-            </div>
-          )}
+        <div className="flex items-center">
           <div className="relative" style={{ maxWidth: '300px', width: '100%' }}>
           <input
             type="text"
@@ -1585,11 +1647,11 @@ const LabelOrderPage = () => {
       </div>
 
       {/* Table */}
-      <div className={`${themeClasses.cardBg} rounded-xl border ${themeClasses.border} shadow-lg mx-6`} style={{ marginTop: '0' }}>
+      <div className={`${themeClasses.cardBg} rounded-xl border ${themeClasses.border} shadow-lg mx-6`} style={{ marginTop: '0', position: 'relative' }}>
         <div style={{ overflowX: 'auto', overflowY: 'visible' }}>
           {/* Table Mode - Show when tableMode is true and in addProducts tab */}
           {tableMode && activeTab === 'addProducts' && (!isViewMode || isEditOrderMode) ? (
-            <table style={{ width: '100%', borderCollapse: 'collapse', borderSpacing: 0, margin: 0, padding: 0 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', borderSpacing: 0, margin: 0, padding: 0, tableLayout: 'fixed' }}>
               <thead className={themeClasses.headerBg}>
                 <tr style={{ height: '40px', minHeight: '40px' }}>
                   <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: '1px solid #3C4656', width: 50 }}>
@@ -1610,6 +1672,7 @@ const LabelOrderPage = () => {
                     paddingLeft: '24px',
                     textAlign: 'left',
                     borderRight: '1px solid #3C4656',
+                    width: isViewMode ? '55%' : undefined,
                   }}>
                     PACKAGING NAME
                   </th>
@@ -1632,6 +1695,7 @@ const LabelOrderPage = () => {
                     paddingLeft: '24px',
                     textAlign: 'right',
                     borderRight: '1px solid #3C4656',
+                    width: isViewMode ? '20%' : undefined,
                   }}>
                     CURRENT INVENTORY
                   </th>
@@ -1643,6 +1707,7 @@ const LabelOrderPage = () => {
                     paddingLeft: '24px',
                     textAlign: 'right',
                     borderRight: '1px solid #3C4656',
+                    width: isViewMode ? '20%' : undefined,
                   }}>
                     UNITS NEEDED
                   </th>
@@ -1945,7 +2010,7 @@ const LabelOrderPage = () => {
                   maxHeight: '40px',
                   boxSizing: 'border-box',
                   textAlign: 'center',
-                  borderRight: '1px solid white',
+                  borderRight: '1px solid white', // extra divider after SIZE header only
                   width: '74px',
                   verticalAlign: 'middle',
                 }}
@@ -1962,9 +2027,8 @@ const LabelOrderPage = () => {
                   maxHeight: '40px',
                   boxSizing: 'border-box',
                   textAlign: 'center',
-                  borderRight: '1px solid white',
+                  borderRight: 'none',
                   width: 120,
-                  boxShadow: 'inset 4px 0 4px -2px rgba(0, 0, 0, 0.3)',
                   verticalAlign: 'middle',
                 }}
               >
@@ -2230,7 +2294,7 @@ const LabelOrderPage = () => {
 
                     {/* ADD - only show in addProducts tab when creating new order or in edit order mode (not when viewing) */}
                     {(activeTab === 'addProducts' && (!isViewMode || isEditOrderMode)) && (
-                    <td style={{ paddingTop: '8px', paddingRight: '16px', paddingBottom: '8px', paddingLeft: '16px', textAlign: 'center', height: '32px', maxHeight: '32px', minHeight: '32px', verticalAlign: 'middle', lineHeight: '1', boxShadow: 'inset 4px 0 8px -4px rgba(0, 0, 0, 0.15)', boxSizing: 'border-box', width: '120px' }}>
+                    <td style={{ paddingTop: '8px', paddingRight: '16px', paddingBottom: '8px', paddingLeft: '16px', textAlign: 'center', height: '32px', maxHeight: '32px', minHeight: '32px', verticalAlign: 'middle', lineHeight: '1', boxSizing: 'border-box', width: '120px' }}>
                       <button
                         type="button"
                         onClick={() => {
@@ -2697,20 +2761,6 @@ const LabelOrderPage = () => {
         </div>
                     </div>
 
-      {/* Legend */}
-      {!isViewMode && (
-      <div className="px-6 py-2 flex items-center gap-4 text-xs text-gray-600">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded" style={{ backgroundColor: '#00D084' }} />
-          <span>Inventory</span>
-                    </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded" style={{ backgroundColor: '#0066FF' }} />
-          <span># to Order</span>
-        </div>
-      </div>
-      )}
-
       {/* Footer - Sticky */}
       <div 
         className="fixed bottom-0 left-64 right-0 z-50"
@@ -2724,137 +2774,48 @@ const LabelOrderPage = () => {
           {/* Summary Table - Show in addProducts, receivePO tabs, and edit mode */}
           {(activeTab === 'addProducts' || activeTab === 'receivePO' || isEditOrderMode) && (
             <div style={{ flex: 1 }}>
-              <table
-                style={{
-                  borderCollapse: 'separate',
-                  borderSpacing: 0,
-                  backgroundColor: 'transparent',
-                }}
-              >
-                <thead>
-                  <tr>
-                    <th
-                      style={{
-                        padding: '8px 16px',
-                        textAlign: 'left',
-                        fontSize: '11px',
-                        fontWeight: 500,
-                        color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                      }}
-                    >
-                      PRODUCTS
-                    </th>
-                    <th
-                      style={{
-                        padding: '8px 16px',
-                        textAlign: 'left',
-                        fontSize: '11px',
-                        fontWeight: 500,
-                        color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                      }}
-                    >
-                      TOTAL LABELS
-                    </th>
-                    <th
-                      style={{
-                        padding: '8px 16px',
-                        textAlign: 'left',
-                        fontSize: '11px',
-                        fontWeight: 500,
-                        color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                      }}
-                    >
-                      EST COST
-                    </th>
-                    <th
-                      style={{
-                        padding: '8px 16px',
-                        textAlign: 'left',
-                        fontSize: '11px',
-                        fontWeight: 500,
-                        color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                      }}
-                    >
-                      5" X 8"
-                    </th>
-                    <th
-                      style={{
-                        padding: '8px 16px',
-                        textAlign: 'left',
-                        fontSize: '11px',
-                        fontWeight: 500,
-                        color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                      }}
-                    >
-                      5.375" X 4.5"
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td
-                      style={{
-                        padding: '8px 16px',
-                        fontSize: '14px',
-                        fontWeight: 700,
-                        color: isDarkMode ? '#F9FAFB' : '#1F2937',
-                      }}
-                    >
-                      {summary.products}
-                    </td>
-                    <td
-                      style={{
-                        padding: '8px 16px',
-                        fontSize: '14px',
-                        fontWeight: 700,
-                        color: isDarkMode ? '#F9FAFB' : '#1F2937',
-                      }}
-                    >
-                      {summary.totalLabels.toLocaleString()}
-                    </td>
-                    <td
-                      style={{
-                        padding: '8px 16px',
-                        fontSize: '14px',
-                        fontWeight: 700,
-                        color: isDarkMode ? '#F9FAFB' : '#1F2937',
-                      }}
-                    >
-                      ${summary.estCost.toFixed(2)}
-                    </td>
-                    <td
-                      style={{
-                        padding: '8px 16px',
-                        fontSize: '14px',
-                        fontWeight: 700,
-                        color: isDarkMode ? '#F9FAFB' : '#1F2937',
-                      }}
-                    >
-                      {summary.size5x8.toLocaleString()}
-                    </td>
-                    <td
-                      style={{
-                        padding: '8px 16px',
-                        fontSize: '14px',
-                        fontWeight: 700,
-                        color: isDarkMode ? '#F9FAFB' : '#1F2937',
-                      }}
-                    >
-                      {summary.size5375x45.toLocaleString()}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 500, color: isDarkMode ? '#9CA3AF' : '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    PRODUCTS
+                  </div>
+                  <div style={{ fontSize: '16px', fontWeight: 700, color: isDarkMode ? '#F9FAFB' : '#1F2937' }}>
+                    {summary.products}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 500, color: isDarkMode ? '#9CA3AF' : '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    TOTAL LABELS
+                  </div>
+                  <div style={{ fontSize: '16px', fontWeight: 700, color: isDarkMode ? '#F9FAFB' : '#1F2937' }}>
+                    {summary.totalLabels.toLocaleString()}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 500, color: isDarkMode ? '#9CA3AF' : '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    EST COST
+                  </div>
+                  <div style={{ fontSize: '16px', fontWeight: 700, color: isDarkMode ? '#F9FAFB' : '#1F2937' }}>
+                    ${summary.estCost.toFixed(2)}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 500, color: isDarkMode ? '#9CA3AF' : '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    5" X 8"
+                  </div>
+                  <div style={{ fontSize: '16px', fontWeight: 700, color: isDarkMode ? '#F9FAFB' : '#1F2937' }}>
+                    {summary.size5x8.toLocaleString()}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 500, color: isDarkMode ? '#9CA3AF' : '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    5.375" X 4.5"
+                  </div>
+                  <div style={{ fontSize: '16px', fontWeight: 700, color: isDarkMode ? '#F9FAFB' : '#1F2937' }}>
+                    {summary.size5375x45.toLocaleString()}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
           
@@ -2980,6 +2941,7 @@ const LabelOrderPage = () => {
             )}
           </div>
         </div>
+        {/* Single floating legend for timelines */}
       </div>
 
       {/* Export Modal */}
@@ -3201,6 +3163,138 @@ const LabelOrderPage = () => {
                 Done
               </button>
       </div>
+          </div>
+        </div>
+      )}
+
+      {/* Labels Settings Modal */}
+      {isLabelsSettingsModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.4)' }}
+          onClick={() => setIsLabelsSettingsModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-lg"
+            style={{
+              width: '420px',
+              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                Labels Settings
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsLabelsSettingsModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 transition"
+                aria-label="Close"
+                style={{ padding: '4px' }}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-5">
+              <div className="mb-5">
+                <div className="flex items-center justify-between gap-4">
+                  {/* Left Column: Label and Info Icon */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                      DOI Goal
+                    </label>
+                    <div
+                      className="relative"
+                      onMouseEnter={() => setShowDoiTooltip(true)}
+                      onMouseLeave={() => setShowDoiTooltip(false)}
+                    >
+                      <svg
+                        className="w-4 h-4 text-gray-600 cursor-help"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+
+                      {/* Tooltip */}
+                      {showDoiTooltip && (
+                        <div
+                          className="absolute left-0 bottom-full mb-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-10"
+                          style={{
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                            fontFamily: 'system-ui, -apple-system, sans-serif',
+                          }}
+                        >
+                          <h3 className="text-sm font-semibold text-gray-900 mb-2">
+                            DOI Goal = Days of Inventory Goal
+                          </h3>
+                          <p className="text-sm text-gray-700 mb-2" style={{ lineHeight: '1.5' }}>
+                            Your total label DOI combines three pieces: days of finished goods at Amazon, days of raw labels in your warehouse, and the days covered by the labels you plan to order.
+                          </p>
+                          <p className="text-sm text-gray-700" style={{ lineHeight: '1.5' }}>
+                            Simply put: Total DOI = Amazon + warehouse + your next label order
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Column: Input Field */}
+                  <div className="flex-1" style={{ maxWidth: '180px' }}>
+                    <input
+                      type="number"
+                      value={doiGoalInput}
+                      onChange={(e) => setDoiGoalInput(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      style={{
+                        fontFamily: 'system-ui, -apple-system, sans-serif',
+                        borderRadius: '8px',
+                      }}
+                      placeholder="196"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Buttons */}
+              <div className="flex justify-end gap-3 mt-5">
+                <button
+                  type="button"
+                  onClick={() => setIsLabelsSettingsModalOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                  style={{
+                    fontFamily: 'system-ui, -apple-system, sans-serif',
+                    borderRadius: '8px',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveDoiGoal}
+                  className="px-4 py-2 text-sm font-medium text-white rounded-lg transition"
+                  style={{
+                    backgroundColor: '#9CA3AF',
+                    borderRadius: '8px',
+                    fontFamily: 'system-ui, -apple-system, sans-serif',
+                  }}
+                >
+                  Save
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

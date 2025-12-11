@@ -1391,12 +1391,9 @@ const NewShipment = () => {
         completedTabs={completedTabs}
         shipmentId={shipmentId}
         canAccessTab={canAccessTab}
-<<<<<<< Updated upstream
         formulaCheckHasComment={formulaCheckHasComment}
         labelCheckHasComment={labelCheckHasComment}
-=======
         hideActionsDropdown={hideActionsDropdown}
->>>>>>> Stashed changes
       />
 
       <div style={{ padding: '0 1.5rem' }}>

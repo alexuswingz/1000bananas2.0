@@ -711,6 +711,84 @@ const BottleOrderPage = () => {
     await handleCompleteOrder();
   };
 
+  const validateCreateOrder = () => {
+    // Validate: Check if any items exceed max warehouse capacity
+    const overCapacityItems = addedLines.filter(line => {
+      const bottleData = bottleInventoryData[line.name] || {};
+      const maxInventory = bottleData.maxWarehouseInventory || 0;
+      const currentInventory = bottleData.warehouseQuantity || 0;
+      const inventoryPercentage = maxInventory > 0 
+        ? Math.round(((currentInventory + (line.qty || 0)) / maxInventory) * 100)
+        : 0;
+      return inventoryPercentage > 100;
+    });
+    
+    if (overCapacityItems.length > 0) {
+      const itemNames = overCapacityItems.map(item => {
+        const bottleData = bottleInventoryData[item.name] || {};
+        const maxInventory = bottleData.maxWarehouseInventory || 0;
+        const currentInventory = bottleData.warehouseQuantity || 0;
+        const percentage = maxInventory > 0 
+          ? Math.round(((currentInventory + (item.qty || 0)) / maxInventory) * 100)
+          : 0;
+        return `• ${item.name}: ${percentage}% (exceeds 100%)`;
+      }).join('\n');
+      
+      alert(`Cannot submit order!\n\nThe following items exceed max warehouse capacity:\n\n${itemNames}\n\nPlease reduce quantities before submitting.`);
+      return false;
+    }
+    
+    // Validate: Check if any items have 0 quantity
+    const zeroQtyItems = addedLines.filter(line => !line.qty || line.qty === 0);
+    if (zeroQtyItems.length > 0) {
+      alert('Cannot submit order with 0 quantity items!\n\nPlease remove items with 0 quantity or enter a valid quantity.');
+      return false;
+    }
+    return true;
+  };
+
+  const createBottleOrder = async () => {
+    if (!validateCreateOrder()) return false;
+
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      
+      const batchOrderData = {
+        order_number: orderNumber,
+        supplier: supplier.name,
+        order_date: today,
+        expected_delivery_date: null,
+        bottles: addedLines.map(line => ({
+          bottle_name: line.fullName || line.name,
+          quantity_ordered: line.qty || 0,
+          cost_per_unit: null,
+          total_cost: null,
+          status: 'submitted',
+          notes: `${line.qty} units (${line.pallets} pallets)`,
+        })),
+      };
+      
+      const response = await bottlesApi.createOrder(batchOrderData);
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to create order');
+      }
+      
+      navigate('/dashboard/supply-chain/bottles', {
+        state: {
+          orderCreated: true,
+          orderNumber: orderNumber,
+          bottleCount: addedLines.length,
+        },
+        replace: false,
+      });
+      return true;
+    } catch (err) {
+      console.error('Error creating order:', err);
+      alert(`Failed to create order: ${err.message}\n\nPlease try again.`);
+      return false;
+    }
+  };
+
   const handleCompleteOrder = async () => {
     if (isViewMode && orderId && activeTab === 'receivePO') {
       // Receive the order - update each line item
@@ -777,7 +855,8 @@ const BottleOrderPage = () => {
         return;
       } catch (error) {
         console.error('Error receiving order:', error);
-        alert('Failed to receive order: ' + error.message);
+        const errorMessage = error.message || 'Unknown error occurred';
+        alert(`Failed to receive order: ${errorMessage}`);
         return;
       }
     }
@@ -785,78 +864,14 @@ const BottleOrderPage = () => {
     if (addedLines.length === 0) {
       return;
     }
-    
-    // Validate: Check if any items exceed max warehouse capacity
-    const overCapacityItems = addedLines.filter(line => {
-      const bottleData = bottleInventoryData[line.name] || {};
-      const maxInventory = bottleData.maxWarehouseInventory || 0;
-      const currentInventory = bottleData.warehouseQuantity || 0;
-      const inventoryPercentage = maxInventory > 0 
-        ? Math.round(((currentInventory + (line.qty || 0)) / maxInventory) * 100)
-        : 0;
-      return inventoryPercentage > 100;
-    });
-    
-    if (overCapacityItems.length > 0) {
-      const itemNames = overCapacityItems.map(item => {
-        const bottleData = bottleInventoryData[item.name] || {};
-        const maxInventory = bottleData.maxWarehouseInventory || 0;
-        const currentInventory = bottleData.warehouseQuantity || 0;
-        const percentage = maxInventory > 0 
-          ? Math.round(((currentInventory + (item.qty || 0)) / maxInventory) * 100)
-          : 0;
-        return `• ${item.name}: ${percentage}% (exceeds 100%)`;
-      }).join('\n');
-      
-      alert(`Cannot submit order!\n\nThe following items exceed max warehouse capacity:\n\n${itemNames}\n\nPlease reduce quantities before submitting.`);
-      return;
-    }
-    
-    // Validate: Check if any items have 0 quantity
-    const zeroQtyItems = addedLines.filter(line => !line.qty || line.qty === 0);
-    if (zeroQtyItems.length > 0) {
-      alert('Cannot submit order with 0 quantity items!\n\nPlease remove items with 0 quantity or enter a valid quantity.');
-      return;
-    }
-    
-    // Create order via API - batch creation for all bottles
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      
-      // Prepare batch order data with all bottles
-      const batchOrderData = {
-        order_number: orderNumber,
-        supplier: supplier.name,
-        order_date: today,
-        expected_delivery_date: null,
-        bottles: addedLines.map(line => ({
-          bottle_name: line.fullName || line.name, // Use full name for database
-          quantity_ordered: line.qty || 0,
-          cost_per_unit: null,
-          total_cost: null,
-          status: 'submitted',
-          notes: `${line.qty} units (${line.pallets} pallets)`,
-        })),
-      };
-      
-      const response = await bottlesApi.createOrder(batchOrderData);
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to create order');
-      }
-      
-      // Navigate back with success message
-      navigate('/dashboard/supply-chain/bottles', {
-        state: {
-          orderCreated: true,
-          orderNumber: orderNumber,
-          bottleCount: addedLines.length,
-        },
-        replace: false,
-      });
-    } catch (err) {
-      console.error('Error creating order:', err);
-      alert(`Failed to create order: ${err.message}\n\nPlease try again.`);
-    }
+
+    if (!validateCreateOrder()) return;
+    setShowExportModal(true);
+  };
+
+  const getExportFileName = () => {
+    const safeOrderName = orderNumber || 'BottleOrder';
+    return `${safeOrderName}.csv`;
   };
 
   const handleExportCSV = () => {
@@ -865,18 +880,11 @@ const BottleOrderPage = () => {
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    // Format filename as TPS_BottleOrder_YYYY-MM-DD.csv
-    const today = new Date().toISOString().split('T')[0];
-    link.setAttribute('download', `TPS_BottleOrder_${today}.csv`);
+    link.setAttribute('download', getExportFileName());
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
-
-  const getExportFileName = () => {
-    const today = new Date().toISOString().split('T')[0];
-    return `TPS_BottleOrder_${today}.csv`;
   };
 
   const generateCSV = () => {
@@ -891,20 +899,11 @@ const BottleOrderPage = () => {
     return [headers.join(','), ...rows.map(row => row.map(cell => `"${cell}"`).join(','))].join('\n');
   };
 
-  const handleDone = () => {
+  const handleDone = async () => {
     setShowExportModal(false);
     
     if (isCreateMode) {
-      navigate('/dashboard/supply-chain/bottles', {
-        state: {
-          newBottleOrder: {
-            orderNumber: orderNumber,
-            supplierName: supplier.name,
-            lines: addedLines,
-          },
-        },
-        replace: false,
-      });
+      await createBottleOrder();
     }
   };
 
@@ -914,7 +913,7 @@ const BottleOrderPage = () => {
   }
 
   return (
-    <div className={`min-h-screen ${themeClasses.pageBg}`} style={{ paddingBottom: '100px' }}>
+    <div className={`min-h-screen ${themeClasses.pageBg}`} style={{ paddingBottom: '24px' }}>
       {/* Header Section */}
       <div style={{ 
         backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
@@ -1343,10 +1342,10 @@ const BottleOrderPage = () => {
 
       {/* Table - Show in all tabs */}
       <div className={`${themeClasses.cardBg} border ${themeClasses.border} shadow-lg mx-6`} style={{ marginTop: '0', borderRadius: '8px', overflow: 'hidden' }}>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" style={{ paddingRight: '0' }}>
             {/* Table Mode - Show different table structure for addProducts tab when tableMode is true */}
             {tableMode && activeTab === 'addProducts' && !isViewMode ? (
-              <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
+            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed' }}>
                 <thead className={themeClasses.headerBg} style={{ borderRadius: '8px 8px 0 0' }}>
                   <tr style={{ height: '40px', maxHeight: '40px' }}>
                     <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: '1px solid #3C4656', width: 50 }}>
@@ -1492,6 +1491,7 @@ const BottleOrderPage = () => {
                             Auto Replenishment
                           </td>
                           <td style={{ 
+                            width: isViewMode && activeTab === 'receivePO' ? '20%' : undefined,
                             height: '40px',
                             paddingTop: '12px',
                             paddingRight: '24px',
@@ -1504,6 +1504,7 @@ const BottleOrderPage = () => {
                             {currentInventory.toLocaleString()}
                           </td>
                           <td style={{ 
+                            width: isViewMode && activeTab === 'receivePO' ? '15%' : undefined,
                             height: '40px',
                             paddingTop: '12px',
                             paddingRight: '24px',
@@ -1516,6 +1517,7 @@ const BottleOrderPage = () => {
                             {unitsNeeded.toLocaleString()}
                           </td>
                           <td style={{ 
+                            width: isViewMode && activeTab === 'receivePO' ? '15%' : undefined,
                             height: '40px',
                             paddingTop: '12px',
                             paddingRight: '24px',
@@ -1582,12 +1584,12 @@ const BottleOrderPage = () => {
                 </tbody>
               </table>
             ) : (
-            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
+            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed' }}>
               <thead className={themeClasses.headerBg} style={{ borderRadius: '8px 8px 0 0' }}>
                 <tr style={{ height: '40px', maxHeight: '40px' }}>
                   {/* Checkbox column - show when viewing an order in receivePO tab */}
                   {isViewMode && activeTab === 'receivePO' && (
-                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: '1px solid #3C4656', width: 50 }}>
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: '1px solid #3C4656', width: '5%' }}>
                     <input 
                       type="checkbox" 
                       style={{ cursor: 'pointer', width: '16px', height: '16px' }}
@@ -1597,13 +1599,14 @@ const BottleOrderPage = () => {
                   </th>
                   )}
                   <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
-                    width: '142px',
+                    width: isViewMode && activeTab === 'receivePO' ? '250px' : (isViewMode ? '45%' : '142px'),
+                    maxWidth: isViewMode && activeTab === 'receivePO' ? '250px' : undefined,
                     height: '40px',
                     paddingTop: '12px',
-                    paddingRight: '16px',
+                    paddingRight: isViewMode && activeTab === 'receivePO' ? '8px' : '16px',
                     paddingBottom: '12px',
                     paddingLeft: '16px',
-                    textAlign: 'left',
+                    textAlign: isViewMode && activeTab === 'receivePO' ? 'left' : 'left',
                     borderRight: '1px solid #3C4656',
                     gap: '10px',
                   }}>
@@ -1622,63 +1625,32 @@ const BottleOrderPage = () => {
                   </th>
                   )}
                   <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
-                    width: '142px',
+                    width: isViewMode && activeTab === 'receivePO' ? '140px' : (isViewMode ? '20%' : '142px'),
                     height: '40px',
                     paddingTop: '12px',
-                    paddingRight: '16px',
+                    paddingRight: isViewMode && activeTab === 'receivePO' ? '8px' : '16px',
                     paddingBottom: '12px',
-                    paddingLeft: '16px',
+                    paddingLeft: isViewMode && activeTab === 'receivePO' ? '8px' : '16px',
                     textAlign: 'center',
-                    borderRight: '1px solid #3C4656',
+                    borderRight: isViewMode && activeTab === 'receivePO' ? '1px solid #3C4656' : '1px solid #3C4656',
                     gap: '10px',
                   }}>
                     QTY
                   </th>
                   <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
-                    width: '142px',
+                    width: isViewMode && activeTab === 'receivePO' ? 'auto' : (isViewMode ? '20%' : '142px'),
                     height: '40px',
                     paddingTop: '12px',
-                    paddingRight: '16px',
+                    paddingRight: isViewMode && activeTab === 'receivePO' ? '16px' : '16px',
                     paddingBottom: '12px',
-                    paddingLeft: '16px',
-                    textAlign: 'center',
-                    borderRight: '1px solid #3C4656',
+                    paddingLeft: isViewMode && activeTab === 'receivePO' ? '8px' : '16px',
+                    textAlign: isViewMode && activeTab === 'receivePO' ? 'left' : 'center',
+                    borderRight: 'none',
                     gap: '10px',
                   }}>
                     PALLETS
                   </th>
-                  {/* WAREHOUSE INVENTORY column - show when viewing an order in receivePO tab */}
-                  {isViewMode && activeTab === 'receivePO' && (
-                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
-                    width: '180px',
-                    height: '40px',
-                    paddingTop: '12px',
-                    paddingRight: '16px',
-                    paddingBottom: '12px',
-                    paddingLeft: '16px',
-                    textAlign: 'center',
-                    borderRight: '1px solid #3C4656',
-                    gap: '10px',
-                  }}>
-                    WAREHOUSE INVENTORY
-                  </th>
-                  )}
-                  {/* SUPPLIER INVENTORY column - show when viewing an order in receivePO tab */}
-                  {isViewMode && activeTab === 'receivePO' && (
-                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
-                    width: '180px',
-                    height: '40px',
-                    paddingTop: '12px',
-                    paddingRight: '16px',
-                    paddingBottom: '12px',
-                    paddingLeft: '16px',
-                    textAlign: 'center',
-                    borderRight: '1px solid #3C4656',
-                    gap: '10px',
-                  }}>
-                    SUPPLIER INVENTORY
-                  </th>
-                  )}
+                  {/* Inventory columns removed in view mode */}
                   {/* INVENTORY PERCENTAGE column - only show in addProducts tab when creating new order (not viewing) */}
                   {(activeTab === 'addProducts' && !isViewMode) && (
                   <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'left', width: 300 }}>
@@ -1687,7 +1659,7 @@ const BottleOrderPage = () => {
                   )}
                   {/* Ellipsis column - show when viewing an order in receivePO tab */}
                   {isViewMode && activeTab === 'receivePO' && (
-                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'center', width: 50 }}>
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0', height: '40px', textAlign: 'center', width: 'auto', minWidth: '140px' }}>
                   </th>
                   )}
                 </tr>
@@ -1695,7 +1667,12 @@ const BottleOrderPage = () => {
               <tbody>
                 {filteredLines.length === 0 ? (
                   <tr>
-                    <td colSpan={(isViewMode && activeTab === 'receivePO') ? 7 : ((activeTab === 'addProducts' && !isViewMode) ? 6 : 4)} className="px-6 py-6 text-center text-sm italic text-gray-400">
+                    <td
+                      colSpan={(isViewMode && activeTab === 'receivePO')
+                        ? 5 // checkbox, packaging, qty, pallets, ellipsis
+                        : ((activeTab === 'addProducts' && !isViewMode) ? 6 : 4)}
+                      className="px-6 py-6 text-center text-sm italic text-gray-400"
+                    >
                       No items available.
                     </td>
                   </tr>
@@ -1723,16 +1700,20 @@ const BottleOrderPage = () => {
                       </td>
                       )}
                       <td style={{ 
-                        width: '300px',
+                        width: isViewMode && activeTab === 'receivePO' ? '250px' : (isViewMode ? '45%' : '300px'),
+                        maxWidth: isViewMode && activeTab === 'receivePO' ? '250px' : undefined,
                         height: '40px',
                         paddingTop: '12px',
-                        paddingRight: '16px',
+                        paddingRight: isViewMode && activeTab === 'receivePO' ? '8px' : '16px',
                         paddingBottom: '12px',
                         paddingLeft: '16px',
                         fontSize: '0.85rem',
                         verticalAlign: 'middle',
                         gap: '10px',
-                      }} className={themeClasses.textPrimary}>
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }} className={themeClasses.textPrimary} title={line.fullName || line.name}>
                         {line.fullName || line.name}
                       </td>
                       {/* SUPPLIER INV - only show in addProducts tab when creating new order (not viewing) */}
@@ -1785,12 +1766,12 @@ const BottleOrderPage = () => {
                       </td>
                       )}
                       <td style={{ 
-                        width: '142px',
+                        width: isViewMode && activeTab === 'receivePO' ? '140px' : (isViewMode ? '20%' : '142px'),
                         height: '40px',
                         paddingTop: '12px',
-                        paddingRight: '16px',
+                        paddingRight: isViewMode && activeTab === 'receivePO' ? '8px' : '16px',
                         paddingBottom: '12px',
-                        paddingLeft: '16px',
+                        paddingLeft: isViewMode && activeTab === 'receivePO' ? '8px' : '16px',
                         textAlign: 'center',
                         verticalAlign: 'middle',
                         gap: '10px',
@@ -1866,7 +1847,15 @@ const BottleOrderPage = () => {
                               </button>
                             </div>
                             {((editedValues.qty || 0) !== (originalValues.qty || 0)) && (
-                              <span style={{ fontSize: '12px', color: '#EF4444', fontWeight: 500 }}>
+                              <span style={{ 
+                                fontSize: '14px', 
+                                color: '#EF4444', 
+                                fontWeight: 600,
+                                marginLeft: '4px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                minWidth: '40px',
+                              }}>
                                 {((editedValues.qty || 0) - (originalValues.qty || 0)) > 0 ? '+' : ''}{((editedValues.qty || 0) - (originalValues.qty || 0)).toLocaleString()}
                               </span>
                             )}
@@ -1919,18 +1908,18 @@ const BottleOrderPage = () => {
                         )}
                       </td>
                       <td style={{ 
-                        width: '142px',
+                        width: isViewMode && activeTab === 'receivePO' ? 'auto' : '142px',
                         height: '40px',
                         paddingTop: '12px',
-                        paddingRight: '16px',
+                        paddingRight: isViewMode && activeTab === 'receivePO' ? '16px' : '16px',
                         paddingBottom: '12px',
-                        paddingLeft: '16px',
-                        textAlign: 'center',
+                        paddingLeft: isViewMode && activeTab === 'receivePO' ? '8px' : '16px',
+                        textAlign: isViewMode && activeTab === 'receivePO' ? 'left' : 'center',
                         verticalAlign: 'middle',
                         gap: '10px',
                       }}>
                         {editingLineId === line.id ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: isViewMode && activeTab === 'receivePO' ? 'flex-start' : 'center' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: '#F3F4F6', borderRadius: '8px', padding: '2px' }}>
                               <button
                                 type="button"
@@ -2001,7 +1990,15 @@ const BottleOrderPage = () => {
                               </button>
                             </div>
                             {(editedValues.pallets || 0) !== (originalValues.pallets || 0) && (
-                              <span style={{ fontSize: '12px', color: '#EF4444', fontWeight: 500 }}>
+                              <span style={{ 
+                                fontSize: '14px', 
+                                color: '#EF4444', 
+                                fontWeight: 600,
+                                marginLeft: '4px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                minWidth: '50px',
+                              }}>
                                 {((editedValues.pallets || 0) - (originalValues.pallets || 0)) > 0 ? '+' : ''}{((editedValues.pallets || 0) - (originalValues.pallets || 0)).toFixed(1)}
                               </span>
                             )}
@@ -2116,115 +2113,12 @@ const BottleOrderPage = () => {
                         </div>
                       </td>
                       )}
-                      {/* WAREHOUSE INVENTORY column - show when viewing an order in receivePO tab */}
-                      {isViewMode && activeTab === 'receivePO' && (
-                      <td style={{ 
-                        width: '180px',
-                        height: '40px',
-                        paddingTop: '12px',
-                        paddingRight: '16px',
-                        paddingBottom: '12px',
-                        paddingLeft: '16px',
-                        textAlign: 'center',
-                        verticalAlign: 'middle',
-                        gap: '10px',
-                      }}>
-                        {editingLineId === line.id ? (
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', width: '100%', paddingRight: '16px' }}>
-                            <input
-                              type="number"
-                              value={editedValues.warehouseQuantity ?? ''}
-                              onChange={(e) => {
-                                setEditedValues(prev => ({ 
-                                  ...prev, 
-                                  warehouseQuantity: e.target.value
-                                }));
-                              }}
-                              onFocus={(e) => {
-                                e.target.select();
-                              }}
-                              onMouseDown={(e) => {
-                                e.stopPropagation();
-                              }}
-                              className="rounded-full border border-blue-300 px-3 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
-                              style={{
-                                backgroundColor: '#FFFFFF',
-                                color: '#000000',
-                                cursor: 'text',
-                                width: '112px',
-                              }}
-                            />
-                          </div>
-                        ) : (
-                          <span className={themeClasses.textPrimary} style={{ display: 'block', width: '100%', textAlign: 'right' }}>
-                            {(() => {
-                              const bottleData = bottleInventoryData[line.fullName] || bottleInventoryData[line.name] || {};
-                              const warehouseQty = bottleData.warehouseQuantity !== undefined 
-                                ? bottleData.warehouseQuantity 
-                                : (line.warehouseQuantity !== undefined ? line.warehouseQuantity : 0);
-                              return warehouseQty.toLocaleString();
-                            })()}
-                          </span>
-                        )}
-                      </td>
-                      )}
-                      {/* SUPPLIER INVENTORY column - show when viewing an order in receivePO tab */}
-                      {isViewMode && activeTab === 'receivePO' && (
-                      <td style={{ 
-                        width: '180px',
-                        height: '40px',
-                        paddingTop: '12px',
-                        paddingRight: '16px',
-                        paddingBottom: '12px',
-                        paddingLeft: '16px',
-                        textAlign: 'center',
-                        verticalAlign: 'middle',
-                        gap: '10px',
-                      }}>
-                        {editingLineId === line.id ? (
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', width: '100%', paddingRight: '16px' }}>
-                            <input
-                              type="number"
-                              value={editedValues.supplierQuantity ?? ''}
-                              onChange={(e) => {
-                                setEditedValues(prev => ({ 
-                                  ...prev, 
-                                  supplierQuantity: e.target.value
-                                }));
-                              }}
-                              onFocus={(e) => {
-                                e.target.select();
-                              }}
-                              onMouseDown={(e) => {
-                                e.stopPropagation();
-                              }}
-                              className="rounded-full border border-blue-300 px-3 py-1 text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
-                              style={{
-                                backgroundColor: '#FFFFFF',
-                                color: '#000000',
-                                cursor: 'text',
-                                width: '112px',
-                              }}
-                            />
-                          </div>
-                        ) : (
-                          <span className={themeClasses.textPrimary} style={{ display: 'block', width: '100%', textAlign: 'right' }}>
-                            {(() => {
-                              const bottleData = bottleInventoryData[line.fullName] || bottleInventoryData[line.name] || {};
-                              const supplierQty = bottleData.supplierQuantity !== undefined 
-                                ? bottleData.supplierQuantity 
-                                : (line.supplierInventory !== undefined ? (typeof line.supplierInventory === 'number' ? line.supplierInventory : Number(line.supplierInventory.replace(/,/g, ''))) : 0);
-                              return supplierQty.toLocaleString();
-                            })()}
-                          </span>
-                        )}
-                      </td>
-                      )}
+                      {/* Inventory columns removed in view mode - hidden to match design */}
                       {/* Ellipsis column - show when viewing an order in receivePO tab */}
                       {isViewMode && activeTab === 'receivePO' && (
-                      <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', position: 'relative' }}>
+                      <td style={{ padding: '0', textAlign: 'center', height: '40px', verticalAlign: 'middle', position: 'relative', width: editingLineId === line.id ? '200px' : 'auto', minWidth: editingLineId === line.id ? '200px' : '140px', whiteSpace: 'nowrap' }}>
                         {editingLineId === line.id ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end', paddingRight: '8px' }}>
                             <button
                               type="button"
                               onClick={handleCancelEdit}
@@ -2241,6 +2135,7 @@ const BottleOrderPage = () => {
                                 fontWeight: 500,
                                 cursor: 'pointer',
                                 transition: 'background-color 0.2s',
+                                whiteSpace: 'nowrap',
                               }}
                               onMouseEnter={(e) => {
                                 e.currentTarget.style.backgroundColor = '#F9FAFB';
@@ -2267,6 +2162,7 @@ const BottleOrderPage = () => {
                                 fontWeight: 500,
                                 cursor: 'pointer',
                                 transition: 'background-color 0.2s',
+                                whiteSpace: 'nowrap',
                               }}
                               onMouseEnter={(e) => {
                                 e.currentTarget.style.backgroundColor = '#2563EB';
@@ -2280,36 +2176,42 @@ const BottleOrderPage = () => {
                           </div>
                         ) : (
                           <>
-                            <button
-                              ref={(el) => {
-                                if (el) ellipsisButtonRefs.current[line.id] = el;
-                              }}
-                              type="button"
-                              data-ellipsis-button={line.id}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEllipsisMenuId(ellipsisMenuId === line.id ? null : line.id);
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                setEllipsisMenuPosition({
-                                  top: rect.bottom + 4,
-                                  left: rect.left,
-                                });
-                              }}
-                              className="p-1 rounded-full hover:bg-gray-100 transition-colors"
-                              style={{
-                                color: '#6B7280',
-                                backgroundColor: 'transparent',
-                                border: 'none',
-                                cursor: 'pointer',
-                              }}
-                              aria-label="Row actions"
-                            >
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="12" cy="6" r="1.5" fill="currentColor"/>
-                                <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
-                                <circle cx="12" cy="18" r="1.5" fill="currentColor"/>
-                              </svg>
-                            </button>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', width: '100%', height: '100%', paddingRight: '8px' }}>
+                              <button
+                                ref={(el) => {
+                                  if (el) ellipsisButtonRefs.current[line.id] = el;
+                                }}
+                                type="button"
+                                data-ellipsis-button={line.id}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEllipsisMenuId(ellipsisMenuId === line.id ? null : line.id);
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  const menuWidth = 140;
+                                  setEllipsisMenuPosition({
+                                    top: rect.bottom + 4,
+                                    left: rect.right - menuWidth,
+                                  });
+                                }}
+                                className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                                style={{
+                                  color: '#6B7280',
+                                  backgroundColor: 'transparent',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}
+                                aria-label="Row actions"
+                              >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <circle cx="12" cy="6" r="1.5" fill="currentColor"/>
+                                  <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+                                  <circle cx="12" cy="18" r="1.5" fill="currentColor"/>
+                                </svg>
+                              </button>
+                            </div>
                             {ellipsisMenuId === line.id && (
                               <div
                                 ref={(el) => {
@@ -2321,30 +2223,36 @@ const BottleOrderPage = () => {
                                   left: ellipsisMenuPosition.left,
                                   backgroundColor: '#FFFFFF',
                                   border: '1px solid #E5E7EB',
-                                  borderRadius: '8px',
+                                  borderRadius: '20px',
                                   boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
                                   zIndex: 1000,
-                                  minWidth: '120px',
-                                  padding: '4px',
+                                  padding: '4px 8px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
                                 }}
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <button
                                   type="button"
-                                  onClick={() => handleStartEdit(line.id)}
+                                  onClick={() => {
+                                    handleStartEdit(line.id);
+                                    setEllipsisMenuId(null);
+                                  }}
                                   style={{
-                                    width: '100%',
-                                    display: 'flex',
+                                    display: 'inline-flex',
                                     alignItems: 'center',
-                                    gap: '8px',
-                                    padding: '8px 12px',
+                                    gap: '6px',
+                                    padding: '6px 12px',
                                     backgroundColor: 'transparent',
                                     border: 'none',
-                                    borderRadius: '6px',
-                                    cursor: 'pointer',
+                                    borderRadius: '20px',
                                     fontSize: '14px',
-                                    color: '#374151',
-                                    textAlign: 'left',
+                                    fontWeight: 500,
+                                    cursor: 'pointer',
+                                    color: '#3B82F6',
+                                    transition: 'background-color 0.2s',
+                                    whiteSpace: 'nowrap',
                                   }}
                                   onMouseEnter={(e) => {
                                     e.currentTarget.style.backgroundColor = '#F3F4F6';
@@ -2744,20 +2652,23 @@ const BottleOrderPage = () => {
             </div>
 
             {/* File display area */}
-            <div className="mb-6" style={{
-              border: '1px solid #3B82F6',
-              borderRadius: '8px',
-              backgroundColor: '#E0F2FE',
-              padding: '12px 16px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-            }}>
-              <svg className="w-6 h-6" fill="#3B82F6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" fill="#3B82F6"/>
-                <path d="M14 2v6h6" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+            <div
+              className="mb-6"
+              style={{
+                border: '1px solid #E5E7EB',
+                borderRadius: '8px',
+                backgroundColor: '#F9FAFB',
+                padding: '12px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+              }}
+            >
+              <svg className="w-5 h-5" fill="#9333EA" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <rect x="6" y="4" width="12" height="16" rx="2" fill="#A855F7" />
+                <rect x="9" y="16" width="6" height="2" rx="1" fill="#7C3AED" />
               </svg>
-              <span className="text-sm font-medium" style={{ color: '#3B82F6' }}>
+              <span className="text-sm font-medium" style={{ color: '#111827' }}>
                 {getExportFileName()}
               </span>
             </div>
@@ -2765,9 +2676,9 @@ const BottleOrderPage = () => {
             {/* Information message */}
             <div className="flex items-start gap-3 mb-6">
               <div className="flex-shrink-0 mt-0.5">
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="12" cy="12" r="10" fill="#3B82F6"/>
-                  <text x="12" y="17" textAnchor="middle" fill="white" fontSize="14" fontWeight="600" fontFamily="Arial, sans-serif">i</text>
+                <svg className="w-5 h-5" fill="none" stroke="#3B82F6" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="10" strokeWidth="2" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 16h.01M12 12v-4" />
                 </svg>
               </div>
               <p className="text-sm text-gray-700" style={{ color: '#374151' }}>
@@ -2804,6 +2715,7 @@ const BottleOrderPage = () => {
                 className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors"
                 style={{
                   backgroundColor: '#3B82F6',
+                  border: '1px solid #3B82F6',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = '#2563EB';

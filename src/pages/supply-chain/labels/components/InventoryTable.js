@@ -701,6 +701,20 @@ const InventoryTable = forwardRef(({
       {/* Edit Inventory Modal */}
       {isEditInventoryOpen && editingLabel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          {/* Floating edit indicator (keep original button visible while modal is open) */}
+          <button
+            type="button"
+            disabled
+            className="fixed z-50 flex items-center gap-2 px-3 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-md shadow-md opacity-90"
+            style={{ top: '110px', right: '48px' }}
+            aria-label="Edit inventory"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+            </svg>
+            <span>Edit inventory</span>
+          </button>
+
           <div className="bg-white rounded-lg shadow-2xl flex flex-col" style={{ width: '600px', maxHeight: '90vh' }}>
             {/* Modal header - Dark navy */}
             <div className="flex items-center justify-between px-5 py-3.5 rounded-t-lg" style={{ backgroundColor: '#2C3544' }}>

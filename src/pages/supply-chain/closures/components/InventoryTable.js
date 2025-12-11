@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useImperativeHandle, forwardRef, useEffect } from 'react';
+import React, { useState, useMemo, useImperativeHandle, forwardRef, useEffect, useRef } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 import { showSuccessToast } from '../../../../utils/notifications';
 import { calculatePallets } from '../../../../utils/palletCalculations';
@@ -37,6 +37,29 @@ const InventoryTable = forwardRef(({
 
   // Action menu state
   const [actionMenuClosureId, setActionMenuClosureId] = useState(null);
+
+  // Header filter state (match bottles behavior)
+  const [openFilterColumn, setOpenFilterColumn] = useState(null);
+  const filterIconRefs = useRef({});
+  const filterDropdownRef = useRef(null);
+
+  useEffect(() => {
+    if (openFilterColumn === null) return;
+    const handleClickOutside = (event) => {
+      const icon = filterIconRefs.current[openFilterColumn];
+      const dropdown = filterDropdownRef.current;
+      const inIcon = icon && icon.contains(event.target);
+      const inDropdown = dropdown && dropdown.contains(event.target);
+      if (!inIcon && !inDropdown) setOpenFilterColumn(null);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [openFilterColumn]);
+
+  const handleFilterClick = (columnKey, e) => {
+    e.stopPropagation();
+    setOpenFilterColumn((prev) => (prev === columnKey ? null : columnKey));
+  };
 
   // Fetch closures from API on mount
   useEffect(() => {
@@ -276,10 +299,14 @@ const InventoryTable = forwardRef(({
               gap: '0',
             }}
           >
-            {['CLOSURE NAME', 'WAREHOUSE INVENTORY', 'SUPPLIER INVENTORY'].map((label, idx) => (
+            {[
+              { key: 'name', label: 'CLOSURE NAME' },
+              { key: 'warehouseInventory', label: 'WAREHOUSE INVENTORY' },
+              { key: 'supplierInventory', label: 'SUPPLIER INVENTORY' },
+            ].map(({ key, label }, idx) => (
               <div
                 key={label}
-                className={`h-full text-xs font-bold text-white uppercase tracking-wider flex items-center`}
+                className="h-full text-xs font-bold text-white uppercase tracking-wider flex items-center group"
                 style={{
                   width: '253px',
                   height: '40px',
@@ -290,9 +317,34 @@ const InventoryTable = forwardRef(({
                   gap: '10px',
                   justifyContent: idx === 0 ? 'flex-start' : 'flex-end',
                   textAlign: idx === 0 ? 'left' : 'right',
+                  position: 'relative',
                 }}
               >
-                <span>{label}</span>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '0.5rem',
+                    width: '100%',
+                  }}
+                >
+                  <span style={{ color: openFilterColumn === key ? '#007AFF' : '#FFFFFF' }}>{label}</span>
+                  <img
+                    ref={(el) => {
+                      if (el) {
+                        filterIconRefs.current[key] = el;
+                      }
+                    }}
+                    src="/assets/Vector (1).png"
+                    alt="Filter"
+                    className={`w-3 h-3 transition-opacity cursor-pointer ${
+                      openFilterColumn === key ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                    }`}
+                    onClick={(e) => handleFilterClick(key, e)}
+                    style={{ width: '12px', height: '12px' }}
+                  />
+                </div>
               </div>
             ))}
             <div className="h-full flex items-center justify-end" style={{ paddingRight: '16px' }}>
@@ -555,7 +607,85 @@ const InventoryTable = forwardRef(({
           </div>
         </div>
       )}
+
+      {openFilterColumn !== null && (
+        <FilterDropdown
+          ref={filterDropdownRef}
+          columnKey={openFilterColumn}
+          filterIconRef={filterIconRefs.current[openFilterColumn]}
+          onClose={() => setOpenFilterColumn(null)}
+        />
+      )}
     </>
+  );
+});
+
+// FilterDropdown reused from bottles (lightweight placeholder)
+const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose }, ref) => {
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (filterIconRef) {
+      const rect = filterIconRef.getBoundingClientRect();
+      const dropdownWidth = 200;
+      const dropdownHeight = 120;
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      let left = rect.left;
+      let top = rect.bottom + 8;
+
+      if (left + dropdownWidth > viewportWidth) left = viewportWidth - dropdownWidth - 16;
+      if (top + dropdownHeight > viewportHeight) top = rect.top - dropdownHeight - 8;
+      if (left < 16) left = 16;
+      if (top < 16) top = 16;
+
+      setPosition({ top, left });
+    }
+  }, [filterIconRef]);
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        position: 'fixed',
+        top: `${position.top}px`,
+        left: `${position.left}px`,
+        width: '200px',
+        backgroundColor: '#FFFFFF',
+        borderRadius: '12px',
+        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+        border: '1px solid #E5E7EB',
+        zIndex: 10000,
+        padding: '12px',
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px', color: '#111827' }}>
+        {columnKey === 'name' ? 'Closure Name' : columnKey === 'warehouseInventory' ? 'Warehouse Inv.' : 'Supplier Inv.'}
+      </div>
+      <div style={{ fontSize: '12px', color: '#4B5563', marginBottom: '12px' }}>
+        Filtering not yet wired. Placeholder dropdown like bottles.
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            padding: '6px 10px',
+            backgroundColor: '#007AFF',
+            color: '#FFFFFF',
+            borderRadius: '8px',
+            border: 'none',
+            fontSize: '12px',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          Close
+        </button>
+      </div>
+    </div>
   );
 });
 

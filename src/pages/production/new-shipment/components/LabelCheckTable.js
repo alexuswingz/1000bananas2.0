@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useLocation } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 import { getShipmentProducts } from '../../../../services/productionApi';
 import VarianceStillExceededModal from './VarianceStillExceededModal';
@@ -13,6 +14,10 @@ const LabelCheckTable = ({
   hideHeader = false,
 }) => {
   const { isDarkMode } = useTheme();
+  const location = useLocation();
+  const isPlanningView = location.pathname.includes('planning');
+  // In viewing shipment (non-recount) hide column dropdown filters
+  const disableFilters = !isRecountMode || isPlanningView;
   const [isExpanded, setIsExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -504,7 +509,7 @@ const LabelCheckTable = ({
                     }}
                   >
                     {column.label}
-                    {column.key !== 'start' && (
+                    {!disableFilters && column.key !== 'start' && (
                       <img
                         ref={(el) => { if (el) filterIconRefs.current[column.key] = el; }}
                         src="/assets/Vector (1).png"
@@ -1270,7 +1275,7 @@ const LabelCheckTable = ({
       )}
 
       {/* Filter Dropdown */}
-      {openFilterColumn && filterIconRefs.current[openFilterColumn] && (
+      {!disableFilters && openFilterColumn && filterIconRefs.current[openFilterColumn] && (
         <FilterDropdown
           ref={filterDropdownRef}
           columnKey={openFilterColumn}

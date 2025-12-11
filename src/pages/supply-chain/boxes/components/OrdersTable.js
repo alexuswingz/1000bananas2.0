@@ -26,6 +26,7 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
             orderDate: order.order_date,
             quantityOrdered: order.quantity_ordered,
             quantityReceived: order.quantity_received || 0,
+            isEdited: order.is_edited || false,
           }));
           
           // Group orders by base order number (before timestamp)
@@ -41,10 +42,15 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
                 orderDate: order.orderDate,
                 orderCount: 0,
                 lineItems: [],
+                isEdited: false, // Will be set to true if any line item is edited
               };
             }
             grouped[baseOrderNumber].orderCount++;
             grouped[baseOrderNumber].lineItems.push(order);
+            // Mark group as edited if any line item is edited
+            if (order.isEdited) {
+              grouped[baseOrderNumber].isEdited = true;
+            }
           });
           
           // Filter: Only show groups that have at least one 'pending', 'submitted', or 'partial' line item
@@ -430,12 +436,14 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
             {filteredOrders.map((order, index) => {
               // Determine status for each stage
               const addProductsStatus = true; // Always completed (order exists)
-              const submitPOStatus = true; // Always completed (order was submitted)
-              // RECEIVE PO: Only green if order is actually received
+              const submitPOStatus = order.status !== 'pending'; // Completed if not pending (submitted, partial, received)
+              // RECEIVE PO: Only green if order is actually received (not just submitted)
               // Check both order status and line items - must have at least one 'received' status
               const hasReceivedLineItem = order.lineItems?.some(item => item.status === 'received') || false;
               const orderStatusIsReceived = order.status === 'received';
-              const receivePOStatus = hasReceivedLineItem || orderStatusIsReceived;
+              // Receive PO should only be green if actually received, not just submitted
+              // If status is 'submitted', do not show green dot (even if line items might be marked received)
+              const receivePOStatus = order.status === 'received' || (hasReceivedLineItem && order.status !== 'submitted');
               
               return (
                 <div
@@ -456,13 +464,26 @@ const OrdersTable = ({ searchQuery = '', themeClasses, onViewOrder, onArchiveOrd
                   </div>
                   <div className="px-6 py-3 flex items-center gap-2">
                     <div className="flex flex-col">
-                      <button
-                        type="button"
-                        className="text-xs font-medium text-blue-600 hover:text-blue-700 underline-offset-2 hover:underline text-left"
-                        onClick={() => onViewOrder(order)}
-                      >
-                        {order.orderNumber}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="text-xs font-medium text-blue-600 hover:text-blue-700 underline-offset-2 hover:underline text-left"
+                          onClick={() => onViewOrder(order)}
+                        >
+                          {order.orderNumber}
+                        </button>
+                        {order.isEdited && (
+                          <span
+                            className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium"
+                            style={{
+                              backgroundColor: '#FEF3C7',
+                              color: '#92400E',
+                            }}
+                          >
+                            Edited
+                          </span>
+                        )}
+                      </div>
                       {order.orderCount > 1 && (
                         <span className="text-[10px] text-gray-400">
                           {order.orderCount} box types

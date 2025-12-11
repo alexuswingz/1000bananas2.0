@@ -8,6 +8,37 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Normalize status coming from API
+  const normalizeStatus = (status) => {
+    const lower = (status || '').toLowerCase();
+    if (lower === 'pending') return 'Submitted';
+    if (lower === 'partial' || lower === 'partially received') return 'Partially Received';
+    if (lower === 'received') return 'Received';
+    return status || 'Draft';
+  };
+
+  const normalizeLines = (lines = []) =>
+    (lines || []).map((line, idx) => {
+      const brand = line.brand || line.brand_name || line.product_brand || '';
+      const product = line.product || line.product_name || '';
+      const size = line.size || line.bottle_size || '';
+      const qty = line.quantityOrdered ?? line.quantity_ordered ?? line.qty ?? line.toOrder ?? 0;
+      const labelSize = line.labelSize || line.label_size || '';
+      return {
+        id: line.id || line.line_id || `${product}-${size}-${idx}`,
+        brand,
+        product,
+        size,
+        labelSize,
+        qty,
+        toOrder: qty,
+        lineTotal: line.lineTotal || line.line_total,
+        costPerLabel: line.costPerLabel || line.cost_per_label,
+        googleDriveLink: line.googleDriveLink || line.google_drive_link,
+        added: true,
+      };
+    });
+
   // Orders data - fetch from API
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -21,16 +52,19 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
         if (response.success) {
           // Filter to show only pending/partial orders
           const activeOrders = response.data
-            .filter(order => order.status === 'pending' || order.status === 'partial')
-            .map(order => ({
-              id: order.id,
-              orderNumber: order.order_number,
-              supplier: order.supplier,
-              status: order.status,
-              orderDate: order.order_date,
-              totalQuantity: order.total_quantity,
-              lines: order.lines || []
-            }));
+            .map(order => {
+              const linesSource = order.lines || order.order_lines || order.items || [];
+              return {
+                id: order.id,
+                orderNumber: order.order_number,
+                supplier: order.supplier,
+                status: normalizeStatus(order.status),
+                orderDate: order.order_date,
+                totalQuantity: order.total_quantity,
+                lines: normalizeLines(linesSource),
+              };
+            })
+            .filter(order => order.status === 'Submitted' || order.status === 'Partially Received');
           setOrders(activeOrders);
         }
       } catch (err) {
@@ -63,16 +97,19 @@ const OrdersTable = forwardRef(({ searchQuery = '', themeClasses, onViewOrder, o
           const response = await labelsApi.getOrders();
           if (response.success) {
             const activeOrders = response.data
-              .filter(order => order.status === 'pending' || order.status === 'partial')
-              .map(order => ({
-                id: order.id,
-                orderNumber: order.order_number,
-                supplier: order.supplier,
-                status: order.status,
-                orderDate: order.order_date,
-                totalQuantity: order.total_quantity,
-                lines: order.lines || []
-              }));
+              .map(order => {
+                const linesSource = order.lines || order.order_lines || order.items || [];
+                return {
+                  id: order.id,
+                  orderNumber: order.order_number,
+                  supplier: order.supplier,
+                  status: normalizeStatus(order.status),
+                  orderDate: order.order_date,
+                  totalQuantity: order.total_quantity,
+                  lines: normalizeLines(linesSource),
+                };
+              })
+              .filter(order => order.status === 'Submitted' || order.status === 'Partially Received');
             setOrders(activeOrders);
             
             if (onNewOrderCreated) {

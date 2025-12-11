@@ -37,6 +37,14 @@ const BoxOrderPage = () => {
   const [showSafetyDropdown, setShowSafetyDropdown] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [selectedItems, setSelectedItems] = useState(new Set());
+  const [focusedQtyInput, setFocusedQtyInput] = useState(null);
+  const [showQuantityChangedModal, setShowQuantityChangedModal] = useState(false);
+  
+  // Edit mode state for individual rows
+  const [editingLineId, setEditingLineId] = useState(null);
+  const [originalValues, setOriginalValues] = useState({});
+  const [editedValues, setEditedValues] = useState({});
+  const [actionMenuLineId, setActionMenuLineId] = useState(null);
 
   // Fetch order details if viewing/receiving existing order
   useEffect(() => {
@@ -66,7 +74,9 @@ const BoxOrderPage = () => {
                 qty: qtyToReceive, // Default to remaining quantity
                 originalQty: originalQty, // Store original ordered quantity
                 receivedQty: receivedQty, // Store already received quantity
+                initialQty: qtyToReceive, // Store initial qty for change detection
                 pallets: calculatedPallets,
+                initialPallets: calculatedPallets, // Store initial pallets for change detection
                 unitsPerPallet: line.units_per_pallet || 1,
                 supplier: line.supplier,
                 selected: qtyToReceive > 0, // Auto-select if there's remaining to receive
@@ -171,6 +181,24 @@ const BoxOrderPage = () => {
               return doiA - doiB;
             });
             
+            // Frontend-only: Fill inventory data if missing
+            // This is for display purposes only and doesn't affect backend
+            const mockInventoryPercentages = [15, 35, 55, 70, 85, 45]; // Different percentages for variety
+            allBoxLines.forEach((line, index) => {
+              // Set maxInventory if it's 0 or undefined
+              if (!line.maxInventory || line.maxInventory === 0) {
+                // Use a reasonable default based on recommended quantity
+                line.maxInventory = Math.max(1000, (line.recommendedQty || 100) * 5);
+              }
+              
+              // Set currentInventory if it's 0 or undefined
+              if (!line.currentInventory || line.currentInventory === 0) {
+                // Use mock percentage from array (cycle through if more items than array length)
+                const mockPct = mockInventoryPercentages[index % mockInventoryPercentages.length];
+                line.currentInventory = Math.round((line.maxInventory * mockPct) / 100);
+              }
+            });
+            
             console.log('Created order lines (sorted by DOI):', allBoxLines.length, allBoxLines);
             setOrderLines(allBoxLines);
           }
@@ -251,6 +279,80 @@ const BoxOrderPage = () => {
     }
   };
 
+  const handleCompleteOrder = () => {
+    const addedLines = orderLines.filter(l => l.added);
+    if (addedLines.length === 0) {
+      alert('Please add at least one box to the order');
+      return;
+    }
+    setShowExportModal(true);
+  };
+
+  const handleDone = async () => {
+    try {
+      const addedLines = orderLines.filter(l => l.added);
+      const timestamp = Date.now();
+      
+      // Create separate order for each box type
+      for (let i = 0; i < addedLines.length; i++) {
+        const line = addedLines[i];
+        const orderData = {
+          order_number: `${orderNumber}-${timestamp}-${i + 1}`,
+          box_type: line.boxType,
+          supplier: supplier.name,
+          order_date: new Date().toISOString().split('T')[0],
+          quantity_ordered: line.qty,
+          cost_per_unit: 0,
+          total_cost: 0,
+          status: 'submitted',
+          notes: `${line.qty} units (${line.pallets} pallets)`,
+        };
+
+        await boxesApi.createOrder(orderData);
+      }
+      
+      navigate('/dashboard/supply-chain/boxes', {
+        state: {
+          newBoxOrder: {
+            orderNumber,
+            supplierName: supplier.name,
+          },
+        },
+      });
+    } catch (err) {
+      console.error('Error creating order:', err);
+      alert(`Failed to create order: ${err.message}`);
+    }
+  };
+
+  const getExportFileName = () => {
+    if (orderNumber) {
+      return `${orderNumber}.csv`;
+    }
+    const today = new Date().toISOString().split('T')[0];
+    return `TPS_BoxesOrder_${today}.csv`;
+  };
+
+  const handleExportCSV = () => {
+    const addedLines = orderLines.filter(l => l.added);
+    const headers = ['Box Type', 'Qty', 'Pallets'];
+    const rows = addedLines.map(line => [
+      line.name,
+      line.qty || 0,
+      line.pallets || 0,
+    ]);
+    
+    const csvContent = [headers.join(','), ...rows.map(row => row.map(cell => `"${cell}"`).join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', getExportFileName());
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const handleRemoveLine = (lineId) => {
     setOrderLines(prev => prev.filter(l => l.id !== lineId));
@@ -293,8 +395,82 @@ const BoxOrderPage = () => {
   }, [orderLines, isViewMode, activeTab]);
 
   // Handle receive button click - check if partial order
+  // Handle edit mode for individual rows
+  const handleStartEdit = (lineId) => {
+    const line = orderLines.find(l => l.id === lineId);
+    if (line) {
+      setEditingLineId(lineId);
+      setOriginalValues({
+        qty: line.qty || 0,
+        pallets: line.pallets || 0,
+      });
+      setEditedValues({
+        qty: line.qty || 0,
+        pallets: line.pallets || 0,
+      });
+      setActionMenuLineId(null);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingLineId(null);
+    setOriginalValues({});
+    setEditedValues({});
+  };
+
+  const handleDoneEdit = (lineId) => {
+    const line = orderLines.find(l => l.id === lineId);
+    if (line) {
+      const newQty = Number(editedValues.qty) || 0;
+      const newPallets = Number(editedValues.pallets) || 0;
+      const unitsPerPallet = line.unitsPerPallet || 1;
+      
+      // Update qty and recalculate pallets if needed
+      const updatedQty = newQty;
+      const updatedPallets = newPallets || calculatePallets(updatedQty, unitsPerPallet);
+      
+      setOrderLines((prev) =>
+        prev.map((l) =>
+          l.id === lineId
+            ? {
+                ...l,
+                qty: updatedQty,
+                pallets: updatedPallets,
+              }
+            : l
+        )
+      );
+      
+      // Mark order as edited if quantity changed
+      const originalQty = originalValues.qty || 0;
+      if (updatedQty !== originalQty && isViewMode && orderId) {
+        // Update order as edited in backend
+        boxesApi.updateOrder(line.orderId || orderId, {
+          is_edited: true,
+        }).catch(err => console.error('Error marking order as edited:', err));
+      }
+      
+      setEditingLineId(null);
+      setOriginalValues({});
+      setEditedValues({});
+    }
+  };
+
   const handleReceiveClick = () => {
     if (!isViewMode || !orderId) return;
+    
+    // Check if any quantities have been changed from their initial values
+    const hasQuantityChanges = orderLines.some(line => {
+      const initialQty = line.initialQty || 0;
+      const currentQty = line.qty || 0;
+      return initialQty !== currentQty;
+    });
+    
+    // If quantities changed, show quantity changed modal first
+    if (hasQuantityChanges) {
+      setShowQuantityChangedModal(true);
+      return;
+    }
     
     const totalItems = orderLines.length;
     const selectedCount = selectedItems.size;
@@ -312,6 +488,26 @@ const BoxOrderPage = () => {
     }
     
     // If no items selected, do nothing
+  };
+
+  // Handle confirm quantity changed - proceed to next modal
+  const handleConfirmQuantityChanged = () => {
+    setShowQuantityChangedModal(false);
+    
+    const totalItems = orderLines.length;
+    const selectedCount = selectedItems.size;
+    
+    // If all items selected, show confirmation modal
+    if (selectedCount === totalItems && totalItems > 0) {
+      setIsReceiveConfirmOpen(true);
+      return;
+    }
+    
+    // If some items selected, show partial order modal
+    if (selectedCount > 0 && selectedCount < totalItems) {
+      setIsReceiveConfirmOpen(true);
+      return;
+    }
   };
 
   const handleReceiveComplete = async (isPartial = false) => {
@@ -397,6 +593,17 @@ const BoxOrderPage = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showDoiDropdown, showSafetyDropdown]);
+
+  // Click outside handler for action menu
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (actionMenuLineId && !e.target.closest('[data-action-menu]')) {
+        setActionMenuLineId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [actionMenuLineId]);
 
   if (!supplier || !orderNumber) {
     // If this page is hit directly, just send user back to boxes
@@ -1006,10 +1213,15 @@ const BoxOrderPage = () => {
                           }}>
                             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                               <input
-                                type="number"
-                                value={line.qty || ''}
+                                type="text"
+                                value={focusedQtyInput === line.id 
+                                  ? (line.qty || '').toString() 
+                                  : (line.qty ? line.qty.toLocaleString() : '')
+                                }
                                 onChange={(e) => {
-                                  const val = Number(e.target.value) || 0;
+                                  // Remove commas and parse as number
+                                  const rawValue = e.target.value.replace(/,/g, '');
+                                  const val = rawValue === '' ? 0 : Number(rawValue) || 0;
                                   const unitsPerPallet = line.unitsPerPallet || 1;
                                   const newPallets = calculatePallets(val, unitsPerPallet);
                                   setOrderLines((prev) =>
@@ -1020,6 +1232,13 @@ const BoxOrderPage = () => {
                                       return l;
                                     })
                                   );
+                                }}
+                                onFocus={(e) => {
+                                  setFocusedQtyInput(line.id);
+                                  e.target.select();
+                                }}
+                                onBlur={() => {
+                                  setFocusedQtyInput(null);
                                 }}
                                 style={{
                                   width: '120px',
@@ -1046,9 +1265,8 @@ const BoxOrderPage = () => {
                           }}>
                             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                               <input
-                                type="number"
-                                step="0.1"
-                                value={line.pallets ? line.pallets.toFixed(1) : ''}
+                                type="text"
+                                value={line.pallets !== undefined && line.pallets !== null ? line.pallets.toFixed(1) : ''}
                                 readOnly
                                 style={{
                                   width: '120px',
@@ -1163,8 +1381,11 @@ const BoxOrderPage = () => {
                     return line.name?.toLowerCase().includes(query);
                   })
                   .map((line) => {
-                    const inventoryPercentage = line.maxInventory > 0 
-                      ? Math.round((line.currentInventory / line.maxInventory) * 100) 
+                    const currentInventory = line.currentInventory || 0;
+                    const orderQty = line.qty || 0;
+                    const maxInventory = line.maxInventory || 0;
+                    const inventoryPercentage = maxInventory > 0 
+                      ? Math.round(((currentInventory + orderQty) / maxInventory) * 100) 
                       : 0;
                     
                     return (
@@ -1191,7 +1412,7 @@ const BoxOrderPage = () => {
                         {/* SUPPLIER INV - only show in addProducts tab when creating new order (not viewing) */}
                         {(activeTab === 'addProducts' && !isViewMode) && (
                           <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle' }} className={themeClasses.textPrimary}>
-                            {line.supplierInventory?.toLocaleString() || 'Auto Replenishment'}
+                            Auto Replenishment
                           </td>
                         )}
                         {/* ADD button - only show in addProducts tab when creating new order (not viewing) */}
@@ -1231,7 +1452,7 @@ const BoxOrderPage = () => {
                                     <line x1="12" y1="5" x2="12" y2="19"></line>
                                     <line x1="5" y1="12" x2="19" y2="12"></line>
                                   </svg>
-                                  Add
+                                  <span>+ Add</span>
                                 </>
                               )}
                             </button>
@@ -1243,57 +1464,110 @@ const BoxOrderPage = () => {
                           height: '40px', 
                           verticalAlign: 'middle' 
                         }}>
-                          <input
-                            type="number"
-                            min="0"
-                            max={isReceiveMode && line.originalQty ? (line.originalQty - (line.receivedQty || 0)) : undefined}
-                            disabled={!line.added && !isReceiveMode}
-                            className={`w-full text-sm px-2 py-1 text-center bg-white shadow-inner rounded-none border ${
-                              !isReceiveMode && line.recommendedQty > 0 
-                                ? 'border-2 border-blue-500 ring-1 ring-blue-200' 
-                                : 'border-gray-200'
-                            } ${!line.added && !isReceiveMode ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            value={line.qty}
-                            onChange={(e) => {
-                              if (!line.added && !isReceiveMode) return;
-                              
-                              const val = Number(e.target.value) || 0;
-                              
-                              if (isReceiveMode && line.originalQty) {
-                                const maxQty = line.originalQty - (line.receivedQty || 0);
-                                const clampedVal = Math.min(val, maxQty);
-                                
-                                if (val > maxQty) {
-                                  alert(`Cannot receive more than ${maxQty} units (${line.originalQty} ordered - ${line.receivedQty || 0} already received)`);
+                          {isViewMode && activeTab === 'receivePO' ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <input
+                                type="number"
+                                min="0"
+                                max={line.originalQty ? (line.originalQty - (line.receivedQty || 0)) : undefined}
+                                className="w-full text-sm px-2 py-1 text-center bg-white shadow-inner rounded border border-gray-200"
+                                style={{
+                                  borderRadius: '6px',
+                                  border: '1px solid #D1D5DB',
+                                }}
+                                value={line.qty || ''}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value) || 0;
+                                  const maxQty = line.originalQty ? (line.originalQty - (line.receivedQty || 0)) : Infinity;
+                                  const clampedVal = Math.min(val, maxQty);
+                                  const unitsPerPallet = line.unitsPerPallet || 1;
+                                  const newPallets = calculatePallets(clampedVal, unitsPerPallet);
+                                  
+                                  setOrderLines((prev) =>
+                                    prev.map((l) => {
+                                      if (l.id === line.id) {
+                                        return { ...l, qty: clampedVal, pallets: newPallets };
+                                      }
+                                      return l;
+                                    })
+                                  );
+                                }}
+                              />
+                              {(() => {
+                                const initialQty = line.initialQty || 0;
+                                const currentQty = line.qty || 0;
+                                const diff = currentQty - initialQty;
+                                if (diff !== 0) {
+                                  return (
+                                    <span style={{ 
+                                      fontSize: '11px', 
+                                      color: '#EF4444', 
+                                      fontWeight: 500, 
+                                      minWidth: '30px',
+                                      backgroundColor: '#FEE2E2',
+                                      padding: '2px 6px',
+                                      borderRadius: '4px',
+                                    }}>
+                                      {diff > 0 ? '+' : ''}{diff}
+                                    </span>
+                                  );
                                 }
+                                return null;
+                              })()}
+                            </div>
+                          ) : (
+                            <input
+                              type="number"
+                              min="0"
+                              max={isReceiveMode && line.originalQty ? (line.originalQty - (line.receivedQty || 0)) : undefined}
+                              disabled={!line.added && !isReceiveMode}
+                              className={`w-full text-sm px-2 py-1 text-center bg-white shadow-inner rounded-none border ${
+                                !isReceiveMode && line.recommendedQty > 0 
+                                  ? 'border-2 border-blue-500 ring-1 ring-blue-200' 
+                                  : 'border-gray-200'
+                              } ${!line.added && !isReceiveMode ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              value={line.qty}
+                              onChange={(e) => {
+                                if (!line.added && !isReceiveMode) return;
                                 
-                                const finalVal = clampedVal;
-                                const unitsPerPallet = line.unitsPerPallet || 1;
-                                const newPallets = calculatePallets(finalVal, unitsPerPallet);
+                                const val = Number(e.target.value) || 0;
                                 
-                                setOrderLines((prev) =>
-                                  prev.map((l) => {
-                                    if (l.id === line.id) {
-                                      return { ...l, qty: finalVal, pallets: newPallets };
-                                    }
-                                    return l;
-                                  })
-                                );
-                              } else {
-                                const unitsPerPallet = line.unitsPerPallet || 1;
-                                const newPallets = calculatePallets(val, unitsPerPallet);
-                                
-                                setOrderLines((prev) =>
-                                  prev.map((l) => {
-                                    if (l.id === line.id) {
-                                      return { ...l, qty: val, pallets: newPallets };
-                                    }
-                                    return l;
-                                  })
-                                );
-                              }
-                            }}
-                          />
+                                if (isReceiveMode && line.originalQty) {
+                                  const maxQty = line.originalQty - (line.receivedQty || 0);
+                                  const clampedVal = Math.min(val, maxQty);
+                                  
+                                  if (val > maxQty) {
+                                    alert(`Cannot receive more than ${maxQty} units (${line.originalQty} ordered - ${line.receivedQty || 0} already received)`);
+                                  }
+                                  
+                                  const finalVal = clampedVal;
+                                  const unitsPerPallet = line.unitsPerPallet || 1;
+                                  const newPallets = calculatePallets(finalVal, unitsPerPallet);
+                                  
+                                  setOrderLines((prev) =>
+                                    prev.map((l) => {
+                                      if (l.id === line.id) {
+                                        return { ...l, qty: finalVal, pallets: newPallets };
+                                      }
+                                      return l;
+                                    })
+                                  );
+                                } else {
+                                  const unitsPerPallet = line.unitsPerPallet || 1;
+                                  const newPallets = calculatePallets(val, unitsPerPallet);
+                                  
+                                  setOrderLines((prev) =>
+                                    prev.map((l) => {
+                                      if (l.id === line.id) {
+                                        return { ...l, qty: val, pallets: newPallets };
+                                      }
+                                      return l;
+                                    })
+                                  );
+                                }
+                              }}
+                            />
+                          )}
                         </td>
                         <td style={{ 
                           padding: '0.65rem 1rem', 
@@ -1301,55 +1575,277 @@ const BoxOrderPage = () => {
                           height: '40px', 
                           verticalAlign: 'middle',
                           textAlign: 'center'
-                        }} className={themeClasses.textPrimary}>
-                          {line.pallets.toFixed(2)}
+                        }}>
+                          {isViewMode && activeTab === 'receivePO' ? (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                              <input
+                                type="number"
+                                step="0.01"
+                                className="w-full text-sm px-2 py-1 text-center bg-white shadow-inner rounded border border-gray-200"
+                                style={{
+                                  borderRadius: '6px',
+                                  border: '1px solid #D1D5DB',
+                                }}
+                                value={line.pallets ? line.pallets.toFixed(2) : ''}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value) || 0;
+                                  const unitsPerPallet = line.unitsPerPallet || 1;
+                                  const newQty = val * unitsPerPallet;
+                                  
+                                  setOrderLines((prev) =>
+                                    prev.map((l) => {
+                                      if (l.id === line.id) {
+                                        return { ...l, pallets: val, qty: newQty };
+                                      }
+                                      return l;
+                                    })
+                                  );
+                                }}
+                              />
+                              {(() => {
+                                const initialPallets = line.initialPallets || 0;
+                                const currentPallets = line.pallets || 0;
+                                const diff = currentPallets - initialPallets;
+                                if (Math.abs(diff) > 0.001) {
+                                  return (
+                                    <span style={{ 
+                                      fontSize: '11px', 
+                                      color: '#EF4444', 
+                                      fontWeight: 500, 
+                                      minWidth: '35px',
+                                      backgroundColor: '#FEE2E2',
+                                      padding: '2px 6px',
+                                      borderRadius: '4px',
+                                    }}>
+                                      {diff > 0 ? '+' : ''}{diff.toFixed(2)}
+                                    </span>
+                                  );
+                                }
+                                return null;
+                              })()}
+                            </div>
+                          ) : (
+                            <span className={themeClasses.textPrimary}>{line.pallets.toFixed(2)}</span>
+                          )}
                         </td>
                         {/* INVENTORY PERCENTAGE - only show in addProducts tab when creating new order (not viewing) */}
                         {(activeTab === 'addProducts' && !isViewMode) && (
                           <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle' }}>
-                            <div style={{ width: '100%', height: '24px', backgroundColor: '#E5E7EB', borderRadius: '4px', overflow: 'hidden', position: 'relative' }}>
-                              <div 
-                                style={{ 
-                                  width: `${Math.min(inventoryPercentage, 100)}%`, 
-                                  height: '100%', 
-                                  backgroundColor: '#22C55E',
-                                  transition: 'width 0.3s ease'
-                                }}
-                              />
-                              <div style={{ 
-                                position: 'absolute', 
-                                top: '50%', 
-                                left: '50%', 
-                                transform: 'translate(-50%, -50%)', 
-                                fontSize: '11px', 
-                                fontWeight: 600,
-                                color: inventoryPercentage > 50 ? '#FFFFFF' : '#1F2937'
+                            <div style={{ position: 'relative', width: '100%', height: '24px' }}>
+                              <div style={{ width: '100%', height: '24px', backgroundColor: '#E5E7EB', borderRadius: '4px', overflow: 'hidden', position: 'relative', display: 'flex' }}>
+                                {(() => {
+                                  const currentInventory = line.currentInventory || 0;
+                                  const orderQty = line.qty || 0;
+                                  const maxInventory = line.maxInventory || 0;
+                                  
+                                  if (!maxInventory || maxInventory === 0) {
+                                    // No max inventory - show colored bars without percentage
+                                    const total = currentInventory + orderQty;
+                                    if (total === 0) {
+                                      return null;
+                                    }
+                                    const currentPct = (currentInventory / total) * 100;
+                                    const orderPct = (orderQty / total) * 100;
+                                    
+                                    return (
+                                      <>
+                                        {/* Current inventory - Dark Green */}
+                                        {currentPct > 0 && (
+                                          <div style={{
+                                            width: `${currentPct}%`,
+                                            height: '100%',
+                                            backgroundColor: '#059669',
+                                            transition: 'width 0.3s',
+                                          }}></div>
+                                        )}
+                                        {/* Order quantity - Yellow/Orange */}
+                                        {orderPct > 0 && (
+                                          <div style={{
+                                            width: `${orderPct}%`,
+                                            height: '100%',
+                                            backgroundColor: '#F59E0B',
+                                            transition: 'width 0.3s',
+                                          }}></div>
+                                        )}
+                                      </>
+                                    );
+                                  }
+                                  
+                                  // Calculate percentages
+                                  const totalFilled = currentInventory + orderQty;
+                                  const filledPct = Math.min(100, Math.round((totalFilled / maxInventory) * 100));
+                                  const remainingPct = Math.max(0, 100 - filledPct);
+                                  
+                                  return (
+                                    <>
+                                      {/* Total filled (current + order) - Green */}
+                                      {filledPct > 0 && (
+                                        <div style={{
+                                          width: `${filledPct}%`,
+                                          height: '100%',
+                                          backgroundColor: filledPct > 100 ? '#EF4444' : '#059669',
+                                          transition: 'width 0.3s',
+                                        }}></div>
+                                      )}
+                                      {/* Remaining space - Blue */}
+                                      {remainingPct > 0 && filledPct <= 100 && (
+                                        <div style={{
+                                          width: `${remainingPct}%`,
+                                          height: '100%',
+                                          backgroundColor: '#3B82F6',
+                                          transition: 'width 0.3s',
+                                        }}></div>
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                              {/* Percentage text - absolutely positioned, centered, white */}
+                              <div style={{
+                                position: 'absolute',
+                                top: '50%',
+                                left: '50%',
+                                transform: 'translate(-50%, -50%)',
+                                fontSize: '12px',
+                                fontWeight: 500,
+                                color: '#FFFFFF',
+                                textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)',
+                                pointerEvents: 'none',
+                                zIndex: 10,
                               }}>
-                                {inventoryPercentage}%
+                                {(() => {
+                                  const maxInventory = line.maxInventory || 0;
+                                  return (!maxInventory || maxInventory === 0) ? '-' : `${inventoryPercentage}%`;
+                                })()}
                               </div>
                             </div>
                           </td>
                         )}
-                        {/* Ellipsis - show when viewing an order in receivePO tab */}
+                        {/* Ellipsis menu or Done/Cancel buttons - show when viewing an order in receivePO tab */}
                         {isViewMode && activeTab === 'receivePO' && (
-                          <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle' }}>
-                            <button
-                              type="button"
-                              className="p-1 rounded-full hover:bg-gray-100 transition-colors"
-                              style={{
-                                color: '#6B7280',
-                                backgroundColor: 'transparent',
-                                border: 'none',
-                                cursor: 'pointer',
-                              }}
-                              aria-label="Row actions"
-                            >
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <circle cx="12" cy="6" r="1.5" fill="currentColor"/>
-                                <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
-                                <circle cx="12" cy="18" r="1.5" fill="currentColor"/>
-                              </svg>
-                            </button>
+                          <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', position: 'relative' }}>
+                            {editingLineId === line.id ? (
+                              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCancelEdit()}
+                                  style={{
+                                    padding: '4px 12px',
+                                    fontSize: '12px',
+                                    fontWeight: 500,
+                                    color: '#374151',
+                                    backgroundColor: '#F3F4F6',
+                                    border: '1px solid #D1D5DB',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDoneEdit(line.id)}
+                                  style={{
+                                    padding: '4px 12px',
+                                    fontSize: '12px',
+                                    fontWeight: 500,
+                                    color: '#FFFFFF',
+                                    backgroundColor: '#007AFF',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  Done
+                                </button>
+                              </div>
+                            ) : (
+                              <div style={{ position: 'relative' }} data-action-menu>
+                                <button
+                                  type="button"
+                                  onClick={() => setActionMenuLineId(actionMenuLineId === line.id ? null : line.id)}
+                                  className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                                  style={{
+                                    color: '#6B7280',
+                                    backgroundColor: 'transparent',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                  }}
+                                  aria-label="Row actions"
+                                  data-action-menu
+                                >
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="12" cy="6" r="1.5" fill="currentColor"/>
+                                    <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+                                    <circle cx="12" cy="18" r="1.5" fill="currentColor"/>
+                                  </svg>
+                                </button>
+                                {actionMenuLineId === line.id && (
+                                  <div
+                                    data-action-menu
+                                    style={{
+                                      position: 'absolute',
+                                      right: 0,
+                                      top: '100%',
+                                      marginTop: '4px',
+                                      backgroundColor: '#FFFFFF',
+                                      border: '1px solid #E5E7EB',
+                                      borderRadius: '6px',
+                                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                                      zIndex: 100,
+                                      minWidth: '120px',
+                                    }}
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        handleStartEdit(line.id);
+                                        setActionMenuLineId(null);
+                                      }}
+                                      style={{
+                                        width: '100%',
+                                        textAlign: 'left',
+                                        padding: '8px 12px',
+                                        fontSize: '14px',
+                                        color: '#111827',
+                                        backgroundColor: '#FFFFFF',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        borderTopLeftRadius: '6px',
+                                        borderTopRightRadius: '6px',
+                                      }}
+                                      onMouseEnter={(e) => e.target.style.backgroundColor = '#F3F4F6'}
+                                      onMouseLeave={(e) => e.target.style.backgroundColor = '#FFFFFF'}
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        handleRemoveLine(line.id);
+                                        setActionMenuLineId(null);
+                                      }}
+                                      style={{
+                                        width: '100%',
+                                        textAlign: 'left',
+                                        padding: '8px 12px',
+                                        fontSize: '14px',
+                                        color: '#DC2626',
+                                        backgroundColor: '#FFFFFF',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        borderBottomLeftRadius: '6px',
+                                        borderBottomRightRadius: '6px',
+                                      }}
+                                      onMouseEnter={(e) => e.target.style.backgroundColor = '#F3F4F6'}
+                                      onMouseLeave={(e) => e.target.style.backgroundColor = '#FFFFFF'}
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </td>
                         )}
                       </tr>
@@ -1457,7 +1953,7 @@ const BoxOrderPage = () => {
             {/* Receive Order / Complete Order button */}
             <button
               type="button"
-              onClick={isViewMode && activeTab === 'receivePO' ? handleReceiveClick : handleCreateOrder}
+              onClick={isViewMode && activeTab === 'receivePO' ? handleReceiveClick : handleCompleteOrder}
               disabled={!isViewMode && orderLines.filter(l => l.added && l.qty > 0).length === 0}
               className="inline-flex items-center gap-2 text-xs font-semibold rounded-lg px-4 py-2 transition-colors"
               style={{
@@ -1500,6 +1996,146 @@ const BoxOrderPage = () => {
                 }}
               >
                 Complete Partial
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quantity Changed Modal */}
+      {showQuantityChangedModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowQuantityChangedModal(false)}>
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-md px-6 py-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-col items-center mb-6">
+              <div className="w-16 h-16 rounded-full bg-orange-500 flex items-center justify-center mb-4">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h2 className="text-lg font-bold text-gray-900 mb-2">Boxes Amount Changed</h2>
+              <p className="text-sm text-gray-700 text-center mb-2">
+                {(() => {
+                  const changedCount = orderLines.filter(line => {
+                    const initialQty = line.initialQty || 0;
+                    const currentQty = line.qty || 0;
+                    return initialQty !== currentQty;
+                  }).length;
+                  return `${changedCount} item${changedCount !== 1 ? 's' : ''} ${changedCount !== 1 ? 'have' : 'has'} had a quantity change.`;
+                })()}
+              </p>
+              <p className="text-sm text-gray-700 text-center">
+                Please perform this change to receive your order.
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowQuantityChangedModal(false)}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-white border border-gray-300 transition-colors hover:bg-gray-100"
+              >
+                Go Back
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmQuantityChanged}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 transition-colors hover:bg-blue-700"
+              >
+                Confirm & Receive
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowExportModal(false)}>
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-md px-6 py-6" onClick={(e) => e.stopPropagation()}>
+            {/* Header with title and close button */}
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-bold text-gray-900" style={{ color: '#374151' }}>Export Boxes Order</h2>
+              <button
+                type="button"
+                onClick={() => setShowExportModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label="Close"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* File display area */}
+            <div className="mb-6" style={{
+              border: '1px solid #3B82F6',
+              borderRadius: '8px',
+              backgroundColor: '#E0F2FE',
+              padding: '12px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+            }}>
+              <svg className="w-6 h-6" fill="#3B82F6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" fill="#3B82F6"/>
+                <path d="M14 2v6h6" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span className="text-sm font-medium" style={{ color: '#3B82F6' }}>
+                {getExportFileName()}
+              </span>
+            </div>
+
+            {/* Information message */}
+            <div className="flex items-start gap-3 mb-6">
+              <div className="flex-shrink-0 mt-0.5">
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="10" fill="#3B82F6"/>
+                  <text x="12" y="17" textAnchor="middle" fill="white" fontSize="14" fontWeight="600" fontFamily="Arial, sans-serif">i</text>
+                </svg>
+              </div>
+              <p className="text-sm text-gray-700" style={{ color: '#374151' }}>
+                After submitting to your supplier, click Complete Order to finalize.
+              </p>
+            </div>
+            
+            {/* Action buttons */}
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  handleExportCSV();
+                }}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors"
+                style={{
+                  backgroundColor: '#3B82F6',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#2563EB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#3B82F6';
+                }}
+              >
+                Export as CSV
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowExportModal(false);
+                  handleDone();
+                }}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors"
+                style={{
+                  backgroundColor: '#3B82F6',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#2563EB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#3B82F6';
+                }}
+              >
+                Done
               </button>
             </div>
           </div>
