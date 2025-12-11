@@ -4164,9 +4164,13 @@ def get_shipments(event):
                 status,
                 add_products_completed,
                 formula_check_completed,
+                formula_check_comment,
                 label_check_completed,
+                label_check_comment,
                 sort_products_completed,
                 sort_formulas_completed,
+                book_shipment_completed,
+                carrier,
                 total_units,
                 total_boxes,
                 total_palettes,
@@ -4179,9 +4183,9 @@ def get_shipments(event):
         
         if status:
             query += " WHERE status = %s"
-            cursor.execute(query + " ORDER BY shipment_date DESC", (status,))
+            cursor.execute(query + " ORDER BY created_at DESC, id DESC", (status,))
         else:
-            cursor.execute(query + " ORDER BY shipment_date DESC")
+            cursor.execute(query + " ORDER BY created_at DESC, id DESC")
         
         shipments = cursor.fetchall()
         
@@ -4316,13 +4320,25 @@ def update_shipment(event):
         update_fields = []
         values = []
         
+        # Get existing columns in shipments table to handle migrations gracefully
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns 
+            WHERE table_name = 'shipments'
+        """)
+        existing_columns = {row['column_name'] for row in cursor.fetchall()}
+        
         allowed_fields = [
             'shipment_number', 'shipment_date', 'shipment_type', 
             'marketplace', 'account', 'location', 'status',
             'add_products_completed', 'formula_check_completed',
-            'label_check_completed', 'sort_products_completed',
-            'sort_formulas_completed', 'book_shipment_completed', 'notes'
+            'formula_check_comment', 'label_check_completed',
+            'label_check_comment', 'sort_products_completed',
+            'sort_formulas_completed', 'book_shipment_completed', 
+            'notes', 'carrier'
         ]
+        
+        # Only allow fields that exist in the database
+        allowed_fields = [f for f in allowed_fields if f in existing_columns]
         
         for field in allowed_fields:
             if field in body:
@@ -4354,6 +4370,9 @@ def update_shipment(event):
                 SELECT 
                     sp.quantity,
                     sp.label_location,
+                    sp.brand_name,
+                    sp.product_name,
+                    sp.size,
                     sp.bottle_name,
                     sp.closure_name,
                     sp.formula_name,
@@ -4370,7 +4389,17 @@ def update_shipment(event):
                 quantity = product['quantity'] or 0
                 
                 # Deduct labels from label_inventory
-                if product['label_location']:
+                # Match by unique key (brand_name, product_name, bottle_size) for accuracy
+                if product['brand_name'] and product['product_name'] and product['size']:
+                    cursor.execute("""
+                        UPDATE label_inventory 
+                        SET warehouse_inventory = GREATEST(0, warehouse_inventory - %s)
+                        WHERE brand_name = %s 
+                        AND product_name = %s 
+                        AND bottle_size = %s
+                    """, (quantity, product['brand_name'], product['product_name'], product['size']))
+                # Fallback to label_location if brand/product/size not available
+                elif product['label_location']:
                     cursor.execute("""
                         UPDATE label_inventory 
                         SET warehouse_inventory = GREATEST(0, warehouse_inventory - %s)
@@ -4415,6 +4444,137 @@ def update_shipment(event):
             'success': True,
             'data': shipment,
             'inventory_deducted': booking_shipment
+        })
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def delete_shipment(event):
+    """DELETE /production/shipments/{id} - Delete a shipment and restore inventory if booked"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # Extract shipment ID from pathParameters or from path directly
+        path_params = event.get('pathParameters') or {}
+        if 'id' in path_params:
+            shipment_id = path_params['id']
+        else:
+            # Extract from path: /production/shipments/{id}
+            path = event.get('path') or event.get('rawPath', '')
+            path_parts = path.split('/')
+            # Find 'shipments' and get the next part
+            for i, part in enumerate(path_parts):
+                if part == 'shipments' and i + 1 < len(path_parts):
+                    shipment_id = path_parts[i + 1]
+                    break
+            else:
+                return cors_response(400, {'success': False, 'error': 'Could not extract shipment ID from path'})
+        
+        # Check if shipment exists and if it was booked
+        cursor.execute("""
+            SELECT id, book_shipment_completed 
+            FROM shipments 
+            WHERE id = %s
+        """, (shipment_id,))
+        shipment = cursor.fetchone()
+        
+        if not shipment:
+            return cors_response(404, {
+                'success': False,
+                'error': 'Shipment not found'
+            })
+        
+        # If shipment was booked, restore inventory before deleting
+        if shipment.get('book_shipment_completed'):
+            # Get all products in this shipment to restore inventory
+            cursor.execute("""
+                SELECT 
+                    sp.quantity,
+                    sp.label_location,
+                    sp.brand_name,
+                    sp.product_name,
+                    sp.size,
+                    sp.bottle_name,
+                    sp.closure_name,
+                    sp.formula_name,
+                    sp.formula_gallons_needed,
+                    sp.boxes_needed,
+                    sp.box_type
+                FROM shipment_products sp
+                WHERE sp.shipment_id = %s
+            """, (shipment_id,))
+            
+            products = cursor.fetchall()
+            
+            for product in products:
+                quantity = product['quantity'] or 0
+                
+                # Restore labels to label_inventory
+                # Match by unique key (brand_name, product_name, bottle_size) for accuracy
+                if product['brand_name'] and product['product_name'] and product['size']:
+                    cursor.execute("""
+                        UPDATE label_inventory 
+                        SET warehouse_inventory = warehouse_inventory + %s
+                        WHERE brand_name = %s 
+                        AND product_name = %s 
+                        AND bottle_size = %s
+                    """, (quantity, product['brand_name'], product['product_name'], product['size']))
+                # Fallback to label_location if brand/product/size not available
+                elif product['label_location']:
+                    cursor.execute("""
+                        UPDATE label_inventory 
+                        SET warehouse_inventory = warehouse_inventory + %s
+                        WHERE label_location = %s
+                    """, (quantity, product['label_location']))
+                
+                # Restore bottles to bottle_inventory
+                if product['bottle_name']:
+                    cursor.execute("""
+                        UPDATE bottle_inventory 
+                        SET warehouse_quantity = warehouse_quantity + %s
+                        WHERE bottle_name = %s
+                    """, (quantity, product['bottle_name']))
+                
+                # Restore closures to closure_inventory
+                if product['closure_name']:
+                    cursor.execute("""
+                        UPDATE closure_inventory 
+                        SET warehouse_quantity = warehouse_quantity + %s
+                        WHERE closure_name = %s
+                    """, (quantity, product['closure_name']))
+                
+                # Restore formula to formula_inventory
+                if product['formula_name'] and product['formula_gallons_needed']:
+                    cursor.execute("""
+                        UPDATE formula_inventory 
+                        SET gallons_available = gallons_available + %s
+                        WHERE formula_name = %s
+                    """, (product['formula_gallons_needed'], product['formula_name']))
+                
+                # Restore boxes to box_inventory
+                if product['box_type'] and product['boxes_needed']:
+                    cursor.execute("""
+                        UPDATE box_inventory 
+                        SET warehouse_quantity = warehouse_quantity + %s
+                        WHERE box_type = %s
+                    """, (product['boxes_needed'], product['box_type']))
+        
+        # Delete shipment (CASCADE will handle related records in shipment_products and shipment_formulas)
+        cursor.execute("DELETE FROM shipments WHERE id = %s", (shipment_id,))
+        conn.commit()
+        
+        return cors_response(200, {
+            'success': True,
+            'message': 'Shipment deleted successfully',
+            'inventory_restored': shipment.get('book_shipment_completed', False)
         })
     except Exception as e:
         conn.rollback()
@@ -4665,9 +4825,24 @@ def get_shipment_formula_check(event):
         
         cursor.execute("""
             SELECT 
-                sf.*,
+                sf.id,
+                sf.shipment_id,
+                sf.formula_name,
+                sf.total_gallons_needed,
+                sf.total_products,
+                sf.vessel_type,
+                sf.vessel_quantity,
+                sf.vessel_size_gallons,
+                sf.formula_available,
+                sf.gallons_allocated,
+                COALESCE(sf.is_checked, FALSE) as is_checked,
+                COALESCE(sf.notes, '') as notes,
+                sf.checked_at,
+                sf.checked_by,
+                sf.created_at,
+                sf.updated_at,
                 fi.gallons_available,
-                fi.gallons_allocated,
+                fi.gallons_allocated as fi_gallons_allocated,
                 (fi.gallons_available - COALESCE(fi.gallons_allocated, 0)) as gallons_free
             FROM shipment_formulas sf
             LEFT JOIN formula_inventory fi ON sf.formula_name = fi.formula_name
@@ -4677,18 +4852,156 @@ def get_shipment_formula_check(event):
         
         formulas = cursor.fetchall()
         
-        # Check for shortages
+        # Check for shortages and ensure proper defaults
         for formula in formulas:
             gallons_free = formula.get('gallons_free') or 0
             gallons_needed = formula.get('total_gallons_needed') or 0
             formula['has_shortage'] = gallons_needed > gallons_free
             formula['shortage_amount'] = max(0, gallons_needed - gallons_free)
+            # Ensure is_checked is boolean, not None
+            formula['is_checked'] = bool(formula.get('is_checked', False))
+            # Ensure notes is string, not None
+            formula['notes'] = formula.get('notes') or ''
         
         return cors_response(200, {
             'success': True,
             'data': formulas
         })
     except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def update_shipment_formula_check(event):
+    """PUT /production/shipments/{id}/formula-check - Update formula check status
+    
+    Updates checked status and notes for formulas in a shipment.
+    Body: {
+        checked_formula_ids: [1, 2, 3],  // IDs of formulas that are checked
+        formula_notes: { "1": "note1", "2": "note2" },  // Notes keyed by formula ID
+        uncheck_formula_ids: [4, 5]  // Optional: IDs to explicitly uncheck
+    }
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # Extract shipment ID from pathParameters or from path directly
+        path_params = event.get('pathParameters') or {}
+        if 'id' in path_params:
+            shipment_id = path_params['id']
+        else:
+            # Extract from path: /production/shipments/{id}/formula-check
+            path = event.get('path') or event.get('rawPath', '')
+            path_parts = path.split('/')
+            # Find 'shipments' and get the next part
+            for i, part in enumerate(path_parts):
+                if part == 'shipments' and i + 1 < len(path_parts):
+                    shipment_id = path_parts[i + 1]
+                    break
+            else:
+                return cors_response(400, {'success': False, 'error': 'Could not extract shipment ID from path'})
+        
+        body = json.loads(event.get('body', '{}'))
+        
+        checked_formula_ids = body.get('checked_formula_ids', [])
+        uncheck_formula_ids = body.get('uncheck_formula_ids', [])
+        formula_notes = body.get('formula_notes', {})
+        checked_by = body.get('checked_by')
+        
+        # Check if new columns exist (migration may not have run yet)
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns 
+            WHERE table_name = 'shipment_formulas'
+        """)
+        existing_columns = {row['column_name'] for row in cursor.fetchall()}
+        has_is_checked = 'is_checked' in existing_columns
+        has_notes = 'notes' in existing_columns
+        
+        # Update checked formulas (only if columns exist)
+        if checked_formula_ids and has_is_checked:
+            cursor.execute("""
+                UPDATE shipment_formulas
+                SET is_checked = TRUE,
+                    checked_at = CURRENT_TIMESTAMP,
+                    checked_by = %s
+                WHERE shipment_id = %s AND id = ANY(%s)
+            """, (checked_by, shipment_id, checked_formula_ids))
+        
+        # Update unchecked formulas (only if columns exist)
+        if uncheck_formula_ids and has_is_checked:
+            cursor.execute("""
+                UPDATE shipment_formulas
+                SET is_checked = FALSE,
+                    checked_at = NULL,
+                    checked_by = NULL
+                WHERE shipment_id = %s AND id = ANY(%s)
+            """, (shipment_id, uncheck_formula_ids))
+        
+        # Update notes for each formula (only if column exists)
+        if has_notes:
+            for formula_id, note in formula_notes.items():
+                cursor.execute("""
+                    UPDATE shipment_formulas
+                    SET notes = %s
+                    WHERE shipment_id = %s AND id = %s
+                """, (note, shipment_id, formula_id))
+        
+        conn.commit()
+        
+        # Return updated formula check data
+        cursor.execute("""
+            SELECT 
+                sf.id,
+                sf.shipment_id,
+                sf.formula_name,
+                sf.total_gallons_needed,
+                sf.total_products,
+                sf.vessel_type,
+                sf.vessel_quantity,
+                sf.vessel_size_gallons,
+                sf.formula_available,
+                sf.gallons_allocated,
+                COALESCE(sf.is_checked, FALSE) as is_checked,
+                COALESCE(sf.notes, '') as notes,
+                sf.checked_at,
+                sf.checked_by,
+                sf.created_at,
+                sf.updated_at,
+                fi.gallons_available,
+                fi.gallons_allocated as fi_gallons_allocated,
+                (fi.gallons_available - COALESCE(fi.gallons_allocated, 0)) as gallons_free
+            FROM shipment_formulas sf
+            LEFT JOIN formula_inventory fi ON sf.formula_name = fi.formula_name
+            WHERE sf.shipment_id = %s
+            ORDER BY sf.formula_name
+        """, (shipment_id,))
+        
+        formulas = cursor.fetchall()
+        
+        # Check for shortages and ensure proper defaults
+        for formula in formulas:
+            gallons_free = formula.get('gallons_free') or 0
+            gallons_needed = formula.get('total_gallons_needed') or 0
+            formula['has_shortage'] = gallons_needed > gallons_free
+            formula['shortage_amount'] = max(0, gallons_needed - gallons_free)
+            # Ensure is_checked is boolean, not None
+            formula['is_checked'] = bool(formula.get('is_checked', False))
+            # Ensure notes is string, not None
+            formula['notes'] = formula.get('notes') or ''
+        
+        return cors_response(200, {
+            'success': True,
+            'data': formulas,
+            'message': 'Formula check status updated'
+        })
+    except Exception as e:
+        conn.rollback()
         import traceback
         return cors_response(500, {
             'success': False,
@@ -5480,9 +5793,14 @@ def lambda_handler(event, context):
         elif http_method == 'GET' and (path.endswith('/production/labels/availability') or path.endswith('/production/labels-availability')):
             return get_labels_availability(event)
         
-        # Shipment endpoints
+        # Shipment endpoints - formula-check (must come before generic shipment routes)
         elif http_method == 'GET' and '/production/shipments/' in path and '/formula-check' in path:
+            print(f"Routing to get_shipment_formula_check")
             return get_shipment_formula_check(event)
+        
+        elif http_method == 'PUT' and '/production/shipments/' in path and '/formula-check' in path:
+            print(f"Routing to update_shipment_formula_check")
+            return update_shipment_formula_check(event)
         
         elif http_method == 'GET' and '/production/shipments/' in path and '/products' in path:
             return get_shipment_products(event)
@@ -5495,6 +5813,9 @@ def lambda_handler(event, context):
         
         elif http_method == 'PUT' and '/production/shipments/' in path:
             return update_shipment(event)
+        
+        elif http_method == 'DELETE' and '/production/shipments/' in path:
+            return delete_shipment(event)
         
         elif http_method == 'GET' and path.endswith('/production/shipments'):
             return get_shipments(event)

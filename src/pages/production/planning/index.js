@@ -8,7 +8,7 @@ import ShipmentsTable from './components/ShipmentsTable';
 import NewShipmentModal from './components/NewShipmentModal';
 import LabelCheckCommentModal from '../new-shipment/components/LabelCheckCommentModal';
 import StatusCommentModal from './components/StatusCommentModal';
-import { getAllShipments, createShipment, updateShipment, getShipmentProducts } from '../../../services/productionApi';
+import { getAllShipments, createShipment, updateShipment, deleteShipment, getShipmentProducts } from '../../../services/productionApi';
 
 const Planning = () => {
   const { isDarkMode } = useTheme();
@@ -155,10 +155,11 @@ const Planning = () => {
       const data = await getAllShipments();
       // Transform API data to match your table format
       const formattedShipments = data.map(shipment => {
-        const { hasComment: hasFormulaComment, commentText: formulaCommentText } =
-          extractComment(shipment.notes || '', 'formula check comment');
-        const { hasComment: hasLabelComment, commentText: labelCommentText } =
-          extractComment(shipment.notes || '', 'label check comment');
+        // Use dedicated comment columns from backend
+        const hasFormulaComment = !!(shipment.formula_check_comment && shipment.formula_check_comment.trim());
+        const formulaCommentText = shipment.formula_check_comment || '';
+        const hasLabelComment = !!(shipment.label_check_comment && shipment.label_check_comment.trim());
+        const labelCommentText = shipment.label_check_comment || '';
 
         return {
         id: shipment.id,
@@ -168,7 +169,9 @@ const Planning = () => {
         marketplace: shipment.marketplace || 'Amazon',
         account: shipment.account || 'TPS Nutrients',
         addProducts: shipment.add_products_completed ? 'completed' : 'pending',
+        // If formula_check_completed is false but has comment, show as 'pending' (will display orange)
         formulaCheck: shipment.formula_check_completed ? 'completed' : 'pending',
+        // If label_check_completed is false but has comment, show as 'pending' (will display orange)
         labelCheck: shipment.label_check_completed ? 'completed' : 'pending',
         bookShipment: shipment.book_shipment_completed ? 'completed' : 'pending',
         sortProducts: shipment.sort_products_completed ? 'completed' : 'pending',
@@ -177,6 +180,7 @@ const Planning = () => {
           formulaCheckCommentText: formulaCommentText,
           labelCheckComment: hasLabelComment,
           labelCheckCommentText: labelCommentText,
+          createdAt: shipment.created_at, // Store timestamp for sorting
         };
       });
       setShipments(formattedShipments);
@@ -643,6 +647,17 @@ const Planning = () => {
     });
   };
 
+  const handleDeleteRow = async (row) => {
+    try {
+      await deleteShipment(row.id);
+      // Refresh the shipments list after deletion
+      await fetchShipments();
+    } catch (error) {
+      console.error('Error deleting shipment:', error);
+      alert('Failed to delete shipment. Please try again.');
+    }
+  };
+
   return (
     <div className={`min-h-screen ${themeClasses.pageBg}`}>
       <PlanningHeader
@@ -688,6 +703,7 @@ const Planning = () => {
                 onRowClick={handleRowClick}
                 onLabelCheckClick={handleLabelCheckClick}
                 onStatusCommentClick={handleStatusCommentClick}
+                onDeleteRow={handleDeleteRow}
               />
             )}
           </>

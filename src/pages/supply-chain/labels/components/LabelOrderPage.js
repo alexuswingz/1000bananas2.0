@@ -148,59 +148,8 @@ const LabelOrderPage = () => {
               daily_sales_rate: l.daily_sales_rate,
             })));
             
-            // Map bottle_size to label_size based on FinishedGoodsDatabase
-            const getLabelSizeFromBottleSize = (bottleSize) => {
-              const size = (bottleSize || '').toLowerCase();
-              if (size.includes('8oz') || size === '8oz') return '5" x 8"';
-              if (size.includes('quart') || size === 'quart') return '5" x 8"';
-              if (size.includes('gallon') || size === 'gallon' || size === '1 gallon') return '5" x 8"';
-              if (size.includes('3oz') || size === '3oz spray') return '4.5" x 3.375"';
-              if (size.includes('6oz') || size === '6oz spray') return '5.375" x 4.5"';
-              if (size.includes('16oz')) return '5" x 8"';
-              return '5" x 8"'; // Default
-            };
-            
-<<<<<<< Updated upstream
-            const transformed = response.data
-              .map(label => {
-                // Calculate suggested order quantity using the formula
-                const suggestedQty = calculateSuggestedOrderQty(label);
-                
-                // Use label_size from API, or derive from bottle_size
-                const labelSize = label.label_size || getLabelSizeFromBottleSize(label.bottle_size);
-                
-                // Calculate current DOI (Days of Inventory)
-                // DOI = current_inventory / daily_sales_rate
-                // Lower DOI = more urgent to order
-                const currentInventory = label.warehouse_inventory || 0;
-                const dailySalesRate = label.daily_sales_rate || 0;
-                const currentDOI = dailySalesRate > 0 
-                  ? Math.round(currentInventory / dailySalesRate)
-                  : currentInventory > 0 ? 999 : 0; // If no sales data but has inventory, put at end; if no inventory, prioritize
-                
-                return {
-                  id: label.id,
-                  brand: label.brand_name,
-                  product: label.product_name,
-                  size: label.bottle_size,
-                  labelSize: labelSize,
-                  qty: suggestedQty, // Auto-populate with calculated quantity
-                  labelStatus: label.label_status || 'Up to Date',
-                  inventory: label.warehouse_inventory || 0,
-                  toOrder: suggestedQty, // Also set toOrder
-                  googleDriveLink: label.google_drive_link,
-                  added: false,
-                  dailySalesRate: dailySalesRate, // Store for reference
-                  suggestedQty: suggestedQty, // Store original suggestion
-                  currentDOI: currentDOI, // Store current DOI for sorting
-                };
-              })
-              // Sort by inventory ascending (lowest inventory first = most urgent)
-              .sort((a, b) => (a.inventory || 0) - (b.inventory || 0));
-=======
             const transformed = transformLabelsToLines(response.data);
             setInventoryLabels(response.data);
->>>>>>> Stashed changes
             setAllLines(transformed);
           }
         } catch (err) {

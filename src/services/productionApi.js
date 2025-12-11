@@ -310,6 +310,33 @@ export const updateShipment = async (shipmentId, updates) => {
 };
 
 /**
+ * Delete a shipment
+ * @param {string|number} shipmentId - The shipment ID
+ * @returns {Promise<Object>} Deletion result
+ */
+export const deleteShipment = async (shipmentId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/production/shipments/${shipmentId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to delete shipment');
+    }
+    
+    return data;
+  } catch (error) {
+    console.error(`Error deleting shipment ${shipmentId}:`, error);
+    throw error;
+  }
+};
+
+/**
  * Add products to a shipment
  * @param {string|number} shipmentId - The shipment ID
  * @param {Array} products - Array of products with catalog_id and quantity
@@ -376,6 +403,39 @@ export const getShipmentFormulaCheck = async (shipmentId) => {
     return data.data;
   } catch (error) {
     console.error(`Error fetching formula check for shipment ${shipmentId}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Update formula check status for a shipment
+ * @param {string|number} shipmentId - The shipment ID
+ * @param {Object} updates - Updates to apply
+ * @param {Array<number>} updates.checked_formula_ids - IDs of formulas that are checked
+ * @param {Array<number>} updates.uncheck_formula_ids - IDs of formulas to uncheck
+ * @param {Object} updates.formula_notes - Notes keyed by formula ID
+ * @param {string} updates.checked_by - User who made the changes
+ * @returns {Promise<Array>} Updated array of formulas
+ */
+export const updateShipmentFormulaCheck = async (shipmentId, updates) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/production/shipments/${shipmentId}/formula-check`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updates),
+    });
+    
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to update formula check status');
+    }
+    
+    return data.data;
+  } catch (error) {
+    console.error(`Error updating formula check for shipment ${shipmentId}:`, error);
     throw error;
   }
 };
@@ -530,9 +590,11 @@ export default {
   getAllShipments,
   getShipmentById,
   updateShipment,
+  deleteShipment,
   addShipmentProducts,
   getShipmentProducts,
   getShipmentFormulaCheck,
+  updateShipmentFormulaCheck,
   getLabelsAvailability,
   
   // Products & Inventory

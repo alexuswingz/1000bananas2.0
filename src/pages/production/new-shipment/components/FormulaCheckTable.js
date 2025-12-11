@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
-import { getShipmentFormulaCheck } from '../../../../services/productionApi';
+import { getShipmentFormulaCheck, updateShipmentFormulaCheck } from '../../../../services/productionApi';
 
 const FormulaCheckTable = ({
   shipmentId,
@@ -22,53 +22,61 @@ const FormulaCheckTable = ({
   const [notes, setNotes] = useState({}); // Store notes by formula ID
   const [notesModalOpen, setNotesModalOpen] = useState(false);
   const [selectedFormulaForNotes, setSelectedFormulaForNotes] = useState(null);
-
-  // Keep selected rows in sync with parent so navigating away preserves checkmarks
-  useEffect(() => {
-    if (externalSelectedRows instanceof Set) {
-      setSelectedRows(new Set(externalSelectedRows));
-    } else if (Array.isArray(externalSelectedRows)) {
-      setSelectedRows(new Set(externalSelectedRows));
-    }
-  }, [externalSelectedRows]);
+  const [dataLoaded, setDataLoaded] = useState(false); // Track if we've loaded from backend
 
   // Load formula data from API
   useEffect(() => {
     if (shipmentId) {
+      setDataLoaded(false); // Reset when shipment changes
       loadFormulaData();
-      loadNotes();
     }
   }, [shipmentId]);
 
-  // Load notes from localStorage
-  const loadNotes = () => {
-    if (shipmentId) {
-      try {
-        const storedNotes = localStorage.getItem(`formula_notes_${shipmentId}`);
-        if (storedNotes) {
-          setNotes(JSON.parse(storedNotes));
-        }
-      } catch (error) {
-        console.error('Error loading notes:', error);
+  // Only sync with parent selectedRows if we haven't loaded from backend yet
+  // Once backend data is loaded, backend is the source of truth
+  useEffect(() => {
+    if (!dataLoaded && externalSelectedRows) {
+      if (externalSelectedRows instanceof Set) {
+        setSelectedRows(new Set(externalSelectedRows));
+      } else if (Array.isArray(externalSelectedRows)) {
+        setSelectedRows(new Set(externalSelectedRows));
       }
     }
-  };
+  }, [externalSelectedRows, dataLoaded]);
 
-  // Save notes to localStorage
-  const saveNotes = (formulaId, noteText) => {
+  // Save notes to backend
+  const saveNotes = useCallback(async (formulaId, noteText) => {
     const updatedNotes = {
       ...notes,
       [formulaId]: noteText
     };
     setNotes(updatedNotes);
+    
+    // Persist to backend
     if (shipmentId) {
       try {
-        localStorage.setItem(`formula_notes_${shipmentId}`, JSON.stringify(updatedNotes));
+        await updateShipmentFormulaCheck(shipmentId, {
+          formula_notes: { [formulaId]: noteText }
+        });
       } catch (error) {
-        console.error('Error saving notes:', error);
+        console.error('Error saving notes to backend:', error);
       }
     }
-  };
+  }, [notes, shipmentId]);
+
+  // Save checked status to backend
+  const saveCheckedStatus = useCallback(async (formulaId, isChecked) => {
+    if (!shipmentId) return;
+    
+    try {
+      await updateShipmentFormulaCheck(shipmentId, {
+        checked_formula_ids: isChecked ? [formulaId] : [],
+        uncheck_formula_ids: isChecked ? [] : [formulaId]
+      });
+    } catch (error) {
+      console.error('Error saving checked status to backend:', error);
+    }
+  }, [shipmentId]);
 
   // Calculate manufacturing volume with spillage and rounding
   // Formula: Round to nearest 5 gallons after adding 8% spillage factor
@@ -107,13 +115,38 @@ const FormulaCheckTable = ({
           gallonsFree: formula.gallons_free,
           hasShortage: formula.has_shortage,
           shortageAmount: formula.shortage_amount,
+          isChecked: formula.is_checked || false, // Load checked status from backend
+          notes: formula.notes || '', // Load notes from backend
         };
       });
       
       setFormulas(formattedFormulas);
+      
+      // Always initialize selectedRows from backend data (formulas that are checked)
+      // This ensures checked formulas remain checked when reopening the table
+      const checkedIds = new Set(
+        formattedFormulas.filter(f => f.isChecked).map(f => f.id)
+      );
+      setSelectedRows(checkedIds);
+      if (onSelectedRowsChange) {
+        onSelectedRowsChange(checkedIds);
+      }
+      
+      // Initialize notes from backend data
+      const loadedNotes = {};
+      formattedFormulas.forEach(f => {
+        if (f.notes) {
+          loadedNotes[f.id] = f.notes;
+        }
+      });
+      setNotes(loadedNotes); // Replace notes with backend data, don't merge
+      
+      // Mark data as loaded so parent state doesn't override backend data
+      setDataLoaded(true);
     } catch (error) {
       console.error('Error loading formula data:', error);
       setFormulas([]);
+      setDataLoaded(true); // Still mark as loaded even on error to prevent parent override
     } finally {
       setLoading(false);
     }
@@ -193,11 +226,17 @@ const FormulaCheckTable = ({
   const handleCheckboxChange = (id) => {
     setSelectedRows(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
-      } else {
+      const isNowChecked = !newSet.has(id);
+      
+      if (isNowChecked) {
         newSet.add(id);
+      } else {
+        newSet.delete(id);
       }
+      
+      // Persist to backend
+      saveCheckedStatus(id, isNowChecked);
+      
       if (onSelectedRowsChange) onSelectedRowsChange(newSet);
       return newSet;
     });

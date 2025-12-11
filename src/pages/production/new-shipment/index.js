@@ -520,6 +520,14 @@ const NewShipment = () => {
       if (data.sort_formulas_completed) completed.add('sort-formulas');
       setCompletedTabs(completed);
       
+      // Set comment flags from backend data
+      if (data.formula_check_comment) {
+        setFormulaCheckHasComment(true);
+      }
+      if (data.label_check_comment) {
+        setLabelCheckHasComment(true);
+      }
+      
       // Load products and quantities
       if (data.products && data.products.length > 0) {
         // Transform products to Set of IDs for addedRows
@@ -980,21 +988,9 @@ const NewShipment = () => {
           status: 'label_check',
         };
     
-    // Add comment to notes if provided
+    // Store comment in dedicated formula_check_comment column
     if (hasComment) {
-      // Get existing notes and append the comment
-      try {
-        const shipment = await getShipmentById(shipmentId);
-        const existingNotes = shipment?.notes || '';
-        const newNotes = existingNotes 
-          ? `${existingNotes}\n\nFormula Check Comment: ${comment.trim()}`
-          : `Formula Check Comment: ${comment.trim()}`;
-        updateData.notes = newNotes;
-      } catch (error) {
-        console.error('Error fetching shipment notes:', error);
-        // If we can't fetch, just set the comment
-        updateData.notes = `Formula Check Comment: ${comment.trim()}`;
-      }
+      updateData.formula_check_comment = comment.trim();
     }
     
     await updateShipment(shipmentId, updateData);
@@ -1034,18 +1030,9 @@ const NewShipment = () => {
           status: 'book_shipment',
         };
 
+    // Store comment in dedicated label_check_comment column
     if (hasComment) {
-      try {
-        const shipment = await getShipmentById(shipmentId);
-        const existingNotes = shipment?.notes || '';
-        const newNotes = existingNotes
-          ? `${existingNotes}\n\nLabel Check Comment: ${comment.trim()}`
-          : `Label Check Comment: ${comment.trim()}`;
-        updateData.notes = newNotes;
-      } catch (error) {
-        console.error('Error fetching shipment notes:', error);
-        updateData.notes = `Label Check Comment: ${comment.trim()}`;
-      }
+      updateData.label_check_comment = comment.trim();
     }
 
     await updateShipment(shipmentId, updateData);

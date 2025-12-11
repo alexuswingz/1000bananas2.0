@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
-const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabelCheckClick, onStatusCommentClick }) => {
+const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabelCheckClick, onStatusCommentClick, onDeleteRow }) => {
   const { isDarkMode } = useTheme();
   const [openFilterColumn, setOpenFilterColumn] = useState(null);
   const filterIconRefs = useRef({});
@@ -12,6 +12,9 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
   const [hoveredCommentId, setHoveredCommentId] = useState(null);
   const iconRefs = useRef({});
   const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
+  const [openActionMenu, setOpenActionMenu] = useState(null); // Track which row's menu is open
+  const actionMenuRefs = useRef({});
+  const actionMenuDropdownRef = useRef(null);
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -410,6 +413,36 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
     }
   }, [openFilterColumn]);
 
+  // Close action menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (openActionMenu !== null) {
+        const menuIcon = actionMenuRefs.current[openActionMenu];
+        const dropdown = actionMenuDropdownRef.current;
+        
+        if (menuIcon && dropdown) {
+          const isClickInsideIcon = menuIcon.contains(event.target);
+          const isClickInsideDropdown = dropdown.contains(event.target);
+          
+          if (!isClickInsideIcon && !isClickInsideDropdown) {
+            setOpenActionMenu(null);
+          }
+        }
+      }
+    };
+
+    if (openActionMenu !== null) {
+      const timeoutId = setTimeout(() => {
+        document.addEventListener('click', handleClickOutside);
+      }, 0);
+      
+      return () => {
+        clearTimeout(timeoutId);
+        document.removeEventListener('click', handleClickOutside);
+      };
+    }
+  }, [openActionMenu]);
+
   // Handle filter icon click
   const handleFilterClick = (columnKey, e) => {
     e.stopPropagation();
@@ -473,6 +506,15 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
     // Apply sorting
     if (sortConfig.field && sortConfig.order) {
       filteredRows.sort((a, b) => {
+        // Special handling for timestamp sorting
+        if (sortConfig.field === 'createdAt' && a.createdAt && b.createdAt) {
+          const aDate = new Date(a.createdAt);
+          const bDate = new Date(b.createdAt);
+          return sortConfig.order === 'asc' 
+            ? aDate - bDate 
+            : bDate - aDate;
+        }
+        
         const aVal = String(a[sortConfig.field] || '').toLowerCase();
         const bVal = String(b[sortConfig.field] || '').toLowerCase();
         
@@ -481,6 +523,17 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         } else {
           return bVal.localeCompare(aVal);
         }
+      });
+    } else {
+      // Default sort by created_at DESC (newest first) when no user sort is applied
+      filteredRows.sort((a, b) => {
+        if (a.createdAt && b.createdAt) {
+          const aDate = new Date(a.createdAt);
+          const bDate = new Date(b.createdAt);
+          return bDate - aDate; // Newest first
+        }
+        // Fallback to ID if no timestamp
+        return (b.id || 0) - (a.id || 0);
       });
     }
 
@@ -1198,21 +1251,46 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                   backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
                   borderTop: '1px solid #E5E7EB',
                   height: '40px',
+                  position: 'relative',
                 }}
               >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke={isDarkMode ? '#9CA3AF' : '#6B7280'}
-                  strokeWidth="2"
-                  style={{ cursor: 'pointer' }}
-                >
-                  <circle cx="12" cy="12" r="1" />
-                  <circle cx="12" cy="5" r="1" />
-                  <circle cx="12" cy="19" r="1" />
-                </svg>
+                <div style={{ position: 'relative', display: 'inline-block' }}>
+                  <svg
+                    ref={(el) => { if (el) actionMenuRefs.current[row.id] = el; }}
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke={isDarkMode ? '#9CA3AF' : '#6B7280'}
+                    strokeWidth="2"
+                    style={{ cursor: 'pointer' }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenActionMenu(openActionMenu === row.id ? null : row.id);
+                    }}
+                  >
+                    <circle cx="12" cy="12" r="1" />
+                    <circle cx="12" cy="5" r="1" />
+                    <circle cx="12" cy="19" r="1" />
+                  </svg>
+                  
+                  {/* Action Menu Dropdown */}
+                  {openActionMenu === row.id && (
+                    <ActionMenuDropdown
+                      ref={actionMenuDropdownRef}
+                      row={row}
+                      menuIconRef={actionMenuRefs.current[row.id]}
+                      onClose={() => setOpenActionMenu(null)}
+                      onDelete={() => {
+                        if (onDeleteRow) {
+                          onDeleteRow(row);
+                        }
+                        setOpenActionMenu(null);
+                      }}
+                      isDarkMode={isDarkMode}
+                    />
+                  )}
+                </div>
               </td>
             </tr>
           ))}
@@ -1622,5 +1700,100 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
 });
 
 FilterDropdown.displayName = 'FilterDropdown';
+
+// ActionMenuDropdown Component
+const ActionMenuDropdown = React.forwardRef(({ row, menuIconRef, onClose, onDelete, isDarkMode }, ref) => {
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (menuIconRef) {
+      const rect = menuIconRef.getBoundingClientRect();
+      const dropdownWidth = 150;
+      const dropdownHeight = 50;
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      
+      let left = rect.right + 8; // Position to the right of the icon
+      let top = rect.top;
+      
+      // Adjust if dropdown goes off right edge
+      if (left + dropdownWidth > viewportWidth) {
+        left = rect.left - dropdownWidth - 8; // Position to the left instead
+      }
+      
+      // Adjust if dropdown goes off bottom
+      if (top + dropdownHeight > viewportHeight) {
+        top = viewportHeight - dropdownHeight - 16;
+      }
+      
+      // Don't go off left edge
+      if (left < 16) {
+        left = 16;
+      }
+      
+      // Don't go off top edge
+      if (top < 16) {
+        top = 16;
+      }
+      
+      setPosition({ top, left });
+    }
+  }, [menuIconRef]);
+
+  return createPortal(
+    <div
+      ref={ref}
+      style={{
+        position: 'fixed',
+        top: `${position.top}px`,
+        left: `${position.left}px`,
+        width: '150px',
+        backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+        borderRadius: '8px',
+        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+        border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+        zIndex: 10001,
+        padding: '4px',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (window.confirm(`Are you sure you want to delete shipment "${row.shipment}"? This action cannot be undone.`)) {
+            onDelete();
+          }
+        }}
+        style={{
+          padding: '8px 12px',
+          borderRadius: '4px',
+          border: 'none',
+          backgroundColor: 'transparent',
+          color: '#EF4444',
+          fontSize: '14px',
+          fontWeight: 500,
+          cursor: 'pointer',
+          textAlign: 'left',
+          width: '100%',
+          transition: 'background-color 0.2s',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'transparent';
+        }}
+      >
+        Delete
+      </button>
+    </div>,
+    document.body
+  );
+});
+
+ActionMenuDropdown.displayName = 'ActionMenuDropdown';
 
 export default PlanningTable;
