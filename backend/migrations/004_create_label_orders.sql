@@ -81,3 +81,4 @@ COMMENT ON COLUMN label_costs.price_per_thousand IS 'Price per 1,000 labels';
 
 
 
+
