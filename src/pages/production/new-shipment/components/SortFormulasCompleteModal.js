@@ -12,13 +12,7 @@ const SortFormulasCompleteModal = ({ isOpen, onClose, onGoToShipments, shipmentD
       onGoToShipments();
     }
     onClose();
-    // Return to the Planning table view inside the dashboard shell with shipment info
-    navigate('/dashboard/production/planning', { 
-      state: { 
-        showBookedToast: true,
-        shipmentInfo: shipmentData 
-      } 
-    });
+    // Navigation disabled per request
   };
 
   return (

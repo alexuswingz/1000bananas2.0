@@ -346,6 +346,8 @@ const FormulaCheckTable = ({
             ).map((formula, index) => {
               // Find the original index for styling
               const originalIndex = displayFormulas.findIndex(f => f.id === formula.id);
+              const hasNote = !!notes[formula.id];
+
               return (
               <tr
                 key={formula.id}
@@ -379,6 +381,7 @@ const FormulaCheckTable = ({
                       width: '16px',
                       height: '16px',
                       cursor: 'pointer',
+                      accentColor: hasNote ? '#F59E0B' : undefined, // turn orange when a comment/note exists
                     }}
                   />
                 </td>

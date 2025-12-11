@@ -2,7 +2,21 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
-const NewShipmentHeader = ({ tableMode, onTableModeToggle, onReviewShipmentClick, onCompleteClick, shipmentData, dataAsOfDate, totalUnits = 0, totalBoxes = 0, activeAction = 'add-products', onActionChange, completedTabs = new Set() }) => {
+const NewShipmentHeader = ({
+  tableMode,
+  onTableModeToggle,
+  onReviewShipmentClick,
+  onCompleteClick,
+  shipmentData,
+  dataAsOfDate,
+  totalUnits = 0,
+  totalBoxes = 0,
+  activeAction = 'add-products',
+  onActionChange,
+  completedTabs = new Set(),
+  formulaCheckHasComment = false,
+  labelCheckHasComment = false,
+}) => {
   const navigate = useNavigate();
   const { isDarkMode } = useTheme();
   const [showDropdown, setShowDropdown] = useState(false);
@@ -898,6 +912,10 @@ const NewShipmentHeader = ({ tableMode, onTableModeToggle, onReviewShipmentClick
             <svg width="16" height="16" viewBox="0 0 24 24" fill="#10B981">
               <circle cx="12" cy="12" r="6"/>
             </svg>
+          ) : formulaCheckHasComment ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#F59E0B">
+              <circle cx="12" cy="12" r="6"/>
+            </svg>
           ) : activeAction === 'formula-check' ? (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="#007AFF">
               <circle cx="12" cy="12" r="6"/>
@@ -930,6 +948,10 @@ const NewShipmentHeader = ({ tableMode, onTableModeToggle, onReviewShipmentClick
         >
           {completedTabs.has('label-check') ? (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="#10B981">
+              <circle cx="12" cy="12" r="6"/>
+            </svg>
+          ) : labelCheckHasComment ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#F59E0B">
               <circle cx="12" cy="12" r="6"/>
             </svg>
           ) : activeAction === 'label-check' ? (

@@ -148,7 +148,11 @@ const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
           className="divide-y"
           style={{ borderColor: isDarkMode ? 'rgba(75, 85, 99, 0.3)' : '#f3f4f6' }}
         >
-          {shipments.map((row) => (
+          {shipments.map((row) => {
+            const hasComment = row.formulaCheckComment || row.labelCheckComment;
+            const statusColor = hasComment ? '#F59E0B' : (row.statusColor || '#10B981');
+
+            return (
             <tr
               key={row.id}
               className={`${themeClasses.rowHover} transition-colors duration-150`}
@@ -183,27 +187,32 @@ const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
                     }}
                   >
                     {/* Status icon */}
+                    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
                     <svg
                       style={{ width: '1rem', height: '1rem' }}
+                        viewBox="0 0 24 24"
+                        fill={statusColor}
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <circle cx="12" cy="12" r="8" fill={statusColor} />
+                      </svg>
+                      {hasComment && (
+                        <svg
+                          style={{ width: '0.65rem', height: '0.65rem', position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}
                       viewBox="0 0 24 24"
                       fill="none"
                       xmlns="http://www.w3.org/2000/svg"
                     >
                       <path
-                        d="M4 7.5L12 3L20 7.5V16.5L12 21L4 16.5V7.5Z"
-                        stroke={row.statusColor}
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <path
-                        d="M9.5 12.5L11 14L14.5 10.5"
-                        stroke={row.statusColor}
-                        strokeWidth="1.8"
+                            d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"
+                            stroke="#FFFFFF"
+                            strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       />
                     </svg>
+                      )}
+                    </div>
                     <span>{row.status}</span>
                   </span>
                   {/* Chevron */}
@@ -282,7 +291,8 @@ const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
                 </button>
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
       

@@ -136,30 +136,30 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
 
   // Render status circle based on status
   const renderStatusCircle = (status, hasComment = false, commentText = '', rowId = null, commentData = {}, statusFieldName = null, row = null) => {
+    const normalizedStatus = status?.toLowerCase();
     let circleColor;
     let borderStyle = 'none';
-    
-    // If has comment, always show orange
-    if (hasComment) {
+
+    switch (normalizedStatus) {
+      case 'pending':
+        circleColor = '#FFFFFF'; // White/transparent
+        borderStyle = '1px solid #D1D5DB'; // Light gray outline
+        break;
+      case 'in progress':
+        circleColor = '#3B82F6'; // Blue for in progress
+        break;
+      case 'completed':
+        circleColor = '#10B981'; // Green
+        break;
+      default:
+        circleColor = '#FFFFFF'; // Default to white (Pending)
+        borderStyle = '1px solid #D1D5DB'; // Light gray outline
+    }
+
+    // Force orange when there's an outstanding comment on label or formula check
+    if (hasComment && (statusFieldName === 'labelCheck' || statusFieldName === 'formulaCheck')) {
       circleColor = '#F59E0B'; // Orange for comment/incomplete
       borderStyle = 'none';
-    } else {
-      switch (status?.toLowerCase()) {
-        case 'pending':
-          circleColor = '#FFFFFF'; // White/transparent
-          borderStyle = '1px solid #D1D5DB'; // Light gray outline
-          break;
-        case 'in progress':
-          // Check if this is for label check - show orange for insufficient labels
-          circleColor = '#3B82F6'; // Blue for other in progress
-          break;
-        case 'completed':
-          circleColor = '#10B981'; // Green
-          break;
-        default:
-          circleColor = '#FFFFFF'; // Default to white (Pending)
-          borderStyle = '1px solid #D1D5DB'; // Light gray outline
-      }
     }
 
     // Create unique identifier for this status field in this row

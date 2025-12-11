@@ -11,8 +11,7 @@ const LabelCheckCompleteModal = ({ isOpen, onClose, onGoToShipments }) => {
       onGoToShipments();
     }
     onClose();
-    // Navigate to planning page
-    navigate('/dashboard/production/planning');
+    // Stay on page: navigation disabled per request
   };
 
   return (

@@ -23,6 +23,7 @@ import SortFormulasCompleteModal from './components/SortFormulasCompleteModal';
 import VarianceExceededModal from './components/VarianceExceededModal';
 import UncheckedFormulaModal from './components/UncheckedFormulaModal';
 import FormulaCheckCommentModal from './components/FormulaCheckCommentModal';
+import LabelCheckCommentModal from './components/LabelCheckCommentModal';
 
 // Account to Brand mapping based on Amazon Seller Account Structure
 // Each account can only sell specific brands
@@ -35,6 +36,8 @@ const ACCOUNT_BRAND_MAPPING = {
 const getAllowedBrandsForAccount = (account) => {
   return ACCOUNT_BRAND_MAPPING[account] || [];
 };
+
+const knownCarriers = ['WeShip', 'TopCarrier', 'Worldwide Express'];
 
 const NewShipment = () => {
   const { isDarkMode } = useTheme();
@@ -56,6 +59,17 @@ const NewShipment = () => {
   const [isUncheckedFormulaOpen, setIsUncheckedFormulaOpen] = useState(false);
   const [uncheckedFormulaCount, setUncheckedFormulaCount] = useState(0);
   const [isFormulaCheckCommentOpen, setIsFormulaCheckCommentOpen] = useState(false);
+  const [isFormulaIncompleteComment, setIsFormulaIncompleteComment] = useState(false);
+  const [formulaCheckHasComment, setFormulaCheckHasComment] = useState(false);
+  const [isLabelCheckCommentOpen, setIsLabelCheckCommentOpen] = useState(false);
+  const [isLabelIncompleteComment, setIsLabelIncompleteComment] = useState(false);
+  const [labelCheckHasComment, setLabelCheckHasComment] = useState(false);
+  const [selectedCarrier, setSelectedCarrier] = useState('');
+  const [isCarrierDropdownOpen, setIsCarrierDropdownOpen] = useState(false);
+  const [customCarrierName, setCustomCarrierName] = useState('');
+  const carrierDropdownRef = useRef(null);
+  const carrierButtonRef = useRef(null);
+  const [carrierDropdownPos, setCarrierDropdownPos] = useState({ top: 0, left: 0, width: 0 });
   const [isRecountMode, setIsRecountMode] = useState(false);
   const [varianceExceededRowIds, setVarianceExceededRowIds] = useState([]);
   const [labelCheckRows, setLabelCheckRows] = useState([]);
@@ -118,6 +132,17 @@ const NewShipment = () => {
       };
     }
   }, [isTooltipPinned, showDOITooltip]);
+
+  // Close carrier dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (isCarrierDropdownOpen && carrierDropdownRef.current && !carrierDropdownRef.current.contains(e.target)) {
+        setIsCarrierDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isCarrierDropdownOpen]);
   
   // Generate unique shipment number
   const generateShipmentNumber = () => {
@@ -435,7 +460,9 @@ const NewShipment = () => {
         shipmentType: data.shipment_type,
         location: data.location || '',
         account: data.account || 'TPS Nutrients',
+        carrier: data.carrier || '',
       });
+      setSelectedCarrier(data.carrier || '');
       
       // Set completed tabs
       const completed = new Set();
@@ -895,14 +922,20 @@ const NewShipment = () => {
     }
   };
 
-  const completeFormulaStep = async (comment = '') => {
-    const updateData = {
-      formula_check_completed: true,
-      status: 'label_check',
-    };
+  const completeFormulaStep = async (comment = '', isIncomplete = false) => {
+    const hasComment = !!(comment && comment.trim());
+    const updateData = isIncomplete
+      ? {
+          formula_check_completed: false,
+          status: 'label_check', // still move forward but keep formula check incomplete
+        }
+      : {
+          formula_check_completed: true,
+          status: 'label_check',
+        };
     
     // Add comment to notes if provided
-    if (comment && comment.trim()) {
+    if (hasComment) {
       // Get existing notes and append the comment
       try {
         const shipment = await getShipmentById(shipmentId);
@@ -919,23 +952,43 @@ const NewShipment = () => {
     }
     
     await updateShipment(shipmentId, updateData);
-    setCompletedTabs(prev => new Set(prev).add('formula-check'));
-    setActiveAction('label-check');
-    toast.success('Formula Check completed! Moving to Label Check');
+
+    if (isIncomplete) {
+      setFormulaCheckHasComment(hasComment);
+      // Move forward but keep formula-check flagged as incomplete/commented
+      setCompletedTabs(prev => {
+        const newSet = new Set(prev);
+        newSet.delete('formula-check');
+        return newSet;
+      });
+      setActiveAction('label-check');
+      toast.info('Formula Check comment saved. Proceeding to Label Check.');
+    } else {
+      setFormulaCheckHasComment(hasComment);
+      setCompletedTabs(prev => new Set(prev).add('formula-check'));
+      setActiveAction('label-check');
+      toast.success('Formula Check completed! Moving to Label Check');
+    }
   };
 
-  const completeLabelCheck = async (comment = '') => {
+  const completeLabelCheck = async (comment = '', isIncomplete = false) => {
     if (!shipmentId) {
       toast.error('Please book the shipment first');
       return;
     }
 
-    const updateData = {
-      label_check_completed: true,
-      status: 'book_shipment',
-    };
+    const hasComment = !!(comment && comment.trim());
+    const updateData = isIncomplete
+      ? {
+          label_check_completed: false,
+          status: 'book_shipment',
+        }
+      : {
+          label_check_completed: true,
+          status: 'book_shipment',
+        };
 
-    if (comment && comment.trim()) {
+    if (hasComment) {
       try {
         const shipment = await getShipmentById(shipmentId);
         const existingNotes = shipment?.notes || '';
@@ -950,9 +1003,21 @@ const NewShipment = () => {
     }
 
     await updateShipment(shipmentId, updateData);
-    setCompletedTabs(prev => new Set(prev).add('label-check'));
-    setActiveAction('book-shipment');
-    toast.success('Label Check completed! Moving to Book Shipment.');
+    setLabelCheckHasComment(hasComment);
+
+    if (isIncomplete) {
+      setCompletedTabs(prev => {
+        const newSet = new Set(prev);
+        newSet.delete('label-check');
+        return newSet;
+      });
+      setActiveAction('book-shipment');
+      toast.info('Label Check comment saved. Proceeding to Book Shipment.');
+    } else {
+      setCompletedTabs(prev => new Set(prev).add('label-check'));
+      setActiveAction('book-shipment');
+      toast.success('Label Check completed! Moving to Book Shipment.');
+    }
   };
 
   const handleCompleteClick = async () => {
@@ -969,12 +1034,14 @@ const NewShipment = () => {
         // Formula Check: Verify formulas are reviewed, then move to Label Check
         if (formulaCheckData?.remaining > 0) {
           setUncheckedFormulaCount(formulaCheckData.remaining);
+          setIsFormulaIncompleteComment(true);
           setIsUncheckedFormulaOpen(true);
           return;
         }
 
-        // If all formulas are checked, show comment modal directly
-        setIsFormulaCheckCommentOpen(true);
+        // If all formulas are checked, skip comment modal and move ahead
+        setIsFormulaIncompleteComment(false);
+        await completeFormulaStep('', false);
         return;
       }
 
@@ -988,6 +1055,7 @@ const NewShipment = () => {
         const varianceCount = checkVarianceExceeded();
         if (varianceCount > 0) {
           setVarianceCount(varianceCount);
+          setIsLabelIncompleteComment(true);
           setIsVarianceExceededOpen(true);
           return;
         }
@@ -1259,6 +1327,8 @@ const NewShipment = () => {
         completedTabs={completedTabs}
         shipmentId={shipmentId}
         canAccessTab={canAccessTab}
+        formulaCheckHasComment={formulaCheckHasComment}
+        labelCheckHasComment={labelCheckHasComment}
       />
 
       <div style={{ padding: '0 1.5rem' }}>
@@ -1947,30 +2017,30 @@ const NewShipment = () => {
                 <label style={{ display: 'block', fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '6px' }}>
                   Carrier
                 </label>
-                <select
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '6px',
-                    border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
-                    backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
-                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-                    fontSize: '14px',
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                    cursor: 'pointer',
-                    appearance: 'none',
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%239CA3AF' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'right 12px center',
-                  }}
-                >
-                  <option value="">Select Carrier Name...</option>
-                  <option value="ups">UPS</option>
-                  <option value="fedex">FedEx</option>
-                  <option value="usps">USPS</option>
-                  <option value="dhl">DHL</option>
-                </select>
+                  <select
+                    value={selectedCarrier}
+                    onChange={(e) => setSelectedCarrier(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '6px',
+                      border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                      backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                      color: isDarkMode ? '#E5E7EB' : '#111827',
+                      fontSize: '14px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      cursor: 'pointer',
+                      appearance: 'none',
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%239CA3AF' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'right 12px center',
+                    }}
+                    >
+                      {knownCarriers.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
               </div>
             </div>
           </div>
@@ -2174,9 +2244,7 @@ const NewShipment = () => {
           ) : activeAction === 'book-shipment' ? (
             /* Book Shipment Footer */
             <>
-              <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
-                {/* Empty left side */}
-              </div>
+              <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }} />
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                 <button
                   type="button"
@@ -2564,16 +2632,9 @@ const NewShipment = () => {
         onGoBack={handleVarianceGoBack}
         onRecount={async () => {
           setIsVarianceExceededOpen(false);
-          // Navigate back to planning table with state to show comment modal
-          navigate('/dashboard/production/planning', {
-            state: {
-              showLabelCommentModal: true,
-              shipmentId: shipmentId,
-              shipmentNumber: shipmentData?.shipmentNumber,
-              marketplace: shipmentData?.marketplace || 'Amazon',
-              account: shipmentData?.account || 'TPS Nutrients',
-            }
-          });
+          // Show label check comment modal instead of navigating away
+          setIsLabelIncompleteComment(true);
+          setIsLabelCheckCommentOpen(true);
         }}
         varianceCount={varianceCount}
       />
@@ -2581,19 +2642,41 @@ const NewShipment = () => {
       <UncheckedFormulaModal
         isOpen={isUncheckedFormulaOpen}
         remainingCount={uncheckedFormulaCount}
-        onCancel={() => setIsUncheckedFormulaOpen(false)}
+        onCancel={() => {
+          setIsFormulaIncompleteComment(false);
+          setIsUncheckedFormulaOpen(false);
+        }}
         onConfirm={() => {
           setIsUncheckedFormulaOpen(false);
+          setIsFormulaIncompleteComment(true);
           setIsFormulaCheckCommentOpen(true);
         }}
       />
 
       <FormulaCheckCommentModal
         isOpen={isFormulaCheckCommentOpen}
-        onClose={() => setIsFormulaCheckCommentOpen(false)}
+        onClose={() => {
+          setIsFormulaIncompleteComment(false);
+          setIsFormulaCheckCommentOpen(false);
+        }}
         onComplete={async (comment) => {
           setIsFormulaCheckCommentOpen(false);
-          await completeFormulaStep(comment);
+          await completeFormulaStep(comment, isFormulaIncompleteComment);
+          setIsFormulaIncompleteComment(false);
+        }}
+        isDarkMode={isDarkMode}
+      />
+
+      <LabelCheckCommentModal
+        isOpen={isLabelCheckCommentOpen}
+        onClose={() => {
+          setIsLabelCheckCommentOpen(false);
+          setIsLabelIncompleteComment(false);
+        }}
+        onComplete={async (comment) => {
+          setIsLabelCheckCommentOpen(false);
+          await completeLabelCheck(comment, isLabelIncompleteComment);
+          setIsLabelIncompleteComment(false);
         }}
         isDarkMode={isDarkMode}
       />
@@ -2707,7 +2790,6 @@ const NewShipment = () => {
                   type="button"
                   onClick={() => {
                     setIsBookShipmentCompleteOpen(false);
-                    navigate('/production/planning');
                   }}
                   style={{
                     padding: '8px 16px',
