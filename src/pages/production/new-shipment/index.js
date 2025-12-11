@@ -99,6 +99,10 @@ const NewShipment = () => {
   const doiIconRef = useRef(null);
   const doiTooltipRef = useRef(null);
 
+  // Hide header action menu for existing shipments or when in label-check tab
+  const hideActionsDropdown = Boolean(location.state?.existingShipment || shipmentId || activeAction === 'label-check');
+  const hideLabelCheckHeader = Boolean(location.state?.existingShipment);
+
   // Track label-check completion counts
   const labelCheckCompletedCount = useMemo(() => (
     labelCheckRows.filter(row => row.totalCount !== '' && row.totalCount !== null && row.totalCount !== undefined).length
@@ -1387,8 +1391,12 @@ const NewShipment = () => {
         completedTabs={completedTabs}
         shipmentId={shipmentId}
         canAccessTab={canAccessTab}
+<<<<<<< Updated upstream
         formulaCheckHasComment={formulaCheckHasComment}
         labelCheckHasComment={labelCheckHasComment}
+=======
+        hideActionsDropdown={hideActionsDropdown}
+>>>>>>> Stashed changes
       />
 
       <div style={{ padding: '0 1.5rem' }}>
@@ -1901,6 +1909,7 @@ const NewShipment = () => {
               shipmentId={shipmentId}
               isRecountMode={isRecountMode}
               varianceExceededRowIds={varianceExceededRowIds}
+              hideHeader={hideLabelCheckHeader}
               onExitRecountMode={() => {
                 setIsRecountMode(false);
                 setVarianceExceededRowIds([]);

@@ -4,7 +4,14 @@ import { useTheme } from '../../../../context/ThemeContext';
 import { getShipmentProducts } from '../../../../services/productionApi';
 import VarianceStillExceededModal from './VarianceStillExceededModal';
 
-const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRowIds = [], onExitRecountMode, onRowsDataChange }) => {
+const LabelCheckTable = ({
+  shipmentId,
+  isRecountMode = false,
+  varianceExceededRowIds = [],
+  onExitRecountMode,
+  onRowsDataChange,
+  hideHeader = false,
+}) => {
   const { isDarkMode } = useTheme();
   const [isExpanded, setIsExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -40,6 +47,8 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
   const [completedRows, setCompletedRows] = useState(new Set());
   const [completedRowStatus, setCompletedRowStatus] = useState({}); // id -> insufficient?: true/false
   const [isVarianceStillExceededOpen, setIsVarianceStillExceededOpen] = useState(false);
+  const hideActionsDropdown = Boolean(shipmentId);
+  const disableHeaderDropdown = true; // Always show label check products; no collapsible header
   const filterIconRefs = useRef({});
   const filterDropdownRef = useRef(null);
 
@@ -270,6 +279,13 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
     }
   }, [openFilterColumn]);
 
+  // Force expanded when dropdown is disabled
+  useEffect(() => {
+    if (disableHeaderDropdown && !isExpanded) {
+      setIsExpanded(true);
+    }
+  }, [disableHeaderDropdown, isExpanded]);
+
   return (
     <div style={{
       backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
@@ -327,135 +343,139 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
         </div>
       )}
       {/* Dropdown Header */}
-      <div
-        onClick={() => setIsExpanded(!isExpanded)}
-        style={{
-          padding: '16px 24px',
-          marginTop: '16px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          cursor: 'pointer',
-          backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-          transition: 'background-color 0.2s',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#FFFFFF';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = isDarkMode ? '#1F2937' : '#FFFFFF';
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flex: 1 }}>
-          {/* Status Indicator */}
-          <div style={{
+      {!hideHeader && (
+        <div
+          onClick={disableHeaderDropdown ? undefined : () => setIsExpanded(!isExpanded)}
+          style={{
+            padding: '16px 24px',
+            marginTop: '16px',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
-            padding: '6px 12px',
-            borderRadius: '6px',
-            border: '1px solid #D1D5DB',
-            backgroundColor: '#FFFFFF',
-            fontSize: '14px',
-            fontWeight: 400,
-          }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              {/* Radial spinner icon with 12 dashed lines */}
-              <g stroke="#3B82F6" strokeWidth="2" strokeLinecap="round">
-                {[...Array(12)].map((_, i) => {
-                  const angle = (i * 30) * (Math.PI / 180);
-                  const x1 = 12 + 4 * Math.cos(angle);
-                  const y1 = 12 + 4 * Math.sin(angle);
-                  const x2 = 12 + 6 * Math.cos(angle);
-                  const y2 = 12 + 6 * Math.sin(angle);
-                  return (
-                    <line
-                      key={i}
-                      x1={x1}
-                      y1={y1}
-                      x2={x2}
-                      y2={y2}
-                      strokeDasharray="2 2"
-                    />
-                  );
-                })}
-              </g>
-            </svg>
-            <span style={{ color: '#000000' }}>In Progress</span>
-          </div>
-
-          {/* COUNT ID */}
-          <div style={{
-            fontSize: '14px',
-            fontWeight: 400,
-            color: isDarkMode ? '#9CA3AF' : '#6B7280',
-          }}>
-            COUNT ID
-          </div>
-          <div style={{
-            fontSize: '14px',
-            fontWeight: 700,
-            color: isDarkMode ? '#E5E7EB' : '#111827',
-          }}>
-            CC-DC-1
-          </div>
-
-          {/* COUNT TYPE */}
-          <div style={{
-            fontSize: '14px',
-            fontWeight: 400,
-            color: isDarkMode ? '#9CA3AF' : '#6B7280',
-          }}>
-            COUNT TYPE
-          </div>
-          <div style={{
-            fontSize: '14px',
-            fontWeight: 700,
-            color: isDarkMode ? '#E5E7EB' : '#111827',
-          }}>
-            Shipment Count
-          </div>
-
-          {/* DATE CREATED */}
-          <div style={{
-            fontSize: '14px',
-            fontWeight: 400,
-            color: isDarkMode ? '#9CA3AF' : '#6B7280',
-          }}>
-            DATE CREATED
-          </div>
-          <div style={{
-            fontSize: '14px',
-            fontWeight: 700,
-            color: isDarkMode ? '#E5E7EB' : '#111827',
-          }}>
-            2025-11-20
-          </div>
-        </div>
-        
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          fill="none"
-          style={{
-            transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-            transition: 'transform 0.2s',
-            color: '#3B82F6',
+            justifyContent: 'space-between',
+            cursor: disableHeaderDropdown ? 'default' : 'pointer',
+            backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+            transition: 'background-color 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#FFFFFF';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = isDarkMode ? '#1F2937' : '#FFFFFF';
           }}
         >
-          <path
-            d="M4 6L8 10L12 6"
-            stroke="#3B82F6"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flex: 1 }}>
+            {/* Status Indicator */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 12px',
+              borderRadius: '6px',
+              border: '1px solid #D1D5DB',
+              backgroundColor: '#FFFFFF',
+              fontSize: '14px',
+              fontWeight: 400,
+            }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                {/* Radial spinner icon with 12 dashed lines */}
+                <g stroke="#3B82F6" strokeWidth="2" strokeLinecap="round">
+                  {[...Array(12)].map((_, i) => {
+                    const angle = (i * 30) * (Math.PI / 180);
+                    const x1 = 12 + 4 * Math.cos(angle);
+                    const y1 = 12 + 4 * Math.sin(angle);
+                    const x2 = 12 + 6 * Math.cos(angle);
+                    const y2 = 12 + 6 * Math.sin(angle);
+                    return (
+                      <line
+                        key={i}
+                        x1={x1}
+                        y1={y1}
+                        x2={x2}
+                        y2={y2}
+                        strokeDasharray="2 2"
+                      />
+                    );
+                  })}
+                </g>
+              </svg>
+              <span style={{ color: '#000000' }}>In Progress</span>
+            </div>
+
+            {/* COUNT ID */}
+            <div style={{
+              fontSize: '14px',
+              fontWeight: 400,
+              color: isDarkMode ? '#9CA3AF' : '#6B7280',
+            }}>
+              COUNT ID
+            </div>
+            <div style={{
+              fontSize: '14px',
+              fontWeight: 700,
+              color: isDarkMode ? '#E5E7EB' : '#111827',
+            }}>
+              CC-DC-1
+            </div>
+
+            {/* COUNT TYPE */}
+            <div style={{
+              fontSize: '14px',
+              fontWeight: 400,
+              color: isDarkMode ? '#9CA3AF' : '#6B7280',
+            }}>
+              COUNT TYPE
+            </div>
+            <div style={{
+              fontSize: '14px',
+              fontWeight: 700,
+              color: isDarkMode ? '#E5E7EB' : '#111827',
+            }}>
+              Shipment Count
+            </div>
+
+            {/* DATE CREATED */}
+            <div style={{
+              fontSize: '14px',
+              fontWeight: 400,
+              color: isDarkMode ? '#9CA3AF' : '#6B7280',
+            }}>
+              DATE CREATED
+            </div>
+            <div style={{
+              fontSize: '14px',
+              fontWeight: 700,
+              color: isDarkMode ? '#E5E7EB' : '#111827',
+            }}>
+              2025-11-20
+            </div>
+          </div>
+          
+          {!disableHeaderDropdown && (
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              style={{
+                transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.2s',
+                color: '#3B82F6',
+              }}
+            >
+              <path
+                d="M4 6L8 10L12 6"
+                stroke="#3B82F6"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
+        </div>
+      )}
 
       {/* Expanded Table */}
-      {isExpanded && (
+      {(hideHeader || isExpanded) && (
         <div style={{ overflowX: 'auto' }}>
           <table style={{
             width: '100%',

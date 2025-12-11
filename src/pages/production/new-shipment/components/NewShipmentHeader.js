@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
+<<<<<<< Updated upstream
 const NewShipmentHeader = ({
   tableMode,
   onTableModeToggle,
@@ -17,6 +18,9 @@ const NewShipmentHeader = ({
   formulaCheckHasComment = false,
   labelCheckHasComment = false,
 }) => {
+=======
+const NewShipmentHeader = ({ tableMode, onTableModeToggle, onReviewShipmentClick, onCompleteClick, shipmentData, dataAsOfDate, totalUnits = 0, totalBoxes = 0, activeAction = 'add-products', onActionChange, completedTabs = new Set(), hideActionsDropdown = false }) => {
+>>>>>>> Stashed changes
   const navigate = useNavigate();
   const { isDarkMode } = useTheme();
   const [showDropdown, setShowDropdown] = useState(false);
@@ -67,6 +71,13 @@ const NewShipmentHeader = ({
       };
     }
   }, [showDropdown]);
+
+  // Ensure dropdown is closed when it is hidden by parent
+  useEffect(() => {
+    if (hideActionsDropdown && showDropdown) {
+      setShowDropdown(false);
+    }
+  }, [hideActionsDropdown, showDropdown]);
 
   const handleThreeDotsClick = () => {
     setShowDropdown(!showDropdown);
@@ -288,75 +299,77 @@ const NewShipmentHeader = ({
           </button>
 
           {/* Three Dots Menu for Add Products */}
-          <div style={{ position: 'relative' }}>
-            <button
-              ref={buttonRef}
-              type="button"
-              onClick={handleThreeDotsClick}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                transition: 'opacity 0.2s',
-              }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="5" r="1" fill="currentColor"/>
-                <circle cx="12" cy="12" r="1" fill="currentColor"/>
-                <circle cx="12" cy="19" r="1" fill="currentColor"/>
-              </svg>
-            </button>
-
-            {/* Dropdown Menu */}
-            {showDropdown && (
-              <div
-                ref={dropdownRef}
+          {!hideActionsDropdown && (
+            <div style={{ position: 'relative' }}>
+              <button
+                ref={buttonRef}
+                type="button"
+                onClick={handleThreeDotsClick}
                 style={{
-                  position: 'absolute',
-                  top: '100%',
-                  right: 0,
-                  marginTop: '8px',
-                  backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-                  border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
-                  borderRadius: '8px',
-                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                  minWidth: '160px',
-                  zIndex: 1000,
-                  overflow: 'hidden',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                  transition: 'opacity 0.2s',
                 }}
               >
-                <button
-                  type="button"
-                  onClick={handleShipmentDetailsClick}
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="5" r="1" fill="currentColor"/>
+                  <circle cx="12" cy="12" r="1" fill="currentColor"/>
+                  <circle cx="12" cy="19" r="1" fill="currentColor"/>
+                </svg>
+              </button>
+
+              {/* Dropdown Menu */}
+              {showDropdown && (
+                <div
+                  ref={dropdownRef}
                   style={{
-                    width: '100%',
-                    padding: '10px 16px',
-                    textAlign: 'left',
-                    background: 'transparent',
-                    border: 'none',
-                    color: isDarkMode ? '#E5E7EB' : '#374151',
-                    fontSize: '14px',
-                    fontWeight: 400,
-                    cursor: 'pointer',
-                    transition: 'background-color 0.2s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    marginTop: '8px',
+                    backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                    border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                    borderRadius: '8px',
+                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                    minWidth: '160px',
+                    zIndex: 1000,
+                    overflow: 'hidden',
                   }}
                 >
-                  Shipment Details
-                </button>
-              </div>
-            )}
-          </div>
+                  <button
+                    type="button"
+                    onClick={handleShipmentDetailsClick}
+                    style={{
+                      width: '100%',
+                      padding: '10px 16px',
+                      textAlign: 'left',
+                      background: 'transparent',
+                      border: 'none',
+                      color: isDarkMode ? '#E5E7EB' : '#374151',
+                      fontSize: '14px',
+                      fontWeight: 400,
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    Shipment Details
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
             </>
           ) : activeAction === 'formula-check' ? (
             <>
@@ -389,75 +402,77 @@ const NewShipmentHeader = ({
               </button>
 
               {/* Three Dots Menu for Formula Check */}
-              <div style={{ position: 'relative' }}>
-                <button
-                  ref={buttonRef}
-                  type="button"
-                  onClick={handleThreeDotsClick}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '4px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                    transition: 'opacity 0.2s',
-                  }}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="5" r="1" fill="currentColor"/>
-                    <circle cx="12" cy="12" r="1" fill="currentColor"/>
-                    <circle cx="12" cy="19" r="1" fill="currentColor"/>
-                  </svg>
-                </button>
-
-                {/* Dropdown Menu */}
-                {showDropdown && (
-                  <div
-                    ref={dropdownRef}
+              {!hideActionsDropdown && (
+                <div style={{ position: 'relative' }}>
+                  <button
+                    ref={buttonRef}
+                    type="button"
+                    onClick={handleThreeDotsClick}
                     style={{
-                      position: 'absolute',
-                      top: '100%',
-                      right: 0,
-                      marginTop: '8px',
-                      backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-                      border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
-                      borderRadius: '8px',
-                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                      minWidth: '160px',
-                      zIndex: 1000,
-                      overflow: 'hidden',
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                      transition: 'opacity 0.2s',
                     }}
                   >
-                    <button
-                      type="button"
-                      onClick={handleShipmentDetailsClick}
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="5" r="1" fill="currentColor"/>
+                      <circle cx="12" cy="12" r="1" fill="currentColor"/>
+                      <circle cx="12" cy="19" r="1" fill="currentColor"/>
+                    </svg>
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {showDropdown && (
+                    <div
+                      ref={dropdownRef}
                       style={{
-                        width: '100%',
-                        padding: '10px 16px',
-                        textAlign: 'left',
-                        background: 'transparent',
-                        border: 'none',
-                        color: isDarkMode ? '#E5E7EB' : '#374151',
-                        fontSize: '14px',
-                        fontWeight: 400,
-                        cursor: 'pointer',
-                        transition: 'background-color 0.2s',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
+                        position: 'absolute',
+                        top: '100%',
+                        right: 0,
+                        marginTop: '8px',
+                        backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                        border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                        borderRadius: '8px',
+                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                        minWidth: '160px',
+                        zIndex: 1000,
+                        overflow: 'hidden',
                       }}
                     >
-                      Shipment Details
-                    </button>
-                  </div>
-                )}
-              </div>
+                      <button
+                        type="button"
+                        onClick={handleShipmentDetailsClick}
+                        style={{
+                          width: '100%',
+                          padding: '10px 16px',
+                          textAlign: 'left',
+                          background: 'transparent',
+                          border: 'none',
+                          color: isDarkMode ? '#E5E7EB' : '#374151',
+                          fontSize: '14px',
+                          fontWeight: 400,
+                          cursor: 'pointer',
+                          transition: 'background-color 0.2s',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                      >
+                        Shipment Details
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           ) : activeAction === 'label-check' ? (
             <>
@@ -485,75 +500,77 @@ const NewShipmentHeader = ({
               </button>
 
               {/* Three Dots Menu for Label Check */}
-              <div style={{ position: 'relative' }}>
-                <button
-                  ref={buttonRef}
-                  type="button"
-                  onClick={handleThreeDotsClick}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '4px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                    transition: 'opacity 0.2s',
-                  }}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="5" r="1" fill="currentColor"/>
-                    <circle cx="12" cy="12" r="1" fill="currentColor"/>
-                    <circle cx="12" cy="19" r="1" fill="currentColor"/>
-                  </svg>
-                </button>
-
-                {/* Dropdown Menu */}
-                {showDropdown && (
-                  <div
-                    ref={dropdownRef}
+              {!hideActionsDropdown && (
+                <div style={{ position: 'relative' }}>
+                  <button
+                    ref={buttonRef}
+                    type="button"
+                    onClick={handleThreeDotsClick}
                     style={{
-                      position: 'absolute',
-                      top: '100%',
-                      right: 0,
-                      marginTop: '8px',
-                      backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-                      border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
-                      borderRadius: '8px',
-                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                      minWidth: '160px',
-                      zIndex: 1000,
-                      overflow: 'hidden',
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                      transition: 'opacity 0.2s',
                     }}
                   >
-                    <button
-                      type="button"
-                      onClick={handleShipmentDetailsClick}
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="5" r="1" fill="currentColor"/>
+                      <circle cx="12" cy="12" r="1" fill="currentColor"/>
+                      <circle cx="12" cy="19" r="1" fill="currentColor"/>
+                    </svg>
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {showDropdown && (
+                    <div
+                      ref={dropdownRef}
                       style={{
-                        width: '100%',
-                        padding: '10px 16px',
-                        textAlign: 'left',
-                        background: 'transparent',
-                        border: 'none',
-                        color: isDarkMode ? '#E5E7EB' : '#374151',
-                        fontSize: '14px',
-                        fontWeight: 400,
-                        cursor: 'pointer',
-                        transition: 'background-color 0.2s',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
+                        position: 'absolute',
+                        top: '100%',
+                        right: 0,
+                        marginTop: '8px',
+                        backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                        border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                        borderRadius: '8px',
+                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                        minWidth: '160px',
+                        zIndex: 1000,
+                        overflow: 'hidden',
                       }}
                     >
-                      Shipment Details
-                    </button>
-                  </div>
-                )}
-              </div>
+                      <button
+                        type="button"
+                        onClick={handleShipmentDetailsClick}
+                        style={{
+                          width: '100%',
+                          padding: '10px 16px',
+                          textAlign: 'left',
+                          background: 'transparent',
+                          border: 'none',
+                          color: isDarkMode ? '#E5E7EB' : '#374151',
+                          fontSize: '14px',
+                          fontWeight: 400,
+                          cursor: 'pointer',
+                          transition: 'background-color 0.2s',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                      >
+                        Shipment Details
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           ) : activeAction === 'book-shipment' ? (
             <>
@@ -581,75 +598,77 @@ const NewShipmentHeader = ({
               </button>
 
               {/* Three Dots Menu for Book Shipment */}
-              <div style={{ position: 'relative' }}>
-                <button
-                  ref={buttonRef}
-                  type="button"
-                  onClick={handleThreeDotsClick}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '4px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                    transition: 'opacity 0.2s',
-                  }}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="5" r="1" fill="currentColor"/>
-                    <circle cx="12" cy="12" r="1" fill="currentColor"/>
-                    <circle cx="12" cy="19" r="1" fill="currentColor"/>
-            </svg>
-          </button>
-
-                {/* Dropdown Menu */}
-                {showDropdown && (
-                  <div
-                    ref={dropdownRef}
+              {!hideActionsDropdown && (
+                <div style={{ position: 'relative' }}>
+                  <button
+                    ref={buttonRef}
+                    type="button"
+                    onClick={handleThreeDotsClick}
                     style={{
-                      position: 'absolute',
-                      top: '100%',
-                      right: 0,
-                      marginTop: '8px',
-                      backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-                      border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
-                      borderRadius: '8px',
-                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                      minWidth: '160px',
-                      zIndex: 1000,
-                      overflow: 'hidden',
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                      transition: 'opacity 0.2s',
                     }}
                   >
-                    <button
-                      type="button"
-                      onClick={handleShipmentDetailsClick}
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="5" r="1" fill="currentColor"/>
+                      <circle cx="12" cy="12" r="1" fill="currentColor"/>
+                      <circle cx="12" cy="19" r="1" fill="currentColor"/>
+                    </svg>
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {showDropdown && (
+                    <div
+                      ref={dropdownRef}
                       style={{
-                        width: '100%',
-                        padding: '10px 16px',
-                        textAlign: 'left',
-                        background: 'transparent',
-                        border: 'none',
-                        color: isDarkMode ? '#E5E7EB' : '#374151',
-                        fontSize: '14px',
-                        fontWeight: 400,
-                        cursor: 'pointer',
-                        transition: 'background-color 0.2s',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
+                        position: 'absolute',
+                        top: '100%',
+                        right: 0,
+                        marginTop: '8px',
+                        backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                        border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                        borderRadius: '8px',
+                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                        minWidth: '160px',
+                        zIndex: 1000,
+                        overflow: 'hidden',
                       }}
                     >
-                      Shipment Details
-                    </button>
-                  </div>
-                )}
-              </div>
+                      <button
+                        type="button"
+                        onClick={handleShipmentDetailsClick}
+                        style={{
+                          width: '100%',
+                          padding: '10px 16px',
+                          textAlign: 'left',
+                          background: 'transparent',
+                          border: 'none',
+                          color: isDarkMode ? '#E5E7EB' : '#374151',
+                          fontSize: '14px',
+                          fontWeight: 400,
+                          cursor: 'pointer',
+                          transition: 'background-color 0.2s',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                      >
+                        Shipment Details
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           ) : activeAction === 'sort-products' ? (
             <>
@@ -677,75 +696,77 @@ const NewShipmentHeader = ({
               </button>
 
               {/* Three Dots Menu for Sort Products */}
-              <div style={{ position: 'relative' }}>
-                <button
-                  ref={buttonRef}
-                  type="button"
-                  onClick={handleThreeDotsClick}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '4px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                    transition: 'opacity 0.2s',
-                  }}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="5" r="1" fill="currentColor"/>
-                    <circle cx="12" cy="12" r="1" fill="currentColor"/>
-                    <circle cx="12" cy="19" r="1" fill="currentColor"/>
-                  </svg>
-                </button>
-
-                {/* Dropdown Menu */}
-                {showDropdown && (
-                  <div
-                    ref={dropdownRef}
+              {!hideActionsDropdown && (
+                <div style={{ position: 'relative' }}>
+                  <button
+                    ref={buttonRef}
+                    type="button"
+                    onClick={handleThreeDotsClick}
                     style={{
-                      position: 'absolute',
-                      top: '100%',
-                      right: 0,
-                      marginTop: '8px',
-                      backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-                      border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
-                      borderRadius: '8px',
-                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                      minWidth: '160px',
-                      zIndex: 1000,
-                      overflow: 'hidden',
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                      transition: 'opacity 0.2s',
                     }}
                   >
-                    <button
-                      type="button"
-                      onClick={handleShipmentDetailsClick}
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="5" r="1" fill="currentColor"/>
+                      <circle cx="12" cy="12" r="1" fill="currentColor"/>
+                      <circle cx="12" cy="19" r="1" fill="currentColor"/>
+                    </svg>
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {showDropdown && (
+                    <div
+                      ref={dropdownRef}
                       style={{
-                        width: '100%',
-                        padding: '10px 16px',
-                        textAlign: 'left',
-                        background: 'transparent',
-                        border: 'none',
-                        color: isDarkMode ? '#E5E7EB' : '#374151',
-                        fontSize: '14px',
-                        fontWeight: 400,
-                        cursor: 'pointer',
-                        transition: 'background-color 0.2s',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
+                        position: 'absolute',
+                        top: '100%',
+                        right: 0,
+                        marginTop: '8px',
+                        backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                        border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                        borderRadius: '8px',
+                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                        minWidth: '160px',
+                        zIndex: 1000,
+                        overflow: 'hidden',
                       }}
                     >
-                      Shipment Details
-                    </button>
-                  </div>
-                )}
-              </div>
+                      <button
+                        type="button"
+                        onClick={handleShipmentDetailsClick}
+                        style={{
+                          width: '100%',
+                          padding: '10px 16px',
+                          textAlign: 'left',
+                          background: 'transparent',
+                          border: 'none',
+                          color: isDarkMode ? '#E5E7EB' : '#374151',
+                          fontSize: '14px',
+                          fontWeight: 400,
+                          cursor: 'pointer',
+                          transition: 'background-color 0.2s',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                      >
+                        Shipment Details
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           ) : activeAction === 'sort-formulas' ? (
             <>
@@ -773,75 +794,77 @@ const NewShipmentHeader = ({
               </button>
 
               {/* Three Dots Menu for Sort Formulas */}
-              <div style={{ position: 'relative' }}>
-                <button
-                  ref={buttonRef}
-                  type="button"
-                  onClick={handleThreeDotsClick}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '4px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                    transition: 'opacity 0.2s',
-                  }}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="5" r="1" fill="currentColor"/>
-                    <circle cx="12" cy="12" r="1" fill="currentColor"/>
-                    <circle cx="12" cy="19" r="1" fill="currentColor"/>
-                  </svg>
-                </button>
-
-                {/* Dropdown Menu */}
-                {showDropdown && (
-                  <div
-                    ref={dropdownRef}
+              {!hideActionsDropdown && (
+                <div style={{ position: 'relative' }}>
+                  <button
+                    ref={buttonRef}
+                    type="button"
+                    onClick={handleThreeDotsClick}
                     style={{
-                      position: 'absolute',
-                      top: '100%',
-                      right: 0,
-                      marginTop: '8px',
-                      backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-                      border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
-                      borderRadius: '8px',
-                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                      minWidth: '160px',
-                      zIndex: 1000,
-                      overflow: 'hidden',
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                      transition: 'opacity 0.2s',
                     }}
                   >
-                    <button
-                      type="button"
-                      onClick={handleShipmentDetailsClick}
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="5" r="1" fill="currentColor"/>
+                      <circle cx="12" cy="12" r="1" fill="currentColor"/>
+                      <circle cx="12" cy="19" r="1" fill="currentColor"/>
+                    </svg>
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {showDropdown && (
+                    <div
+                      ref={dropdownRef}
                       style={{
-                        width: '100%',
-                        padding: '10px 16px',
-                        textAlign: 'left',
-                        background: 'transparent',
-                        border: 'none',
-                        color: isDarkMode ? '#E5E7EB' : '#374151',
-                        fontSize: '14px',
-                        fontWeight: 400,
-                        cursor: 'pointer',
-                        transition: 'background-color 0.2s',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
+                        position: 'absolute',
+                        top: '100%',
+                        right: 0,
+                        marginTop: '8px',
+                        backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                        border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                        borderRadius: '8px',
+                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                        minWidth: '160px',
+                        zIndex: 1000,
+                        overflow: 'hidden',
                       }}
                     >
-                      Shipment Details
-                    </button>
-                  </div>
-                )}
-              </div>
+                      <button
+                        type="button"
+                        onClick={handleShipmentDetailsClick}
+                        style={{
+                          width: '100%',
+                          padding: '10px 16px',
+                          textAlign: 'left',
+                          background: 'transparent',
+                          border: 'none',
+                          color: isDarkMode ? '#E5E7EB' : '#374151',
+                          fontSize: '14px',
+                          fontWeight: 400,
+                          cursor: 'pointer',
+                          transition: 'background-color 0.2s',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                      >
+                        Shipment Details
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           ) : null}
         </div>
