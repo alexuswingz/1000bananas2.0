@@ -9,7 +9,7 @@ const VarianceStillExceededModal = ({ isOpen, onClose, onGoBack, onConfirm }) =>
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'rgba(0, 0, 0, 0.45)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -20,80 +20,77 @@ const VarianceStillExceededModal = ({ isOpen, onClose, onGoBack, onConfirm }) =>
       <div
         style={{
           backgroundColor: '#FFFFFF',
-          borderRadius: '8px',
-          width: '400px',
-          maxWidth: '90vw',
-          padding: '32px',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+          borderRadius: '12px',
+          width: '420px',
+          maxWidth: '92vw',
+          padding: '20px',
+          boxShadow: '0 18px 28px rgba(0, 0, 0, 0.12)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: '20px',
+          gap: '14px',
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Warning Icon - Gray outlined circle with orange exclamation */}
         <div
           style={{
-            width: '64px',
-            height: '64px',
+            width: '36px',
+            height: '36px',
             borderRadius: '50%',
-            border: '2px solid #E5E7EB',
-            backgroundColor: '#FFFFFF',
+            backgroundColor: '#F59E0B',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            marginTop: '4px',
           }}
         >
           <svg
-            width="32"
-            height="32"
+            width="18"
+            height="18"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#F97316"
+            stroke="#FFFFFF"
             strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            <path d="M12 9v4M12 17h.01" />
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
+            <path d="M12 8v5" />
+            <path d="M12 16h.01" />
+            <path d="M12 3C7.029 3 3 7.029 3 12s4.029 9 9 9 9-4.029 9-9-4.029-9-9-9Z" />
           </svg>
         </div>
 
-        {/* Title */}
         <h2
           style={{
-            fontSize: '20px',
-            fontWeight: 600,
+            fontSize: '18px',
+            fontWeight: 700,
             color: '#111827',
             margin: 0,
             textAlign: 'center',
           }}
         >
-          Variance Exceeded
+          Are you sure?
         </h2>
 
-        {/* Message */}
         <p
           style={{
             fontSize: '14px',
             fontWeight: 400,
-            color: '#374151',
+            color: '#4B5563',
             margin: 0,
             textAlign: 'center',
             lineHeight: '1.5',
           }}
         >
-          Your recount still exceeds the allowed variance. Confirm this variance or go back and edit the count.
+          This update will change our live inventory. Continue?
         </p>
 
-        {/* Action Buttons */}
         <div
           style={{
             display: 'flex',
             gap: '12px',
             width: '100%',
-            marginTop: '8px',
+            marginTop: '6px',
           }}
         >
           <button
@@ -101,11 +98,12 @@ const VarianceStillExceededModal = ({ isOpen, onClose, onGoBack, onConfirm }) =>
             onClick={onGoBack}
             style={{
               flex: 1,
-              padding: '10px 16px',
+              height: '36px',
+              padding: '0 14px',
               borderRadius: '6px',
-              border: '1px solid #D1D5DB',
+              border: '1px solid #E5E7EB',
               backgroundColor: '#FFFFFF',
-              color: '#374151',
+              color: '#111827',
               fontSize: '14px',
               fontWeight: 500,
               cursor: 'pointer',
@@ -118,31 +116,32 @@ const VarianceStillExceededModal = ({ isOpen, onClose, onGoBack, onConfirm }) =>
               e.currentTarget.style.backgroundColor = '#FFFFFF';
             }}
           >
-            Go Back
+            Cancel
           </button>
           <button
             type="button"
             onClick={onConfirm}
             style={{
               flex: 1,
-              padding: '10px 16px',
+              height: '36px',
+              padding: '0 14px',
               borderRadius: '6px',
               border: 'none',
-              backgroundColor: '#3B82F6',
+              backgroundColor: '#0B7DFF',
               color: '#FFFFFF',
               fontSize: '14px',
-              fontWeight: 500,
+              fontWeight: 600,
               cursor: 'pointer',
               transition: 'all 0.2s',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#2563EB';
+              e.currentTarget.style.backgroundColor = '#0669D1';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#3B82F6';
+              e.currentTarget.style.backgroundColor = '#0B7DFF';
             }}
           >
-            Confirm
+            Continue
           </button>
         </div>
       </div>

@@ -35,7 +35,10 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
   const [fullRolls, setFullRolls] = useState(['', '', '']);
   const [partialWeights, setPartialWeights] = useState(['', '', '']);
   const [openFilterColumn, setOpenFilterColumn] = useState(null);
+  const [isStartPreviewOpen, setIsStartPreviewOpen] = useState(false);
+  const [showInfoTooltip, setShowInfoTooltip] = useState(false);
   const [completedRows, setCompletedRows] = useState(new Set());
+  const [completedRowStatus, setCompletedRowStatus] = useState({}); // id -> insufficient?: true/false
   const [isVarianceStillExceededOpen, setIsVarianceStillExceededOpen] = useState(false);
   const filterIconRefs = useRef({});
   const filterDropdownRef = useRef(null);
@@ -94,11 +97,12 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
   const handleStartClick = (row, index) => {
     setSelectedRow(row);
     setSelectedRowIndex(index);
-    setIsModalOpen(true);
+    setIsStartPreviewOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
+    setIsStartPreviewOpen(false);
     setSelectedRow(null);
     setSelectedRowIndex(null);
     setFullRolls(['', '', '']);
@@ -110,6 +114,7 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
       const calculatedTotal = calculateTotalLabels();
       const labelsNeeded = selectedRow.quantity || 0;
       const discrepancy = calculatedTotal - labelsNeeded;
+      const insufficient = calculatedTotal < labelsNeeded;
       
       // Check if variance exceeds threshold
       const varianceExceeds = checkVarianceExceeded(discrepancy, labelsNeeded);
@@ -132,6 +137,7 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
       
       // Mark the row as completed
       setCompletedRows(prev => new Set(prev).add(selectedRow.id));
+      setCompletedRowStatus(prev => ({ ...prev, [selectedRow.id]: insufficient }));
       handleCloseModal();
     }
   };
@@ -145,6 +151,8 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
     // User confirmed the variance - save the data and close both modals
     if (selectedRow && selectedRow.id) {
       const calculatedTotal = calculateTotalLabels();
+      const labelsNeeded = selectedRow.quantity || 0;
+      const insufficient = calculatedTotal < labelsNeeded;
       // Save the calculated total even though variance exceeds
       const updatedRows = rows.map(row => 
         row.id === selectedRow.id 
@@ -154,6 +162,7 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
       setRows(updatedRows);
       // Mark the row as completed (but it will need recount)
       setCompletedRows(prev => new Set(prev).add(selectedRow.id));
+      setCompletedRowStatus(prev => ({ ...prev, [selectedRow.id]: insufficient }));
     }
     setIsVarianceStillExceededOpen(false);
     handleCloseModal();
@@ -203,6 +212,13 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
     const labelsNeeded = selectedRow.quantity || 0;
     return calculatedTotal - labelsNeeded;
   };
+
+  const isInsufficientLabels = (() => {
+    if (!selectedRow) return false;
+    const counted = calculateTotalLabels();
+    const needed = Number(selectedRow.quantity ?? 0) || 0;
+    return counted < needed;
+  })();
 
   // Check if variance exceeds threshold
   // Variance is the difference between calculated total and labels needed
@@ -544,7 +560,7 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
                           padding: '0 10px',
                           borderRadius: '6px',
                           border: 'none',
-                          backgroundColor: '#22C55E',
+                          backgroundColor: completedRowStatus[row.id] ? '#F59E0B' : '#22C55E',
                           color: '#FFFFFF',
                           fontSize: '14px',
                           fontWeight: 500,
@@ -1010,7 +1026,7 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
                   padding: '8px 16px',
                   borderRadius: '6px',
                   border: 'none',
-                  backgroundColor: '#3B82F6',
+                  backgroundColor: isInsufficientLabels ? '#F59E0B' : '#22C55E',
                   color: '#FFFFFF',
                   fontSize: '14px',
                   fontWeight: 500,
@@ -1018,13 +1034,214 @@ const LabelCheckTable = ({ shipmentId, isRecountMode = false, varianceExceededRo
                   transition: 'background-color 0.2s',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#2563EB';
+                  e.currentTarget.style.backgroundColor = isInsufficientLabels ? '#D97706' : '#16A34A';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#3B82F6';
+                  e.currentTarget.style.backgroundColor = isInsufficientLabels ? '#F59E0B' : '#22C55E';
                 }}
               >
                 Verify
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Start Preview Modal */}
+      {isStartPreviewOpen && selectedRow && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+          onClick={handleCloseModal}
+        >
+          <div
+            style={{
+              backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
+              borderRadius: '12px',
+              width: '324px',
+              padding: '24px',
+              border: isDarkMode ? '1px solid #1F2937' : '1px solid #E5E7EB',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '24px',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: isDarkMode ? '#E5E7EB' : '#111827' }}>
+                  Label Check
+                </h2>
+                <div style={{ position: 'relative', display: 'inline-flex' }}>
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    aria-label="Info"
+                    onMouseEnter={() => setShowInfoTooltip(true)}
+                    onMouseLeave={() => setShowInfoTooltip(false)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <circle cx="12" cy="12" r="10" stroke="#007AFF" strokeWidth="2" />
+                    <path d="M12 10v6" stroke="#007AFF" strokeWidth="2" strokeLinecap="round" />
+                    <circle cx="12" cy="7" r="1" fill="#007AFF" />
+                  </svg>
+                  {showInfoTooltip && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        bottom: '28px',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        width: '304px',
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: '12px',
+                        border: '1px solid #E5E7EB',
+                        boxShadow: '0px 10px 24px rgba(0, 0, 0, 0.14)',
+                        padding: '12px',
+                        display: 'flex',
+                        gap: '4px',
+                        alignItems: 'flex-start',
+                        zIndex: 10,
+                        overflow: 'visible',
+                      }}
+                    >
+                      {/* Tail */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          bottom: '-8px',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          width: 0,
+                          height: 0,
+                          borderLeft: '8px solid transparent',
+                          borderRight: '8px solid transparent',
+                          borderTop: '8px solid #FFFFFF',
+                          filter: 'drop-shadow(0px 2px 4px rgba(0, 0, 0, 0.12))',
+                        }}
+                      />
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style={{ marginTop: '2px' }}>
+                        <rect x="5" y="3" width="14" height="18" rx="2" stroke="#007AFF" strokeWidth="2" />
+                        <path d="M9 7h6" stroke="#007AFF" strokeWidth="2" strokeLinecap="round" />
+                        <path d="M9 11h6" stroke="#007AFF" strokeWidth="2" strokeLinecap="round" />
+                      </svg>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+                        <span style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
+                          Label Confirmation
+                        </span>
+                        <span style={{ fontSize: '13px', color: '#4B5563', lineHeight: 1.4 }}>
+                          Confirming that we have sufficient labels for this shipment. This is not a full label inventory, but a quick confirmation.
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseModal}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = isDarkMode ? '#FFFFFF' : '#111827'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = isDarkMode ? '#9CA3AF' : '#6B7280'; }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{
+              border: isDarkMode ? '1px solid #1F2937' : '1px solid #E5E7EB',
+              borderRadius: '12px',
+              padding: '12px 16px',
+              width: '276px',
+              backgroundColor: isDarkMode ? '#1F2937' : '#F9FAFB',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              alignSelf: 'center',
+            }}>
+              <div>
+                <div style={{ fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '4px' }}>Product Name</div>
+                <div style={{ fontSize: '16px', fontWeight: 700, color: isDarkMode ? '#E5E7EB' : '#111827' }}>
+                  {selectedRow.product} ({selectedRow.size})
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '4px' }}>Label Location</div>
+                <div style={{ fontSize: '16px', fontWeight: 700, color: isDarkMode ? '#E5E7EB' : '#111827' }}>
+                  {selectedRow.labelLocation}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '4px' }}>Labels Needed</div>
+                <div style={{ fontSize: '16px', fontWeight: 700, color: isDarkMode ? '#E5E7EB' : '#111827' }}>
+                  {formatNumber(selectedRow.quantity)}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={handleCloseModal}
+                style={{
+                  height: '31px',
+                  padding: '0 12px',
+                  borderRadius: '4px',
+                  width: '276px',
+                  border: 'none',
+                  backgroundColor: '#007AFF',
+                  color: '#FFFFFF',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                  alignSelf: 'center',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#0056CC'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#007AFF'; }}
+              >
+                Confirm
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsStartPreviewOpen(false);
+                  setIsModalOpen(true);
+                }}
+                style={{
+                  height: '31px',
+                  padding: '0 12px',
+                  borderRadius: '4px',
+                  width: '276px',
+                  alignSelf: 'center',
+                  border: '1px solid #D1D5DB',
+                  backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
+                  color: isDarkMode ? '#E5E7EB' : '#111827',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = isDarkMode ? '#1F2937' : '#F3F4F6'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = isDarkMode ? '#111827' : '#FFFFFF'; }}
+              >
+                Count Labels
               </button>
             </div>
           </div>

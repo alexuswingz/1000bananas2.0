@@ -6,7 +6,9 @@ import PlanningTable from './components/PlanningTable';
 import ArchiveTable from './components/ArchiveTable';
 import ShipmentsTable from './components/ShipmentsTable';
 import NewShipmentModal from './components/NewShipmentModal';
-import { getAllShipments, createShipment } from '../../../services/productionApi';
+import LabelCheckCommentModal from '../new-shipment/components/LabelCheckCommentModal';
+import StatusCommentModal from './components/StatusCommentModal';
+import { getAllShipments, createShipment, updateShipment, getShipmentProducts } from '../../../services/productionApi';
 
 const Planning = () => {
   const { isDarkMode } = useTheme();
@@ -25,6 +27,11 @@ const Planning = () => {
   const [error, setError] = useState(null);
   const [showBookedToast, setShowBookedToast] = useState(false);
   const [bookedShipmentInfo, setBookedShipmentInfo] = useState(null);
+  const [isLabelCommentOpen, setIsLabelCommentOpen] = useState(false);
+  const [labelCommentRow, setLabelCommentRow] = useState(null);
+  const [isStatusCommentOpen, setIsStatusCommentOpen] = useState(false);
+  const [statusCommentRow, setStatusCommentRow] = useState(null);
+  const [statusCommentField, setStatusCommentField] = useState(null);
 
   // State for planning table rows
   const [rows, setRows] = useState([
@@ -114,6 +121,64 @@ const Planning = () => {
     }
   }, [location.state]);
 
+  // Check for navigation state to show label comment modal
+  useEffect(() => {
+    if (location.state?.showLabelCommentModal && location.state?.shipmentId) {
+      // Find the shipment in the list
+      const shipment = shipments.find(s => s.id === location.state.shipmentId);
+      if (shipment) {
+        // Update shipment to show orange (in progress) status with comment flag
+        setShipments(prev => prev.map(s => {
+          if (s.id === location.state.shipmentId) {
+            return {
+              ...s,
+              labelCheck: 'in progress', // Will show orange because hasComment is true
+              labelCheckComment: true, // Flag to show orange with comment icon
+            };
+          }
+          return s;
+        }));
+        
+        // Set the row and show modal
+        const updatedShipment = {
+          ...shipment,
+          labelCheck: 'in progress',
+          labelCheckComment: true,
+        };
+        setLabelCommentRow(updatedShipment);
+        setIsLabelCommentOpen(true);
+        
+        // Clear the state to prevent showing again on refresh
+        window.history.replaceState({}, document.title);
+      } else {
+        // If shipment not found, fetch shipments first
+        fetchShipments().then(() => {
+          const foundShipment = shipments.find(s => s.id === location.state.shipmentId);
+          if (foundShipment) {
+            setShipments(prev => prev.map(s => {
+              if (s.id === location.state.shipmentId) {
+                return {
+                  ...s,
+                  labelCheck: 'in progress',
+                  labelCheckComment: true, // Flag to show orange with comment icon
+                };
+              }
+              return s;
+            }));
+            const updatedShipment = {
+              ...foundShipment,
+              labelCheck: 'in progress',
+              labelCheckComment: true,
+            };
+            setLabelCommentRow(updatedShipment);
+            setIsLabelCommentOpen(true);
+            window.history.replaceState({}, document.title);
+          }
+        });
+      }
+    }
+  }, [location.state, shipments]);
+
   // Fetch shipments from API
   useEffect(() => {
     if (activeTab === 'shipments') {
@@ -148,6 +213,230 @@ const Planning = () => {
       setShipments([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleLabelCheckClick = async (row) => {
+    // Only show comment modal if label check is not completed
+    // If already completed, just mark as complete without showing modal
+    if (row.labelCheck === 'completed') {
+      // Already completed, no need to show modal
+      return;
+    }
+    
+    // Check if there are insufficient labels
+    try {
+      const products = await getShipmentProducts(row.id);
+      
+      // Check if any products have insufficient labels
+      // A product has insufficient labels if labels_needed > labels_available
+      const hasInsufficientLabels = products.some(product => {
+        const labelsNeeded = product.labels_needed || 0;
+        const labelsAvailable = product.labels_available || 0;
+        return labelsNeeded > labelsAvailable;
+      });
+      
+      // Only show modal if there are insufficient labels
+      if (hasInsufficientLabels) {
+        setLabelCommentRow(row);
+        setIsLabelCommentOpen(true);
+      } else {
+        // All labels are sufficient, no need to show modal
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking label availability:', error);
+      // On error, still show modal to be safe
+      setLabelCommentRow(row);
+      setIsLabelCommentOpen(true);
+    }
+  };
+
+  const handleStatusCommentClick = (row, statusFieldName) => {
+    // Don't show modal if status is completed
+    if (row[statusFieldName] === 'completed') {
+      return;
+    }
+    setStatusCommentRow(row);
+    setStatusCommentField(statusFieldName);
+    setIsStatusCommentOpen(true);
+  };
+
+  const handleStatusCommentComplete = async (comment) => {
+    if (!statusCommentRow?.id || !statusCommentField) {
+      setIsStatusCommentOpen(false);
+      setStatusCommentRow(null);
+      setStatusCommentField(null);
+      return;
+    }
+
+    const shipmentId = statusCommentRow.id;
+    const commentText = comment || '';
+    const fieldName = statusCommentField;
+    
+    // Clear the modal state
+    setIsStatusCommentOpen(false);
+    const rowToUpdate = statusCommentRow;
+    setStatusCommentRow(null);
+    setStatusCommentField(null);
+
+    try {
+      // Map status field names to backend field names
+      const backendFieldMap = {
+        'addProducts': 'add_products_completed',
+        'formulaCheck': 'formula_check_completed',
+        'labelCheck': 'label_check_completed',
+        'bookShipment': 'book_shipment_completed',
+        'sortProducts': 'sort_products_completed',
+        'sortFormulas': 'sort_formulas_completed',
+      };
+
+      const backendField = backendFieldMap[fieldName];
+      if (!backendField) {
+        console.error('Unknown status field:', fieldName);
+        return;
+      }
+
+      const updateData = {
+        [backendField]: false, // Mark as incomplete since comment was added
+      };
+      
+      // Add comment to notes if provided
+      if (commentText.trim()) {
+        updateData.notes = commentText.trim();
+      }
+
+      // Update shipment in backend
+      await updateShipment(shipmentId, updateData);
+
+      // Get current user name (from localStorage or default)
+      const userName = localStorage.getItem('userName') || 'User';
+      const userInitials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+      const commentDate = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+      // Update local state
+      setShipments(prev => prev.map(s => {
+        if (s.id === shipmentId) {
+          return {
+            ...s,
+            [`${fieldName}Comment`]: true,
+            [fieldName]: 'in progress', // keep in-progress but flagged with comment
+            [`${fieldName}CommentText`]: commentText,
+            [`${fieldName}CommentDate`]: commentDate,
+            [`${fieldName}CommentUser`]: userName,
+            [`${fieldName}CommentUserInitials`]: userInitials,
+          };
+        }
+        return s;
+      }));
+    } catch (error) {
+      console.error('Error saving status comment:', error);
+      // Get current user name (from localStorage or default)
+      const userName = localStorage.getItem('userName') || 'User';
+      const userInitials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+      const commentDate = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+      // Still update local state even if backend fails
+      setShipments(prev => prev.map(s => {
+        if (s.id === shipmentId) {
+          return {
+            ...s,
+            [`${fieldName}Comment`]: true,
+            [fieldName]: 'in progress',
+            [`${fieldName}CommentText`]: commentText,
+            [`${fieldName}CommentDate`]: commentDate,
+            [`${fieldName}CommentUser`]: userName,
+            [`${fieldName}CommentUserInitials`]: userInitials,
+          };
+        }
+        return s;
+      }));
+    }
+  };
+
+  const handleLabelCommentComplete = async (comment) => {
+    console.log('handleLabelCommentComplete called', { comment, labelCommentRow });
+    
+    if (!labelCommentRow?.id) {
+      console.log('No labelCommentRow.id');
+      setIsLabelCommentOpen(false);
+      setLabelCommentRow(null);
+      return;
+    }
+
+    // Modal is already closed by the component, just update state
+    const shipmentId = labelCommentRow.id;
+    const commentText = comment || '';
+    
+    console.log('Processing comment', { shipmentId, commentText });
+    
+    // Clear the modal state
+    setIsLabelCommentOpen(false);
+    setLabelCommentRow(null);
+
+    try {
+      // Get existing notes and append the comment
+      const updateData = {
+        label_check_completed: false, // Mark as incomplete since comment was added
+      };
+      
+      // Add comment to notes if provided
+      if (commentText.trim()) {
+        try {
+          // We'll append to notes - for now just update the shipment
+          // The notes field will be handled by the backend
+          const notesText = commentText.trim();
+          updateData.notes = notesText;
+        } catch (error) {
+          console.error('Error preparing comment:', error);
+        }
+      }
+
+      // Update shipment in backend
+      await updateShipment(shipmentId, updateData);
+
+      // Get current user name (from localStorage or default)
+      const userName = localStorage.getItem('userName') || 'User';
+      const userInitials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+      const commentDate = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+      // Update local state
+      setShipments(prev => prev.map(s => {
+        if (s.id === shipmentId) {
+          return {
+            ...s,
+            labelCheckComment: true,
+            labelCheck: 'in progress', // keep in-progress but flagged with comment
+            labelCheckCommentText: commentText,
+            labelCheckCommentDate: commentDate,
+            labelCheckCommentUser: userName,
+            labelCheckCommentUserInitials: userInitials,
+          };
+        }
+        return s;
+      }));
+    } catch (error) {
+      console.error('Error saving label check comment:', error);
+      // Get current user name (from localStorage or default)
+      const userName = localStorage.getItem('userName') || 'User';
+      const userInitials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+      const commentDate = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+      // Still update local state even if backend fails
+      setShipments(prev => prev.map(s => {
+        if (s.id === shipmentId) {
+          return {
+            ...s,
+            labelCheckComment: true,
+            labelCheck: 'in progress',
+            labelCheckCommentText: commentText,
+            labelCheckCommentDate: commentDate,
+            labelCheckCommentUser: userName,
+            labelCheckCommentUserInitials: userInitials,
+          };
+        }
+        return s;
+      }));
     }
   };
 
@@ -426,6 +715,28 @@ const Planning = () => {
         setNewShipment={setNewShipment}
       />
 
+      <LabelCheckCommentModal
+        isOpen={isLabelCommentOpen}
+        onClose={() => {
+          setIsLabelCommentOpen(false);
+          setLabelCommentRow(null);
+        }}
+        onComplete={handleLabelCommentComplete}
+        isDarkMode={isDarkMode}
+      />
+
+      <StatusCommentModal
+        isOpen={isStatusCommentOpen}
+        onClose={() => {
+          setIsStatusCommentOpen(false);
+          setStatusCommentRow(null);
+          setStatusCommentField(null);
+        }}
+        onComplete={handleStatusCommentComplete}
+        isDarkMode={isDarkMode}
+        statusFieldName={statusCommentField}
+      />
+
       {/* Content */}
       <div style={{ padding: '1rem 2rem 2rem 2rem' }}>
         {/* Shipments tab */}
@@ -439,6 +750,8 @@ const Planning = () => {
                 activeFilters={activeFilters}
                 onFilterToggle={toggleFilter}
                 onRowClick={handleRowClick}
+                onLabelCheckClick={handleLabelCheckClick}
+                onStatusCommentClick={handleStatusCommentClick}
               />
             )}
           </>

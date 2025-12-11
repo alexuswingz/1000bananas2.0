@@ -1,13 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
-const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick }) => {
+const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabelCheckClick, onStatusCommentClick }) => {
   const { isDarkMode } = useTheme();
   const [openFilterColumn, setOpenFilterColumn] = useState(null);
   const filterIconRefs = useRef({});
   const filterDropdownRef = useRef(null);
   const [filters, setFilters] = useState({});
   const [sortConfig, setSortConfig] = useState({ field: '', order: '' });
+  const [hoveredCommentId, setHoveredCommentId] = useState(null);
+  const iconRefs = useRef({});
+  const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -131,39 +135,250 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick }) => {
   };
 
   // Render status circle based on status
-  const renderStatusCircle = (status) => {
+  const renderStatusCircle = (status, hasComment = false, commentText = '', rowId = null, commentData = {}, statusFieldName = null, row = null) => {
     let circleColor;
     let borderStyle = 'none';
     
-    switch (status?.toLowerCase()) {
-      case 'pending':
-        circleColor = '#FFFFFF'; // White/transparent
-        borderStyle = '1px solid #D1D5DB'; // Light gray outline
-        break;
-      case 'in progress':
-        circleColor = '#3B82F6'; // Blue
-        break;
-      case 'completed':
-        circleColor = '#10B981'; // Green
-        break;
-      default:
-        circleColor = '#FFFFFF'; // Default to white (Pending)
-        borderStyle = '1px solid #D1D5DB'; // Light gray outline
+    // If has comment, always show orange
+    if (hasComment) {
+      circleColor = '#F59E0B'; // Orange for comment/incomplete
+      borderStyle = 'none';
+    } else {
+      switch (status?.toLowerCase()) {
+        case 'pending':
+          circleColor = '#FFFFFF'; // White/transparent
+          borderStyle = '1px solid #D1D5DB'; // Light gray outline
+          break;
+        case 'in progress':
+          // Check if this is for label check - show orange for insufficient labels
+          circleColor = '#3B82F6'; // Blue for other in progress
+          break;
+        case 'completed':
+          circleColor = '#10B981'; // Green
+          break;
+        default:
+          circleColor = '#FFFFFF'; // Default to white (Pending)
+          borderStyle = '1px solid #D1D5DB'; // Light gray outline
+      }
     }
 
+    // Create unique identifier for this status field in this row
+    const uniqueCommentId = rowId && statusFieldName ? `${rowId}-${statusFieldName}` : null;
+    const isHovered = hoveredCommentId === uniqueCommentId && hasComment && commentText;
+    const { commentDate, commentUser, commentUserInitials } = commentData;
+    const userName = commentUser || 'User';
+    const userInitials = commentUserInitials || 'U';
+    const date = commentDate || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+    const handleIconClick = (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (hasComment && commentText && uniqueCommentId) {
+        // If has comment, show tooltip
+        if (hoveredCommentId === uniqueCommentId) {
+          // If already showing, close it
+          setHoveredCommentId(null);
+        } else {
+          // Calculate position and show tooltip
+          const rect = e.currentTarget.getBoundingClientRect();
+          setTooltipPos({
+            top: rect.bottom + window.scrollY + 12,
+            left: rect.left + rect.width / 2 + window.scrollX,
+          });
+          setHoveredCommentId(uniqueCommentId);
+        }
+      } else if (onStatusCommentClick && statusFieldName && row) {
+        // If no comment, allow adding one by clicking the circle
+        onStatusCommentClick(row, statusFieldName);
+      }
+    };
+
     return (
-      <div
-        style={{
-          width: '20px',
-          height: '20px',
-          borderRadius: '20px',
-          backgroundColor: circleColor,
-          border: borderStyle,
+      <div 
+        ref={(el) => { if (el && uniqueCommentId) iconRefs.current[uniqueCommentId] = el; }}
+        style={{ 
+          position: 'relative', 
           display: 'inline-block',
+          cursor: (onStatusCommentClick && statusFieldName && row) || (hasComment && commentText) ? 'pointer' : 'default'
         }}
-      />
+        onClick={handleIconClick}
+      >
+        <div
+          style={{
+            width: '20px',
+            height: '20px',
+            borderRadius: '20px',
+            backgroundColor: circleColor,
+            border: borderStyle,
+            display: 'inline-block',
+          }}
+        />
+        {hasComment && (
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#FFFFFF"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              pointerEvents: 'none',
+            }}
+          >
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+          </svg>
+        )}
+        {isHovered && createPortal(
+          <div
+            data-comment-tooltip={uniqueCommentId}
+            style={{
+              position: 'fixed',
+              top: `${tooltipPos.top}px`,
+              left: `${tooltipPos.left}px`,
+              transform: 'translateX(-50%)',
+              width: '320px',
+              backgroundColor: '#FFFFFF',
+              borderRadius: '8px',
+              padding: '16px',
+              zIndex: 999999,
+              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+              border: '1px solid #E5E7EB',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Tooltip arrow pointing up */}
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '100%',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: 0,
+                height: 0,
+                borderLeft: '8px solid transparent',
+                borderRight: '8px solid transparent',
+                borderBottom: '8px solid #FFFFFF',
+              }}
+            />
+            {/* Arrow border */}
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '100%',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: 0,
+                height: 0,
+                borderLeft: '9px solid transparent',
+                borderRight: '9px solid transparent',
+                borderBottom: '9px solid #E5E7EB',
+                marginBottom: '-1px',
+              }}
+            />
+            
+            {/* Header with avatar, name, and date */}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'flex-start', 
+              marginBottom: '0',
+              gap: '12px',
+            }}>
+              {/* Avatar */}
+              <div
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  backgroundColor: '#F59E0B',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#FFFFFF',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  flexShrink: 0,
+                }}
+              >
+                {userInitials}
+              </div>
+              
+              {/* Name, date, and comment text */}
+              <div style={{ 
+                flex: 1, 
+                minWidth: 0,
+              }}>
+                {/* Name and date on same line */}
+                <div style={{ 
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  flexWrap: 'wrap',
+                  marginBottom: '4px',
+                }}>
+                  <span style={{ 
+                    fontSize: '14px', 
+                    fontWeight: 600, 
+                    color: '#111827',
+                    lineHeight: '1.4',
+                  }}>
+                    {userName}
+                  </span>
+                  <span style={{ 
+                    fontSize: '14px', 
+                    fontWeight: 400, 
+                    color: '#6B7280',
+                    lineHeight: '1.4',
+                  }}>
+                    {date}
+                  </span>
+                </div>
+                
+                {/* Comment text below name/date */}
+                <div style={{ 
+                  fontSize: '14px', 
+                  fontWeight: 400, 
+                  color: '#374151', 
+                  lineHeight: '1.5', 
+                  wordWrap: 'break-word',
+                  whiteSpace: 'pre-wrap',
+                }}>
+                  {commentText}
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+      </div>
     );
   };
+
+  // Close tooltip when clicking outside
+  useEffect(() => {
+    if (hoveredCommentId) {
+      const handleClickOutside = (e) => {
+        // Check if click is outside the tooltip and icon
+        const iconElement = iconRefs.current[hoveredCommentId];
+        const tooltipElement = document.querySelector(`[data-comment-tooltip="${hoveredCommentId}"]`);
+        
+        if (iconElement && !iconElement.contains(e.target) && 
+            tooltipElement && !tooltipElement.contains(e.target)) {
+          setHoveredCommentId(null);
+        }
+      };
+
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [hoveredCommentId]);
 
   // Close filter dropdown when clicking outside
   useEffect(() => {
@@ -714,7 +929,13 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick }) => {
           {displayRows.map((row) => (
             <tr
               key={row.id}
-              onClick={() => onRowClick && onRowClick(row)}
+              onClick={(e) => {
+                // Don't navigate if clicking on label check cell
+                if (e.target.closest('td') && e.target.closest('td').getAttribute('data-label-check-cell')) {
+                  return;
+                }
+                if (onRowClick) onRowClick(row);
+              }}
               style={{
                 backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
                 height: '40px',
@@ -825,7 +1046,19 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick }) => {
                   height: '40px',
                 }}
               >
-                {renderStatusCircle(row.addProducts || 'pending')}
+                {renderStatusCircle(
+                  row.addProducts || 'pending',
+                  !!row.addProductsComment,
+                  row.addProductsCommentText || '',
+                  row.id,
+                  {
+                    commentDate: row.addProductsCommentDate,
+                    commentUser: row.addProductsCommentUser,
+                    commentUserInitials: row.addProductsCommentUserInitials,
+                  },
+                  'addProducts',
+                  row
+                )}
               </td>
               <td
                 style={{
@@ -837,7 +1070,54 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick }) => {
                   height: '40px',
                 }}
               >
-                {renderStatusCircle(row.formulaCheck || 'pending')}
+                {renderStatusCircle(
+                  row.formulaCheck || 'pending',
+                  !!row.formulaCheckComment,
+                  row.formulaCheckCommentText || '',
+                  row.id,
+                  {
+                    commentDate: row.formulaCheckCommentDate,
+                    commentUser: row.formulaCheckCommentUser,
+                    commentUserInitials: row.formulaCheckCommentUserInitials,
+                  },
+                  'formulaCheck',
+                  row
+                )}
+              </td>
+              <td
+                data-label-check-cell="true"
+                style={{
+                  padding: '0.75rem 1rem',
+                  verticalAlign: 'middle',
+                  textAlign: 'center',
+                  backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
+                  borderTop: '1px solid #E5E7EB',
+                  height: '40px',
+                  cursor: onLabelCheckClick ? 'pointer' : 'default',
+                  overflow: 'visible',
+                  position: 'relative',
+                }}
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  if (onLabelCheckClick) {
+                    await onLabelCheckClick(row);
+                  }
+                }}
+              >
+                {renderStatusCircle(
+                  row.labelCheck || 'pending', 
+                  !!row.labelCheckComment, 
+                  row.labelCheckCommentText || '', 
+                  row.id,
+                  {
+                    commentDate: row.labelCheckCommentDate,
+                    commentUser: row.labelCheckCommentUser,
+                    commentUserInitials: row.labelCheckCommentUserInitials,
+                  },
+                  'labelCheck',
+                  row
+                )}
               </td>
               <td
                 style={{
@@ -849,7 +1129,19 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick }) => {
                   height: '40px',
                 }}
               >
-                {renderStatusCircle(row.labelCheck || 'pending')}
+                {renderStatusCircle(
+                  row.bookShipment || 'pending',
+                  !!row.bookShipmentComment,
+                  row.bookShipmentCommentText || '',
+                  row.id,
+                  {
+                    commentDate: row.bookShipmentCommentDate,
+                    commentUser: row.bookShipmentCommentUser,
+                    commentUserInitials: row.bookShipmentCommentUserInitials,
+                  },
+                  'bookShipment',
+                  row
+                )}
               </td>
               <td
                 style={{
@@ -861,7 +1153,19 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick }) => {
                   height: '40px',
                 }}
               >
-                {renderStatusCircle(row.bookShipment || 'pending')}
+                {renderStatusCircle(
+                  row.sortProducts || 'pending',
+                  !!row.sortProductsComment,
+                  row.sortProductsCommentText || '',
+                  row.id,
+                  {
+                    commentDate: row.sortProductsCommentDate,
+                    commentUser: row.sortProductsCommentUser,
+                    commentUserInitials: row.sortProductsCommentUserInitials,
+                  },
+                  'sortProducts',
+                  row
+                )}
               </td>
               <td
                 style={{
@@ -873,19 +1177,19 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick }) => {
                   height: '40px',
                 }}
               >
-                {renderStatusCircle(row.sortProducts || 'pending')}
-              </td>
-              <td
-                style={{
-                  padding: '0.75rem 1rem',
-                  verticalAlign: 'middle',
-                  textAlign: 'center',
-                  backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
-                  borderTop: '1px solid #E5E7EB',
-                  height: '40px',
-                }}
-              >
-                {renderStatusCircle(row.sortFormulas || 'pending')}
+                {renderStatusCircle(
+                  row.sortFormulas || 'pending',
+                  !!row.sortFormulasComment,
+                  row.sortFormulasCommentText || '',
+                  row.id,
+                  {
+                    commentDate: row.sortFormulasCommentDate,
+                    commentUser: row.sortFormulasCommentUser,
+                    commentUserInitials: row.sortFormulasCommentUserInitials,
+                  },
+                  'sortFormulas',
+                  row
+                )}
               </td>
               <td
                 style={{

@@ -85,6 +85,14 @@ const NewShipment = () => {
   const doiIconRef = useRef(null);
   const doiTooltipRef = useRef(null);
 
+  // Track label-check completion counts
+  const labelCheckCompletedCount = useMemo(() => (
+    labelCheckRows.filter(row => row.totalCount !== '' && row.totalCount !== null && row.totalCount !== undefined).length
+  ), [labelCheckRows]);
+  const totalLabelCheckRows = labelCheckRows.length;
+  const labelCheckRemainingCount = totalLabelCheckRows - labelCheckCompletedCount;
+  const isLabelCheckReadyToComplete = totalLabelCheckRows > 0 && labelCheckRemainingCount === 0;
+
   // Close tooltip when clicking outside if it's pinned
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -834,39 +842,20 @@ const NewShipment = () => {
     }
   };
 
-  // Check for variance exceeded and get row IDs
+  // Check for insufficient labels (or variance for formulas) and get row IDs
   const checkVarianceExceeded = () => {
-    // For label-check and formula-check actions, check if there are products with variance exceeded
     if (activeAction === 'label-check') {
-      // Check rows from LabelCheckTable
-      // Variance is exceeded when discrepancy between calculated total and labels needed exceeds threshold
-      // Threshold: absolute value > 5% of labels needed or > 10 units (whichever is larger)
-      const varianceThreshold = 10; // Minimum threshold in units
-      const varianceThresholdPercent = 0.05; // 5% threshold
-      
-      const rowsWithVariance = labelCheckRows.filter(row => {
-        // Only check rows that have been completed (have a totalCount value)
-        if (row.totalCount === '' || row.totalCount === null || row.totalCount === undefined) {
-          return false;
-        }
-        
-        const calculatedTotal = typeof row.totalCount === 'number' ? row.totalCount : parseFloat(row.totalCount) || 0;
-        const labelsNeeded = row.quantity || 0;
-        
-        // Calculate discrepancy: calculated total - labels needed
-        const discrepancy = calculatedTotal - labelsNeeded;
-        const absVariance = Math.abs(discrepancy);
-        
-        // Check if variance exceeds threshold (either absolute or percentage)
-        const percentThreshold = Math.abs(labelsNeeded * varianceThresholdPercent);
-        const threshold = Math.max(varianceThreshold, percentThreshold);
-        
-        return absVariance > threshold;
+      // Count rows that have a recorded total but are insufficient vs needed
+      const insufficientRows = labelCheckRows.filter(row => {
+        if (row.totalCount === '' || row.totalCount === null || row.totalCount === undefined) return false;
+        const counted = typeof row.totalCount === 'number' ? row.totalCount : parseFloat(row.totalCount) || 0;
+        const needed = row.quantity || 0;
+        return counted < needed;
       });
-      
-      const varianceRowIds = rowsWithVariance.map(row => row.id);
-      setVarianceExceededRowIds(varianceRowIds);
-      return varianceRowIds.length;
+
+      const insufficientIds = insufficientRows.map(row => row.id);
+      setVarianceExceededRowIds(insufficientIds);
+      return insufficientIds.length;
     }
     
     if (activeAction === 'formula-check') {
@@ -935,6 +924,37 @@ const NewShipment = () => {
     toast.success('Formula Check completed! Moving to Label Check');
   };
 
+  const completeLabelCheck = async (comment = '') => {
+    if (!shipmentId) {
+      toast.error('Please book the shipment first');
+      return;
+    }
+
+    const updateData = {
+      label_check_completed: true,
+      status: 'book_shipment',
+    };
+
+    if (comment && comment.trim()) {
+      try {
+        const shipment = await getShipmentById(shipmentId);
+        const existingNotes = shipment?.notes || '';
+        const newNotes = existingNotes
+          ? `${existingNotes}\n\nLabel Check Comment: ${comment.trim()}`
+          : `Label Check Comment: ${comment.trim()}`;
+        updateData.notes = newNotes;
+      } catch (error) {
+        console.error('Error fetching shipment notes:', error);
+        updateData.notes = `Label Check Comment: ${comment.trim()}`;
+      }
+    }
+
+    await updateShipment(shipmentId, updateData);
+    setCompletedTabs(prev => new Set(prev).add('label-check'));
+    setActiveAction('book-shipment');
+    toast.success('Label Check completed! Moving to Book Shipment.');
+  };
+
   const handleCompleteClick = async () => {
     try {
       if (!shipmentId) {
@@ -959,6 +979,11 @@ const NewShipment = () => {
       }
 
       if (activeAction === 'label-check') {
+      if (!isLabelCheckReadyToComplete) {
+        toast.error('Complete all label counts before continuing.');
+        return;
+      }
+
         // Check for variance first
         const varianceCount = checkVarianceExceeded();
         if (varianceCount > 0) {
@@ -2072,7 +2097,7 @@ const NewShipment = () => {
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
                   }}>
-                    {labelCheckRows.length}
+                    {totalLabelCheckRows}
                   </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -2089,7 +2114,7 @@ const NewShipment = () => {
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
                   }}>
-                    {labelCheckRows.filter(row => row.totalCount !== '' && row.totalCount !== null && row.totalCount !== undefined).length}
+                    {labelCheckCompletedCount}
                   </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -2106,34 +2131,40 @@ const NewShipment = () => {
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
                   }}>
-                    {labelCheckRows.length - labelCheckRows.filter(row => row.totalCount !== '' && row.totalCount !== null && row.totalCount !== undefined).length}
+                    {labelCheckRemainingCount}
                   </span>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                 <button
                   type="button"
+                  disabled={!isLabelCheckReadyToComplete}
                   onClick={handleCompleteClick}
                   style={{
                     height: '31px',
                     padding: '0 16px',
                     borderRadius: '6px',
                     border: 'none',
-                    backgroundColor: '#007AFF',
+                    backgroundColor: isLabelCheckReadyToComplete ? '#007AFF' : '#9CA3AF',
                     color: '#FFFFFF',
                     fontSize: '14px',
                     fontWeight: 500,
-                    cursor: 'pointer',
+                    cursor: isLabelCheckReadyToComplete ? 'pointer' : 'not-allowed',
+                    opacity: isLabelCheckReadyToComplete ? 1 : 0.7,
                     transition: 'all 0.2s',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#0056CC';
+                    if (isLabelCheckReadyToComplete) {
+                      e.currentTarget.style.backgroundColor = '#0056CC';
+                    }
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#007AFF';
+                    if (isLabelCheckReadyToComplete) {
+                      e.currentTarget.style.backgroundColor = '#007AFF';
+                    }
                   }}
                 >
                   Complete
@@ -2531,7 +2562,19 @@ const NewShipment = () => {
         isOpen={isVarianceExceededOpen}
         onClose={() => setIsVarianceExceededOpen(false)}
         onGoBack={handleVarianceGoBack}
-        onRecount={handleVarianceRecount}
+        onRecount={async () => {
+          setIsVarianceExceededOpen(false);
+          // Navigate back to planning table with state to show comment modal
+          navigate('/dashboard/production/planning', {
+            state: {
+              showLabelCommentModal: true,
+              shipmentId: shipmentId,
+              shipmentNumber: shipmentData?.shipmentNumber,
+              marketplace: shipmentData?.marketplace || 'Amazon',
+              account: shipmentData?.account || 'TPS Nutrients',
+            }
+          });
+        }}
         varianceCount={varianceCount}
       />
 
@@ -2554,6 +2597,7 @@ const NewShipment = () => {
         }}
         isDarkMode={isDarkMode}
       />
+
 
       {/* Book Shipment Complete Modal */}
       {isBookShipmentCompleteOpen && (
@@ -2724,4 +2768,5 @@ const NewShipment = () => {
 };
 
 export default NewShipment;
+
 
