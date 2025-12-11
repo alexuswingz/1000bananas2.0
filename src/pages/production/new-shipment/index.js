@@ -122,8 +122,12 @@ const NewShipment = () => {
   const hideLabelCheckHeader = Boolean(location.state?.existingShipment);
 
   // Track label-check completion counts
+  // A row is complete if it was either confirmed (quick check) or counted (detailed verify)
   const labelCheckCompletedCount = useMemo(() => (
-    labelCheckRows.filter(row => row.totalCount !== '' && row.totalCount !== null && row.totalCount !== undefined).length
+    labelCheckRows.filter(row => 
+      row.isComplete || // New: explicit completion flag from LabelCheckTable
+      (row.totalCount !== '' && row.totalCount !== null && row.totalCount !== undefined) // Legacy: totalCount set
+    ).length
   ), [labelCheckRows]);
   const totalLabelCheckRows = labelCheckRows.length;
   const labelCheckRemainingCount = totalLabelCheckRows - labelCheckCompletedCount;
@@ -1402,7 +1406,9 @@ const NewShipment = () => {
         shipmentId={shipmentId}
         canAccessTab={canAccessTab}
         formulaCheckHasComment={formulaCheckHasComment}
+        formulaCheckRemainingCount={formulaCheckData.remaining || 0}
         labelCheckHasComment={labelCheckHasComment}
+        labelCheckRemainingCount={labelCheckRemainingCount}
         hideActionsDropdown={hideActionsDropdown}
       />
 

@@ -160,9 +160,13 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
     }
 
     // Force orange when there's an outstanding comment on label or formula check
-    if (hasComment && (statusFieldName === 'labelCheck' || statusFieldName === 'formulaCheck')) {
-      circleColor = '#F59E0B'; // Orange for comment/incomplete
-      borderStyle = 'none';
+    // OR when status is pending (not completed) for label or formula check
+    // But don't override if status is already completed (green)
+    if ((statusFieldName === 'labelCheck' || statusFieldName === 'formulaCheck') && normalizedStatus !== 'completed') {
+      if (hasComment || normalizedStatus === 'pending') {
+        circleColor = '#F59E0B'; // Orange for comment/incomplete/pending
+        borderStyle = 'none';
+      }
     }
 
     // Create unique identifier for this status field in this row

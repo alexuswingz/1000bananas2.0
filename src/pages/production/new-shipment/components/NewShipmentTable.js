@@ -37,6 +37,17 @@ const NewShipmentTable = ({
     filterValue: '',
   });
 
+  // Get units_per_case increment for a product (from database, fallback to 1)
+  const getUnitsPerCase = (row) => {
+    // Use units_per_case from database if available
+    const unitsPerCase = row?.units_per_case || row?.unitsPerCase;
+    if (unitsPerCase && unitsPerCase > 0) {
+      return unitsPerCase;
+    }
+    // Fallback to 1 if not available
+    return 1;
+  };
+
   // Calculate available labels for a product, accounting for other products with same label_location
   const getAvailableLabelsForRow = (row, rowIndex) => {
     if (!row?.label_location) return row?.labelsAvailable || 0;
@@ -698,13 +709,7 @@ const NewShipmentTable = ({
                       <div style={{ position: 'relative', display: 'inline-block' }}>
                         <input
                           type="number"
-                          step={(() => {
-                            const size = row.size?.toLowerCase() || '';
-                            if (size.includes('8oz')) return 60;
-                            if (size.includes('quart')) return 12;
-                            if (size.includes('gallon')) return 4;
-                            return 1;
-                          })()}
+                          step={getUnitsPerCase(row)}
                           value={effectiveQtyValues[index] !== undefined && effectiveQtyValues[index] !== null && effectiveQtyValues[index] !== '' ? String(effectiveQtyValues[index]) : ''}
                           onChange={(e) => {
                             const inputValue = e.target.value;
@@ -717,16 +722,8 @@ const NewShipmentTable = ({
                             } else {
                               const numValue = parseInt(inputValue, 10);
                               if (!isNaN(numValue) && numValue >= 0) {
-                                // Determine increment based on size
-                                let increment = 1;
-                                const size = row.size?.toLowerCase() || '';
-                                if (size.includes('8oz')) {
-                                  increment = 60;
-                                } else if (size.includes('quart')) {
-                                  increment = 12;
-                                } else if (size.includes('gallon')) {
-                                  increment = 4;
-                                }
+                                // Use units_per_case from database
+                                const increment = getUnitsPerCase(row);
                                 
                                 // Round immediately as user types
                                 const rounded = Math.round(numValue / increment) * increment;
@@ -843,13 +840,8 @@ const NewShipmentTable = ({
                                 e.preventDefault();
                                 const labelsAvailable = getAvailableLabelsForRow(row, index);
                                 
-                                // Round down to nearest case pack increment
-                                let increment = 1;
-                                const size = row.size?.toLowerCase() || '';
-                                if (size.includes('8oz')) increment = 60;
-                                else if (size.includes('quart')) increment = 12;
-                                else if (size.includes('gallon')) increment = 4;
-                                
+                                // Round down to nearest case pack increment using units_per_case from database
+                                const increment = getUnitsPerCase(row);
                                 const maxQty = Math.floor(labelsAvailable / increment) * increment;
                                 
                                 effectiveSetQtyValues(prev => ({
@@ -1960,16 +1952,8 @@ const NewShipmentTable = ({
                           } else {
                             const newValue = parseInt(inputValue, 10);
                             if (!isNaN(newValue) && newValue >= 0) {
-                              // Determine increment based on size
-                              let increment = 1;
-                              const size = row.size?.toLowerCase() || '';
-                              if (size.includes('8oz')) {
-                                increment = 60;
-                              } else if (size.includes('quart')) {
-                                increment = 12;
-                              } else if (size.includes('gallon')) {
-                                increment = 4;
-                              }
+                              // Use units_per_case from database
+                              const increment = getUnitsPerCase(row);
                               
                               // Round immediately as user types
                               const rounded = Math.round(newValue / increment) * increment;
@@ -1993,16 +1977,8 @@ const NewShipmentTable = ({
                             // Round to nearest multiple based on size
                             const numValue = typeof currentValue === 'number' ? currentValue : parseInt(currentValue, 10);
                             if (!isNaN(numValue) && numValue > 0) {
-                              // Determine increment based on size
-                              let increment = 0;
-                              const size = row.size?.toLowerCase() || '';
-                              if (size.includes('8oz')) {
-                                increment = 60;
-                              } else if (size.includes('quart')) {
-                                increment = 12;
-                              } else if (size.includes('gallon')) {
-                                increment = 4;
-                              }
+                              // Use units_per_case from database
+                              const increment = getUnitsPerCase(row);
                               
                               // Round to nearest multiple of increment
                               if (increment > 0) {
@@ -2080,17 +2056,8 @@ const NewShipmentTable = ({
                             const currentQty = effectiveQtyValues[index] ?? 0;
                             const numQty = typeof currentQty === 'number' ? currentQty : (currentQty === '' || currentQty === null || currentQty === undefined ? 0 : parseInt(currentQty, 10) || 0);
                             
-                            // Determine increment based on size
-                            let increment = 0;
-                            const size = row.size?.toLowerCase() || '';
-                            if (size.includes('8oz')) {
-                              increment = 60;
-                            } else if (size.includes('quart')) {
-                              increment = 12;
-                            } else if (size.includes('gallon')) {
-                              increment = 4;
-                            }
-                            
+                            // Use units_per_case from database
+                            const increment = getUnitsPerCase(row);
                             const newQty = Math.max(0, numQty + increment);
                             effectiveSetQtyValues(prev => ({
                               ...prev,
@@ -2137,17 +2104,8 @@ const NewShipmentTable = ({
                             const currentQty = effectiveQtyValues[index] ?? 0;
                             const numQty = typeof currentQty === 'number' ? currentQty : (currentQty === '' || currentQty === null || currentQty === undefined ? 0 : parseInt(currentQty, 10) || 0);
                             
-                            // Determine increment based on size
-                            let increment = 0;
-                            const size = row.size?.toLowerCase() || '';
-                            if (size.includes('8oz')) {
-                              increment = 60;
-                            } else if (size.includes('quart')) {
-                              increment = 12;
-                            } else if (size.includes('gallon')) {
-                              increment = 4;
-                            }
-                            
+                            // Use units_per_case from database
+                            const increment = getUnitsPerCase(row);
                             const newQty = Math.max(0, numQty - increment);
                             effectiveSetQtyValues(prev => ({
                               ...prev,
@@ -2294,12 +2252,8 @@ const NewShipmentTable = ({
                             const labelsAvailable = getAvailableLabelsForRow(row, index);
                             
                             // Round down to nearest case pack increment
-                            let increment = 1;
-                            const size = row.size?.toLowerCase() || '';
-                            if (size.includes('8oz')) increment = 60;
-                            else if (size.includes('quart')) increment = 12;
-                            else if (size.includes('gallon')) increment = 4;
-                            
+                            // Use units_per_case from database
+                            const increment = getUnitsPerCase(row);
                             const maxQty = Math.floor(labelsAvailable / increment) * increment;
                             
                             effectiveSetQtyValues(prev => ({

@@ -2523,6 +2523,65 @@ def update_label_inventory(event):
         cursor.close()
         conn.close()
 
+def update_label_inventory_by_location(event):
+    """PUT /supply-chain/labels/inventory/by-location - Update label inventory by label_location
+    
+    Used by Label Check in production planning to update inventory after counting.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        data = json.loads(event.get('body', '{}'))
+        label_location = data.get('label_location')
+        
+        if not label_location:
+            return cors_response(400, {
+                'success': False,
+                'error': 'label_location is required'
+            })
+        
+        warehouse_inventory = data.get('warehouse_inventory')
+        if warehouse_inventory is None:
+            return cors_response(400, {
+                'success': False,
+                'error': 'warehouse_inventory is required'
+            })
+        
+        cursor.execute("""
+            UPDATE label_inventory 
+            SET warehouse_inventory = %s,
+                last_count_date = CURRENT_DATE,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE label_location = %s
+            RETURNING *
+        """, (warehouse_inventory, label_location))
+        
+        label = cursor.fetchone()
+        conn.commit()
+        
+        if not label:
+            return cors_response(404, {
+                'success': False,
+                'error': f'Label inventory not found for location: {label_location}'
+            })
+        
+        return cors_response(200, {
+            'success': True,
+            'data': dict(label),
+            'message': f'Label inventory updated for {label_location}'
+        })
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
 def get_label_orders(event):
     """GET /supply-chain/labels/orders - Get all label orders"""
     conn = get_db_connection()
@@ -3879,6 +3938,257 @@ def complete_box_cycle_count(event):
         conn.close()
 
 # ============================================
+# LABEL FORMULAS (WEIGHT-TO-LABELS CONVERSION)
+# ============================================
+
+def get_label_formulas(event):
+    """GET /supply-chain/labels/formulas - Get all label formulas for weight-to-labels conversion
+    
+    Formula from 1000 Bananas Database > LabelFormulas:
+    labels = (gram_weight - core_weight_grams) / grams_per_label
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cursor.execute("""
+            SELECT 
+                id,
+                label_size,
+                core_weight_grams,
+                grams_per_label,
+                notes,
+                created_at,
+                updated_at
+            FROM label_formulas
+            ORDER BY label_size
+        """)
+        formulas = cursor.fetchall()
+        
+        return cors_response(200, {
+            'success': True,
+            'data': formulas
+        })
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_label_formula_by_size(event):
+    """GET /supply-chain/labels/formulas/{label_size} - Get formula for specific label size
+    
+    Formula: labels = (gram_weight - core_weight_grams) / grams_per_label
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # Get label_size from path or query params
+        path_params = event.get('pathParameters') or {}
+        query_params = event.get('queryStringParameters') or {}
+        label_size = path_params.get('label_size') or query_params.get('label_size')
+        
+        if not label_size:
+            return cors_response(400, {
+                'success': False,
+                'error': 'label_size parameter is required'
+            })
+        
+        cursor.execute("""
+            SELECT 
+                id,
+                label_size,
+                core_weight_grams,
+                grams_per_label,
+                notes
+            FROM label_formulas
+            WHERE label_size = %s
+        """, (label_size,))
+        formula = cursor.fetchone()
+        
+        if not formula:
+            # Return default formula if not found (5" x 8" default)
+            return cors_response(200, {
+                'success': True,
+                'data': {
+                    'label_size': label_size,
+                    'core_weight_grams': 71,
+                    'grams_per_label': 3.35,
+                    'notes': 'Default formula - not found in database'
+                }
+            })
+        
+        return cors_response(200, {
+            'success': True,
+            'data': formula
+        })
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def get_label_formula_by_location(event):
+    """GET /supply-chain/labels/formulas/by-location - Get formula by label location
+    
+    Formula: labels = (gram_weight - core_weight_grams) / grams_per_label
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        query_params = event.get('queryStringParameters') or {}
+        label_location = query_params.get('label_location')
+        
+        if not label_location:
+            return cors_response(400, {
+                'success': False,
+                'error': 'label_location parameter is required'
+            })
+        
+        # First get the label_size from label_inventory using label_location
+        cursor.execute("""
+            SELECT label_size FROM label_inventory 
+            WHERE label_location = %s
+            LIMIT 1
+        """, (label_location,))
+        inv_result = cursor.fetchone()
+        
+        label_size = inv_result.get('label_size') if inv_result else None
+        
+        if label_size:
+            # Get formula by label_size
+            cursor.execute("""
+                SELECT 
+                    id,
+                    label_size,
+                    core_weight_grams,
+                    grams_per_label,
+                    notes
+                FROM label_formulas
+                WHERE label_size = %s
+            """, (label_size,))
+            formula = cursor.fetchone()
+            
+            if formula:
+                return cors_response(200, {
+                    'success': True,
+                    'data': formula
+                })
+        
+        # Return default formula if not found (5" x 8" default)
+        return cors_response(200, {
+            'success': True,
+            'data': {
+                'label_location': label_location,
+                'label_size': label_size,
+                'core_weight_grams': 71,
+                'grams_per_label': 3.35,
+                'notes': 'Default formula - label size not found or no formula defined'
+            }
+        })
+    except Exception as e:
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def update_label_formula(event):
+    """PUT /supply-chain/labels/formulas/{id} - Update label formula"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        formula_id = event['pathParameters']['id']
+        body = json.loads(event.get('body', '{}'))
+        
+        cursor.execute("""
+            UPDATE label_formulas 
+            SET label_size = COALESCE(%s, label_size),
+                core_weight_grams = COALESCE(%s, core_weight_grams),
+                grams_per_label = COALESCE(%s, grams_per_label),
+                notes = COALESCE(%s, notes),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+            RETURNING *
+        """, (
+            body.get('label_size'),
+            body.get('core_weight_grams'),
+            body.get('grams_per_label'),
+            body.get('notes'),
+            formula_id
+        ))
+        
+        updated = cursor.fetchone()
+        conn.commit()
+        
+        if not updated:
+            return cors_response(404, {'success': False, 'error': 'Formula not found'})
+        
+        return cors_response(200, {'success': True, 'data': updated})
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+def create_label_formula(event):
+    """POST /supply-chain/labels/formulas - Create new label formula
+    
+    Formula: labels = (gram_weight - core_weight_grams) / grams_per_label
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        body = json.loads(event.get('body', '{}'))
+        
+        cursor.execute("""
+            INSERT INTO label_formulas 
+            (label_size, core_weight_grams, grams_per_label, notes)
+            VALUES (%s, %s, %s, %s)
+            RETURNING *
+        """, (
+            body.get('label_size'),
+            body.get('core_weight_grams', 71),
+            body.get('grams_per_label', 3.35),
+            body.get('notes')
+        ))
+        
+        created = cursor.fetchone()
+        conn.commit()
+        
+        return cors_response(201, {'success': True, 'data': created})
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
+# ============================================
 # LABEL DOI (DAYS OF INVENTORY) CALCULATION
 # ============================================
 
@@ -5168,6 +5478,84 @@ def get_shipment_products(event):
         cursor.close()
         conn.close()
 
+def update_shipment_product_label_check(event):
+    """PUT /production/shipments/{id}/products/{product_id}/label-check - Update label check status for a product"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        shipment_id = event['pathParameters']['id']
+        product_id = event['pathParameters'].get('product_id')
+        body = json.loads(event.get('body', '{}'))
+        
+        status = body.get('status')  # 'confirmed' or 'counted'
+        count = body.get('count')  # Only for 'counted' status
+        
+        if not status:
+            return cors_response(400, {
+                'success': False,
+                'error': 'status is required (confirmed or counted)'
+            })
+        
+        if status == 'counted':
+            # Update with count value and update label_inventory
+            cursor.execute("""
+                UPDATE shipment_products 
+                SET label_check_status = %s,
+                    label_check_count = %s,
+                    label_check_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s AND shipment_id = %s
+                RETURNING *
+            """, (status, count, product_id, shipment_id))
+            
+            product = cursor.fetchone()
+            
+            # Also update label_inventory if count provided and label_location exists
+            if count is not None and product and product.get('label_location'):
+                cursor.execute("""
+                    UPDATE label_inventory 
+                    SET warehouse_inventory = %s,
+                        last_count_date = CURRENT_DATE,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE label_location = %s
+                """, (count, product['label_location']))
+        else:
+            # Just mark as confirmed (no count update)
+            cursor.execute("""
+                UPDATE shipment_products 
+                SET label_check_status = %s,
+                    label_check_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s AND shipment_id = %s
+                RETURNING *
+            """, (status, product_id, shipment_id))
+            
+            product = cursor.fetchone()
+        
+        conn.commit()
+        
+        if not product:
+            return cors_response(404, {
+                'success': False,
+                'error': f'Product {product_id} not found in shipment {shipment_id}'
+            })
+        
+        return cors_response(200, {
+            'success': True,
+            'data': dict(product)
+        })
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
 def get_sellables(event):
     """GET /production/floor-inventory/sellables - Get products ready to manufacture/ship"""
     conn = get_db_connection()
@@ -5720,6 +6108,9 @@ def lambda_handler(event, context):
                 return get_label_inventory_by_id(event)
             return get_label_inventory(event)
         
+        elif http_method == 'PUT' and '/labels/inventory/by-location' in path:
+            return update_label_inventory_by_location(event)
+        
         elif http_method == 'PUT' and '/labels/inventory/' in path:
             return update_label_inventory(event)
         
@@ -5765,6 +6156,22 @@ def lambda_handler(event, context):
         elif http_method == 'GET' and ('/labels/costs' in path or path.endswith('/labels/costs')):
             return get_label_costs(event)
         
+        # Supply Chain - Labels Formulas (weight-to-labels conversion)
+        elif http_method == 'GET' and '/labels/formulas/by-location' in path:
+            return get_label_formula_by_location(event)
+        
+        elif http_method == 'GET' and '/labels/formulas/' in path and not path.endswith('/labels/formulas'):
+            return get_label_formula_by_size(event)
+        
+        elif http_method == 'GET' and ('/labels/formulas' in path or path.endswith('/labels/formulas')):
+            return get_label_formulas(event)
+        
+        elif http_method == 'POST' and ('/labels/formulas' in path or path.endswith('/labels/formulas')):
+            return create_label_formula(event)
+        
+        elif http_method == 'PUT' and '/labels/formulas/' in path:
+            return update_label_formula(event)
+        
         # Production Planning
         elif http_method == 'GET' and path.endswith('/production/planning'):
             return get_production_planning(event)
@@ -5804,6 +6211,9 @@ def lambda_handler(event, context):
         
         elif http_method == 'GET' and '/production/shipments/' in path and '/products' in path:
             return get_shipment_products(event)
+        
+        elif http_method == 'PUT' and '/production/shipments/' in path and '/label-check' in path and '/products/' in path:
+            return update_shipment_product_label_check(event)
         
         elif http_method == 'POST' and '/production/shipments/' in path and '/products' in path:
             return add_shipment_products(event)

@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
-import { getShipmentProducts } from '../../../../services/productionApi';
+import { getShipmentProducts, getLabelFormulaByLocation, updateLabelInventoryByLocation, updateShipmentProductLabelCheck } from '../../../../services/productionApi';
 import VarianceStillExceededModal from './VarianceStillExceededModal';
 
 const LabelCheckTable = ({
@@ -50,12 +50,34 @@ const LabelCheckTable = ({
   const [isStartPreviewOpen, setIsStartPreviewOpen] = useState(false);
   const [showInfoTooltip, setShowInfoTooltip] = useState(false);
   const [completedRows, setCompletedRows] = useState(new Set());
+  const [confirmedRows, setConfirmedRows] = useState(new Set()); // Rows confirmed without counting
   const [completedRowStatus, setCompletedRowStatus] = useState({}); // id -> insufficient?: true/false
   const [isVarianceStillExceededOpen, setIsVarianceStillExceededOpen] = useState(false);
+  const [labelFormula, setLabelFormula] = useState(null); // Current label formula for weight conversion
   const hideActionsDropdown = Boolean(shipmentId);
   const disableHeaderDropdown = true; // Always show label check products; no collapsible header
   const filterIconRefs = useRef({});
   const filterDropdownRef = useRef(null);
+
+  // Fetch label formula when a row is selected for counting
+  const fetchLabelFormula = useCallback(async (labelLocation) => {
+    if (!labelLocation) {
+      setLabelFormula(null);
+      return;
+    }
+    try {
+      const formula = await getLabelFormulaByLocation(labelLocation);
+      setLabelFormula(formula);
+    } catch (error) {
+      console.error('Error fetching label formula:', error);
+      // Use default formula if fetch fails
+      setLabelFormula({
+        labels_per_gram: 5.56,
+        full_roll_labels: 2500,
+        core_weight_grams: 50
+      });
+    }
+  }, []);
 
   // Load label data from API
   useEffect(() => {
@@ -69,19 +91,43 @@ const LabelCheckTable = ({
       setLoading(true);
       const data = await getShipmentProducts(shipmentId);
       
+      // Initialize completed/confirmed rows from saved database status
+      const newCompletedRows = new Set();
+      const newConfirmedRows = new Set();
+      const newCompletedRowStatus = {};
+      
       // Transform API data to match table format
-      const formattedRows = data.map(product => ({
-        id: product.id,
-        brand: product.brand_name,
-        product: product.product_name,
-        size: product.size,
-        quantity: product.labels_needed,
-        lblCurrentInv: product.labels_available || 0,
-        labelLocation: product.label_location,
-        totalCount: '',
-      }));
+      const formattedRows = data.map(product => {
+        const row = {
+          id: product.id,
+          brand: product.brand_name,
+          product: product.product_name,
+          size: product.size,
+          quantity: product.labels_needed,
+          lblCurrentInv: product.labels_available || 0,
+          labelLocation: product.label_location,
+          totalCount: product.label_check_count || '',
+          label_check_status: product.label_check_status,
+        };
+        
+        // Restore completed/confirmed status from database
+        if (product.label_check_status === 'confirmed') {
+          newConfirmedRows.add(product.id);
+          newCompletedRows.add(product.id);
+          newCompletedRowStatus[product.id] = false; // Confirmed = not insufficient
+        } else if (product.label_check_status === 'counted') {
+          newCompletedRows.add(product.id);
+          const insufficient = (product.label_check_count || 0) < (product.labels_needed || 0);
+          newCompletedRowStatus[product.id] = insufficient;
+        }
+        
+        return row;
+      });
       
       setRows(formattedRows);
+      setCompletedRows(newCompletedRows);
+      setConfirmedRows(newConfirmedRows);
+      setCompletedRowStatus(newCompletedRowStatus);
     } catch (error) {
       console.error('Error loading label data:', error);
       setRows([]); // Use empty array on error instead of dummy data
@@ -112,6 +158,10 @@ const LabelCheckTable = ({
     setSelectedRow(row);
     setSelectedRowIndex(index);
     setIsStartPreviewOpen(true);
+    // Fetch label formula when opening the modal
+    if (row.labelLocation) {
+      fetchLabelFormula(row.labelLocation);
+    }
   };
 
   const handleCloseModal = () => {
@@ -123,7 +173,7 @@ const LabelCheckTable = ({
     setPartialWeights(['', '', '']);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (selectedRow && selectedRow.id) {
       const calculatedTotal = calculateTotalLabels();
       const labelsNeeded = selectedRow.quantity || 0;
@@ -140,11 +190,29 @@ const LabelCheckTable = ({
         return;
       }
       
+      // Save label check status to database (this also updates label_inventory)
+      if (shipmentId) {
+        try {
+          await updateShipmentProductLabelCheck(shipmentId, selectedRow.id, 'counted', calculatedTotal);
+          console.log(`Label check counted for product ${selectedRow.id}: ${calculatedTotal}`);
+        } catch (error) {
+          console.error('Error saving label check:', error);
+          // Fallback: try to update label inventory directly
+          if (selectedRow.labelLocation) {
+            try {
+              await updateLabelInventoryByLocation(selectedRow.labelLocation, calculatedTotal);
+            } catch (e) {
+              console.error('Error updating label inventory:', e);
+            }
+          }
+        }
+      }
+      
       // Save the calculated total (not discrepancy) for display
       // The discrepancy will be calculated as: totalCount - labelsNeeded
       const updatedRows = rows.map(row => 
         row.id === selectedRow.id 
-          ? { ...row, totalCount: calculatedTotal }
+          ? { ...row, totalCount: calculatedTotal, lblCurrentInv: calculatedTotal }
           : row
       );
       setRows(updatedRows);
@@ -161,16 +229,35 @@ const LabelCheckTable = ({
     setIsVarianceStillExceededOpen(false);
   };
 
-  const handleVarianceConfirm = () => {
+  const handleVarianceConfirm = async () => {
     // User confirmed the variance - save the data and close both modals
     if (selectedRow && selectedRow.id) {
       const calculatedTotal = calculateTotalLabels();
       const labelsNeeded = selectedRow.quantity || 0;
       const insufficient = calculatedTotal < labelsNeeded;
+      
+      // Save label check status to database (this also updates label_inventory)
+      if (shipmentId) {
+        try {
+          await updateShipmentProductLabelCheck(shipmentId, selectedRow.id, 'counted', calculatedTotal);
+          console.log(`Label check counted (variance confirmed) for product ${selectedRow.id}: ${calculatedTotal}`);
+        } catch (error) {
+          console.error('Error saving label check:', error);
+          // Fallback: try to update label inventory directly
+          if (selectedRow.labelLocation) {
+            try {
+              await updateLabelInventoryByLocation(selectedRow.labelLocation, calculatedTotal);
+            } catch (e) {
+              console.error('Error updating label inventory:', e);
+            }
+          }
+        }
+      }
+      
       // Save the calculated total even though variance exceeds
       const updatedRows = rows.map(row => 
         row.id === selectedRow.id 
-          ? { ...row, totalCount: calculatedTotal }
+          ? { ...row, totalCount: calculatedTotal, lblCurrentInv: calculatedTotal }
           : row
       );
       setRows(updatedRows);
@@ -203,17 +290,27 @@ const LabelCheckTable = ({
   };
 
   const calculateTotalLabels = () => {
-    // Label Weight Calculation Formula:
-    // - Each full roll = 1000 labels
-    // - Each gram of partial roll = 10 labels
+    // Label Weight Calculation Formula from 1000 Bananas Database > LabelFormulas:
+    // - Full roll count: User enters actual label count directly (e.g., 2500 labels)
+    // - Partial roll: labels = (gram_weight - core_weight) / grams_per_label
+    
+    // Full rolls: Sum of all entered label counts (direct values)
     const fullRollTotal = fullRolls.reduce((sum, roll) => {
-      const numRolls = parseInt(roll) || 0;
-      return sum + (numRolls * 1000); // Each roll = 1000 labels
+      const numLabels = parseInt(roll) || 0;
+      return sum + numLabels; // Direct label count
     }, 0);
+    
+    // Partial rolls: Convert weight to labels using formula
+    // Default formula values if not loaded: core_weight=71g, grams_per_label=3.35
+    const coreWeight = labelFormula?.core_weight_grams || 71;
+    const gramsPerLabel = labelFormula?.grams_per_label || 3.35;
     
     const partialWeightTotal = partialWeights.reduce((sum, weight) => {
       const numGrams = parseFloat(weight) || 0;
-      return sum + (numGrams * 10); // Each gram = 10 labels
+      if (numGrams <= coreWeight) return sum; // Not enough weight (just core)
+      // Formula: labels = (weight - core_weight) / grams_per_label
+      const labels = Math.floor((numGrams - coreWeight) / gramsPerLabel);
+      return sum + Math.max(0, labels);
     }, 0);
     
     return fullRollTotal + partialWeightTotal;
@@ -248,11 +345,19 @@ const LabelCheckTable = ({
   };
 
   // Notify parent component when rows data changes
+  // Include completion status in the row data so parent can track confirmed rows
   useEffect(() => {
     if (onRowsDataChange) {
-      onRowsDataChange(rows);
+      // Merge completion status into rows so parent knows which are done
+      const rowsWithStatus = rows.map(row => ({
+        ...row,
+        isComplete: completedRows.has(row.id) || confirmedRows.has(row.id),
+        isConfirmed: confirmedRows.has(row.id),
+        isCounted: completedRows.has(row.id) && !confirmedRows.has(row.id),
+      }));
+      onRowsDataChange(rowsWithStatus);
     }
-  }, [rows, onRowsDataChange]);
+  }, [rows, completedRows, confirmedRows, onRowsDataChange]);
 
   // Close filter dropdown when clicking outside
   useEffect(() => {
@@ -833,14 +938,14 @@ const LabelCheckTable = ({
                   color: isDarkMode ? '#9CA3AF' : '#6B7280',
                   marginBottom: '16px',
                 }}>
-                  Enter the quantity of complete, unused label rolls.
+                  Enter the label count for each full roll (e.g., 2500).
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {fullRolls.map((roll, index) => (
                     <input
                       key={index}
-                      type="text"
-                      placeholder="Enter roll quantity..."
+                      type="number"
+                      placeholder="Enter label count..."
                       value={roll}
                       onChange={(e) => handleRollChange(index, e.target.value)}
                       style={{
@@ -1223,7 +1328,25 @@ const LabelCheckTable = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button
                 type="button"
-                onClick={handleCloseModal}
+                onClick={async () => {
+                  // Confirm action: Mark row as confirmed without counting
+                  // This is a checkpoint to verify labels are sufficient
+                  if (selectedRow && selectedRow.id && shipmentId) {
+                    try {
+                      // Save to database
+                      await updateShipmentProductLabelCheck(shipmentId, selectedRow.id, 'confirmed');
+                      console.log(`Label check confirmed for product ${selectedRow.id}`);
+                    } catch (error) {
+                      console.error('Error saving label check confirmation:', error);
+                      // Continue with local update even if API fails
+                    }
+                    
+                    setConfirmedRows(prev => new Set(prev).add(selectedRow.id));
+                    setCompletedRows(prev => new Set(prev).add(selectedRow.id));
+                    setCompletedRowStatus(prev => ({ ...prev, [selectedRow.id]: false })); // Not insufficient
+                  }
+                  handleCloseModal();
+                }}
                 style={{
                   height: '31px',
                   padding: '0 12px',

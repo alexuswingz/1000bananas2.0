@@ -468,6 +468,118 @@ export const getLabelsAvailability = async (excludeShipmentId = null) => {
 };
 
 /**
+ * Get label formula by label location for weight-to-labels conversion
+ * Formula: labels = (gram_weight - core_weight_grams) / grams_per_label
+ * @param {string} labelLocation - The label location code (e.g., "LBL-PLANT-494")
+ * @returns {Promise<Object>} Label formula object with core_weight_grams and grams_per_label
+ */
+export const getLabelFormulaByLocation = async (labelLocation) => {
+  try {
+    const url = `${API_BASE_URL}/supply-chain/labels/formulas/by-location?label_location=${encodeURIComponent(labelLocation)}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to fetch label formula');
+    }
+    
+    return data.data;
+  } catch (error) {
+    console.error(`Error fetching label formula for ${labelLocation}:`, error);
+    // Return default formula on error
+    return {
+      core_weight_grams: 71,
+      grams_per_label: 3.35,
+      notes: 'Default formula - error fetching from API'
+    };
+  }
+};
+
+/**
+ * Get all label formulas
+ * @returns {Promise<Array>} Array of label formula objects
+ */
+export const getLabelFormulas = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/supply-chain/labels/formulas`);
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to fetch label formulas');
+    }
+    
+    return data.data;
+  } catch (error) {
+    console.error('Error fetching label formulas:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update label inventory by label location (used after counting labels)
+ * @param {string} labelLocation - The label location code (e.g., "LBL-PLANT-494")
+ * @param {number} warehouseInventory - The new counted inventory value
+ * @returns {Promise<Object>} Updated label inventory object
+ */
+export const updateLabelInventoryByLocation = async (labelLocation, warehouseInventory) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/supply-chain/labels/inventory/by-location`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        label_location: labelLocation,
+        warehouse_inventory: warehouseInventory,
+      }),
+    });
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to update label inventory');
+    }
+    
+    return data.data;
+  } catch (error) {
+    console.error(`Error updating label inventory for ${labelLocation}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Update label check status for a shipment product
+ * @param {number} shipmentId - The shipment ID
+ * @param {number} productId - The shipment product ID
+ * @param {string} status - Status: 'confirmed' or 'counted'
+ * @param {number|null} count - The counted inventory (only for 'counted' status)
+ * @returns {Promise<Object>} Updated shipment product object
+ */
+export const updateShipmentProductLabelCheck = async (shipmentId, productId, status, count = null) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/production/shipments/${shipmentId}/products/${productId}/label-check`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        status,
+        count,
+      }),
+    });
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to update label check status');
+    }
+    
+    return data.data;
+  } catch (error) {
+    console.error(`Error updating label check for product ${productId}:`, error);
+    throw error;
+  }
+};
+
+/**
  * Get products inventory for production supply chain
  * @returns {Promise<Array>} Array of product inventory items
  */
