@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { createShipment, getShipmentById, updateShipment, addShipmentProducts, getShipmentProducts, getShipmentFormulaCheck, getLabelsAvailability } from '../../../services/productionApi';
 import CatalogAPI from '../../../services/catalogApi';
 import NgoosAPI from '../../../services/ngoosApi';
+import { extractFileId, getDriveImageUrl } from '../../../services/googleDriveApi';
 import NewShipmentHeader from './components/NewShipmentHeader';
 import NewShipmentTable from './components/NewShipmentTable';
 import SortProductsTable from './components/SortProductsTable';
@@ -24,6 +25,23 @@ import VarianceExceededModal from './components/VarianceExceededModal';
 import UncheckedFormulaModal from './components/UncheckedFormulaModal';
 import FormulaCheckCommentModal from './components/FormulaCheckCommentModal';
 import LabelCheckCommentModal from './components/LabelCheckCommentModal';
+
+// Utility function to handle Google Drive image URLs
+const getImageUrl = (url) => {
+  if (!url) return null;
+  
+  // Check if URL is from Google Drive
+  if (typeof url === 'string' && url.includes('drive.google.com')) {
+    // Extract file ID and convert to direct image URL
+    const fileId = extractFileId(url);
+    if (fileId) {
+      return getDriveImageUrl(fileId);
+    }
+  }
+  
+  // Return original URL if not a Drive URL
+  return url;
+};
 
 // Account to Brand mapping based on Amazon Seller Account Structure
 // Each account can only sell specific brands
@@ -341,6 +359,11 @@ const NewShipment = () => {
           childSku: item.child_sku_final || '',
           marketplace: 'Amazon',
           account: 'TPS Nutrients',
+          // Image data - check multiple possible field names and convert Drive URLs
+          mainImage: getImageUrl(item.mainImage || item.product_image_url || item.productImage || item.image || item.productImageUrl || null),
+          product_image_url: getImageUrl(item.product_image_url || item.mainImage || item.productImage || item.image || item.productImageUrl || null),
+          productImage: getImageUrl(item.productImage || item.mainImage || item.product_image_url || item.image || item.productImageUrl || null),
+          image: getImageUrl(item.image || item.mainImage || item.product_image_url || item.productImage || item.productImageUrl || null),
           // Inventory/DOI data - merge forecast with database
           fbaAvailable: Math.round((forecast.inventory || 0) * 0.5),
           totalInventory: forecast.inventory || 0,

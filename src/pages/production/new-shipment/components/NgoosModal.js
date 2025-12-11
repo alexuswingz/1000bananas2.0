@@ -1,7 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 import NgoosAPI from '../../../../services/ngoosApi';
+import CatalogAPI from '../../../../services/catalogApi';
+import { extractFileId, getDriveImageUrl } from '../../../../services/googleDriveApi';
 import Ngoos from '../../../products/catalog/detail/Ngoos';
+
+// Utility function to handle Google Drive image URLs
+const getImageUrl = (url) => {
+  if (!url) return null;
+  
+  // Check if URL is from Google Drive
+  if (typeof url === 'string' && url.includes('drive.google.com')) {
+    // Extract file ID and convert to direct image URL
+    const fileId = extractFileId(url);
+    if (fileId) {
+      return getDriveImageUrl(fileId);
+    }
+  }
+  
+  // Return original URL if not a Drive URL
+  return url;
+};
 
 const NgoosModal = ({ 
   isOpen, 
@@ -15,6 +34,7 @@ const NgoosModal = ({
   const { isDarkMode } = useTheme();
   const [forecastData, setForecastData] = useState(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [catalogImageData, setCatalogImageData] = useState(null);
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -39,6 +59,50 @@ const NgoosModal = ({
     };
 
     fetchForecastData();
+  }, [isOpen, selectedRow]);
+
+  // Fetch catalog data to get image if not available in selectedRow
+  useEffect(() => {
+    const fetchCatalogImage = async () => {
+      if (!isOpen || !selectedRow) {
+        setCatalogImageData(null);
+        return;
+      }
+
+      // Check if image already exists
+      const hasImage = selectedRow?.mainImage || 
+                      selectedRow?.product_image_url || 
+                      selectedRow?.productImage || 
+                      selectedRow?.image ||
+                      selectedRow?.productImageUrl;
+      
+      if (hasImage) {
+        setCatalogImageData(null);
+        return; // Image already available, no need to fetch
+      }
+
+      // Try to fetch from catalog using catalogId
+      const catalogId = selectedRow?.catalogId || selectedRow?.id;
+      if (!catalogId) return;
+
+      try {
+        const catalogData = await CatalogAPI.getById(catalogId);
+        if (catalogData) {
+          // Extract image from catalog data and convert Drive URLs
+          const imageUrl = catalogData.productImages?.productImageUrl || 
+                          catalogData.slides?.productImage ||
+                          catalogData.mainImage ||
+                          catalogData.product_image_url ||
+                          null;
+          setCatalogImageData(getImageUrl(imageUrl));
+        }
+      } catch (error) {
+        console.error('Error fetching catalog image data:', error);
+        setCatalogImageData(null);
+      }
+    };
+
+    fetchCatalogImage();
   }, [isOpen, selectedRow]);
 
   if (!isOpen || !selectedRow) return null;
@@ -80,6 +144,17 @@ const NgoosModal = ({
   // Get real label inventory from database (passed via selectedRow.label_inventory or labelsAvailable prop)
   const realLabelInventory = labelsAvailable ?? selectedRow?.label_inventory ?? selectedRow?.labelsAvailable ?? 0;
   
+  // Get image from selectedRow or catalog, and convert Drive URLs
+  const convertedImage = getImageUrl(
+    selectedRow?.mainImage || 
+    selectedRow?.product_image_url || 
+    selectedRow?.productImage || 
+    selectedRow?.image ||
+    selectedRow?.productImageUrl ||
+    catalogImageData ||
+    null
+  );
+
   // Prepare data for Ngoos component
   const ngoosData = {
     child_asin: childAsin,
@@ -88,7 +163,17 @@ const NgoosModal = ({
     brand: selectedRow?.brand || selectedRow?.brand_name,
     size: selectedRow?.size,
     variations: selectedRow?.variations,
-    ...selectedRow
+    // Ensure mainImage is included and converted from Drive URLs
+    mainImage: convertedImage,
+    product_image_url: convertedImage,
+    productImage: convertedImage,
+    image: convertedImage,
+    ...selectedRow,
+    // Override image fields with converted URLs (spread after to ensure they take precedence)
+    mainImage: convertedImage,
+    product_image_url: convertedImage,
+    productImage: convertedImage,
+    image: convertedImage
   };
 
   const handleConfirmUnits = (units) => {
@@ -116,10 +201,10 @@ const NgoosModal = ({
       <div
         className={themeClasses.cardBg}
         style={{
-          width: '95vw',
-          maxWidth: '1400px',
+          width: '64%',
+          maxWidth: '896px',
           height: 'auto',
-          maxHeight: '92vh',
+          maxHeight: '150vh',
           borderRadius: '12px',
           boxShadow: '0 24px 80px rgba(15,23,42,0.75)',
           border: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`,

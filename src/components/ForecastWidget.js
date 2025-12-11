@@ -73,22 +73,21 @@ const ForecastWidget = ({ asin, productName }) => {
     totalRunoutDate.setDate(totalRunoutDate.getDate() + totalDays);
 
     // Combine historical and forecast data
+    // Backend API returns: historical.units_smooth, forecast.units_smooth, forecast.adj_forecast
     const allData = [
       ...historical.map(item => ({
         week_end: item.week_end,
         units_sold: item.units_sold,
         units_smooth: item.units_smooth,
-        forecast_base: null,
-        forecast_adjusted: null,
+        adj_forecast: null,
         isForecast: false,
         isHistorical: true
       })),
       ...forecast.map(item => ({
         week_end: item.week_end,
         units_sold: null,
-        units_smooth: null,
-        forecast_base: item.forecast_base,
-        forecast_adjusted: item.forecast_adjusted,
+        units_smooth: item.units_smooth,  // Base forecast (smoothed baseline)
+        adj_forecast: item.adj_forecast,  // Velocity-adjusted forecast
         isForecast: true,
         isHistorical: false
       }))
@@ -272,8 +271,9 @@ const ForecastWidget = ({ asin, productName }) => {
                 fontSize: '0.875rem'
               }}
               formatter={(value, name) => {
-                if (name === 'units_sold' || name === 'units_smooth' || name === 'forecast_adjusted') {
-                  return [Math.round(value), name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())];
+                if (name === 'units_sold' || name === 'units_smooth' || name === 'adj_forecast') {
+                  const displayName = name === 'adj_forecast' ? 'Forecast' : name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                  return [Math.round(value), displayName];
                 }
                 return null;
               }}
@@ -310,7 +310,7 @@ const ForecastWidget = ({ asin, productName }) => {
             <Line 
               yAxisId="left"
               type="monotone" 
-              dataKey="forecast_adjusted" 
+              dataKey="adj_forecast" 
               stroke="#f97316" 
               strokeWidth={2}
               strokeDasharray="5 5"

@@ -16,8 +16,6 @@ import {
   Legend, 
   ResponsiveContainer,
   ComposedChart,
-  Area,
-  ReferenceArea,
   Brush
 } from 'recharts';
 
@@ -33,6 +31,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
   const [adsChartData, setAdsChartData] = useState(null);
   const [zoomDomain, setZoomDomain] = useState({ left: null, right: null });
   const [isZooming, setIsZooming] = useState(false);
+  const [brushRange, setBrushRange] = useState({ startIndex: null, endIndex: null });
   const [lastClickTime, setLastClickTime] = useState(0);
   const [activeTab, setActiveTab] = useState('forecast');
   const [metricsDays, setMetricsDays] = useState(30);
@@ -75,7 +74,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
 
   const themeClasses = {
     bg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
-    cardBg: isDarkMode ? 'bg-[#1e293b]' : 'bg-[#1e293b]', // Match the dark blue from screenshot
+    cardBg: isDarkMode ? 'bg-[#0f172a]' : 'bg-[#0f172a]', // Match the dark blue from screenshot
     text: isDarkMode ? 'text-dark-text-primary' : 'text-gray-900',
     textSecondary: isDarkMode ? 'text-dark-text-secondary' : 'text-gray-500',
     border: isDarkMode ? 'border-dark-border-primary' : 'border-gray-200',
@@ -228,7 +227,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
 
   // Prepare chart data for visualization with inventory bars
   const chartDisplayData = useMemo(() => {
-    if (!chartData || !forecastData) return [];
+    if (!chartData || !forecastData) return { data: [], maxValue: 0 };
 
     const historical = chartData.historical || [];
     let forecast = chartData.forecast || [];
@@ -266,7 +265,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
       maxValue = Math.max(maxValue, item.units_sold || 0, item.units_smooth || 0);
     });
     forecast.forEach(item => {
-      maxValue = Math.max(maxValue, item.forecast_base || 0, item.forecast_adjusted || 0);
+      maxValue = Math.max(maxValue, item.units_smooth || 0, item.adj_forecast || 0);
     });
     
     // Use max value for full-height bars
@@ -287,6 +286,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
         timestamp: itemDate.getTime(),
         unitsSold: item.units_sold || 0,
         unitsSmooth: item.units_smooth || 0,
+        forecastBase: item.units_smooth || 0, // Smoothed units sold (forecast base) - shown from start
         isForecast: false,
         isInDoiPeriod: isInInventoryPeriod,
         // Bars span full height when in their respective periods
@@ -297,6 +297,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
     });
     
     // Add forecast data with inventory visualization
+    // Smoothed units sold (solid) stops at Today, forecast (dashed) takes over
     forecast.forEach((item, index) => {
       const itemDate = new Date(item.week_end);
       const isInInventoryPeriod = itemDate >= currentDate && itemDate <= doiGoalDate;
@@ -304,11 +305,14 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
       const isInTotalPeriod = itemDate >= runoutDate && itemDate < totalRunoutDate;
       const isInForecastPeriod = itemDate >= totalRunoutDate && itemDate <= doiGoalDate;
       
+      // Only first forecast point gets forecastBase value for smooth transition from historical
+      // After that, only forecastAdjusted (dashed) is shown
       combinedData.push({
         date: item.week_end,
         timestamp: itemDate.getTime(),
-        forecastBase: item.forecast_base || 0,
-        forecastAdjusted: item.forecast_adjusted || 0,
+        // forecastBase (solid) only at first point for smooth transition, then null
+        forecastBase: index === 0 ? (item.units_smooth || item.adj_forecast || 0) : null,
+        forecastAdjusted: item.adj_forecast || 0, // Forecast (dashed) takes over after Today
         isForecast: true,
         isInDoiPeriod: isInInventoryPeriod,
         // Bars span full height when in their respective periods
@@ -318,41 +322,22 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
       });
     });
     
-    return combinedData;
+    // Calculate max value from actual line data (excluding inventory bars)
+    let chartMaxValue = 0;
+    combinedData.forEach(item => {
+      chartMaxValue = Math.max(
+        chartMaxValue,
+        item.unitsSold || 0,
+        item.forecastBase || 0,
+        item.forecastAdjusted || 0
+      );
+    });
+    
+    return { data: combinedData, maxValue: chartMaxValue };
   }, [chartData, forecastData, selectedView]);
 
-  // Get timeline period boundaries for highlighting
-  // Use doiGoalDays when provided (from production planning modal)
-  const timelinePeriods = useMemo(() => {
-    if (!forecastData) return null;
-    
-    // Calculate DOI goal date based on doiGoalDays if provided
-    const currentDate = forecastData.current_date || new Date().toISOString();
-    const calculatedDoiGoalDate = doiGoalDays 
-      ? new Date(new Date(currentDate).getTime() + doiGoalDays * 24 * 60 * 60 * 1000).toISOString()
-      : forecastData.doi_goal_date;
-    
-    return {
-      fbaAvailable: {
-        start: currentDate,
-        end: forecastData.runout_date,
-        color: '#a855f7',
-        label: 'FBA Available'
-      },
-      total: {
-        start: forecastData.runout_date,
-        end: forecastData.total_runout_date,
-        color: '#22c55e',
-        label: 'Total'
-      },
-      forecast: {
-        start: forecastData.total_runout_date,
-        end: calculatedDoiGoalDate,
-        color: '#3b82f6',
-        label: 'Forecast'
-      }
-    };
-  }, [forecastData, doiGoalDays]);
+  // Timeline periods are now provided by the backend via forecastData.chart_rendering
+  // This eliminates complex date calculations on the frontend
 
   // Handle zoom reset
   const handleZoomReset = () => {
@@ -772,7 +757,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
     if (timeDiff < 300) {
       // Double-click detected - zoom in
       const clickedDate = new Date(e.activeLabel);
-      const allDates = chartDisplayData.map(d => new Date(d.date).getTime()).sort((a, b) => a - b);
+      const allDates = (chartDisplayData?.data || []).map(d => new Date(d.date).getTime()).sort((a, b) => a - b);
       
       // Find the index of clicked date
       const clickedIndex = allDates.findIndex(d => Math.abs(d - clickedDate.getTime()) < 1000 * 60 * 60 * 24 * 7);
@@ -796,7 +781,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
     setLastClickTime(currentTime);
   };
 
-  // Custom tooltip with detailed date and filtering
+  // Custom tooltip with detailed date and filtering - matching dark theme
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const date = new Date(label);
@@ -805,18 +790,18 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
           backgroundColor: '#1e293b', 
           padding: '0.75rem', 
           borderRadius: '0.5rem',
-          border: '1px solid #475569',
+          border: '1px solid #334155',
           fontSize: '0.875rem',
-          boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
+          boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
         }}>
-          <p style={{ color: '#fff', fontWeight: '600', marginBottom: '0.5rem' }}>
+          <p style={{ color: '#fff', fontWeight: '600', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
             {date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
           </p>
           {payload.map((entry, index) => {
             if (entry.value && entry.value !== 0 && entry.value !== null) {
               return (
-                <p key={index} style={{ color: entry.color, margin: '0.25rem 0', fontSize: '0.75rem' }}>
-                  {entry.name}: {Math.round(entry.value).toLocaleString()}
+                <p key={index} style={{ color: entry.color || '#fff', margin: '0.25rem 0', fontSize: '0.75rem', fontWeight: '500' }}>
+                  {entry.name}: <span style={{ color: '#fff', fontWeight: '600' }}>{Math.round(entry.value).toLocaleString()}</span>
                 </p>
               );
             }
@@ -864,7 +849,14 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
   }
 
   return (
-    <div className={`${themeClasses.bg} rounded-xl border ${themeClasses.border} shadow-sm`}>
+    <div 
+      className={`${themeClasses.bg} rounded-xl border ${themeClasses.border} shadow-sm`} 
+      style={{ 
+        width: inventoryOnly ? '100%' : '100%', 
+        maxWidth: inventoryOnly ? '100%' : 'none', 
+        margin: inventoryOnly ? '0' : '0 auto' 
+      }}
+    >
       {/* Tab Navigation - Hidden when inventoryOnly is true */}
       {!inventoryOnly && (
         <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #334155' }}>
@@ -954,7 +946,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
         {/* Main Grid - Horizontal layout when inventoryOnly */}
         <div style={{ 
           display: 'grid', 
-          gridTemplateColumns: inventoryOnly ? '1fr 1fr 1fr' : '1fr 2fr', 
+          gridTemplateColumns: inventoryOnly ? '1fr 1fr 1fr' : '1fr 1fr 1fr', 
           gap: inventoryOnly ? '0.75rem' : '1.5rem', 
           marginBottom: inventoryOnly ? '0.75rem' : '2rem' 
         }}>
@@ -972,8 +964,12 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
                 overflow: 'hidden',
                 flexShrink: 0
               }}>
-                {data?.mainImage ? (
-                  <img src={data.mainImage} alt={data.product} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                {(data?.mainImage || data?.product_image_url || data?.productImage || data?.image || data?.productImageUrl) ? (
+                  <img 
+                    src={data?.mainImage || data?.product_image_url || data?.productImage || data?.image || data?.productImageUrl} 
+                    alt={data?.product || data?.product_name || 'Product'} 
+                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} 
+                  />
                 ) : (
                   <svg style={{ width: inventoryOnly ? '1.5rem' : '3rem', height: inventoryOnly ? '1.5rem' : '3rem', color: '#9ca3af' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -1290,262 +1286,239 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
             </div>
           </div>
 
-          {/* Chart Legend */}
-          <div style={{ display: 'flex', gap: '2rem', justifyContent: 'center', marginTop: '1rem', marginBottom: '0.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ width: '32px', height: '2px', backgroundColor: '#64748b' }}></div>
-              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Unit Sales</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ width: '32px', height: '2px', backgroundColor: '#f97316' }}></div>
-              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Forecast</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ width: '32px', height: '2px', backgroundColor: '#06b6d4' }}></div>
-              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Search Volume</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ width: '12px', height: '12px', backgroundColor: '#a855f7', borderRadius: '2px' }}></div>
-              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>FBA Avail</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ width: '12px', height: '12px', backgroundColor: '#22c55e', borderRadius: '2px' }}></div>
-              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Total Inv</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ width: '12px', height: '12px', backgroundColor: '#3b82f6', borderRadius: '2px' }}></div>
-              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Forecast</span>
-            </div>
-          </div>
-
-          {/* Chart Controls */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
-            <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic' }}>
-              💡 Double-click on the chart to zoom in for detailed dates
-            </div>
-            <button 
-              onClick={handleZoomReset}
-              style={{ 
-                padding: '0.375rem 0.75rem', 
-                fontSize: '0.75rem',
-                color: '#94a3b8',
-                backgroundColor: '#1e293b',
-                border: '1px solid #475569',
-                borderRadius: '0.375rem',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#334155';
-                e.target.style.color = '#fff';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.backgroundColor = '#1e293b';
-                e.target.style.color = '#94a3b8';
-              }}
-            >
-              Reset Zoom
-            </button>
-          </div>
 
           {/* Chart Area - More compact height when inventoryOnly */}
-          <div style={{ height: inventoryOnly ? '240px' : '320px', width: '100%', marginTop: '0.25rem' }}>
-            {chartDisplayData.length > 0 ? (
+          <div style={{ height: inventoryOnly ? '240px' : '320px', width: '100%', marginTop: '0.25rem', position: 'relative' }}>
+            {/* 
+              BACKEND-DRIVEN CHART RENDERING
+              Uses pre-calculated percentages from forecastData.chart_rendering
+              This ensures continuous backgrounds without gaps
+            */}
+            
+            {/* Colored Period Backgrounds - Position calculated from actual chart data timestamps */}
+            {forecastData?.chart_rendering?.periods && chartDisplayData?.data?.length > 0 && (() => {
+              const { periods } = forecastData.chart_rendering;
+              // These margins approximate Recharts' actual chart area
+              const leftMargin = 8.5;  // ~8.5% for Y-axis + labels
+              const chartWidth = 88;   // ~88% chart drawing area
+              
+              // Get actual chart data range (aligns with X-axis)
+              const data = chartDisplayData.data;
+              const startIdx = brushRange.startIndex ?? 0;
+              const endIdx = brushRange.endIndex ?? (data.length - 1);
+              
+              const minTs = data[startIdx]?.timestamp;
+              const maxTs = data[endIdx]?.timestamp;
+              
+              if (!minTs || !maxTs || minTs === maxTs) return null;
+              
+              const totalRange = maxTs - minTs;
+              
+              return periods.map(period => {
+                // IMPORTANT: Calculate timestamps the SAME way as chart data
+                // Using JavaScript Date parsing ensures perfect alignment with X-axis
+                const periodStartTs = new Date(period.start_date).getTime();
+                const periodEndTs = new Date(period.end_date).getTime();
+                
+                // Clamp to visible range
+                const clampedStart = Math.max(periodStartTs, minTs);
+                const clampedEnd = Math.min(periodEndTs, maxTs);
+                
+                // Skip if period is completely outside visible range
+                if (clampedStart >= clampedEnd || clampedEnd <= minTs || clampedStart >= maxTs) {
+                  return null;
+                }
+                
+                // Calculate percentages within visible range
+                const startPct = ((clampedStart - minTs) / totalRange) * 100;
+                const endPct = ((clampedEnd - minTs) / totalRange) * 100;
+                const widthPct = endPct - startPct;
+                
+                // Skip if width is negligible
+                if (widthPct <= 0) return null;
+                
+                const leftPos = leftMargin + (startPct * chartWidth / 100);
+                const width = widthPct * chartWidth / 100;
+                
+                return (
+                  <div
+                    key={period.id}
+                    style={{
+                      position: 'absolute',
+                      left: `${leftPos}%`,
+                      width: `${width}%`,
+                      top: '10px',
+                      bottom: '25%',  // Match exactly at X-axis line (bottom margin)
+                      backgroundColor: period.color,
+                      opacity: period.opacity,
+                      zIndex: 0,  // Behind chart lines
+                      pointerEvents: 'none'
+                    }}
+                    title={`${period.label}: ${period.days} days`}
+                  />
+                );
+              });
+            })()}
+            
+            {/* Today Marker - Position calculated from actual current date */}
+            {chartDisplayData?.data?.length > 0 && (() => {
+              // These margins approximate Recharts' actual chart area
+              // Adjusted for Y-axis labels and padding
+              const leftMargin = 8.5;  // ~8.5% for Y-axis + labels
+              const chartWidth = 88;   // ~88% chart drawing area
+              
+              // Calculate position based on ACTUAL chart data range (aligns with X-axis)
+              const data = chartDisplayData.data;
+              const startIdx = brushRange.startIndex ?? 0;
+              const endIdx = brushRange.endIndex ?? (data.length - 1);
+              
+              const minTs = data[startIdx]?.timestamp;
+              const maxTs = data[endIdx]?.timestamp;
+              
+              // Use ACTUAL current date from browser (not backend)
+              // This ensures Today is always the real current date
+              const now = new Date();
+              const todayTs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+              const formattedDate = `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear().toString().slice(-2)}`;
+              
+              // If today is outside visible range, don't render
+              if (!minTs || !maxTs || minTs === maxTs || todayTs < minTs || todayTs > maxTs) {
+                return null;
+              }
+              
+              // Calculate percentage within actual chart data range
+              const rawPercentage = ((todayTs - minTs) / (maxTs - minTs)) * 100;
+              const adjustedLeft = leftMargin + (rawPercentage * chartWidth / 100);
+              
+              return (
+                <>
+                  {/* Today Label - Above chart */}
+                  <div style={{
+                    position: 'absolute',
+                    top: inventoryOnly ? '-25px' : '-30px',
+                    left: `${adjustedLeft}%`,
+                    transform: 'translateX(-50%)',
+                    textAlign: 'center',
+                    whiteSpace: 'nowrap',
+                    zIndex: 10,
+                    pointerEvents: 'none',
+                    padding: inventoryOnly ? '0.25rem 0.5rem' : '0',
+                    minWidth: inventoryOnly ? '80px' : 'auto'
+                  }}>
+                    <div style={{ color: '#fff', fontSize: inventoryOnly ? '12px' : '14px', fontWeight: 700, lineHeight: 1.2 }}>Today</div>
+                    <div style={{ color: '#64748b', fontSize: inventoryOnly ? '10px' : '11px', lineHeight: 1.2 }}>{formattedDate}</div>
+                  </div>
+                  
+                  {/* Today Divider Line - Inside chart */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: `${adjustedLeft}%`,
+                      top: '10px',
+                      bottom: '25%',  // Match exactly at X-axis line
+                      width: '2px',
+                      background: 'repeating-linear-gradient(to bottom, #fff 0px, #fff 4px, transparent 4px, transparent 8px)',
+                      zIndex: 5,  // Above colors but below tooltips
+                      pointerEvents: 'none'
+                    }}
+                  />
+                </>
+              );
+            })()}
+            
+            {chartDisplayData?.data && chartDisplayData.data.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart
-                  data={chartDisplayData}
-                  margin={{ top: 5, right: 40, left: 10, bottom: 25 }}
-                  onClick={handleChartClick}
-                  onMouseDown={(e) => {
-                    if (e) {
-                      setZoomDomain({ ...zoomDomain, left: e.activeLabel });
-                      setIsZooming(true);
-                    }
-                  }}
-                  onMouseMove={(e) => {
-                    if (isZooming && e) {
-                      setZoomDomain({ ...zoomDomain, right: e.activeLabel });
-                    }
-                  }}
-                  onMouseUp={() => {
-                    if (isZooming && zoomDomain.left && zoomDomain.right) {
-                      setIsZooming(false);
-                    }
-                  }}
+                  <ComposedChart
+                  data={chartDisplayData.data}
+                  margin={{ top: 10, right: 10, left: 10, bottom: 30 }}
+                  style={{ backgroundColor: 'transparent' }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                  <CartesianGrid 
+                    strokeDasharray="0" 
+                    stroke="rgba(148, 163, 184, 0.15)" 
+                    vertical={false} 
+                    strokeWidth={1}
+                    yAxisId="left"
+                  />
                   
-                  {/* Timeline Period Background Highlights */}
-                  {timelinePeriods?.fbaAvailable && (
-                    <ReferenceArea
-                      x1={timelinePeriods.fbaAvailable.start}
-                      x2={timelinePeriods.fbaAvailable.end}
-                      fill="#a855f7"
-                      fillOpacity={0.18}
-                      strokeOpacity={0}
-                      ifOverflow="extendDomain"
-                      isFront={false}
-                    />
-                  )}
-                  
-                  {timelinePeriods?.total && (
-                    <ReferenceArea
-                      x1={timelinePeriods.total.start}
-                      x2={timelinePeriods.total.end}
-                      fill="#22c55e"
-                      fillOpacity={0.18}
-                      strokeOpacity={0}
-                      ifOverflow="extendDomain"
-                      isFront={false}
-                    />
-                  )}
-                  
-                  {timelinePeriods?.forecast && (
-                    <ReferenceArea
-                      x1={timelinePeriods.forecast.start}
-                      x2={timelinePeriods.forecast.end}
-                      fill="#3b82f6"
-                      fillOpacity={0.18}
-                      strokeOpacity={0}
-                      ifOverflow="extendDomain"
-                      isFront={false}
-                    />
-                  )}
+                  {/* Period backgrounds are now rendered via CSS absolute divs above for pixel-perfect continuous rendering */}
                   
                   <XAxis 
-                    dataKey="date" 
-                    stroke="#475569"
-                    tick={{ fill: '#64748b', fontSize: 10 }}
+                    dataKey="timestamp" 
+                    type="number"
+                    domain={['dataMin', 'dataMax']}
+                    stroke="#64748b"
+                    tick={{ fill: '#94a3b8', fontSize: 10 }}
+                    tickLine={{ stroke: '#64748b' }}
                     tickFormatter={(value) => {
                       const date = new Date(value);
-                      // Show more detailed format when zoomed
-                      if (zoomDomain.left && zoomDomain.right) {
-                        return `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
-                      }
-                      return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear().toString().slice(-2)}`;
+                      return `${date.getUTCMonth() + 1}/${date.getUTCDate()}/${date.getUTCFullYear().toString().slice(-2)}`;
                     }}
-                    domain={zoomDomain.left && zoomDomain.right ? [zoomDomain.left, zoomDomain.right] : ['auto', 'auto']}
-                    interval={zoomDomain.left && zoomDomain.right ? 0 : "preserveStartEnd"}
-                    minTickGap={zoomDomain.left && zoomDomain.right ? 20 : 30}
-                    angle={zoomDomain.left && zoomDomain.right ? -45 : 0}
-                    textAnchor={zoomDomain.left && zoomDomain.right ? "end" : "middle"}
+                    tickCount={8}
+                    interval="preserveStartEnd"
+                    height={30}
                   />
                   <YAxis 
                     yAxisId="left"
-                    stroke="#475569"
-                    tick={{ fill: '#64748b', fontSize: 10 }}
+                    axisLine={false}
+                    tick={{ fill: '#94a3b8', fontSize: 11 }}
+                    tickLine={{ stroke: '#64748b' }}
                     tickFormatter={(value) => {
-                      if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
-                      return value;
+                      if (value >= 1000) {
+                        const k = value / 1000;
+                        return k % 1 === 0 ? `${k}k` : `${k.toFixed(1)}k`;
+                      }
+                      return Math.round(value);
                     }}
-                    label={{ value: 'Unit Sales', angle: -90, position: 'insideLeft', style: { fill: '#64748b', fontSize: 11 } }}
-                  />
-                  <YAxis 
-                    yAxisId="right"
-                    orientation="right"
-                    stroke="#475569"
-                    tick={{ fill: '#64748b', fontSize: 10 }}
-                    tickFormatter={(value) => {
-                      if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
-                      return value;
-                    }}
-                    label={{ value: 'Search Volume', angle: 90, position: 'insideRight', style: { fill: '#64748b', fontSize: 11 } }}
+                    domain={[0, chartDisplayData.maxValue ? Math.ceil(chartDisplayData.maxValue * 1.1) : 'auto']}
+                    tickCount={6}
+                    allowDecimals={false}
+                    label={{ value: 'Units Sold', angle: -90, position: 'insideLeft', style: { fill: '#94a3b8', fontSize: 12 } }}
                   />
                   <Tooltip content={<CustomTooltip />} />
                   
-                  {/* Inventory Bars - Full Height - FBA Available (Purple) */}
-                  <Bar 
-                    yAxisId="left"
-                    dataKey="fbaAvail" 
-                    fill="#a855f7" 
-                    fillOpacity={0.9}
-                    name="FBA Avail"
-                    barSize={40}
-                    stackId="inventory"
-                  />
+                  {/* Period backgrounds are rendered via CSS absolute divs (see above) */}
                   
-                  {/* Inventory Bars - Full Height - Total Inventory (Green) */}
-                  <Bar 
-                    yAxisId="left"
-                    dataKey="totalInv" 
-                    fill="#22c55e" 
-                    fillOpacity={0.9}
-                    name="Total Inv"
-                    barSize={40}
-                    stackId="inventory"
-                  />
-                  
-                  {/* Inventory Bars - Full Height - Forecast (Blue) */}
-                  <Bar 
-                    yAxisId="left"
-                    dataKey="forecastInv" 
-                    fill="#3b82f6" 
-                    fillOpacity={0.9}
-                    name="Forecast"
-                    barSize={40}
-                    stackId="inventory"
-                  />
-                  
-                  {/* Unit Sales - Gray line */}
+                  {/* Unit Sales - Grey line (matching image) */}
                   <Line 
                     yAxisId="left"
                     type="monotone" 
                     dataKey="unitsSold" 
                     stroke="#64748b" 
-                    strokeWidth={2}
+                    strokeWidth={2.5}
                     dot={false}
-                    name="Unit Sales"
+                    name="Units Sold"
                     connectNulls
+                    activeDot={{ r: 4, fill: '#64748b' }}
                   />
                   
-                  {/* Forecast - Orange line */}
+                  {/* Smoothed Units Sold - Orange solid line from start, continues into forecast period (matching image) */}
+                  <Line 
+                    yAxisId="left"
+                    type="monotone" 
+                    dataKey="forecastBase" 
+                    stroke="#f97316" 
+                    strokeWidth={2.5}
+                    dot={false}
+                    name="Smoothed Units Sold"
+                    connectNulls
+                    activeDot={{ r: 4, fill: '#f97316' }}
+                  />
+                  
+                  {/* Forecast - Orange dashed line (continues from forecastBase in forecast period, matching image) */}
                   <Line 
                     yAxisId="left"
                     type="monotone" 
                     dataKey="forecastAdjusted" 
                     stroke="#f97316" 
                     strokeWidth={2.5}
+                    strokeDasharray="8 4"
                     dot={false}
                     name="Forecast"
                     connectNulls
+                    activeDot={{ r: 4, fill: '#f97316' }}
                   />
                   
-                  {/* Search Volume - Cyan/Teal line */}
-                  <Line 
-                    yAxisId="right"
-                    type="monotone" 
-                    dataKey="unitsSmooth" 
-                    stroke="#06b6d4" 
-                    strokeWidth={2}
-                    dot={false}
-                    name="Search Volume"
-                    connectNulls
-                  />
-                  
-                  {/* Forecast Dashed - Orange dashed line */}
-                  <Line 
-                    yAxisId="left"
-                    type="monotone" 
-                    dataKey="forecastBase" 
-                    stroke="#f97316" 
-                    strokeWidth={2}
-                    strokeDasharray="8 4"
-                    dot={false}
-                    name="Forecast (Dashed)"
-                    connectNulls
-                  />
-                  
-                  {/* Brush for zooming */}
-                  <Brush 
-                    dataKey="date"
-                    height={20}
-                    stroke="#475569"
-                    fill="#1e293b"
-                    tickFormatter={(value) => {
-                      const date = new Date(value);
-                      return `${date.getMonth() + 1}/${date.getFullYear().toString().slice(-2)}`;
-                    }}
-                  />
                 </ComposedChart>
               </ResponsiveContainer>
             ) : (
@@ -1560,35 +1533,60 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
             )}
           </div>
 
-          {/* Legend */}
-          <div style={{ display: 'flex', gap: '2rem', marginTop: '3rem', justifyContent: 'center', fontSize: '0.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ width: '40px', height: '3px', backgroundColor: '#06b6d4' }}></div>
-              <span style={{ color: '#94a3b8' }}>Unit Sales</span>
+          {/* Legend at bottom - matching image format: Lines on left, squares on right */}
+          <div style={{ 
+            display: 'flex', 
+            gap: inventoryOnly ? '1rem' : '2rem', 
+            marginTop: inventoryOnly ? '0.75rem' : '1rem', 
+            justifyContent: 'center', 
+            fontSize: inventoryOnly ? '0.65rem' : '0.75rem',
+            flexWrap: 'wrap'
+          }}>
+            {/* Left side - Lines */}
+            <div style={{ display: 'flex', gap: inventoryOnly ? '0.75rem' : '1rem', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ width: inventoryOnly ? '24px' : '32px', height: '2px', backgroundColor: '#64748b' }}></div>
+                <span style={{ color: '#94a3b8' }}>Units Sold</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ width: inventoryOnly ? '24px' : '32px', height: '2px', backgroundColor: '#f97316' }}></div>
+                <span style={{ color: '#94a3b8' }}>Smoothed Units Sold</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ width: inventoryOnly ? '24px' : '32px', height: '2px', borderTop: '2px dashed #f97316' }}></div>
+                <span style={{ color: '#94a3b8' }}>Forecast</span>
+              </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ width: '40px', height: '3px', backgroundColor: '#f97316' }}></div>
-              <span style={{ color: '#94a3b8' }}>Forecast</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ width: '40px', height: '3px', backgroundColor: '#64748b' }}></div>
-              <span style={{ color: '#94a3b8' }}>Search Volume</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ width: '20px', height: '12px', backgroundColor: '#a855f7' }}></div>
-              <span style={{ color: '#94a3b8' }}>FBA Avail.</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ width: '20px', height: '12px', backgroundColor: '#22c55e' }}></div>
-              <span style={{ color: '#94a3b8' }}>Total Inv.</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ width: '20px', height: '12px', backgroundColor: '#3b82f6' }}></div>
-              <span style={{ color: '#94a3b8' }}>Forecast</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ width: '40px', height: '3px', borderTop: '2px dashed #f97316' }}></div>
-              <span style={{ color: '#94a3b8' }}>Forecast</span>
+            
+            {/* Right side - Squares */}
+            <div style={{ display: 'flex', gap: inventoryOnly ? '0.75rem' : '1rem', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ 
+                  width: inventoryOnly ? '10px' : '12px', 
+                  height: inventoryOnly ? '10px' : '12px', 
+                  backgroundColor: '#a855f7',
+                  borderRadius: '2px'
+                }}></div>
+                <span style={{ color: '#94a3b8' }}>FBA Avail.</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ 
+                  width: inventoryOnly ? '10px' : '12px', 
+                  height: inventoryOnly ? '10px' : '12px', 
+                  backgroundColor: '#15803d',
+                  borderRadius: '2px'
+                }}></div>
+                <span style={{ color: '#94a3b8' }}>Total Inv.</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ 
+                  width: inventoryOnly ? '10px' : '12px', 
+                  height: inventoryOnly ? '10px' : '12px', 
+                  backgroundColor: '#3b82f6',
+                  borderRadius: '2px'
+                }}></div>
+                <span style={{ color: '#94a3b8' }}>Forecast</span>
+              </div>
             </div>
           </div>
         </div>
@@ -1695,7 +1693,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
               <div className={themeClasses.cardBg} style={{ borderRadius: '0.75rem', padding: '1.5rem' }}>
                 <ResponsiveContainer width="100%" height={300}>
                   <ComposedChart data={salesChartData?.chart_data || []}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                    <CartesianGrid strokeDasharray="0" stroke="rgba(148, 163, 184, 0.5)" vertical={false} strokeWidth={1} />
                     <XAxis 
                       dataKey="date" 
                       stroke="#64748b"
@@ -2132,7 +2130,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
               <div className={themeClasses.cardBg} style={{ borderRadius: '0.75rem', padding: '1.5rem' }}>
                 <ResponsiveContainer width="100%" height={300}>
                   <ComposedChart data={adsChartData?.chart_data || []}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                    <CartesianGrid strokeDasharray="0" stroke="rgba(148, 163, 184, 0.5)" vertical={false} strokeWidth={1} />
                     <XAxis 
                       dataKey="date" 
                       stroke="#64748b"
