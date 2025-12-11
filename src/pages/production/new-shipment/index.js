@@ -136,17 +136,48 @@ const NewShipment = () => {
   // Close carrier dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (isCarrierDropdownOpen && carrierDropdownRef.current && !carrierDropdownRef.current.contains(e.target)) {
+      if (!isCarrierDropdownOpen) return;
+
+      const clickedInsideButton = carrierButtonRef.current?.contains(e.target);
+      const clickedInsideDropdown = carrierDropdownRef.current?.contains(e.target);
+
+      if (!clickedInsideButton && !clickedInsideDropdown) {
         setIsCarrierDropdownOpen(false);
       }
     };
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isCarrierDropdownOpen]);
+
+  // Keep carrier dropdown aligned with trigger
+  useEffect(() => {
+    if (!isCarrierDropdownOpen || !carrierButtonRef.current) return;
+    const rect = carrierButtonRef.current.getBoundingClientRect();
+    setCarrierDropdownPos({
+      top: rect.bottom + 4,
+      left: rect.left,
+      width: rect.width,
+    });
   }, [isCarrierDropdownOpen]);
   
   // Generate unique shipment number
   const generateShipmentNumber = () => {
     return new Date().toISOString().split('T')[0].replace(/-/g, '.') + '-' + Date.now().toString().slice(-6);
+  };
+
+  const handleCarrierSelect = (carrier) => {
+    setSelectedCarrier(carrier);
+    setIsCarrierDropdownOpen(false);
+    setCustomCarrierName('');
+  };
+
+  const handleUseCustomCarrier = () => {
+    const trimmedName = customCarrierName.trim();
+    if (!trimmedName) return;
+    setSelectedCarrier(trimmedName);
+    setCustomCarrierName('');
+    setIsCarrierDropdownOpen(false);
   };
 
   const [shipmentData, setShipmentData] = useState({
@@ -155,6 +186,8 @@ const NewShipment = () => {
     shipmentType: 'AWD',
     location: '',
     account: 'TPS Nutrients',
+    shipFrom: '',
+    shipTo: '',
     amazonShipmentNumber: 'STAR-XXXXXXXXXXXXX', // Default for AWD
     amazonRefId: 'XXXXXXXX',
   });
@@ -199,6 +232,8 @@ const NewShipment = () => {
         shipmentDate: new Date().toISOString().split('T')[0],
         account: navShipmentData?.account || prev.account || 'TPS Nutrients',
         marketplace: navShipmentData?.marketplace || prev.marketplace || 'Amazon',
+        shipFrom: navShipmentData?.shipFrom || prev.shipFrom || '',
+        shipTo: navShipmentData?.shipTo || prev.shipTo || '',
       }));
     }
   }, [id, location.state]); // Re-run when ID or navigation state changes
@@ -460,6 +495,10 @@ const NewShipment = () => {
         shipmentType: data.shipment_type,
         location: data.location || '',
         account: data.account || 'TPS Nutrients',
+        shipFrom: data.ship_from || data.location || '',
+        shipTo: data.ship_to || '',
+        amazonShipmentNumber: data.amazon_shipment_number || getAmazonShipmentFormat(data.shipment_type),
+        amazonRefId: data.amazon_ref_id || '',
         carrier: data.carrier || '',
       });
       setSelectedCarrier(data.carrier || '');
@@ -469,7 +508,10 @@ const NewShipment = () => {
       if (data.add_products_completed) completed.add('add-products');
       if (data.formula_check_completed) completed.add('formula-check');
       if (data.label_check_completed) completed.add('label-check');
-      if (data.book_shipment_completed) completed.add('book-shipment');
+      // Backend may not have book_shipment_completed column; infer from status
+      if (data.book_shipment_completed || data.status === 'sort_products' || data.status === 'sort_formulas') {
+        completed.add('book-shipment');
+      }
       if (data.sort_products_completed) completed.add('sort-products');
       if (data.sort_formulas_completed) completed.add('sort-formulas');
       setCompletedTabs(completed);
@@ -1072,9 +1114,27 @@ const NewShipment = () => {
       }
 
       if (activeAction === 'book-shipment') {
+        // Validate required fields before booking
+        const trimmedShipmentType = (shipmentData.shipmentType || '').trim();
+        const trimmedAmazonNumber = (shipmentData.amazonShipmentNumber || '').trim();
+        const trimmedAmazonRef = (shipmentData.amazonRefId || '').trim();
+        const trimmedShipFrom = (shipmentData.shipFrom || '').trim();
+        const trimmedShipTo = (shipmentData.shipTo || '').trim();
+        const trimmedCarrier = (selectedCarrier || '').trim();
+
+        if (!trimmedShipmentType || !trimmedAmazonNumber || !trimmedAmazonRef || !trimmedShipFrom || !trimmedShipTo || !trimmedCarrier) {
+          toast.error('Please fill Shipment Type, Amazon IDs, Ship From, Ship To, and Carrier.');
+          return;
+        }
+
         // Book Shipment: Complete and show modal
         await updateShipment(shipmentId, {
-          book_shipment_completed: true,
+          shipment_type: trimmedShipmentType,
+          amazon_shipment_number: trimmedAmazonNumber,
+          amazon_ref_id: trimmedAmazonRef,
+          ship_from: trimmedShipFrom,
+          ship_to: trimmedShipTo,
+          carrier: trimmedCarrier,
           status: 'sort_products',
         });
         setCompletedTabs(prev => new Set(prev).add('book-shipment'));
@@ -1975,6 +2035,8 @@ const NewShipment = () => {
                 </label>
                 <input
                   type="text"
+                  value={shipmentData.shipFrom}
+                  onChange={(e) => setShipmentData({ ...shipmentData, shipFrom: e.target.value })}
                   placeholder="Enter Shipment Location..."
                   style={{
                     width: '100%',
@@ -1997,6 +2059,8 @@ const NewShipment = () => {
                 </label>
                 <input
                   type="text"
+                  value={shipmentData.shipTo}
+                  onChange={(e) => setShipmentData({ ...shipmentData, shipTo: e.target.value })}
                   placeholder="Enter Shipment Destination..."
                   style={{
                     width: '100%',
@@ -2013,34 +2077,189 @@ const NewShipment = () => {
               </div>
 
               {/* Row 5: Carrier */}
-              <div style={{ marginBottom: '16px' }}>
+              <div style={{ marginBottom: '16px', position: 'relative' }}>
                 <label style={{ display: 'block', fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '6px' }}>
                   Carrier
                 </label>
-                  <select
-                    value={selectedCarrier}
-                    onChange={(e) => setSelectedCarrier(e.target.value)}
+                <div
+                  ref={carrierButtonRef}
+                  onClick={() => setIsCarrierDropdownOpen(!isCarrierDropdownOpen)}
+                  style={{
+                    width: '100%',
+                    padding: '6px 10px',
+                    borderRadius: '6px',
+                    border: '1px solid #D1D5DB',
+                    backgroundColor: '#FFFFFF',
+                    color: selectedCarrier ? '#111827' : '#9CA3AF',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    boxSizing: 'border-box',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    minHeight: '28px',
+                  }}
+                >
+                  <span>{selectedCarrier || 'Select Carrier'}</span>
+                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 1L6 6L11 1" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+
+                {isCarrierDropdownOpen && createPortal(
+                  <div
+                    ref={carrierDropdownRef}
                     style={{
-                      width: '100%',
-                      padding: '10px 12px',
+                      position: 'fixed',
+                      top: `${carrierDropdownPos.top}px`,
+                      left: `${carrierDropdownPos.left}px`,
+                      width: `${carrierDropdownPos.width}px`,
+                      backgroundColor: '#FFFFFF',
+                      border: '1px solid #E5E7EB',
                       borderRadius: '6px',
-                      border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
-                      backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
-                      color: isDarkMode ? '#E5E7EB' : '#111827',
-                      fontSize: '14px',
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                      cursor: 'pointer',
-                      appearance: 'none',
-                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%239CA3AF' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
-                      backgroundRepeat: 'no-repeat',
-                      backgroundPosition: 'right 12px center',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                      zIndex: 10000,
+                      overflow: 'hidden',
                     }}
-                    >
-                      {knownCarriers.map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
+                  >
+                    {/* Known Carriers */}
+                    <div style={{ padding: '8px 10px', borderBottom: '1px solid #E5E7EB' }}>
+                      <div style={{
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        color: '#6B7280',
+                        marginBottom: '6px',
+                      }}>
+                        Known Carriers:
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        {knownCarriers.map((carrier) => (
+                          <div
+                            key={carrier}
+                            onClick={() => handleCarrierSelect(carrier)}
+                            style={{
+                              padding: '4px 6px',
+                              cursor: 'pointer',
+                              borderRadius: '4px',
+                              color: '#111827',
+                              fontSize: '12px',
+                              transition: 'background-color 0.2s',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#F3F4F6';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
+                          >
+                            {carrier}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Custom Entry */}
+                    <div style={{ padding: '8px 10px', borderBottom: '1px solid #E5E7EB' }}>
+                      <div style={{
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        color: '#6B7280',
+                        marginBottom: '6px',
+                      }}>
+                        Custom Entry:
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <input
+                          type="text"
+                          value={customCarrierName}
+                          onChange={(e) => setCustomCarrierName(e.target.value)}
+                          placeholder="Enter custom carrier name here..."
+                          style={{
+                            flex: 1,
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            border: '1px solid #D1D5DB',
+                            backgroundColor: '#FFFFFF',
+                            color: '#111827',
+                            fontSize: '12px',
+                            outline: 'none',
+                            boxSizing: 'border-box',
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.borderColor = '#3B82F6';
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.borderColor = '#D1D5DB';
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleUseCustomCarrier();
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleUseCustomCarrier}
+                          style={{
+                            padding: '4px 12px',
+                            borderRadius: '4px',
+                            border: 'none',
+                            backgroundColor: '#9CA3AF',
+                            color: '#FFFFFF',
+                            fontSize: '12px',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            transition: 'background-color 0.2s',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#6B7280';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = '#9CA3AF';
+                          }}
+                        >
+                          Use
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Create a Carrier */}
+                    <div style={{ padding: '8px 10px' }}>
+                      <div style={{
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        color: '#6B7280',
+                        marginBottom: '6px',
+                      }}>
+                        Create a Carrier:
+                      </div>
+                      <div
+                        onClick={() => setIsCarrierDropdownOpen(false)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          cursor: 'pointer',
+                          color: '#3B82F6',
+                          fontSize: '12px',
+                          padding: '2px 0',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.opacity = '0.8';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.opacity = '1';
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M8 3V13M3 8H13" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        <span>Add new carrier to system</span>
+                      </div>
+                    </div>
+                  </div>,
+                  document.body
+                )}
               </div>
             </div>
           </div>
@@ -2693,7 +2912,7 @@ const NewShipment = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              backgroundColor: 'rgba(0, 0, 0, 0.35)',
               zIndex: 9998,
               display: 'flex',
               alignItems: 'center',
@@ -2705,8 +2924,8 @@ const NewShipment = () => {
             <div
               style={{
                 backgroundColor: '#FFFFFF',
-                borderRadius: '12px',
-                width: '360px',
+                borderRadius: '14px',
+                width: '340px',
                 border: '1px solid #E5E7EB',
                 boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
                 zIndex: 9999,
@@ -2720,6 +2939,7 @@ const NewShipment = () => {
               {/* Close button */}
               <button
                 type="button"
+                aria-label="Close"
                 onClick={() => setIsBookShipmentCompleteOpen(false)}
                 style={{
                   position: 'absolute',
@@ -2744,23 +2964,23 @@ const NewShipment = () => {
 
               {/* Content */}
               <div style={{
-                padding: '32px 24px 24px',
+                padding: '32px 24px 18px',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: '16px',
+                gap: '14px',
               }}>
                 {/* Green checkmark icon */}
                 <div style={{
-                  width: '48px',
-                  height: '48px',
+                  width: '44px',
+                  height: '44px',
                   borderRadius: '50%',
                   backgroundColor: '#10B981',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M5 12L10 17L19 8" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </div>
@@ -2779,11 +2999,12 @@ const NewShipment = () => {
 
               {/* Footer buttons */}
               <div style={{
-                padding: '16px 24px',
+                padding: '14px 20px 20px',
                 display: 'flex',
+                flexDirection: 'row',
                 justifyContent: 'center',
                 alignItems: 'center',
-                gap: '12px',
+                gap: '10px',
               }}>
                 {/* Go to Shipments button */}
                 <button
@@ -2792,8 +3013,10 @@ const NewShipment = () => {
                     setIsBookShipmentCompleteOpen(false);
                   }}
                   style={{
-                    padding: '8px 16px',
-                    borderRadius: '6px',
+                    minWidth: '147px',
+                    height: '31px',
+                    padding: '0 14px',
+                    borderRadius: '4px',
                     border: '1px solid #D1D5DB',
                     backgroundColor: '#FFFFFF',
                     color: '#374151',
@@ -2803,7 +3026,7 @@ const NewShipment = () => {
                     transition: 'all 0.2s',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#F9FAFB';
+                    e.currentTarget.style.backgroundColor = '#F3F4F6';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.backgroundColor = '#FFFFFF';
@@ -2820,21 +3043,27 @@ const NewShipment = () => {
                     setActiveAction('sort-products');
                   }}
                   style={{
-                    padding: '8px 16px',
-                    borderRadius: '6px',
+                    minWidth: '147px',
+                    height: '31px',
+                    padding: '0 12px',
+                    borderRadius: '4px',
                     border: 'none',
-                    backgroundColor: '#3B82F6',
+                    backgroundColor: '#007AFF',
                     color: '#FFFFFF',
-                    fontSize: '14px',
-                    fontWeight: 500,
+                    fontSize: '13px',
+                    fontWeight: 600,
                     cursor: 'pointer',
                     transition: 'all 0.2s',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#2563EB';
+                    e.currentTarget.style.backgroundColor = '#005FCC';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#3B82F6';
+                    e.currentTarget.style.backgroundColor = '#007AFF';
                   }}
                 >
                   Begin Sort Products
