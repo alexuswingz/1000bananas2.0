@@ -489,26 +489,6 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         {column.label}
                         {(() => {
-                          const sortPriority = getSortPriority(column.key);
-                          if (sortPriority) {
-                            return (
-                              <span style={{ 
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                minWidth: '16px',
-                                height: '16px',
-                                borderRadius: '50%', 
-                                backgroundColor: '#3B82F6',
-                                color: '#FFFFFF',
-                                fontSize: '10px',
-                                fontWeight: 600,
-                                padding: '0 4px',
-                              }}>
-                                {sortPriority}
-                              </span>
-                            );
-                          }
                           if (isActive) {
                             return (
                               <span style={{ 

@@ -128,7 +128,8 @@ const SortProductsFilterDropdown = ({
         conditionValue,
       });
     }
-    onClose?.();
+    // Keep the dropdown open so user can continue configuring multiple filters
+    // onClose?.();
   };
 
   return createPortal(
