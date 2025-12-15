@@ -44,17 +44,6 @@ const NewShipmentTable = ({
     filterValue: '',
   });
 
-  // Get units_per_case increment for a product (from database, fallback to 1)
-  const getUnitsPerCase = (row) => {
-    // Use units_per_case from database if available
-    const unitsPerCase = row?.units_per_case || row?.unitsPerCase;
-    if (unitsPerCase && unitsPerCase > 0) {
-      return unitsPerCase;
-    }
-    // Fallback to 1 if not available
-    return 1;
-  };
-
   // Calculate available labels for a product, accounting for other products with same label_location
   const getAvailableLabelsForRow = (row, rowIndex) => {
     if (!row?.label_location) return row?.labelsAvailable || 0;
@@ -782,7 +771,7 @@ const NewShipmentTable = ({
                       boxSizing: 'border-box',
                       textAlign: 'left',
                       verticalAlign: 'middle',
-                      overflow: 'hidden',
+                      overflow: 'visible',
                       borderRight: '1px solid #FFFFFF',
                       position: 'relative',
                       borderTopRightRadius: '16px',
@@ -819,64 +808,175 @@ const NewShipmentTable = ({
                     <div
                       style={{
                         position: 'relative',
-                        height: '18px',
-                        marginTop: '-4px',
+                        height: '100%',
+                        width: '100%',
+                        paddingTop: '12px',
                       }}
                     >
                       {(() => {
-                        // Generate dynamic month labels based on forecastRange
-                        const months = [];
                         const today = new Date();
-                        const daysPerMonth = forecastRange / 4; // Divide timeline into 4 segments
+                        const doiGoalDate = new Date(today.getTime() + forecastRange * 24 * 60 * 60 * 1000);
                         
-                        for (let i = 1; i <= 4; i++) {
-                          const futureDate = new Date(today.getTime() + (daysPerMonth * i) * 24 * 60 * 60 * 1000);
-                          const monthLabel = futureDate.toLocaleDateString('en-US', { month: 'short' });
-                          months.push({ label: monthLabel, left: `${i * 20}%` });
+                        // Format dates as M/D/YY
+                        const formatDate = (date) => {
+                          const month = date.getMonth() + 1;
+                          const day = date.getDate();
+                          const year = date.getFullYear().toString().slice(-2);
+                          return `${month}/${day}/${year}`;
+                        };
+                        
+                        // Calculate monthly intervals
+                        const months = [];
+                        const totalDays = forecastRange;
+                        const numMonths = 4; // Dec, Jan, Feb, Mar
+                        const daysPerSegment = totalDays / (numMonths + 1);
+                        
+                        for (let i = 1; i <= numMonths; i++) {
+                          const monthDate = new Date(today.getTime() + (daysPerSegment * i) * 24 * 60 * 60 * 1000);
+                          const monthLabel = monthDate.toLocaleDateString('en-US', { month: 'short' });
+                          const leftPercent = (i / (numMonths + 1)) * 100;
+                          months.push({ label: monthLabel, left: `${leftPercent}%` });
                         }
                         
-                        return months.map((m) => (
-                          <span
-                            key={m.left}
-                            style={{
-                              position: 'absolute',
-                              top: -14,
-                              left: m.left,
-                              transform: 'translateX(-50%)',
-                              fontSize: '0.6rem',
-                            }}
-                          >
-                            {m.label}
-                          </span>
-                        ));
+                        return (
+                          <>
+                            {/* Today label and date */}
+                            <div
+                              style={{
+                                position: 'absolute',
+                                top: '0',
+                                left: '7%',
+                                transform: 'translateX(-50%)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '1px',
+                              }}
+                            >
+                              <span style={{ fontSize: '11px', fontWeight: 600, color: '#FFFFFF', whiteSpace: 'nowrap', lineHeight: '1.1' }}>
+                                Today
+                              </span>
+                              <span style={{ fontSize: '9px', color: '#FFFFFF', whiteSpace: 'nowrap', lineHeight: '1.1' }}>
+                                {formatDate(today)}
+                              </span>
+                            </div>
+                            
+                            {/* Month labels */}
+                            {months.map((m) => {
+                              // Adjust month label positions to align with the constrained markers
+                              const basePercent = parseFloat(m.left);
+                              const adjustedPercent = 7 + (basePercent * 0.86);
+                              return (
+                                <div
+                                  key={m.left}
+                                  style={{
+                                    position: 'absolute',
+                                    top: '8px',
+                                    left: `${adjustedPercent}%`,
+                                    transform: 'translateX(-50%)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                  }}
+                                >
+                                  <span style={{ fontSize: '11px', fontWeight: 600, color: '#FFFFFF', whiteSpace: 'nowrap', lineHeight: '1.1' }}>
+                                    {m.label}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                            
+                            {/* DOI Goal label and date */}
+                            <div
+                              style={{
+                                position: 'absolute',
+                                top: '0',
+                                right: '7%',
+                                transform: 'translateX(50%)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '1px',
+                              }}
+                            >
+                              <span style={{ fontSize: '11px', fontWeight: 600, color: '#FFFFFF', whiteSpace: 'nowrap', lineHeight: '1.1' }}>
+                                DOI Goal
+                              </span>
+                              <span style={{ fontSize: '9px', color: '#FFFFFF', whiteSpace: 'nowrap', lineHeight: '1.1' }}>
+                                {formatDate(doiGoalDate)}
+                              </span>
+                            </div>
+                            
+                            {/* Horizontal line - thick white line with rounded corners on right */}
+                            <div
+                              style={{
+                                position: 'absolute',
+                                left: '7%',
+                                right: '7%',
+                                top: '30px',
+                                height: '3px',
+                                backgroundColor: '#FFFFFF',
+                                borderTopRightRadius: '6px',
+                                borderBottomRightRadius: '6px',
+                              }}
+                            />
+                            
+                            {/* Today marker - solid white circle */}
+                            <div
+                              style={{
+                                position: 'absolute',
+                                left: '7%',
+                                top: '30px',
+                                transform: 'translate(-50%, -50%)',
+                                width: '12px',
+                                height: '12px',
+                                borderRadius: '50%',
+                                backgroundColor: '#FFFFFF',
+                                zIndex: 1,
+                              }}
+                            />
+                            
+                            {/* Month markers - outlined circles with dark center */}
+                            {months.map((m) => {
+                              // Adjust month marker positions to align with the constrained line
+                              const basePercent = parseFloat(m.left);
+                              const adjustedPercent = 7 + (basePercent * 0.86);
+                              return (
+                                <div
+                                  key={`marker-${m.left}`}
+                                  style={{
+                                    position: 'absolute',
+                                    left: `${adjustedPercent}%`,
+                                    top: '30px',
+                                    transform: 'translate(-50%, -50%)',
+                                    width: '12px',
+                                    height: '12px',
+                                    borderRadius: '50%',
+                                    border: '2px solid #FFFFFF',
+                                    backgroundColor: '#1C2634',
+                                    zIndex: 1,
+                                  }}
+                                />
+                              );
+                            })}
+                            
+                            {/* DOI Goal marker - solid white circle */}
+                            <div
+                              style={{
+                                position: 'absolute',
+                                right: '7%',
+                                top: '30px',
+                                transform: 'translate(50%, -50%)',
+                                width: '12px',
+                                height: '12px',
+                                borderRadius: '50%',
+                                backgroundColor: '#FFFFFF',
+                                zIndex: 1,
+                              }}
+                            />
+                          </>
+                        );
                       })()}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          left: '6%',
-                          right: '8%',
-                          top: 10,
-                          height: '2px',
-                          backgroundColor: '#E5E7EB',
-                          borderRadius: '9999px',
-                        }}
-                      />
-                      {['6%', '24%', '42%', '60%', '78%', '92%'].map((left) => (
-                        <span
-                          key={left}
-                          style={{
-                            position: 'absolute',
-                            left,
-                            top: 10,
-                            transform: 'translate(-50%, -50%)',
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '9999px',
-                            border: '2px solid #FFFFFF',
-                            backgroundColor: '#FFFFFF',
-                          }}
-                        />
-                      ))}
                     </div>
                   </th>
                 </tr>
@@ -964,7 +1064,13 @@ const NewShipmentTable = ({
                       <div style={{ position: 'relative', display: 'inline-block' }}>
                         <input
                           type="number"
-                          step={getUnitsPerCase(row)}
+                          step={(() => {
+                            const size = row.size?.toLowerCase() || '';
+                            if (size.includes('8oz')) return 60;
+                            if (size.includes('quart')) return 12;
+                            if (size.includes('gallon')) return 4;
+                            return 1;
+                          })()}
                           value={effectiveQtyValues[index] !== undefined && effectiveQtyValues[index] !== null && effectiveQtyValues[index] !== '' ? String(effectiveQtyValues[index]) : ''}
                           onChange={(e) => {
                             const inputValue = e.target.value;
@@ -977,8 +1083,16 @@ const NewShipmentTable = ({
                             } else {
                               const numValue = parseInt(inputValue, 10);
                               if (!isNaN(numValue) && numValue >= 0) {
-                                // Use units_per_case from database
-                                const increment = getUnitsPerCase(row);
+                                // Determine increment based on size
+                                let increment = 1;
+                                const size = row.size?.toLowerCase() || '';
+                                if (size.includes('8oz')) {
+                                  increment = 60;
+                                } else if (size.includes('quart')) {
+                                  increment = 12;
+                                } else if (size.includes('gallon')) {
+                                  increment = 4;
+                                }
                                 
                                 // Round immediately as user types
                                 const rounded = Math.round(numValue / increment) * increment;
@@ -1095,8 +1209,13 @@ const NewShipmentTable = ({
                                 e.preventDefault();
                                 const labelsAvailable = getAvailableLabelsForRow(row, index);
                                 
-                                // Round down to nearest case pack increment using units_per_case from database
-                                const increment = getUnitsPerCase(row);
+                                // Round down to nearest case pack increment
+                                let increment = 1;
+                                const size = row.size?.toLowerCase() || '';
+                                if (size.includes('8oz')) increment = 60;
+                                else if (size.includes('quart')) increment = 12;
+                                else if (size.includes('gallon')) increment = 4;
+                                
                                 const maxQty = Math.floor(labelsAvailable / increment) * increment;
                                 
                                 effectiveSetQtyValues(prev => ({
@@ -2410,8 +2529,16 @@ const NewShipmentTable = ({
                           } else {
                             const newValue = parseInt(inputValue, 10);
                             if (!isNaN(newValue) && newValue >= 0) {
-                              // Use units_per_case from database
-                              const increment = getUnitsPerCase(row);
+                              // Determine increment based on size
+                              let increment = 1;
+                              const size = row.size?.toLowerCase() || '';
+                              if (size.includes('8oz')) {
+                                increment = 60;
+                              } else if (size.includes('quart')) {
+                                increment = 12;
+                              } else if (size.includes('gallon')) {
+                                increment = 4;
+                              }
                               
                               // Round immediately as user types
                               const rounded = Math.round(newValue / increment) * increment;
@@ -2435,8 +2562,16 @@ const NewShipmentTable = ({
                             // Round to nearest multiple based on size
                             const numValue = typeof currentValue === 'number' ? currentValue : parseInt(currentValue, 10);
                             if (!isNaN(numValue) && numValue > 0) {
-                              // Use units_per_case from database
-                              const increment = getUnitsPerCase(row);
+                              // Determine increment based on size
+                              let increment = 0;
+                              const size = row.size?.toLowerCase() || '';
+                              if (size.includes('8oz')) {
+                                increment = 60;
+                              } else if (size.includes('quart')) {
+                                increment = 12;
+                              } else if (size.includes('gallon')) {
+                                increment = 4;
+                              }
                               
                               // Round to nearest multiple of increment
                               if (increment > 0) {
@@ -2522,8 +2657,17 @@ const NewShipmentTable = ({
                             const currentQty = effectiveQtyValues[index] ?? 0;
                             const numQty = typeof currentQty === 'number' ? currentQty : (currentQty === '' || currentQty === null || currentQty === undefined ? 0 : parseInt(currentQty, 10) || 0);
                             
-                            // Use units_per_case from database
-                            const increment = getUnitsPerCase(row);
+                            // Determine increment based on size
+                            let increment = 0;
+                            const size = row.size?.toLowerCase() || '';
+                            if (size.includes('8oz')) {
+                              increment = 60;
+                            } else if (size.includes('quart')) {
+                              increment = 12;
+                            } else if (size.includes('gallon')) {
+                              increment = 4;
+                            }
+                            
                             const newQty = Math.max(0, numQty + increment);
                             effectiveSetQtyValues(prev => ({
                               ...prev,
@@ -2570,8 +2714,17 @@ const NewShipmentTable = ({
                             const currentQty = effectiveQtyValues[index] ?? 0;
                             const numQty = typeof currentQty === 'number' ? currentQty : (currentQty === '' || currentQty === null || currentQty === undefined ? 0 : parseInt(currentQty, 10) || 0);
                             
-                            // Use units_per_case from database
-                            const increment = getUnitsPerCase(row);
+                            // Determine increment based on size
+                            let increment = 0;
+                            const size = row.size?.toLowerCase() || '';
+                            if (size.includes('8oz')) {
+                              increment = 60;
+                            } else if (size.includes('quart')) {
+                              increment = 12;
+                            } else if (size.includes('gallon')) {
+                              increment = 4;
+                            }
+                            
                             const newQty = Math.max(0, numQty - increment);
                             effectiveSetQtyValues(prev => ({
                               ...prev,
@@ -2718,8 +2871,12 @@ const NewShipmentTable = ({
                             const labelsAvailable = getAvailableLabelsForRow(row, index);
                             
                             // Round down to nearest case pack increment
-                            // Use units_per_case from database
-                            const increment = getUnitsPerCase(row);
+                            let increment = 1;
+                            const size = row.size?.toLowerCase() || '';
+                            if (size.includes('8oz')) increment = 60;
+                            else if (size.includes('quart')) increment = 12;
+                            else if (size.includes('gallon')) increment = 4;
+                            
                             const maxQty = Math.floor(labelsAvailable / increment) * increment;
                             
                             effectiveSetQtyValues(prev => ({
