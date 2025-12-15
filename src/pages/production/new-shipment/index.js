@@ -853,18 +853,22 @@ const NewShipment = () => {
     return sum + weight;
   }, 0);
 
+  // Total products added to shipment (for footer counter)
+  const totalProducts =
+    addedRows && addedRows instanceof Set ? addedRows.size : 0;
+
   const handleProductClick = (row) => {
     setSelectedRow(row);
     setIsNgoosOpen(true);
   };
 
   const handleActionChange = (action) => {
-    // Stepper validation - uses flexible ordering for Formula Check and Label Check
-    const tabOrder = ['add-products', 'formula-check', 'label-check', 'book-shipment', 'sort-products', 'sort-formulas'];
+    // Stepper validation - strict ordering: Add Products → Label Check → Formula Check
+    const tabOrder = ['add-products', 'label-check', 'formula-check', 'book-shipment', 'sort-products', 'sort-formulas'];
     const targetIndex = tabOrder.indexOf(action);
     
-    // BLOCKING RULE: Cannot access formula-check or beyond if there are unexported products
-    if (targetIndex >= tabOrder.indexOf('formula-check') && productsAddedAfterExport) {
+    // BLOCKING RULE: Cannot access label-check or beyond if there are unexported products
+    if (targetIndex >= tabOrder.indexOf('label-check') && productsAddedAfterExport) {
       toast.error('You added new products that haven\'t been exported. Please export the template first or remove the new products.');
       return;
     }
@@ -875,15 +879,28 @@ const NewShipment = () => {
       return;
     }
     
-    // Formula Check and Label Check can be done in ANY order after Add Products is completed
-    if (action === 'formula-check' || action === 'label-check') {
-      if (completedTabs.has('add-products')) {
-        setActiveAction(action);
-        return;
-      } else {
+    // Label Check comes immediately after Add Products
+    if (action === 'label-check') {
+      if (!completedTabs.has('add-products')) {
         toast.error('Complete "Add Products" first before proceeding.');
         return;
       }
+      setActiveAction(action);
+      return;
+    }
+
+    // Formula Check comes after Label Check
+    if (action === 'formula-check') {
+      if (!completedTabs.has('add-products')) {
+        toast.error('Complete "Add Products" first before proceeding.');
+        return;
+      }
+      if (!completedTabs.has('label-check')) {
+        toast.error('Complete "Label Check" first before proceeding.');
+        return;
+      }
+      setActiveAction(action);
+      return;
     }
     
     // For Book Shipment, Sort Products, Sort Formulas - require BOTH checks to be completed
@@ -989,21 +1006,21 @@ const NewShipment = () => {
         toast.success(`${productsToAdd.length} products added to shipment`);
       }
       
-      // Update shipment to mark add_products as completed and move to formula_check
+      // Update shipment to mark add_products as completed and move to label_check
       await updateShipment(currentShipmentId, {
         add_products_completed: true,
-        status: 'formula_check',
+        status: 'label_check',
       });
       
-      // Mark 'add-products' as completed when navigating to 'formula-check'
+      // Mark 'add-products' as completed when navigating to 'label-check'
       setCompletedTabs(prev => {
         const newSet = new Set(prev);
         newSet.add('add-products');
         return newSet;
       });
-      setActiveAction('formula-check');
+      setActiveAction('label-check');
       setIsShipmentDetailsOpen(false);
-      toast.success('Moving to Formula Check');
+      toast.success('Moving to Label Check');
     } catch (error) {
       console.error('Error booking shipment:', error);
       toast.error('Failed to book shipment: ' + error.message);
@@ -1070,11 +1087,11 @@ const NewShipment = () => {
     const updateData = isIncomplete
       ? {
           formula_check_completed: false,
-          status: 'label_check', // still move forward but keep formula check incomplete
+          status: 'book_shipment', // still move forward but keep formula check incomplete
         }
       : {
           formula_check_completed: true,
-          status: 'label_check',
+          status: 'book_shipment',
         };
     
     // Store comment in dedicated formula_check_comment column
@@ -1092,13 +1109,13 @@ const NewShipment = () => {
         newSet.delete('formula-check');
         return newSet;
       });
-      setActiveAction('label-check');
-      toast.info('Formula Check comment saved. Proceeding to Label Check.');
+      setActiveAction('book-shipment');
+      toast.info('Formula Check comment saved. Proceeding to Book Shipment.');
     } else {
       setFormulaCheckHasComment(hasComment);
       setCompletedTabs(prev => new Set(prev).add('formula-check'));
-      setActiveAction('label-check');
-      toast.success('Formula Check completed! Moving to Label Check');
+      setActiveAction('book-shipment');
+      toast.success('Formula Check completed! Moving to Book Shipment');
     }
   };
 
@@ -1112,11 +1129,11 @@ const NewShipment = () => {
     const updateData = isIncomplete
       ? {
           label_check_completed: false,
-          status: 'book_shipment',
+          status: 'formula_check',
         }
       : {
           label_check_completed: true,
-          status: 'book_shipment',
+          status: 'formula_check',
         };
 
     // Store comment in dedicated label_check_comment column
@@ -1133,12 +1150,12 @@ const NewShipment = () => {
         newSet.delete('label-check');
         return newSet;
       });
-      setActiveAction('book-shipment');
-      toast.info('Label Check comment saved. Proceeding to Book Shipment.');
+      setActiveAction('formula-check');
+      toast.info('Label Check comment saved. Proceeding to Formula Check.');
     } else {
       setCompletedTabs(prev => new Set(prev).add('label-check'));
-      setActiveAction('book-shipment');
-      toast.success('Label Check completed! Moving to Book Shipment.');
+      setActiveAction('formula-check');
+      toast.success('Label Check completed! Moving to Formula Check.');
     }
   };
 
@@ -1150,10 +1167,10 @@ const NewShipment = () => {
       }
 
       // WORKFLOW PROGRESSION:
-      // add-products → formula-check → label-check → (review) → sort-products → sort-formulas
+      // add-products → label-check → formula-check → (review) → sort-products → sort-formulas
 
       if (activeAction === 'formula-check') {
-        // Formula Check: Verify formulas are reviewed, then move to Label Check
+        // Formula Check: Verify formulas are reviewed, then move to Book Shipment
         if (formulaCheckData?.remaining > 0) {
           setUncheckedFormulaCount(formulaCheckData.remaining);
           setIsFormulaIncompleteComment(true);
@@ -1168,10 +1185,10 @@ const NewShipment = () => {
       }
 
       if (activeAction === 'label-check') {
-      if (!isLabelCheckReadyToComplete) {
-        toast.error('Complete all label counts before continuing.');
-        return;
-      }
+        if (!isLabelCheckReadyToComplete) {
+          toast.error('Complete all label counts before continuing.');
+          return;
+        }
 
         // Check for variance first
         const varianceCount = checkVarianceExceeded();
@@ -1182,14 +1199,8 @@ const NewShipment = () => {
           return;
         }
         
-        // Label Check: Complete and move to Book Shipment
-        await updateShipment(shipmentId, {
-          label_check_completed: true,
-          status: 'book_shipment',
-        });
-        setCompletedTabs(prev => new Set(prev).add('label-check'));
-        setActiveAction('book-shipment');
-        toast.success('Label Check completed! Moving to Book Shipment.');
+        // Label Check: Complete and move to Formula Check
+        await completeLabelCheck('', false);
         return;
       }
 
@@ -3014,6 +3025,22 @@ const NewShipment = () => {
                     fontWeight: 400,
                     color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
                   }}>
+                    PRODUCTS
+                  </span>
+                  <span style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                  }}>
+                    {totalProducts.toLocaleString()}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 400,
+                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                  }}>
                     TOTAL BOXES
                   </span>
                   <span style={{
@@ -3200,7 +3227,7 @@ const NewShipment = () => {
           setProductsAddedAfterExport(false);
         }}
         onBeginFormulaCheck={async () => {
-          // Book shipment if not already booked (needed for formula check)
+          // Book shipment if not already booked (needed for label check)
           if (!shipmentId) {
             try {
               setLoading(true);
@@ -3244,10 +3271,10 @@ const NewShipment = () => {
               // Add products to shipment
               await addShipmentProducts(newShipmentId, productsToAdd);
               
-              // Update shipment to mark add_products as completed
+              // Update shipment to mark add_products as completed and move to label_check
               await updateShipment(newShipmentId, {
                 add_products_completed: true,
-                status: 'formula_check',
+                status: 'label_check',
               });
               
               // Mark 'add-products' and 'export' as completed
@@ -3281,8 +3308,8 @@ const NewShipment = () => {
             setProductsAddedAfterExport(false);
           }
 
-          // After exporting, move to Formula Check and keep footer visible
-          setActiveAction('formula-check');
+          // After exporting, move to Label Check and keep footer visible
+          setActiveAction('label-check');
         }}
         products={products.map((product, index) => ({
           ...product,

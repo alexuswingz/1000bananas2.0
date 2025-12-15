@@ -217,8 +217,11 @@ const NewShipmentTable = ({
             case 'labels':
               rowValue = row.labelsAvailable || row.label_inventory || row.labels_available;
               break;
-            default:
-              rowValue = row[columnKey];
+            default: {
+              const field = getFieldForHeaderFilter(columnKey);
+              rowValue = row[field];
+              break;
+            }
           }
           return filter.selectedValues.has(rowValue) || 
                  filter.selectedValues.has(String(rowValue));
@@ -242,8 +245,11 @@ const NewShipmentTable = ({
             case 'labels':
               rowValue = row.labelsAvailable || row.label_inventory || row.labels_available || 0;
               break;
-            default:
-              rowValue = row[columnKey] || 0;
+            default: {
+              const field = getFieldForHeaderFilter(columnKey);
+              rowValue = row[field] || 0;
+              break;
+            }
           }
 
           const numValue = typeof rowValue === 'number' ? rowValue : parseFloat(rowValue) || 0;
@@ -305,16 +311,28 @@ const NewShipmentTable = ({
               aVal = a.labelsAvailable || a.label_inventory || a.labels_available || 0;
               bVal = b.labelsAvailable || b.label_inventory || b.labels_available || 0;
               break;
-            default:
-              aVal = a[sort.column] || 0;
-              bVal = b[sort.column] || 0;
+            default: {
+              const field = getFieldForHeaderFilter(sort.column);
+              aVal = a[field];
+              bVal = b[field];
+            }
           }
 
-          const aNum = typeof aVal === 'number' ? aVal : parseFloat(aVal) || 0;
-          const bNum = typeof bVal === 'number' ? bVal : parseFloat(bVal) || 0;
-          
-          if (aNum !== bNum) {
-            return sort.order === 'asc' ? aNum - bNum : bNum - aNum;
+          // Brand/Product/Size/etc are text fields; Qty/Add may be numeric/boolean
+          if (sort.column === 'normal-0' || sort.column === 'normal-1' || sort.column === 'normal-2') {
+            const aStr = String(aVal ?? '').toLowerCase();
+            const bStr = String(bVal ?? '').toLowerCase();
+            const cmp = aStr.localeCompare(bStr);
+            if (cmp !== 0) {
+              return sort.order === 'asc' ? cmp : -cmp;
+            }
+          } else {
+            const aNum = typeof aVal === 'number' ? aVal : parseFloat(aVal) || 0;
+            const bNum = typeof bVal === 'number' ? bVal : parseFloat(bVal) || 0;
+            
+            if (aNum !== bNum) {
+              return sort.order === 'asc' ? aNum - bNum : bNum - aNum;
+            }
           }
         }
         return 0;
@@ -401,6 +419,24 @@ const NewShipmentTable = ({
     });
   };
 
+  // Map normal header filter keys to row fields
+  function getFieldForHeaderFilter(columnKey) {
+    switch (columnKey) {
+      case 'normal-0':
+        return 'brand';
+      case 'normal-1':
+        return 'product';
+      case 'normal-2':
+        return 'size';
+      case 'normal-3':
+        return 'add'; // whether product is added (uses boolean/flag)
+      case 'normal-4':
+        return 'qty'; // quantity field
+      default:
+        return columnKey;
+    }
+  }
+
   // Get unique values for a column
   const getColumnValues = (columnKey) => {
     const values = new Set();
@@ -419,8 +455,11 @@ const NewShipmentTable = ({
         case 'labels':
           val = row.labelsAvailable || row.label_inventory || row.labels_available;
           break;
-        default:
-          val = row[columnKey];
+        default: {
+          const field = getFieldForHeaderFilter(columnKey);
+          val = row[field];
+          break;
+        }
       }
       if (val !== undefined && val !== null && val !== '') {
         values.add(val);
@@ -723,7 +762,6 @@ const NewShipmentTable = ({
                         textAlign: idx === 3 || idx === 4 ? 'center' : 'left',
                         borderRight: idx === 3 ? 'none' : '1px solid #FFFFFF',
                         position: 'relative',
-                        // Soften outer header corners more
                         borderTopLeftRadius: idx === 0 ? '16px' : undefined,
                         width:
                           idx === 0
@@ -740,7 +778,7 @@ const NewShipmentTable = ({
                       <span>{col}</span>
                       <img
                         ref={(el) => {
-                          if (el) filterRefs.current[`normal-${idx}`] = el;
+                          if (el) filterIconRefs.current[`normal-${idx}`] = el;
                         }}
                         src="/assets/Vector (1).png"
                         alt="Filter"
@@ -757,7 +795,15 @@ const NewShipmentTable = ({
                         onClick={(e) => {
                           e.stopPropagation();
                           const filterKey = `normal-${idx}`;
-                          setOpenFilterIndex(openFilterIndex === filterKey ? null : filterKey);
+                          setOpenFilterColumns((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(filterKey)) {
+                              next.delete(filterKey);
+                            } else {
+                              next.add(filterKey);
+                            }
+                            return next;
+                          });
                         }}
                       />
                     </th>
@@ -1375,6 +1421,29 @@ const NewShipmentTable = ({
             </table>
           </div>
         </div>
+
+        {/* Header Filter Dropdowns for Brand / Product / Size / Add / Qty */}
+        {Array.from(openFilterColumns).map((columnKey) => {
+          if (!filterIconRefs.current[columnKey]) return null;
+          return (
+            <SortFormulasFilterDropdown
+              key={columnKey}
+              filterIconRef={filterIconRefs.current[columnKey]}
+              columnKey={columnKey}
+              availableValues={getColumnValues(columnKey)}
+              currentFilter={columnFilters[columnKey] || {}}
+              currentSort={getColumnSortOrder(columnKey)}
+              onApply={(filterData) => handleApplyColumnFilter(columnKey, filterData)}
+              onClose={() => {
+                setOpenFilterColumns((prev) => {
+                  const next = new Set(prev);
+                  next.delete(columnKey);
+                  return next;
+                });
+              }}
+            />
+          );
+        })}
 
         {/* Filter status indicator */}
         {(activeFilters.popularFilter || activeFilters.sortField || activeFilters.filterField) && (
@@ -3065,7 +3134,7 @@ const NewShipmentTable = ({
       </div>
     </div>
     
-    {/* Timeline Filter Modal for Table Mode */}
+      {/* Timeline Filter Modal for Table Mode (DOI Goal) */}
     {openFilterIndex === 'doi-goal' && (
       <TimelineFilterDropdown
         ref={(el) => {

@@ -613,8 +613,9 @@ const Planning = () => {
   const getNextIncompleteStep = (row) => {
     // Return the first incomplete step
     if (row.addProducts !== 'completed') return 'add-products';
-    if (row.formulaCheck !== 'completed') return 'formula-check';
+    // Updated flow: Add Products → Label Check → Formula Check
     if (row.labelCheck !== 'completed') return 'label-check';
+    if (row.formulaCheck !== 'completed') return 'formula-check';
     if (row.bookShipment !== 'completed') return 'book-shipment';
     if (row.sortProducts !== 'completed') return 'sort-products';
     if (row.sortFormulas !== 'completed') return 'sort-formulas';

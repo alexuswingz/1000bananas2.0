@@ -107,6 +107,7 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck, p
     if (onExport) {
       onExport(selectedType);
     }
+    // Updated flow: after export, begin Label Check (not Formula Check)
     if (onBeginFormulaCheck) {
       onBeginFormulaCheck();
     }
@@ -244,7 +245,7 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck, p
                 Close
               </button>
 
-              {/* Begin Formula Check button */}
+              {/* Begin Label Check button */}
               <button
                 type="button"
                 onClick={handleBeginFormulaCheck}
@@ -266,7 +267,7 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck, p
                   e.currentTarget.style.backgroundColor = '#3B82F6';
                 }}
               >
-                Begin Formula Check
+                Begin Label Check
               </button>
             </div>
           </div>

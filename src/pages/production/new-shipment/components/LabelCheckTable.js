@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 import { getShipmentProducts, getLabelFormulaByLocation, updateLabelInventoryByLocation, updateShipmentProductLabelCheck } from '../../../../services/productionApi';
 import VarianceStillExceededModal from './VarianceStillExceededModal';
+import SortFormulasFilterDropdown from './SortFormulasFilterDropdown';
 
 const LabelCheckTable = ({
   shipmentId,
@@ -16,8 +17,8 @@ const LabelCheckTable = ({
   const { isDarkMode } = useTheme();
   const location = useLocation();
   const isPlanningView = location.pathname.includes('planning');
-  // In viewing shipment (non-recount) hide column dropdown filters
-  const disableFilters = !isRecountMode || isPlanningView;
+  // Show column dropdown filters in Label Check table (except in planning view)
+  const disableFilters = isPlanningView;
   const [isExpanded, setIsExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -58,6 +59,9 @@ const LabelCheckTable = ({
   const disableHeaderDropdown = true; // Always show label check products; no collapsible header
   const filterIconRefs = useRef({});
   const filterDropdownRef = useRef(null);
+  const [filters, setFilters] = useState({});
+  const [sortField, setSortField] = useState('');
+  const [sortOrder, setSortOrder] = useState('');
 
   // Fetch label formula when a row is selected for counting
   const fetchLabelFormula = useCallback(async (labelLocation) => {
@@ -152,6 +156,143 @@ const LabelCheckTable = ({
   const formatNumber = (num) => {
     if (num === '' || num === null || num === undefined) return '';
     return num.toLocaleString();
+  };
+
+  // Get unique values for a column (for dropdown list)
+  const getColumnValues = (columnKey) => {
+    const values = new Set();
+    rows.forEach(row => {
+      const val = row[columnKey];
+      if (val !== undefined && val !== null && val !== '') {
+        values.add(val);
+      }
+    });
+    const sortedValues = Array.from(values).sort((a, b) => {
+      if (typeof a === 'number' && typeof b === 'number') return a - b;
+      return String(a).localeCompare(String(b));
+    });
+    return sortedValues;
+  };
+
+  const isNumericColumn = (columnKey) =>
+    columnKey === 'quantity' || columnKey === 'lblCurrentInv';
+
+  const applyConditionFilter = (value, conditionType, conditionValue, numeric) => {
+    if (!conditionType) return true;
+
+    const strValue = String(value ?? '').toLowerCase();
+    const strCond = String(conditionValue ?? '').toLowerCase();
+
+    switch (conditionType) {
+      case 'contains':
+        return strValue.includes(strCond);
+      case 'notContains':
+        return !strValue.includes(strCond);
+      case 'equals':
+        return numeric ? Number(value) === Number(conditionValue) : strValue === strCond;
+      case 'notEquals':
+        return numeric ? Number(value) !== Number(conditionValue) : strValue !== strCond;
+      case 'startsWith':
+        return strValue.startsWith(strCond);
+      case 'endsWith':
+        return strValue.endsWith(strCond);
+      case 'isEmpty':
+        return !value || strValue === '';
+      case 'isNotEmpty':
+        return !!value && strValue !== '';
+      case 'greaterThan':
+        return Number(value) > Number(conditionValue);
+      case 'lessThan':
+        return Number(value) < Number(conditionValue);
+      case 'greaterOrEqual':
+        return Number(value) >= Number(conditionValue);
+      case 'lessOrEqual':
+        return Number(value) <= Number(conditionValue);
+      default:
+        return true;
+    }
+  };
+
+  const handleApplyFilter = (columnKey, filterData) => {
+    setFilters(prev => ({
+      ...prev,
+      [columnKey]: {
+        selectedValues: filterData.selectedValues || new Set(),
+        conditionType: filterData.conditionType || '',
+        conditionValue: filterData.conditionValue || '',
+      },
+    }));
+
+    if (filterData.sortOrder) {
+      setSortField(columnKey);
+      setSortOrder(filterData.sortOrder);
+    } else if (sortField === columnKey) {
+      setSortField('');
+      setSortOrder('');
+    }
+  };
+
+  const getFilteredRows = () => {
+    // Base rows: all rows, or only variance-exceeded in recount mode
+    const baseRows = isRecountMode
+      ? rows.filter(row => varianceExceededRowIds.includes(row.id))
+      : rows;
+
+    let result = [...baseRows];
+
+    // Apply filters
+    Object.keys(filters).forEach(columnKey => {
+      const filter = filters[columnKey];
+      if (!filter) return;
+
+      const numeric = isNumericColumn(columnKey);
+
+      // Value filters
+      if (filter.selectedValues && filter.selectedValues.size > 0) {
+        result = result.filter(row => {
+          const value = row[columnKey];
+          return (
+            filter.selectedValues.has(value) ||
+            filter.selectedValues.has(String(value))
+          );
+        });
+      }
+
+      // Condition filters
+      if (filter.conditionType) {
+        result = result.filter(row =>
+          applyConditionFilter(
+            row[columnKey],
+            filter.conditionType,
+            filter.conditionValue,
+            numeric
+          )
+        );
+      }
+    });
+
+    // Apply single-column sort
+    if (sortField && sortOrder) {
+      const numeric = isNumericColumn(sortField);
+      result.sort((a, b) => {
+        const aVal = a[sortField];
+        const bVal = b[sortField];
+
+        if (numeric) {
+          const aNum = Number(aVal) || 0;
+          const bNum = Number(bVal) || 0;
+          return sortOrder === 'asc' ? aNum - bNum : bNum - aNum;
+        }
+
+        const aStr = String(aVal ?? '').toLowerCase();
+        const bStr = String(bVal ?? '').toLowerCase();
+        return sortOrder === 'asc'
+          ? aStr.localeCompare(bStr)
+          : bStr.localeCompare(aStr);
+      });
+    }
+
+    return result;
   };
 
   const handleStartClick = (row, index) => {
@@ -690,10 +831,7 @@ const LabelCheckTable = ({
             </thead>
 
             <tbody>
-              {(isRecountMode 
-                ? rows.filter(row => varianceExceededRowIds.includes(row.id))
-                : rows
-              ).map((row, index) => {
+              {getFilteredRows().map((row, index) => {
                 // Find the original index for styling
                 const originalIndex = rows.findIndex(r => r.id === row.id);
                 return (
@@ -1639,12 +1777,14 @@ const LabelCheckTable = ({
 
       {/* Filter Dropdown */}
       {!disableFilters && openFilterColumn && filterIconRefs.current[openFilterColumn] && (
-        <FilterDropdown
-          ref={filterDropdownRef}
-          columnKey={openFilterColumn}
+        <SortFormulasFilterDropdown
           filterIconRef={filterIconRefs.current[openFilterColumn]}
+          columnKey={openFilterColumn}
+          availableValues={getColumnValues(openFilterColumn)}
+          currentFilter={filters[openFilterColumn] || {}}
+          currentSort={sortField === openFilterColumn ? sortOrder : ''}
+          onApply={(filterData) => handleApplyFilter(openFilterColumn, filterData)}
           onClose={() => setOpenFilterColumn(null)}
-          isDarkMode={isDarkMode}
         />
       )}
 

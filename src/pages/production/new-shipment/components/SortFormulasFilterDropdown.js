@@ -165,6 +165,8 @@ const SortFormulasFilterDropdown = ({
                 conditionValue,
               });
             }
+            // Close dropdown after applying sort
+            onClose?.();
           }}
           style={{
             display: 'flex',
@@ -225,6 +227,8 @@ const SortFormulasFilterDropdown = ({
                 conditionValue,
               });
             }
+            // Close dropdown after applying sort
+            onClose?.();
           }}
           style={{
             display: 'flex',
