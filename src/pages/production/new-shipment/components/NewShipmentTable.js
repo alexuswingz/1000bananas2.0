@@ -1107,7 +1107,11 @@ const NewShipmentTable = ({
                       </div>
                     </td>
                     <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }}>
-                      <div style={{ position: 'relative', display: 'inline-block' }}>
+                      <div
+                        style={{ position: 'relative', display: 'inline-block' }}
+                        onMouseEnter={() => setHoveredQtyIndex(index)}
+                        onMouseLeave={() => setHoveredQtyIndex(null)}
+                      >
                         <input
                           type="number"
                           step={(() => {
@@ -1152,7 +1156,7 @@ const NewShipmentTable = ({
                           placeholder="0"
                           className={`${themeClasses.cardBg} border rounded-md text-xs ${themeClasses.text}`}
                           style={{
-                            padding: '0.25rem 0.5rem',
+                            padding: '0.25rem 0.5rem 0.25rem 1.75rem', // extra left padding for reset icon
                             width: '90px',
                             textAlign: 'center',
                             cursor: 'text',
@@ -1160,6 +1164,47 @@ const NewShipmentTable = ({
                             backgroundColor: isQtyExceedingLabels(row, index) ? (isDarkMode ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.05)') : undefined,
                           }}
                         />
+                        {hoveredQtyIndex === index && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              effectiveSetQtyValues(prev => ({
+                                ...prev,
+                                [index]: 0,
+                              }));
+                            }}
+                            style={{
+                              position: 'absolute',
+                              left: '6px',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              borderRadius: '999px',
+                              border: 'none',
+                              backgroundColor: 'transparent',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: 0,
+                              margin: 0,
+                            }}
+                            onMouseEnter={() => {}}
+                            onMouseLeave={() => {}}
+                          >
+                            <img
+                              src="/assets/reset.png"
+                              alt="Reset quantity"
+                              style={{
+                                display: 'block',
+                                width: '9px',
+                                height: '9px',
+                                objectFit: 'contain',
+                              }}
+                            />
+                          </button>
+                        )}
                         {/* Label warning icon - positioned absolutely to not affect alignment */}
                         {isQtyExceedingLabels(row, index) && (effectiveQtyValues[index] ?? 0) > 0 && (
                           <span
@@ -2705,133 +2750,195 @@ const NewShipmentTable = ({
                         }}
                       />
                       {hoveredQtyIndex === index && (
-                        <div style={{
-                          position: 'absolute',
-                          right: '2px',
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '0',
-                          height: '20px',
-                          width: '14px',
-                        }}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            const currentQty = effectiveQtyValues[index] ?? 0;
-                            const numQty = typeof currentQty === 'number' ? currentQty : (currentQty === '' || currentQty === null || currentQty === undefined ? 0 : parseInt(currentQty, 10) || 0);
-                            
-                            // Determine increment based on size
-                            let increment = 0;
-                            const size = row.size?.toLowerCase() || '';
-                            if (size.includes('8oz')) {
-                              increment = 60;
-                            } else if (size.includes('quart')) {
-                              increment = 12;
-                            } else if (size.includes('gallon')) {
-                              increment = 4;
-                            }
-                            
-                            const newQty = Math.max(0, numQty + increment);
-                            effectiveSetQtyValues(prev => ({
-                              ...prev,
-                              [index]: newQty
-                            }));
-                          }}
+                        <div
                           style={{
-                            width: '100%',
-                            height: '50%',
-                            border: 'none',
-                            backgroundColor: 'transparent',
-                            cursor: 'pointer',
+                            position: 'absolute',
+                            right: '2px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
                             display: 'flex',
+                            flexDirection: 'column',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            padding: 0,
-                            margin: 0,
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#F3F4F6';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent';
+                            gap: '0',
+                            height: '20px',
+                            width: '14px',
                           }}
                         >
-                          <svg
-                            width="8"
-                            height="8"
-                            viewBox="0 0 8 8"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
+                          {/* Reset button - only visible on hover */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              effectiveSetQtyValues(prev => ({
+                                ...prev,
+                                [index]: 0,
+                              }));
+                            }}
+                            style={{
+                              position: 'absolute',
+                              left: '-20px',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              width: '16px',
+                              height: '16px',
+                              borderRadius: '999px',
+                              border: 'none',
+                              backgroundColor: '#F3F4F6',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: 0,
+                              margin: 0,
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#E5E7EB';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = '#F3F4F6';
+                            }}
                           >
-                            <path
-                              d="M4 2L6 5H2L4 2Z"
-                              fill="#6B7280"
-                            />
-                          </svg>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            const currentQty = effectiveQtyValues[index] ?? 0;
-                            const numQty = typeof currentQty === 'number' ? currentQty : (currentQty === '' || currentQty === null || currentQty === undefined ? 0 : parseInt(currentQty, 10) || 0);
-                            
-                            // Determine increment based on size
-                            let increment = 0;
-                            const size = row.size?.toLowerCase() || '';
-                            if (size.includes('8oz')) {
-                              increment = 60;
-                            } else if (size.includes('quart')) {
-                              increment = 12;
-                            } else if (size.includes('gallon')) {
-                              increment = 4;
-                            }
-                            
-                            const newQty = Math.max(0, numQty - increment);
-                            effectiveSetQtyValues(prev => ({
-                              ...prev,
-                              [index]: newQty
-                            }));
-                          }}
-                          style={{
-                            width: '100%',
-                            height: '50%',
-                            border: 'none',
-                            backgroundColor: 'transparent',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            padding: 0,
-                            margin: 0,
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#F3F4F6';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }}
-                        >
-                          <svg
-                            width="8"
-                            height="8"
-                            viewBox="0 0 8 8"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
+                            <svg
+                              width="10"
+                              height="10"
+                              viewBox="0 0 10 10"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                d="M2 3.5V1.5H0.5M5 2C3.067 2 1.5 3.567 1.5 5.5C1.5 7.433 3.067 9 5 9C6.933 9 8.5 7.433 8.5 5.5C8.5 4.197 7.836 3.049 6.824 2.36"
+                                stroke="#6B7280"
+                                strokeWidth="0.8"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </button>
+                          {/* Up / down controls */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              const currentQty = effectiveQtyValues[index] ?? 0;
+                              const numQty =
+                                typeof currentQty === 'number'
+                                  ? currentQty
+                                  : currentQty === '' ||
+                                    currentQty === null ||
+                                    currentQty === undefined
+                                  ? 0
+                                  : parseInt(currentQty, 10) || 0;
+                              
+                              // Determine increment based on size
+                              let increment = 0;
+                              const size = row.size?.toLowerCase() || '';
+                              if (size.includes('8oz')) {
+                                increment = 60;
+                              } else if (size.includes('quart')) {
+                                increment = 12;
+                              } else if (size.includes('gallon')) {
+                                increment = 4;
+                              }
+                              
+                              const newQty = Math.max(0, numQty + increment);
+                              effectiveSetQtyValues(prev => ({
+                                ...prev,
+                                [index]: newQty,
+                              }));
+                            }}
+                            style={{
+                              width: '100%',
+                              height: '50%',
+                              border: 'none',
+                              backgroundColor: 'transparent',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: 0,
+                              margin: 0,
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#F3F4F6';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
                           >
-                            <path
-                              d="M4 6L2 3H6L4 6Z"
-                              fill="#6B7280"
-                            />
-                          </svg>
-                        </button>
+                            <svg
+                              width="8"
+                              height="8"
+                              viewBox="0 0 8 8"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path d="M4 2L6 5H2L4 2Z" fill="#6B7280" />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              const currentQty = effectiveQtyValues[index] ?? 0;
+                              const numQty =
+                                typeof currentQty === 'number'
+                                  ? currentQty
+                                  : currentQty === '' ||
+                                    currentQty === null ||
+                                    currentQty === undefined
+                                  ? 0
+                                  : parseInt(currentQty, 10) || 0;
+                              
+                              // Determine increment based on size
+                              let increment = 0;
+                              const size = row.size?.toLowerCase() || '';
+                              if (size.includes('8oz')) {
+                                increment = 60;
+                              } else if (size.includes('quart')) {
+                                increment = 12;
+                              } else if (size.includes('gallon')) {
+                                increment = 4;
+                              }
+                              
+                              const newQty = Math.max(0, numQty - increment);
+                              effectiveSetQtyValues(prev => ({
+                                ...prev,
+                                [index]: newQty,
+                              }));
+                            }}
+                            style={{
+                              width: '100%',
+                              height: '50%',
+                              border: 'none',
+                              backgroundColor: 'transparent',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: 0,
+                              margin: 0,
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#F3F4F6';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
+                          >
+                            <svg
+                              width="8"
+                              height="8"
+                              viewBox="0 0 8 8"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path d="M4 6L2 3H6L4 6Z" fill="#6B7280" />
+                            </svg>
+                          </button>
                         </div>
                       )}
                       {/* Label warning icon - shown when QTY exceeds labels */}
