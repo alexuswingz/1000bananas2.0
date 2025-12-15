@@ -859,10 +859,9 @@ const NewShipment = () => {
   };
 
   const handleActionChange = (action) => {
-    // Stepper validation - can only access completed tabs or the next available step
+    // Stepper validation - uses flexible ordering for Formula Check and Label Check
     const tabOrder = ['add-products', 'formula-check', 'label-check', 'book-shipment', 'sort-products', 'sort-formulas'];
     const targetIndex = tabOrder.indexOf(action);
-    const currentIndex = tabOrder.indexOf(activeAction);
     
     // BLOCKING RULE: Cannot access formula-check or beyond if there are unexported products
     if (targetIndex >= tabOrder.indexOf('formula-check') && productsAddedAfterExport) {
@@ -876,41 +875,50 @@ const NewShipment = () => {
       return;
     }
     
-    // Check if trying to skip ahead
-    if (targetIndex > currentIndex) {
-      // Find the first incomplete step
-      let firstIncompleteIndex = 0;
-      for (let i = 0; i < tabOrder.length; i++) {
-        if (!completedTabs.has(tabOrder[i])) {
-          firstIncompleteIndex = i;
-          break;
-        }
-      }
-      
-      // Can only go to the next incomplete step, not skip ahead
-      if (targetIndex > firstIncompleteIndex) {
-        const firstIncompleteTab = tabOrder[firstIncompleteIndex];
-        const tabNames = {
-          'add-products': 'Add Products',
-          'formula-check': 'Formula Check',
-          'label-check': 'Label Check',
-          'book-shipment': 'Book Shipment',
-          'sort-products': 'Sort Products',
-          'sort-formulas': 'Sort Formulas',
-        };
-        toast.error(`Complete "${tabNames[firstIncompleteTab]}" first before proceeding.`);
+    // Formula Check and Label Check can be done in ANY order after Add Products is completed
+    if (action === 'formula-check' || action === 'label-check') {
+      if (completedTabs.has('add-products')) {
+        setActiveAction(action);
         return;
-      }
-      
-      // Check for unresolved issues blocking progress to book-shipment and beyond
-      if (targetIndex >= tabOrder.indexOf('book-shipment') && hasUnresolvedCheckIssues) {
-        const reason = getTabBlockedReason(action);
-        toast.error(`Cannot proceed: ${reason}`);
+      } else {
+        toast.error('Complete "Add Products" first before proceeding.');
         return;
       }
     }
     
-    // Allow the action change
+    // For Book Shipment, Sort Products, Sort Formulas - require BOTH checks to be completed
+    const laterSteps = ['book-shipment', 'sort-products', 'sort-formulas'];
+    if (laterSteps.includes(action)) {
+      const bothChecksCompleted = completedTabs.has('formula-check') && completedTabs.has('label-check');
+      
+      if (!bothChecksCompleted) {
+        const reason = getTabBlockedReason(action);
+        toast.error(reason || 'Complete Formula Check and Label Check first');
+        return;
+      }
+      
+      // Check for unresolved issues
+      if (hasUnresolvedCheckIssues) {
+        const reason = getTabBlockedReason(action);
+        toast.error(`Cannot proceed: ${reason}`);
+        return;
+      }
+      
+      // For steps after book-shipment, check if previous step is completed
+      if (action === 'sort-products' && !completedTabs.has('book-shipment')) {
+        toast.error('Complete "Book Shipment" first before proceeding.');
+        return;
+      }
+      if (action === 'sort-formulas' && !completedTabs.has('sort-products')) {
+        toast.error('Complete "Sort Products" first before proceeding.');
+        return;
+      }
+      
+      setActiveAction(action);
+      return;
+    }
+    
+    // Default: allow the action change
     setActiveAction(action);
   };
 
@@ -1274,37 +1282,70 @@ const NewShipment = () => {
       return tabName === 'add-products';
     }
     
-    // Workflow order: add-products → formula-check → label-check → book-shipment → sort-products → sort-formulas
-    const tabOrder = ['add-products', 'formula-check', 'label-check', 'book-shipment', 'sort-products', 'sort-formulas'];
-    const currentIndex = tabOrder.indexOf(tabName);
+    // add-products is always accessible
+    if (tabName === 'add-products') return true;
     
-    // BLOCKING RULE: Cannot access book-shipment or later steps if formula/label check is incomplete
-    if (currentIndex >= tabOrder.indexOf('book-shipment')) {
+    // Completed tabs are always accessible
+    if (completedTabs.has(tabName)) return true;
+    
+    // Formula Check and Label Check can be done in ANY order after Add Products is completed
+    if (tabName === 'formula-check' || tabName === 'label-check') {
+      return completedTabs.has('add-products');
+    }
+    
+    // Book Shipment, Sort Products, Sort Formulas require BOTH formula-check AND label-check to be completed
+    const laterSteps = ['book-shipment', 'sort-products', 'sort-formulas'];
+    if (laterSteps.includes(tabName)) {
+      // Must have both formula-check and label-check completed
+      const bothChecksCompleted = completedTabs.has('formula-check') && completedTabs.has('label-check');
+      if (!bothChecksCompleted) {
+        return false;
+      }
+      
+      // Also check for unresolved issues (comments without completion)
       if (hasUnresolvedCheckIssues) {
         return false;
       }
-    }
-    
-    // Can access current tab or any completed tab
-    if (completedTabs.has(tabName)) {
+      
+      // For steps after book-shipment, check if previous step is completed
+      if (tabName === 'sort-products') {
+        return completedTabs.has('book-shipment');
+      }
+      if (tabName === 'sort-formulas') {
+        return completedTabs.has('sort-products');
+      }
+      
+      // book-shipment is accessible if both checks are completed
       return true;
     }
     
-    // Can access next tab if previous tab is completed
-    if (currentIndex > 0) {
-      const previousTab = tabOrder[currentIndex - 1];
-      return completedTabs.has(previousTab);
-    }
-    
-    return currentIndex === 0; // add-products is always accessible
+    return false;
   };
 
   // Get reason why a tab is blocked
+  // Only show tooltip for book-shipment, sort-products, and sort-formulas
   const getTabBlockedReason = (tabName) => {
-    const tabOrder = ['add-products', 'formula-check', 'label-check', 'book-shipment', 'sort-products', 'sort-formulas'];
-    const currentIndex = tabOrder.indexOf(tabName);
+    const laterSteps = ['book-shipment', 'sort-products', 'sort-formulas'];
     
-    if (currentIndex >= tabOrder.indexOf('book-shipment') && hasUnresolvedCheckIssues) {
+    // Only show tooltip for steps after formula/label check
+    if (!laterSteps.includes(tabName)) {
+      return null;
+    }
+    
+    // Check if both checks are completed
+    const formulaCheckDone = completedTabs.has('formula-check');
+    const labelCheckDone = completedTabs.has('label-check');
+    
+    if (!formulaCheckDone && !labelCheckDone) {
+      return 'Complete Formula Check and Label Check first';
+    } else if (!formulaCheckDone) {
+      return 'Complete Formula Check first';
+    } else if (!labelCheckDone) {
+      return 'Complete Label Check first';
+    }
+    
+    // Check for unresolved issues (comments without completion)
+    if (hasUnresolvedCheckIssues) {
       if (isFormulaCheckIncomplete && isLabelCheckIncomplete) {
         return 'Formula Check and Label Check have unresolved issues';
       } else if (isFormulaCheckIncomplete) {
@@ -1313,6 +1354,7 @@ const NewShipment = () => {
         return 'Label Check has unresolved issues';
       }
     }
+    
     return null;
   };
 

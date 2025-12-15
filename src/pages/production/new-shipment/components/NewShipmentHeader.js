@@ -23,40 +23,53 @@ const NewShipmentHeader = ({
   productsAddedAfterExport = false,
 }) => {
   // Stepper logic - determine which tabs are accessible
+  // Formula Check and Label Check can be done in ANY order after Add Products
   const tabOrder = ['add-products', 'formula-check', 'label-check', 'book-shipment', 'sort-products', 'sort-formulas'];
   
   const isTabAccessible = (tabName) => {
-    const targetIndex = tabOrder.indexOf(tabName);
-    
     // add-products is always accessible
     if (tabName === 'add-products') return true;
-    
-    // Block formula-check and beyond if there are unexported products
-    if (targetIndex >= tabOrder.indexOf('formula-check') && productsAddedAfterExport) {
-      return false;
-    }
     
     // Completed tabs are always accessible
     if (completedTabs.has(tabName)) return true;
     
-    // Find the first incomplete step
-    let firstIncompleteIndex = 0;
-    for (let i = 0; i < tabOrder.length; i++) {
-      if (!completedTabs.has(tabOrder[i])) {
-        firstIncompleteIndex = i;
-        break;
+    // Formula Check and Label Check can be done in ANY order after Add Products is completed
+    if (tabName === 'formula-check' || tabName === 'label-check') {
+      // Block if there are unexported products
+      if (productsAddedAfterExport) {
+        return false;
       }
+      // Accessible once add-products is completed
+      return completedTabs.has('add-products');
     }
     
-    // Can only access up to the first incomplete step
-    if (targetIndex > firstIncompleteIndex) return false;
-    
-    // Block book-shipment and beyond if there are unresolved issues
-    if (targetIndex >= tabOrder.indexOf('book-shipment') && hasUnresolvedCheckIssues) {
-      return false;
+    // Book Shipment, Sort Products, Sort Formulas require BOTH formula-check AND label-check
+    const laterSteps = ['book-shipment', 'sort-products', 'sort-formulas'];
+    if (laterSteps.includes(tabName)) {
+      // Must have both formula-check and label-check completed
+      const bothChecksCompleted = completedTabs.has('formula-check') && completedTabs.has('label-check');
+      if (!bothChecksCompleted) {
+        return false;
+      }
+      
+      // Block if there are unresolved issues
+      if (hasUnresolvedCheckIssues) {
+        return false;
+      }
+      
+      // For steps after book-shipment, check if previous step is completed
+      if (tabName === 'sort-products') {
+        return completedTabs.has('book-shipment');
+      }
+      if (tabName === 'sort-formulas') {
+        return completedTabs.has('sort-products');
+      }
+      
+      // book-shipment is accessible if both checks are completed
+      return true;
     }
     
-    return true;
+    return false;
   };
   
   // Check if tab is blocked due to unexported products
