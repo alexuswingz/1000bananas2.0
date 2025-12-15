@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+  import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 import { calculatePallets } from '../../../../utils/palletCalculations';
@@ -766,16 +766,8 @@ const BoxOrderPage = () => {
               }}
               aria-label="Settings"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                <circle cx="12" cy="12" r="2" fill="currentColor"/>
-                <line x1="12" y1="2" x2="12" y2="8"/>
-                <line x1="12" y1="16" x2="12" y2="22"/>
-                <line x1="2" y1="12" x2="8" y2="12"/>
-                <line x1="16" y1="12" x2="22" y2="12"/>
-                <line x1="4.343" y1="4.343" x2="8.485" y2="8.485"/>
-                <line x1="15.515" y1="15.515" x2="19.657" y2="19.657"/>
-                <line x1="19.657" y1="4.343" x2="15.515" y2="8.485"/>
-                <line x1="8.485" y1="15.515" x2="4.343" y2="19.657"/>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5a3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97c0-.33-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.4-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1c0 .33.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.66Z"/>
               </svg>
             </button>
           </div>
@@ -1030,7 +1022,7 @@ const BoxOrderPage = () => {
             <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
               <thead style={{ backgroundColor: '#2C3544', borderRadius: '8px 8px 0 0' }}>
                 <tr style={{ height: '40px', maxHeight: '40px' }}>
-                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: '1px solid #3C4656', width: 50 }}>
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'center', width: 50 }}>
                     <input 
                       type="checkbox" 
                       style={{ cursor: 'pointer', width: '16px', height: '16px' }}
@@ -1046,7 +1038,7 @@ const BoxOrderPage = () => {
                     paddingRight: '24px',
                     paddingBottom: '12px',
                     paddingLeft: '24px',
-                    textAlign: 'left',
+                    textAlign: 'center',
                     borderRight: '1px solid #3C4656',
                   }}>
                     PACKAGING NAME
@@ -1057,7 +1049,7 @@ const BoxOrderPage = () => {
                     paddingRight: '24px',
                     paddingBottom: '12px',
                     paddingLeft: '24px',
-                    textAlign: 'left',
+                    textAlign: 'center',
                     borderRight: '1px solid #3C4656',
                   }}>
                     SUPPLIER INVENTORY
@@ -1068,7 +1060,7 @@ const BoxOrderPage = () => {
                     paddingRight: '24px',
                     paddingBottom: '12px',
                     paddingLeft: '24px',
-                    textAlign: 'right',
+                    textAlign: 'center',
                     borderRight: '1px solid #3C4656',
                   }}>
                     CURRENT INVENTORY
@@ -1079,7 +1071,7 @@ const BoxOrderPage = () => {
                     paddingRight: '24px',
                     paddingBottom: '12px',
                     paddingLeft: '24px',
-                    textAlign: 'right',
+                    textAlign: 'center',
                     borderRight: '1px solid #3C4656',
                   }}>
                     UNITS NEEDED
@@ -1090,7 +1082,7 @@ const BoxOrderPage = () => {
                     paddingRight: '24px',
                     paddingBottom: '12px',
                     paddingLeft: '24px',
-                    textAlign: 'right',
+                    textAlign: 'center',
                     borderRight: '1px solid #3C4656',
                   }}>
                     QTY
@@ -1101,7 +1093,7 @@ const BoxOrderPage = () => {
                     paddingRight: '24px',
                     paddingBottom: '12px',
                     paddingLeft: '24px',
-                    textAlign: 'right',
+                    textAlign: 'center',
                   }}>
                     PALLETS
                   </th>
@@ -1307,7 +1299,7 @@ const BoxOrderPage = () => {
                 <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
                   padding: '0 1rem', 
                   height: '40px', 
-                  textAlign: 'left', 
+                  textAlign: 'center', 
                   borderRight: '1px solid #3C4656',
                   width: isViewMode && activeTab === 'receivePO' ? 300 : 350
                 }}>
@@ -1315,7 +1307,7 @@ const BoxOrderPage = () => {
                 </th>
                 {/* SUPPLIER INV column - only show in addProducts tab when creating new order (not viewing) */}
                 {(activeTab === 'addProducts' && !isViewMode) && (
-                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'left', borderRight: '1px solid #3C4656', width: 200 }}>
+                <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: '1px solid #3C4656', width: 200 }}>
                     SUPPLIER INV
                   </th>
                 )}
@@ -1345,7 +1337,7 @@ const BoxOrderPage = () => {
                 </th>
                 {/* INVENTORY PERCENTAGE column - only show in addProducts tab when creating new order (not viewing) */}
                 {(activeTab === 'addProducts' && !isViewMode) && (
-                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'left', width: 300 }}>
+                <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'center', width: 300 }}>
                     INVENTORY PERCENTAGE
                   </th>
                 )}

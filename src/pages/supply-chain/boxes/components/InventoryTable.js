@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useImperativeHandle, forwardRef, useEffect, useRef } from 'react';
+import SortFormulasFilterDropdown from '../../../production/new-shipment/components/SortFormulasFilterDropdown';
 import { useTheme } from '../../../../context/ThemeContext';
 import { showSuccessToast } from '../../../../utils/notifications';
 import { calculatePallets } from '../../../../utils/palletCalculations';
@@ -49,9 +50,29 @@ const InventoryTable = forwardRef(({
 
   // Header filter state (match bottles behavior)
   const [openFilterColumn, setOpenFilterColumn] = useState(null);
+  const [sortConfig, setSortConfig] = useState({ column: null, order: '' });
   const filterIconRefs = useRef({});
   const filterDropdownRef = useRef(null);
 
+  const getColumnValues = (columnKey) => {
+    const values = new Set();
+    filteredData.forEach((box) => {
+      switch (columnKey) {
+        case 'name':
+          values.add(box.name ?? '');
+          break;
+        case 'warehouseInventory':
+          values.add(box.warehouseInventory ?? 0);
+          break;
+        case 'supplierInventory':
+          values.add(box.supplierInventory ?? 0);
+          break;
+        default:
+          break;
+      }
+    });
+    return Array.from(values);
+  };
   useEffect(() => {
     if (openFilterColumn === null) return;
     const handleClickOutside = (event) => {
@@ -621,10 +642,25 @@ const InventoryTable = forwardRef(({
       )}
 
       {openFilterColumn !== null && (
-        <FilterDropdown
+        <SortFormulasFilterDropdown
           ref={filterDropdownRef}
           columnKey={openFilterColumn}
           filterIconRef={filterIconRefs.current[openFilterColumn]}
+          availableValues={getColumnValues(openFilterColumn)}
+          currentFilter={{}}
+          currentSort={sortConfig.column === openFilterColumn ? sortConfig.order : ''}
+          onApply={(data) => {
+            if (data?.sortOrder) {
+              setSortConfig({ column: openFilterColumn, order: data.sortOrder });
+            } else {
+              setSortConfig((prev) =>
+                prev.column === openFilterColumn ? { column: null, order: '' } : prev
+              );
+            }
+            if (!data?.__fromSortClick) {
+              setOpenFilterColumn(null);
+            }
+          }}
           onClose={() => setOpenFilterColumn(null)}
         />
       )}

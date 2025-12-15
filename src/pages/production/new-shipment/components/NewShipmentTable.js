@@ -315,6 +315,22 @@ const NewShipmentTable = ({
               aVal = a.labelsAvailable || a.label_inventory || a.labels_available || 0;
               bVal = b.labelsAvailable || b.label_inventory || b.labels_available || 0;
               break;
+            case 'size':
+              aVal = a.size || '';
+              bVal = b.size || '';
+              // For size, compare as strings
+              const aStr = String(aVal).toLowerCase();
+              const bStr = String(bVal).toLowerCase();
+              if (aStr !== bStr) {
+                return sort.order === 'asc' ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
+              }
+              continue;
+            case 'qty':
+              const aIndex = a._originalIndex !== undefined ? a._originalIndex : rows.indexOf(a);
+              const bIndex = b._originalIndex !== undefined ? b._originalIndex : rows.indexOf(b);
+              aVal = effectiveQtyValues[aIndex] || 0;
+              bVal = effectiveQtyValues[bIndex] || 0;
+              break;
             default: {
               const field = getFieldForHeaderFilter(sort.column);
               aVal = a[field];
@@ -444,7 +460,7 @@ const NewShipmentTable = ({
   // Get unique values for a column
   const getColumnValues = (columnKey) => {
     const values = new Set();
-    filteredRows.forEach(row => {
+    filteredRows.forEach((row, index) => {
       let val;
       switch(columnKey) {
         case 'bottles':
@@ -458,6 +474,12 @@ const NewShipmentTable = ({
           break;
         case 'labels':
           val = row.labelsAvailable || row.label_inventory || row.labels_available;
+          break;
+        case 'size':
+          val = row.size;
+          break;
+        case 'qty':
+          val = effectiveQtyValues[row._originalIndex !== undefined ? row._originalIndex : index] || 0;
           break;
         default: {
           const field = getFieldForHeaderFilter(columnKey);
@@ -1965,7 +1987,7 @@ const NewShipmentTable = ({
               <th 
                 className="group"
                 style={{ 
-                  padding: '0 0.75rem', 
+                  padding: '0 1rem', 
                   textAlign: 'center',
                   position: 'sticky',
                   left: '390px',
@@ -1977,7 +1999,6 @@ const NewShipmentTable = ({
                   height: '40px',
                   maxHeight: '40px',
                   boxSizing: 'border-box',
-                  boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
                   fontFamily: 'Inter, sans-serif',
                   fontWeight: 600,
                   fontSize: '12px',
@@ -1985,7 +2006,6 @@ const NewShipmentTable = ({
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
                   color: '#FFFFFF',
-                  borderRight: '1px solid #FFFFFF',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
@@ -2002,7 +2022,7 @@ const NewShipmentTable = ({
               <th 
                 className="group"
                 style={{ 
-                  padding: '12px 16px', 
+                  padding: '0 1rem', 
                   textAlign: 'center', 
                   width: '143px',
                   height: '40px',
@@ -2022,10 +2042,19 @@ const NewShipmentTable = ({
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
                   <span>QTY</span>
                   <img
+                    ref={(el) => {
+                      if (el) filterIconRefs.current['qty'] = el;
+                    }}
                     src="/assets/Vector (1).png"
                     alt="Filter"
                     className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
-                    style={{ width: '12px', height: '12px' }}
+                    style={{ 
+                      width: '12px', 
+                      height: '12px',
+                      cursor: 'pointer',
+                      filter: hasActiveColumnFilter('qty') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                    }}
+                    onClick={(e) => handleFilterClick('qty', e)}
                   />
                 </div>
               </th>
@@ -2580,7 +2609,7 @@ const NewShipmentTable = ({
                   </button>
                 </td>
                 <td style={{ 
-                  padding: '0.65rem 0.75rem', 
+                  padding: '0.65rem 1rem', 
                   fontSize: '0.85rem',
                   textAlign: 'center',
                   position: 'sticky',
@@ -2592,22 +2621,23 @@ const NewShipmentTable = ({
                   maxWidth: '120px',
                   height: '40px',
                   verticalAlign: 'middle',
-                  boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
                   borderTop: '1px solid #E5E7EB',
+                  borderRight: 'none',
                 }} className={themeClasses.textSecondary}>
                   {row.size}
                 </td>
                 {/* Scrollable columns */}
                 <td style={{ 
-                  padding: '12px 16px', 
-                  textAlign: 'center', 
+                  padding: '0.65rem 1rem', 
+                  textAlign: 'center',
                   width: '143px',
                   height: '40px',
                   verticalAlign: 'middle',
                   boxSizing: 'border-box',
                   borderTop: '1px solid #E5E7EB',
+                  borderLeft: 'none',
                 }}>
-                  <div style={{ position: 'relative', display: 'inline-block' }}>
+                  <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
                     <div
                       ref={(el) => {
                         if (el) qtyContainerRefs.current[index] = el;
@@ -2624,7 +2654,7 @@ const NewShipmentTable = ({
                         borderRadius: '8px',
                         border: isQtyExceedingLabels(row, index) ? '1px solid #EF4444' : '1px solid #E5E7EB',
                         padding: '4px 6px',
-                        width: isQtyExceedingLabels(row, index) && (effectiveQtyValues[index] ?? 0) > 0 ? '135px' : '107px',
+                        width: '107px',
                         height: '24px',
                         boxSizing: 'border-box',
                         position: 'relative',
@@ -2729,20 +2759,7 @@ const NewShipmentTable = ({
                           }
                         }}
                         style={{
-                          position: 'absolute',
-                          left: 0,
-                          right: (() => {
-                            const labelsAvailable = getAvailableLabelsForRow(row, index);
-                            const labelsNeeded = effectiveQtyValues[index] ?? 0;
-                            return (labelsNeeded > labelsAvailable && labelsNeeded > 0) ? '28px' : 0;
-                          })(),
-                          top: 0,
-                          bottom: 0,
-                          width: (() => {
-                            const labelsAvailable = getAvailableLabelsForRow(row, index);
-                            const labelsNeeded = effectiveQtyValues[index] ?? 0;
-                            return (labelsNeeded > labelsAvailable && labelsNeeded > 0) ? 'calc(100% - 28px)' : '100%';
-                          })(),
+                          width: '100%',
                           height: '100%',
                           border: 'none',
                           outline: 'none',
@@ -2955,41 +2972,41 @@ const NewShipmentTable = ({
                           </button>
                         </div>
                       )}
-                      {/* Label warning icon - shown when QTY exceeds labels */}
-                      {(() => {
-                        const labelsAvailable = getAvailableLabelsForRow(row, index);
-                        const labelsNeeded = effectiveQtyValues[index] ?? 0;
-                        // Only show warning if labels needed exceed available
-                        if (labelsNeeded > labelsAvailable && labelsNeeded > 0) {
-                          return (
-                            <span
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setClickedQtyIndex(clickedQtyIndex === index ? null : index);
-                              }}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                width: '18px',
-                                height: '18px',
-                                borderRadius: '50%',
-                                backgroundColor: '#FEE2E2',
-                                color: '#DC2626',
-                                fontSize: '12px',
-                                fontWeight: 700,
-                                marginLeft: '6px',
-                                cursor: 'pointer',
-                                flexShrink: 0,
-                              }}
-                            >
-                              !
-                            </span>
-                          );
-                        }
-                        return null;
-                      })()}
                     </div>
+                    {/* Label warning icon - shown when QTY exceeds labels, positioned after input box */}
+                    {(() => {
+                      const labelsAvailable = getAvailableLabelsForRow(row, index);
+                      const labelsNeeded = effectiveQtyValues[index] ?? 0;
+                      // Only show warning if labels needed exceed available
+                      if (labelsNeeded > labelsAvailable && labelsNeeded > 0) {
+                        return (
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setClickedQtyIndex(clickedQtyIndex === index ? null : index);
+                            }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '18px',
+                              height: '18px',
+                              borderRadius: '50%',
+                              backgroundColor: '#FEE2E2',
+                              color: '#DC2626',
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              marginLeft: '6px',
+                              cursor: 'pointer',
+                              flexShrink: 0,
+                            }}
+                          >
+                            !
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
                     {clickedQtyIndex === index && (() => {
                       const labelsAvailable = getAvailableLabelsForRow(row, index);
                       const labelsNeeded = effectiveQtyValues[index] ?? 0;

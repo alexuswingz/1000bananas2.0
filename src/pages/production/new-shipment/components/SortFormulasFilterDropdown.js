@@ -154,15 +154,15 @@ const SortFormulasFilterDropdown = ({
         {/* Sort Ascending */}
         <div
           onClick={() => {
-            const newSortOrder = sortOrder === 'asc' ? '' : 'asc';
-            setSortOrder(newSortOrder);
-            // Automatically apply sort when clicking
+            const newOrder = sortOrder === 'asc' ? '' : 'asc';
+            setSortOrder(newOrder);
             if (onApply) {
               onApply({
-                sortOrder: newSortOrder,
+                sortOrder: newOrder,
                 selectedValues,
                 conditionType,
                 conditionValue,
+                __fromSortClick: true,
               });
             }
             // Close dropdown after applying sort
@@ -216,15 +216,15 @@ const SortFormulasFilterDropdown = ({
         {/* Sort Descending */}
         <div
           onClick={() => {
-            const newSortOrder = sortOrder === 'desc' ? '' : 'desc';
-            setSortOrder(newSortOrder);
-            // Automatically apply sort when clicking
+            const newOrder = sortOrder === 'desc' ? '' : 'desc';
+            setSortOrder(newOrder);
             if (onApply) {
               onApply({
-                sortOrder: newSortOrder,
+                sortOrder: newOrder,
                 selectedValues,
                 conditionType,
                 conditionValue,
+                __fromSortClick: true,
               });
             }
             // Close dropdown after applying sort

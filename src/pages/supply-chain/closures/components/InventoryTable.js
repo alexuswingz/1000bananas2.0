@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useImperativeHandle, forwardRef, useEffect, useRef } from 'react';
+import SortFormulasFilterDropdown from '../../../production/new-shipment/components/SortFormulasFilterDropdown';
 import { useTheme } from '../../../../context/ThemeContext';
 import { showSuccessToast } from '../../../../utils/notifications';
 import { calculatePallets } from '../../../../utils/palletCalculations';
@@ -40,6 +41,7 @@ const InventoryTable = forwardRef(({
 
   // Header filter state (match bottles behavior)
   const [openFilterColumn, setOpenFilterColumn] = useState(null);
+  const [sortConfig, setSortConfig] = useState({ column: null, order: '' });
   const filterIconRefs = useRef({});
   const filterDropdownRef = useRef(null);
 
@@ -100,10 +102,60 @@ const InventoryTable = forwardRef(({
 
   // Filter closures based on search query
   const filteredData = useMemo(() => {
-    if (!searchQuery.trim()) return closures;
-    const query = searchQuery.toLowerCase();
-    return closures.filter((closure) => closure.name.toLowerCase().includes(query));
-  }, [closures, searchQuery]);
+    let data = closures;
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      data = closures.filter((closure) => closure.name.toLowerCase().includes(query));
+    }
+
+    if (sortConfig.column && sortConfig.order) {
+      data = [...data].sort((a, b) => {
+        const getVal = (item) => {
+          switch (sortConfig.column) {
+            case 'name':
+              return item.name || '';
+            case 'warehouseInventory':
+              return item.warehouseInventory ?? 0;
+            case 'supplierInventory':
+              return item.supplierInventory ?? 0;
+            default:
+              return item[sortConfig.column];
+          }
+        };
+        const aVal = getVal(a);
+        const bVal = getVal(b);
+
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+          return sortConfig.order === 'asc' ? aVal - bVal : bVal - aVal;
+        }
+        return sortConfig.order === 'asc'
+          ? String(aVal).localeCompare(String(bVal))
+          : String(bVal).localeCompare(String(aVal));
+      });
+    }
+
+    return data;
+  }, [closures, searchQuery, sortConfig]);
+
+  const getColumnValues = (columnKey) => {
+    const values = new Set();
+    filteredData.forEach((closure) => {
+      switch (columnKey) {
+        case 'name':
+          values.add(closure.name ?? '');
+          break;
+        case 'warehouseInventory':
+          values.add(closure.warehouseInventory ?? 0);
+          break;
+        case 'supplierInventory':
+          values.add(closure.supplierInventory ?? 0);
+          break;
+        default:
+          break;
+      }
+    });
+    return Array.from(values);
+  };
 
   // Calculate bulk unsaved count (only for supplier inventory)
   const bulkUnsavedCount = useMemo(() => {
@@ -609,83 +661,29 @@ const InventoryTable = forwardRef(({
       )}
 
       {openFilterColumn !== null && (
-        <FilterDropdown
+        <SortFormulasFilterDropdown
           ref={filterDropdownRef}
           columnKey={openFilterColumn}
           filterIconRef={filterIconRefs.current[openFilterColumn]}
+          availableValues={getColumnValues(openFilterColumn)}
+          currentFilter={{}}
+          currentSort={sortConfig.column === openFilterColumn ? sortConfig.order : ''}
+          onApply={(data) => {
+            if (data?.sortOrder) {
+              setSortConfig({ column: openFilterColumn, order: data.sortOrder });
+            } else {
+              setSortConfig((prev) =>
+                prev.column === openFilterColumn ? { column: null, order: '' } : prev
+              );
+            }
+            if (!data?.__fromSortClick) {
+              setOpenFilterColumn(null);
+            }
+          }}
           onClose={() => setOpenFilterColumn(null)}
         />
       )}
     </>
-  );
-});
-
-// FilterDropdown reused from bottles (lightweight placeholder)
-const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose }, ref) => {
-  const [position, setPosition] = useState({ top: 0, left: 0 });
-
-  useEffect(() => {
-    if (filterIconRef) {
-      const rect = filterIconRef.getBoundingClientRect();
-      const dropdownWidth = 200;
-      const dropdownHeight = 120;
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-
-      let left = rect.left;
-      let top = rect.bottom + 8;
-
-      if (left + dropdownWidth > viewportWidth) left = viewportWidth - dropdownWidth - 16;
-      if (top + dropdownHeight > viewportHeight) top = rect.top - dropdownHeight - 8;
-      if (left < 16) left = 16;
-      if (top < 16) top = 16;
-
-      setPosition({ top, left });
-    }
-  }, [filterIconRef]);
-
-  return (
-    <div
-      ref={ref}
-      style={{
-        position: 'fixed',
-        top: `${position.top}px`,
-        left: `${position.left}px`,
-        width: '200px',
-        backgroundColor: '#FFFFFF',
-        borderRadius: '12px',
-        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-        border: '1px solid #E5E7EB',
-        zIndex: 10000,
-        padding: '12px',
-      }}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px', color: '#111827' }}>
-        {columnKey === 'name' ? 'Closure Name' : columnKey === 'warehouseInventory' ? 'Warehouse Inv.' : 'Supplier Inv.'}
-      </div>
-      <div style={{ fontSize: '12px', color: '#4B5563', marginBottom: '12px' }}>
-        Filtering not yet wired. Placeholder dropdown like bottles.
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button
-          type="button"
-          onClick={onClose}
-          style={{
-            padding: '6px 10px',
-            backgroundColor: '#007AFF',
-            color: '#FFFFFF',
-            borderRadius: '8px',
-            border: 'none',
-            fontSize: '12px',
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          Close
-        </button>
-      </div>
-    </div>
   );
 });
 
