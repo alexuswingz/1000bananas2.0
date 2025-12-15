@@ -550,7 +550,7 @@ export const updateLabelInventoryByLocation = async (labelLocation, warehouseInv
  * Update label check status for a shipment product
  * @param {number} shipmentId - The shipment ID
  * @param {number} productId - The shipment product ID
- * @param {string} status - Status: 'confirmed' or 'counted'
+ * @param {string|null} status - Status: 'confirmed', 'counted', or null (to reset)
  * @param {number|null} count - The counted inventory (only for 'counted' status)
  * @returns {Promise<Object>} Updated shipment product object
  */

@@ -110,6 +110,8 @@ const NewShipment = () => {
   const bookShipmentButtonRef = useRef(null);
   const [bookShipmentTooltipPosition, setBookShipmentTooltipPosition] = useState({ top: 0, left: 0 });
   const [exportCompleted, setExportCompleted] = useState(false);
+  const [exportedProductCount, setExportedProductCount] = useState(0); // Track how many products were in last export
+  const [productsAddedAfterExport, setProductsAddedAfterExport] = useState(false); // Flag for unexported changes
   const [forecastRange, setForecastRange] = useState('150');
   const [showDOITooltip, setShowDOITooltip] = useState(false);
   const [isTooltipPinned, setIsTooltipPinned] = useState(false);
@@ -857,6 +859,58 @@ const NewShipment = () => {
   };
 
   const handleActionChange = (action) => {
+    // Stepper validation - can only access completed tabs or the next available step
+    const tabOrder = ['add-products', 'formula-check', 'label-check', 'book-shipment', 'sort-products', 'sort-formulas'];
+    const targetIndex = tabOrder.indexOf(action);
+    const currentIndex = tabOrder.indexOf(activeAction);
+    
+    // BLOCKING RULE: Cannot access formula-check or beyond if there are unexported products
+    if (targetIndex >= tabOrder.indexOf('formula-check') && productsAddedAfterExport) {
+      toast.error('You added new products that haven\'t been exported. Please export the template first or remove the new products.');
+      return;
+    }
+    
+    // Always allow going backwards to completed tabs or to add-products
+    if (action === 'add-products' || completedTabs.has(action)) {
+      setActiveAction(action);
+      return;
+    }
+    
+    // Check if trying to skip ahead
+    if (targetIndex > currentIndex) {
+      // Find the first incomplete step
+      let firstIncompleteIndex = 0;
+      for (let i = 0; i < tabOrder.length; i++) {
+        if (!completedTabs.has(tabOrder[i])) {
+          firstIncompleteIndex = i;
+          break;
+        }
+      }
+      
+      // Can only go to the next incomplete step, not skip ahead
+      if (targetIndex > firstIncompleteIndex) {
+        const firstIncompleteTab = tabOrder[firstIncompleteIndex];
+        const tabNames = {
+          'add-products': 'Add Products',
+          'formula-check': 'Formula Check',
+          'label-check': 'Label Check',
+          'book-shipment': 'Book Shipment',
+          'sort-products': 'Sort Products',
+          'sort-formulas': 'Sort Formulas',
+        };
+        toast.error(`Complete "${tabNames[firstIncompleteTab]}" first before proceeding.`);
+        return;
+      }
+      
+      // Check for unresolved issues blocking progress to book-shipment and beyond
+      if (targetIndex >= tabOrder.indexOf('book-shipment') && hasUnresolvedCheckIssues) {
+        const reason = getTabBlockedReason(action);
+        toast.error(`Cannot proceed: ${reason}`);
+        return;
+      }
+    }
+    
+    // Allow the action change
     setActiveAction(action);
   };
 
@@ -1132,6 +1186,13 @@ const NewShipment = () => {
       }
 
       if (activeAction === 'book-shipment') {
+        // BLOCKING RULE: Cannot proceed if formula/label check has unresolved issues
+        if (hasUnresolvedCheckIssues) {
+          const reason = getTabBlockedReason('book-shipment');
+          toast.error(`Cannot book shipment: ${reason}. Please resolve the issues first.`);
+          return;
+        }
+
         // Validate required fields before booking
         const trimmedShipmentType = (shipmentData.shipmentType || '').trim();
         const trimmedAmazonNumber = (shipmentData.amazonShipmentNumber || '').trim();
@@ -1201,6 +1262,11 @@ const NewShipment = () => {
     setIsRecountMode(true);
   };
 
+  // Check if formula or label check is incomplete (has unresolved issues)
+  const isFormulaCheckIncomplete = formulaCheckHasComment && !completedTabs.has('formula-check');
+  const isLabelCheckIncomplete = labelCheckHasComment && !completedTabs.has('label-check');
+  const hasUnresolvedCheckIssues = isFormulaCheckIncomplete || isLabelCheckIncomplete;
+
   // Validate workflow progression
   const canAccessTab = (tabName) => {
     if (!shipmentId) {
@@ -1211,6 +1277,13 @@ const NewShipment = () => {
     // Workflow order: add-products → formula-check → label-check → book-shipment → sort-products → sort-formulas
     const tabOrder = ['add-products', 'formula-check', 'label-check', 'book-shipment', 'sort-products', 'sort-formulas'];
     const currentIndex = tabOrder.indexOf(tabName);
+    
+    // BLOCKING RULE: Cannot access book-shipment or later steps if formula/label check is incomplete
+    if (currentIndex >= tabOrder.indexOf('book-shipment')) {
+      if (hasUnresolvedCheckIssues) {
+        return false;
+      }
+    }
     
     // Can access current tab or any completed tab
     if (completedTabs.has(tabName)) {
@@ -1224,6 +1297,23 @@ const NewShipment = () => {
     }
     
     return currentIndex === 0; // add-products is always accessible
+  };
+
+  // Get reason why a tab is blocked
+  const getTabBlockedReason = (tabName) => {
+    const tabOrder = ['add-products', 'formula-check', 'label-check', 'book-shipment', 'sort-products', 'sort-formulas'];
+    const currentIndex = tabOrder.indexOf(tabName);
+    
+    if (currentIndex >= tabOrder.indexOf('book-shipment') && hasUnresolvedCheckIssues) {
+      if (isFormulaCheckIncomplete && isLabelCheckIncomplete) {
+        return 'Formula Check and Label Check have unresolved issues';
+      } else if (isFormulaCheckIncomplete) {
+        return 'Formula Check has unresolved issues';
+      } else if (isLabelCheckIncomplete) {
+        return 'Label Check has unresolved issues';
+      }
+    }
+    return null;
   };
 
   const handleExport = () => {
@@ -1410,16 +1500,59 @@ const NewShipment = () => {
         labelCheckHasComment={labelCheckHasComment}
         labelCheckRemainingCount={labelCheckRemainingCount}
         hideActionsDropdown={hideActionsDropdown}
+        hasUnresolvedCheckIssues={hasUnresolvedCheckIssues}
+        productsAddedAfterExport={productsAddedAfterExport}
       />
 
       <div style={{ padding: '0 1.5rem' }}>
         {activeAction === 'add-products' && (
           <>
+            {/* Warning Banner when products added after export - BLOCKS Formula Check */}
+            {productsAddedAfterExport && (
+              <div style={{
+                backgroundColor: '#FEF2F2',
+                border: '1px solid #FECACA',
+                borderRadius: '12px',
+                padding: '16px 20px',
+                marginTop: '1.25rem',
+                marginBottom: '12px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '12px',
+              }}>
+                <div style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  backgroundColor: '#EF4444',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5">
+                    <path d="M12 9v4M12 17h.01" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#991B1B', marginBottom: '4px' }}>
+                    Export Required - Formula Check Blocked
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#B91C1C', lineHeight: 1.5 }}>
+                    You added <strong>{addedRows.size - exportedProductCount} new product(s)</strong> after your last export. 
+                    You must <strong>re-export the template</strong> before you can proceed to Formula Check.
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#DC2626', marginTop: '8px' }}>
+                    Options: Use <strong>"Export Template"</strong> dropdown above to re-export, or remove the newly added products.
+                  </div>
+                </div>
+              </div>
+            )}
             {/* Products Table Header */}
             <div
               style={{
                 padding: '12px 16px',
-                marginTop: '1.25rem',
+                marginTop: productsAddedAfterExport ? '0' : '1.25rem',
                 marginBottom: '12px',
                 display: 'flex',
                 alignItems: 'center',
@@ -1905,6 +2038,99 @@ const NewShipment = () => {
 
         {activeAction === 'formula-check' && (
           <div style={{ marginTop: '1.5rem' }}>
+            {/* Warning Banner when products added after export */}
+            {productsAddedAfterExport && (
+              <div style={{
+                backgroundColor: '#FEF3C7',
+                border: '1px solid #FCD34D',
+                borderRadius: '12px',
+                padding: '14px 20px',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+              }}>
+                <div style={{
+                  width: '22px',
+                  height: '22px',
+                  borderRadius: '50%',
+                  backgroundColor: '#F59E0B',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5">
+                    <path d="M12 9v4M12 17h.01" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#92400E', marginBottom: '4px' }}>
+                    Products added but not exported
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#A16207' }}>
+                    You added {addedRows.size - exportedProductCount} new product(s) since the last export. 
+                    Formulas for these products won't appear until you re-export from Add Products.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveAction('add-products')}
+                    style={{
+                      marginTop: '10px',
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid #F59E0B',
+                      backgroundColor: '#FFFFFF',
+                      color: '#92400E',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#FEF3C7';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#FFFFFF';
+                    }}
+                  >
+                    Go to Add Products & Re-export
+                  </button>
+                </div>
+              </div>
+            )}
+            {/* Warning Banner when Formula Check is incomplete */}
+            {isFormulaCheckIncomplete && !productsAddedAfterExport && (
+              <div style={{
+                backgroundColor: '#FEF3C7',
+                border: '1px solid #FCD34D',
+                borderRadius: '12px',
+                padding: '14px 20px',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+              }}>
+                <div style={{
+                  width: '22px',
+                  height: '22px',
+                  borderRadius: '50%',
+                  backgroundColor: '#F59E0B',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5">
+                    <path d="M12 9v4M12 17h.01" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <div style={{ flex: 1, fontSize: '13px', color: '#92400E' }}>
+                  <strong>Unresolved issue:</strong> Formula Check was previously marked incomplete. 
+                  Complete all formula checks to resolve and continue to Book Shipment.
+                </div>
+              </div>
+            )}
             <FormulaCheckTable 
               shipmentId={shipmentId}
               isRecountMode={isRecountMode}
@@ -1918,6 +2144,38 @@ const NewShipment = () => {
 
         {activeAction === 'label-check' && (
           <div style={{ marginTop: '1.5rem' }}>
+            {/* Warning Banner when Label Check is incomplete */}
+            {isLabelCheckIncomplete && (
+              <div style={{
+                backgroundColor: '#FEF3C7',
+                border: '1px solid #FCD34D',
+                borderRadius: '12px',
+                padding: '14px 20px',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+              }}>
+                <div style={{
+                  width: '22px',
+                  height: '22px',
+                  borderRadius: '50%',
+                  backgroundColor: '#F59E0B',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5">
+                    <path d="M12 9v4M12 17h.01" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <div style={{ flex: 1, fontSize: '13px', color: '#92400E' }}>
+                  <strong>Unresolved issue:</strong> Label Check was previously marked incomplete. 
+                  Complete all label checks to resolve and continue to Book Shipment.
+                </div>
+              </div>
+            )}
             <LabelCheckTable 
               shipmentId={shipmentId}
               isRecountMode={isRecountMode}
@@ -1934,6 +2192,114 @@ const NewShipment = () => {
 
         {activeAction === 'book-shipment' && (
           <div style={{ marginTop: '1.5rem', padding: '0' }}>
+            {/* Warning Banner for Unresolved Issues */}
+            {hasUnresolvedCheckIssues && (
+              <div style={{
+                backgroundColor: '#FEF2F2',
+                border: '1px solid #FECACA',
+                borderRadius: '12px',
+                padding: '16px 20px',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '12px',
+              }}>
+                <div style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  backgroundColor: '#EF4444',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5">
+                    <path d="M12 9v4M12 17h.01" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    color: '#991B1B',
+                    marginBottom: '4px',
+                  }}>
+                    Cannot proceed with booking
+                  </div>
+                  <div style={{
+                    fontSize: '13px',
+                    color: '#B91C1C',
+                    lineHeight: 1.5,
+                  }}>
+                    {isFormulaCheckIncomplete && isLabelCheckIncomplete ? (
+                      <>Both <strong>Formula Check</strong> and <strong>Label Check</strong> have unresolved issues.</>
+                    ) : isFormulaCheckIncomplete ? (
+                      <><strong>Formula Check</strong> has unresolved issues.</>
+                    ) : (
+                      <><strong>Label Check</strong> has unresolved issues.</>
+                    )}
+                    {' '}Please go back and resolve them before booking this shipment.
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    gap: '8px',
+                    marginTop: '12px',
+                  }}>
+                    {isFormulaCheckIncomplete && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveAction('formula-check')}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          border: '1px solid #EF4444',
+                          backgroundColor: '#FFFFFF',
+                          color: '#DC2626',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#FEE2E2';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = '#FFFFFF';
+                        }}
+                      >
+                        Go to Formula Check
+                      </button>
+                    )}
+                    {isLabelCheckIncomplete && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveAction('label-check')}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          border: '1px solid #EF4444',
+                          backgroundColor: '#FFFFFF',
+                          color: '#DC2626',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#FEE2E2';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = '#FFFFFF';
+                        }}
+                      >
+                        Go to Label Check
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
             <div style={{
               backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
               padding: '24px',
@@ -2485,31 +2851,59 @@ const NewShipment = () => {
           ) : activeAction === 'book-shipment' ? (
             /* Book Shipment Footer */
             <>
-              <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }} />
+              <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
+                {hasUnresolvedCheckIssues && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    color: '#EF4444',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                  }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10"/>
+                      <path d="M12 8v4M12 16h.01" strokeLinecap="round"/>
+                    </svg>
+                    {isFormulaCheckIncomplete && isLabelCheckIncomplete 
+                      ? 'Resolve Formula Check and Label Check issues first'
+                      : isFormulaCheckIncomplete 
+                        ? 'Resolve Formula Check issues first'
+                        : 'Resolve Label Check issues first'
+                    }
+                  </div>
+                )}
+              </div>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                 <button
                   type="button"
+                  disabled={hasUnresolvedCheckIssues}
                   onClick={handleCompleteClick}
                   style={{
                     height: '31px',
                     padding: '0 16px',
                     borderRadius: '6px',
                     border: 'none',
-                    backgroundColor: '#007AFF',
+                    backgroundColor: hasUnresolvedCheckIssues ? '#9CA3AF' : '#007AFF',
                     color: '#FFFFFF',
                     fontSize: '14px',
                     fontWeight: 500,
-                    cursor: 'pointer',
+                    cursor: hasUnresolvedCheckIssues ? 'not-allowed' : 'pointer',
+                    opacity: hasUnresolvedCheckIssues ? 0.7 : 1,
                     transition: 'all 0.2s',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#0056CC';
+                    if (!hasUnresolvedCheckIssues) {
+                      e.currentTarget.style.backgroundColor = '#0056CC';
+                    }
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#007AFF';
+                    if (!hasUnresolvedCheckIssues) {
+                      e.currentTarget.style.backgroundColor = '#007AFF';
+                    }
                   }}
                 >
                   Book Shipment
@@ -2725,7 +3119,14 @@ const NewShipment = () => {
             }));
             
             // Also add the row to addedRows so button shows "Added"
-            setAddedRows(prev => new Set([...prev, row.id]));
+            setAddedRows(prev => {
+              const newSet = new Set([...prev, row.id]);
+              // Check if products were added after export
+              if (exportCompleted && newSet.size > exportedProductCount) {
+                setProductsAddedAfterExport(true);
+              }
+              return newSet;
+            });
             
             toast.success(`Added ${finalUnits.toLocaleString()} units of ${row.product}`);
           }
@@ -2753,6 +3154,8 @@ const NewShipment = () => {
             return newSet;
           });
           setExportCompleted(true);
+          setExportedProductCount(addedRows.size);
+          setProductsAddedAfterExport(false);
         }}
         onBeginFormulaCheck={async () => {
           // Book shipment if not already booked (needed for formula check)
@@ -2813,6 +3216,8 @@ const NewShipment = () => {
                 return newSet;
               });
               setExportCompleted(true);
+              setExportedProductCount(addedRows.size);
+              setProductsAddedAfterExport(false);
               toast.success('Shipment booked and exported!');
             } catch (error) {
               console.error('Error booking shipment for export:', error);
@@ -2827,11 +3232,13 @@ const NewShipment = () => {
             setCompletedTabs(prev => {
               const newSet = new Set(prev);
               newSet.add('export');
-              return newSet;
+            return newSet;
             });
             setExportCompleted(true);
+            setExportedProductCount(addedRows.size);
+            setProductsAddedAfterExport(false);
           }
-          
+
           // After exporting, move to Formula Check and keep footer visible
           setActiveAction('formula-check');
         }}

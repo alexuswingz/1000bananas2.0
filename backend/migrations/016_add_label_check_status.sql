@@ -23,3 +23,5 @@ COMMENT ON COLUMN shipment_products.label_check_status IS 'Label check status: N
 COMMENT ON COLUMN shipment_products.label_check_count IS 'Counted label inventory value when user does full count';
 COMMENT ON COLUMN shipment_products.label_check_at IS 'Timestamp when label check was completed';
 
+
+

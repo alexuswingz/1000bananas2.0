@@ -19,7 +19,51 @@ const NewShipmentHeader = ({
   labelCheckHasComment = false,
   labelCheckRemainingCount = 0,
   hideActionsDropdown = false,
+  hasUnresolvedCheckIssues = false,
+  productsAddedAfterExport = false,
 }) => {
+  // Stepper logic - determine which tabs are accessible
+  const tabOrder = ['add-products', 'formula-check', 'label-check', 'book-shipment', 'sort-products', 'sort-formulas'];
+  
+  const isTabAccessible = (tabName) => {
+    const targetIndex = tabOrder.indexOf(tabName);
+    
+    // add-products is always accessible
+    if (tabName === 'add-products') return true;
+    
+    // Block formula-check and beyond if there are unexported products
+    if (targetIndex >= tabOrder.indexOf('formula-check') && productsAddedAfterExport) {
+      return false;
+    }
+    
+    // Completed tabs are always accessible
+    if (completedTabs.has(tabName)) return true;
+    
+    // Find the first incomplete step
+    let firstIncompleteIndex = 0;
+    for (let i = 0; i < tabOrder.length; i++) {
+      if (!completedTabs.has(tabOrder[i])) {
+        firstIncompleteIndex = i;
+        break;
+      }
+    }
+    
+    // Can only access up to the first incomplete step
+    if (targetIndex > firstIncompleteIndex) return false;
+    
+    // Block book-shipment and beyond if there are unresolved issues
+    if (targetIndex >= tabOrder.indexOf('book-shipment') && hasUnresolvedCheckIssues) {
+      return false;
+    }
+    
+    return true;
+  };
+  
+  // Check if tab is blocked due to unexported products
+  const isBlockedByUnexportedProducts = (tabName) => {
+    const targetIndex = tabOrder.indexOf(tabName);
+    return targetIndex >= tabOrder.indexOf('formula-check') && productsAddedAfterExport;
+  };
   const navigate = useNavigate();
   const { isDarkMode } = useTheme();
   const [showDropdown, setShowDropdown] = useState(false);

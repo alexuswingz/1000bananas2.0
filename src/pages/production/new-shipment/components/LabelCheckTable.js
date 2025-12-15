@@ -164,6 +164,63 @@ const LabelCheckTable = ({
     }
   };
 
+  const handleEditClick = (row, index) => {
+    setSelectedRow(row);
+    setSelectedRowIndex(index);
+    // If it was counted, open the edit modal with existing data
+    // If it was confirmed, open the preview modal
+    if (row.label_check_status === 'counted' && row.totalCount) {
+      // Restore the count data - we'll need to parse it
+      // For now, just open the edit modal
+      setIsModalOpen(true);
+      // Reset form fields - user will need to re-enter
+      setFullRolls(['', '', '']);
+      setPartialWeights(['', '', '']);
+    } else {
+      // It was confirmed, open preview modal
+      setIsStartPreviewOpen(true);
+    }
+    // Fetch label formula when opening the modal
+    if (row.labelLocation) {
+      fetchLabelFormula(row.labelLocation);
+    }
+  };
+
+  const handleReset = async () => {
+    if (selectedRow && selectedRow.id && shipmentId) {
+      try {
+        // Reset status to null by calling API with null status
+        await updateShipmentProductLabelCheck(shipmentId, selectedRow.id, null);
+        console.log(`Label check reset for product ${selectedRow.id}`);
+        
+        // Reload data from API to ensure consistency
+        await loadLabelData();
+        
+        handleCloseModal();
+      } catch (error) {
+        console.error('Error resetting label check:', error);
+        // Still update local state even if API fails
+        setCompletedRows(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(selectedRow.id);
+          return newSet;
+        });
+        setConfirmedRows(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(selectedRow.id);
+          return newSet;
+        });
+        const updatedRows = rows.map(r => 
+          r.id === selectedRow.id 
+            ? { ...r, totalCount: '', label_check_status: null }
+            : r
+        );
+        setRows(updatedRows);
+        handleCloseModal();
+      }
+    }
+  };
+
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setIsStartPreviewOpen(false);
@@ -208,18 +265,9 @@ const LabelCheckTable = ({
         }
       }
       
-      // Save the calculated total (not discrepancy) for display
-      // The discrepancy will be calculated as: totalCount - labelsNeeded
-      const updatedRows = rows.map(row => 
-        row.id === selectedRow.id 
-          ? { ...row, totalCount: calculatedTotal, lblCurrentInv: calculatedTotal }
-          : row
-      );
-      setRows(updatedRows);
+      // Reload data from API to ensure consistency
+      await loadLabelData();
       
-      // Mark the row as completed
-      setCompletedRows(prev => new Set(prev).add(selectedRow.id));
-      setCompletedRowStatus(prev => ({ ...prev, [selectedRow.id]: insufficient }));
       handleCloseModal();
     }
   };
@@ -254,16 +302,8 @@ const LabelCheckTable = ({
         }
       }
       
-      // Save the calculated total even though variance exceeds
-      const updatedRows = rows.map(row => 
-        row.id === selectedRow.id 
-          ? { ...row, totalCount: calculatedTotal, lblCurrentInv: calculatedTotal }
-          : row
-      );
-      setRows(updatedRows);
-      // Mark the row as completed (but it will need recount)
-      setCompletedRows(prev => new Set(prev).add(selectedRow.id));
-      setCompletedRowStatus(prev => ({ ...prev, [selectedRow.id]: insufficient }));
+      // Reload data from API to ensure consistency
+      await loadLabelData();
     }
     setIsVarianceStillExceededOpen(false);
     handleCloseModal();
@@ -684,52 +724,111 @@ const LabelCheckTable = ({
                     {completedRows.has(row.id) ? (
                       <button
                         type="button"
-                        disabled
+                        onClick={() => handleEditClick(row, index)}
+                        className="done-badge-btn"
                         style={{
-                          height: '23px',
-                          padding: '0 10px',
-                          borderRadius: '6px',
+                          height: '26px',
+                          padding: '0 12px',
+                          borderRadius: '13px',
                           border: 'none',
-                          backgroundColor: completedRowStatus[row.id] ? '#F59E0B' : '#22C55E',
+                          backgroundColor: completedRowStatus[row.id] ? '#F59E0B' : '#10B981',
                           color: '#FFFFFF',
-                          fontSize: '14px',
-                          fontWeight: 500,
-                          cursor: 'default',
-                          display: 'flex',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          letterSpacing: '0.025em',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
+                          gap: '5px',
                           whiteSpace: 'nowrap',
-                          minWidth: '55px',
+                          minWidth: '60px',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                          position: 'relative',
                         }}
+                        onMouseEnter={(e) => {
+                          const baseColor = completedRowStatus[row.id] ? '#D97706' : '#059669';
+                          e.currentTarget.style.backgroundColor = baseColor;
+                          e.currentTarget.style.transform = 'scale(1.02)';
+                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+                          // Show edit icon
+                          const icon = e.currentTarget.querySelector('.edit-icon');
+                          if (icon) icon.style.opacity = '1';
+                        }}
+                        onMouseLeave={(e) => {
+                          const baseColor = completedRowStatus[row.id] ? '#F59E0B' : '#10B981';
+                          e.currentTarget.style.backgroundColor = baseColor;
+                          e.currentTarget.style.transform = 'scale(1)';
+                          e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
+                          // Hide edit icon
+                          const icon = e.currentTarget.querySelector('.edit-icon');
+                          if (icon) icon.style.opacity = '0';
+                        }}
+                        title="Click to edit"
                       >
-                        Done
+                        <svg 
+                          width="12" 
+                          height="12" 
+                          viewBox="0 0 24 24" 
+                          fill="none" 
+                          stroke="currentColor" 
+                          strokeWidth="2.5"
+                          style={{ marginRight: '-2px' }}
+                        >
+                          <polyline points="20 6 9 17 4 12" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        <span>Done</span>
+                        <svg 
+                          className="edit-icon"
+                          width="10" 
+                          height="10" 
+                          viewBox="0 0 24 24" 
+                          fill="none" 
+                          stroke="currentColor" 
+                          strokeWidth="2.5"
+                          style={{ 
+                            opacity: 0, 
+                            transition: 'opacity 0.15s ease',
+                            marginLeft: '2px',
+                          }}
+                        >
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
                       </button>
                     ) : (
                       <button
                         type="button"
                         onClick={() => handleStartClick(row, index)}
                         style={{
-                          height: '23px',
-                          padding: '0 10px',
-                          borderRadius: '6px',
+                          height: '26px',
+                          padding: '0 14px',
+                          borderRadius: '13px',
                           border: 'none',
                           backgroundColor: '#3B82F6',
                           color: '#FFFFFF',
-                          fontSize: '14px',
-                          fontWeight: 500,
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          letterSpacing: '0.025em',
                           cursor: 'pointer',
-                          transition: 'background-color 0.2s',
-                          display: 'flex',
+                          transition: 'all 0.2s ease',
+                          display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           whiteSpace: 'nowrap',
-                          minWidth: '55px',
+                          minWidth: '60px',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.backgroundColor = '#2563EB';
+                          e.currentTarget.style.transform = 'scale(1.02)';
+                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(59, 130, 246, 0.4)';
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.backgroundColor = '#3B82F6';
+                          e.currentTarget.style.transform = 'scale(1)';
+                          e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
                         }}
                       >
                         Start
@@ -1326,71 +1425,212 @@ const LabelCheckTable = ({
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={async () => {
-                  // Confirm action: Mark row as confirmed without counting
-                  // This is a checkpoint to verify labels are sufficient
-                  if (selectedRow && selectedRow.id && shipmentId) {
-                    try {
-                      // Save to database
-                      await updateShipmentProductLabelCheck(shipmentId, selectedRow.id, 'confirmed');
-                      console.log(`Label check confirmed for product ${selectedRow.id}`);
-                    } catch (error) {
-                      console.error('Error saving label check confirmation:', error);
-                      // Continue with local update even if API fails
-                    }
-                    
-                    setConfirmedRows(prev => new Set(prev).add(selectedRow.id));
-                    setCompletedRows(prev => new Set(prev).add(selectedRow.id));
-                    setCompletedRowStatus(prev => ({ ...prev, [selectedRow.id]: false })); // Not insufficient
-                  }
-                  handleCloseModal();
-                }}
-                style={{
-                  height: '31px',
-                  padding: '0 12px',
-                  borderRadius: '4px',
-                  width: '276px',
-                  border: 'none',
-                  backgroundColor: '#007AFF',
-                  color: '#FFFFFF',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'background-color 0.2s',
-                  alignSelf: 'center',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#0056CC'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#007AFF'; }}
-              >
-                Confirm
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsStartPreviewOpen(false);
-                  setIsModalOpen(true);
-                }}
-                style={{
-                  height: '31px',
-                  padding: '0 12px',
-                  borderRadius: '4px',
-                  width: '276px',
-                  alignSelf: 'center',
-                  border: '1px solid #D1D5DB',
-                  backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
-                  color: isDarkMode ? '#E5E7EB' : '#111827',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'background-color 0.2s',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = isDarkMode ? '#1F2937' : '#F3F4F6'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = isDarkMode ? '#111827' : '#FFFFFF'; }}
-              >
-                Count Labels
-              </button>
+              {completedRows.has(selectedRow?.id) ? (
+                <>
+                  {/* Edit Mode Header */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    marginBottom: '4px',
+                  }}>
+                    <span style={{
+                      fontSize: '11px',
+                      fontWeight: 500,
+                      color: '#10B981',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                    }}>
+                      ✓ Previously confirmed
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      // Re-confirm action: Update confirmation
+                      if (selectedRow && selectedRow.id && shipmentId) {
+                        try {
+                          await updateShipmentProductLabelCheck(shipmentId, selectedRow.id, 'confirmed');
+                          console.log(`Label check re-confirmed for product ${selectedRow.id}`);
+                        } catch (error) {
+                          console.error('Error saving label check confirmation:', error);
+                        }
+                        
+                        setConfirmedRows(prev => new Set(prev).add(selectedRow.id));
+                        setCompletedRows(prev => new Set(prev).add(selectedRow.id));
+                        setCompletedRowStatus(prev => ({ ...prev, [selectedRow.id]: false }));
+                        // Reload data from API to ensure consistency
+                        await loadLabelData();
+                      }
+                      handleCloseModal();
+                    }}
+                    style={{
+                      height: '40px',
+                      padding: '0 16px',
+                      borderRadius: '10px',
+                      width: '276px',
+                      border: 'none',
+                      backgroundColor: '#10B981',
+                      color: '#FFFFFF',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      alignSelf: 'center',
+                      boxShadow: '0 2px 4px rgba(16, 185, 129, 0.2)',
+                    }}
+                    onMouseEnter={(e) => { 
+                      e.currentTarget.style.backgroundColor = '#059669';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+                    }}
+                    onMouseLeave={(e) => { 
+                      e.currentTarget.style.backgroundColor = '#10B981';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(16, 185, 129, 0.2)';
+                    }}
+                  >
+                    Keep Confirmed
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsStartPreviewOpen(false);
+                      setIsModalOpen(true);
+                    }}
+                    style={{
+                      height: '40px',
+                      padding: '0 16px',
+                      borderRadius: '10px',
+                      width: '276px',
+                      alignSelf: 'center',
+                      border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                      backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                      color: isDarkMode ? '#E5E7EB' : '#374151',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                    onMouseEnter={(e) => { 
+                      e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                      e.currentTarget.style.borderColor = isDarkMode ? '#4B5563' : '#D1D5DB';
+                    }}
+                    onMouseLeave={(e) => { 
+                      e.currentTarget.style.backgroundColor = isDarkMode ? '#1F2937' : '#FFFFFF';
+                      e.currentTarget.style.borderColor = isDarkMode ? '#374151' : '#E5E7EB';
+                    }}
+                  >
+                    Recount Labels
+                  </button>
+                  {/* Reset as subtle text link */}
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: isDarkMode ? '#6B7280' : '#9CA3AF',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      padding: '8px 0 0 0',
+                      transition: 'color 0.2s ease',
+                      alignSelf: 'center',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = '#EF4444'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = isDarkMode ? '#6B7280' : '#9CA3AF'; }}
+                  >
+                    Reset and start over
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      // Confirm action: Mark row as confirmed without counting
+                      // This is a checkpoint to verify labels are sufficient
+                      if (selectedRow && selectedRow.id && shipmentId) {
+                        try {
+                          // Save to database
+                          await updateShipmentProductLabelCheck(shipmentId, selectedRow.id, 'confirmed');
+                          console.log(`Label check confirmed for product ${selectedRow.id}`);
+                        } catch (error) {
+                          console.error('Error saving label check confirmation:', error);
+                          // Continue with local update even if API fails
+                        }
+                        
+                        setConfirmedRows(prev => new Set(prev).add(selectedRow.id));
+                        setCompletedRows(prev => new Set(prev).add(selectedRow.id));
+                        setCompletedRowStatus(prev => ({ ...prev, [selectedRow.id]: false })); // Not insufficient
+                        // Reload data from API to ensure consistency
+                        await loadLabelData();
+                      }
+                      handleCloseModal();
+                    }}
+                    style={{
+                      height: '40px',
+                      padding: '0 16px',
+                      borderRadius: '10px',
+                      width: '276px',
+                      border: 'none',
+                      backgroundColor: '#3B82F6',
+                      color: '#FFFFFF',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      alignSelf: 'center',
+                      boxShadow: '0 2px 4px rgba(59, 130, 246, 0.2)',
+                    }}
+                    onMouseEnter={(e) => { 
+                      e.currentTarget.style.backgroundColor = '#2563EB';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
+                    }}
+                    onMouseLeave={(e) => { 
+                      e.currentTarget.style.backgroundColor = '#3B82F6';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(59, 130, 246, 0.2)';
+                    }}
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsStartPreviewOpen(false);
+                      setIsModalOpen(true);
+                    }}
+                    style={{
+                      height: '40px',
+                      padding: '0 16px',
+                      borderRadius: '10px',
+                      width: '276px',
+                      alignSelf: 'center',
+                      border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                      backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                      color: isDarkMode ? '#E5E7EB' : '#374151',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                    onMouseEnter={(e) => { 
+                      e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                      e.currentTarget.style.borderColor = isDarkMode ? '#4B5563' : '#D1D5DB';
+                    }}
+                    onMouseLeave={(e) => { 
+                      e.currentTarget.style.backgroundColor = isDarkMode ? '#1F2937' : '#FFFFFF';
+                      e.currentTarget.style.borderColor = isDarkMode ? '#374151' : '#E5E7EB';
+                    }}
+                  >
+                    Count Labels
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>,

@@ -5487,13 +5487,40 @@ def update_shipment_product_label_check(event):
         product_id = event['pathParameters'].get('product_id')
         body = json.loads(event.get('body', '{}'))
         
-        status = body.get('status')  # 'confirmed' or 'counted'
+        status = body.get('status')  # 'confirmed', 'counted', or None (to reset)
         count = body.get('count')  # Only for 'counted' status
+        
+        # Allow null status to reset the label check
+        if status is None:
+            # Reset label check status
+            cursor.execute("""
+                UPDATE shipment_products 
+                SET label_check_status = NULL,
+                    label_check_count = NULL,
+                    label_check_at = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s AND shipment_id = %s
+                RETURNING *
+            """, (product_id, shipment_id))
+            
+            product = cursor.fetchone()
+            conn.commit()
+            
+            if not product:
+                return cors_response(404, {
+                    'success': False,
+                    'error': f'Product {product_id} not found in shipment {shipment_id}'
+                })
+            
+            return cors_response(200, {
+                'success': True,
+                'data': dict(product)
+            })
         
         if not status:
             return cors_response(400, {
                 'success': False,
-                'error': 'status is required (confirmed or counted)'
+                'error': 'status is required (confirmed or counted), or null to reset'
             })
         
         if status == 'counted':
