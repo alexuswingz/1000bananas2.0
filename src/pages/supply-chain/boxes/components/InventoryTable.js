@@ -327,8 +327,8 @@ const InventoryTable = forwardRef(({
                   paddingBottom: '12px',
                   paddingLeft: '24px',
                   gap: '10px',
-                  justifyContent: idx === 0 ? 'flex-start' : 'flex-end',
-                  textAlign: idx === 0 ? 'left' : 'right',
+                  justifyContent: idx === 0 ? 'flex-start' : 'center',
+                  textAlign: idx === 0 ? 'left' : 'center',
                   position: 'relative',
                 }}
               >
@@ -336,7 +336,7 @@ const InventoryTable = forwardRef(({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'space-between',
+                    justifyContent: idx === 0 ? 'space-between' : 'center',
                     gap: '0.5rem',
                     width: '100%',
                   }}
@@ -368,7 +368,7 @@ const InventoryTable = forwardRef(({
         {/* Table body */}
         <div
           className="w-full"
-          style={{ minHeight: '360px' }}
+          style={{ minHeight: '0px' }}
         >
           {loading ? (
             <div className={`px-6 py-6 text-center text-sm ${effectiveThemeClasses.textSecondary}`}>
@@ -433,7 +433,7 @@ const InventoryTable = forwardRef(({
                 </div>
 
                 <div 
-                  className="flex items-center justify-end" 
+                  className="flex items-center justify-center" 
                   style={{ 
                     width: '280px',
                     height: '40px',
@@ -450,7 +450,7 @@ const InventoryTable = forwardRef(({
                     title="Warehouse inventory is updated automatically when orders are received" 
                     style={{ 
                       fontSize: '14px', 
-                      textAlign: 'right',
+                      textAlign: 'center',
                       display: 'block',
                       width: '100%',
                     }}
@@ -460,7 +460,7 @@ const InventoryTable = forwardRef(({
                 </div>
 
                 <div 
-                  className="flex items-center justify-end" 
+                  className="flex items-center justify-center" 
                   style={{ 
                     width: '280px',
                     height: '40px',
@@ -489,7 +489,7 @@ const InventoryTable = forwardRef(({
                       className={effectiveThemeClasses.textPrimary} 
                       style={{ 
                         fontSize: '14px', 
-                        textAlign: 'right',
+                        textAlign: 'center',
                         display: 'block',
                         width: '100%',
                       }}

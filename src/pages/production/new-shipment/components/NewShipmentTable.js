@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
+import SortFormulasFilterDropdown from './SortFormulasFilterDropdown';
 
 const NewShipmentTable = ({
   rows,
@@ -26,6 +27,12 @@ const NewShipmentTable = ({
   const [openFilterIndex, setOpenFilterIndex] = useState(null);
   const filterRefs = useRef({});
   const filterModalRefs = useRef({});
+  
+  // Filter dropdown state for bottles, closures, boxes, labels
+  const [openFilterColumns, setOpenFilterColumns] = useState(() => new Set());
+  const filterIconRefs = useRef({});
+  const [columnFilters, setColumnFilters] = useState({});
+  const [columnSortConfig, setColumnSortConfig] = useState([]);
   
   // Filter state
   const [activeFilters, setActiveFilters] = useState({
@@ -198,9 +205,135 @@ const NewShipmentTable = ({
         return activeFilters.sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
       });
     }
+
+    // Apply column filters (bottles, closures, boxes, labels)
+    Object.keys(columnFilters).forEach(columnKey => {
+      const filter = columnFilters[columnKey];
+      if (!filter) return;
+
+      // Apply value filters (checkbox selections)
+      if (filter.selectedValues && filter.selectedValues.size > 0) {
+        result = result.filter(row => {
+          let rowValue;
+          switch(columnKey) {
+            case 'bottles':
+              rowValue = row.bottleInventory || row.bottle_inventory;
+              break;
+            case 'closures':
+              rowValue = row.closureInventory || row.closure_inventory;
+              break;
+            case 'boxes':
+              rowValue = row.boxInventory || row.box_inventory;
+              break;
+            case 'labels':
+              rowValue = row.labelsAvailable || row.label_inventory || row.labels_available;
+              break;
+            default:
+              rowValue = row[columnKey];
+          }
+          return filter.selectedValues.has(rowValue) || 
+                 filter.selectedValues.has(String(rowValue));
+        });
+      }
+
+      // Apply condition filters
+      if (filter.conditionType && filter.conditionType !== '') {
+        result = result.filter(row => {
+          let rowValue;
+          switch(columnKey) {
+            case 'bottles':
+              rowValue = row.bottleInventory || row.bottle_inventory || 0;
+              break;
+            case 'closures':
+              rowValue = row.closureInventory || row.closure_inventory || 0;
+              break;
+            case 'boxes':
+              rowValue = row.boxInventory || row.box_inventory || 0;
+              break;
+            case 'labels':
+              rowValue = row.labelsAvailable || row.label_inventory || row.labels_available || 0;
+              break;
+            default:
+              rowValue = row[columnKey] || 0;
+          }
+
+          const numValue = typeof rowValue === 'number' ? rowValue : parseFloat(rowValue) || 0;
+          const filterNum = parseFloat(filter.conditionValue) || 0;
+          const strValue = String(rowValue || '').toLowerCase();
+          const filterStr = (filter.conditionValue || '').toLowerCase();
+
+          switch (filter.conditionType) {
+            case 'equals':
+              return numValue === filterNum || strValue === filterStr;
+            case 'notEquals':
+              return numValue !== filterNum && strValue !== filterStr;
+            case 'greaterThan':
+              return numValue > filterNum;
+            case 'lessThan':
+              return numValue < filterNum;
+            case 'greaterOrEqual':
+              return numValue >= filterNum;
+            case 'lessOrEqual':
+              return numValue <= filterNum;
+            case 'contains':
+              return strValue.includes(filterStr);
+            case 'notContains':
+              return !strValue.includes(filterStr);
+            case 'startsWith':
+              return strValue.startsWith(filterStr);
+            case 'endsWith':
+              return strValue.endsWith(filterStr);
+            case 'isEmpty':
+              return rowValue === null || rowValue === undefined || rowValue === '' || rowValue === 0;
+            case 'isNotEmpty':
+              return rowValue !== null && rowValue !== undefined && rowValue !== '' && rowValue !== 0;
+            default:
+              return true;
+          }
+        });
+      }
+    });
+
+    // Apply column sorting
+    if (columnSortConfig.length > 0) {
+      result.sort((a, b) => {
+        for (const sort of columnSortConfig) {
+          let aVal, bVal;
+          switch(sort.column) {
+            case 'bottles':
+              aVal = a.bottleInventory || a.bottle_inventory || 0;
+              bVal = b.bottleInventory || b.bottle_inventory || 0;
+              break;
+            case 'closures':
+              aVal = a.closureInventory || a.closure_inventory || 0;
+              bVal = b.closureInventory || b.closure_inventory || 0;
+              break;
+            case 'boxes':
+              aVal = a.boxInventory || a.box_inventory || 0;
+              bVal = b.boxInventory || b.box_inventory || 0;
+              break;
+            case 'labels':
+              aVal = a.labelsAvailable || a.label_inventory || a.labels_available || 0;
+              bVal = b.labelsAvailable || b.label_inventory || b.labels_available || 0;
+              break;
+            default:
+              aVal = a[sort.column] || 0;
+              bVal = b[sort.column] || 0;
+          }
+
+          const aNum = typeof aVal === 'number' ? aVal : parseFloat(aVal) || 0;
+          const bNum = typeof bVal === 'number' ? bVal : parseFloat(bVal) || 0;
+          
+          if (aNum !== bNum) {
+            return sort.order === 'asc' ? aNum - bNum : bNum - aNum;
+          }
+        }
+        return 0;
+      });
+    }
     
     return result;
-  }, [rows, activeFilters]);
+  }, [rows, activeFilters, columnFilters, columnSortConfig]);
 
   // Apply selection filter only in table mode
   const filteredRowsWithSelection = useMemo(() => {
@@ -241,6 +374,119 @@ const NewShipmentTable = ({
       filterValue: '',
     });
   };
+
+  // Filter handlers for bottles, closures, boxes, labels columns
+  const handleFilterClick = (columnKey, event) => {
+    event.stopPropagation();
+    setOpenFilterColumns((prev) => {
+      const next = new Set(prev);
+      if (next.has(columnKey)) {
+        next.delete(columnKey);
+      } else {
+        next.add(columnKey);
+      }
+      return next;
+    });
+  };
+
+  const handleApplyColumnFilter = (columnKey, filterData) => {
+    setColumnFilters(prev => ({
+      ...prev,
+      [columnKey]: filterData,
+    }));
+    
+    // Update sort config
+    setColumnSortConfig(prev => {
+      if (filterData.sortOrder) {
+        const existingIndex = prev.findIndex(sort => sort.column === columnKey);
+        if (existingIndex >= 0) {
+          const newConfig = [...prev];
+          newConfig[existingIndex] = { column: columnKey, order: filterData.sortOrder };
+          return newConfig;
+        } else {
+          return [...prev, { column: columnKey, order: filterData.sortOrder }];
+        }
+      } else {
+        return prev.filter(sort => sort.column !== columnKey);
+      }
+    });
+  };
+
+  // Get unique values for a column
+  const getColumnValues = (columnKey) => {
+    const values = new Set();
+    filteredRows.forEach(row => {
+      let val;
+      switch(columnKey) {
+        case 'bottles':
+          val = row.bottleInventory || row.bottle_inventory;
+          break;
+        case 'closures':
+          val = row.closureInventory || row.closure_inventory;
+          break;
+        case 'boxes':
+          val = row.boxInventory || row.box_inventory;
+          break;
+        case 'labels':
+          val = row.labelsAvailable || row.label_inventory || row.labels_available;
+          break;
+        default:
+          val = row[columnKey];
+      }
+      if (val !== undefined && val !== null && val !== '') {
+        values.add(val);
+      }
+    });
+    const sortedValues = Array.from(values).sort((a, b) => {
+      if (typeof a === 'number' && typeof b === 'number') {
+        return a - b;
+      }
+      return String(a).localeCompare(String(b));
+    });
+    return sortedValues;
+  };
+
+  // Get sort order for a column
+  const getColumnSortOrder = (columnKey) => {
+    const sort = columnSortConfig.find(sort => sort.column === columnKey);
+    return sort ? sort.order : '';
+  };
+
+  // Check if a column has active filters
+  const hasActiveColumnFilter = (columnKey) => {
+    const filter = columnFilters[columnKey];
+    if (!filter) return false;
+    const hasValues = filter.selectedValues && filter.selectedValues.size > 0;
+    const hasCondition = filter.conditionType && filter.conditionType !== '';
+    return hasValues || hasCondition;
+  };
+
+  // Close filter dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (openFilterColumns.size > 0) {
+        const clickedOnFilterIcon = Object.values(filterIconRefs.current).some(ref => 
+          ref && ref.contains(event.target)
+        );
+        const clickedInsideDropdown = event.target.closest('[data-filter-dropdown]');
+        
+        if (!clickedOnFilterIcon && !clickedInsideDropdown) {
+          setOpenFilterColumns(new Set());
+        }
+      }
+    };
+
+    if (openFilterColumns.size > 0) {
+      const timeoutId = setTimeout(() => {
+        document.addEventListener('click', handleClickOutside);
+      }, 0);
+      
+      return () => {
+        clearTimeout(timeoutId);
+        document.removeEventListener('click', handleClickOutside);
+      };
+    }
+  }, [openFilterColumns]);
 
   const currentRows = filteredRowsWithSelection;
 
@@ -486,7 +732,7 @@ const NewShipmentTable = ({
                         lineHeight: '40px',
                         boxSizing: 'border-box',
                         textAlign: idx === 3 || idx === 4 ? 'center' : 'left',
-                        borderRight: '1px solid #FFFFFF',
+                        borderRight: idx === 3 ? 'none' : '1px solid #FFFFFF',
                         position: 'relative',
                         // Soften outer header corners more
                         borderTopLeftRadius: idx === 0 ? '16px' : undefined,
@@ -640,25 +886,34 @@ const NewShipmentTable = ({
                   const index = row._originalIndex;
                   return (
                   <tr key={`${row.id}-${index}`} className="border-t border-gray-200" style={{ height: '40px', maxHeight: '40px' }}>
-                    <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }} className={themeClasses.text}>
+                    <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} className={themeClasses.text}>
                       {row.brand}
                     </td>
                     <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <button
-                          type="button"
-                          onClick={() => onProductClick(row)}
-                          className="text-xs text-blue-500 hover:text-blue-600"
-                          style={{ cursor: 'pointer' }}
-                        >
-                          {row.product}...
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onProductClick(row)}
+                        className="text-blue-500 hover:text-blue-600"
+                        style={{ 
+                          cursor: 'pointer',
+                          fontSize: '0.85rem',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          width: '100%',
+                          textAlign: 'left',
+                          background: 'none',
+                          border: 'none',
+                          padding: 0
+                        }}
+                      >
+                        {row.product}
+                      </button>
                     </td>
-                    <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }} className={themeClasses.textSecondary}>
+                    <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} className={themeClasses.textSecondary}>
                       {row.size}
                     </td>
-                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB', boxShadow: 'inset 4px 0 8px -4px rgba(0, 0, 0, 0.15)' }}>
+                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }}>
                       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
                         <button
                           type="button"
@@ -1783,6 +2038,209 @@ const NewShipmentTable = ({
                   />
                 </div>
               </th>
+              <th 
+                className="group"
+                style={{ 
+                  padding: '12px 16px', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  maxHeight: '40px',
+                  borderRight: '1px solid #FFFFFF',
+                  boxSizing: 'border-box',
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  lineHeight: '100%',
+                  letterSpacing: '0%',
+                  textTransform: 'uppercase',
+                  color: '#FFFFFF',
+                  backgroundColor: hasActiveColumnFilter('bottles') ? 'rgba(59, 130, 246, 0.1)' : '#1C2634',
+                  position: 'relative',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', position: 'relative', width: '100%' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    BOTTLES
+                    {hasActiveColumnFilter('bottles') && (
+                      <span style={{ 
+                        display: 'inline-block',
+                        width: '6px', 
+                        height: '6px', 
+                        borderRadius: '50%', 
+                        backgroundColor: '#10B981',
+                      }} />
+                    )}
+                  </span>
+                  <img
+                    src="/assets/Vector (1).png"
+                    alt="Filter"
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('bottles') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    ref={(el) => {
+                      if (el) filterIconRefs.current['bottles'] = el;
+                    }}
+                    onClick={(e) => handleFilterClick('bottles', e)}
+                    style={{ 
+                      width: '12px', 
+                      height: '12px',
+                      cursor: 'pointer',
+                      filter: hasActiveColumnFilter('bottles') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                      position: 'absolute',
+                      right: '0',
+                    }}
+                  />
+                </div>
+              </th>
+              <th 
+                className="group"
+                style={{ 
+                  padding: '12px 16px', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  maxHeight: '40px',
+                  borderRight: '1px solid #FFFFFF',
+                  boxSizing: 'border-box',
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  lineHeight: '100%',
+                  letterSpacing: '0%',
+                  textTransform: 'uppercase',
+                  color: '#FFFFFF',
+                  backgroundColor: hasActiveColumnFilter('closures') ? 'rgba(59, 130, 246, 0.1)' : '#1C2634',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    CLOSURES
+                    {hasActiveColumnFilter('closures') && (
+                      <span style={{ 
+                        display: 'inline-block',
+                        width: '6px', 
+                        height: '6px', 
+                        borderRadius: '50%', 
+                        backgroundColor: '#10B981',
+                      }} />
+                    )}
+                  </span>
+                  <img
+                    src="/assets/Vector (1).png"
+                    alt="Filter"
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('closures') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    ref={(el) => {
+                      if (el) filterIconRefs.current['closures'] = el;
+                    }}
+                    onClick={(e) => handleFilterClick('closures', e)}
+                    style={{ 
+                      width: '12px', 
+                      height: '12px',
+                      cursor: 'pointer',
+                      filter: hasActiveColumnFilter('closures') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                    }}
+                  />
+                </div>
+              </th>
+              <th 
+                className="group"
+                style={{ 
+                  padding: '12px 16px', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  maxHeight: '40px',
+                  borderRight: '1px solid #FFFFFF',
+                  boxSizing: 'border-box',
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  lineHeight: '100%',
+                  letterSpacing: '0%',
+                  textTransform: 'uppercase',
+                  color: '#FFFFFF',
+                  backgroundColor: hasActiveColumnFilter('boxes') ? 'rgba(59, 130, 246, 0.1)' : '#1C2634',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    BOXES
+                    {hasActiveColumnFilter('boxes') && (
+                      <span style={{ 
+                        display: 'inline-block',
+                        width: '6px', 
+                        height: '6px', 
+                        borderRadius: '50%', 
+                        backgroundColor: '#10B981',
+                      }} />
+                    )}
+                  </span>
+                  <img
+                    src="/assets/Vector (1).png"
+                    alt="Filter"
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('boxes') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    ref={(el) => {
+                      if (el) filterIconRefs.current['boxes'] = el;
+                    }}
+                    onClick={(e) => handleFilterClick('boxes', e)}
+                    style={{ 
+                      width: '12px', 
+                      height: '12px',
+                      cursor: 'pointer',
+                      filter: hasActiveColumnFilter('boxes') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                    }}
+                  />
+                </div>
+              </th>
+              <th 
+                className="group"
+                style={{ 
+                  padding: '12px 16px', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  maxHeight: '40px',
+                  borderRight: '1px solid #FFFFFF',
+                  boxSizing: 'border-box',
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  lineHeight: '100%',
+                  letterSpacing: '0%',
+                  textTransform: 'uppercase',
+                  color: '#FFFFFF',
+                  backgroundColor: hasActiveColumnFilter('labels') ? 'rgba(59, 130, 246, 0.1)' : '#1C2634',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    LABELS
+                    {hasActiveColumnFilter('labels') && (
+                      <span style={{ 
+                        display: 'inline-block',
+                        width: '6px', 
+                        height: '6px', 
+                        borderRadius: '50%', 
+                        backgroundColor: '#10B981',
+                      }} />
+                    )}
+                  </span>
+                  <img
+                    src="/assets/Vector (1).png"
+                    alt="Filter"
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('labels') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    ref={(el) => {
+                      if (el) filterIconRefs.current['labels'] = el;
+                    }}
+                    onClick={(e) => handleFilterClick('labels', e)}
+                    style={{ 
+                      width: '12px', 
+                      height: '12px',
+                      cursor: 'pointer',
+                      filter: hasActiveColumnFilter('labels') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                    }}
+                  />
+                </div>
+              </th>
               {/* Sticky three dots */}
               <th style={{ 
                 padding: '0 1rem', 
@@ -1919,11 +2377,11 @@ const NewShipmentTable = ({
                         borderRadius: '8px',
                         border: isQtyExceedingLabels(row, index) ? '1px solid #EF4444' : '1px solid #E5E7EB',
                         padding: '4px 6px',
-                        width: '107px',
+                        width: isQtyExceedingLabels(row, index) && (effectiveQtyValues[index] ?? 0) > 0 ? '135px' : '107px',
                         height: '24px',
                         boxSizing: 'border-box',
                         position: 'relative',
-                        overflow: 'hidden',
+                        overflow: 'visible',
                       }}
                     >
                       <input
@@ -2010,10 +2468,18 @@ const NewShipmentTable = ({
                         style={{
                           position: 'absolute',
                           left: 0,
-                          right: 0,
+                          right: (() => {
+                            const labelsAvailable = getAvailableLabelsForRow(row, index);
+                            const labelsNeeded = effectiveQtyValues[index] ?? 0;
+                            return (labelsNeeded > labelsAvailable && labelsNeeded > 0) ? '28px' : 0;
+                          })(),
                           top: 0,
                           bottom: 0,
-                          width: '100%',
+                          width: (() => {
+                            const labelsAvailable = getAvailableLabelsForRow(row, index);
+                            const labelsNeeded = effectiveQtyValues[index] ?? 0;
+                            return (labelsNeeded > labelsAvailable && labelsNeeded > 0) ? 'calc(100% - 28px)' : '100%';
+                          })(),
                           height: '100%',
                           border: 'none',
                           outline: 'none',
@@ -2146,41 +2612,41 @@ const NewShipmentTable = ({
                         </button>
                         </div>
                       )}
+                      {/* Label warning icon - shown when QTY exceeds labels */}
+                      {(() => {
+                        const labelsAvailable = getAvailableLabelsForRow(row, index);
+                        const labelsNeeded = effectiveQtyValues[index] ?? 0;
+                        // Only show warning if labels needed exceed available
+                        if (labelsNeeded > labelsAvailable && labelsNeeded > 0) {
+                          return (
+                            <span
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setClickedQtyIndex(clickedQtyIndex === index ? null : index);
+                              }}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '18px',
+                                height: '18px',
+                                borderRadius: '50%',
+                                backgroundColor: '#FEE2E2',
+                                color: '#DC2626',
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                marginLeft: '6px',
+                                cursor: 'pointer',
+                                flexShrink: 0,
+                              }}
+                            >
+                              !
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
-                    {/* Label warning icon - shown when QTY exceeds labels */}
-                    {(() => {
-                      const labelsAvailable = getAvailableLabelsForRow(row, index);
-                      const labelsNeeded = effectiveQtyValues[index] ?? 0;
-                      // Only show warning if labels needed exceed available
-                      if (labelsNeeded > labelsAvailable && labelsNeeded > 0) {
-                        return (
-                          <span
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setClickedQtyIndex(clickedQtyIndex === index ? null : index);
-                            }}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: '18px',
-                              height: '18px',
-                              borderRadius: '50%',
-                              backgroundColor: '#FEE2E2',
-                              color: '#DC2626',
-                              fontSize: '12px',
-                              fontWeight: 700,
-                              marginLeft: '6px',
-                              cursor: 'pointer',
-                              flexShrink: 0,
-                            }}
-                          >
-                            !
-                          </span>
-                        );
-                      }
-                      return null;
-                    })()}
                     {clickedQtyIndex === index && (() => {
                       const labelsAvailable = getAvailableLabelsForRow(row, index);
                       const labelsNeeded = effectiveQtyValues[index] ?? 0;
@@ -2361,6 +2827,54 @@ const NewShipmentTable = ({
                 }} className={themeClasses.text}>
                   {row.formula_name || ''}
                 </td>
+                <td style={{ 
+                  padding: '12px 16px', 
+                  fontSize: '0.85rem', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  verticalAlign: 'middle',
+                  boxSizing: 'border-box',
+                  borderTop: '1px solid #E5E7EB',
+                }} className={themeClasses.text}>
+                  {row.bottleInventory || row.bottle_inventory || 0}
+                </td>
+                <td style={{ 
+                  padding: '12px 16px', 
+                  fontSize: '0.85rem', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  verticalAlign: 'middle',
+                  boxSizing: 'border-box',
+                  borderTop: '1px solid #E5E7EB',
+                }} className={themeClasses.text}>
+                  {row.closureInventory || row.closure_inventory || 0}
+                </td>
+                <td style={{ 
+                  padding: '12px 16px', 
+                  fontSize: '0.85rem', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  verticalAlign: 'middle',
+                  boxSizing: 'border-box',
+                  borderTop: '1px solid #E5E7EB',
+                }} className={themeClasses.text}>
+                  {row.boxInventory || row.box_inventory || 0}
+                </td>
+                <td style={{ 
+                  padding: '12px 16px', 
+                  fontSize: '0.85rem', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  verticalAlign: 'middle',
+                  boxSizing: 'border-box',
+                  borderTop: '1px solid #E5E7EB',
+                }} className={themeClasses.text}>
+                  {row.labelsAvailable || row.label_inventory || row.labels_available || 0}
+                </td>
                 {/* Sticky three dots */}
                 <td style={{ 
                   padding: '0.65rem 1rem', 
@@ -2407,6 +2921,29 @@ const NewShipmentTable = ({
         currentFilters={activeFilters}
       />
     )}
+
+    {/* Column Filter Dropdowns for Bottles, Closures, Boxes, Labels */}
+    {Array.from(openFilterColumns).map((columnKey) => {
+      if (!filterIconRefs.current[columnKey]) return null;
+      return (
+        <SortFormulasFilterDropdown
+          key={columnKey}
+          filterIconRef={filterIconRefs.current[columnKey]}
+          columnKey={columnKey}
+          availableValues={getColumnValues(columnKey)}
+          currentFilter={columnFilters[columnKey] || {}}
+          currentSort={getColumnSortOrder(columnKey)}
+          onApply={(filterData) => handleApplyColumnFilter(columnKey, filterData)}
+          onClose={() => {
+            setOpenFilterColumns((prev) => {
+              const next = new Set(prev);
+              next.delete(columnKey);
+              return next;
+            });
+          }}
+        />
+      );
+    })}
     </>
   );
 };

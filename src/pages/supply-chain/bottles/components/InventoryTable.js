@@ -311,17 +311,20 @@ const InventoryTable = forwardRef(({
                   paddingBottom: '12px',
                   paddingLeft: '16px',
                   gap: '10px',
-                  justifyContent: idx === 0 ? 'flex-start' : 'flex-end',
-                  textAlign: idx === 0 ? 'left' : 'right',
+                  justifyContent: idx === 0 ? 'flex-start' : 'center',
+                  textAlign: idx === 0 ? 'left' : 'center',
                   borderRight: `1px solid ${dividerColor}`,
+                  position: 'relative',
                 }}
               >
                 <div
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'space-between',
+                    justifyContent: idx === 0 ? 'flex-start' : 'center',
                     gap: '0.5rem',
+                    position: 'relative',
+                    width: '100%',
                   }}
                 >
                   <span style={{ color: openFilterColumn === key ? '#007AFF' : '#FFFFFF' }}>{label}</span>
@@ -338,7 +341,12 @@ const InventoryTable = forwardRef(({
                         openFilterColumn === key ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                       }`}
                       onClick={(e) => handleFilterClick(key, e)}
-                      style={{ width: '12px', height: '12px' }}
+                      style={{ 
+                        width: '12px', 
+                        height: '12px',
+                        position: idx === 0 ? 'static' : 'absolute',
+                        right: idx === 0 ? 'auto' : '0',
+                      }}
                     />
                   )}
                 </div>
@@ -419,7 +427,7 @@ const InventoryTable = forwardRef(({
                 </div>
 
                 <div 
-                  className="flex items-center justify-end" 
+                  className="flex items-center justify-center" 
                   style={{ 
                     width: '253px',
                     minWidth: '253px',
@@ -432,7 +440,7 @@ const InventoryTable = forwardRef(({
                   }}
                 >
                   {showInputs ? (
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
                       <input
                         type="number"
                         value={isBulkRow 
@@ -455,7 +463,7 @@ const InventoryTable = forwardRef(({
                       className={themeClasses.textPrimary} 
                       style={{ 
                         fontSize: '14px', 
-                        textAlign: 'right',
+                        textAlign: 'center',
                         display: 'block',
                         width: '100%',
                       }}
@@ -466,7 +474,7 @@ const InventoryTable = forwardRef(({
                 </div>
 
                 <div 
-                  className="flex items-center justify-end" 
+                  className="flex items-center justify-center" 
                   style={{ 
                     width: '253px',
                     minWidth: '253px',
@@ -479,7 +487,7 @@ const InventoryTable = forwardRef(({
                   }}
                 >
                   {showInputs ? (
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
                       <input
                         type="number"
                         value={supplierValue}
@@ -499,7 +507,7 @@ const InventoryTable = forwardRef(({
                       className={themeClasses.textPrimary} 
                       style={{ 
                         fontSize: '14px', 
-                        textAlign: 'right',
+                        textAlign: 'center',
                         display: 'block',
                         width: '100%',
                       }}

@@ -231,7 +231,7 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
               key={key}
               className="text-xs font-bold text-white uppercase tracking-wider border-r border-[#3C4656] group cursor-pointer"
               style={{ 
-                textAlign: 'left', 
+                textAlign: 'center', 
                 width: '222px',
                 height: '40px',
                 paddingTop: '12px',
@@ -242,7 +242,7 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
                 alignItems: 'center',
                 gap: '10px',
               }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', gap: '8px' }}>
                 <span style={{ color: openFilterColumn === key ? '#007AFF' : '#FFFFFF' }}>{label}</span>
                 <img
                   ref={(el) => {
@@ -271,7 +271,7 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
             <div>RECEIVE</div>
             <div>PO</div>
           </div>
-          <div className="text-xs font-bold text-white uppercase tracking-wider" style={{ textAlign: 'right', position: 'relative', paddingRight: '16px', paddingLeft: '0px', paddingTop: '12px', paddingBottom: '12px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+          <div className="text-xs font-bold text-white uppercase tracking-wider" style={{ textAlign: 'center', position: 'relative', paddingRight: '16px', paddingLeft: '0px', paddingTop: '12px', paddingBottom: '12px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           </div>
         </div>
       </div>
@@ -327,11 +327,12 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
                 <div className="px-6 py-3 flex items-center justify-center">
                   <div
                     style={{
-                      width: '16px',
-                      height: '16px',
+                      width: '18px',
+                      height: '18px',
                       borderRadius: '50%',
-                      backgroundColor: addProductsStatus ? '#22C55E' : 'transparent',
-                      border: addProductsStatus ? 'none' : '2px solid #9CA3AF',
+                      backgroundColor: addProductsStatus ? '#22C55E' : '#D1D5DB',
+                      border: addProductsStatus ? '2px solid #1B7A3D' : '2px solid #E5E7EB',
+                      boxShadow: addProductsStatus ? '0 0 0 2px rgba(34,197,94,0.2)' : 'none',
                     }}
                   />
                 </div>
@@ -339,11 +340,12 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
                 <div className="px-6 py-3 flex items-center justify-center">
                   <div
                     style={{
-                      width: '16px',
-                      height: '16px',
+                      width: '18px',
+                      height: '18px',
                       borderRadius: '50%',
-                      backgroundColor: submitPOStatus ? '#22C55E' : 'transparent',
-                      border: submitPOStatus ? 'none' : '2px solid #9CA3AF',
+                      backgroundColor: submitPOStatus ? '#22C55E' : '#D1D5DB',
+                      border: submitPOStatus ? '2px solid #1B7A3D' : '2px solid #E5E7EB',
+                      boxShadow: submitPOStatus ? '0 0 0 2px rgba(34,197,94,0.2)' : 'none',
                     }}
                   />
                 </div>
@@ -351,11 +353,12 @@ const ArchivedOrdersTable = forwardRef(({ themeClasses }, ref) => {
                 <div className="px-6 py-3 flex items-center justify-center">
                   <div
                     style={{
-                      width: '16px',
-                      height: '16px',
+                      width: '18px',
+                      height: '18px',
                       borderRadius: '50%',
-                      backgroundColor: receivePOStatus ? '#22C55E' : 'transparent',
-                      border: receivePOStatus ? 'none' : '2px solid #9CA3AF',
+                      backgroundColor: receivePOStatus ? '#22C55E' : '#D1D5DB',
+                      border: receivePOStatus ? '2px solid #1B7A3D' : '2px solid #E5E7EB',
+                      boxShadow: receivePOStatus ? '0 0 0 2px rgba(34,197,94,0.2)' : 'none',
                     }}
                   />
                 </div>

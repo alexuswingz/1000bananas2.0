@@ -24,7 +24,9 @@ const SortFormulasFilterDropdown = ({
   const [conditionValue, setConditionValue] = useState(currentFilter.conditionValue || '');
   
   // Check if column is numeric
-  const isNumericColumn = columnKey === 'qty' || columnKey === 'volume';
+  const isNumericColumn = columnKey === 'qty' || columnKey === 'volume' || 
+                          columnKey === 'bottles' || columnKey === 'closures' || 
+                          columnKey === 'boxes' || columnKey === 'labels';
   
   // Available conditions based on column type
   const textConditions = [

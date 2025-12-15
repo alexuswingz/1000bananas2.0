@@ -1158,32 +1158,6 @@ const BottleOrderPage = () => {
             <span>Receive PO</span>
           </button>
 
-          {/* Legend - only show when not in view mode */}
-          {!isViewMode && (
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '16px', marginRight: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{ width: '12px', height: '12px', backgroundColor: '#22C55E', borderRadius: '2px' }}></div>
-              <span style={{ fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>Inventory</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{ width: '12px', height: '12px', backgroundColor: '#3B82F6', borderRadius: '2px' }}></div>
-              <span style={{ fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}># to Order</span>
-            </div>
-            
-            {/* Add bottle button */}
-            {!isReceiveMode && (
-              <div className="bg-gray-50 border-t border-gray-200 px-4 py-3">
-                <button
-                  type="button"
-                  className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
-                  onClick={() => setShowAddBottleModal(true)}
-                >
-                  <span className="text-lg">+</span> Add Bottle
-                </button>
-              </div>
-            )}
-          </div>
-          )}
         </div>
       </div>
 
@@ -1348,83 +1322,92 @@ const BottleOrderPage = () => {
             <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed' }}>
                 <thead className={themeClasses.headerBg} style={{ borderRadius: '8px 8px 0 0' }}>
                   <tr style={{ height: '40px', maxHeight: '40px' }}>
-                    <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: '1px solid #3C4656', width: 50 }}>
-                      <input 
-                        type="checkbox" 
+                    <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                      width: '50px',
+                      minWidth: '50px',
+                      maxWidth: '50px',
+                      height: '40px',
+                      padding: '0 12px',
+                      textAlign: 'center',
+                    }}>
+                      <input
+                        type="checkbox"
                         style={{ cursor: 'pointer', width: '16px', height: '16px' }}
                         checked={filteredLines.length > 0 && filteredLines.every(l => l.added)}
-                        onChange={(e) => {
-                          setOrderLines(prev => prev.map(line => {
-                            if (filteredLines.some(fl => fl.id === line.id)) {
-                              return { ...line, added: e.target.checked };
+                        onChange={() => {
+                          const allSelected = filteredLines.every(l => l.added);
+                          filteredLines.forEach(l => {
+                            if (allSelected && l.added) {
+                              handleAddProduct(l.id);
+                            } else if (!allSelected && !l.added) {
+                              handleAddProduct(l.id);
                             }
-                            return line;
-                          }));
+                          });
                         }}
                       />
                     </th>
                     <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                      width: '142px',
                       height: '40px',
                       paddingTop: '12px',
-                      paddingRight: '24px',
+                      paddingRight: '16px',
                       paddingBottom: '12px',
-                      paddingLeft: '24px',
-                      textAlign: 'left',
-                      borderRight: '1px solid #3C4656',
+                      paddingLeft: '16px',
+                      textAlign: 'center',
+                      borderRight: '2px solid #FFFFFF',
+                      gap: '10px',
                     }}>
                       PACKAGING NAME
                     </th>
                     <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
-                      height: '40px',
-                      paddingTop: '12px',
-                      paddingRight: '24px',
-                      paddingBottom: '12px',
-                      paddingLeft: '24px',
-                      textAlign: 'left',
-                      borderRight: '1px solid #3C4656',
+                      padding: '0 1rem', 
+                      height: '40px', 
+                      textAlign: 'center', 
+                      borderRight: '2px solid #FFFFFF',
+                      width: 200 
                     }}>
                       SUPPLIER INVENTORY
                     </th>
                     <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
-                      height: '40px',
-                      paddingTop: '12px',
-                      paddingRight: '24px',
-                      paddingBottom: '12px',
-                      paddingLeft: '24px',
-                      textAlign: 'right',
-                      borderRight: '1px solid #3C4656',
+                      padding: '0 1rem', 
+                      height: '40px', 
+                      textAlign: 'center', 
+                      borderRight: '2px solid #FFFFFF',
+                      width: 180 
                     }}>
                       CURRENT INVENTORY
                     </th>
                     <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
-                      height: '40px',
-                      paddingTop: '12px',
-                      paddingRight: '24px',
-                      paddingBottom: '12px',
-                      paddingLeft: '24px',
-                      textAlign: 'right',
-                      borderRight: '1px solid #3C4656',
+                      padding: '0 1rem', 
+                      height: '40px', 
+                      textAlign: 'center', 
+                      borderRight: '2px solid #FFFFFF',
+                      width: 180 
                     }}>
                       UNITS NEEDED
                     </th>
                     <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                      width: '142px',
                       height: '40px',
                       paddingTop: '12px',
-                      paddingRight: '24px',
+                      paddingRight: '16px',
                       paddingBottom: '12px',
-                      paddingLeft: '24px',
-                      textAlign: 'right',
-                      borderRight: '1px solid #3C4656',
+                      paddingLeft: '16px',
+                      textAlign: 'center',
+                      borderRight: '2px solid #FFFFFF',
+                      gap: '10px',
                     }}>
                       QTY
                     </th>
                     <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                      width: '142px',
                       height: '40px',
                       paddingTop: '12px',
-                      paddingRight: '24px',
+                      paddingRight: '16px',
                       paddingBottom: '12px',
-                      paddingLeft: '24px',
-                      textAlign: 'right',
+                      paddingLeft: '16px',
+                      textAlign: 'center',
+                      gap: '10px',
                     }}>
                       PALLETS
                     </th>
@@ -1439,10 +1422,6 @@ const BottleOrderPage = () => {
                     </tr>
                   ) : (
                     filteredLines.map((line, index) => {
-                      const bottleData = bottleInventoryData[line.name] || bottleInventoryData[line.fullName] || {};
-                      const currentInventory = bottleData.warehouseQuantity || 0;
-                      const unitsNeeded = line.forecastedUnitsNeeded || line.recommendedQty || 0;
-                      
                       return (
                         <tr 
                           key={line.id}
@@ -1454,24 +1433,28 @@ const BottleOrderPage = () => {
                             borderTop: index === 0 ? 'none' : (isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid #e5e7eb'),
                           }}
                         >
-                          <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle' }}>
+                          <td style={{ 
+                            width: '50px',
+                            minWidth: '50px',
+                            maxWidth: '50px',
+                            height: '40px',
+                            padding: '0 12px',
+                            textAlign: 'center',
+                            verticalAlign: 'middle',
+                          }}>
                             <input 
                               type="checkbox" 
                               style={{ cursor: 'pointer', width: '16px', height: '16px' }}
                               checked={line.added || false}
-                              onChange={(e) => {
-                                setOrderLines(prev => prev.map(l => 
-                                  l.id === line.id ? { ...l, added: e.target.checked } : l
-                                ));
-                              }}
+                              onChange={() => handleAddProduct(line.id)}
                             />
                           </td>
                           <td style={{ 
                             height: '40px',
                             paddingTop: '12px',
-                            paddingRight: '24px',
+                            paddingRight: '16px',
                             paddingBottom: '12px',
-                            paddingLeft: '24px',
+                            paddingLeft: '16px',
                             fontSize: '0.875rem',
                             verticalAlign: 'middle',
                             textAlign: 'left',
@@ -1481,52 +1464,73 @@ const BottleOrderPage = () => {
                           <td style={{ 
                             height: '40px',
                             paddingTop: '12px',
-                            paddingRight: '24px',
+                            paddingRight: '16px',
                             paddingBottom: '12px',
-                            paddingLeft: '24px',
+                            paddingLeft: '16px',
                             fontSize: '0.875rem',
                             verticalAlign: 'middle',
-                            textAlign: 'left',
+                            textAlign: 'center',
                           }} className={themeClasses.textPrimary}>
-                            Auto Replenishment
+                            {line.supplierInventory || 0}
                           </td>
                           <td style={{ 
-                            width: isViewMode && activeTab === 'receivePO' ? '20%' : undefined,
                             height: '40px',
                             paddingTop: '12px',
-                            paddingRight: '24px',
+                            paddingRight: '16px',
                             paddingBottom: '12px',
-                            paddingLeft: '24px',
-                            fontSize: '0.875rem',
-                            verticalAlign: 'middle',
-                            textAlign: 'right',
-                          }} className={themeClasses.textPrimary}>
-                            {currentInventory.toLocaleString()}
-                          </td>
-                          <td style={{ 
-                            width: isViewMode && activeTab === 'receivePO' ? '15%' : undefined,
-                            height: '40px',
-                            paddingTop: '12px',
-                            paddingRight: '24px',
-                            paddingBottom: '12px',
-                            paddingLeft: '24px',
-                            fontSize: '0.875rem',
-                            verticalAlign: 'middle',
-                            textAlign: 'right',
-                          }} className={themeClasses.textPrimary}>
-                            {unitsNeeded.toLocaleString()}
-                          </td>
-                          <td style={{ 
-                            width: isViewMode && activeTab === 'receivePO' ? '15%' : undefined,
-                            height: '40px',
-                            paddingTop: '12px',
-                            paddingRight: '24px',
-                            paddingBottom: '12px',
-                            paddingLeft: '24px',
-                            textAlign: 'right',
+                            paddingLeft: '16px',
+                            textAlign: 'center',
                             verticalAlign: 'middle',
                           }}>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleAddProduct(line.id)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                backgroundColor: line.added ? '#22C55E' : '#3B82F6',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: '6px',
+                                paddingLeft: '12px',
+                                paddingRight: '12px',
+                                paddingTop: '4px',
+                                paddingBottom: '4px',
+                                fontSize: '14px',
+                                fontWeight: 400,
+                                cursor: 'pointer',
+                                transition: 'background-color 0.2s',
+                              }}
+                            >
+                              {line.added ? (
+                                <>
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M5 13l4 4L19 7"/>
+                                  </svg>
+                                  <span>Added</span>
+                                </>
+                              ) : (
+                                <>
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M12 5v14M5 12h14"/>
+                                  </svg>
+                                  <span>Add</span>
+                                </>
+                              )}
+                            </button>
+                          </td>
+                          <td style={{ 
+                            height: '40px',
+                            paddingTop: '12px',
+                            paddingRight: '16px',
+                            paddingBottom: '12px',
+                            paddingLeft: '16px',
+                            textAlign: 'center',
+                            verticalAlign: 'middle',
+                          }}>
+                            <div style={{ display: 'flex', justifyContent: 'center' }}>
                               <input
                                 type="number"
                                 value={line.qty || ''}
@@ -1535,7 +1539,7 @@ const BottleOrderPage = () => {
                                   width: '120px',
                                   padding: '6px 12px',
                                   fontSize: '14px',
-                                  textAlign: 'right',
+                                  textAlign: 'center',
                                   border: '1px solid #D1D5DB',
                                   borderRadius: '6px',
                                   backgroundColor: '#FFFFFF',
@@ -1548,13 +1552,13 @@ const BottleOrderPage = () => {
                           <td style={{ 
                             height: '40px',
                             paddingTop: '12px',
-                            paddingRight: '24px',
+                            paddingRight: '16px',
                             paddingBottom: '12px',
-                            paddingLeft: '24px',
-                            textAlign: 'right',
+                            paddingLeft: '16px',
+                            textAlign: 'center',
                             verticalAlign: 'middle',
                           }}>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <div style={{ display: 'flex', justifyContent: 'center' }}>
                               <input
                                 type="number"
                                 step="0.1"
@@ -1567,7 +1571,7 @@ const BottleOrderPage = () => {
                                   width: '120px',
                                   padding: '6px 12px',
                                   fontSize: '14px',
-                                  textAlign: 'right',
+                                  textAlign: 'center',
                                   border: '1px solid #D1D5DB',
                                   borderRadius: '6px',
                                   backgroundColor: '#FFFFFF',
@@ -1575,6 +1579,87 @@ const BottleOrderPage = () => {
                                   cursor: 'text',
                                 }}
                               />
+                            </div>
+                          </td>
+                          <td style={{ 
+                            padding: '0.65rem 1rem', 
+                            height: '40px', 
+                            verticalAlign: 'middle',
+                            textAlign: 'center',
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%' }}>
+                              <div style={{ 
+                                flex: 1, 
+                                maxWidth: '300px',
+                                height: '20px', 
+                                backgroundColor: '#E5E7EB', 
+                                borderRadius: '4px',
+                                overflow: 'hidden',
+                                position: 'relative',
+                                display: 'flex',
+                              }}>
+                                {(() => {
+                                  const bottleData = bottleInventoryData[line.name] || {};
+                                  const maxInventory = bottleData.maxWarehouseInventory;
+                                  const currentInventory = bottleData.warehouseQuantity || 0;
+                                  const orderQty = line.qty || 0;
+                                  
+                                  // If no max is set, show unlimited/unrestricted indicator
+                                  if (!maxInventory || maxInventory === 0) {
+                                    return (
+                                      <div style={{ 
+                                        width: '100%', 
+                                        height: '100%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '11px', 
+                                        color: '#9CA3AF',
+                                        fontStyle: 'italic'
+                                      }}>
+                                        Unlimited
+                                      </div>
+                                    );
+                                  }
+                                  
+                                  const currentPct = Math.round((currentInventory / maxInventory) * 100);
+                                  const orderPct = Math.round((orderQty / maxInventory) * 100);
+                                  const totalPct = currentPct + orderPct;
+                                  const remainingPct = Math.max(0, 100 - totalPct);
+                                  
+                                  return (
+                                    <>
+                                      {/* Current inventory - Dark Green */}
+                                      {currentPct > 0 && (
+                                        <div style={{
+                                          width: `${Math.min(100, currentPct)}%`,
+                                          height: '100%',
+                                          backgroundColor: '#059669',
+                                          transition: 'width 0.3s',
+                                        }} title={`Current: ${currentInventory.toLocaleString()} (${currentPct}%)`}></div>
+                                      )}
+                                      {/* Order quantity - Yellow/Orange */}
+                                      {orderPct > 0 && (
+                                        <div style={{
+                                          width: `${Math.min(100 - currentPct, orderPct)}%`,
+                                          height: '100%',
+                                          backgroundColor: totalPct > 100 ? '#EF4444' : '#F59E0B',
+                                          transition: 'width 0.3s, background-color 0.3s',
+                                        }} title={`Order: ${orderQty.toLocaleString()} (${orderPct}%)`}></div>
+                                      )}
+                                      {/* Remaining space - Blue */}
+                                      {remainingPct > 0 && totalPct <= 100 && (
+                                        <div style={{
+                                          width: `${remainingPct}%`,
+                                          height: '100%',
+                                          backgroundColor: '#DBEAFE',
+                                          transition: 'width 0.3s',
+                                        }} title={`Available: ${(maxInventory - currentInventory - orderQty).toLocaleString()} (${remainingPct}%)`}></div>
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                              </div>
                             </div>
                           </td>
                         </tr>
@@ -1587,15 +1672,16 @@ const BottleOrderPage = () => {
             <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed' }}>
               <thead className={themeClasses.headerBg} style={{ borderRadius: '8px 8px 0 0' }}>
                 <tr style={{ height: '40px', maxHeight: '40px' }}>
-                  {/* Checkbox column - show when viewing an order in receivePO tab */}
-                  {isViewMode && activeTab === 'receivePO' && (
-                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: '1px solid #3C4656', width: '5%' }}>
-                    <input 
-                      type="checkbox" 
-                      style={{ cursor: 'pointer', width: '16px', height: '16px' }}
-                      checked={selectedItems.size === orderLines.length && orderLines.length > 0}
-                      onChange={(e) => handleSelectAll(e.target.checked)}
-                    />
+                  {/* Placeholder checkbox column to keep alignment with table mode when addProducts tab is active */}
+                  {activeTab === 'addProducts' && !isViewMode && (
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                    width: '50px',
+                    minWidth: '50px',
+                    maxWidth: '50px',
+                    height: '40px',
+                    padding: '0 12px',
+                    textAlign: 'center',
+                  }}>
                   </th>
                   )}
                   <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
@@ -1606,21 +1692,21 @@ const BottleOrderPage = () => {
                     paddingRight: isViewMode && activeTab === 'receivePO' ? '8px' : '16px',
                     paddingBottom: '12px',
                     paddingLeft: '16px',
-                    textAlign: isViewMode && activeTab === 'receivePO' ? 'left' : 'left',
-                    borderRight: '1px solid #3C4656',
+                    textAlign: 'center',
+                    borderRight: '2px solid #FFFFFF',
                     gap: '10px',
                   }}>
                     PACKAGING NAME
                   </th>
                   {/* SUPPLIER INV column - only show in addProducts tab when creating new order (not viewing) */}
                   {(activeTab === 'addProducts' && !isViewMode) && (
-                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'left', borderRight: '1px solid #3C4656', width: 200 }}>
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: '2px solid #FFFFFF', width: 200 }}>
                     SUPPLIER INV
                   </th>
                   )}
                   {/* ADD column - only show in addProducts tab when creating new order (not viewing) */}
                   {(activeTab === 'addProducts' && !isViewMode) && (
-                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: '1px solid #3C4656', width: 120 }}>
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'center', width: 120 }}>
                     ADD
                   </th>
                   )}
@@ -1632,7 +1718,7 @@ const BottleOrderPage = () => {
                     paddingBottom: '12px',
                     paddingLeft: isViewMode && activeTab === 'receivePO' ? '8px' : '16px',
                     textAlign: 'center',
-                    borderRight: isViewMode && activeTab === 'receivePO' ? '1px solid #3C4656' : '1px solid #3C4656',
+                    borderRight: isViewMode && activeTab === 'receivePO' ? '1px solid #3C4656' : 'none',
                     gap: '10px',
                   }}>
                     QTY
@@ -1645,7 +1731,7 @@ const BottleOrderPage = () => {
                     paddingBottom: '12px',
                     paddingLeft: isViewMode && activeTab === 'receivePO' ? '8px' : '16px',
                     textAlign: isViewMode && activeTab === 'receivePO' ? 'left' : 'center',
-                    borderRight: 'none',
+                    borderRight: isViewMode && activeTab === 'receivePO' ? 'none' : '2px solid #FFFFFF',
                     gap: '10px',
                   }}>
                     PALLETS
@@ -1653,7 +1739,7 @@ const BottleOrderPage = () => {
                   {/* Inventory columns removed in view mode */}
                   {/* INVENTORY PERCENTAGE column - only show in addProducts tab when creating new order (not viewing) */}
                   {(activeTab === 'addProducts' && !isViewMode) && (
-                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'left', width: 300 }}>
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderLeft: '2px solid #FFFFFF', width: 300 }}>
                     INVENTORY PERCENTAGE
                   </th>
                   )}
@@ -1669,8 +1755,8 @@ const BottleOrderPage = () => {
                   <tr>
                     <td
                       colSpan={(isViewMode && activeTab === 'receivePO')
-                        ? 5 // checkbox, packaging, qty, pallets, ellipsis
-                        : ((activeTab === 'addProducts' && !isViewMode) ? 6 : 4)}
+                        ? 4 // packaging, qty, pallets, ellipsis
+                        : ((activeTab === 'addProducts' && !isViewMode) ? 7 : 4)}
                       className="px-6 py-6 text-center text-sm italic text-gray-400"
                     >
                       No items available.
@@ -1688,15 +1774,17 @@ const BottleOrderPage = () => {
                         borderTop: index === 0 ? 'none' : (isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid #e5e7eb'),
                       }}
                     >
-                      {/* Checkbox - show when viewing an order in receivePO tab */}
-                      {isViewMode && activeTab === 'receivePO' && (
-                      <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle' }}>
-                        <input 
-                          type="checkbox" 
-                          style={{ cursor: 'pointer' }}
-                          checked={selectedItems.has(line.id)}
-                          onChange={(e) => handleCheckboxChange(line.id, e.target.checked)}
-                        />
+                      {/* Placeholder checkbox column to align with table mode when addProducts is active */}
+                      {activeTab === 'addProducts' && !isViewMode && (
+                      <td style={{ 
+                        width: '50px',
+                        minWidth: '50px',
+                        maxWidth: '50px',
+                        height: '40px',
+                        padding: '0 12px',
+                        textAlign: 'center',
+                        verticalAlign: 'middle',
+                      }}>
                       </td>
                       )}
                       <td style={{ 
