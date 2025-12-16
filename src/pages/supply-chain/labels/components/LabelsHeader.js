@@ -28,30 +28,31 @@ const LabelsHeader = ({ activeTab, onTabChange, search, onSearchChange, onNewOrd
         <div className="flex items-center space-x-5">
           <h1 className="text-xl font-semibold text-gray-900">Labels</h1>
           
-          {/* Tabs as pill group */}
-          <div className="flex items-center rounded-full border border-gray-200 bg-white/70 dark:bg-dark-bg-tertiary">
-          {['inventory', 'orders', 'archive'].map((tab, index) => {
-            const labelMap = {
-              inventory: 'Inventory',
-              orders: 'Orders',
-              archive: 'Archive',
-            };
-            const isActive = activeTab === tab;
-            return (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => onTabChange(tab)}
-                className={`px-3 py-1 text-xs rounded-full transition-colors ${
-                  isActive
-                    ? 'bg-gray-900 text-white font-semibold shadow-sm'
-                    : 'text-gray-600 hover:bg-gray-100 font-medium'
-                } ${index === 0 ? 'ml-1' : ''} ${index === 2 ? 'mr-1' : ''}`}
-              >
-                {labelMap[tab]}
-              </button>
-            );
-          })}
+          {/* Tabs */}
+          <div className="flex items-center rounded-full border border-gray-200 bg-white/70 dark:bg-dark-bg-tertiary p-1">
+            {['inventory', 'orders', 'archive'].map((tab) => {
+              const labelMap = {
+                inventory: 'Inventory',
+                orders: 'Orders',
+                archive: 'Archive',
+              };
+              const isActive = activeTab === tab;
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => onTabChange(tab)}
+                  className={`px-3 py-1 text-xs font-medium transition-colors ${
+                    isActive
+                      ? 'bg-gray-900 text-white rounded-full shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                  style={{ minWidth: 'fit-content' }}
+                >
+                  {labelMap[tab]}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>

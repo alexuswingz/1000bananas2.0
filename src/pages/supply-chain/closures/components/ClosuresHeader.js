@@ -50,9 +50,9 @@ const ClosuresHeader = ({ activeTab, onTabChange, search, onSearchChange, onNewO
         <div className="flex items-center space-x-5">
           <h1 className="text-xl font-semibold text-gray-900 dark:text-dark-text-primary">Closures</h1>
 
-          {/* Tabs as pill group */}
-          <div className="flex items-center rounded-full border border-gray-200 bg-white/70 dark:bg-dark-bg-tertiary">
-            {['inventory', 'ordering', 'archive'].map((tab, index) => {
+          {/* Tabs */}
+          <div className="flex items-center rounded-full border border-gray-200 bg-white/70 dark:bg-dark-bg-tertiary p-1">
+            {['inventory', 'ordering', 'archive'].map((tab) => {
               const labelMap = {
                 inventory: 'Inventory',
                 ordering: 'Ordering',
@@ -64,11 +64,12 @@ const ClosuresHeader = ({ activeTab, onTabChange, search, onSearchChange, onNewO
                   key={tab}
                   type="button"
                   onClick={() => onTabChange(tab)}
-                  className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                  className={`px-3 py-1 text-xs font-medium transition-colors ${
                     isActive
-                      ? 'bg-gray-900 text-white font-semibold shadow-sm'
-                      : 'text-gray-600 hover:bg-gray-100 font-medium'
-                  } ${index === 0 ? 'ml-1' : ''} ${index === 2 ? 'mr-1' : ''}`}
+                      ? 'bg-gray-900 text-white rounded-full shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                  style={{ minWidth: 'fit-content' }}
                 >
                   {labelMap[tab]}
                 </button>

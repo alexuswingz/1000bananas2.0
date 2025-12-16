@@ -236,9 +236,9 @@ const Boxes = () => {
           <div className="flex items-center space-x-5">
             <h1 className={`text-xl font-semibold ${themeClasses.textPrimary}`}>Boxes</h1>
 
-            {/* Tabs as pill group */}
-            <div className={`flex items-center rounded-full border ${themeClasses.border} bg-white/70 dark:bg-dark-bg-tertiary`}>
-              {['inventory', 'orders', 'archive'].map((tabKey, index) => {
+            {/* Tabs */}
+            <div className={`flex items-center rounded-full border ${themeClasses.border} bg-white/70 dark:bg-dark-bg-tertiary p-1`}>
+              {['inventory', 'orders', 'archive'].map((tabKey) => {
                 const label =
                   tabKey === 'inventory' ? 'Inventory' : 
                   tabKey === 'orders' ? 'Orders' : 
@@ -250,11 +250,12 @@ const Boxes = () => {
                     key={tabKey}
                     type="button"
                     onClick={() => setActiveTab(tabKey)}
-                    className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                    className={`px-3 py-1 text-xs font-medium transition-colors ${
                       isActive
-                        ? 'bg-gray-900 text-white font-semibold shadow-sm'
-                        : 'text-gray-600 hover:bg-gray-100 font-medium'
-                    } ${index === 0 ? 'ml-1' : ''} ${index === 2 ? 'mr-1' : ''}`}
+                        ? 'bg-gray-900 text-white rounded-full shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                    style={{ minWidth: 'fit-content' }}
                   >
                     {label}
                   </button>
