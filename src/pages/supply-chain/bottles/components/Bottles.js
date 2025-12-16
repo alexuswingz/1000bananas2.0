@@ -1124,7 +1124,7 @@ const Bottles = () => {
       {/* Bottle Details Modal */}
       {isDetailsOpen && selectedBottle && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-2xl w-[800px] min-h-[650px] max-h-[650px] my-auto flex flex-col overflow-hidden">
+          <div className="bg-white rounded-xl shadow-2xl w-[800px] min-h-[550px] max-h-[550px] my-auto flex flex-col overflow-hidden">
             {/* Header */}
             <div className={`${themeClasses.headerBg} flex items-center justify-between px-6 py-3`}>
               <div className="flex items-center gap-3">
