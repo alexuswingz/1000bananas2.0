@@ -748,7 +748,7 @@ const Closures = () => {
       {/* Closure Details Modal */}
       {isDetailsOpen && selectedClosure && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] my-auto flex flex-col overflow-hidden">
+          <div className="bg-white rounded-xl shadow-2xl w-[800px] min-h-[470px] max-h-[470px] my-auto flex flex-col overflow-hidden">
             {/* Header */}
             <div className={`${themeClasses.headerBg} flex items-center justify-between px-6 py-3`}>
               <div className="flex items-center gap-3">
@@ -769,33 +769,37 @@ const Closures = () => {
             </div>
 
             {/* Tabs + search */}
-            <div className="px-6 pt-4 flex items-center justify-between gap-4 border-b border-gray-200">
-              <div className="flex items-center gap-4">
-                {['core', 'supplier', 'inventory'].map((key) => {
+            <div className="px-6 pt-4 flex items-center justify-between gap-4">
+              <div className="flex items-center rounded-lg bg-white border border-gray-200 p-1 gap-1 h-[32px]">
+                {['core', 'supplier', 'inventory'].map((key, index) => {
                   const labelMap = {
                     core: 'Core Info',
                     supplier: 'Supplier Info',
                     inventory: 'Inventory',
                   };
                   const isActive = activeDetailsTab === key;
+                  const hasNotification = key === 'core';
                   return (
                     <button
                       key={key}
                       type="button"
                       onClick={() => setActiveDetailsTab(key)}
-                      className={`px-4 py-1.5 text-xs font-medium rounded-full border ${
+                      className={`px-4 py-1 text-xs font-medium transition-colors flex items-center gap-2 ${
                         isActive
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                          ? 'bg-blue-600 text-white font-semibold rounded border border-blue-500/20 shadow-sm'
+                          : 'text-gray-700 hover:text-gray-900'
                       }`}
                     >
-                      {labelMap[key]}
+                      <span>{labelMap[key]}</span>
+                      {hasNotification && (
+                        <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+                      )}
                     </button>
                   );
                 })}
               </div>
 
-              <div className="w-64 relative">
+              <div className="w-[280px] relative">
                 <input
                   type="text"
                   value={detailsSearch}
@@ -822,8 +826,8 @@ const Closures = () => {
                       }
                     }
                   }}
-                  placeholder="Search and find..."
-                  className="w-full rounded-full border border-gray-300 px-8 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
+                  placeholder="Search closure info..."
+                  className="w-full h-[31px] rounded-[6px] border border-gray-300 p-2 pl-8 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
                 />
                 <svg
                   className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2"
@@ -838,19 +842,11 @@ const Closures = () => {
                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                   />
                 </svg>
-                <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex flex-col gap-0.5">
-                  <svg className="w-2 h-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                  </svg>
-                  <svg className="w-2 h-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
               </div>
             </div>
 
             {/* Content */}
-            <div className="px-6 py-5 overflow-y-auto flex-1" style={{ minHeight: '500px', height: '500px' }}>
+            <div className="px-6 py-5 overflow-y-auto flex-1">
               {activeDetailsTab === 'core' && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between border-b border-gray-200 pb-3">
@@ -895,7 +891,6 @@ const Closures = () => {
                           setEditedCoreInfo({ ...editedCoreInfo, closureName: e.target.value })
                         }
                         readOnly={!isEditingDetails}
-                        placeholder={isEditingDetails ? "Enter closure name" : ""}
                         className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
                           isEditingDetails
                             ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
@@ -905,7 +900,7 @@ const Closures = () => {
                         )}`}
                       />
                     </div>
-                    <div className="col-span-6">
+                    <div className="col-span-4">
                       <label className="block text-xs font-medium text-gray-500 mb-1">
                         Closure Image Link
                       </label>
@@ -921,12 +916,21 @@ const Closures = () => {
                           setEditedCoreInfo({ ...editedCoreInfo, imageLink: e.target.value })
                         }
                         readOnly={!isEditingDetails}
-                        placeholder={isEditingDetails ? "Enter image link" : ""}
                         className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
                           isEditingDetails
                             ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
                             : ''
                         }${getDetailsHighlightClass(selectedClosure.details?.core.imageLink || '')}`}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Size (oz)
+                      </label>
+                      <input
+                        value=""
+                        readOnly
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass('')}`}
                       />
                     </div>
                   </div>
@@ -1149,6 +1153,25 @@ const Closures = () => {
                       />
                     </div>
                   </div>
+
+                  {isEditingDetails && (
+                    <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+                      <button
+                        type="button"
+                        onClick={handleCancelDetailsEdit}
+                        className="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveDetails}
+                        className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                      >
+                        Save Changes
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1437,24 +1460,6 @@ const Closures = () => {
                   </div>
                 </div>
               )}
-            </div>
-
-            {/* Footer - Always render to prevent layout shift */}
-            <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50 ${isEditingDetails ? '' : 'invisible'}`}>
-              <button
-                type="button"
-                onClick={handleCancelDetailsEdit}
-                className="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveDetails}
-                className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-              >
-                Save Changes
-              </button>
             </div>
           </div>
         </div>

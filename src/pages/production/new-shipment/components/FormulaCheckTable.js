@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 import { getShipmentFormulaCheck, updateShipmentFormulaCheck } from '../../../../services/productionApi';
+import SortFormulasFilterDropdown from './SortFormulasFilterDropdown';
 
 const FormulaCheckTable = ({
   shipmentId,
@@ -17,7 +18,6 @@ const FormulaCheckTable = ({
   const [loading, setLoading] = useState(false);
   const [openFilterColumn, setOpenFilterColumn] = useState(null);
   const filterIconRefs = useRef({});
-  const filterDropdownRef = useRef(null);
   const [filters, setFilters] = useState({});
   const [sortConfig, setSortConfig] = useState({ field: '', order: '' });
   const [notes, setNotes] = useState({}); // Store notes by formula ID
@@ -153,8 +153,124 @@ const FormulaCheckTable = ({
     }
   };
 
-  // Only use real data from API - no dummy data
-  const displayFormulas = formulas;
+  // Get unique values for a column (for dropdown list)
+  const getColumnValues = (columnKey) => {
+    const values = new Set();
+    formulas.forEach(formula => {
+      const val = formula[columnKey];
+      if (val !== undefined && val !== null && val !== '') {
+        values.add(val);
+      }
+    });
+    const sortedValues = Array.from(values).sort((a, b) => {
+      if (typeof a === 'number' && typeof b === 'number') return a - b;
+      return String(a).localeCompare(String(b));
+    });
+    return sortedValues;
+  };
+
+  const isNumericColumn = (columnKey) =>
+    columnKey === 'qty' || columnKey === 'totalVolume';
+
+  const applyConditionFilter = (value, conditionType, conditionValue, numeric) => {
+    if (!conditionType) return true;
+
+    const strValue = String(value ?? '').toLowerCase();
+    const strCond = String(conditionValue ?? '').toLowerCase();
+
+    switch (conditionType) {
+      case 'contains':
+        return strValue.includes(strCond);
+      case 'notContains':
+        return !strValue.includes(strCond);
+      case 'equals':
+        return numeric ? Number(value) === Number(conditionValue) : strValue === strCond;
+      case 'notEquals':
+        return numeric ? Number(value) !== Number(conditionValue) : strValue !== strCond;
+      case 'startsWith':
+        return strValue.startsWith(strCond);
+      case 'endsWith':
+        return strValue.endsWith(strCond);
+      case 'isEmpty':
+        return !value || strValue === '';
+      case 'isNotEmpty':
+        return !!value && strValue !== '';
+      case 'greaterThan':
+        return Number(value) > Number(conditionValue);
+      case 'lessThan':
+        return Number(value) < Number(conditionValue);
+      case 'greaterOrEqual':
+        return Number(value) >= Number(conditionValue);
+      case 'lessOrEqual':
+        return Number(value) <= Number(conditionValue);
+      default:
+        return true;
+    }
+  };
+
+  // Apply filters & sorting to formulas
+  const getFilteredFormulas = () => {
+    let result = [...formulas];
+
+    // Apply filters
+    Object.keys(filters).forEach(columnKey => {
+      const filter = filters[columnKey];
+      if (!filter) return;
+
+      const numeric = isNumericColumn(columnKey);
+
+      // Value filters
+      if (filter.selectedValues && filter.selectedValues.size > 0) {
+        result = result.filter(formula => {
+          const value = formula[columnKey];
+          return (
+            filter.selectedValues.has(value) ||
+            filter.selectedValues.has(String(value))
+          );
+        });
+      }
+
+      // Condition filters
+      if (filter.conditionType) {
+        result = result.filter(formula =>
+          applyConditionFilter(
+            formula[columnKey],
+            filter.conditionType,
+            filter.conditionValue,
+            numeric
+          )
+        );
+      }
+    });
+
+    // Apply single-column sort
+    if (sortConfig.field && sortConfig.order) {
+      const sortField = sortConfig.field;
+      const sortOrder = sortConfig.order;
+      const numeric = isNumericColumn(sortField);
+
+      result.sort((a, b) => {
+        const aVal = a[sortField];
+        const bVal = b[sortField];
+
+        if (numeric) {
+          const aNum = Number(aVal) || 0;
+          const bNum = Number(bVal) || 0;
+          return sortOrder === 'asc' ? aNum - bNum : bNum - aNum;
+        }
+
+        const aStr = String(aVal ?? '').toLowerCase();
+        const bStr = String(bVal ?? '').toLowerCase();
+        return sortOrder === 'asc'
+          ? aStr.localeCompare(bStr)
+          : bStr.localeCompare(aStr);
+      });
+    }
+
+    return result;
+  };
+
+  const displayFormulas = getFilteredFormulas();
 
   // Report formula data changes to parent
   useEffect(() => {
@@ -171,16 +287,12 @@ const FormulaCheckTable = ({
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (openFilterColumn !== null) {
-        const filterIcon = filterIconRefs.current[openFilterColumn];
-        const dropdown = filterDropdownRef.current;
-        
-        if (filterIcon && dropdown) {
-          const isClickInsideIcon = filterIcon.contains(event.target);
-          const isClickInsideDropdown = dropdown.contains(event.target);
-          
-          if (!isClickInsideIcon && !isClickInsideDropdown) {
-            setOpenFilterColumn(null);
-          }
+        const icon = filterIconRefs.current[openFilterColumn];
+        const clickedOnIcon = icon && icon.contains(event.target);
+        const clickedInsideDropdown = event.target.closest('[data-filter-dropdown]');
+
+        if (!clickedOnIcon && !clickedInsideDropdown) {
+          setOpenFilterColumn(null);
         }
       }
     };
@@ -189,7 +301,7 @@ const FormulaCheckTable = ({
       const timeoutId = setTimeout(() => {
         document.addEventListener('click', handleClickOutside);
       }, 0);
-      
+
       return () => {
         clearTimeout(timeoutId);
         document.removeEventListener('click', handleClickOutside);
@@ -197,28 +309,25 @@ const FormulaCheckTable = ({
     }
   }, [openFilterColumn]);
 
-  // Handle filter apply
-  const handleApplyFilter = (filterConfig) => {
-    // Update sort config
-    if (filterConfig.sortField && filterConfig.sortOrder) {
-      setSortConfig({ field: filterConfig.sortField, order: filterConfig.sortOrder });
+  // Handle filter apply from compact dropdown
+  const handleApplyFilter = (columnKey, filterData) => {
+    setFilters(prev => ({
+      ...prev,
+      [columnKey]: {
+        selectedValues: filterData.selectedValues || new Set(),
+        conditionType: filterData.conditionType || '',
+        conditionValue: filterData.conditionValue || '',
+      },
+    }));
+
+    if (filterData.sortOrder) {
+      setSortConfig({ field: columnKey, order: filterData.sortOrder });
+    } else if (sortConfig.field === columnKey) {
+      setSortConfig({ field: '', order: '' });
     }
-    
-    // Update filters
-    if (filterConfig.filterField && filterConfig.filterCondition && filterConfig.filterValue) {
-      setFilters(prev => ({
-        ...prev,
-        [filterConfig.filterField]: {
-          condition: filterConfig.filterCondition,
-          value: filterConfig.filterValue,
-        }
-      }));
-    }
-    
-    setOpenFilterColumn(null);
   };
 
-  // Handle filter reset
+  // Handle filter reset (clear all filters & sorting)
   const handleResetFilter = () => {
     setSortConfig({ field: '', order: '' });
     setFilters({});
@@ -331,25 +440,30 @@ const FormulaCheckTable = ({
                       gap: '8px',
                     }}>
                       <span>{column.label}</span>
-                      <img
-                        ref={(el) => { if (el) filterIconRefs.current[column.key] = el; }}
-                        src="/assets/Vector (1).png"
-                        alt="Filter"
-                        className="transition-opacity"
-                        style={{
-                          width: '12px',
-                          height: '12px',
-                          cursor: 'pointer',
-                          opacity: openFilterColumn === column.key ? 1 : 0,
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.opacity = '1';
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenFilterColumn(openFilterColumn === column.key ? null : column.key);
-                        }}
-                      />
+                      {column.key !== 'notes' && (
+                        <img
+                          ref={(el) => { if (el) filterIconRefs.current[column.key] = el; }}
+                          src="/assets/Vector (1).png"
+                          alt="Filter"
+                          className="transition-opacity"
+                          style={{
+                            width: '12px',
+                            height: '12px',
+                            cursor: 'pointer',
+                            opacity: openFilterColumn === column.key ? 1 : 0,
+                            filter: openFilterColumn === column.key
+                              ? 'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)'
+                              : undefined,
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.opacity = '1';
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenFilterColumn(openFilterColumn === column.key ? null : column.key);
+                          }}
+                        />
+                      )}
                     </div>
                   )}
                 </th>
@@ -567,17 +681,15 @@ const FormulaCheckTable = ({
       </div>
       
       {/* Filter Dropdown */}
-      {openFilterColumn !== null && (
-        <FilterDropdown
-          ref={filterDropdownRef}
-          columnKey={openFilterColumn}
+      {openFilterColumn !== null && filterIconRefs.current[openFilterColumn] && (
+        <SortFormulasFilterDropdown
           filterIconRef={filterIconRefs.current[openFilterColumn]}
+          columnKey={openFilterColumn}
+          availableValues={getColumnValues(openFilterColumn)}
+          currentFilter={filters[openFilterColumn] || {}}
+          currentSort={sortConfig.field === openFilterColumn ? sortConfig.order : ''}
+          onApply={(filterData) => handleApplyFilter(openFilterColumn, filterData)}
           onClose={() => setOpenFilterColumn(null)}
-          onApply={handleApplyFilter}
-          onReset={handleResetFilter}
-          currentSort={sortConfig}
-          currentFilters={filters}
-          isDarkMode={isDarkMode}
         />
       )}
 
@@ -1097,6 +1209,7 @@ const NotesModal = ({ isOpen, onClose, onSave, formula, currentNote, isDarkMode 
 };
 
 export default FormulaCheckTable;
+
 
 
 

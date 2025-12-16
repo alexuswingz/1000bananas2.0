@@ -970,44 +970,6 @@ const NewShipmentHeader = ({
         </button>
         <button
           type="button"
-          onClick={() => onActionChange && onActionChange('formula-check')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '12px 16px',
-            fontSize: '14px',
-            fontWeight: 500,
-            color: activeAction === 'formula-check' ? '#007AFF' : (isDarkMode ? '#9CA3AF' : '#6B7280'),
-            backgroundColor: activeAction === 'formula-check' ? (isDarkMode ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.05)') : 'transparent',
-            border: 'none',
-            borderBottom: activeAction === 'formula-check' ? '2px solid #007AFF' : '2px solid transparent',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {completedTabs.has('formula-check') ? (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="#10B981">
-              <circle cx="12" cy="12" r="6"/>
-            </svg>
-          ) : (formulaCheckHasComment || formulaCheckRemainingCount > 0) ? (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="#F59E0B">
-              <circle cx="12" cy="12" r="6"/>
-            </svg>
-          ) : activeAction === 'formula-check' ? (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="#007AFF">
-              <circle cx="12" cy="12" r="6"/>
-            </svg>
-          ) : (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={isDarkMode ? '#9CA3AF' : '#6B7280'} strokeWidth="2">
-              <circle cx="12" cy="12" r="6"/>
-            </svg>
-          )}
-          <span>Formula Check</span>
-        </button>
-        <button
-          type="button"
           onClick={() => onActionChange && onActionChange('label-check')}
           style={{
             display: 'flex',
@@ -1043,6 +1005,44 @@ const NewShipmentHeader = ({
             </svg>
           )}
           <span>Label Check</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onActionChange && onActionChange('formula-check')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '12px 16px',
+            fontSize: '14px',
+            fontWeight: 500,
+            color: activeAction === 'formula-check' ? '#007AFF' : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+            backgroundColor: activeAction === 'formula-check' ? (isDarkMode ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.05)') : 'transparent',
+            border: 'none',
+            borderBottom: activeAction === 'formula-check' ? '2px solid #007AFF' : '2px solid transparent',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {completedTabs.has('formula-check') ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#10B981">
+              <circle cx="12" cy="12" r="6"/>
+            </svg>
+          ) : (formulaCheckHasComment || formulaCheckRemainingCount > 0) ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#F59E0B">
+              <circle cx="12" cy="12" r="6"/>
+            </svg>
+          ) : activeAction === 'formula-check' ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#007AFF">
+              <circle cx="12" cy="12" r="6"/>
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={isDarkMode ? '#9CA3AF' : '#6B7280'} strokeWidth="2">
+              <circle cx="12" cy="12" r="6"/>
+            </svg>
+          )}
+          <span>Formula Check</span>
         </button>
         <button
           type="button"

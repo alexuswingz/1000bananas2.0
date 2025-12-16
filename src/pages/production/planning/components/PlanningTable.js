@@ -780,25 +780,25 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
               }}
             >
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.1', gap: '1px' }}>
-                <span style={{ fontSize: '9px', fontWeight: 600 }}>FORMULA</span>
+                <span style={{ fontSize: '9px', fontWeight: 600 }}>LABEL</span>
                 <span style={{ fontSize: '9px', fontWeight: 600 }}>CHECK</span>
               </div>
                 <img
-                ref={(el) => { if (el) filterIconRefs.current['formulaCheck'] = el; }}
+                ref={(el) => { if (el) filterIconRefs.current['labelCheck'] = el; }}
                   src="/assets/Vector (1).png"
                   alt="Filter"
                   className={`w-3 h-3 transition-opacity cursor-pointer ${
-                  (isFilterActive('formulaCheck') || openFilterColumn === 'formulaCheck')
+                  (isFilterActive('labelCheck') || openFilterColumn === 'labelCheck')
                       ? 'opacity-100'
                       : 'opacity-0 group-hover:opacity-100'
                   }`}
-                onClick={(e) => handleFilterClick('formulaCheck', e)}
+                onClick={(e) => handleFilterClick('labelCheck', e)}
                 style={{
                   position: 'absolute',
                   top: '50%',
                   right: '8px',
                   transform: 'translateY(-50%)',
-                  ...((isFilterActive('formulaCheck') || openFilterColumn === 'formulaCheck')
+                  ...((isFilterActive('labelCheck') || openFilterColumn === 'labelCheck')
                       ? {
                           filter:
                             'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
@@ -820,25 +820,25 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
               }}
             >
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.1', gap: '1px' }}>
-                <span style={{ fontSize: '9px', fontWeight: 600 }}>LABEL</span>
+                <span style={{ fontSize: '9px', fontWeight: 600 }}>FORMULA</span>
                 <span style={{ fontSize: '9px', fontWeight: 600 }}>CHECK</span>
               </div>
                 <img
-                ref={(el) => { if (el) filterIconRefs.current['labelCheck'] = el; }}
+                ref={(el) => { if (el) filterIconRefs.current['formulaCheck'] = el; }}
                   src="/assets/Vector (1).png"
                   alt="Filter"
                   className={`w-3 h-3 transition-opacity cursor-pointer ${
-                  (isFilterActive('labelCheck') || openFilterColumn === 'labelCheck')
+                  (isFilterActive('formulaCheck') || openFilterColumn === 'formulaCheck')
                       ? 'opacity-100'
                       : 'opacity-0 group-hover:opacity-100'
                   }`}
-                onClick={(e) => handleFilterClick('labelCheck', e)}
+                onClick={(e) => handleFilterClick('formulaCheck', e)}
                 style={{
                   position: 'absolute',
                   top: '50%',
                   right: '8px',
                   transform: 'translateY(-50%)',
-                  ...((isFilterActive('labelCheck') || openFilterColumn === 'labelCheck')
+                  ...((isFilterActive('formulaCheck') || openFilterColumn === 'formulaCheck')
                       ? {
                           filter:
                             'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
@@ -1118,30 +1118,6 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                 )}
               </td>
               <td
-                style={{
-                  padding: '0.75rem 1rem',
-                  verticalAlign: 'middle',
-                  textAlign: 'center',
-                  backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
-                  borderTop: '1px solid #E5E7EB',
-                  height: '40px',
-                }}
-              >
-                {renderStatusCircle(
-                  row.formulaCheck || 'pending',
-                  !!row.formulaCheckComment,
-                  row.formulaCheckCommentText || '',
-                  row.id,
-                  {
-                    commentDate: row.formulaCheckCommentDate,
-                    commentUser: row.formulaCheckCommentUser,
-                    commentUserInitials: row.formulaCheckCommentUserInitials,
-                  },
-                  'formulaCheck',
-                  row
-                )}
-              </td>
-              <td
                 data-label-check-cell="true"
                 style={{
                   padding: '0.75rem 1rem',
@@ -1173,6 +1149,30 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                     commentUserInitials: row.labelCheckCommentUserInitials,
                   },
                   'labelCheck',
+                  row
+                )}
+              </td>
+              <td
+                style={{
+                  padding: '0.75rem 1rem',
+                  verticalAlign: 'middle',
+                  textAlign: 'center',
+                  backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
+                  borderTop: '1px solid #E5E7EB',
+                  height: '40px',
+                }}
+              >
+                {renderStatusCircle(
+                  row.formulaCheck || 'pending',
+                  !!row.formulaCheckComment,
+                  row.formulaCheckCommentText || '',
+                  row.id,
+                  {
+                    commentDate: row.formulaCheckCommentDate,
+                    commentUser: row.formulaCheckCommentUser,
+                    commentUserInitials: row.formulaCheckCommentUserInitials,
+                  },
+                  'formulaCheck',
                   row
                 )}
               </td>
@@ -1496,8 +1496,8 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
     { value: 'marketplace', label: 'Marketplace' },
     { value: 'account', label: 'Account' },
     { value: 'addProducts', label: 'Add Products' },
-    { value: 'formulaCheck', label: 'Formula Check' },
     { value: 'labelCheck', label: 'Label Check' },
+    { value: 'formulaCheck', label: 'Formula Check' },
     { value: 'bookShipment', label: 'Book Shipment' },
     { value: 'sortProducts', label: 'Sort Products' },
     { value: 'sortFormulas', label: 'Sort Formulas' },
