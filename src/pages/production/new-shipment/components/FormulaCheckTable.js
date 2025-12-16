@@ -9,6 +9,7 @@ const FormulaCheckTable = ({
   onFormulaDataChange,
   selectedRows: externalSelectedRows = null,
   onSelectedRowsChange,
+  refreshKey = 0, // Increment to trigger reload while preserving checked status
 }) => {
   const { isDarkMode } = useTheme();
   const [selectedRows, setSelectedRows] = useState(new Set());
@@ -24,13 +25,13 @@ const FormulaCheckTable = ({
   const [selectedFormulaForNotes, setSelectedFormulaForNotes] = useState(null);
   const [dataLoaded, setDataLoaded] = useState(false); // Track if we've loaded from backend
 
-  // Load formula data from API
+  // Load formula data from API - reload when shipmentId OR refreshKey changes
   useEffect(() => {
     if (shipmentId) {
       setDataLoaded(false); // Reset when shipment changes
       loadFormulaData();
     }
-  }, [shipmentId]);
+  }, [shipmentId, refreshKey]);
 
   // Only sync with parent selectedRows if we haven't loaded from backend yet
   // Once backend data is loaded, backend is the source of truth

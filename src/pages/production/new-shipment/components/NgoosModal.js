@@ -42,7 +42,7 @@ const NgoosModal = ({
     textSecondary: isDarkMode ? 'text-dark-text-secondary' : 'text-gray-500',
   };
 
-  // Fetch forecast data for Add Units button
+  // Fetch forecast data for Add Units button (refetch when forecastRange changes)
   useEffect(() => {
     const fetchForecastData = async () => {
       if (!isOpen || !selectedRow) return;
@@ -51,7 +51,8 @@ const NgoosModal = ({
       if (!childAsin) return;
 
       try {
-        const forecast = await NgoosAPI.getForecast(childAsin);
+        // Pass the forecastRange (DOI goal) to get updated units_to_make calculation
+        const forecast = await NgoosAPI.getForecast(childAsin, forecastRange);
         setForecastData(forecast);
       } catch (error) {
         console.error('Error fetching forecast data:', error);
@@ -59,7 +60,7 @@ const NgoosModal = ({
     };
 
     fetchForecastData();
-  }, [isOpen, selectedRow]);
+  }, [isOpen, selectedRow, forecastRange]);
 
   // Fetch catalog data to get image if not available in selectedRow
   useEffect(() => {
@@ -110,36 +111,11 @@ const NgoosModal = ({
   const childAsin = selectedRow?.child_asin || selectedRow?.childAsin || selectedRow?.asin;
   const hasAsin = !!childAsin;
   
-  // Calculate units to make based on forecastRange (DOI goal from order page)
-  // Uses the SAME formula as the order table for consistency
-  // Formula: (targetDOI - currentDOI) * dailySalesRate, rounded up to units_per_case
-  const calculateUnitsToMake = () => {
-    // Use the same data source as the order table for consistency
-    const dailySalesRate = (selectedRow?.sales30Day || 0) / 30;
-    const currentDOI = selectedRow?.doiTotal || selectedRow?.daysOfInventory || 0;
-    const unitsPerCase = selectedRow?.units_per_case || 60;
-    
-    // Only calculate if there are sales and we're below target DOI
-    if (dailySalesRate <= 0 || currentDOI >= forecastRange) {
-      return 0;
-    }
-    
-    // Units needed = (targetDOI - currentDOI) * dailySalesRate
-    const daysNeeded = forecastRange - currentDOI;
-    const rawUnitsNeeded = daysNeeded * dailySalesRate;
-    
-    // Round up to nearest units_per_case (case pack) - same as order table
-    let suggestedQty = Math.ceil(rawUnitsNeeded / unitsPerCase) * unitsPerCase;
-    
-    // Ensure minimum of 1 case if there's any need
-    if (suggestedQty === 0 && rawUnitsNeeded > 0) {
-      suggestedQty = unitsPerCase;
-    }
-    
-    return suggestedQty;
-  };
-  
-  const forecastUnits = calculateUnitsToMake();
+  // Get units_to_make from selectedRow (passed from table) - this matches what's shown in the row
+  // Use nullish coalescing (??) to treat 0 as a valid value (not falsy)
+  // This ensures consistency between the table QTY and the modal's "Add Units" button
+  // Only fall back to forecastData if selectedRow values are undefined/null
+  const forecastUnits = selectedRow?.units_to_make ?? selectedRow?.suggestedQty ?? forecastData?.units_to_make ?? 0;
   
   // Get real label inventory from database (passed via selectedRow.label_inventory or labelsAvailable prop)
   const realLabelInventory = labelsAvailable ?? selectedRow?.label_inventory ?? selectedRow?.labelsAvailable ?? 0;

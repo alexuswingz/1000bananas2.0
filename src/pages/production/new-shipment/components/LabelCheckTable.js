@@ -12,6 +12,7 @@ const LabelCheckTable = ({
   onExitRecountMode,
   onRowsDataChange,
   hideHeader = false,
+  refreshKey = 0, // Increment to trigger reload while preserving checked status
 }) => {
   const { isDarkMode } = useTheme();
   const location = useLocation();
@@ -79,12 +80,12 @@ const LabelCheckTable = ({
     }
   }, []);
 
-  // Load label data from API
+  // Load label data from API - reload when shipmentId OR refreshKey changes
   useEffect(() => {
     if (shipmentId) {
       loadLabelData();
     }
-  }, [shipmentId]);
+  }, [shipmentId, refreshKey]);
 
   const loadLabelData = async () => {
     try {

@@ -112,7 +112,9 @@ const NewShipment = () => {
   const [exportCompleted, setExportCompleted] = useState(false);
   const [exportedProductCount, setExportedProductCount] = useState(0); // Track how many products were in last export
   const [productsAddedAfterExport, setProductsAddedAfterExport] = useState(false); // Flag for unexported changes
-  const [forecastRange, setForecastRange] = useState('150');
+  const [productsRefreshKey, setProductsRefreshKey] = useState(0); // Increment to trigger Formula/Label Check reload
+  const [forecastRange, setForecastRange] = useState('120'); // Applied DOI goal (triggers API)
+  const [forecastRangeInput, setForecastRangeInput] = useState('120'); // Input value (user typing)
   const [showDOITooltip, setShowDOITooltip] = useState(false);
   const [isTooltipPinned, setIsTooltipPinned] = useState(false);
   const [showDateCalculationInfo, setShowDateCalculationInfo] = useState(false);
@@ -242,10 +244,20 @@ const NewShipment = () => {
     }
   }, [shipmentData.shipmentType]);
 
-  // Load products from catalog - reload when shipment ID changes (new shipment vs editing)
+  // Load products from catalog - reload when shipment ID or forecastRange changes
+  // Track if this is an initial load to avoid re-fetching for forecastRange changes on mount
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
+  
   useEffect(() => {
-    loadProducts();
-  }, [id]); // Re-run when ID changes to get fresh labels availability
+    // For existing shipments, only load once (don't re-fetch when forecastRange changes)
+    if (id && initialLoadDone) {
+      return;
+    }
+    
+    loadProducts().then(() => {
+      setInitialLoadDone(true);
+    });
+  }, [id, forecastRange]); // Re-run when ID or forecastRange changes
 
   // Reset shipment number for new shipments (when no ID in route)
   // Also read account from navigation state if coming from Planning modal
@@ -273,15 +285,15 @@ const NewShipment = () => {
       // Load Amazon forecast data, production supply chain data, and labels availability
       // Use production inventory as PRIMARY source (all products from our database)
       // Merge in forecast data where available
+      const doiGoal = parseInt(forecastRange) || 120;
       const [planningData, productionInventory, labelsAvailability] = await Promise.all([
-        NgoosAPI.getPlanning(1, 5000), // Increase limit for forecast data
+        NgoosAPI.getPlanning(1, 5000, doiGoal), // Pass DOI goal for units_to_make calculation
         import('../../../services/productionApi').then(api => api.getProductsInventory()),
         getLabelsAvailability(shipmentId) // Pass shipment ID to exclude current shipment
       ]);
       
-      console.log('Loaded planning data:', planningData.products?.length || 0, 'products with forecast');
+      console.log(`Loaded planning data for DOI goal ${doiGoal}:`, planningData.products?.length || 0, 'products');
       console.log('Loaded production inventory:', productionInventory.length, 'total products from database');
-      console.log('Loaded labels availability:', Object.keys(labelsAvailability.byLocation || {}).length, 'label locations');
       
       // Store labels availability map
       setLabelsAvailabilityMap(labelsAvailability.byLocation || {});
@@ -290,15 +302,45 @@ const NewShipment = () => {
         console.log('Sample production item:', productionInventory[0]);
       }
       
-      // Create lookup for forecast data by ASIN
+      // Helper to normalize size for matching (e.g., "1 Gallon" -> "gallon", "32 oz" -> "32oz")
+      const normalizeSize = (size) => {
+        if (!size) return '';
+        return size.toLowerCase()
+          .replace(/^\d+\s+/, '') // Only remove leading numbers followed by SPACE (e.g., "1 Gallon" -> "Gallon")
+                                   // This preserves "8oz", "16oz" etc. where number is part of size
+          .replace(/\s+/g, '')    // Remove all spaces
+          .trim();
+      };
+      
+      // Helper to normalize product name for matching (trim whitespace, lowercase)
+      const normalizeProductName = (name) => {
+        if (!name) return '';
+        return name.toLowerCase().trim();
+      };
+      
+      // Create lookup for forecast data by ASIN and also by product name for fallback matching
       const forecastMap = {};
+      const forecastByProductName = {};
       (planningData.products || []).forEach(item => {
         if (item.asin) {
           forecastMap[item.asin] = item;
         }
+        // Also create lookup by product name + normalized size for fallback matching
+        if (item.product) {
+          // Store with normalized product name and size
+          const key = `${normalizeProductName(item.product)}|${normalizeSize(item.size)}`;
+          forecastByProductName[key] = item;
+          
+          // Also store with just product name as ultimate fallback
+          const keyNoSize = normalizeProductName(item.product);
+          if (!forecastByProductName[keyNoSize]) {
+            forecastByProductName[keyNoSize] = item;
+          }
+        }
       });
       
-      console.log('Forecast map has', Object.keys(forecastMap).length, 'entries');
+      console.log('Forecast map has', Object.keys(forecastMap).length, 'entries by ASIN');
+      console.log('Forecast map has', Object.keys(forecastByProductName).length, 'entries by product name');
       
       // DEDUPLICATE products by child_asin to prevent React key errors
       // Keep the first occurrence of each ASIN (or use database ID for products without ASIN)
@@ -319,7 +361,26 @@ const NewShipment = () => {
       // This ensures we show ALL products, not just those with forecast data
       const formattedProducts = uniqueProducts.map((item, index) => {
         // Get forecast data for this product if available
-        const forecast = forecastMap[item.child_asin] || {};
+        // Try ASIN match first, then fallback to product name + size match
+        let forecast = forecastMap[item.child_asin] || null;
+        let matchMethod = forecast ? 'asin' : null;
+        
+        // Fallback: match by product name + size if ASIN lookup failed
+        if (!forecast && item.product_name) {
+          // Try matching with normalized product name and size
+          const key = `${normalizeProductName(item.product_name)}|${normalizeSize(item.size)}`;
+          forecast = forecastByProductName[key] || null;
+          matchMethod = forecast ? 'name+size' : null;
+          
+          // If still no match, try just product name
+          if (!forecast) {
+            const keyNoSize = normalizeProductName(item.product_name);
+            forecast = forecastByProductName[keyNoSize] || null;
+            matchMethod = forecast ? 'name-only' : null;
+          }
+        }
+        
+        forecast = forecast || {};
         
         // Get sales data from forecast API if available
         const salesData = forecast.sales_30_day || item.units_sold_30_days || 0;
@@ -402,41 +463,21 @@ const NewShipment = () => {
           single_box_pallet_share: parseFloat(item.single_box_pallet_share) || 0.02,
           bottles_per_minute: parseInt(item.bottles_per_minute) || 20,
           finished_units_per_case: parseInt(item.finished_units_per_case) || 60,
+          // NEW: Use units_to_make from API directly for QTY column
+          units_to_make: forecast.units_to_make || 0,
+          units_algorithm: forecast.algorithm || '',
+          product_age_months: forecast.product_age_months || 0,
+          units_formula: forecast.formula || '',
         };
       });
       
       console.log('Loaded products with supply chain:', formattedProducts.length);
       
-      // Calculate suggested qty for each product based on forecast
-      // Formula: unitsNeeded = (targetDOI - currentDOI) * dailySalesRate
-      // Then round up to nearest units_per_case
-      const productsWithSuggestedQty = formattedProducts.map(product => {
-        const dailySalesRate = (product.sales30Day || 0) / 30;
-        const currentDOI = product.doiTotal || product.daysOfInventory || 0;
-        const targetDOI = parseInt(forecastRange) || 120;
-        const unitsPerCase = product.units_per_case || 60;
-        
-        let suggestedQty = 0;
-        
-        // Only calculate if there are sales and we're below target DOI
-        if (dailySalesRate > 0 && currentDOI < targetDOI) {
-          const daysNeeded = targetDOI - currentDOI;
-          const rawUnitsNeeded = daysNeeded * dailySalesRate;
-          
-          // Round up to nearest units_per_case (case pack)
-          suggestedQty = Math.ceil(rawUnitsNeeded / unitsPerCase) * unitsPerCase;
-          
-          // Ensure minimum of 1 case if there's any need
-          if (suggestedQty === 0 && rawUnitsNeeded > 0) {
-            suggestedQty = unitsPerCase;
-          }
-        }
-        
-        return {
-          ...product,
-          suggestedQty,
-        };
-      });
+      // Use units_to_make from API as suggestedQty (no more client-side calculation)
+      const productsWithSuggestedQty = formattedProducts.map(product => ({
+        ...product,
+        suggestedQty: product.units_to_make || 0,
+      }));
       
       // Sort by DOI ascending (lowest DOI first = most urgent)
       // Products with sales but low DOI need to be prioritized
@@ -475,7 +516,6 @@ const NewShipment = () => {
       // Use filtered products indices since that's what the table displays
       const initialQtyValues = {};
       filteredProducts.forEach((product, index) => {
-        // Auto-populate qty with suggested qty if product needs restocking
         if (product.suggestedQty > 0) {
           initialQtyValues[index] = product.suggestedQty;
         }
@@ -656,64 +696,14 @@ const NewShipment = () => {
     }
   }, [shipmentProducts, products]);
 
-  // Recalculate suggested quantities when forecastRange changes (but NOT on initial load)
+  // Note: qtyValues are initialized directly in loadProducts() when products are fetched.
+  // When forecastRange changes, loadProducts() is called again and sets new qtyValues.
+  // This useEffect is kept minimal - only for tracking lastForecastRange for display purposes.
   useEffect(() => {
-    // Skip if no products or if this is an existing shipment
-    if (products.length === 0 || shipmentId) {
-      return;
-    }
-    
-    // Skip initial load - only recalculate when forecastRange actually CHANGES
-    if (lastForecastRange === null) {
+    if (products.length > 0 && lastForecastRange === null) {
       setLastForecastRange(forecastRange);
-      return;
     }
-    
-    // Skip if forecastRange hasn't changed
-    if (lastForecastRange === forecastRange) {
-      return;
-    }
-    
-    console.log(`ForecastRange changed from ${lastForecastRange} to ${forecastRange}. Recalculating QTY values.`);
-    setLastForecastRange(forecastRange);
-    
-    const targetDOI = parseInt(forecastRange) || 120;
-    
-    const newQtyValues = {};
-    products.forEach((product, index) => {
-      // Only update qty for products that haven't been manually added yet
-      if (!addedRows.has(product.id)) {
-        const dailySalesRate = (product.sales30Day || 0) / 30;
-        const currentDOI = product.doiTotal || product.daysOfInventory || 0;
-        const unitsPerCase = product.units_per_case || 60;
-        
-        let suggestedQty = 0;
-        
-        if (dailySalesRate > 0 && currentDOI < targetDOI) {
-          const daysNeeded = targetDOI - currentDOI;
-          const rawUnitsNeeded = daysNeeded * dailySalesRate;
-          
-          // Round up to nearest units_per_case (case pack)
-          suggestedQty = Math.ceil(rawUnitsNeeded / unitsPerCase) * unitsPerCase;
-          
-          if (suggestedQty === 0 && rawUnitsNeeded > 0) {
-            suggestedQty = unitsPerCase;
-          }
-        }
-        
-        if (suggestedQty > 0) {
-          newQtyValues[index] = suggestedQty;
-        }
-      } else {
-        // Keep existing quantity for already added products
-        if (qtyValues[index] !== undefined) {
-          newQtyValues[index] = qtyValues[index];
-        }
-      }
-    });
-    
-    setQtyValues(newQtyValues);
-  }, [forecastRange, products.length, lastForecastRange, addedRows, qtyValues, shipmentId, products]);
+  }, [products, forecastRange, lastForecastRange]);
 
   // Compute the list of products for Sort Products and Sort Formulas tabs
   // This ensures all added products are included regardless of data source
@@ -1479,26 +1469,31 @@ const NewShipment = () => {
   const floorInventoryOptions = ['Sellables', 'Shiners', 'Unused Formulas'];
 
   // Filter products based on search term
-  // This is computed directly, not memoized, to ensure immediate updates
+  // IMPORTANT: Attach original index to each product so qtyValues lookup works after filtering
   const getFilteredProducts = () => {
-    // If no search term or empty, return all products
+    // First, attach original index to each product (for qtyValues lookup)
+    const productsWithIndex = products.map((product, index) => ({
+      ...product,
+      _originalIndex: index
+    }));
+    
+    // If no search term or empty, return all products with indices
     if (!searchTerm || searchTerm.trim() === '') {
-      console.log(`🔍 Search empty, returning all ${products.length} products`);
-      return products;
+      return productsWithIndex;
     }
     
     const searchLower = searchTerm.toLowerCase().trim();
     
     // If search is empty after trim, return all products
     if (searchLower === '') {
-      return products;
+      return productsWithIndex;
     }
     
     // Split into words for AND logic
     const searchWords = searchLower.split(/\s+/).filter(w => w.length > 0);
     console.log(`🔍 Searching for words: [${searchWords.join(', ')}] in ${products.length} products`);
     
-    const filtered = products.filter(product => {
+    const filtered = productsWithIndex.filter(product => {
       // Create a single searchable string from all relevant fields
       const searchableText = [
         product.brand || '',
@@ -1522,8 +1517,15 @@ const NewShipment = () => {
   const filteredProducts = getFilteredProducts();
 
   return (
-    <div className={`min-h-screen ${themeClasses.pageBg}`} style={{ paddingBottom: (activeAction === 'add-products' || activeAction === 'formula-check' || activeAction === 'label-check' || activeAction === 'book-shipment' || activeAction === 'sort-products' || activeAction === 'sort-formulas') ? '100px' : '0px' }}>
-      <NewShipmentHeader
+    <>
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+      <div className={`min-h-screen ${themeClasses.pageBg}`} style={{ paddingBottom: (activeAction === 'add-products' || activeAction === 'formula-check' || activeAction === 'label-check' || activeAction === 'book-shipment' || activeAction === 'sort-products' || activeAction === 'sort-formulas') ? '100px' : '0px' }}>
+        <NewShipmentHeader
         tableMode={tableMode}
         onTableModeToggle={() => setTableMode(!tableMode)}
         onReviewShipmentClick={() => setIsShipmentDetailsOpen(true)}
@@ -1933,14 +1935,22 @@ const NewShipment = () => {
                   )}
                   <input
                     type="text"
-                    value={forecastRange}
-                    onChange={(e) => setForecastRange(e.target.value)}
+                    value={forecastRangeInput}
+                    onChange={(e) => setForecastRangeInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const value = parseInt(forecastRangeInput) || 120;
+                        if (value !== parseInt(forecastRange)) {
+                          setForecastRange(String(value));
+                        }
+                      }
+                    }}
                     style={{
-                      width: '80px',
+                      width: '70px',
                       height: '32px',
                       padding: '6px 12px',
                       borderRadius: '6px',
-                      border: '1px solid #D1D5DB',
+                      border: `1px solid ${forecastRangeInput !== forecastRange ? '#3B82F6' : '#D1D5DB'}`,
                       backgroundColor: '#FFFFFF',
                       color: '#111827',
                       fontSize: '14px',
@@ -1952,12 +1962,47 @@ const NewShipment = () => {
                       e.target.style.borderColor = '#3B82F6';
                     }}
                     onBlur={(e) => {
-                      e.target.style.borderColor = '#D1D5DB';
+                      e.target.style.borderColor = forecastRangeInput !== forecastRange ? '#3B82F6' : '#D1D5DB';
                     }}
                   />
                   <span style={{ fontSize: '14px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
                     days
                   </span>
+                  <button
+                    onClick={() => {
+                      const value = parseInt(forecastRangeInput) || 120;
+                      if (value !== parseInt(forecastRange)) {
+                        setForecastRange(String(value));
+                      }
+                    }}
+                    disabled={forecastRangeInput === forecastRange || loadingProducts}
+                    style={{
+                      height: '32px',
+                      padding: '0 12px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      backgroundColor: forecastRangeInput !== forecastRange ? '#3B82F6' : '#E5E7EB',
+                      color: forecastRangeInput !== forecastRange ? '#FFFFFF' : '#9CA3AF',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      cursor: forecastRangeInput !== forecastRange && !loadingProducts ? 'pointer' : 'default',
+                      transition: 'all 0.15s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    {loadingProducts ? (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ animation: 'spin 1s linear infinite' }}>
+                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeDasharray="31.4 31.4" />
+                        </svg>
+                        Loading...
+                      </>
+                    ) : (
+                      'Apply'
+                    )}
+                  </button>
                 </div>
 
                 {/* Search Input */}
@@ -2180,6 +2225,7 @@ const NewShipment = () => {
               onFormulaDataChange={setFormulaCheckData}
               selectedRows={formulaSelectedRows}
               onSelectedRowsChange={setFormulaSelectedRows}
+              refreshKey={productsRefreshKey}
             />
           </div>
         )}
@@ -2228,6 +2274,7 @@ const NewShipment = () => {
                 setVarianceExceededRowIds([]);
               }}
               onRowsDataChange={setLabelCheckRows}
+              refreshKey={productsRefreshKey}
             />
           </div>
         )}
@@ -3270,11 +3317,43 @@ const NewShipment = () => {
               setLoading(false);
             }
           } else {
-            // If shipment already existed, still mark export as completed
+            // If shipment already exists, update products in database
+            try {
+              setLoading(true);
+              
+              // Get updated products to add/update
+              const productsToAdd = Object.keys(qtyValues)
+                .filter(idx => {
+                  const product = products[idx];
+                  const qty = qtyValues[idx];
+                  return product && addedRows.has(product.id) && qty > 0;
+                })
+                .map(idx => ({
+                  catalog_id: products[idx].catalogId || products[idx].id,
+                  quantity: qtyValues[idx],
+                }));
+              
+              if (productsToAdd.length > 0) {
+                // Update products in shipment (this replaces existing products)
+                await addShipmentProducts(shipmentId, productsToAdd);
+                
+                // Increment refresh key to trigger Formula/Label Check reload
+                setProductsRefreshKey(prev => prev + 1);
+                
+                toast.success('Shipment products updated!');
+              }
+            } catch (error) {
+              console.error('Error updating shipment products:', error);
+              toast.error('Failed to update products: ' + error.message);
+            } finally {
+              setLoading(false);
+            }
+            
+            // Mark export as completed
             setCompletedTabs(prev => {
               const newSet = new Set(prev);
               newSet.add('export');
-            return newSet;
+              return newSet;
             });
             setExportCompleted(true);
             setExportedProductCount(addedRows.size);
@@ -3545,7 +3624,8 @@ const NewShipment = () => {
         </>
       )}
 
-    </div>
+      </div>
+    </>
   );
 };
 

@@ -58,10 +58,25 @@ class NgoosAPI {
 
   /**
    * GET /forecast/{asin} - Get forecast metrics
+   * @param {string} asin - Product ASIN
+   * @param {number} doiGoal - DOI goal in days (optional)
+   * @param {number} leadTime - Lead time in days (optional)
    */
-  static async getForecast(asin) {
+  static async getForecast(asin, doiGoal = null, leadTime = null) {
     try {
-      const response = await fetch(`${API_BASE_URL}/forecast/${asin}`, {
+      let url = `${API_BASE_URL}/forecast/${asin}`;
+      const params = [];
+      if (doiGoal !== null && doiGoal !== undefined) {
+        params.push(`doi_goal=${doiGoal}`);
+      }
+      if (leadTime !== null && leadTime !== undefined) {
+        params.push(`lead_time=${leadTime}`);
+      }
+      if (params.length > 0) {
+        url += `?${params.join('&')}`;
+      }
+      
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -118,10 +133,17 @@ class NgoosAPI {
 
   /**
    * GET /planning - Get planning table data
+   * @param {number} page - Page number
+   * @param {number} limit - Items per page
+   * @param {number} doiGoal - DOI goal in days (optional, defaults to 120)
    */
-  static async getPlanning(page = 1, limit = 20) {
+  static async getPlanning(page = 1, limit = 20, doiGoal = null) {
     try {
-      const response = await fetch(`${API_BASE_URL}/planning?page=${page}&limit=${limit}`, {
+      let url = `${API_BASE_URL}/planning?page=${page}&limit=${limit}`;
+      if (doiGoal !== null && doiGoal !== undefined) {
+        url += `&doi_goal=${doiGoal}`;
+      }
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

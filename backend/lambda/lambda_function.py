@@ -4899,7 +4899,14 @@ def delete_shipment(event):
         conn.close()
 
 def add_shipment_products(event):
-    """POST /production/shipments/{id}/products - Add products to shipment"""
+    """POST /production/shipments/{id}/products - Add/Update products in shipment
+    
+    This function now supports updating products:
+    - Saves existing checked status for formulas
+    - Saves existing label check status for products
+    - Clears and re-inserts products
+    - Restores checked status for formulas/products that still exist
+    """
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -4907,9 +4914,38 @@ def add_shipment_products(event):
         body = json.loads(event.get('body', '{}'))
         products = body.get('products', [])
         
+        # ============================================
+        # STEP 1: Save existing checked status before deleting
+        # ============================================
+        
+        # Save formula check status (by formula_name)
+        cursor.execute("""
+            SELECT formula_name, is_checked, notes, checked_at, checked_by
+            FROM shipment_formulas
+            WHERE shipment_id = %s
+        """, (shipment_id,))
+        existing_formula_status = {row['formula_name']: row for row in cursor.fetchall()}
+        
+        # Save label check status (by label_location)
+        cursor.execute("""
+            SELECT label_location, label_check_status, label_check_count
+            FROM shipment_products
+            WHERE shipment_id = %s AND label_check_status IS NOT NULL
+        """, (shipment_id,))
+        existing_label_status = {row['label_location']: row for row in cursor.fetchall()}
+        
+        # ============================================
+        # STEP 2: Delete existing products and formulas
+        # ============================================
+        cursor.execute("DELETE FROM shipment_formulas WHERE shipment_id = %s", (shipment_id,))
+        cursor.execute("DELETE FROM shipment_products WHERE shipment_id = %s", (shipment_id,))
+        
         added_products = []
         supply_warnings = []
         
+        # ============================================
+        # STEP 3: Insert new products
+        # ============================================
         for product in products:
             catalog_id = product['catalog_id']
             quantity = product['quantity']
@@ -5098,20 +5134,77 @@ def add_shipment_products(event):
             
             added_products.append(cursor.fetchone())
         
-        # Aggregate formulas
+        # ============================================
+        # STEP 4: Aggregate formulas
+        # ============================================
         cursor.execute("SELECT aggregate_shipment_formulas(%s)", (shipment_id,))
         
+        # ============================================
+        # STEP 5: Restore checked status for formulas that still exist
+        # ============================================
+        if existing_formula_status:
+            for formula_name, saved_data in existing_formula_status.items():
+                if saved_data.get('is_checked'):
+                    cursor.execute("""
+                        UPDATE shipment_formulas
+                        SET is_checked = TRUE,
+                            notes = %s,
+                            checked_at = %s,
+                            checked_by = %s
+                        WHERE shipment_id = %s AND formula_name = %s
+                    """, (
+                        saved_data.get('notes', ''),
+                        saved_data.get('checked_at'),
+                        saved_data.get('checked_by'),
+                        shipment_id,
+                        formula_name
+                    ))
+                elif saved_data.get('notes'):
+                    # Restore notes even if not checked
+                    cursor.execute("""
+                        UPDATE shipment_formulas
+                        SET notes = %s
+                        WHERE shipment_id = %s AND formula_name = %s
+                    """, (saved_data.get('notes', ''), shipment_id, formula_name))
+        
+        # ============================================
+        # STEP 6: Restore label check status for products that still exist
+        # ============================================
+        if existing_label_status:
+            for label_location, saved_data in existing_label_status.items():
+                cursor.execute("""
+                    UPDATE shipment_products
+                    SET label_check_status = %s,
+                        label_check_count = %s
+                    WHERE shipment_id = %s AND label_location = %s
+                """, (
+                    saved_data.get('label_check_status'),
+                    saved_data.get('label_check_count'),
+                    shipment_id,
+                    label_location
+                ))
+        
         conn.commit()
+        
+        # Count how many checks were preserved
+        formulas_preserved = sum(1 for f in existing_formula_status.values() if f.get('is_checked'))
+        labels_preserved = len(existing_label_status)
         
         response_data = {
             'success': True,
             'data': added_products,
-            'supply_warnings': supply_warnings if supply_warnings else None
+            'supply_warnings': supply_warnings if supply_warnings else None,
+            'preserved_checks': {
+                'formulas': formulas_preserved,
+                'labels': labels_preserved
+            }
         }
         
         # If there are supply warnings, add a warning message
         if supply_warnings:
             response_data['message'] = f'⚠️ Warning: {len(supply_warnings)} product(s) exceed available inventory'
+        elif formulas_preserved > 0 or labels_preserved > 0:
+            response_data['message'] = f'Products updated. Preserved {formulas_preserved} formula checks and {labels_preserved} label checks.'
         
         return cors_response(201, response_data)
     except Exception as e:

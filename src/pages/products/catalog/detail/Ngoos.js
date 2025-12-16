@@ -130,7 +130,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
               if (inventoryOnly) {
                 const results = await Promise.allSettled([
                   NgoosAPI.getProductDetails(childAsin),
-                  NgoosAPI.getForecast(childAsin),
+                  NgoosAPI.getForecast(childAsin, doiGoalDays), // Pass DOI goal for accurate units_to_make
                   NgoosAPI.getChartData(childAsin, weeks, salesVelocityWeight, svVelocityWeight)
                 ]);
 
@@ -154,7 +154,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
                 // Full mode - fetch all data including metrics/sales/ads
                 const results = await Promise.allSettled([
                   NgoosAPI.getProductDetails(childAsin),
-                  NgoosAPI.getForecast(childAsin),
+                  NgoosAPI.getForecast(childAsin, doiGoalDays), // Pass DOI goal for accurate units_to_make
                   NgoosAPI.getChartData(childAsin, weeks, salesVelocityWeight, svVelocityWeight),
                   NgoosAPI.getMetrics(childAsin, metricsDays),
                   NgoosAPI.getSalesChart(childAsin, metricsDays),
@@ -199,7 +199,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
     };
 
       fetchNgoosData();
-    }, [data?.child_asin, data?.childAsin, selectedView, metricsDays, salesVelocityWeight, svVelocityWeight, inventoryOnly]);
+    }, [data?.child_asin, data?.childAsin, selectedView, metricsDays, salesVelocityWeight, svVelocityWeight, inventoryOnly, doiGoalDays]);
 
   // Extract inventory data from API response or use fallback
   const inventoryData = productDetails?.inventory || {
@@ -217,13 +217,101 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
     }
   };
 
-  // Extract timeline data from forecast API response
-  const timeline = {
-    fbaAvailable: Math.round(forecastData?.fba_available_days || 0),
-    totalDays: Math.round(forecastData?.total_days || 0),
-    forecast: Math.round(forecastData?.forecast_days || 0),
-    adjustment: Math.round(forecastData?.forecast_adjustment || 0)
-  };
+  // Extract inventory data for timeline visualization
+  // Uses same logic as backend: FBA inventory + Additional inventory + Units to Make
+  const timeline = useMemo(() => {
+    // Get inventory units directly
+    const fbaUnits = inventoryData?.fba?.available || inventoryData?.fba?.total || 0;
+    const awdUnits = inventoryData?.awd?.available || inventoryData?.awd?.total || 0;
+    const totalUnits = fbaUnits + awdUnits;
+    const additionalUnits = awdUnits; // Additional inventory beyond FBA
+    
+    // Get units_to_make from forecast API (matches backend calculation)
+    const unitsToMake = forecastData?.units_to_make || 0;
+    const adjustment = forecastData?.forecast_adjustment || 0;
+    
+    // Get DOI days from API
+    let doiFba = forecastData?.doi_fba || 0;
+    let doiTotal = forecastData?.doi_total || 0;
+    
+    // If DOI not provided, calculate from runout dates
+    if (doiFba === 0 && forecastData?.runout_date && forecastData?.current_date) {
+      const currentDate = new Date(forecastData.current_date);
+      const runoutDate = new Date(forecastData.runout_date);
+      doiFba = Math.round((runoutDate - currentDate) / (1000 * 60 * 60 * 24));
+    }
+    if (doiTotal === 0 && forecastData?.total_runout_date && forecastData?.current_date) {
+      const currentDate = new Date(forecastData.current_date);
+      const totalRunoutDate = new Date(forecastData.total_runout_date);
+      doiTotal = Math.round((totalRunoutDate - currentDate) / (1000 * 60 * 60 * 24));
+    }
+    
+    // Final fallback: calculate from inventory and weekly forecast
+    if (doiFba === 0 || doiTotal === 0) {
+      const weeklyForecast = forecastData?.weekly_forecast || forecastData?.forecast || 0;
+      if (weeklyForecast > 0) {
+        const dailySales = weeklyForecast / 7;
+        if (doiFba === 0 && fbaUnits > 0) {
+          doiFba = Math.round(fbaUnits / dailySales);
+        }
+        if (doiTotal === 0 && totalUnits > 0) {
+          doiTotal = Math.round(totalUnits / dailySales);
+        }
+      }
+    }
+    
+    return {
+      // Inventory units for bar proportions
+      fbaInventory: Math.round(fbaUnits),
+      additionalInventory: Math.round(additionalUnits),
+      totalInventory: Math.round(totalUnits),
+      unitsToMake: Math.round(unitsToMake),
+      // DOI days for labels
+      fbaAvailable: doiFba,
+      totalDays: doiTotal,
+      forecast: Math.round(unitsToMake), // Show units to make, not days
+      adjustment: Math.round(adjustment)
+    };
+  }, [forecastData, inventoryData]);
+
+  // Calculate bar widths proportionally based on inventory units (matches backend logic)
+  // Total span = FBA inventory + Additional inventory + Units to Make
+  const totalTimelineUnits = useMemo(() => {
+    const fba = timeline.fbaInventory || 0;
+    const additional = timeline.additionalInventory || 0;
+    const unitsToMake = timeline.unitsToMake || 0;
+    
+    const totalSpan = fba + additional + unitsToMake;
+    
+    return totalSpan > 0 ? totalSpan : 1; // Avoid division by zero
+  }, [timeline.fbaInventory, timeline.additionalInventory, timeline.unitsToMake]);
+
+  // Calculate percentage widths for each bar segment
+  const timelineWidths = useMemo(() => {
+    const fba = timeline.fbaInventory || 0;
+    const additional = timeline.additionalInventory || 0;
+    const unitsToMake = timeline.unitsToMake || 0;
+    
+    // Calculate percentages - ensure minimum width of 10% if there are any units
+    let fbaPercent = fba > 0 ? Math.max(10, (fba / totalTimelineUnits) * 100) : 0;
+    let totalPercent = additional > 0 ? Math.max(10, (additional / totalTimelineUnits) * 100) : 0;
+    let forecastPercent = unitsToMake > 0 ? Math.max(10, (unitsToMake / totalTimelineUnits) * 100) : 0;
+    
+    // Normalize to 100% if we have data
+    const sum = fbaPercent + totalPercent + forecastPercent;
+    if (sum > 0 && sum !== 100) {
+      const scale = 100 / sum;
+      fbaPercent = fbaPercent * scale;
+      totalPercent = totalPercent * scale;
+      forecastPercent = forecastPercent * scale;
+    }
+    
+    return {
+      fba: `${fbaPercent.toFixed(1)}%`,
+      total: `${totalPercent.toFixed(1)}%`,
+      forecast: `${forecastPercent.toFixed(1)}%`
+    };
+  }, [timeline.fbaInventory, timeline.additionalInventory, timeline.unitsToMake, totalTimelineUnits]);
 
   // Prepare chart data for visualization with inventory bars
   const chartDisplayData = useMemo(() => {
@@ -334,7 +422,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
     });
     
     return { data: combinedData, maxValue: chartMaxValue };
-  }, [chartData, forecastData, selectedView]);
+  }, [chartData, forecastData, selectedView, doiGoalDays]);
 
   // Timeline periods are now provided by the backend via forecastData.chart_rendering
   // This eliminates complex date calculations on the frontend
@@ -1104,8 +1192,10 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
           </div>
           
           <div style={{ display: 'flex', height: inventoryOnly ? '40px' : '60px', borderRadius: '0.375rem', overflow: 'hidden', position: 'relative' }}>
+            {/* FBA Inventory - Purple */}
+            {timeline.fbaInventory > 0 && (
             <div style={{ 
-              width: '20%', 
+                width: timelineWidths.fba, 
               backgroundColor: '#a855f7', 
               display: 'flex', 
               flexDirection: inventoryOnly ? 'row' : 'column', 
@@ -1114,13 +1204,17 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
               gap: inventoryOnly ? '0.25rem' : 0,
               color: '#fff',
               fontSize: inventoryOnly ? '0.7rem' : '0.875rem',
-              fontWeight: '600'
+                fontWeight: '600',
+                minWidth: '60px'
             }}>
               <div>{timeline.fbaAvailable} Days</div>
               <div style={{ fontSize: inventoryOnly ? '0.6rem' : '0.75rem', opacity: 0.8 }}>FBA</div>
             </div>
+            )}
+            {/* Additional Inventory (AWD) - Green */}
+            {timeline.additionalInventory > 0 && (
             <div style={{ 
-              width: '35%', 
+                width: timelineWidths.total, 
               backgroundColor: '#22c55e', 
               display: 'flex', 
               flexDirection: inventoryOnly ? 'row' : 'column', 
@@ -1129,13 +1223,17 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
               gap: inventoryOnly ? '0.25rem' : 0,
               color: '#fff',
               fontSize: inventoryOnly ? '0.7rem' : '0.875rem',
-              fontWeight: '600'
+                fontWeight: '600',
+                minWidth: '60px'
             }}>
               <div>{timeline.totalDays} Days</div>
               <div style={{ fontSize: inventoryOnly ? '0.6rem' : '0.75rem', opacity: 0.8 }}>Total</div>
             </div>
+            )}
+            {/* Units to Make - Blue */}
+            {timeline.unitsToMake > 0 && (
             <div style={{ 
-              width: '45%', 
+                width: timelineWidths.forecast, 
               backgroundColor: '#3b82f6', 
               display: 'flex', 
               flexDirection: inventoryOnly ? 'row' : 'column', 
@@ -1145,10 +1243,11 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
               color: '#fff',
               fontSize: inventoryOnly ? '0.7rem' : '0.875rem',
               fontWeight: '600',
-              position: 'relative'
+                position: 'relative',
+                minWidth: '80px'
             }}>
-              <div>{timeline.forecast} Days</div>
-              <div style={{ fontSize: inventoryOnly ? '0.6rem' : '0.75rem', opacity: 0.8 }}>Forecast</div>
+              <div>{timeline.unitsToMake.toLocaleString()} Units</div>
+              <div style={{ fontSize: inventoryOnly ? '0.6rem' : '0.75rem', opacity: 0.8 }}>To Make</div>
               {timeline.adjustment !== 0 && (
                 <div style={{ 
                   position: 'absolute', 
@@ -1169,6 +1268,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
                 </div>
               )}
             </div>
+            )}
           </div>
         </div>
 

@@ -110,8 +110,12 @@ const NewShipmentTable = ({
 
   // Apply filters to rows - preserve original index for qtyValues mapping
   const filteredRows = useMemo(() => {
-    // First, attach original index to each row
-    let result = rows.map((row, index) => ({ ...row, _originalIndex: index }));
+    // Use existing _originalIndex if already set by parent (from search filter),
+    // otherwise use the current index (for backward compatibility)
+    let result = rows.map((row, index) => ({ 
+      ...row, 
+      _originalIndex: row._originalIndex !== undefined ? row._originalIndex : index 
+    }));
     
     // Apply popular filter
     if (activeFilters.popularFilter) {
@@ -1143,7 +1147,6 @@ const NewShipmentTable = ({
                         />
                         <div
                           style={{
-                            marginRight: index === 2 ? '30px' : index === 0 ? '-30px' : 0,
                             position: 'relative',
                           }}
                         >
@@ -1160,71 +1163,97 @@ const NewShipmentTable = ({
                             }}
                             title={`FBA: ${row.fbaAvailable || 0}, Total: ${row.totalInventory || 0}, Forecast: ${Math.round(row.weeklyForecast || row.forecast || 0)}/week, DOI: ${row.daysOfInventory || 0}d | Double-click for N-GOOS details`}
                           >
-                            {/* DOI Timeline Visualization - uses forecastRange */}
+                            {/* Inventory Timeline Visualization - matches backend units_to_make calculation */}
                             {(() => {
-                              const doiGoal = forecastRange; // Use forecast range as DOI goal
-                              const fba = row.fbaAvailable || 0;
-                              const total = row.totalInventory || 0;
+                              // Use the same logic as the backend:
+                              // Target = weekly_forecast × weeks_to_goal
+                              // units_to_make = Target - current_inventory
+                              
                               const weeklyForecast = row.weeklyForecast || row.forecast || 0;
-                              const doiFba = row.doiFba || 0;
-                              const doiTotal = row.doiTotal || row.daysOfInventory || 0;
+                              const weeksToGoal = forecastRange / 7; // Convert days to weeks
+                              const targetInventory = weeklyForecast * weeksToGoal;
                               
-                              // Calculate DOI if not provided (using sales velocity)
-                              let calculatedDoiFba = doiFba;
-                              let calculatedDoiTotal = doiTotal;
+                              const fbaInventory = row.fbaAvailable || 0;
+                              const totalInventory = row.totalInventory || 0;
+                              const additionalInventory = Math.max(0, totalInventory - fbaInventory); // AWD etc.
                               
-                              if (calculatedDoiTotal === 0 && row.sales30Day > 0) {
-                                const dailySales = row.sales30Day / 30.0;
-                                calculatedDoiFba = fba / dailySales;
-                                calculatedDoiTotal = total / dailySales;
+                              // units_to_make from the row (calculated by backend)
+                              const unitsToMake = row.units_to_make || row.suggestedQty || 0;
+                              
+                              // Show bars if:
+                              // - units_to_make > 0 (something to produce) - shows all segments
+                              // - OR inventory exists (fbaInventory or additionalInventory > 0) - shows purple/green only
+                              // Hide bars only when there's nothing at all
+                              const hasInventory = fbaInventory > 0 || additionalInventory > 0;
+                              if (unitsToMake === 0 && !hasInventory) {
+                                return null;
                               }
                               
-                              // Calculate bar widths as percentage of forecastRange timeline
-                              const fbaWidth = Math.min((calculatedDoiFba / doiGoal) * 100, 100);
-                              const totalWidth = Math.min((calculatedDoiTotal / doiGoal) * 100, 100);
+                              // Total bar represents: current inventory + units to make = target
+                              // OR just use target if we have it
+                              const totalBar = Math.max(targetInventory, totalInventory + unitsToMake);
                               
-                              // Calculate the green segment (total beyond FBA)
-                              const greenWidth = Math.max(0, totalWidth - fbaWidth);
+                              if (totalBar === 0) {
+                                return null;
+                              }
                               
-                              // Show as segments: Purple (FBA) + Green (additional) + Blue (forecast reference)
+                              // Calculate proportional widths
+                              let fbaPercent = fbaInventory > 0 ? (fbaInventory / totalBar) * 100 : 0;
+                              let greenPercent = additionalInventory > 0 ? (additionalInventory / totalBar) * 100 : 0;
+                              let bluePercent = unitsToMake > 0 ? (unitsToMake / totalBar) * 100 : 0;
+                              
+                              // Add minimum visibility (5%) only for non-zero segments
+                              if (fbaPercent > 0 && fbaPercent < 5) fbaPercent = 5;
+                              if (greenPercent > 0 && greenPercent < 5) greenPercent = 5;
+                              if (bluePercent > 0 && bluePercent < 5) bluePercent = 5;
+                              
+                              // Normalize to 100%
+                              const sum = fbaPercent + greenPercent + bluePercent;
+                              if (sum > 0 && sum !== 100) {
+                                const scale = 100 / sum;
+                                fbaPercent = fbaPercent * scale;
+                                greenPercent = greenPercent * scale;
+                                bluePercent = bluePercent * scale;
+                              }
+                              
+                              // Show as segments: Purple (FBA inventory) + Green (additional inventory) + Blue (units to make)
                               return (
                                 <>
-                                  {/* Purple segment: FBA Available */}
-                                  {fbaWidth > 0 && (
+                                  {/* Purple segment: FBA Inventory */}
+                                  {fbaInventory > 0 && (
                                     <div style={{ 
-                                      width: `${fbaWidth}%`, 
+                                      width: `${fbaPercent}%`, 
                                       height: '100%',
                                       backgroundColor: '#A855F7',
                                       position: 'absolute',
                                       left: 0,
                                       top: 0,
-                                      borderRadius: greenWidth === 0 && (totalWidth >= 100 || weeklyForecast === 0) ? '9999px' : '9999px 0 0 9999px',
+                                      borderRadius: greenPercent === 0 && bluePercent === 0 ? '9999px' : '9999px 0 0 9999px',
                                     }} />
                                   )}
                                   
-                                  {/* Green segment: Additional Total Inventory beyond FBA */}
-                                  {greenWidth > 0 && (
+                                  {/* Green segment: Additional Inventory (AWD, etc.) */}
+                                  {additionalInventory > 0 && (
                                     <div style={{ 
-                                      width: `${greenWidth}%`, 
+                                      width: `${greenPercent}%`, 
                                       height: '100%',
                                       backgroundColor: '#22C55E',
                                       position: 'absolute',
-                                      left: `${fbaWidth}%`,
+                                      left: `${fbaPercent}%`,
                                       top: 0,
-                                      borderRadius: 0,
+                                      borderRadius: bluePercent === 0 ? '0 9999px 9999px 0' : 0,
                                     }} />
                                   )}
                                   
-                                  {/* Blue segment: Forecast reference (rest of timeline) */}
-                                  {weeklyForecast > 0 && totalWidth < 100 && (
+                                  {/* Blue segment: Units to Make (from backend) */}
+                                  {unitsToMake > 0 && (
                                     <div style={{ 
-                                      width: `${100 - totalWidth}%`, 
+                                      width: `${bluePercent}%`, 
                                       height: '100%',
                                       backgroundColor: '#3B82F6',
                                       position: 'absolute',
-                                      left: `${totalWidth}%`,
+                                      left: `${fbaPercent + greenPercent}%`,
                                       top: 0,
-                                      opacity: 0.4,
                                       borderRadius: '0 9999px 9999px 0',
                                     }} />
                                   )}
@@ -1232,21 +1261,6 @@ const NewShipmentTable = ({
                               );
                             })()}
                           </div>
-                          {index === 2 && (
-                            <span
-                              style={{
-                                position: 'absolute',
-                                right: '-18px',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                fontSize: '0.7rem',
-                                fontWeight: 600,
-                                color: '#007AFF',
-                              }}
-                            >
-                              -5
-                            </span>
-                          )}
                         </div>
                       </div>
                     </td>
