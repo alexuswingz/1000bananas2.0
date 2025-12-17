@@ -895,7 +895,7 @@ const NewShipmentTable = ({
                               style={{
                                 position: 'absolute',
                                 top: '0',
-                                left: '7%',
+                                left: 'calc(7% - 5px)',
                                 transform: 'translateX(-50%)',
                                 display: 'flex',
                                 flexDirection: 'column',
@@ -941,7 +941,7 @@ const NewShipmentTable = ({
                               style={{
                                 position: 'absolute',
                                 top: '0',
-                                right: '7%',
+                                right: 'calc(7% + 5px)',
                                 transform: 'translateX(50%)',
                                 display: 'flex',
                                 flexDirection: 'column',
@@ -962,7 +962,7 @@ const NewShipmentTable = ({
                               style={{
                                 position: 'absolute',
                                 left: '7%',
-                                right: '7%',
+                                right: 'calc(7% + 5px)',
                                 top: '30px',
                                 height: '3px',
                                 backgroundColor: '#FFFFFF',
@@ -975,7 +975,7 @@ const NewShipmentTable = ({
                             <div
                               style={{
                                 position: 'absolute',
-                                left: '7%',
+                                left: 'calc(7% - 5px)',
                                 top: '30px',
                                 transform: 'translate(-50%, -50%)',
                                 width: '12px',
@@ -1014,7 +1014,7 @@ const NewShipmentTable = ({
                             <div
                               style={{
                                 position: 'absolute',
-                                right: '7%',
+                                right: 'calc(7% + 5px)',
                                 top: '30px',
                                 transform: 'translate(50%, -50%)',
                                 width: '12px',
