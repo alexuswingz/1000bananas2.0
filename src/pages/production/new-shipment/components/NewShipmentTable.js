@@ -1168,47 +1168,57 @@ const NewShipmentTable = ({
                             backgroundColor: isQtyExceedingLabels(row, index) ? (isDarkMode ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.05)') : undefined,
                           }}
                         />
-                        {hoveredQtyIndex === index && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              effectiveSetQtyValues(prev => ({
-                                ...prev,
-                                [index]: 0,
-                              }));
-                            }}
-                            style={{
-                              position: 'absolute',
-                              left: '6px',
-                              top: '50%',
-                              transform: 'translateY(-50%)',
-                              borderRadius: '999px',
-                              border: 'none',
-                              backgroundColor: 'transparent',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              padding: 0,
-                              margin: 0,
-                            }}
-                            onMouseEnter={() => {}}
-                            onMouseLeave={() => {}}
-                          >
-                            <img
-                              src="/assets/reset.png"
-                              alt="Reset quantity"
-                              style={{
-                                display: 'block',
-                                width: '9px',
-                                height: '9px',
-                                objectFit: 'contain',
+                        {(() => {
+                          const forecastValue = Math.round(row.weeklyForecast || row.forecast || 0);
+                          const currentQty = typeof effectiveQtyValues[index] === 'number' 
+                            ? effectiveQtyValues[index] 
+                            : (effectiveQtyValues[index] === '' || effectiveQtyValues[index] === null || effectiveQtyValues[index] === undefined) 
+                              ? 0 
+                              : parseInt(effectiveQtyValues[index], 10) || 0;
+                          const hasChanged = currentQty !== forecastValue;
+                          
+                          return hasChanged ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                effectiveSetQtyValues(prev => ({
+                                  ...prev,
+                                  [index]: forecastValue,
+                                }));
                               }}
-                            />
-                          </button>
-                        )}
+                              style={{
+                                position: 'absolute',
+                                left: '6px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                borderRadius: '999px',
+                                border: 'none',
+                                backgroundColor: 'transparent',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: 0,
+                                margin: 0,
+                              }}
+                              onMouseEnter={() => {}}
+                              onMouseLeave={() => {}}
+                            >
+                              <img
+                                src="/assets/reset.png"
+                                alt="Reset quantity"
+                                style={{
+                                  display: 'block',
+                                  width: '9px',
+                                  height: '9px',
+                                  objectFit: 'contain',
+                                }}
+                              />
+                            </button>
+                          ) : null;
+                        })()}
                         {/* Label warning icon - positioned absolutely to not affect alignment */}
                         {isQtyExceedingLabels(row, index) && (effectiveQtyValues[index] ?? 0) > 0 && (
                           <span
@@ -1218,7 +1228,7 @@ const NewShipmentTable = ({
                             }}
                             style={{
                               position: 'absolute',
-                              right: '-22px',
+                              right: '20px',
                               top: '50%',
                               transform: 'translateY(-50%)',
                               display: 'inline-flex',
