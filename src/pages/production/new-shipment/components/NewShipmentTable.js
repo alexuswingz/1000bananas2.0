@@ -2624,13 +2624,58 @@ const NewShipmentTable = ({
                         borderRadius: '8px',
                         border: isQtyExceedingLabels(row, index) ? '1px solid #EF4444' : '1px solid #E5E7EB',
                         padding: '4px 6px',
-                        width: isQtyExceedingLabels(row, index) && (effectiveQtyValues[index] ?? 0) > 0 ? '135px' : '107px',
+                        width: '107px',
                         height: '24px',
                         boxSizing: 'border-box',
                         position: 'relative',
                         overflow: 'visible',
                       }}
                     >
+                      {(() => {
+                        const forecastValue = Math.round(row.weeklyForecast || row.forecast || 0);
+                        const currentQty = typeof effectiveQtyValues[index] === 'number' 
+                          ? effectiveQtyValues[index] 
+                          : (effectiveQtyValues[index] === '' || effectiveQtyValues[index] === null || effectiveQtyValues[index] === undefined) 
+                            ? 0 
+                            : parseInt(effectiveQtyValues[index], 10) || 0;
+                        const hasChanged = currentQty !== forecastValue;
+                        
+                        return hasChanged ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              effectiveSetQtyValues(prev => ({
+                                ...prev,
+                                [index]: forecastValue,
+                              }));
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              border: 'none',
+                              backgroundColor: 'transparent',
+                              cursor: 'pointer',
+                              padding: 0,
+                              margin: 0,
+                              flexShrink: 0,
+                            }}
+                          >
+                            <img
+                              src="/assets/reset.png"
+                              alt="Reset quantity"
+                              style={{
+                                display: 'block',
+                                width: '9px',
+                                height: '9px',
+                                objectFit: 'contain',
+                              }}
+                            />
+                          </button>
+                        ) : null;
+                      })()}
                       <input
                         key={`qty-input-${index}`}
                         ref={(el) => {
@@ -2729,21 +2774,7 @@ const NewShipmentTable = ({
                           }
                         }}
                         style={{
-                          position: 'absolute',
-                          left: 0,
-                          right: (() => {
-                            const labelsAvailable = getAvailableLabelsForRow(row, index);
-                            const labelsNeeded = effectiveQtyValues[index] ?? 0;
-                            return (labelsNeeded > labelsAvailable && labelsNeeded > 0) ? '28px' : 0;
-                          })(),
-                          top: 0,
-                          bottom: 0,
-                          width: (() => {
-                            const labelsAvailable = getAvailableLabelsForRow(row, index);
-                            const labelsNeeded = effectiveQtyValues[index] ?? 0;
-                            return (labelsNeeded > labelsAvailable && labelsNeeded > 0) ? 'calc(100% - 28px)' : '100%';
-                          })(),
-                          height: '100%',
+                          flex: 1,
                           border: 'none',
                           outline: 'none',
                           backgroundColor: 'transparent',
@@ -2755,6 +2786,7 @@ const NewShipmentTable = ({
                           margin: 0,
                           MozAppearance: 'textfield',
                           WebkitAppearance: 'none',
+                          minWidth: 0,
                         }}
                         onFocus={(e) => {
                           e.target.select();
@@ -2779,57 +2811,6 @@ const NewShipmentTable = ({
                             width: '14px',
                           }}
                         >
-                          {/* Reset button - only visible on hover */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              effectiveSetQtyValues(prev => ({
-                                ...prev,
-                                [index]: 0,
-                              }));
-                            }}
-                            style={{
-                              position: 'absolute',
-                              left: '-20px',
-                              top: '50%',
-                              transform: 'translateY(-50%)',
-                              width: '16px',
-                              height: '16px',
-                              borderRadius: '999px',
-                              border: 'none',
-                              backgroundColor: '#F3F4F6',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              padding: 0,
-                              margin: 0,
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#E5E7EB';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = '#F3F4F6';
-                            }}
-                          >
-                            <svg
-                              width="10"
-                              height="10"
-                              viewBox="0 0 10 10"
-                              fill="none"
-                              xmlns="http://www.w3.org/2000/svg"
-                            >
-                              <path
-                                d="M2 3.5V1.5H0.5M5 2C3.067 2 1.5 3.567 1.5 5.5C1.5 7.433 3.067 9 5 9C6.933 9 8.5 7.433 8.5 5.5C8.5 4.197 7.836 3.049 6.824 2.36"
-                                stroke="#6B7280"
-                                strokeWidth="0.8"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            </svg>
-                          </button>
                           {/* Up / down controls */}
                           <button
                             type="button"
