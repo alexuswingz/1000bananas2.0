@@ -1324,6 +1324,8 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         alignItems: 'center',
         gap: '24px',
         marginTop: '24px',
+        justifyContent: 'flex-end',
+        width: '100%',
       }}
     >
       <span
