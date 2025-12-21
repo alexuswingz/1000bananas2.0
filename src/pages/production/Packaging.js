@@ -30,12 +30,17 @@ const Packaging = () => {
 
   const handleStartClick = (row) => {
     setSelectedProduct(row);
-    setShowProductInfoModal(true);
+    setShowQualityChecksModal(true);
   };
 
   const handleBeginQC = () => {
     setShowProductInfoModal(false);
     setShowQualityChecksModal(true);
+  };
+
+  const handleStartProduction = () => {
+    setShowQualityChecksModal(false);
+    setShowProductInfoModal(true);
   };
 
   const handleCloseProductInfo = () => {
@@ -190,6 +195,7 @@ const Packaging = () => {
         isOpen={showQualityChecksModal}
         onClose={handleCloseQualityChecks}
         productData={selectedProduct}
+        onStartProduction={handleStartProduction}
       />
     </div>
   );

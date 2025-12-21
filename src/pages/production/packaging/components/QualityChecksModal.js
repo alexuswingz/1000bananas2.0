@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 
-const QualityChecksModal = ({ isOpen, onClose, productData }) => {
+const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction }) => {
   const { isDarkMode } = useTheme();
   const [uploadedFile, setUploadedFile] = useState(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -117,7 +117,11 @@ const QualityChecksModal = ({ isOpen, onClose, productData }) => {
 
   const handleContinue = () => {
     if (isLastStep) {
+      // Close QC modal and open Production Started modal
       onClose();
+      if (onStartProduction) {
+        onStartProduction();
+      }
     } else {
       setCurrentStepIndex((prev) => prev + 1);
       setUploadedFile(null);
@@ -202,6 +206,15 @@ const QualityChecksModal = ({ isOpen, onClose, productData }) => {
             </svg>
           </button>
         </div>
+
+        {/* Separator Line */}
+        <div
+          style={{
+            width: '100%',
+            height: '1px',
+            backgroundColor: '#E5E7EB',
+          }}
+        />
 
         {/* Content */}
         <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', flex: 1, overflow: 'auto' }}>
@@ -311,7 +324,17 @@ const QualityChecksModal = ({ isOpen, onClose, productData }) => {
           {/* Step Confirmation */}
           <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <p className={themeClasses.textPrimary} style={{ fontSize: '14px', fontWeight: '500', margin: 0 }}>
-              {currentStep.confirmationText}
+              {currentStep.id === 'formula' && productData?.formula 
+                ? (
+                  <>
+                    Confirm Correct Formula:{' '}
+                    <span style={{ color: '#2563EB', fontWeight: '600' }}>
+                      {productData.formula}
+                    </span>
+                  </>
+                )
+                : currentStep.confirmationText
+              }
             </p>
             <svg
               width="14"
