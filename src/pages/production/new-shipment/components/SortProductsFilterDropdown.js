@@ -24,7 +24,7 @@ const SortProductsFilterDropdown = ({
   const [conditionValue, setConditionValue] = useState(currentFilter.conditionValue || '');
   
   // Check if column is numeric
-  const isNumericColumn = columnKey === 'qty';
+  const isNumericColumn = columnKey === 'qty' || columnKey === 'volume';
   
   // Available conditions based on column type
   const textConditions = [
@@ -128,8 +128,8 @@ const SortProductsFilterDropdown = ({
         conditionValue,
       });
     }
-    // Keep the dropdown open so user can continue configuring multiple filters
-    // onClose?.();
+    // Close dropdown after applying filter
+    onClose?.();
   };
 
   return createPortal(
@@ -153,7 +153,9 @@ const SortProductsFilterDropdown = ({
       <div style={{ padding: '8px 12px', borderBottom: '1px solid #E5E7EB' }}>
         {/* Sort Ascending */}
         <div
-          onClick={() => {
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
             const newSortOrder = sortOrder === 'asc' ? '' : 'asc';
             setSortOrder(newSortOrder);
             // Automatically apply sort when clicking
@@ -165,7 +167,12 @@ const SortProductsFilterDropdown = ({
                 conditionValue,
               });
             }
+            // Close dropdown after applying sort
+            setTimeout(() => {
+              onClose?.();
+            }, 0);
           }}
+          onMouseDown={(e) => e.stopPropagation()}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -213,7 +220,9 @@ const SortProductsFilterDropdown = ({
 
         {/* Sort Descending */}
         <div
-          onClick={() => {
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
             const newSortOrder = sortOrder === 'desc' ? '' : 'desc';
             setSortOrder(newSortOrder);
             // Automatically apply sort when clicking
@@ -225,7 +234,12 @@ const SortProductsFilterDropdown = ({
                 conditionValue,
               });
             }
+            // Close dropdown after applying sort
+            setTimeout(() => {
+              onClose?.();
+            }, 0);
           }}
+          onMouseDown={(e) => e.stopPropagation()}
           style={{
             display: 'flex',
             alignItems: 'center',

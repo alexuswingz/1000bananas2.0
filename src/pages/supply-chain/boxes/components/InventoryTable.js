@@ -78,12 +78,18 @@ const InventoryTable = forwardRef(({
     const handleClickOutside = (event) => {
       const icon = filterIconRefs.current[openFilterColumn];
       const dropdown = filterDropdownRef.current;
+      // Check if click is inside the dropdown or icon
       const inIcon = icon && icon.contains(event.target);
       const inDropdown = dropdown && dropdown.contains(event.target);
-      if (!inIcon && !inDropdown) setOpenFilterColumn(null);
+      // Also check if click is on any element with data-filter-dropdown attribute
+      const inFilterDropdown = event.target.closest && event.target.closest('[data-filter-dropdown]');
+      if (!inIcon && !inDropdown && !inFilterDropdown) {
+        setOpenFilterColumn(null);
+      }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    // Use 'click' instead of 'mousedown' to allow sort option clicks to work
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
   }, [openFilterColumn]);
 
   const handleFilterClick = (columnKey, e) => {
@@ -357,8 +363,8 @@ const InventoryTable = forwardRef(({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: idx === 0 ? 'space-between' : 'center',
-                    gap: '0.5rem',
+                    justifyContent: idx === 0 ? 'flex-start' : 'center',
+                    gap: '6px',
                     width: '100%',
                   }}
                 >
@@ -375,7 +381,7 @@ const InventoryTable = forwardRef(({
                       openFilterColumn === key ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                     }`}
                     onClick={(e) => handleFilterClick(key, e)}
-                    style={{ width: '12px', height: '12px' }}
+                    style={{ width: '12px', height: '12px', flexShrink: 0 }}
                   />
                 </div>
               </div>

@@ -519,7 +519,8 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
               onClose();
               navigate('/dashboard/production/shipment/new', {
                 state: {
-                  shipmentData: newShipment
+                  shipmentData: newShipment,
+                  fromPlanning: true
                 }
               });
             }}

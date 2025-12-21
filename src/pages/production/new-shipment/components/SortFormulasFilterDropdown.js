@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, forwardRef, useRef, useImperativeHandle } from 'react';
 import { createPortal } from 'react-dom';
 
-const SortFormulasFilterDropdown = ({ 
+const SortFormulasFilterDropdown = forwardRef(({ 
   filterIconRef, 
   columnKey, 
   availableValues = [], 
@@ -9,7 +9,7 @@ const SortFormulasFilterDropdown = ({
   currentSort = '',
   onApply,
   onClose 
-}) => {
+}, ref) => {
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [sortOrder, setSortOrder] = useState(currentSort); // 'asc' or 'desc'
   const [filterConditionExpanded, setFilterConditionExpanded] = useState(true);
@@ -132,8 +132,19 @@ const SortFormulasFilterDropdown = ({
     onClose?.();
   };
 
+  const dropdownRef = useRef(null);
+
+  // Expose the DOM element via ref
+  useImperativeHandle(ref, () => dropdownRef.current, []);
+  
+  // Ensure component always returns valid JSX
+  if (!columnKey) {
+    return null;
+  }
+
   return createPortal(
     <div
+      ref={dropdownRef}
       data-filter-dropdown={columnKey}
       style={{
         position: 'fixed',
@@ -148,12 +159,14 @@ const SortFormulasFilterDropdown = ({
         overflow: 'hidden',
       }}
       onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
     >
       {/* Sort Options */}
       <div style={{ padding: '8px 12px', borderBottom: '1px solid #E5E7EB' }}>
         {/* Sort Ascending */}
         <div
-          onClick={() => {
+          onClick={(e) => {
+            e.stopPropagation();
             const newOrder = sortOrder === 'asc' ? '' : 'asc';
             setSortOrder(newOrder);
             if (onApply) {
@@ -165,9 +178,9 @@ const SortFormulasFilterDropdown = ({
                 __fromSortClick: true,
               });
             }
-            // Close dropdown after applying sort
-            onClose?.();
+            // Keep dropdown open after applying sort
           }}
+          onMouseDown={(e) => e.stopPropagation()}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -175,19 +188,15 @@ const SortFormulasFilterDropdown = ({
             padding: '6px',
             cursor: 'pointer',
             borderRadius: '4px',
-            backgroundColor: sortOrder === 'asc' ? '#EFF6FF' : 'transparent',
+            backgroundColor: 'transparent',
             marginBottom: '6px',
             transition: 'background-color 0.2s',
           }}
           onMouseEnter={(e) => {
-            if (sortOrder !== 'asc') {
-              e.currentTarget.style.backgroundColor = '#F9FAFB';
-            }
+            e.currentTarget.style.backgroundColor = '#F9FAFB';
           }}
           onMouseLeave={(e) => {
-            if (sortOrder !== 'asc') {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }
+            e.currentTarget.style.backgroundColor = 'transparent';
           }}
         >
           <div
@@ -215,7 +224,8 @@ const SortFormulasFilterDropdown = ({
 
         {/* Sort Descending */}
         <div
-          onClick={() => {
+          onClick={(e) => {
+            e.stopPropagation();
             const newOrder = sortOrder === 'desc' ? '' : 'desc';
             setSortOrder(newOrder);
             if (onApply) {
@@ -227,9 +237,9 @@ const SortFormulasFilterDropdown = ({
                 __fromSortClick: true,
               });
             }
-            // Close dropdown after applying sort
-            onClose?.();
+            // Keep dropdown open after applying sort
           }}
+          onMouseDown={(e) => e.stopPropagation()}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -237,18 +247,14 @@ const SortFormulasFilterDropdown = ({
             padding: '6px',
             cursor: 'pointer',
             borderRadius: '4px',
-            backgroundColor: sortOrder === 'desc' ? '#EFF6FF' : 'transparent',
+            backgroundColor: 'transparent',
             transition: 'background-color 0.2s',
           }}
           onMouseEnter={(e) => {
-            if (sortOrder !== 'desc') {
-              e.currentTarget.style.backgroundColor = '#F9FAFB';
-            }
+            e.currentTarget.style.backgroundColor = '#F9FAFB';
           }}
           onMouseLeave={(e) => {
-            if (sortOrder !== 'desc') {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }
+            e.currentTarget.style.backgroundColor = 'transparent';
           }}
         >
           <div
@@ -605,6 +611,8 @@ const SortFormulasFilterDropdown = ({
     </div>,
     document.body
   );
-};
+});
+
+SortFormulasFilterDropdown.displayName = 'SortFormulasFilterDropdown';
 
 export default SortFormulasFilterDropdown;

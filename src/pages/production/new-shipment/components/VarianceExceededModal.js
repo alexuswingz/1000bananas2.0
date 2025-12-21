@@ -82,8 +82,7 @@ const VarianceExceededModal = ({ isOpen, onClose, onGoBack, onRecount, varianceC
             lineHeight: '1.5',
           }}
         >
-          {varianceCount} {varianceCount === 1 ? 'product has' : 'products have'} insufficient labels.<br />
-          Proceed anyway and mark as incomplete?
+          {varianceCount} {varianceCount === 1 ? 'product has' : 'products have'} insufficient labels. Proceed anyway and mark as incomplete?
         </p>
 
         <div

@@ -464,7 +464,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     marginBottom: '4px',
               }}
             >
-                  Ship From
+                  Ship From<span style={{ color: '#EF4444', marginLeft: '4px' }}>*</span>
                 </label>
                 <input
                   type="text"
@@ -502,7 +502,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     marginBottom: '4px',
                   }}
                 >
-                  Ship To
+                  Ship To<span style={{ color: '#EF4444', marginLeft: '4px' }}>*</span>
                 </label>
                 <input
                   type="text"
@@ -540,7 +540,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     marginBottom: '4px',
                   }}
                 >
-                  Carrier
+                  Carrier<span style={{ color: '#EF4444', marginLeft: '4px' }}>*</span>
                 </label>
                 <div
                   ref={carrierInputRef}

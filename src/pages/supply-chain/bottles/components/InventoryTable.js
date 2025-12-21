@@ -374,7 +374,7 @@ const InventoryTable = forwardRef(({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: idx === 0 ? 'flex-start' : 'center',
-                    gap: '0.5rem',
+                    gap: '6px',
                     position: 'relative',
                     width: '100%',
                   }}
@@ -396,8 +396,7 @@ const InventoryTable = forwardRef(({
                       style={{ 
                         width: '12px', 
                         height: '12px',
-                        position: idx === 0 ? 'static' : 'absolute',
-                        right: idx === 0 ? 'auto' : '0',
+                        flexShrink: 0,
                       }}
                     />
                   )}

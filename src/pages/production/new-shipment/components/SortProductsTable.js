@@ -29,6 +29,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
         size: product.size || '',
         qty: product.qty || 0,
         formula: product.formula_name || product.formula || '',
+        volume: product.volume || product.volume_gallons || '',
         productType: 'Liquid', // Default to Liquid for fertilizers
       }));
       setProducts(transformedProducts);
@@ -74,6 +75,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
     { key: 'size', label: 'SIZE', width: '100px' },
     { key: 'qty', label: 'QTY', width: '80px' },
     { key: 'formula', label: 'FORMULA', width: '180px' },
+    { key: 'volume', label: 'VOLUME', width: '100px' },
     { key: 'productType', label: 'TYPE', width: '100px' },
     { key: 'notes', label: 'NOTES', width: '80px' },
   ];
@@ -338,7 +340,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
     
     Object.keys(filters).forEach(columnKey => {
       const filter = filters[columnKey];
-      const isNumericColumn = columnKey === 'qty';
+      const isNumericColumn = columnKey === 'qty' || columnKey === 'volume';
       
       // Apply value filters (checkbox selections)
       if (filter.selectedValues && filter.selectedValues.size > 0) {
@@ -588,9 +590,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
                     style={{
                       backgroundColor: isDragging
                         ? (isDarkMode ? '#4B5563' : '#E5E7EB')
-                        : index % 2 === 0
-                        ? (isDarkMode ? '#1F2937' : '#FFFFFF')
-                        : (isDarkMode ? '#1A1F2E' : '#F9FAFB'),
+                        : (isDarkMode ? '#1F2937' : '#FFFFFF'),
                       borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
                       transition: isDragging ? 'none' : 'background-color 0.2s',
                       height: '40px',
@@ -607,9 +607,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
                     }}
                     onMouseLeave={(e) => {
                       if (!isDragging && draggedIndex === null) {
-                        e.currentTarget.style.backgroundColor = index % 2 === 0
-                          ? (isDarkMode ? '#1F2937' : '#FFFFFF')
-                          : (isDarkMode ? '#1A1F2E' : '#F9FAFB');
+                        e.currentTarget.style.backgroundColor = isDarkMode ? '#1F2937' : '#FFFFFF';
                       }
                     }}
                   >
@@ -765,6 +763,15 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
                   height: '40px',
                 }}>
                   {product.formula}
+                </td>
+                <td style={{
+                  padding: '0 16px',
+                  fontSize: '14px',
+                  fontWeight: 400,
+                  color: isDarkMode ? '#E5E7EB' : '#374151',
+                  height: '40px',
+                }}>
+                  {product.volume || ''}
                 </td>
                 <td style={{
                   padding: '0 16px',
