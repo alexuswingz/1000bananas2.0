@@ -36,6 +36,10 @@ const Bottles = () => {
   const [selectedBottle, setSelectedBottle] = useState(null);
   const [isEditingCoreInfo, setIsEditingCoreInfo] = useState(false);
   const [editedCoreInfo, setEditedCoreInfo] = useState({});
+  const [isEditingSupplierInfo, setIsEditingSupplierInfo] = useState(false);
+  const [editedSupplierInfo, setEditedSupplierInfo] = useState({});
+  const [isEditingDimensionsInfo, setIsEditingDimensionsInfo] = useState(false);
+  const [editedDimensionsInfo, setEditedDimensionsInfo] = useState({});
 
   // Delete confirmation modal state
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -181,6 +185,10 @@ const Bottles = () => {
     setDetailsSearch('');
     setIsEditingCoreInfo(false);
     setEditedCoreInfo({});
+    setIsEditingSupplierInfo(false);
+    setEditedSupplierInfo({});
+    setIsEditingDimensionsInfo(false);
+    setEditedDimensionsInfo({});
   };
 
   const handleSaveCoreInfo = () => {
@@ -212,6 +220,62 @@ const Bottles = () => {
   const handleCancelCoreInfoEdit = () => {
     setIsEditingCoreInfo(false);
     setEditedCoreInfo({});
+  };
+
+  const handleSaveSupplierInfo = () => {
+    if (!selectedBottle || !selectedBottle.details) return;
+    
+    const updatedDetails = {
+      ...selectedBottle.details,
+      supplier: {
+        ...selectedBottle.details.supplier,
+        ...editedSupplierInfo,
+      },
+    };
+    
+    setSelectedBottle({
+      ...selectedBottle,
+      details: updatedDetails,
+    });
+    
+    bottleDetails[selectedBottle.name] = updatedDetails;
+    
+    setIsEditingSupplierInfo(false);
+    setEditedSupplierInfo({});
+    showSuccessToast('Supplier Info updated successfully');
+  };
+
+  const handleCancelSupplierInfoEdit = () => {
+    setIsEditingSupplierInfo(false);
+    setEditedSupplierInfo({});
+  };
+
+  const handleSaveDimensionsInfo = () => {
+    if (!selectedBottle || !selectedBottle.details) return;
+    
+    const updatedDetails = {
+      ...selectedBottle.details,
+      dimensions: {
+        ...selectedBottle.details.dimensions,
+        ...editedDimensionsInfo,
+      },
+    };
+    
+    setSelectedBottle({
+      ...selectedBottle,
+      details: updatedDetails,
+    });
+    
+    bottleDetails[selectedBottle.name] = updatedDetails;
+    
+    setIsEditingDimensionsInfo(false);
+    setEditedDimensionsInfo({});
+    showSuccessToast('Dimensions Info updated successfully');
+  };
+
+  const handleCancelDimensionsInfoEdit = () => {
+    setIsEditingDimensionsInfo(false);
+    setEditedDimensionsInfo({});
   };
 
   const suppliers = [
@@ -1125,7 +1189,7 @@ const Bottles = () => {
       {/* Bottle Details Modal */}
       {isDetailsOpen && selectedBottle && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-2xl w-[800px] min-h-[550px] max-h-[550px] my-auto flex flex-col overflow-hidden">
+          <div className="bg-white rounded-xl shadow-2xl w-[800px] my-auto flex flex-col">
             {/* Header */}
             <div className={`${themeClasses.headerBg} flex items-center justify-between px-6 py-3`}>
               <div className="flex items-center gap-3">
@@ -1559,16 +1623,54 @@ const Bottles = () => {
 
               {activeDetailsTab === 'supplier' && (
                 <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-gray-900">Supplier Info</h3>
+                  <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+                    <h3 className="text-sm font-semibold text-gray-900">Supplier Info</h3>
+                    {!isEditingSupplierInfo && (
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingSupplierInfo(true)}
+                        className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-xs font-medium"
+                      >
+                        <svg
+                          className="w-3.5 h-3.5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                          />
+                        </svg>
+                        Edit Info
+                      </button>
+                    )}
+                  </div>
                   <div className="grid grid-cols-4 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">
                         Lead Time (Weeks)
                       </label>
                       <input
-                        defaultValue={selectedBottle.details?.supplier.leadTimeWeeks || ''}
+                        value={
+                          isEditingSupplierInfo
+                            ? editedSupplierInfo.leadTimeWeeks !== undefined
+                              ? editedSupplierInfo.leadTimeWeeks
+                              : selectedBottle.details?.supplier.leadTimeWeeks || ''
+                            : selectedBottle.details?.supplier.leadTimeWeeks || ''
+                        }
+                        onChange={(e) =>
+                          setEditedSupplierInfo({ ...editedSupplierInfo, leadTimeWeeks: e.target.value })
+                        }
+                        readOnly={!isEditingSupplierInfo}
                         placeholder={!selectedBottle.details?.supplier.leadTimeWeeks ? "Enter lead time" : ""}
-                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingSupplierInfo
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(
                           selectedBottle.details?.supplier.leadTimeWeeks || ''
                         )}`}
                       />
@@ -1576,9 +1678,23 @@ const Bottles = () => {
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">MOQ</label>
                       <input
-                        defaultValue={selectedBottle.details?.supplier.moq || ''}
+                        value={
+                          isEditingSupplierInfo
+                            ? editedSupplierInfo.moq !== undefined
+                              ? editedSupplierInfo.moq
+                              : selectedBottle.details?.supplier.moq || ''
+                            : selectedBottle.details?.supplier.moq || ''
+                        }
+                        onChange={(e) =>
+                          setEditedSupplierInfo({ ...editedSupplierInfo, moq: e.target.value })
+                        }
+                        readOnly={!isEditingSupplierInfo}
                         placeholder={!selectedBottle.details?.supplier.moq ? "Enter MOQ" : ""}
-                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingSupplierInfo
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(
                           selectedBottle.details?.supplier.moq || ''
                         )}`}
                       />
@@ -1588,9 +1704,23 @@ const Bottles = () => {
                         Units per Pallet
                       </label>
                       <input
-                        defaultValue={selectedBottle.details?.supplier.unitsPerPallet || ''}
+                        value={
+                          isEditingSupplierInfo
+                            ? editedSupplierInfo.unitsPerPallet !== undefined
+                              ? editedSupplierInfo.unitsPerPallet
+                              : selectedBottle.details?.supplier.unitsPerPallet || ''
+                            : selectedBottle.details?.supplier.unitsPerPallet || ''
+                        }
+                        onChange={(e) =>
+                          setEditedSupplierInfo({ ...editedSupplierInfo, unitsPerPallet: e.target.value })
+                        }
+                        readOnly={!isEditingSupplierInfo}
                         placeholder={!selectedBottle.details?.supplier.unitsPerPallet ? "Enter units per pallet" : ""}
-                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingSupplierInfo
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(
                           selectedBottle.details?.supplier.unitsPerPallet || ''
                         )}`}
                       />
@@ -1600,9 +1730,23 @@ const Bottles = () => {
                         Units per Case
                       </label>
                       <input
-                        defaultValue={selectedBottle.details?.supplier.unitsPerCase || ''}
+                        value={
+                          isEditingSupplierInfo
+                            ? editedSupplierInfo.unitsPerCase !== undefined
+                              ? editedSupplierInfo.unitsPerCase
+                              : selectedBottle.details?.supplier.unitsPerCase || ''
+                            : selectedBottle.details?.supplier.unitsPerCase || ''
+                        }
+                        onChange={(e) =>
+                          setEditedSupplierInfo({ ...editedSupplierInfo, unitsPerCase: e.target.value })
+                        }
+                        readOnly={!isEditingSupplierInfo}
                         placeholder={!selectedBottle.details?.supplier.unitsPerCase ? "Enter units per case" : ""}
-                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingSupplierInfo
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(
                           selectedBottle.details?.supplier.unitsPerCase || ''
                         )}`}
                       />
@@ -1612,29 +1756,100 @@ const Bottles = () => {
                         Cases per Pallet
                       </label>
                       <input
-                        defaultValue={selectedBottle.details?.supplier.casesPerPallet || ''}
+                        value={
+                          isEditingSupplierInfo
+                            ? editedSupplierInfo.casesPerPallet !== undefined
+                              ? editedSupplierInfo.casesPerPallet
+                              : selectedBottle.details?.supplier.casesPerPallet || ''
+                            : selectedBottle.details?.supplier.casesPerPallet || ''
+                        }
+                        onChange={(e) =>
+                          setEditedSupplierInfo({ ...editedSupplierInfo, casesPerPallet: e.target.value })
+                        }
+                        readOnly={!isEditingSupplierInfo}
                         placeholder={!selectedBottle.details?.supplier.casesPerPallet ? "Enter cases per pallet" : ""}
-                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingSupplierInfo
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(
                           selectedBottle.details?.supplier.casesPerPallet || ''
                         )}`}
                       />
                     </div>
                   </div>
+
+                  {isEditingSupplierInfo && (
+                    <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+                      <button
+                        type="button"
+                        onClick={handleCancelSupplierInfoEdit}
+                        className="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveSupplierInfo}
+                        className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                      >
+                        Save Changes
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
               {activeDetailsTab === 'dimensions' && (
                 <div className="space-y-4">
-                  <h3 className="text-sm font-semibold text-gray-900">Dimensions</h3>
+                  <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+                    <h3 className="text-sm font-semibold text-gray-900">Dimensions</h3>
+                    {!isEditingDimensionsInfo && (
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingDimensionsInfo(true)}
+                        className="flex items-center gap-1.5 text-blue-600 hover:text-blue-700 text-xs font-medium"
+                      >
+                        <svg
+                          className="w-3.5 h-3.5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                          />
+                        </svg>
+                        Edit Info
+                      </button>
+                    )}
+                  </div>
                   <div className="grid grid-cols-4 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">
                         Length (in)
                       </label>
                       <input
-                        defaultValue={selectedBottle.details?.dimensions.lengthIn || ''}
+                        value={
+                          isEditingDimensionsInfo
+                            ? editedDimensionsInfo.lengthIn !== undefined
+                              ? editedDimensionsInfo.lengthIn
+                              : selectedBottle.details?.dimensions.lengthIn || ''
+                            : selectedBottle.details?.dimensions.lengthIn || ''
+                        }
+                        onChange={(e) =>
+                          setEditedDimensionsInfo({ ...editedDimensionsInfo, lengthIn: e.target.value })
+                        }
+                        readOnly={!isEditingDimensionsInfo}
                         placeholder={!selectedBottle.details?.dimensions.lengthIn ? "Enter length" : ""}
-                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingDimensionsInfo
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(
                           selectedBottle.details?.dimensions.lengthIn || ''
                         )}`}
                       />
@@ -1644,9 +1859,23 @@ const Bottles = () => {
                         Width (in)
                       </label>
                       <input
-                        defaultValue={selectedBottle.details?.dimensions.widthIn || ''}
+                        value={
+                          isEditingDimensionsInfo
+                            ? editedDimensionsInfo.widthIn !== undefined
+                              ? editedDimensionsInfo.widthIn
+                              : selectedBottle.details?.dimensions.widthIn || ''
+                            : selectedBottle.details?.dimensions.widthIn || ''
+                        }
+                        onChange={(e) =>
+                          setEditedDimensionsInfo({ ...editedDimensionsInfo, widthIn: e.target.value })
+                        }
+                        readOnly={!isEditingDimensionsInfo}
                         placeholder={!selectedBottle.details?.dimensions.widthIn ? "Enter width" : ""}
-                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingDimensionsInfo
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(
                           selectedBottle.details?.dimensions.widthIn || ''
                         )}`}
                       />
@@ -1656,9 +1885,23 @@ const Bottles = () => {
                         Height (in)
                       </label>
                       <input
-                        defaultValue={selectedBottle.details?.dimensions.heightIn || ''}
+                        value={
+                          isEditingDimensionsInfo
+                            ? editedDimensionsInfo.heightIn !== undefined
+                              ? editedDimensionsInfo.heightIn
+                              : selectedBottle.details?.dimensions.heightIn || ''
+                            : selectedBottle.details?.dimensions.heightIn || ''
+                        }
+                        onChange={(e) =>
+                          setEditedDimensionsInfo({ ...editedDimensionsInfo, heightIn: e.target.value })
+                        }
+                        readOnly={!isEditingDimensionsInfo}
                         placeholder={!selectedBottle.details?.dimensions.heightIn ? "Enter height" : ""}
-                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingDimensionsInfo
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(
                           selectedBottle.details?.dimensions.heightIn || ''
                         )}`}
                       />
@@ -1668,9 +1911,23 @@ const Bottles = () => {
                         Weight (lbs) - Finished Good
                       </label>
                       <input
-                        defaultValue={selectedBottle.details?.dimensions.weightLbs || ''}
+                        value={
+                          isEditingDimensionsInfo
+                            ? editedDimensionsInfo.weightLbs !== undefined
+                              ? editedDimensionsInfo.weightLbs
+                              : selectedBottle.details?.dimensions.weightLbs || ''
+                            : selectedBottle.details?.dimensions.weightLbs || ''
+                        }
+                        onChange={(e) =>
+                          setEditedDimensionsInfo({ ...editedDimensionsInfo, weightLbs: e.target.value })
+                        }
+                        readOnly={!isEditingDimensionsInfo}
                         placeholder={!selectedBottle.details?.dimensions.weightLbs ? "Enter weight" : ""}
-                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingDimensionsInfo
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(
                           selectedBottle.details?.dimensions.weightLbs || ''
                         )}`}
                       />
@@ -1682,14 +1939,47 @@ const Bottles = () => {
                         Label Size
                       </label>
                       <input
-                        defaultValue={selectedBottle.details?.dimensions.labelSize || ''}
+                        value={
+                          isEditingDimensionsInfo
+                            ? editedDimensionsInfo.labelSize !== undefined
+                              ? editedDimensionsInfo.labelSize
+                              : selectedBottle.details?.dimensions.labelSize || ''
+                            : selectedBottle.details?.dimensions.labelSize || ''
+                        }
+                        onChange={(e) =>
+                          setEditedDimensionsInfo({ ...editedDimensionsInfo, labelSize: e.target.value })
+                        }
+                        readOnly={!isEditingDimensionsInfo}
                         placeholder={!selectedBottle.details?.dimensions.labelSize ? "Enter label size" : ""}
-                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm${getDetailsHighlightClass(
+                        className={`w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm ${
+                          isEditingDimensionsInfo
+                            ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
+                            : ''
+                        }${getDetailsHighlightClass(
                           selectedBottle.details?.dimensions.labelSize || ''
                         )}`}
                       />
                     </div>
                   </div>
+
+                  {isEditingDimensionsInfo && (
+                    <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+                      <button
+                        type="button"
+                        onClick={handleCancelDimensionsInfoEdit}
+                        className="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveDimensionsInfo}
+                        className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                      >
+                        Save Changes
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1748,42 +2038,6 @@ const Bottles = () => {
                   </div>
                 </div>
               )}
-            </div>
-
-            {/* Footer */}
-            <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-white">
-              <button
-                type="button"
-                className="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                onClick={() => setIsDetailsOpen(false)}
-              >
-                Cancel
-              </button>
-              <div className="flex items-center gap-4">
-                <button
-                  type="button"
-                  className="text-xs font-medium text-blue-600 hover:text-blue-700"
-                  onClick={() => {
-                    // Placeholder for save for later functionality
-                    setIsDetailsOpen(false);
-                  }}
-                >
-                  Save for Later
-                </button>
-                <button
-                  type="button"
-                  className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-                  onClick={() => {
-                    // Placeholder for save changes functionality
-                    if (isEditingCoreInfo) {
-                      handleSaveCoreInfo();
-                    }
-                    setIsDetailsOpen(false);
-                  }}
-                >
-                  Save Changes
-                </button>
-              </div>
             </div>
           </div>
         </div>

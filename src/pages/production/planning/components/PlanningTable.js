@@ -147,7 +147,26 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
 
   // Render status circle based on status
   const renderStatusCircle = (status, hasComment = false, commentText = '', rowId = null, commentData = {}, statusFieldName = null, row = null) => {
-    const normalizedStatus = status?.toLowerCase();
+    // Base status from row field
+    const baseStatus = (status || 'pending').toLowerCase();
+
+    // Derive "in progress" from the shipment's current workflow status
+    // so that when you're actively working a step in New Shipment, Planning shows it as blue.
+    let normalizedStatus = baseStatus;
+    const workflowStatus = row?.workflowStatus; // e.g. 'label_check', 'formula_check', 'book_shipment', 'sort_products', 'sort_formulas'
+
+    // Only override to "in progress" if status is not already "completed" or "incomplete"
+    if (normalizedStatus !== 'completed' && normalizedStatus !== 'incomplete' && workflowStatus) {
+      if (
+        (statusFieldName === 'labelCheck' && workflowStatus === 'label_check') ||
+        (statusFieldName === 'formulaCheck' && workflowStatus === 'formula_check') ||
+        (statusFieldName === 'bookShipment' && workflowStatus === 'book_shipment') ||
+        (statusFieldName === 'sortProducts' && workflowStatus === 'sort_products') ||
+        (statusFieldName === 'sortFormulas' && workflowStatus === 'sort_formulas')
+      ) {
+        normalizedStatus = 'in progress';
+      }
+    }
     let circleColor;
     let borderStyle = 'none';
 
@@ -162,17 +181,52 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
       case 'completed':
         circleColor = '#10B981'; // Green
         break;
+      case 'incomplete':
+        circleColor = '#F59E0B'; // Orange for incomplete
+        borderStyle = 'none';
+        break;
       default:
         circleColor = '#FFFFFF'; // Default to white (Pending)
         borderStyle = '1px solid #D1D5DB'; // Light gray outline
     }
 
-    // Force orange when there's an outstanding comment on label or formula check
-    // OR when status is pending (not completed) for label or formula check
-    // But don't override if status is already completed (green)
-    if ((statusFieldName === 'labelCheck' || statusFieldName === 'formulaCheck') && normalizedStatus !== 'completed') {
-      if (hasComment || normalizedStatus === 'pending') {
-        circleColor = '#F59E0B'; // Orange for comment/incomplete/pending
+    // Force orange when incomplete (status is 'incomplete' OR has comment OR workflow moved past without completing)
+    // Priority: Completed (green) > In Progress (blue) > Incomplete (orange) > Pending (white)
+    // If status is already 'incomplete', it's already orange from the switch statement
+    // Otherwise, check if it should be incomplete
+    if (normalizedStatus === 'incomplete') {
+      // Already handled in switch statement above
+    } else if (normalizedStatus !== 'completed' && normalizedStatus !== 'in progress') {
+      let isIncomplete = false;
+      
+      // Check if has comment
+      if (hasComment && commentText) {
+        isIncomplete = true;
+      }
+      // OR check if workflow has moved past this step (indicating it was marked incomplete)
+      else if (workflowStatus) {
+        const workflowSteps = ['add_products', 'label_check', 'formula_check', 'book_shipment', 'sort_products', 'sort_formulas'];
+        const currentStepIndex = workflowSteps.findIndex(step => {
+          const stepMap = {
+            'addProducts': 'add_products',
+            'labelCheck': 'label_check',
+            'formulaCheck': 'formula_check',
+            'bookShipment': 'book_shipment',
+            'sortProducts': 'sort_products',
+            'sortFormulas': 'sort_formulas'
+          };
+          return step === stepMap[statusFieldName];
+        });
+        const workflowStepIndex = workflowSteps.indexOf(workflowStatus);
+        
+        // If workflow has moved past this step, it means it was marked incomplete
+        if (currentStepIndex >= 0 && workflowStepIndex > currentStepIndex) {
+          isIncomplete = true;
+        }
+      }
+      
+      if (isIncomplete) {
+        circleColor = '#F59E0B'; // Orange for incomplete
         borderStyle = 'none';
       }
     }

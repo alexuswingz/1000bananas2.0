@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../../../context/ThemeContext';
 import PlanningHeader from './components/PlanningHeader';
@@ -141,6 +141,9 @@ const Planning = () => {
           }
   }, [location.state]);
 
+  // Track last fetch time to prevent unnecessary refetches
+  const lastFetchRef = useRef(0);
+
   // Fetch shipments from API
   useEffect(() => {
     if (activeTab === 'shipments') {
@@ -148,9 +151,37 @@ const Planning = () => {
     }
   }, [activeTab]);
 
+  // Track previous location key to detect navigation
+  const prevLocationKeyRef = useRef(location.key || 'initial');
+
+  // Refetch shipments when navigating to this page (e.g., from "Go to Shipments" button)
+  useEffect(() => {
+    if (location.pathname === '/dashboard/production/planning' && activeTab === 'shipments') {
+      // Check if location key changed (indicates navigation occurred)
+      const currentKey = location.key || 'default';
+      const locationKeyChanged = currentKey !== prevLocationKeyRef.current;
+      const now = Date.now();
+      const timeSinceLastFetch = now - lastFetchRef.current;
+      
+      // Refresh if location key changed OR if refresh flag is set OR if it's been more than 2 seconds since last fetch
+      if (location.state?.refresh || (locationKeyChanged && prevLocationKeyRef.current !== 'initial') || timeSinceLastFetch > 2000) {
+        const timer = setTimeout(() => {
+          fetchShipments();
+          lastFetchRef.current = Date.now();
+          prevLocationKeyRef.current = currentKey;
+        }, 100);
+        return () => clearTimeout(timer);
+      } else {
+        // Update the ref even if we don't fetch, to track the current key
+        prevLocationKeyRef.current = currentKey;
+      }
+    }
+  }, [location.pathname, location.key, location.state, activeTab]);
+
   const fetchShipments = async () => {
     setLoading(true);
     setError(null);
+    lastFetchRef.current = Date.now(); // Update last fetch time
     try {
       const data = await getAllShipments();
       // Transform API data to match your table format
@@ -161,21 +192,54 @@ const Planning = () => {
         const hasLabelComment = !!(shipment.label_check_comment && shipment.label_check_comment.trim());
         const labelCommentText = shipment.label_check_comment || '';
 
+        // Determine status for each step
+        // Completed takes priority, then in progress (if workflow is on that step), then incomplete (if workflow moved past), then pending
+        const isBookShipmentCompleted = shipment.book_shipment_completed || 
+          shipment.status === 'sort_products' || 
+          shipment.status === 'sort_formulas';
+        
+        // Helper function to determine step status
+        const getStepStatus = (completed, currentStepStatus, workflowStatus, hasComment) => {
+          // If completed, always show as completed
+          if (completed) return 'completed';
+          
+          // If workflow is currently on this step, show as in progress
+          if (workflowStatus && workflowStatus === currentStepStatus) return 'in progress';
+          
+          // If has comment, it's incomplete
+          if (hasComment) return 'incomplete';
+          
+          // Check if workflow has moved past this step (incomplete)
+          // Only check if workflowStatus is valid
+          if (workflowStatus) {
+            const workflowSteps = ['add_products', 'label_check', 'formula_check', 'book_shipment', 'sort_products', 'sort_formulas'];
+            const currentStepIndex = workflowSteps.indexOf(currentStepStatus);
+            const workflowStepIndex = workflowSteps.indexOf(workflowStatus);
+            
+            // If workflow has moved past this step and it's not completed, it's incomplete
+            if (currentStepIndex >= 0 && workflowStepIndex > currentStepIndex) {
+              return 'incomplete'; // Workflow moved past without completing
+            }
+          }
+          
+          // Otherwise, it's pending
+          return 'pending';
+        };
+        
         return {
         id: shipment.id,
         status: getStatusDisplay(shipment.status),
         statusColor: getStatusColor(shipment.status),
+        workflowStatus: shipment.status, // Raw status value for determining in-progress steps (e.g., 'label_check', 'formula_check')
         shipment: shipment.shipment_number,
         marketplace: shipment.marketplace || 'Amazon',
         account: shipment.account || 'TPS Nutrients',
-        addProducts: shipment.add_products_completed ? 'completed' : 'pending',
-        // If formula_check_completed is false but has comment, show as 'pending' (will display orange)
-        formulaCheck: shipment.formula_check_completed ? 'completed' : 'pending',
-        // If label_check_completed is false but has comment, show as 'pending' (will display orange)
-        labelCheck: shipment.label_check_completed ? 'completed' : 'pending',
-        bookShipment: shipment.book_shipment_completed ? 'completed' : 'pending',
-        sortProducts: shipment.sort_products_completed ? 'completed' : 'pending',
-        sortFormulas: shipment.sort_formulas_completed ? 'completed' : 'pending',
+        addProducts: getStepStatus(shipment.add_products_completed, 'add_products', shipment.status, false),
+        formulaCheck: getStepStatus(shipment.formula_check_completed, 'formula_check', shipment.status, hasFormulaComment),
+        labelCheck: getStepStatus(shipment.label_check_completed, 'label_check', shipment.status, hasLabelComment),
+        bookShipment: isBookShipmentCompleted ? 'completed' : (shipment.status === 'book_shipment' ? 'in progress' : 'pending'),
+        sortProducts: getStepStatus(shipment.sort_products_completed, 'sort_products', shipment.status, false),
+        sortFormulas: getStepStatus(shipment.sort_formulas_completed, 'sort_formulas', shipment.status, false),
           formulaCheckComment: hasFormulaComment,
           formulaCheckCommentText: formulaCommentText,
           labelCheckComment: hasLabelComment,
