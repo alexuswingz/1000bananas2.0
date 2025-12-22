@@ -991,12 +991,12 @@ const NewShipmentHeader = ({
             <svg width="16" height="16" viewBox="0 0 24 24" fill="#10B981">
               <circle cx="12" cy="12" r="6"/>
             </svg>
-          ) : (labelCheckHasComment || labelCheckRemainingCount > 0) ? (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="#F59E0B">
-              <circle cx="12" cy="12" r="6"/>
-            </svg>
           ) : activeAction === 'label-check' ? (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="#007AFF">
+              <circle cx="12" cy="12" r="6"/>
+            </svg>
+          ) : (labelCheckHasComment || labelCheckRemainingCount > 0) ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#F59E0B">
               <circle cx="12" cy="12" r="6"/>
             </svg>
           ) : (
@@ -1029,12 +1029,12 @@ const NewShipmentHeader = ({
             <svg width="16" height="16" viewBox="0 0 24 24" fill="#10B981">
               <circle cx="12" cy="12" r="6"/>
             </svg>
-          ) : (formulaCheckHasComment || formulaCheckRemainingCount > 0) ? (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="#F59E0B">
-              <circle cx="12" cy="12" r="6"/>
-            </svg>
           ) : activeAction === 'formula-check' ? (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="#007AFF">
+              <circle cx="12" cy="12" r="6"/>
+            </svg>
+          ) : (formulaCheckHasComment || formulaCheckRemainingCount > 0) ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#F59E0B">
               <circle cx="12" cy="12" r="6"/>
             </svg>
           ) : (
@@ -1131,7 +1131,11 @@ const NewShipmentHeader = ({
             whiteSpace: 'nowrap',
           }}
         >
-          {activeAction === 'sort-formulas' ? (
+          {completedTabs.has('sort-formulas') ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#10B981">
+              <circle cx="12" cy="12" r="6"/>
+            </svg>
+          ) : activeAction === 'sort-formulas' ? (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="#007AFF">
               <circle cx="12" cy="12" r="6"/>
             </svg>

@@ -2834,7 +2834,7 @@ const NewShipment = () => {
               // Update shipment to mark add_products as completed
               await updateShipment(newShipmentId, {
                 add_products_completed: true,
-                status: 'formula_check',
+                status: 'label_check',
               });
               
               // Mark 'add-products' and 'export' as completed
@@ -2864,8 +2864,8 @@ const NewShipment = () => {
             setExportCompleted(true);
           }
           
-          // After exporting, move to Formula Check and keep footer visible
-          setActiveAction('formula-check');
+          // After exporting, move to Label Check and keep footer visible
+          setActiveAction('label-check');
         }}
         products={products.map((product, index) => ({
           ...product,
