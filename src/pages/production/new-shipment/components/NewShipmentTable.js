@@ -325,12 +325,17 @@ const NewShipmentTable = ({
                 return sort.order === 'asc' ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
               }
               continue;
-            case 'qty':
+            case 'normal-4':
+            case 'qty': {
+              // Qty values are stored in effectiveQtyValues, indexed by original row index
               const aIndex = a._originalIndex !== undefined ? a._originalIndex : rows.indexOf(a);
               const bIndex = b._originalIndex !== undefined ? b._originalIndex : rows.indexOf(b);
-              aVal = effectiveQtyValues[aIndex] || 0;
-              bVal = effectiveQtyValues[bIndex] || 0;
+              const aQty = effectiveQtyValues[aIndex];
+              const bQty = effectiveQtyValues[bIndex];
+              aVal = typeof aQty === 'number' ? aQty : (aQty === '' || aQty === null || aQty === undefined ? 0 : parseInt(aQty, 10) || 0);
+              bVal = typeof bQty === 'number' ? bQty : (bQty === '' || bQty === null || bQty === undefined ? 0 : parseInt(bQty, 10) || 0);
               break;
+            }
             default: {
               const field = getFieldForHeaderFilter(sort.column);
               aVal = a[field];
@@ -360,7 +365,7 @@ const NewShipmentTable = ({
     }
     
     return result;
-  }, [rows, activeFilters, columnFilters, columnSortConfig]);
+  }, [rows, activeFilters, columnFilters, columnSortConfig, effectiveQtyValues]);
 
   // Apply selection filter only in table mode
   const filteredRowsWithSelection = useMemo(() => {
