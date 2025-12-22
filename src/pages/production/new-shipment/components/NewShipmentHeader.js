@@ -23,8 +23,8 @@ const NewShipmentHeader = ({
   productsAddedAfterExport = false,
 }) => {
   // Stepper logic - determine which tabs are accessible
-  // Formula Check and Label Check can be done in ANY order after Add Products
-  const tabOrder = ['add-products', 'formula-check', 'label-check', 'book-shipment', 'sort-products', 'sort-formulas'];
+  // Workflow: Add Products → Label Check → Formula Check → Book Shipment → Sort Products → Sort Formulas
+  const tabOrder = ['add-products', 'label-check', 'formula-check', 'book-shipment', 'sort-products', 'sort-formulas'];
   
   const isTabAccessible = (tabName) => {
     // add-products is always accessible
@@ -33,14 +33,23 @@ const NewShipmentHeader = ({
     // Completed tabs are always accessible
     if (completedTabs.has(tabName)) return true;
     
-    // Formula Check and Label Check can be done in ANY order after Add Products is completed
-    if (tabName === 'formula-check' || tabName === 'label-check') {
+    // Label Check comes first after Add Products, then Formula Check
+    if (tabName === 'label-check') {
       // Block if there are unexported products
       if (productsAddedAfterExport) {
         return false;
       }
       // Accessible once add-products is completed
       return completedTabs.has('add-products');
+    }
+    
+    if (tabName === 'formula-check') {
+      // Block if there are unexported products
+      if (productsAddedAfterExport) {
+        return false;
+      }
+      // Accessible once label-check is completed
+      return completedTabs.has('label-check');
     }
     
     // Book Shipment, Sort Products, Sort Formulas require BOTH formula-check AND label-check
@@ -75,7 +84,7 @@ const NewShipmentHeader = ({
   // Check if tab is blocked due to unexported products
   const isBlockedByUnexportedProducts = (tabName) => {
     const targetIndex = tabOrder.indexOf(tabName);
-    return targetIndex >= tabOrder.indexOf('formula-check') && productsAddedAfterExport;
+    return targetIndex >= tabOrder.indexOf('label-check') && productsAddedAfterExport;
   };
   const navigate = useNavigate();
   const { isDarkMode } = useTheme();

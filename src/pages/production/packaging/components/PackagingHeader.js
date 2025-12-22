@@ -16,7 +16,7 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
   };
 
   const tabs = [
-    { id: 'active', label: 'Active Queue' },
+    { id: 'active', label: 'Current List' },
     { id: 'archive', label: 'Archive' },
   ];
 

@@ -51,11 +51,15 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
           />
         );
       case 'fillLevel':
-        // Teardrop/drop icon
+        // Container/fill level icon
         return (
-          <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill={iconColor} style={svgStyle}>
-            <path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z" />
-          </svg>
+          <img 
+            src="/assets/Container.png" 
+            alt="Fill Level" 
+            width={iconSize} 
+            height={iconSize} 
+            style={{ display: 'block', objectFit: 'contain' }}
+          />
         );
       case 'seal':
         // Padlock icon

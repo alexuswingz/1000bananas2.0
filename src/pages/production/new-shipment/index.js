@@ -928,21 +928,21 @@ const NewShipment = () => {
         toast.success(`${productsToAdd.length} products added to shipment`);
       }
       
-      // Update shipment to mark add_products as completed and move to formula_check
+      // Update shipment to mark add_products as completed and move to label_check
       await updateShipment(currentShipmentId, {
         add_products_completed: true,
-        status: 'formula_check',
+        status: 'label_check',
       });
       
-      // Mark 'add-products' as completed when navigating to 'formula-check'
+      // Mark 'add-products' as completed when navigating to 'label-check'
       setCompletedTabs(prev => {
         const newSet = new Set(prev);
         newSet.add('add-products');
         return newSet;
       });
-      setActiveAction('formula-check');
+      setActiveAction('label-check');
       setIsShipmentDetailsOpen(false);
-      toast.success('Moving to Formula Check');
+      toast.success('Moving to Label Check');
     } catch (error) {
       console.error('Error booking shipment:', error);
       toast.error('Failed to book shipment: ' + error.message);
@@ -1009,11 +1009,11 @@ const NewShipment = () => {
     const updateData = isIncomplete
       ? {
           formula_check_completed: false,
-          status: 'label_check', // still move forward but keep formula check incomplete
+          status: 'book_shipment', // still move forward but keep formula check incomplete
         }
       : {
           formula_check_completed: true,
-          status: 'label_check',
+          status: 'book_shipment',
         };
     
     // Store comment in dedicated formula_check_comment column
@@ -1031,13 +1031,13 @@ const NewShipment = () => {
         newSet.delete('formula-check');
         return newSet;
       });
-      setActiveAction('label-check');
-      toast.info('Formula Check comment saved. Proceeding to Label Check.');
+      setActiveAction('book-shipment');
+      toast.info('Formula Check comment saved. Proceeding to Book Shipment.');
     } else {
       setFormulaCheckHasComment(hasComment);
       setCompletedTabs(prev => new Set(prev).add('formula-check'));
-      setActiveAction('label-check');
-      toast.success('Formula Check completed! Moving to Label Check');
+      setActiveAction('book-shipment');
+      toast.success('Formula Check completed! Moving to Book Shipment');
     }
   };
 
@@ -1051,11 +1051,11 @@ const NewShipment = () => {
     const updateData = isIncomplete
       ? {
           label_check_completed: false,
-          status: 'book_shipment',
+          status: 'formula_check',
         }
       : {
           label_check_completed: true,
-          status: 'book_shipment',
+          status: 'formula_check',
         };
 
     // Store comment in dedicated label_check_comment column
@@ -1072,12 +1072,12 @@ const NewShipment = () => {
         newSet.delete('label-check');
         return newSet;
       });
-      setActiveAction('book-shipment');
-      toast.info('Label Check comment saved. Proceeding to Book Shipment.');
+      setActiveAction('formula-check');
+      toast.info('Label Check comment saved. Proceeding to Formula Check.');
     } else {
       setCompletedTabs(prev => new Set(prev).add('label-check'));
-      setActiveAction('book-shipment');
-      toast.success('Label Check completed! Moving to Book Shipment.');
+      setActiveAction('formula-check');
+      toast.success('Label Check completed! Moving to Formula Check.');
     }
   };
 
@@ -1089,7 +1089,7 @@ const NewShipment = () => {
       }
 
       // WORKFLOW PROGRESSION:
-      // add-products → formula-check → label-check → (review) → sort-products → sort-formulas
+      // add-products → label-check → formula-check → book-shipment → sort-products → sort-formulas
 
       if (activeAction === 'formula-check') {
         // Formula Check: Verify formulas are reviewed, then move to Label Check
@@ -1121,14 +1121,14 @@ const NewShipment = () => {
           return;
         }
         
-        // Label Check: Complete and move to Book Shipment
+        // Label Check: Complete and move to Formula Check
         await updateShipment(shipmentId, {
           label_check_completed: true,
-          status: 'book_shipment',
+          status: 'formula_check',
         });
         setCompletedTabs(prev => new Set(prev).add('label-check'));
-        setActiveAction('book-shipment');
-        toast.success('Label Check completed! Moving to Book Shipment.');
+        setActiveAction('formula-check');
+        toast.success('Label Check completed! Moving to Formula Check.');
         return;
       }
 
@@ -2833,8 +2833,8 @@ const NewShipment = () => {
             setExportCompleted(true);
           }
           
-          // After exporting, move to Formula Check and keep footer visible
-          setActiveAction('formula-check');
+          // After exporting, move to Label Check and keep footer visible
+          setActiveAction('label-check');
         }}
         products={products.map((product, index) => ({
           ...product,

@@ -9,6 +9,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
   const filterDropdownRef = useRef(null);
   const [filters, setFilters] = useState({});
   const [sortConfig, setSortConfig] = useState({ field: '', order: '' });
+  const [addProductsFilterValues, setAddProductsFilterValues] = useState(new Set(['completed', 'pending', 'in progress'])); // Default: both Added and Not Added checked
   const [hoveredCommentId, setHoveredCommentId] = useState(null);
   const iconRefs = useRef({});
   const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 });
@@ -31,6 +32,13 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
     // Check if there's an active filter for this column or if sorting is applied
     const hasFilter = filters[key] !== undefined;
     const hasSorting = sortConfig.field === key && sortConfig.order !== '';
+    // For addProducts, check if filter values are not default (both checked)
+    if (key === 'addProducts') {
+      const defaultValues = new Set(['completed', 'pending', 'in progress']);
+      const isDefault = addProductsFilterValues.size === defaultValues.size && 
+        [...addProductsFilterValues].every(v => defaultValues.has(v));
+      return !isDefault || hasFilter || hasSorting || activeFilters.includes(key);
+    }
     return hasFilter || hasSorting || activeFilters.includes(key);
   };
 
@@ -470,6 +478,11 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         }
       }));
     }
+
+    // Update addProducts filter values if provided
+    if (filterConfig.addProductsFilterValues !== undefined) {
+      setAddProductsFilterValues(filterConfig.addProductsFilterValues);
+    }
     
     setOpenFilterColumn(null);
   };
@@ -478,13 +491,23 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
   const handleResetFilter = () => {
     setSortConfig({ field: '', order: '' });
     setFilters({});
+    setAddProductsFilterValues(new Set(['completed', 'pending', 'in progress'])); // Reset to default
   };
 
   // Apply filters and sorting to rows
   const getFilteredAndSortedRows = () => {
     let filteredRows = [...rows];
 
-    // Apply filters
+    // Apply addProducts filter by values
+    if (addProductsFilterValues.size > 0 && addProductsFilterValues.size < 3) {
+      // Only filter if not all values are selected (default state)
+      filteredRows = filteredRows.filter(row => {
+        const status = row.addProducts?.toLowerCase() || 'pending';
+        return addProductsFilterValues.has(status);
+      });
+    }
+
+    // Apply other filters
     Object.keys(filters).forEach(field => {
       const filter = filters[field];
       filteredRows = filteredRows.filter(row => {
@@ -729,6 +752,12 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
             </th>
             <th
               className="text-center text-white uppercase tracking-wider group cursor-pointer"
+              onClick={(e) => {
+                // Only open filter if clicking on header, not on filter icon
+                if (!e.target.closest('img')) {
+                  handleFilterClick('addProducts', e);
+                }
+              }}
               style={{
                 padding: '0.5rem 1rem',
                 width: '12%',
@@ -737,11 +766,12 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                 borderRight: `1px solid #FFFFFF`,
                 boxSizing: 'border-box',
                 position: 'relative',
+                color: (isFilterActive('addProducts') || openFilterColumn === 'addProducts') ? '#007AFF' : '#FFFFFF',
               }}
             >
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.1', gap: '1px' }}>
-                <span style={{ fontSize: '9px', fontWeight: 600 }}>ADD</span>
-                <span style={{ fontSize: '9px', fontWeight: 600 }}>PRODUCTS</span>
+                <span style={{ fontSize: '9px', fontWeight: 600, color: (isFilterActive('addProducts') || openFilterColumn === 'addProducts') ? '#007AFF' : '#FFFFFF' }}>ADD</span>
+                <span style={{ fontSize: '9px', fontWeight: 600, color: (isFilterActive('addProducts') || openFilterColumn === 'addProducts') ? '#007AFF' : '#FFFFFF' }}>PRODUCTS</span>
               </div>
               <img
                 ref={(el) => { if (el) filterIconRefs.current['addProducts'] = el; }}
@@ -1313,6 +1343,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
           currentSort={sortConfig}
           currentFilters={filters}
           isDarkMode={isDarkMode}
+          addProductsFilterValues={openFilterColumn === 'addProducts' ? addProductsFilterValues : undefined}
         />
       )}
     </div>
@@ -1403,7 +1434,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
 };
 
 // FilterDropdown Component
-const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, onApply, onReset, currentSort, currentFilters, isDarkMode }, ref) => {
+const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, onApply, onReset, currentSort, currentFilters, isDarkMode, addProductsFilterValues: initialAddProductsFilterValues }, ref) => {
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [sortField, setSortField] = useState(currentSort?.field || '');
   const [sortOrder, setSortOrder] = useState(currentSort?.order || '');
@@ -1413,6 +1444,12 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
   const [filterField, setFilterField] = useState(existingFilter ? existingFilter[0] : '');
   const [filterCondition, setFilterCondition] = useState(existingFilter ? existingFilter[1].condition : '');
   const [filterValue, setFilterValue] = useState(existingFilter ? existingFilter[1].value : '');
+  
+  // For addProducts column: Filter by values
+  const defaultAddProductsValues = new Set(['completed', 'pending', 'in progress']);
+  const [addProductsFilterValues, setAddProductsFilterValues] = useState(
+    initialAddProductsFilterValues || defaultAddProductsValues
+  );
 
   useEffect(() => {
     if (filterIconRef) {
@@ -1460,6 +1497,9 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
     setFilterField('');
     setFilterCondition('');
     setFilterValue('');
+    if (columnKey === 'addProducts') {
+      setAddProductsFilterValues(defaultAddProductsValues);
+    }
     if (onReset) {
       onReset();
     }
@@ -1468,15 +1508,31 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
 
   const handleLocalApply = () => {
     if (onApply) {
-      onApply({
+      const applyData = {
         sortField,
         sortOrder,
         filterField,
         filterCondition,
         filterValue,
-      });
+      };
+      if (columnKey === 'addProducts') {
+        applyData.addProductsFilterValues = addProductsFilterValues;
+      }
+      onApply(applyData);
     }
     onClose();
+  };
+
+  const handleToggleAddProductsValue = (value) => {
+    setAddProductsFilterValues(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(value)) {
+        newSet.delete(value);
+      } else {
+        newSet.add(value);
+      }
+      return newSet;
+    });
   };
 
   const sortFields = [
@@ -1599,72 +1655,151 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
         </div>
       </div>
 
-      {/* Filter by condition section */}
-      <div style={{ marginBottom: '16px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
-        <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', textTransform: 'uppercase', marginBottom: '12px', display: 'block' }}>
-          Filter by condition:
-        </label>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <select
-            value={filterField}
-            onChange={(e) => setFilterField(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              border: '1px solid #D1D5DB',
-              borderRadius: '6px',
-              fontSize: '0.875rem',
-              color: filterField ? '#374151' : '#9CA3AF',
-              backgroundColor: '#FFFFFF',
-              cursor: 'pointer',
-            }}
-          >
-            {filterFields.map((field) => (
-              <option key={field.value} value={field.value}>
-                {field.label}
-              </option>
-            ))}
-          </select>
+      {/* Filter by values section (for addProducts column) */}
+      {columnKey === 'addProducts' && (
+        <div style={{ marginBottom: '16px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
+          <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', textTransform: 'uppercase', marginBottom: '12px', display: 'block' }}>
+            Filter by values:
+          </label>
           
-          <select
-            value={filterCondition}
-            onChange={(e) => setFilterCondition(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              border: '1px solid #D1D5DB',
-              borderRadius: '6px',
-              fontSize: '0.875rem',
-              color: filterCondition ? '#374151' : '#9CA3AF',
-              backgroundColor: '#FFFFFF',
-              cursor: 'pointer',
-            }}
-          >
-            {filterConditions.map((condition) => (
-              <option key={condition.value} value={condition.value}>
-                {condition.label}
-              </option>
-            ))}
-          </select>
-          
-          <input
-            type="text"
-            placeholder="Value here..."
-            value={filterValue}
-            onChange={(e) => setFilterValue(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              border: '1px solid #D1D5DB',
-              borderRadius: '6px',
-              fontSize: '0.875rem',
-              color: '#374151',
-              backgroundColor: '#FFFFFF',
-            }}
-          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                padding: '6px 0',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={addProductsFilterValues.has('completed')}
+                onChange={() => handleToggleAddProductsValue('completed')}
+                style={{
+                  width: '16px',
+                  height: '16px',
+                  cursor: 'pointer',
+                  accentColor: '#3B82F6',
+                }}
+              />
+              <span style={{ fontSize: '0.875rem', color: '#374151' }}>Added</span>
+            </label>
+            
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                padding: '6px 0',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={addProductsFilterValues.has('pending') && addProductsFilterValues.has('in progress')}
+                onChange={() => {
+                  const hasPending = addProductsFilterValues.has('pending');
+                  const hasInProgress = addProductsFilterValues.has('in progress');
+                  if (hasPending && hasInProgress) {
+                    // Both checked, uncheck both
+                    setAddProductsFilterValues(prev => {
+                      const newSet = new Set(prev);
+                      newSet.delete('pending');
+                      newSet.delete('in progress');
+                      return newSet;
+                    });
+                  } else {
+                    // Check both
+                    setAddProductsFilterValues(prev => {
+                      const newSet = new Set(prev);
+                      newSet.add('pending');
+                      newSet.add('in progress');
+                      return newSet;
+                    });
+                  }
+                }}
+                style={{
+                  width: '16px',
+                  height: '16px',
+                  cursor: 'pointer',
+                  accentColor: '#3B82F6',
+                }}
+              />
+              <span style={{ fontSize: '0.875rem', color: '#374151' }}>Not Added</span>
+            </label>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Filter by condition section */}
+      {columnKey !== 'addProducts' && (
+        <div style={{ marginBottom: '16px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
+          <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', textTransform: 'uppercase', marginBottom: '12px', display: 'block' }}>
+            Filter by condition:
+          </label>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <select
+              value={filterField}
+              onChange={(e) => setFilterField(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                border: '1px solid #D1D5DB',
+                borderRadius: '6px',
+                fontSize: '0.875rem',
+                color: filterField ? '#374151' : '#9CA3AF',
+                backgroundColor: '#FFFFFF',
+                cursor: 'pointer',
+              }}
+            >
+              {filterFields.map((field) => (
+                <option key={field.value} value={field.value}>
+                  {field.label}
+                </option>
+              ))}
+            </select>
+            
+            <select
+              value={filterCondition}
+              onChange={(e) => setFilterCondition(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                border: '1px solid #D1D5DB',
+                borderRadius: '6px',
+                fontSize: '0.875rem',
+                color: filterCondition ? '#374151' : '#9CA3AF',
+                backgroundColor: '#FFFFFF',
+                cursor: 'pointer',
+              }}
+            >
+              {filterConditions.map((condition) => (
+                <option key={condition.value} value={condition.value}>
+                  {condition.label}
+                </option>
+              ))}
+            </select>
+            
+            <input
+              type="text"
+              placeholder="Value here..."
+              value={filterValue}
+              onChange={(e) => setFilterValue(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                border: '1px solid #D1D5DB',
+                borderRadius: '6px',
+                fontSize: '0.875rem',
+                color: '#374151',
+                backgroundColor: '#FFFFFF',
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Action buttons */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
