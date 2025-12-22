@@ -1005,15 +1005,23 @@ const NewShipment = () => {
   };
 
   const completeFormulaStep = async (comment = '', isIncomplete = false) => {
+    if (!shipmentId) {
+      toast.error('Please book the shipment first');
+      return;
+    }
+
     const hasComment = !!(comment && comment.trim());
+    const labelCheckCompleted = completedTabs.has('label-check');
+    const nextStatus = labelCheckCompleted ? 'book_shipment' : 'label_check';
+
     const updateData = isIncomplete
       ? {
           formula_check_completed: false,
-          status: 'label_check', // still move forward but keep formula check incomplete
+          status: nextStatus, // move forward but keep formula check incomplete
         }
       : {
           formula_check_completed: true,
-          status: 'label_check',
+          status: nextStatus,
         };
     
     // Store comment in dedicated formula_check_comment column
@@ -1023,21 +1031,33 @@ const NewShipment = () => {
     
     await updateShipment(shipmentId, updateData);
 
-    if (isIncomplete) {
-      setFormulaCheckHasComment(hasComment);
-      // Move forward but keep formula-check flagged as incomplete/commented
-      setCompletedTabs(prev => {
-        const newSet = new Set(prev);
+    setFormulaCheckHasComment(hasComment);
+    setCompletedTabs(prev => {
+      const newSet = new Set(prev);
+      if (isIncomplete) {
         newSet.delete('formula-check');
-        return newSet;
-      });
-      setActiveAction('label-check');
-      toast.info('Formula Check comment saved. Proceeding to Label Check.');
+      } else {
+        newSet.add('formula-check');
+      }
+      return newSet;
+    });
+
+    // If Label Check is already completed, proceed directly to Book Shipment,
+    // otherwise move to Label Check
+    if (labelCheckCompleted) {
+      setActiveAction('book-shipment');
+      if (isIncomplete) {
+        toast.info('Formula Check comment saved. Proceeding to Book Shipment.');
+      } else {
+        toast.success('Formula Check completed! Moving to Book Shipment');
+      }
     } else {
-      setFormulaCheckHasComment(hasComment);
-      setCompletedTabs(prev => new Set(prev).add('formula-check'));
       setActiveAction('label-check');
-      toast.success('Formula Check completed! Moving to Label Check');
+      if (isIncomplete) {
+        toast.info('Formula Check comment saved. Proceeding to Label Check.');
+      } else {
+        toast.success('Formula Check completed! Moving to Label Check');
+      }
     }
   };
 
@@ -1048,14 +1068,17 @@ const NewShipment = () => {
     }
 
     const hasComment = !!(comment && comment.trim());
+    const formulaCheckCompleted = completedTabs.has('formula-check');
+    const nextStatus = formulaCheckCompleted ? 'book_shipment' : 'formula_check';
+
     const updateData = isIncomplete
       ? {
           label_check_completed: false,
-          status: 'book_shipment',
+          status: nextStatus,
         }
       : {
           label_check_completed: true,
-          status: 'book_shipment',
+          status: nextStatus,
         };
 
     // Store comment in dedicated label_check_comment column
@@ -1066,18 +1089,32 @@ const NewShipment = () => {
     await updateShipment(shipmentId, updateData);
     setLabelCheckHasComment(hasComment);
 
-    if (isIncomplete) {
-      setCompletedTabs(prev => {
-        const newSet = new Set(prev);
+    setCompletedTabs(prev => {
+      const newSet = new Set(prev);
+      if (isIncomplete) {
         newSet.delete('label-check');
-        return newSet;
-      });
+      } else {
+        newSet.add('label-check');
+      }
+      return newSet;
+    });
+
+    // If Formula Check is already completed, proceed directly to Book Shipment,
+    // otherwise move to Formula Check
+    if (formulaCheckCompleted) {
       setActiveAction('book-shipment');
-      toast.info('Label Check comment saved. Proceeding to Book Shipment.');
+      if (isIncomplete) {
+        toast.info('Label Check comment saved. Proceeding to Book Shipment.');
+      } else {
+        toast.success('Label Check completed! Moving to Book Shipment.');
+      }
     } else {
-      setCompletedTabs(prev => new Set(prev).add('label-check'));
-      setActiveAction('book-shipment');
-      toast.success('Label Check completed! Moving to Book Shipment.');
+      setActiveAction('formula-check');
+      if (isIncomplete) {
+        toast.info('Label Check comment saved. Proceeding to Formula Check.');
+      } else {
+        toast.success('Label Check completed! Moving to Formula Check.');
+      }
     }
   };
 
@@ -1107,10 +1144,10 @@ const NewShipment = () => {
       }
 
       if (activeAction === 'label-check') {
-      if (!isLabelCheckReadyToComplete) {
-        toast.error('Complete all label counts before continuing.');
-        return;
-      }
+        if (!isLabelCheckReadyToComplete) {
+          toast.error('Complete all label counts before continuing.');
+          return;
+        }
 
         // Check for variance first
         const varianceCount = checkVarianceExceeded();
@@ -1121,14 +1158,8 @@ const NewShipment = () => {
           return;
         }
         
-        // Label Check: Complete and move to Book Shipment
-        await updateShipment(shipmentId, {
-          label_check_completed: true,
-          status: 'book_shipment',
-        });
-        setCompletedTabs(prev => new Set(prev).add('label-check'));
-        setActiveAction('book-shipment');
-        toast.success('Label Check completed! Moving to Book Shipment.');
+        // Label Check: Complete and move to the next appropriate step
+        await completeLabelCheck('', false);
         return;
       }
 
