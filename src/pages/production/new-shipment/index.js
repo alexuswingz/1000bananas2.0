@@ -517,6 +517,31 @@ const NewShipment = () => {
     }
   }, [shipmentId]);
 
+  // Update shipment status when navigating to workflow steps
+  useEffect(() => {
+    if (!shipmentId) return;
+
+    const statusMap = {
+      'label-check': 'label_check',
+      'formula-check': 'formula_check',
+      'book-shipment': 'book_shipment',
+      'sort-products': 'sort_products',
+      'sort-formulas': 'sort_formulas',
+    };
+
+    const newStatus = statusMap[activeAction];
+    if (newStatus) {
+      // Update shipment status to reflect current workflow step
+      updateShipment(shipmentId, { status: newStatus })
+        .then(() => {
+          console.log(`Shipment status updated to: ${newStatus}`);
+        })
+        .catch(error => {
+          console.error('Error updating shipment status:', error);
+        });
+    }
+  }, [activeAction, shipmentId]);
+
   const loadShipment = async () => {
     try {
       setLoading(true);
@@ -1011,8 +1036,7 @@ const NewShipment = () => {
     }
 
     const hasComment = !!(comment && comment.trim());
-    const labelCheckCompleted = completedTabs.has('label-check');
-    const nextStatus = labelCheckCompleted ? 'book_shipment' : 'label_check';
+    const nextStatus = 'book_shipment';
 
     const updateData = isIncomplete
       ? {
@@ -1042,22 +1066,12 @@ const NewShipment = () => {
       return newSet;
     });
 
-    // If Label Check is already completed, proceed directly to Book Shipment,
-    // otherwise move to Label Check
-    if (labelCheckCompleted) {
-      setActiveAction('book-shipment');
-      if (isIncomplete) {
-        toast.info('Formula Check comment saved. Proceeding to Book Shipment.');
-      } else {
-        toast.success('Formula Check completed! Moving to Book Shipment');
-      }
+    // Always proceed to Book Shipment after completing Formula Check
+    setActiveAction('book-shipment');
+    if (isIncomplete) {
+      toast.info('Formula Check comment saved. Proceeding to Book Shipment.');
     } else {
-      setActiveAction('label-check');
-      if (isIncomplete) {
-        toast.info('Formula Check comment saved. Proceeding to Label Check.');
-      } else {
-        toast.success('Formula Check completed! Moving to Label Check');
-      }
+      toast.success('Formula Check completed! Moving to Book Shipment');
     }
   };
 
@@ -1144,10 +1158,8 @@ const NewShipment = () => {
       }
 
       if (activeAction === 'label-check') {
-        if (!isLabelCheckReadyToComplete) {
-          toast.error('Complete all label counts before continuing.');
-          return;
-        }
+        // Treat step as incomplete if not all label checks are done
+        const isIncomplete = !isLabelCheckReadyToComplete;
 
         // Check for variance first
         const varianceCount = checkVarianceExceeded();
@@ -1159,7 +1171,8 @@ const NewShipment = () => {
         }
         
         // Label Check: Complete and move to the next appropriate step
-        await completeLabelCheck('', false);
+        // - When incomplete, mark status as incomplete (orange) but still advance
+        await completeLabelCheck('', isIncomplete);
         return;
       }
 
@@ -1185,6 +1198,7 @@ const NewShipment = () => {
           ship_from: trimmedShipFrom,
           ship_to: trimmedShipTo,
           carrier: trimmedCarrier,
+          book_shipment_completed: true,
           status: 'sort_products',
         });
         setCompletedTabs(prev => new Set(prev).add('book-shipment'));
@@ -1923,6 +1937,7 @@ const NewShipment = () => {
             <SortProductsTable 
               shipmentProducts={productsForSortTabs}
               shipmentType={shipmentData.shipmentType}
+              shipmentId={shipmentId}
             />
           </div>
         )}
@@ -1931,6 +1946,7 @@ const NewShipment = () => {
           <div style={{ marginTop: '1.5rem' }}>
             <SortFormulasTable 
               shipmentProducts={productsForSortTabs}
+              shipmentId={shipmentId}
             />
           </div>
         )}
@@ -2481,18 +2497,17 @@ const NewShipment = () => {
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                 <button
                   type="button"
-                  disabled={!isLabelCheckReadyToComplete}
                   onClick={handleCompleteClick}
                   style={{
                     height: '31px',
                     padding: '0 16px',
                     borderRadius: '6px',
                     border: 'none',
-                    backgroundColor: isLabelCheckReadyToComplete ? '#007AFF' : '#9CA3AF',
+                    backgroundColor: '#007AFF',
                     color: '#FFFFFF',
                     fontSize: '14px',
                     fontWeight: 500,
-                    cursor: isLabelCheckReadyToComplete ? 'pointer' : 'not-allowed',
+                    cursor: 'pointer',
                     opacity: isLabelCheckReadyToComplete ? 1 : 0.7,
                     transition: 'all 0.2s',
                     display: 'flex',
@@ -2500,14 +2515,10 @@ const NewShipment = () => {
                     justifyContent: 'center',
                   }}
                   onMouseEnter={(e) => {
-                    if (isLabelCheckReadyToComplete) {
-                      e.currentTarget.style.backgroundColor = '#0056CC';
-                    }
+                    e.currentTarget.style.backgroundColor = '#0056CC';
                   }}
                   onMouseLeave={(e) => {
-                    if (isLabelCheckReadyToComplete) {
-                      e.currentTarget.style.backgroundColor = '#007AFF';
-                    }
+                    e.currentTarget.style.backgroundColor = '#007AFF';
                   }}
                 >
                   Complete
@@ -3065,6 +3076,9 @@ const NewShipment = () => {
                   type="button"
                   onClick={() => {
                     setIsBookShipmentCompleteOpen(false);
+                    navigate('/dashboard/production/planning', { 
+                      state: { refresh: true } 
+                    });
                   }}
                   style={{
                     minWidth: '147px',

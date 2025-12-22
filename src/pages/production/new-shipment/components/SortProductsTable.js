@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 import SortProductsFilterDropdown from './SortProductsFilterDropdown';
 
-const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
+const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipmentId = null }) => {
   const { isDarkMode } = useTheme();
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
@@ -17,12 +17,21 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
 
   // Transform shipment products into table format
   const [products, setProducts] = useState([]);
+  const locksLoadedRef = useRef(null); // Track which shipmentId we've loaded locks for
+
+  // Reset locks loaded flag when shipmentId changes
+  useEffect(() => {
+    if (locksLoadedRef.current !== shipmentId) {
+      locksLoadedRef.current = null;
+      setLockedProductIds(new Set());
+    }
+  }, [shipmentId]);
 
   // Update products when shipmentProducts prop changes
   useEffect(() => {
     if (shipmentProducts && shipmentProducts.length > 0) {
       const transformedProducts = shipmentProducts.map((product, index) => ({
-        id: product.id || product.catalogId || index + 1,
+        id: product.id || product.catalogId || product.catalog_id || `product_${index}`,
         type: shipmentType,
         brand: product.brand || '',
         product: product.product || '',
@@ -33,8 +42,42 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
         productType: 'Liquid', // Default to Liquid for fertilizers
       }));
       setProducts(transformedProducts);
+      
+      // Load locked IDs after products are set, but only once per shipmentId
+      if (shipmentId && locksLoadedRef.current !== shipmentId) {
+        try {
+          const stored = localStorage.getItem(`sortProductsLocks_${shipmentId}`);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed)) {
+              // Filter to only include IDs that exist in current products
+              const productIds = new Set(transformedProducts.map(p => p.id));
+              const validLockedIds = parsed.filter(id => productIds.has(id));
+              setLockedProductIds(new Set(validLockedIds));
+              console.log('Loaded locked product IDs:', validLockedIds);
+            }
+          }
+          locksLoadedRef.current = shipmentId;
+        } catch (error) {
+          console.error('Error loading sort products locks from localStorage:', error);
+        }
+      }
+    } else {
+      setProducts([]);
     }
-  }, [shipmentProducts, shipmentType]);
+  }, [shipmentProducts, shipmentType, shipmentId]);
+
+  // Persist locked product IDs to localStorage whenever they change
+  useEffect(() => {
+    if (!shipmentId) return;
+
+    try {
+      const idsArray = Array.from(lockedProductIds);
+      localStorage.setItem(`sortProductsLocks_${shipmentId}`, JSON.stringify(idsArray));
+    } catch (error) {
+      console.error('Error saving sort products locks to localStorage:', error);
+    }
+  }, [lockedProductIds, shipmentId]);
 
   // Close filter dropdowns when clicking outside
   useEffect(() => {
@@ -179,9 +222,12 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD' }) => {
       const next = new Set(prev);
       if (next.has(productId)) {
         next.delete(productId);
+        console.log('Unlocked product:', productId);
       } else {
         next.add(productId);
+        console.log('Locked product:', productId);
       }
+      console.log('Current locked IDs:', Array.from(next));
       return next;
     });
   };

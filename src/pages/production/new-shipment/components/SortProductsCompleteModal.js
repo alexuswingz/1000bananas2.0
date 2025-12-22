@@ -8,7 +8,10 @@ const SortProductsCompleteModal = ({ isOpen, onClose, onBeginSortFormulas }) => 
 
   const handleGoToShipments = () => {
     onClose();
-    // Navigation disabled per request
+    // Navigate to planning table with refresh flag
+    navigate('/dashboard/production/planning', { 
+      state: { refresh: true } 
+    });
   };
 
   const handleBeginSortFormulas = () => {

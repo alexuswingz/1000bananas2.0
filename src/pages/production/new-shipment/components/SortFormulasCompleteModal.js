@@ -12,7 +12,10 @@ const SortFormulasCompleteModal = ({ isOpen, onClose, onGoToShipments, shipmentD
       onGoToShipments();
     }
     onClose();
-    // Navigation disabled per request
+    // Navigate to planning table with refresh flag
+    navigate('/dashboard/production/planning', { 
+      state: { refresh: true } 
+    });
   };
 
   return (

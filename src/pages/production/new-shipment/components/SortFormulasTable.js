@@ -27,7 +27,7 @@ const calculateManufacturingVolume = (rawGallons) => {
 
 const GALLONS_PER_TOTE = 275;
 
-const SortFormulasTable = ({ shipmentProducts = [] }) => {
+const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
   const { isDarkMode } = useTheme();
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
@@ -40,9 +40,10 @@ const SortFormulasTable = ({ shipmentProducts = [] }) => {
   const [openFilterColumns, setOpenFilterColumns] = useState(() => new Set());
   const filterIconRefs = useRef({});
   
-  // Locking state
+  // Locking state - use formula name as stable identifier
   const [lockedFormulaIds, setLockedFormulaIds] = useState(() => new Set());
-  
+  const locksLoadedRef = useRef(null); // Track which shipmentId we've loaded locks for
+
   // Filter and sort state
   const [filters, setFilters] = useState({});
   // sortConfig is now an array of sort objects: [{column: 'formula', order: 'asc'}, {column: 'qty', order: 'desc'}]
@@ -51,6 +52,14 @@ const SortFormulasTable = ({ shipmentProducts = [] }) => {
 
   // Transform shipment products into formula data
   const [formulas, setFormulas] = useState([]);
+
+  // Reset locks loaded flag when shipmentId changes
+  useEffect(() => {
+    if (locksLoadedRef.current !== shipmentId) {
+      locksLoadedRef.current = null;
+      setLockedFormulaIds(new Set());
+    }
+  }, [shipmentId]);
 
   // Update formulas when shipmentProducts prop changes
   useEffect(() => {
@@ -94,7 +103,7 @@ const SortFormulasTable = ({ shipmentProducts = [] }) => {
         // This allows split functionality when qty > 1
         transformedFormulas.push({
           id: idCounter++,
-          formula: formulaData.formula,
+          formula: formulaData.formula, // Use formula name as stable identifier for locking
           size: 'Tote',
           qty: Math.max(1, totesNeeded), // At least 1 tote if there's any volume
           tote: 'Clean',
@@ -106,8 +115,42 @@ const SortFormulasTable = ({ shipmentProducts = [] }) => {
       });
 
       setFormulas(transformedFormulas);
+      
+      // Load locked formula names after formulas are set, but only once per shipmentId
+      if (shipmentId && locksLoadedRef.current !== shipmentId) {
+        try {
+          const stored = localStorage.getItem(`sortFormulasLocks_${shipmentId}`);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (Array.isArray(parsed)) {
+              // Filter to only include formula names that exist in current formulas
+              const formulaNames = new Set(transformedFormulas.map(f => f.formula));
+              const validLockedNames = parsed.filter(name => formulaNames.has(name));
+              setLockedFormulaIds(new Set(validLockedNames));
+              console.log('Loaded locked formula names:', validLockedNames);
+            }
+          }
+          locksLoadedRef.current = shipmentId;
+        } catch (error) {
+          console.error('Error loading sort formulas locks from localStorage:', error);
+        }
+      }
+    } else {
+      setFormulas([]);
     }
-  }, [shipmentProducts]);
+  }, [shipmentProducts, shipmentId]);
+
+  // Persist locked formula names to localStorage whenever they change
+  useEffect(() => {
+    if (!shipmentId) return;
+
+    try {
+      const namesArray = Array.from(lockedFormulaIds);
+      localStorage.setItem(`sortFormulasLocks_${shipmentId}`, JSON.stringify(namesArray));
+    } catch (error) {
+      console.error('Error saving sort formulas locks to localStorage:', error);
+    }
+  }, [lockedFormulaIds, shipmentId]);
 
   const columns = [
     { key: 'drag', label: '', width: '50px' },
@@ -359,14 +402,27 @@ const SortFormulasTable = ({ shipmentProducts = [] }) => {
   };
 
   // Locking a formula means it will NOT be affected by filters
+  // Use formula name as the identifier since it's stable
   const handleToggleLock = (formulaId) => {
+    // Find the formula name from the ID
+    const formula = formulas.find(f => f.id === formulaId);
+    const formulaName = formula?.formula;
+    
+    if (!formulaName) {
+      console.error('Formula not found for ID:', formulaId, 'Available formulas:', formulas.map(f => ({ id: f.id, formula: f.formula })));
+      return;
+    }
+    
     setLockedFormulaIds((prev) => {
       const next = new Set(prev);
-      if (next.has(formulaId)) {
-        next.delete(formulaId);
+      if (next.has(formulaName)) {
+        next.delete(formulaName);
+        console.log('Unlocked formula:', formulaName);
       } else {
-        next.add(formulaId);
+        next.add(formulaName);
+        console.log('Locked formula:', formulaName);
       }
+      console.log('Current locked formula names:', Array.from(next));
       return next;
     });
   };
@@ -495,7 +551,7 @@ const SortFormulasTable = ({ shipmentProducts = [] }) => {
     const unlockedFormulas = [];
     
     formulas.forEach((formula, index) => {
-      if (lockedFormulaIds.has(formula.id)) {
+      if (lockedFormulaIds.has(formula.formula)) {
         lockedFormulas.push({ formula, originalIndex: index });
       } else {
         unlockedFormulas.push(formula);
@@ -708,7 +764,7 @@ const SortFormulasTable = ({ shipmentProducts = [] }) => {
                 </td>
               </tr>
             ) : filteredFormulas.map((formula, index) => {
-              const isLocked = lockedFormulaIds.has(formula.id);
+              const isLocked = lockedFormulaIds.has(formula.formula);
               const isDragging = draggedIndex === index;
               const isDragOver = dragOverIndex === index;
               const showDropLineAbove = dropPosition && dropPosition.index === index && dropPosition.position === 'above';
