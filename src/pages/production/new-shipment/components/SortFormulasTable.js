@@ -49,6 +49,10 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
   // sortConfig is now an array of sort objects: [{column: 'formula', order: 'asc'}, {column: 'qty', order: 'desc'}]
   // The order in the array determines the sort priority (first = primary, second = secondary, etc.)
   const [sortConfig, setSortConfig] = useState([]);
+  
+  // Selection state for bulk operations
+  const [selectedIndices, setSelectedIndices] = useState(() => new Set());
+  const [lastSelectedIndex, setLastSelectedIndex] = useState(null);
 
   // Transform shipment products into formula data
   const [formulas, setFormulas] = useState([]);
@@ -165,8 +169,59 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
     { key: 'menu', label: '', width: '50px' },
   ];
 
+  const handleRowClick = (e, index) => {
+    // Don't handle selection if clicking on interactive elements
+    if (e.target.closest('button') || e.target.closest('input') || e.target.closest('img[alt="Lock"]') || e.target.closest('img[alt="Unlock"]')) {
+      return;
+    }
+
+    const isShiftClick = e.shiftKey;
+    const isCmdClick = e.metaKey || e.ctrlKey;
+
+    if (isShiftClick && lastSelectedIndex !== null) {
+      // Shift + Click: Select range between lastSelectedIndex and current index
+      const start = Math.min(lastSelectedIndex, index);
+      const end = Math.max(lastSelectedIndex, index);
+      const newSelected = new Set(selectedIndices);
+      
+      for (let i = start; i <= end; i++) {
+        newSelected.add(i);
+      }
+      
+      setSelectedIndices(newSelected);
+      setLastSelectedIndex(index);
+    } else if (isCmdClick) {
+      // Cmd/Ctrl + Click: Toggle selection of this item
+      const newSelected = new Set(selectedIndices);
+      if (newSelected.has(index)) {
+        newSelected.delete(index);
+      } else {
+        newSelected.add(index);
+      }
+      setSelectedIndices(newSelected);
+      setLastSelectedIndex(index);
+    } else {
+      // Regular click: Select only this item
+      setSelectedIndices(new Set([index]));
+      setLastSelectedIndex(index);
+    }
+  };
+
   const handleDragStart = (e, index) => {
-    setDraggedIndex(index);
+    // If this index is part of a selection, we'll handle multi-drag
+    // Otherwise, just drag this single item
+    if (selectedIndices.has(index) && selectedIndices.size > 1) {
+      // Multi-drag: set draggedIndex to the first selected item
+      const sortedIndices = Array.from(selectedIndices).sort((a, b) => a - b);
+      setDraggedIndex(sortedIndices[0]);
+    } else {
+      setDraggedIndex(index);
+      // Clear selection if dragging a single unselected item
+      if (!selectedIndices.has(index)) {
+        setSelectedIndices(new Set([index]));
+        setLastSelectedIndex(index);
+      }
+    }
     e.dataTransfer.effectAllowed = 'move';
     // Set a simple data transfer to enable drag
     e.dataTransfer.setData('text/plain', index.toString());
@@ -176,7 +231,8 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     
-    if (draggedIndex === null || draggedIndex === index) {
+    // Don't allow dropping on the dragged item or any selected item during multi-drag
+    if (draggedIndex === null || draggedIndex === index || (selectedIndices.has(index) && selectedIndices.size > 1)) {
       setDragOverIndex(null);
       setDropPosition(null);
       return;
@@ -207,7 +263,7 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
   const handleDrop = (e, dropIndex) => {
     e.preventDefault();
     
-    if (draggedIndex === null || draggedIndex === dropIndex) {
+    if (draggedIndex === null) {
       setDraggedIndex(null);
       setDragOverIndex(null);
       setDropPosition(null);
@@ -216,48 +272,109 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
 
     // Work with filtered formulas for display, but update the original formulas array
     const filteredList = filteredFormulas;
-    const draggedItem = filteredList[draggedIndex];
     const dropItem = filteredList[dropIndex];
     
-    // Find these items in the original formulas array
-    const draggedOriginalIndex = formulas.findIndex(f => f.id === draggedItem.id);
-    const dropOriginalIndex = formulas.findIndex(f => f.id === dropItem.id);
+    // Check if we're dragging multiple items
+    const isMultiDrag = selectedIndices.size > 1 && selectedIndices.has(draggedIndex);
     
-    const newFormulas = [...formulas];
-    
-    // Remove the dragged item
-    newFormulas.splice(draggedOriginalIndex, 1);
-    
-    // Find new position after removal
-    const newDropIndex = newFormulas.findIndex(f => f.id === dropItem.id);
-    
-    // Use drop position to determine insert index
-    let insertIndex;
-    if (dropPosition && dropPosition.index === dropIndex) {
-      insertIndex = dropPosition.position === 'above' ? newDropIndex : newDropIndex + 1;
+    if (isMultiDrag) {
+      // Multi-drag: move all selected items
+      const sortedSelectedIndices = Array.from(selectedIndices).sort((a, b) => a - b);
+      const draggedItems = sortedSelectedIndices.map(idx => filteredList[idx]);
+      
+      // Find drop item in original formulas array
+      const dropOriginalIndex = formulas.findIndex(f => f.id === dropItem.id);
+      
+      const newFormulas = [...formulas];
+      
+      // Remove all dragged items (in reverse order to maintain indices)
+      const draggedOriginalIndices = draggedItems.map(item => 
+        formulas.findIndex(f => f.id === item.id)
+      ).sort((a, b) => b - a); // Sort descending to remove from end first
+      
+      draggedOriginalIndices.forEach(originalIdx => {
+        newFormulas.splice(originalIdx, 1);
+      });
+      
+      // Find new position after removal
+      let newDropIndex = newFormulas.findIndex(f => f.id === dropItem.id);
+      
+      // Use drop position to determine insert index
+      let insertIndex;
+      if (dropPosition && dropPosition.index === dropIndex) {
+        insertIndex = dropPosition.position === 'above' ? newDropIndex : newDropIndex + 1;
+      } else {
+        // Fallback: insert after drop item
+        insertIndex = newDropIndex + 1;
+      }
+      
+      // Insert all dragged items at the new position
+      newFormulas.splice(insertIndex, 0, ...draggedItems);
+      
+      // Clear drag states and selection
+      setDragOverIndex(null);
+      setDropPosition(null);
+      
+      setTimeout(() => {
+        setFormulas(newFormulas);
+        setDraggedIndex(null);
+        setSelectedIndices(new Set());
+        setLastSelectedIndex(null);
+      }, 50);
     } else {
-      // Fallback to original logic
-      insertIndex = draggedOriginalIndex < dropOriginalIndex ? newDropIndex + 1 : newDropIndex;
+      // Single drag: original logic
+      if (draggedIndex === dropIndex) {
+        setDraggedIndex(null);
+        setDragOverIndex(null);
+        setDropPosition(null);
+        return;
+      }
+      
+      const draggedItem = filteredList[draggedIndex];
+      
+      // Find these items in the original formulas array
+      const draggedOriginalIndex = formulas.findIndex(f => f.id === draggedItem.id);
+      const dropOriginalIndex = formulas.findIndex(f => f.id === dropItem.id);
+      
+      const newFormulas = [...formulas];
+      
+      // Remove the dragged item
+      newFormulas.splice(draggedOriginalIndex, 1);
+      
+      // Find new position after removal
+      const newDropIndex = newFormulas.findIndex(f => f.id === dropItem.id);
+      
+      // Use drop position to determine insert index
+      let insertIndex;
+      if (dropPosition && dropPosition.index === dropIndex) {
+        insertIndex = dropPosition.position === 'above' ? newDropIndex : newDropIndex + 1;
+      } else {
+        // Fallback to original logic
+        insertIndex = draggedOriginalIndex < dropOriginalIndex ? newDropIndex + 1 : newDropIndex;
+      }
+      
+      // Insert it at the new position
+      newFormulas.splice(insertIndex, 0, draggedItem);
+      
+      // Clear drag states first for smooth transition
+      setDragOverIndex(null);
+      setDropPosition(null);
+      
+      // Small delay to allow drop line to fade out smoothly
+      setTimeout(() => {
+        setFormulas(newFormulas);
+        setDraggedIndex(null);
+        setSelectedIndices(new Set());
+        setLastSelectedIndex(null);
+      }, 50);
     }
-    
-    // Insert it at the new position
-    newFormulas.splice(insertIndex, 0, draggedItem);
-    
-    // Clear drag states first for smooth transition
-    setDragOverIndex(null);
-    setDropPosition(null);
-    
-    // Small delay to allow drop line to fade out smoothly
-    setTimeout(() => {
-      setFormulas(newFormulas);
-      setDraggedIndex(null);
-    }, 50);
   };
 
   const handleDragEnd = () => {
     setDraggedIndex(null);
     setDragOverIndex(null);
     setDropPosition(null);
+    // Don't clear selection here - let handleDrop handle it
   };
 
   // Close menu when clicking outside
@@ -765,8 +882,9 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
               </tr>
             ) : filteredFormulas.map((formula, index) => {
               const isLocked = lockedFormulaIds.has(formula.formula);
-              const isDragging = draggedIndex === index;
+              const isDragging = draggedIndex === index || (selectedIndices.has(index) && selectedIndices.size > 1 && draggedIndex !== null);
               const isDragOver = dragOverIndex === index;
+              const isSelected = selectedIndices.has(index);
               const showDropLineAbove = dropPosition && dropPosition.index === index && dropPosition.position === 'above';
               const showDropLineBelow = dropPosition && dropPosition.index === index && dropPosition.position === 'below';
               
@@ -805,13 +923,17 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
                   onDragOver={(e) => handleDragOver(e, index)}
                   onDrop={(e) => handleDrop(e, index)}
                   onDragEnd={handleDragEnd}
+                  onClick={(e) => handleRowClick(e, index)}
                   style={{
                     backgroundColor: isDragging
                       ? (isDarkMode ? '#4B5563' : '#E5E7EB')
+                      : isSelected
+                      ? (isDarkMode ? '#1E3A5F' : '#DBEAFE')
                       : index % 2 === 0
                       ? (isDarkMode ? '#1F2937' : '#FFFFFF')
                       : (isDarkMode ? '#1A1F2E' : '#F9FAFB'),
                     borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                    borderLeft: isSelected ? '3px solid #3B82F6' : 'none',
                     transition: isDragging ? 'none' : 'background-color 0.2s',
                     height: '40px',
                     opacity: isDragging ? 0.5 : 1,
@@ -822,12 +944,16 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
                   }}
                   onMouseEnter={(e) => {
                     if (!isDragging && draggedIndex === null) {
-                      e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                      e.currentTarget.style.backgroundColor = isSelected
+                        ? (isDarkMode ? '#1E3A5F' : '#DBEAFE')
+                        : (isDarkMode ? '#374151' : '#F3F4F6');
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!isDragging && draggedIndex === null) {
-                      e.currentTarget.style.backgroundColor = index % 2 === 0
+                      e.currentTarget.style.backgroundColor = isSelected
+                        ? (isDarkMode ? '#1E3A5F' : '#DBEAFE')
+                        : index % 2 === 0
                         ? (isDarkMode ? '#1F2937' : '#FFFFFF')
                         : (isDarkMode ? '#1A1F2E' : '#F9FAFB');
                     }
@@ -874,7 +1000,15 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
                         justifyContent: 'center',
                         cursor: 'pointer',
                       }}
-                      onClick={() => handleToggleLock(formula.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        handleToggleLock(formula.id);
+                      }}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                      }}
                     >
                       {isLocked ? (
                         <img
