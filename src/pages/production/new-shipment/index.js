@@ -3039,7 +3039,7 @@ const NewShipment = () => {
               style={{
                 backgroundColor: '#FFFFFF',
                 borderRadius: '14px',
-                width: '340px',
+                width: '400px',
                 border: '1px solid #E5E7EB',
                 boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
                 zIndex: 9999,
@@ -3130,7 +3130,7 @@ const NewShipment = () => {
                     });
                   }}
                   style={{
-                    minWidth: '147px',
+                    minWidth: '170px',
                     height: '31px',
                     padding: '0 14px',
                     borderRadius: '4px',
@@ -3160,7 +3160,7 @@ const NewShipment = () => {
                     setActiveAction('sort-products');
                   }}
                   style={{
-                    minWidth: '147px',
+                    minWidth: '170px',
                     height: '31px',
                     padding: '0 12px',
                     borderRadius: '4px',

@@ -21,9 +21,12 @@ const NewShipmentTable = ({
   const selectAllCheckboxRef = useRef(null);
   const [clickedQtyIndex, setClickedQtyIndex] = useState(null);
   const [hoveredQtyIndex, setHoveredQtyIndex] = useState(null);
+  const [hoveredAddIndex, setHoveredAddIndex] = useState(null);
   const qtyContainerRefs = useRef({});
   const popupRefs = useRef({});
   const qtyInputRefs = useRef({});
+  const addButtonRefs = useRef({});
+  const addPopupRefs = useRef({});
   const [openFilterIndex, setOpenFilterIndex] = useState(null);
   const filterRefs = useRef({});
   const filterModalRefs = useRef({});
@@ -585,6 +588,42 @@ const NewShipmentTable = ({
     }
   }, [clickedQtyIndex]);
 
+  // Position Add button popup when it appears
+  useEffect(() => {
+    if (hoveredAddIndex !== null) {
+      const addButton = addButtonRefs.current[hoveredAddIndex];
+      const popup = addPopupRefs.current[hoveredAddIndex];
+      if (addButton && popup) {
+        const rect = addButton.getBoundingClientRect();
+        const popupHeight = popup.offsetHeight || 100;
+        const top = rect.bottom + 8;
+        const left = rect.left + rect.width / 2;
+        popup.style.top = `${top}px`;
+        popup.style.left = `${left}px`;
+        popup.style.transform = 'translateX(-50%)';
+        
+        // Update position on scroll/resize
+        const updatePosition = () => {
+          if (addButton && popup) {
+            const newRect = addButton.getBoundingClientRect();
+            const newTop = newRect.bottom + 8;
+            const newLeft = newRect.left + newRect.width / 2;
+            popup.style.top = `${newTop}px`;
+            popup.style.left = `${newLeft}px`;
+          }
+        };
+        
+        window.addEventListener('scroll', updatePosition, true);
+        window.addEventListener('resize', updatePosition);
+        
+        return () => {
+          window.removeEventListener('scroll', updatePosition, true);
+          window.removeEventListener('resize', updatePosition);
+        };
+      }
+    }
+  }, [hoveredAddIndex]);
+
   // Close popup when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -693,11 +732,36 @@ const NewShipmentTable = ({
   // Handle select all checkbox
   const handleSelectAll = (e) => {
     if (e.target.checked) {
-      setSelectedRows(new Set(currentRows.map(row => row.id)));
+      const selectedIds = new Set();
+      const addedIds = new Set();
+      
+      // Only select/add rows with non-zero quantity
+      currentRows.forEach(row => {
+        const index = row._originalIndex;
+        const currentQty = typeof effectiveQtyValues[index] === 'number' 
+          ? effectiveQtyValues[index] 
+          : (effectiveQtyValues[index] === '' || effectiveQtyValues[index] === null || effectiveQtyValues[index] === undefined) 
+            ? 0 
+            : parseInt(effectiveQtyValues[index], 10) || 0;
+        
+        if (currentQty > 0) {
+          selectedIds.add(row.id);
+          if (tableMode) {
+            addedIds.add(row.id);
+          }
+        }
+      });
+      
+      setSelectedRows(selectedIds);
       if (tableMode) {
-        const newAdded = new Set(currentRows.map(row => row.id));
-        setAddedRows(newAdded);
-        if (onAddedRowsChange) onAddedRowsChange(newAdded);
+        setAddedRows(addedIds);
+        if (onAddedRowsChange) onAddedRowsChange(addedIds);
+      }
+      
+      // Update checkbox state if not all rows were selected
+      if (selectAllCheckboxRef.current && selectedIds.size < currentRows.length) {
+        selectAllCheckboxRef.current.indeterminate = selectedIds.size > 0;
+        selectAllCheckboxRef.current.checked = false;
       }
     } else {
       setSelectedRows(new Set());
@@ -722,6 +786,26 @@ const NewShipmentTable = ({
     if (tableMode) {
       const newAdded = new Set(addedRows);
       if (e.target.checked) {
+        // Find the row index to check quantity
+        const rowIndex = currentRows.findIndex(r => r.id === rowId);
+        if (rowIndex >= 0) {
+          const row = currentRows[rowIndex];
+          const index = row._originalIndex;
+          // Check if quantity is 0 before adding
+          const currentQty = typeof effectiveQtyValues[index] === 'number' 
+            ? effectiveQtyValues[index] 
+            : (effectiveQtyValues[index] === '' || effectiveQtyValues[index] === null || effectiveQtyValues[index] === undefined) 
+              ? 0 
+              : parseInt(effectiveQtyValues[index], 10) || 0;
+          
+          if (currentQty === 0) {
+            // Don't add if quantity is 0 - revert checkbox
+            e.target.checked = false;
+            newSelected.delete(rowId);
+            setSelectedRows(newSelected);
+            return;
+          }
+        }
         newAdded.add(rowId);
       } else {
         newAdded.delete(rowId);
@@ -739,6 +823,18 @@ const NewShipmentTable = ({
       // Remove from added - keep the qty value (don't clear it)
       newAdded.delete(row.id);
     } else {
+      // Check if quantity is 0 before adding
+      const currentQty = typeof effectiveQtyValues[index] === 'number' 
+        ? effectiveQtyValues[index] 
+        : (effectiveQtyValues[index] === '' || effectiveQtyValues[index] === null || effectiveQtyValues[index] === undefined) 
+          ? 0 
+          : parseInt(effectiveQtyValues[index], 10) || 0;
+      
+      if (currentQty === 0) {
+        // Don't add if quantity is 0 - the hover popup will show
+        return;
+      }
+      
       // Add - just mark as added, don't change qty value
       // User should have already entered qty before clicking Add
       newAdded.add(row.id);
@@ -1091,50 +1187,114 @@ const NewShipmentTable = ({
                       {row.size}
                     </td>
                     <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }}>
-                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleAddClick(row, index)}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: addedRows.has(row.id) ? '0' : '10px',
-                            width: '80px',
-                            height: '24px',
-                            borderRadius: '9999px',
-                            border: 'none',
-                            backgroundColor: addedRows.has(row.id) ? '#10B981' : '#2563EB',
-                            color: '#FFFFFF',
-                            fontSize: '0.875rem',
-                            fontWeight: 500,
-                            fontFamily: 'sans-serif',
-                            cursor: 'pointer',
-                            padding: 0,
-                            transition: 'background-color 0.2s',
-                            position: 'relative',
+                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', position: 'relative' }}>
+                        <div
+                          ref={(el) => {
+                            if (el) addButtonRefs.current[index] = el;
                           }}
+                          onMouseEnter={() => {
+                            const currentQty = typeof effectiveQtyValues[index] === 'number' 
+                              ? effectiveQtyValues[index] 
+                              : (effectiveQtyValues[index] === '' || effectiveQtyValues[index] === null || effectiveQtyValues[index] === undefined) 
+                                ? 0 
+                                : parseInt(effectiveQtyValues[index], 10) || 0;
+                            if (currentQty === 0 && !addedRows.has(row.id)) {
+                              setHoveredAddIndex(index);
+                            }
+                          }}
+                          onMouseLeave={() => setHoveredAddIndex(null)}
+                          style={{ position: 'relative', display: 'inline-block' }}
                         >
-                          {!addedRows.has(row.id) && (
-                            <span
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                width: '9.33px',
-                                height: '9.33px',
-                                color: '#FFFFFF',
-                                fontSize: '0.875rem',
-                                fontWeight: 600,
-                                lineHeight: 1,
-                                flexShrink: 0,
+                          <button
+                            type="button"
+                            onClick={() => handleAddClick(row, index)}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: addedRows.has(row.id) ? '0' : '10px',
+                              width: '80px',
+                              height: '24px',
+                              borderRadius: '9999px',
+                              border: 'none',
+                              backgroundColor: addedRows.has(row.id) ? '#10B981' : '#2563EB',
+                              color: '#FFFFFF',
+                              fontSize: '0.875rem',
+                              fontWeight: 500,
+                              fontFamily: 'sans-serif',
+                              cursor: 'pointer',
+                              padding: 0,
+                              transition: 'background-color 0.2s',
+                              position: 'relative',
+                            }}
+                          >
+                            {!addedRows.has(row.id) && (
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: '9.33px',
+                                  height: '9.33px',
+                                  color: '#FFFFFF',
+                                  fontSize: '0.875rem',
+                                  fontWeight: 600,
+                                  lineHeight: 1,
+                                  flexShrink: 0,
+                                }}
+                              >
+                                +
+                              </span>
+                            )}
+                            <span style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>{addedRows.has(row.id) ? 'Added' : 'Add'}</span>
+                          </button>
+                          {/* Hover popup for 0 quantity */}
+                          {hoveredAddIndex === index && (() => {
+                            const currentQty = typeof effectiveQtyValues[index] === 'number' 
+                              ? effectiveQtyValues[index] 
+                              : (effectiveQtyValues[index] === '' || effectiveQtyValues[index] === null || effectiveQtyValues[index] === undefined) 
+                                ? 0 
+                                : parseInt(effectiveQtyValues[index], 10) || 0;
+                            return currentQty === 0 && !addedRows.has(row.id);
+                          })() && (
+                            <div
+                              ref={(el) => {
+                                if (el) addPopupRefs.current[index] = el;
                               }}
+                              style={{
+                                position: 'fixed',
+                                backgroundColor: '#FFFFFF',
+                                borderRadius: '12px',
+                                padding: '14px 16px',
+                                minWidth: '220px',
+                                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                                zIndex: 9999,
+                                border: '1px solid #E5E7EB',
+                                pointerEvents: 'auto',
+                              }}
+                              onMouseEnter={() => setHoveredAddIndex(index)}
+                              onMouseLeave={() => setHoveredAddIndex(null)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                              }}
+                              onMouseDown={(e) => e.stopPropagation()}
+                              onMouseUp={(e) => e.stopPropagation()}
                             >
-                              +
-                            </span>
+                              <div style={{ marginBottom: '10px' }}>
+                                <h3 style={{
+                                  fontSize: '14px',
+                                  fontWeight: 600,
+                                  color: '#111827',
+                                  marginBottom: '4px',
+                                  lineHeight: '1.3',
+                                }}>
+                                  0 quantity. Add quantity to include in shipment
+                                </h3>
+                              </div>
+                            </div>
                           )}
-                          <span style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>{addedRows.has(row.id) ? 'Added' : 'Add'}</span>
-                        </button>
+                        </div>
                       </div>
                     </td>
                     <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }}>
