@@ -1041,11 +1041,19 @@ const NewShipment = () => {
     const updateData = isIncomplete
       ? {
           formula_check_completed: false,
+<<<<<<< HEAD
+          status: 'book_shipment', // still move forward but keep formula check incomplete
+        }
+      : {
+          formula_check_completed: true,
+          status: 'book_shipment',
+=======
           status: nextStatus, // move forward but keep formula check incomplete
         }
       : {
           formula_check_completed: true,
           status: nextStatus,
+>>>>>>> 7a675a4ebf05965f28e697c5881014b989789962
         };
     
     // Store comment in dedicated formula_check_comment column
@@ -1060,6 +1068,16 @@ const NewShipment = () => {
       const newSet = new Set(prev);
       if (isIncomplete) {
         newSet.delete('formula-check');
+<<<<<<< HEAD
+        return newSet;
+      });
+      setActiveAction('book-shipment');
+      toast.info('Formula Check comment saved. Proceeding to Book Shipment.');
+    } else {
+      setFormulaCheckHasComment(hasComment);
+      setCompletedTabs(prev => new Set(prev).add('formula-check'));
+      setActiveAction('book-shipment');
+=======
       } else {
         newSet.add('formula-check');
       }
@@ -1071,6 +1089,7 @@ const NewShipment = () => {
     if (isIncomplete) {
       toast.info('Formula Check comment saved. Proceeding to Book Shipment.');
     } else {
+>>>>>>> 7a675a4ebf05965f28e697c5881014b989789962
       toast.success('Formula Check completed! Moving to Book Shipment');
     }
   };
@@ -1088,11 +1107,19 @@ const NewShipment = () => {
     const updateData = isIncomplete
       ? {
           label_check_completed: false,
+<<<<<<< HEAD
+          status: 'formula_check',
+        }
+      : {
+          label_check_completed: true,
+          status: 'formula_check',
+=======
           status: nextStatus,
         }
       : {
           label_check_completed: true,
           status: nextStatus,
+>>>>>>> 7a675a4ebf05965f28e697c5881014b989789962
         };
 
     // Store comment in dedicated label_check_comment column
@@ -1107,6 +1134,16 @@ const NewShipment = () => {
       const newSet = new Set(prev);
       if (isIncomplete) {
         newSet.delete('label-check');
+<<<<<<< HEAD
+        return newSet;
+      });
+      setActiveAction('formula-check');
+      toast.info('Label Check comment saved. Proceeding to Formula Check.');
+    } else {
+      setCompletedTabs(prev => new Set(prev).add('label-check'));
+      setActiveAction('formula-check');
+      toast.success('Label Check completed! Moving to Formula Check.');
+=======
       } else {
         newSet.add('label-check');
       }
@@ -1129,6 +1166,7 @@ const NewShipment = () => {
       } else {
         toast.success('Label Check completed! Moving to Formula Check.');
       }
+>>>>>>> 7a675a4ebf05965f28e697c5881014b989789962
     }
   };
 
@@ -1170,9 +1208,20 @@ const NewShipment = () => {
           return;
         }
         
+<<<<<<< HEAD
+        // Label Check: Complete and move to Formula Check
+        await updateShipment(shipmentId, {
+          label_check_completed: true,
+          status: 'formula_check',
+        });
+        setCompletedTabs(prev => new Set(prev).add('label-check'));
+        setActiveAction('formula-check');
+        toast.success('Label Check completed! Moving to Formula Check.');
+=======
         // Label Check: Complete and move to the next appropriate step
         // - When incomplete, mark status as incomplete (orange) but still advance
         await completeLabelCheck('', isIncomplete);
+>>>>>>> 7a675a4ebf05965f28e697c5881014b989789962
         return;
       }
 
