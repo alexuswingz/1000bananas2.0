@@ -90,6 +90,14 @@ const Bottles = () => {
     inputBg: isDarkMode ? 'bg-dark-bg-tertiary' : 'bg-white',
   };
 
+  const getSectionLockStyles = (isEditing) => ({
+    pointerEvents: isEditing ? 'auto' : 'none',
+    userSelect: isEditing ? 'auto' : 'none',
+    opacity: isEditing ? 1 : 0.9,
+  });
+
+  const detailsInputStyle = { height: '41px' };
+
 
   // Static bottle details data used in the details modal
   const bottleDetails = {
@@ -1189,7 +1197,10 @@ const Bottles = () => {
       {/* Bottle Details Modal */}
       {isDetailsOpen && selectedBottle && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-2xl w-[800px] my-auto flex flex-col">
+          <div
+            className="bg-white rounded-xl shadow-2xl w-[800px] my-auto flex flex-col"
+            style={{ height: '524px' }}
+          >
             {/* Header */}
             <div className={`${themeClasses.headerBg} flex items-center justify-between px-6 py-3`}>
               <div className="flex items-center gap-3">
@@ -1316,6 +1327,7 @@ const Bottles = () => {
                       </button>
                     )}
                   </div>
+                  <div style={getSectionLockStyles(isEditingCoreInfo)}>
                   <div className="grid grid-cols-12 gap-4">
                     <div className="col-span-6">
                       <label className="block text-xs font-medium text-gray-500 mb-1">
@@ -1340,6 +1352,7 @@ const Bottles = () => {
                         }${getDetailsHighlightClass(
                           selectedBottle.details?.core.packagingName || selectedBottle.name
                         )}`}
+                        style={detailsInputStyle}
                       />
                     </div>
                     <div className="col-span-4">
@@ -1363,6 +1376,7 @@ const Bottles = () => {
                             ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
                             : ''
                         }${getDetailsHighlightClass(selectedBottle.details?.core.imageLink || '')}`}
+                        style={detailsInputStyle}
                       />
                     </div>
                     <div className="col-span-2">
@@ -1386,6 +1400,7 @@ const Bottles = () => {
                             ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
                             : ''
                         }${getDetailsHighlightClass(selectedBottle.details?.core.sizeOz || '')}`}
+                        style={detailsInputStyle}
                       />
                     </div>
                   </div>
@@ -1410,6 +1425,7 @@ const Bottles = () => {
                             ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
                             : ''
                         }${getDetailsHighlightClass(selectedBottle.details?.core.shape || '')}`}
+                        style={detailsInputStyle}
                       />
                     </div>
                     <div>
@@ -1431,6 +1447,7 @@ const Bottles = () => {
                             ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
                             : ''
                         }${getDetailsHighlightClass(selectedBottle.details?.core.color || '')}`}
+                        style={detailsInputStyle}
                       />
                     </div>
                     <div>
@@ -1454,6 +1471,7 @@ const Bottles = () => {
                             ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
                             : ''
                         }${getDetailsHighlightClass(selectedBottle.details?.core.threadType || '')}`}
+                        style={detailsInputStyle}
                       />
                     </div>
                     <div>
@@ -1477,6 +1495,7 @@ const Bottles = () => {
                             ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
                             : ''
                         }${getDetailsHighlightClass(selectedBottle.details?.core.capSize || '')}`}
+                        style={detailsInputStyle}
                       />
                     </div>
                   </div>
@@ -1503,6 +1522,7 @@ const Bottles = () => {
                             ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
                             : ''
                         }${getDetailsHighlightClass(selectedBottle.details?.core.material || '')}`}
+                        style={detailsInputStyle}
                       />
                     </div>
                     <div>
@@ -1526,6 +1546,7 @@ const Bottles = () => {
                             ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
                             : ''
                         }${getDetailsHighlightClass(selectedBottle.details?.core.supplier || '')}`}
+                        style={detailsInputStyle}
                       />
                     </div>
                     <div>
@@ -1549,6 +1570,7 @@ const Bottles = () => {
                             ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
                             : ''
                         }${getDetailsHighlightClass(selectedBottle.details?.core.packagingPart || '')}`}
+                        style={detailsInputStyle}
                       />
                     </div>
                   </div>
@@ -1575,6 +1597,7 @@ const Bottles = () => {
                             ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
                             : ''
                         }${getDetailsHighlightClass(selectedBottle.details?.core.description || '')}`}
+                        style={detailsInputStyle}
                       />
                     </div>
                     <div>
@@ -1596,8 +1619,10 @@ const Bottles = () => {
                             ? 'focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500'
                             : ''
                         }${getDetailsHighlightClass(selectedBottle.details?.core.brand || '')}`}
+                        style={detailsInputStyle}
                       />
                     </div>
+                  </div>
                   </div>
 
                   {isEditingCoreInfo && (
@@ -1648,6 +1673,7 @@ const Bottles = () => {
                       </button>
                     )}
                   </div>
+                  <div style={getSectionLockStyles(isEditingSupplierInfo)}>
                   <div className="grid grid-cols-4 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">
@@ -1673,6 +1699,7 @@ const Bottles = () => {
                         }${getDetailsHighlightClass(
                           selectedBottle.details?.supplier.leadTimeWeeks || ''
                         )}`}
+                        style={detailsInputStyle}
                       />
                     </div>
                     <div>
@@ -1697,6 +1724,7 @@ const Bottles = () => {
                         }${getDetailsHighlightClass(
                           selectedBottle.details?.supplier.moq || ''
                         )}`}
+                        style={detailsInputStyle}
                       />
                     </div>
                     <div>
@@ -1723,6 +1751,7 @@ const Bottles = () => {
                         }${getDetailsHighlightClass(
                           selectedBottle.details?.supplier.unitsPerPallet || ''
                         )}`}
+                        style={detailsInputStyle}
                       />
                     </div>
                     <div>
@@ -1749,6 +1778,7 @@ const Bottles = () => {
                         }${getDetailsHighlightClass(
                           selectedBottle.details?.supplier.unitsPerCase || ''
                         )}`}
+                        style={detailsInputStyle}
                       />
                     </div>
                     <div>
@@ -1775,8 +1805,10 @@ const Bottles = () => {
                         }${getDetailsHighlightClass(
                           selectedBottle.details?.supplier.casesPerPallet || ''
                         )}`}
+                        style={detailsInputStyle}
                       />
                     </div>
+                  </div>
                   </div>
 
                   {isEditingSupplierInfo && (
@@ -1827,6 +1859,7 @@ const Bottles = () => {
                       </button>
                     )}
                   </div>
+                  <div style={getSectionLockStyles(isEditingDimensionsInfo)}>
                   <div className="grid grid-cols-4 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">
@@ -1852,6 +1885,7 @@ const Bottles = () => {
                         }${getDetailsHighlightClass(
                           selectedBottle.details?.dimensions.lengthIn || ''
                         )}`}
+                        style={detailsInputStyle}
                       />
                     </div>
                     <div>
@@ -1878,6 +1912,7 @@ const Bottles = () => {
                         }${getDetailsHighlightClass(
                           selectedBottle.details?.dimensions.widthIn || ''
                         )}`}
+                        style={detailsInputStyle}
                       />
                     </div>
                     <div>
@@ -1904,6 +1939,7 @@ const Bottles = () => {
                         }${getDetailsHighlightClass(
                           selectedBottle.details?.dimensions.heightIn || ''
                         )}`}
+                        style={detailsInputStyle}
                       />
                     </div>
                     <div>
@@ -1930,6 +1966,7 @@ const Bottles = () => {
                         }${getDetailsHighlightClass(
                           selectedBottle.details?.dimensions.weightLbs || ''
                         )}`}
+                        style={detailsInputStyle}
                       />
                     </div>
                   </div>
@@ -1958,8 +1995,10 @@ const Bottles = () => {
                         }${getDetailsHighlightClass(
                           selectedBottle.details?.dimensions.labelSize || ''
                         )}`}
+                        style={detailsInputStyle}
                       />
                     </div>
+                  </div>
                   </div>
 
                   {isEditingDimensionsInfo && (
@@ -1997,6 +2036,7 @@ const Bottles = () => {
                           selectedBottle.details?.inventory.orderStrategy || ''
                         )}`}
                         readOnly
+                        style={detailsInputStyle}
                       />
                     </div>
                     <div>
@@ -2009,6 +2049,7 @@ const Bottles = () => {
                           selectedBottle.details?.inventory.supplierInventory || ''
                         )}`}
                         readOnly
+                        style={detailsInputStyle}
                       />
                     </div>
                     <div>
@@ -2021,6 +2062,7 @@ const Bottles = () => {
                           selectedBottle.details?.inventory.warehouseInventory || ''
                         )}`}
                         readOnly
+                        style={detailsInputStyle}
                       />
                     </div>
                     <div>
@@ -2033,6 +2075,7 @@ const Bottles = () => {
                           selectedBottle.details?.inventory.maxWarehouseInventory || ''
                         )}`}
                         readOnly
+                        style={detailsInputStyle}
                       />
                     </div>
                   </div>
