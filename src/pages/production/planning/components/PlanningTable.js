@@ -256,10 +256,8 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
           });
           setHoveredCommentId(uniqueCommentId);
         }
-      } else if (onStatusCommentClick && statusFieldName && row) {
-        // If no comment, allow adding one by clicking the circle
-        onStatusCommentClick(row, statusFieldName);
       }
+      // Removed: clicking status circle no longer opens comment modal
     };
 
     return (
@@ -268,7 +266,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         style={{ 
           position: 'relative', 
           display: 'inline-block',
-          cursor: (onStatusCommentClick && statusFieldName && row) || (hasComment && commentText) ? 'pointer' : 'default'
+          cursor: (hasComment && commentText) ? 'pointer' : 'default'
         }}
         onClick={handleIconClick}
       >

@@ -27,6 +27,7 @@ const NewShipmentTable = ({
   const qtyInputRefs = useRef({});
   const addButtonRefs = useRef({});
   const addPopupRefs = useRef({});
+  const manuallyEditedIndices = useRef(new Set()); // Track which fields have been manually edited by user
   const [openFilterIndex, setOpenFilterIndex] = useState(null);
   const filterRefs = useRef({});
   const filterModalRefs = useRef({});
@@ -1264,9 +1265,9 @@ const NewShipmentTable = ({
                               style={{
                                 position: 'fixed',
                                 backgroundColor: '#FFFFFF',
-                                borderRadius: '12px',
-                                padding: '14px 16px',
-                                minWidth: '220px',
+                                borderRadius: '8px',
+                                padding: '8px 12px',
+                                minWidth: '180px',
                                 boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
                                 zIndex: 9999,
                                 border: '1px solid #E5E7EB',
@@ -1281,12 +1282,12 @@ const NewShipmentTable = ({
                               onMouseDown={(e) => e.stopPropagation()}
                               onMouseUp={(e) => e.stopPropagation()}
                             >
-                              <div style={{ marginBottom: '10px' }}>
+                              <div style={{ marginBottom: '6px' }}>
                                 <h3 style={{
-                                  fontSize: '14px',
+                                  fontSize: '12px',
                                   fontWeight: 600,
                                   color: '#111827',
-                                  marginBottom: '4px',
+                                  marginBottom: '2px',
                                   lineHeight: '1.3',
                                 }}>
                                   0 quantity. Add quantity to include in shipment
@@ -1315,6 +1316,8 @@ const NewShipmentTable = ({
                           value={effectiveQtyValues[index] !== undefined && effectiveQtyValues[index] !== null && effectiveQtyValues[index] !== '' ? String(effectiveQtyValues[index]) : ''}
                           onChange={(e) => {
                             const inputValue = e.target.value;
+                            // Mark this field as manually edited
+                            manuallyEditedIndices.current.add(index);
                             // Allow empty string while typing, or parse the number
                             if (inputValue === '' || inputValue === '-') {
                               effectiveSetQtyValues(prev => ({
@@ -1357,12 +1360,16 @@ const NewShipmentTable = ({
                         />
                         {(() => {
                           const forecastValue = Math.round(row.weeklyForecast || row.forecast || 0);
-                          const currentQty = typeof effectiveQtyValues[index] === 'number' 
-                            ? effectiveQtyValues[index] 
-                            : (effectiveQtyValues[index] === '' || effectiveQtyValues[index] === null || effectiveQtyValues[index] === undefined) 
-                              ? 0 
-                              : parseInt(effectiveQtyValues[index], 10) || 0;
-                          const hasChanged = currentQty !== forecastValue;
+                          const qtyValue = effectiveQtyValues[index];
+                          // Only show reset if value has been manually edited by user and differs from forecast
+                          const isValueSet = qtyValue !== undefined && qtyValue !== null && qtyValue !== '';
+                          const isManuallyEdited = manuallyEditedIndices.current.has(index);
+                          const currentQty = typeof qtyValue === 'number' 
+                            ? qtyValue 
+                            : isValueSet 
+                              ? parseInt(qtyValue, 10) || 0
+                              : 0;
+                          const hasChanged = isValueSet && isManuallyEdited && currentQty !== forecastValue;
                           
                           return hasChanged ? (
                             <button
@@ -1374,6 +1381,8 @@ const NewShipmentTable = ({
                                   ...prev,
                                   [index]: forecastValue,
                                 }));
+                                // Remove from manually edited set when reset to forecast
+                                manuallyEditedIndices.current.delete(index);
                               }}
                               style={{
                                 position: 'absolute',
@@ -1510,6 +1519,8 @@ const NewShipmentTable = ({
                                 
                                 const maxQty = Math.floor(labelsAvailable / increment) * increment;
                                 
+                                // Mark as manually edited since user clicked "Use Available"
+                                manuallyEditedIndices.current.add(index);
                                 effectiveSetQtyValues(prev => ({
                                   ...prev,
                                   [index]: maxQty
@@ -2838,12 +2849,16 @@ const NewShipmentTable = ({
                     >
                       {(() => {
                         const forecastValue = Math.round(row.weeklyForecast || row.forecast || 0);
-                        const currentQty = typeof effectiveQtyValues[index] === 'number' 
-                          ? effectiveQtyValues[index] 
-                          : (effectiveQtyValues[index] === '' || effectiveQtyValues[index] === null || effectiveQtyValues[index] === undefined) 
-                            ? 0 
-                            : parseInt(effectiveQtyValues[index], 10) || 0;
-                        const hasChanged = currentQty !== forecastValue;
+                        const qtyValue = effectiveQtyValues[index];
+                        // Only show reset if value has been manually edited by user and differs from forecast
+                        const isValueSet = qtyValue !== undefined && qtyValue !== null && qtyValue !== '';
+                        const isManuallyEdited = manuallyEditedIndices.current.has(index);
+                        const currentQty = typeof qtyValue === 'number' 
+                          ? qtyValue 
+                          : isValueSet 
+                            ? parseInt(qtyValue, 10) || 0
+                            : 0;
+                        const hasChanged = isValueSet && isManuallyEdited && currentQty !== forecastValue;
                         
                         return hasChanged ? (
                           <button
@@ -2855,6 +2870,8 @@ const NewShipmentTable = ({
                                 ...prev,
                                 [index]: forecastValue,
                               }));
+                              // Remove from manually edited set when reset to forecast
+                              manuallyEditedIndices.current.delete(index);
                             }}
                             style={{
                               display: 'flex',
@@ -2898,6 +2915,8 @@ const NewShipmentTable = ({
                         value={effectiveQtyValues[index] !== undefined && effectiveQtyValues[index] !== null && effectiveQtyValues[index] !== '' ? String(effectiveQtyValues[index]) : (effectiveQtyValues[index] === '' ? '' : '0')}
                         onChange={(e) => {
                           const inputValue = e.target.value;
+                          // Mark this field as manually edited
+                          manuallyEditedIndices.current.add(index);
                           // Allow empty string while typing, or parse the number
                           if (inputValue === '' || inputValue === '-') {
                             effectiveSetQtyValues(prev => ({
@@ -3046,6 +3065,8 @@ const NewShipmentTable = ({
                               }
                               
                               const newQty = Math.max(0, numQty + increment);
+                              // Mark as manually edited since user clicked increment button
+                              manuallyEditedIndices.current.add(index);
                               effectiveSetQtyValues(prev => ({
                                 ...prev,
                                 [index]: newQty,
@@ -3107,6 +3128,8 @@ const NewShipmentTable = ({
                               }
                               
                               const newQty = Math.max(0, numQty - increment);
+                              // Mark as manually edited since user clicked decrement button
+                              manuallyEditedIndices.current.add(index);
                               effectiveSetQtyValues(prev => ({
                                 ...prev,
                                 [index]: newQty,
@@ -3257,6 +3280,8 @@ const NewShipmentTable = ({
                             
                             const maxQty = Math.floor(labelsAvailable / increment) * increment;
                             
+                            // Mark as manually edited since user clicked "Use Available"
+                            manuallyEditedIndices.current.add(index);
                             effectiveSetQtyValues(prev => ({
                               ...prev,
                               [index]: maxQty

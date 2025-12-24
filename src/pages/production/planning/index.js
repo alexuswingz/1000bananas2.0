@@ -675,6 +675,26 @@ const Planning = () => {
 
   // Determine which step to navigate to based on shipment status
   const getNextIncompleteStep = (row) => {
+    // Check workflow status first - if currently on a step, go to that step
+    if (row.workflowStatus) {
+      const statusMap = {
+        'add_products': 'add-products',
+        'label_check': 'label-check',
+        'formula_check': 'formula-check',
+        'book_shipment': 'book-shipment',
+        'sort_products': 'sort-products',
+        'sort_formulas': 'sort-formulas',
+      };
+      if (statusMap[row.workflowStatus]) {
+        return statusMap[row.workflowStatus];
+      }
+    }
+    
+    // If book-shipment is completed (checkpoint), navigate to it instead of next incomplete step
+    if (row.bookShipment === 'completed') {
+      return 'book-shipment';
+    }
+    
     // Return the first incomplete step
     if (row.addProducts !== 'completed') return 'add-products';
     // Updated flow: Add Products → Label Check → Formula Check

@@ -11,7 +11,7 @@ const SortProductsFilterDropdown = ({
   onClose 
 }) => {
   const [position, setPosition] = useState({ top: 0, left: 0 });
-  const [sortOrder, setSortOrder] = useState(currentSort); // 'asc' or 'desc'
+  const [sortOrder, setSortOrder] = useState(''); // Always start with empty, don't show blue state
   const [filterConditionExpanded, setFilterConditionExpanded] = useState(true);
   const [filterValuesExpanded, setFilterValuesExpanded] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -156,8 +156,7 @@ const SortProductsFilterDropdown = ({
           onClick={(e) => {
             e.stopPropagation();
             e.preventDefault();
-            const newSortOrder = sortOrder === 'asc' ? '' : 'asc';
-            setSortOrder(newSortOrder);
+            const newSortOrder = 'asc';
             // Automatically apply sort when clicking
             if (onApply) {
               onApply({
@@ -167,10 +166,9 @@ const SortProductsFilterDropdown = ({
                 conditionValue,
               });
             }
-            // Close dropdown after applying sort
-            setTimeout(() => {
-              onClose?.();
-            }, 0);
+            // Reset sortOrder state and close dropdown
+            setSortOrder('');
+            onClose?.();
           }}
           onMouseDown={(e) => e.stopPropagation()}
           style={{
@@ -180,33 +178,29 @@ const SortProductsFilterDropdown = ({
             padding: '6px',
             cursor: 'pointer',
             borderRadius: '4px',
-            backgroundColor: sortOrder === 'asc' ? '#EFF6FF' : 'transparent',
+            backgroundColor: 'transparent',
             marginBottom: '6px',
             transition: 'background-color 0.2s',
           }}
           onMouseEnter={(e) => {
-            if (sortOrder !== 'asc') {
-              e.currentTarget.style.backgroundColor = '#F9FAFB';
-            }
+            e.currentTarget.style.backgroundColor = '#F9FAFB';
           }}
           onMouseLeave={(e) => {
-            if (sortOrder !== 'asc') {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }
+            e.currentTarget.style.backgroundColor = 'transparent';
           }}
         >
           <div
             style={{
               width: '20px',
               height: '20px',
-              backgroundColor: sortOrder === 'asc' ? '#3B82F6' : '#E5E7EB',
+              backgroundColor: '#E5E7EB',
               borderRadius: '3px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: '9px',
               fontWeight: 700,
-              color: sortOrder === 'asc' ? '#FFFFFF' : '#6B7280',
+              color: '#6B7280',
               flexShrink: 0,
             }}
           >
@@ -223,8 +217,7 @@ const SortProductsFilterDropdown = ({
           onClick={(e) => {
             e.stopPropagation();
             e.preventDefault();
-            const newSortOrder = sortOrder === 'desc' ? '' : 'desc';
-            setSortOrder(newSortOrder);
+            const newSortOrder = 'desc';
             // Automatically apply sort when clicking
             if (onApply) {
               onApply({
@@ -234,10 +227,9 @@ const SortProductsFilterDropdown = ({
                 conditionValue,
               });
             }
-            // Close dropdown after applying sort
-            setTimeout(() => {
-              onClose?.();
-            }, 0);
+            // Reset sortOrder state and close dropdown
+            setSortOrder('');
+            onClose?.();
           }}
           onMouseDown={(e) => e.stopPropagation()}
           style={{
@@ -247,32 +239,28 @@ const SortProductsFilterDropdown = ({
             padding: '6px',
             cursor: 'pointer',
             borderRadius: '4px',
-            backgroundColor: sortOrder === 'desc' ? '#EFF6FF' : 'transparent',
+            backgroundColor: 'transparent',
             transition: 'background-color 0.2s',
           }}
           onMouseEnter={(e) => {
-            if (sortOrder !== 'desc') {
-              e.currentTarget.style.backgroundColor = '#F9FAFB';
-            }
+            e.currentTarget.style.backgroundColor = '#F9FAFB';
           }}
           onMouseLeave={(e) => {
-            if (sortOrder !== 'desc') {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }
+            e.currentTarget.style.backgroundColor = 'transparent';
           }}
         >
           <div
             style={{
               width: '20px',
               height: '20px',
-              backgroundColor: sortOrder === 'desc' ? '#3B82F6' : '#E5E7EB',
+              backgroundColor: '#E5E7EB',
               borderRadius: '3px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: '9px',
               fontWeight: 700,
-              color: sortOrder === 'desc' ? '#FFFFFF' : '#6B7280',
+              color: '#6B7280',
               flexShrink: 0,
             }}
           >

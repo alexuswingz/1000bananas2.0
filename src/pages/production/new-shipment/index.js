@@ -134,6 +134,40 @@ const NewShipment = () => {
   const labelCheckRemainingCount = totalLabelCheckRows - labelCheckCompletedCount;
   const isLabelCheckReadyToComplete = totalLabelCheckRows > 0 && labelCheckRemainingCount === 0;
 
+  // Auto-complete label check when all products are checked
+  useEffect(() => {
+    // Only auto-complete if:
+    // 1. We have products to check
+    // 2. All products are completed
+    // 3. Label check is not already marked as completed
+    // 4. We have a shipmentId
+    // 5. We're currently on the label-check step
+    if (
+      shipmentId &&
+      activeAction === 'label-check' &&
+      isLabelCheckReadyToComplete &&
+      !completedTabs.has('label-check') &&
+      totalLabelCheckRows > 0
+    ) {
+      // Check for variance/incomplete status - if any row is insufficient, mark as incomplete
+      const hasVariance = labelCheckRows.some(row => {
+        // A row is incomplete if it's counted and has insufficient labels
+        return row.isCounted && row.isInsufficient === true;
+      });
+      
+      // Auto-complete the label check step (only once)
+      const autoComplete = async () => {
+        try {
+          await completeLabelCheck('', hasVariance);
+        } catch (error) {
+          console.error('Error auto-completing label check:', error);
+        }
+      };
+      autoComplete();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLabelCheckReadyToComplete, shipmentId, activeAction, completedTabs, totalLabelCheckRows, labelCheckRows]);
+
   // Close tooltip when clicking outside if it's pinned
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -1069,7 +1103,11 @@ const NewShipment = () => {
     // Always proceed to Book Shipment after completing Formula Check
     setActiveAction('book-shipment');
     if (isIncomplete) {
-      toast.info('Formula Check comment saved. Proceeding to Book Shipment.');
+      if (hasComment) {
+        toast.info('Formula Check comment saved. Proceeding to Book Shipment.');
+      } else {
+        toast.info('Proceeding to Book Shipment.');
+      }
     } else {
       toast.success('Formula Check completed! Moving to Book Shipment');
     }
@@ -1118,14 +1156,22 @@ const NewShipment = () => {
     if (formulaCheckCompleted) {
       setActiveAction('book-shipment');
       if (isIncomplete) {
-        toast.info('Label Check comment saved. Proceeding to Book Shipment.');
+        if (hasComment) {
+          toast.info('Label Check comment saved. Proceeding to Book Shipment.');
+        } else {
+          toast.info('Proceeding to Book Shipment.');
+        }
       } else {
         toast.success('Label Check completed! Moving to Book Shipment.');
       }
     } else {
       setActiveAction('formula-check');
       if (isIncomplete) {
-        toast.info('Label Check comment saved. Proceeding to Formula Check.');
+        if (hasComment) {
+          toast.info('Label Check comment saved. Proceeding to Formula Check.');
+        } else {
+          toast.info('Proceeding to Formula Check.');
+        }
       } else {
         toast.success('Label Check completed! Moving to Formula Check.');
       }
@@ -1161,7 +1207,14 @@ const NewShipment = () => {
         // Treat step as incomplete if not all label checks are done
         const isIncomplete = !isLabelCheckReadyToComplete;
 
-        // Check for variance first
+        // If not all label checks are done, show comment modal
+        if (isIncomplete) {
+          setIsLabelIncompleteComment(true);
+          setIsLabelCheckCommentOpen(true);
+          return;
+        }
+
+        // Check for variance if all checks are done
         const varianceCount = checkVarianceExceeded();
         if (varianceCount > 0) {
           setVarianceCount(varianceCount);

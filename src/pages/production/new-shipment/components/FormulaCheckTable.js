@@ -389,6 +389,10 @@ const FormulaCheckTable = ({
           .group:hover .transition-opacity {
             opacity: 1 !important;
           }
+          /* Keep filter icon visible when dropdown is open */
+          .transition-opacity[data-filter-open="true"] {
+            opacity: 1 !important;
+          }
         `}
       </style>
       <div style={{
@@ -446,6 +450,7 @@ const FormulaCheckTable = ({
                           src="/assets/Vector (1).png"
                           alt="Filter"
                           className="transition-opacity"
+                          data-filter-open={openFilterColumn === column.key ? 'true' : 'false'}
                           style={{
                             width: '12px',
                             height: '12px',
@@ -457,6 +462,14 @@ const FormulaCheckTable = ({
                           }}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.opacity = '1';
+                          }}
+                          onMouseLeave={(e) => {
+                            // Keep visible if dropdown is open for this column
+                            if (openFilterColumn !== column.key) {
+                              e.currentTarget.style.opacity = '0';
+                            } else {
+                              e.currentTarget.style.opacity = '1';
+                            }
                           }}
                           onClick={(e) => {
                             e.stopPropagation();

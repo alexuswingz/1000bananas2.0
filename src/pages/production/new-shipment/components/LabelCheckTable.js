@@ -536,10 +536,11 @@ const LabelCheckTable = ({
         isComplete: completedRows.has(row.id) || confirmedRows.has(row.id),
         isConfirmed: confirmedRows.has(row.id),
         isCounted: completedRows.has(row.id) && !confirmedRows.has(row.id),
+        isInsufficient: completedRowStatus[row.id] || false, // Include insufficient status
       }));
       onRowsDataChange(rowsWithStatus);
     }
-  }, [rows, completedRows, confirmedRows, onRowsDataChange]);
+  }, [rows, completedRows, confirmedRows, completedRowStatus, onRowsDataChange]);
 
   // Close filter dropdown when clicking outside
   useEffect(() => {
