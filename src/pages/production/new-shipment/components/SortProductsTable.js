@@ -22,10 +22,15 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
   // Transform shipment products into table format
   const [products, setProducts] = useState([]);
   const locksLoadedRef = useRef(null); // Track which shipmentId we've loaded locks for
+  const previousShipmentIdRef = useRef(null); // Track previous shipmentId to detect actual changes
 
-  // Reset locks loaded flag when shipmentId changes
+  // Reset locks loaded flag when shipmentId actually changes (not on remount)
   useEffect(() => {
-    if (locksLoadedRef.current !== shipmentId) {
+    const previousShipmentId = previousShipmentIdRef.current;
+    previousShipmentIdRef.current = shipmentId;
+    
+    // Only clear locks if shipmentId actually changed to a different value
+    if (previousShipmentId !== null && previousShipmentId !== shipmentId) {
       locksLoadedRef.current = null;
       setLockedProductIds(new Set());
     }
@@ -47,23 +52,30 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
       }));
       setProducts(transformedProducts);
       
-      // Load locked IDs after products are set, but only once per shipmentId
-      if (shipmentId && locksLoadedRef.current !== shipmentId) {
-        try {
-          const stored = localStorage.getItem(`sortProductsLocks_${shipmentId}`);
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            if (Array.isArray(parsed)) {
-              // Filter to only include IDs that exist in current products
-              const productIds = new Set(transformedProducts.map(p => p.id));
-              const validLockedIds = parsed.filter(id => productIds.has(id));
-              setLockedProductIds(new Set(validLockedIds));
-              console.log('Loaded locked product IDs:', validLockedIds);
+      // Load locked IDs from localStorage whenever products are set
+      // This handles both initial mount and remount scenarios
+      if (shipmentId) {
+        // Only load if we haven't loaded for this shipmentId yet, or if shipmentId changed
+        if (locksLoadedRef.current !== shipmentId) {
+          try {
+            const stored = localStorage.getItem(`sortProductsLocks_${shipmentId}`);
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              if (Array.isArray(parsed)) {
+                // Filter to only include IDs that exist in current products
+                const productIds = new Set(transformedProducts.map(p => p.id));
+                const validLockedIds = parsed.filter(id => productIds.has(id));
+                setLockedProductIds(new Set(validLockedIds));
+                console.log('Loaded locked product IDs:', validLockedIds);
+              }
+            } else {
+              // If no stored locks, ensure we start with empty set
+              setLockedProductIds(new Set());
             }
+            locksLoadedRef.current = shipmentId;
+          } catch (error) {
+            console.error('Error loading sort products locks from localStorage:', error);
           }
-          locksLoadedRef.current = shipmentId;
-        } catch (error) {
-          console.error('Error loading sort products locks from localStorage:', error);
         }
       }
     } else {

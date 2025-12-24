@@ -825,7 +825,7 @@ const Boxes = () => {
       {/* Box Details Modal */}
       {isDetailsOpen && selectedBox && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-2xl w-[800px] min-h-[480px] max-h-[480px] my-auto flex flex-col overflow-hidden">
+          <div className="bg-white rounded-xl shadow-2xl w-[800px] min-h-[540px] max-h-[540px] my-auto flex flex-col overflow-hidden">
             {/* Header */}
             <div className={`${themeClasses.headerBg} flex items-center justify-between px-6 py-3`}>
               <div className="flex items-center gap-3">
