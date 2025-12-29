@@ -1500,6 +1500,9 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
   const [filterCondition, setFilterCondition] = useState(existingFilter ? existingFilter[1].condition : '');
   const [filterValue, setFilterValue] = useState(existingFilter ? existingFilter[1].value : '');
   
+  // State to control if "Filter by condition" section is expanded
+  const [isFilterConditionOpen, setIsFilterConditionOpen] = useState(false);
+  
   // For addProducts column: Filter by values
   const defaultAddProductsValues = new Set(['completed', 'pending', 'in progress']);
   const [addProductsFilterValues, setAddProductsFilterValues] = useState(
@@ -1790,86 +1793,122 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
       {/* Filter by condition section */}
       {columnKey !== 'addProducts' && (
         <div style={{ marginBottom: '16px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
-          <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', textTransform: 'uppercase', marginBottom: '12px', display: 'block' }}>
-            Filter by condition:
-          </label>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <select
-              value={filterField}
-              onChange={(e) => setFilterField(e.target.value)}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: isFilterConditionOpen ? '12px' : '0',
+              cursor: 'pointer',
+            }}
+            onClick={() => setIsFilterConditionOpen(!isFilterConditionOpen)}
+          >
+            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', textTransform: 'uppercase', display: 'block' }}>
+              Filter by condition:
+            </label>
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#374151"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
               style={{
-                width: '100%',
-                padding: '8px 12px',
-                border: '1px solid #D1D5DB',
-                borderRadius: '6px',
-                fontSize: '0.875rem',
-                color: filterField ? '#374151' : '#9CA3AF',
-                backgroundColor: '#FFFFFF',
-                cursor: 'pointer',
+                transform: isFilterConditionOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.2s ease',
               }}
             >
-              {filterFields.map((field) => (
-                <option key={field.value} value={field.value}>
-                  {field.label}
-                </option>
-              ))}
-            </select>
-            
-            <select
-              value={filterCondition}
-              onChange={(e) => setFilterCondition(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                border: '1px solid #D1D5DB',
-                borderRadius: '6px',
-                fontSize: '0.875rem',
-                color: filterCondition ? '#374151' : '#9CA3AF',
-                backgroundColor: '#FFFFFF',
-                cursor: 'pointer',
-              }}
-            >
-              {filterConditions.map((condition) => (
-                <option key={condition.value} value={condition.value}>
-                  {condition.label}
-                </option>
-              ))}
-            </select>
-            
-            <input
-              type="text"
-              placeholder="Value here..."
-              value={filterValue}
-              onChange={(e) => setFilterValue(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                border: '1px solid #D1D5DB',
-                borderRadius: '6px',
-                fontSize: '0.875rem',
-                color: '#374151',
-                backgroundColor: '#FFFFFF',
-              }}
-            />
+              <path d="M6 9l6 6 6-6" />
+            </svg>
           </div>
+          
+          {isFilterConditionOpen && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <select
+                value={filterField}
+                onChange={(e) => setFilterField(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  color: filterField ? '#374151' : '#9CA3AF',
+                  backgroundColor: '#FFFFFF',
+                  cursor: 'pointer',
+                }}
+              >
+                {filterFields.map((field) => (
+                  <option key={field.value} value={field.value}>
+                    {field.label}
+                  </option>
+                ))}
+              </select>
+              
+              <select
+                value={filterCondition}
+                onChange={(e) => setFilterCondition(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  color: filterCondition ? '#374151' : '#9CA3AF',
+                  backgroundColor: '#FFFFFF',
+                  cursor: 'pointer',
+                }}
+              >
+                {filterConditions.map((condition) => (
+                  <option key={condition.value} value={condition.value}>
+                    {condition.label}
+                  </option>
+                ))}
+              </select>
+              
+              <input
+                type="text"
+                placeholder="Value here..."
+                value={filterValue}
+                onChange={(e) => setFilterValue(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  color: '#374151',
+                  backgroundColor: '#FFFFFF',
+                }}
+              />
+            </div>
+          )}
         </div>
       )}
 
       {/* Action buttons */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
         <button
           type="button"
           onClick={handleLocalReset}
           style={{
-            padding: '8px 16px',
+            width: '57px',
+            height: '23px',
+            padding: '0',
             border: '1px solid #D1D5DB',
-            borderRadius: '6px',
+            borderRadius: '4px',
             backgroundColor: '#FFFFFF',
             color: '#374151',
             fontSize: '0.875rem',
             fontWeight: 500,
             cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            whiteSpace: 'nowrap',
+            boxSizing: 'border-box',
           }}
         >
           Reset
@@ -1878,14 +1917,21 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
           type="button"
           onClick={handleLocalApply}
           style={{
-            padding: '8px 16px',
+            width: '57px',
+            height: '23px',
+            padding: '0',
             border: 'none',
-            borderRadius: '6px',
+            borderRadius: '4px',
             backgroundColor: '#3B82F6',
             color: '#FFFFFF',
             fontSize: '0.875rem',
             fontWeight: 500,
             cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            whiteSpace: 'nowrap',
+            boxSizing: 'border-box',
           }}
         >
           Apply

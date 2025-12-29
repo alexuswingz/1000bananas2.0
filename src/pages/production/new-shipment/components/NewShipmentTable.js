@@ -3516,7 +3516,7 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
   const [sortField, setSortField] = useState(currentFilters.sortField || '');
   const [isSortFieldOpen, setIsSortFieldOpen] = useState(false);
   const [sortOrder, setSortOrder] = useState(currentFilters.sortOrder || '');
-  const [isFilterConditionExpanded, setIsFilterConditionExpanded] = useState(true);
+  const [isFilterConditionExpanded, setIsFilterConditionExpanded] = useState(false);
   const [filterField, setFilterField] = useState(currentFilters.filterField || '');
   const [filterCondition, setFilterCondition] = useState(currentFilters.filterCondition || '');
   const [filterValue, setFilterValue] = useState(currentFilters.filterValue || '');
@@ -3526,7 +3526,7 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
   useEffect(() => {
     if (filterIconRef) {
       const rect = filterIconRef.getBoundingClientRect();
-      const dropdownWidth = 320;
+      const dropdownWidth = 300;
       const dropdownHeight = 500;
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
@@ -3664,19 +3664,19 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
         position: 'fixed',
         top: `${position.top}px`,
         left: `${position.left}px`,
-        width: '320px',
+        width: '300px',
         backgroundColor: '#FFFFFF',
         borderRadius: '12px',
         boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
         border: '1px solid #E5E7EB',
         zIndex: 10000,
-        padding: '16px',
+        padding: '12px',
       }}
       onClick={(e) => e.stopPropagation()}
     >
       {/* Popular filters section */}
-      <div style={{ marginBottom: '16px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+      <div style={{ marginBottom: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
           <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', textTransform: 'uppercase' }}>
             Popular filters:
           </label>
@@ -3697,12 +3697,12 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
         </div>
         
         <div style={{ position: 'relative' }} ref={popularFilterRef}>
-          <button
+            <button
             type="button"
             onClick={() => setIsPopularFilterOpen(!isPopularFilterOpen)}
             style={{
               width: '100%',
-              padding: '8px 12px',
+              padding: '6px 10px',
               border: '1px solid #D1D5DB',
               borderRadius: '6px',
               fontSize: '0.875rem',
@@ -3823,8 +3823,8 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
       </div>
 
       {/* Sort by section */}
-      <div style={{ marginBottom: '16px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+      <div style={{ marginBottom: '12px', paddingTop: '12px', borderTop: '1px solid #E5E7EB' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
           <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', textTransform: 'uppercase' }}>
             Sort by:
           </label>
@@ -3844,14 +3844,14 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
           </button>
         </div>
         
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <div style={{ position: 'relative' }} ref={sortFieldRef}>
             <button
               type="button"
               onClick={() => setIsSortFieldOpen(!isSortFieldOpen)}
               style={{
                 width: '100%',
-                padding: '8px 12px',
+                padding: '6px 10px',
                 border: '1px solid #D1D5DB',
                 borderRadius: '6px',
                 fontSize: '0.875rem',
@@ -3911,7 +3911,7 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
                     style={{
                       width: '100%',
                       textAlign: 'left',
-                      padding: '10px 12px',
+                      padding: '8px 10px',
                       fontSize: '0.875rem',
                       color: '#374151',
                       backgroundColor: sortField === field.value ? '#F9FAFB' : '#FFFFFF',
@@ -3939,7 +3939,7 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
             onChange={(e) => setSortOrder(e.target.value)}
             style={{
               width: '100%',
-              padding: '8px 12px',
+              padding: '6px 36px 6px 10px',
               border: sortOrder ? '1px solid #3B82F6' : '1px solid #D1D5DB',
               borderRadius: '6px',
               fontSize: '0.875rem',
@@ -3963,13 +3963,13 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
       </div>
 
       {/* Filter by condition section - collapsible */}
-      <div style={{ marginBottom: '16px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
+      <div style={{ marginBottom: '12px', paddingTop: '12px', borderTop: '1px solid #E5E7EB' }}>
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: isFilterConditionExpanded ? '12px' : 0,
+            marginBottom: isFilterConditionExpanded ? '8px' : 0,
             cursor: 'pointer',
           }}
           onClick={() => setIsFilterConditionExpanded(!isFilterConditionExpanded)}
@@ -3992,13 +3992,13 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
         </div>
         
         {isFilterConditionExpanded && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <select
               value={filterField}
               onChange={(e) => setFilterField(e.target.value)}
               style={{
                 width: '100%',
-                padding: '8px 12px',
+                padding: '6px 36px 6px 10px',
                 border: '1px solid #D1D5DB',
                 borderRadius: '6px',
                 fontSize: '0.875rem',
@@ -4024,7 +4024,7 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
               onChange={(e) => setFilterCondition(e.target.value)}
               style={{
                 width: '100%',
-                padding: '8px 12px',
+                padding: '6px 36px 6px 10px',
                 border: '1px solid #D1D5DB',
                 borderRadius: '6px',
                 fontSize: '0.875rem',
@@ -4053,7 +4053,7 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
                 onChange={(e) => setFilterValue(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '8px 36px 8px 12px',
+                  padding: '6px 36px 6px 10px',
                   border: '1px solid #D1D5DB',
                   borderRadius: '6px',
                   fontSize: '0.875rem',
@@ -4076,19 +4076,26 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
       </div>
 
       {/* Action buttons */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '12px', borderTop: '1px solid #E5E7EB' }}>
         <button
           type="button"
           onClick={handleReset}
           style={{
-            padding: '8px 16px',
+            width: '57px',
+            height: '23px',
+            padding: '0',
             border: '1px solid #D1D5DB',
-            borderRadius: '6px',
+            borderRadius: '4px',
             backgroundColor: '#FFFFFF',
             color: '#374151',
             fontSize: '0.875rem',
             fontWeight: 500,
             cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            whiteSpace: 'nowrap',
+            boxSizing: 'border-box',
           }}
         >
           Reset
@@ -4097,14 +4104,21 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
           type="button"
           onClick={handleApply}
           style={{
-            padding: '8px 16px',
+            width: '57px',
+            height: '23px',
+            padding: '0',
             border: 'none',
-            borderRadius: '6px',
+            borderRadius: '4px',
             backgroundColor: '#3B82F6',
             color: '#FFFFFF',
             fontSize: '0.875rem',
             fontWeight: 500,
             cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            whiteSpace: 'nowrap',
+            boxSizing: 'border-box',
           }}
         >
           Apply
