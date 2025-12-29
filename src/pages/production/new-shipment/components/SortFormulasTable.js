@@ -911,26 +911,70 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
       [columnKey]: filterData,
     }));
     
-    // Update sort config: if sortOrder is set, add/update this column in the sort array
-    // If sortOrder is empty, remove this column from the sort array
-    setSortConfig(prev => {
-      if (filterData.sortOrder) {
-        // Check if this column already has a sort
-        const existingIndex = prev.findIndex(sort => sort.column === columnKey);
-        if (existingIndex >= 0) {
-          // Update existing sort
-          const newConfig = [...prev];
-          newConfig[existingIndex] = { column: columnKey, order: filterData.sortOrder };
-          return newConfig;
-        } else {
-          // Add new sort (appends to end, making it the lowest priority)
-          return [...prev, { column: columnKey, order: filterData.sortOrder }];
+    // If sortOrder is provided, apply one-time sort to formulas array
+    // Locked items maintain their positions, only unlocked items are sorted
+    if (filterData.sortOrder) {
+      setFormulas(prevFormulas => {
+        // Separate locked and unlocked formulas
+        const lockedFormulas = [];
+        const unlockedFormulas = [];
+        
+        prevFormulas.forEach((formula, index) => {
+          if (lockedFormulaIds.has(formula.formula)) {
+            lockedFormulas.push({ formula, originalIndex: index });
+          } else {
+            unlockedFormulas.push(formula);
+          }
+        });
+        
+        // Sort only unlocked formulas
+        unlockedFormulas.sort((a, b) => {
+          const aVal = a[columnKey];
+          const bVal = b[columnKey];
+          
+          let comparison = 0;
+          
+          // Handle numeric values
+          if (typeof aVal === 'number' && typeof bVal === 'number') {
+            comparison = filterData.sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+          } else {
+            // Handle string values
+            const aStr = String(aVal || '').toLowerCase();
+            const bStr = String(bVal || '').toLowerCase();
+            
+            if (filterData.sortOrder === 'asc') {
+              comparison = aStr.localeCompare(bStr);
+            } else {
+              comparison = bStr.localeCompare(aStr);
+            }
+          }
+          
+          return comparison;
+        });
+        
+        // Rebuild the array: locked items at their original positions, sorted unlocked items fill the rest
+        const result = [];
+        let unlockedIndex = 0;
+        
+        for (let i = 0; i < prevFormulas.length; i++) {
+          const lockedItem = lockedFormulas.find(lf => lf.originalIndex === i);
+          if (lockedItem) {
+            result.push(lockedItem.formula);
+          } else if (unlockedIndex < unlockedFormulas.length) {
+            result.push(unlockedFormulas[unlockedIndex]);
+            unlockedIndex++;
+          }
         }
-      } else {
-        // Remove sort for this column
-        return prev.filter(sort => sort.column !== columnKey);
-      }
-    });
+        
+        return result;
+      });
+      
+      // Clear sort config for this column (one-time sort, not persistent)
+      setSortConfig(prev => prev.filter(sort => sort.column !== columnKey));
+    } else {
+      // If sortOrder is empty, remove sort from config
+      setSortConfig(prev => prev.filter(sort => sort.column !== columnKey));
+    }
     // Keep the dropdown open so user can continue configuring multiple filters
     // setOpenFilterColumn(null);
   };
@@ -1021,8 +1065,9 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
     }
   };
 
-  // Apply filters and sorting to formulas
-  // Locked items maintain their positions and are not affected by filters/sorting
+  // Apply filters to formulas
+  // Locked items maintain their positions and are not affected by filters
+  // Note: Sorting is now one-time (applied directly to formulas array), not continuous
   const getFilteredAndSortedFormulas = () => {
     // Separate locked and unlocked formulas
     const lockedFormulas = [];
@@ -1066,45 +1111,7 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
       }
     });
 
-    // Apply hierarchical sorting to unlocked formulas only
-    // Sort by each column in priority order (primary first, then secondary, etc.)
-    if (sortConfig.length > 0) {
-      filteredUnlocked.sort((a, b) => {
-        // Try each sort level in order
-        for (const sort of sortConfig) {
-          const aVal = a[sort.column];
-          const bVal = b[sort.column];
-          
-          let comparison = 0;
-          
-          // Handle numeric values
-          if (typeof aVal === 'number' && typeof bVal === 'number') {
-            comparison = sort.order === 'asc' ? aVal - bVal : bVal - aVal;
-          } else {
-            // Handle string values
-            const aStr = String(aVal || '').toLowerCase();
-            const bStr = String(bVal || '').toLowerCase();
-            
-            if (sort.order === 'asc') {
-              comparison = aStr.localeCompare(bStr);
-            } else {
-              comparison = bStr.localeCompare(aStr);
-            }
-          }
-          
-          // If values are different at this level, return the comparison
-          // Otherwise, continue to the next sort level
-          if (comparison !== 0) {
-            return comparison;
-          }
-        }
-        
-        // If all sort levels are equal, maintain original order
-        return 0;
-      });
-    }
-
-    // Rebuild the array: locked items at their original positions, unlocked items fill the rest
+    // Rebuild the array: locked items at their original positions, filtered unlocked items fill the rest
     const result = [];
     let unlockedIndex = 0;
     
