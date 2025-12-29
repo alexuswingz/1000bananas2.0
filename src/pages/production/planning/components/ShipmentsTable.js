@@ -6,6 +6,9 @@ const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
   const [openFilterColumn, setOpenFilterColumn] = useState(null);
   const filterIconRefs = useRef({});
   const filterDropdownRef = useRef(null);
+  const [filters, setFilters] = useState({});
+  const [sortConfig, setSortConfig] = useState({ field: '', order: '' });
+  const [sortedRowOrder, setSortedRowOrder] = useState(null); // Store sorted row IDs for one-time sort
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -18,7 +21,11 @@ const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
 
   const columnBorderColor = isDarkMode ? 'rgba(55, 65, 81, 0.9)' : '#E5E7EB';
 
-  const isFilterActive = (key) => activeFilters.includes(key);
+  const isFilterActive = (key) => {
+    const hasFilter = filters[key] !== undefined;
+    const hasSorting = sortConfig.field === key && sortConfig.order !== '';
+    return hasFilter || hasSorting || activeFilters.includes(key);
+  };
 
   // Close filter dropdown when clicking outside
   useEffect(() => {
@@ -55,6 +62,197 @@ const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
     e.stopPropagation();
     setOpenFilterColumn(openFilterColumn === columnKey ? null : columnKey);
   };
+
+  // Handle filter apply
+  const handleApplyFilter = (filterConfig) => {
+    // Prepare filter values to use for sorting (use new values from config if provided, otherwise current state)
+    const filtersToUse = { ...filters };
+    if (filterConfig.filterField && filterConfig.filterCondition && filterConfig.filterValue) {
+      filtersToUse[filterConfig.filterField] = {
+        condition: filterConfig.filterCondition,
+        value: filterConfig.filterValue,
+      };
+    }
+    
+    // Update sort config
+    if (filterConfig.sortField && filterConfig.sortOrder) {
+      setSortConfig({ field: filterConfig.sortField, order: filterConfig.sortOrder });
+      
+      // Perform one-time sort and store the order
+      let rowsToSort = [...shipments];
+      
+      // Apply filters
+      Object.keys(filtersToUse).forEach(field => {
+        const filter = filtersToUse[field];
+        rowsToSort = rowsToSort.filter(row => {
+          const value = row[field];
+          const filterValue = filter.value.toLowerCase();
+          const rowValue = String(value || '').toLowerCase();
+
+          switch (filter.condition) {
+            case 'equals':
+              return rowValue === filterValue;
+            case 'contains':
+              return rowValue.includes(filterValue);
+            case 'greaterThan':
+              return rowValue > filterValue;
+            case 'lessThan':
+              return rowValue < filterValue;
+            default:
+              return true;
+          }
+        });
+      });
+      
+      // Apply sorting
+      rowsToSort.sort((a, b) => {
+        // Special handling for date sorting
+        if (filterConfig.sortField === 'shipmentDate' && a.shipmentDate && b.shipmentDate) {
+          const aDate = new Date(a.shipmentDate);
+          const bDate = new Date(b.shipmentDate);
+          return filterConfig.sortOrder === 'asc' 
+            ? aDate - bDate 
+            : bDate - aDate;
+        }
+        
+        const aVal = String(a[filterConfig.sortField] || '').toLowerCase();
+        const bVal = String(b[filterConfig.sortField] || '').toLowerCase();
+        
+        if (filterConfig.sortOrder === 'asc') {
+          return aVal.localeCompare(bVal);
+        } else {
+          return bVal.localeCompare(aVal);
+        }
+      });
+      
+      // Store the sorted order (array of IDs)
+      setSortedRowOrder(rowsToSort.map(row => row.id));
+    } else {
+      // If no sort is being applied, clear the sorted order (filters changed, need to re-sort)
+      setSortedRowOrder(null);
+    }
+    
+    // Update filters
+    if (filterConfig.filterField && filterConfig.filterCondition && filterConfig.filterValue) {
+      setFilters(prev => ({
+        ...prev,
+        [filterConfig.filterField]: {
+          condition: filterConfig.filterCondition,
+          value: filterConfig.filterValue,
+        }
+      }));
+      // If filters changed but sort wasn't reapplied, clear sorted order
+      if (!filterConfig.sortField || !filterConfig.sortOrder) {
+        setSortedRowOrder(null);
+      }
+    }
+  };
+
+  // Handle filter reset
+  const handleResetFilter = () => {
+    setSortConfig({ field: '', order: '' });
+    setSortedRowOrder(null); // Clear stored sorted order
+    setFilters({});
+  };
+
+  // Apply filters and sorting to rows
+  const getFilteredAndSortedRows = () => {
+    let filteredRows = [...shipments];
+
+    // Apply filters
+    Object.keys(filters).forEach(field => {
+      const filter = filters[field];
+      filteredRows = filteredRows.filter(row => {
+        const value = row[field];
+        const filterValue = filter.value.toLowerCase();
+        const rowValue = String(value || '').toLowerCase();
+
+        switch (filter.condition) {
+          case 'equals':
+            return rowValue === filterValue;
+          case 'contains':
+            return rowValue.includes(filterValue);
+          case 'greaterThan':
+            return rowValue > filterValue;
+          case 'lessThan':
+            return rowValue < filterValue;
+          default:
+            return true;
+        }
+      });
+    });
+
+    // Apply sorting - use stored sorted order if available (one-time sort)
+    if (sortedRowOrder && sortedRowOrder.length > 0) {
+      // Create a map for quick lookup
+      const rowMap = new Map(filteredRows.map(row => [row.id, row]));
+      
+      // Order rows according to stored sorted order
+      const orderedRows = [];
+      const remainingRows = [];
+      
+      sortedRowOrder.forEach(id => {
+        if (rowMap.has(id)) {
+          orderedRows.push(rowMap.get(id));
+          rowMap.delete(id);
+        }
+      });
+      
+      // Add any rows that weren't in the original sorted order (new rows)
+      rowMap.forEach(row => {
+        remainingRows.push(row);
+      });
+      
+      // Sort remaining rows by default (newest first if has date, otherwise by ID)
+      remainingRows.sort((a, b) => {
+        if (a.shipmentDate && b.shipmentDate) {
+          const aDate = new Date(a.shipmentDate);
+          const bDate = new Date(b.shipmentDate);
+          return bDate - aDate; // Newest first
+        }
+        return (b.id || 0) - (a.id || 0);
+      });
+      
+      // Combine: sorted rows first, then new rows
+      filteredRows = [...orderedRows, ...remainingRows];
+    } else if (sortConfig.field && sortConfig.order) {
+      // If sort config exists but no stored order, apply sorting (shouldn't happen normally, but fallback)
+      filteredRows.sort((a, b) => {
+        // Special handling for date sorting
+        if (sortConfig.field === 'shipmentDate' && a.shipmentDate && b.shipmentDate) {
+          const aDate = new Date(a.shipmentDate);
+          const bDate = new Date(b.shipmentDate);
+          return sortConfig.order === 'asc' 
+            ? aDate - bDate 
+            : bDate - aDate;
+        }
+        
+        const aVal = String(a[sortConfig.field] || '').toLowerCase();
+        const bVal = String(b[sortConfig.field] || '').toLowerCase();
+        
+        if (sortConfig.order === 'asc') {
+          return aVal.localeCompare(bVal);
+        } else {
+          return bVal.localeCompare(aVal);
+        }
+      });
+    } else {
+      // Default sort by shipmentDate DESC (newest first) when no user sort is applied
+      filteredRows.sort((a, b) => {
+        if (a.shipmentDate && b.shipmentDate) {
+          const aDate = new Date(a.shipmentDate);
+          const bDate = new Date(b.shipmentDate);
+          return bDate - aDate; // Newest first
+        }
+        // Fallback to ID if no timestamp
+        return (b.id || 0) - (a.id || 0);
+      });
+    }
+
+    return filteredRows;
+  };
+
+  const displayRows = getFilteredAndSortedRows();
 
   const columns = [
     { key: 'status', label: 'Status', width: 160, align: 'left' },
@@ -148,7 +346,7 @@ const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
           className="divide-y"
           style={{ borderColor: isDarkMode ? 'rgba(75, 85, 99, 0.3)' : '#f3f4f6' }}
         >
-          {shipments.map((row) => {
+          {displayRows.map((row) => {
             const hasComment = row.formulaCheckComment || row.labelCheckComment;
             const statusColor = hasComment ? '#F59E0B' : (row.statusColor || '#10B981');
 
@@ -303,6 +501,10 @@ const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
           columnKey={openFilterColumn}
           filterIconRef={filterIconRefs.current[openFilterColumn]}
           onClose={() => setOpenFilterColumn(null)}
+          onApply={handleApplyFilter}
+          onReset={handleResetFilter}
+          currentSort={sortConfig}
+          currentFilters={filters}
           isDarkMode={isDarkMode}
         />
       )}
@@ -311,13 +513,16 @@ const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
 };
 
 // FilterDropdown Component
-const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, isDarkMode }, ref) => {
+const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, onApply, onReset, currentSort, currentFilters, isDarkMode }, ref) => {
   const [position, setPosition] = useState({ top: 0, left: 0 });
-  const [sortField, setSortField] = useState('');
-  const [sortOrder, setSortOrder] = useState('');
-  const [filterField, setFilterField] = useState('');
-  const [filterCondition, setFilterCondition] = useState('');
-  const [filterValue, setFilterValue] = useState('');
+  const [sortField, setSortField] = useState(currentSort?.field || '');
+  const [sortOrder, setSortOrder] = useState(currentSort?.order || '');
+  
+  // Initialize filter fields from current filters if they exist
+  const existingFilter = currentFilters ? Object.entries(currentFilters)[0] : null;
+  const [filterField, setFilterField] = useState(existingFilter ? existingFilter[0] : '');
+  const [filterCondition, setFilterCondition] = useState(existingFilter ? existingFilter[1].condition : '');
+  const [filterValue, setFilterValue] = useState(existingFilter ? existingFilter[1].value : '');
 
   useEffect(() => {
     if (filterIconRef) {
@@ -359,16 +564,29 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, is
     setSortOrder('');
   };
 
-  const handleReset = () => {
+  const handleLocalReset = () => {
     setSortField('');
     setSortOrder('');
     setFilterField('');
     setFilterCondition('');
     setFilterValue('');
+    if (onReset) {
+      onReset();
+    }
+    onClose();
   };
 
-  const handleApply = () => {
-    // Apply filter logic here
+  const handleLocalApply = () => {
+    if (onApply) {
+      const applyData = {
+        sortField,
+        sortOrder,
+        filterField,
+        filterCondition,
+        filterValue,
+      };
+      onApply(applyData);
+    }
     onClose();
   };
 
@@ -563,7 +781,7 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, is
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
         <button
           type="button"
-          onClick={handleReset}
+          onClick={handleLocalReset}
           style={{
             padding: '8px 16px',
             border: '1px solid #D1D5DB',
@@ -579,7 +797,7 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, is
         </button>
         <button
           type="button"
-          onClick={handleApply}
+          onClick={handleLocalApply}
           style={{
             padding: '8px 16px',
             border: 'none',

@@ -9,6 +9,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
   const filterDropdownRef = useRef(null);
   const [filters, setFilters] = useState({});
   const [sortConfig, setSortConfig] = useState({ field: '', order: '' });
+  const [sortedRowOrder, setSortedRowOrder] = useState(null); // Store sorted row IDs for one-time sort
   const [addProductsFilterValues, setAddProductsFilterValues] = useState(new Set(['completed', 'pending', 'in progress'])); // Default: both Added and Not Added checked
   const [hoveredCommentId, setHoveredCommentId] = useState(null);
   const iconRefs = useRef({});
@@ -518,9 +519,83 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
 
   // Handle filter apply
   const handleApplyFilter = (filterConfig) => {
+    // Prepare filter values to use for sorting (use new values from config if provided, otherwise current state)
+    const addProductsValuesToUse = filterConfig.addProductsFilterValues !== undefined 
+      ? filterConfig.addProductsFilterValues 
+      : addProductsFilterValues;
+    
+    const filtersToUse = { ...filters };
+    if (filterConfig.filterField && filterConfig.filterCondition && filterConfig.filterValue) {
+      filtersToUse[filterConfig.filterField] = {
+        condition: filterConfig.filterCondition,
+        value: filterConfig.filterValue,
+      };
+    }
+    
     // Update sort config
     if (filterConfig.sortField && filterConfig.sortOrder) {
       setSortConfig({ field: filterConfig.sortField, order: filterConfig.sortOrder });
+      
+      // Perform one-time sort and store the order
+      let rowsToSort = [...rows];
+      
+      // Apply addProducts filter first if needed
+      if (addProductsValuesToUse.size > 0 && addProductsValuesToUse.size < 3) {
+        rowsToSort = rowsToSort.filter(row => {
+          const status = row.addProducts?.toLowerCase() || 'pending';
+          return addProductsValuesToUse.has(status);
+        });
+      }
+      
+      // Apply other filters
+      Object.keys(filtersToUse).forEach(field => {
+        const filter = filtersToUse[field];
+        rowsToSort = rowsToSort.filter(row => {
+          const value = row[field];
+          const filterValue = filter.value.toLowerCase();
+          const rowValue = String(value || '').toLowerCase();
+
+          switch (filter.condition) {
+            case 'equals':
+              return rowValue === filterValue;
+            case 'contains':
+              return rowValue.includes(filterValue);
+            case 'greaterThan':
+              return rowValue > filterValue;
+            case 'lessThan':
+              return rowValue < filterValue;
+            default:
+              return true;
+          }
+        });
+      });
+      
+      // Apply sorting
+      rowsToSort.sort((a, b) => {
+        // Special handling for timestamp sorting
+        if (filterConfig.sortField === 'createdAt' && a.createdAt && b.createdAt) {
+          const aDate = new Date(a.createdAt);
+          const bDate = new Date(b.createdAt);
+          return filterConfig.sortOrder === 'asc' 
+            ? aDate - bDate 
+            : bDate - aDate;
+        }
+        
+        const aVal = String(a[filterConfig.sortField] || '').toLowerCase();
+        const bVal = String(b[filterConfig.sortField] || '').toLowerCase();
+        
+        if (filterConfig.sortOrder === 'asc') {
+          return aVal.localeCompare(bVal);
+        } else {
+          return bVal.localeCompare(aVal);
+        }
+      });
+      
+      // Store the sorted order (array of IDs)
+      setSortedRowOrder(rowsToSort.map(row => row.id));
+    } else {
+      // If no sort is being applied, clear the sorted order (filters changed, need to re-sort)
+      setSortedRowOrder(null);
     }
     
     // Update filters
@@ -532,11 +607,19 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
           value: filterConfig.filterValue,
         }
       }));
+      // If filters changed but sort wasn't reapplied, clear sorted order
+      if (!filterConfig.sortField || !filterConfig.sortOrder) {
+        setSortedRowOrder(null);
+      }
     }
 
     // Update addProducts filter values if provided
     if (filterConfig.addProductsFilterValues !== undefined) {
       setAddProductsFilterValues(filterConfig.addProductsFilterValues);
+      // If addProducts filter changed but sort wasn't reapplied, clear sorted order
+      if (!filterConfig.sortField || !filterConfig.sortOrder) {
+        setSortedRowOrder(null);
+      }
     }
     
     setOpenFilterColumn(null);
@@ -545,6 +628,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
   // Handle filter reset
   const handleResetFilter = () => {
     setSortConfig({ field: '', order: '' });
+    setSortedRowOrder(null); // Clear stored sorted order
     setFilters({});
     setAddProductsFilterValues(new Set(['completed', 'pending', 'in progress'])); // Reset to default
   };
@@ -585,8 +669,41 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
       });
     });
 
-    // Apply sorting
-    if (sortConfig.field && sortConfig.order) {
+    // Apply sorting - use stored sorted order if available (one-time sort)
+    if (sortedRowOrder && sortedRowOrder.length > 0) {
+      // Create a map for quick lookup
+      const rowMap = new Map(filteredRows.map(row => [row.id, row]));
+      
+      // Order rows according to stored sorted order
+      const orderedRows = [];
+      const remainingRows = [];
+      
+      sortedRowOrder.forEach(id => {
+        if (rowMap.has(id)) {
+          orderedRows.push(rowMap.get(id));
+          rowMap.delete(id);
+        }
+      });
+      
+      // Add any rows that weren't in the original sorted order (new rows)
+      rowMap.forEach(row => {
+        remainingRows.push(row);
+      });
+      
+      // Sort remaining rows by default (newest first)
+      remainingRows.sort((a, b) => {
+        if (a.createdAt && b.createdAt) {
+          const aDate = new Date(a.createdAt);
+          const bDate = new Date(b.createdAt);
+          return bDate - aDate; // Newest first
+        }
+        return (b.id || 0) - (a.id || 0);
+      });
+      
+      // Combine: sorted rows first, then new rows
+      filteredRows = [...orderedRows, ...remainingRows];
+    } else if (sortConfig.field && sortConfig.order) {
+      // If sort config exists but no stored order, apply sorting (shouldn't happen normally, but fallback)
       filteredRows.sort((a, b) => {
         // Special handling for timestamp sorting
         if (sortConfig.field === 'createdAt' && a.createdAt && b.createdAt) {
