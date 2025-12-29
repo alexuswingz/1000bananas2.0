@@ -226,6 +226,15 @@ const Planning = () => {
           return 'pending';
         };
         
+        // Determine step statuses
+        const formulaCheckStatus = getStepStatus(shipment.formula_check_completed, 'formula_check', shipment.status, hasFormulaComment);
+        const labelCheckStatus = getStepStatus(shipment.label_check_completed, 'label_check', shipment.status, hasLabelComment);
+        
+        // Only show comment icon if step is NOT completed (comments should be cleared when completed)
+        // If status is 'completed', don't show comment even if it exists in DB (it should have been cleared)
+        const showFormulaComment = hasFormulaComment && formulaCheckStatus !== 'completed';
+        const showLabelComment = hasLabelComment && labelCheckStatus !== 'completed';
+        
         return {
         id: shipment.id,
         status: getStatusDisplay(shipment.status),
@@ -235,15 +244,15 @@ const Planning = () => {
         marketplace: shipment.marketplace || 'Amazon',
         account: shipment.account || 'TPS Nutrients',
         addProducts: getStepStatus(shipment.add_products_completed, 'add_products', shipment.status, false),
-        formulaCheck: getStepStatus(shipment.formula_check_completed, 'formula_check', shipment.status, hasFormulaComment),
-        labelCheck: getStepStatus(shipment.label_check_completed, 'label_check', shipment.status, hasLabelComment),
+        formulaCheck: formulaCheckStatus,
+        labelCheck: labelCheckStatus,
         bookShipment: isBookShipmentCompleted ? 'completed' : (shipment.status === 'book_shipment' ? 'in progress' : 'pending'),
         sortProducts: getStepStatus(shipment.sort_products_completed, 'sort_products', shipment.status, false),
         sortFormulas: getStepStatus(shipment.sort_formulas_completed, 'sort_formulas', shipment.status, false),
-          formulaCheckComment: hasFormulaComment,
-          formulaCheckCommentText: formulaCommentText,
-          labelCheckComment: hasLabelComment,
-          labelCheckCommentText: labelCommentText,
+          formulaCheckComment: showFormulaComment,
+          formulaCheckCommentText: showFormulaComment ? formulaCommentText : '',
+          labelCheckComment: showLabelComment,
+          labelCheckCommentText: showLabelComment ? labelCommentText : '',
           createdAt: shipment.created_at, // Store timestamp for sorting
         };
       });

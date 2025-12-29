@@ -149,6 +149,9 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
   const renderStatusCircle = (status, hasComment = false, commentText = '', rowId = null, commentData = {}, statusFieldName = null, row = null) => {
     // Base status from row field
     const baseStatus = (status || 'pending').toLowerCase();
+    
+    // Don't show comment icon if status is completed (comments should be cleared when completed)
+    const shouldShowComment = hasComment && baseStatus !== 'completed';
 
     // Derive "in progress" from the shipment's current workflow status
     // so that when you're actively working a step in New Shipment, Planning shows it as blue.
@@ -233,7 +236,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
 
     // Create unique identifier for this status field in this row
     const uniqueCommentId = rowId && statusFieldName ? `${rowId}-${statusFieldName}` : null;
-    const isHovered = hoveredCommentId === uniqueCommentId && hasComment && commentText;
+    const isHovered = hoveredCommentId === uniqueCommentId && shouldShowComment && commentText;
     const { commentDate, commentUser, commentUserInitials } = commentData;
     const userName = commentUser || 'User';
     const userInitials = commentUserInitials || 'U';
@@ -266,7 +269,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         style={{ 
           position: 'relative', 
           display: 'inline-block',
-          cursor: (hasComment && commentText) ? 'pointer' : 'default'
+          cursor: (shouldShowComment && commentText) ? 'pointer' : 'default'
         }}
         onClick={handleIconClick}
       >
@@ -280,7 +283,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
             display: 'inline-block',
           }}
         />
-        {hasComment && (
+        {shouldShowComment && (
           <svg
             width="12"
             height="12"
