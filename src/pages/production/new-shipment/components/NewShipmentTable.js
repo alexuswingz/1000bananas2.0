@@ -3479,6 +3479,7 @@ const NewShipmentTable = ({
         />
       );
     })}
+
     </>
   );
 };

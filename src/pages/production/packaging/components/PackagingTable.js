@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 import SortFormulasFilterDropdown from '../../new-shipment/components/SortFormulasFilterDropdown';
+import ProductionNotesModal from './ProductionNotesModal';
 
 const PackagingTable = ({ data = [], onStartClick, searchQuery = '' }) => {
   const { isDarkMode } = useTheme();
@@ -9,6 +11,36 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '' }) => {
   const filterIconRefs = useRef({});
   const filterDropdownRef = useRef(null);
   const [actionMenuId, setActionMenuId] = useState(null);
+  const [actionMenuPosition, setActionMenuPosition] = useState({ top: 0, right: 0 });
+  const actionButtonRefs = useRef({});
+  const [selectedProductForNotes, setSelectedProductForNotes] = useState(null);
+  const [productionNotes, setProductionNotes] = useState({}); // Map of product id to notes array
+
+  // Handle click outside action menu
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (actionMenuId) {
+        const buttonElement = actionButtonRefs.current[actionMenuId];
+        const clickedElement = event.target;
+        
+        // Check if click is outside both the menu and the button
+        if (buttonElement && !buttonElement.contains(clickedElement)) {
+          const menuElement = document.querySelector('[data-action-menu-portal]');
+          if (menuElement && !menuElement.contains(clickedElement)) {
+            setActionMenuId(null);
+          }
+        }
+      }
+    };
+
+    if (actionMenuId) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [actionMenuId]);
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -286,6 +318,17 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '' }) => {
                     paddingRight: '16px',
                     paddingTop: '12px',
                     paddingBottom: '12px',
+                    cursor: 'pointer',
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedProductForNotes(row);
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.textDecoration = 'underline';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.textDecoration = 'none';
                   }}
                 >
                   {row.brand}
@@ -379,7 +422,23 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '' }) => {
                   }}
                 >
                   <button
-                    onClick={() => setActionMenuId(actionMenuId === row.id ? null : row.id)}
+                    ref={(el) => { if (el) actionButtonRefs.current[row.id] = el; }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (actionMenuId === row.id) {
+                        setActionMenuId(null);
+                      } else {
+                        const buttonElement = actionButtonRefs.current[row.id];
+                        if (buttonElement) {
+                          const rect = buttonElement.getBoundingClientRect();
+                          setActionMenuPosition({
+                            top: rect.bottom + window.scrollY + 4,
+                            right: window.innerWidth - rect.right - window.scrollX,
+                          });
+                        }
+                        setActionMenuId(row.id);
+                      }
+                    }}
                     className="rounded transition-colors"
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F3F4F6'}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
@@ -400,32 +459,112 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '' }) => {
                       <circle cx="2" cy="12" r="1.5" fill="currentColor" />
                     </svg>
                   </button>
-                  {actionMenuId === row.id && (
-                    <div
-                      className={`absolute right-4 top-9 z-20 w-32 ${themeClasses.cardBg} border ${themeClasses.border} rounded-md shadow-lg text-xs`}
-                    >
-                      <button
-                        type="button"
-                        className={`w-full text-left px-3 py-2 hover:bg-gray-50 ${themeClasses.textPrimary}`}
-                        onClick={() => setActionMenuId(null)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className={`w-full text-left px-3 py-2 hover:bg-gray-50 text-red-600`}
-                        onClick={() => setActionMenuId(null)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  )}
                 </div>
               </div>
             ))
           )}
         </div>
       </div>
+
+      {/* Action Menu Portal - rendered outside overflow container */}
+      {actionMenuId && (() => {
+        const selectedRow = filteredData.find(r => r.id === actionMenuId);
+        if (!selectedRow) return null;
+
+        return createPortal(
+          <div
+            data-action-menu-portal
+            style={{
+              position: 'fixed',
+              top: `${actionMenuPosition.top}px`,
+              right: `${actionMenuPosition.right}px`,
+              zIndex: 10000,
+              minWidth: '240px',
+              padding: '6px',
+              backgroundColor: '#FFFFFF',
+              border: '1px solid #E5E7EB',
+              borderRadius: '8px',
+              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              style={{
+                width: '100%',
+                textAlign: 'left',
+                padding: '10px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                fontSize: '14px',
+                fontWeight: 400,
+                color: '#111827',
+                borderRadius: '6px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'background-color 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#F3F4F6';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+              onClick={() => {
+                // TODO: Implement split product functionality
+                console.log('Split Product clicked for:', selectedRow);
+                setActionMenuId(null);
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2v20" />
+                <path d="M8 8l4-4 4 4M8 16l4 4 4-4" />
+              </svg>
+              <span>Split Product</span>
+            </button>
+            <button
+              type="button"
+              style={{
+                width: '100%',
+                textAlign: 'left',
+                padding: '10px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                fontSize: '14px',
+                fontWeight: 400,
+                color: '#111827',
+                borderRadius: '6px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'background-color 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#F3F4F6';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+              onClick={() => {
+                // TODO: Implement mark as floor inventory - shiners functionality
+                console.log('Mark as Floor Inventory - Shiners clicked for:', selectedRow);
+                setActionMenuId(null);
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="7" width="18" height="12" rx="2" />
+                <path d="M7 7V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2" />
+                <line x1="7" y1="13" x2="17" y2="13" />
+              </svg>
+              <span>Mark as Floor Inventory - Shiners</span>
+            </button>
+          </div>,
+          document.body
+        );
+      })()}
 
       {/* Filter Dropdown */}
       {openFilterColumn !== null && (
@@ -449,6 +588,72 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '' }) => {
             }
           }}
           onClose={() => setOpenFilterColumn(null)}
+        />
+      )}
+
+      {/* Production Notes Modal */}
+      {selectedProductForNotes && (
+        <ProductionNotesModal
+          isOpen={!!selectedProductForNotes}
+          onClose={() => setSelectedProductForNotes(null)}
+          product={selectedProductForNotes}
+          notes={(() => {
+            const productId = selectedProductForNotes.id;
+            const existingNotes = productionNotes[productId] || [];
+            
+            // If no notes exist, add a default note
+            if (existingNotes.length === 0) {
+              const defaultNote = {
+                text: `${selectedProductForNotes.product || 'Product'} isn't ready to be made. It'll take a couple days for the remaining raw materials to arrive.`,
+                userName: 'Christian R.',
+                userInitials: 'CR',
+                date: 'Aug 20, 2025',
+              };
+              return [defaultNote];
+            }
+            
+            return existingNotes;
+          })()}
+          onAddNote={(noteText) => {
+            const productId = selectedProductForNotes.id;
+            const userName = localStorage.getItem('userName') || 'User';
+            const userInitials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+            const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            
+            const newNote = {
+              text: noteText,
+              userName: userName,
+              userInitials: userInitials,
+              date: date,
+            };
+
+            setProductionNotes(prev => {
+              const existingNotes = prev[productId] || [];
+              
+              // If this is the first note being added, include the default note
+              if (existingNotes.length === 0) {
+                const defaultNote = {
+                  text: `${selectedProductForNotes.product || 'Product'} isn't ready to be made. It'll take a couple days for the remaining raw materials to arrive.`,
+                  userName: 'Christian R.',
+                  userInitials: 'CR',
+                  date: 'Aug 20, 2025',
+                };
+                return {
+                  ...prev,
+                  [productId]: [defaultNote, newNote],
+                };
+              }
+              
+              // Otherwise, just add the new note to existing notes
+              return {
+                ...prev,
+                [productId]: [...existingNotes, newNote],
+              };
+            });
+
+            // TODO: Save to backend API here
+          }}
+          isDarkMode={isDarkMode}
         />
       )}
     </>
