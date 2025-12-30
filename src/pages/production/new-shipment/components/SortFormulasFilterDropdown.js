@@ -11,7 +11,7 @@ const SortFormulasFilterDropdown = forwardRef(({
   onClose 
 }, ref) => {
   const [position, setPosition] = useState({ top: 0, left: 0 });
-  const [sortOrder, setSortOrder] = useState(currentSort); // 'asc' or 'desc'
+  const [sortOrder, setSortOrder] = useState(''); // Always start with empty, don't show blue state
   const [filterConditionExpanded, setFilterConditionExpanded] = useState(true);
   const [filterValuesExpanded, setFilterValuesExpanded] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -167,8 +167,7 @@ const SortFormulasFilterDropdown = forwardRef(({
         <div
           onClick={(e) => {
             e.stopPropagation();
-            const newOrder = sortOrder === 'asc' ? '' : 'asc';
-            setSortOrder(newOrder);
+            const newOrder = 'asc';
             if (onApply) {
               onApply({
                 sortOrder: newOrder,
@@ -178,7 +177,9 @@ const SortFormulasFilterDropdown = forwardRef(({
                 __fromSortClick: true,
               });
             }
-            // Keep dropdown open after applying sort
+            // Reset sortOrder state and close dropdown
+            setSortOrder('');
+            onClose?.();
           }}
           onMouseDown={(e) => e.stopPropagation()}
           style={{
@@ -226,8 +227,7 @@ const SortFormulasFilterDropdown = forwardRef(({
         <div
           onClick={(e) => {
             e.stopPropagation();
-            const newOrder = sortOrder === 'desc' ? '' : 'desc';
-            setSortOrder(newOrder);
+            const newOrder = 'desc';
             if (onApply) {
               onApply({
                 sortOrder: newOrder,
@@ -237,7 +237,9 @@ const SortFormulasFilterDropdown = forwardRef(({
                 __fromSortClick: true,
               });
             }
-            // Keep dropdown open after applying sort
+            // Reset sortOrder state and close dropdown
+            setSortOrder('');
+            onClose?.();
           }}
           onMouseDown={(e) => e.stopPropagation()}
           style={{

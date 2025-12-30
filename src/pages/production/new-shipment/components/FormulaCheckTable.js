@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
-import { getShipmentFormulaCheck, updateShipmentFormulaCheck } from '../../../../services/productionApi';
+import { getShipmentFormulaCheck, updateShipmentFormulaCheck, updateShipment } from '../../../../services/productionApi';
 import SortFormulasFilterDropdown from './SortFormulasFilterDropdown';
 
 const FormulaCheckTable = ({
@@ -76,6 +76,51 @@ const FormulaCheckTable = ({
       });
     } catch (error) {
       console.error('Error saving checked status to backend:', error);
+    }
+  }, [shipmentId]);
+
+  // Check if all formulas are checked and clear comment if so
+  const checkAndClearFormulaCheckComment = useCallback(async () => {
+    if (!shipmentId) return;
+    
+    try {
+      // Reload data to get current status of all formulas
+      const data = await getShipmentFormulaCheck(shipmentId);
+      
+      // Check if all formulas are checked
+      const allChecked = data.length > 0 && data.every(formula => formula.is_checked === true);
+      
+      console.log('Checking formula check completion:', {
+        totalFormulas: data.length,
+        allChecked,
+        checkedStatuses: data.map(f => ({ id: f.id, is_checked: f.is_checked }))
+      });
+      
+      if (allChecked) {
+        // Clear the formula_check_comment since all are now checked
+        // Use empty string to ensure it's cleared (some databases prefer empty string over null)
+        try {
+          const result = await updateShipment(shipmentId, { formula_check_comment: '' });
+          console.log('Formula check comment cleared - all formulas are checked', result);
+        } catch (updateError) {
+          console.error('Error clearing formula check comment:', updateError);
+          // Try with null as fallback
+          try {
+            const result = await updateShipment(shipmentId, { formula_check_comment: null });
+            console.log('Formula check comment cleared (using null)', result);
+          } catch (nullError) {
+            console.error('Error clearing formula check comment with null:', nullError);
+          }
+        }
+      } else {
+        console.log('Not all formulas are checked yet:', {
+          total: data.length,
+          checked: data.filter(f => f.is_checked === true).length
+        });
+      }
+    } catch (error) {
+      console.error('Error checking and clearing formula check comment:', error);
+      // Don't throw - this is a cleanup operation
     }
   }, [shipmentId]);
 
@@ -333,23 +378,33 @@ const FormulaCheckTable = ({
     setFilters({});
   };
 
-  const handleCheckboxChange = (id) => {
-    setSelectedRows(prev => {
-      const newSet = new Set(prev);
-      const isNowChecked = !newSet.has(id);
-      
-      if (isNowChecked) {
-        newSet.add(id);
-      } else {
-        newSet.delete(id);
+  const handleCheckboxChange = async (id) => {
+    const newSet = new Set(selectedRows);
+    const isNowChecked = !newSet.has(id);
+    
+    if (isNowChecked) {
+      newSet.add(id);
+    } else {
+      newSet.delete(id);
+    }
+    
+    // Persist to backend
+    await saveCheckedStatus(id, isNowChecked);
+    
+    // Update local state
+    setSelectedRows(newSet);
+    if (onSelectedRowsChange) onSelectedRowsChange(newSet);
+    
+    // Reload data to get latest state, then check if all formulas are checked
+    if (isNowChecked) {
+      try {
+        await loadFormulaData();
+        // Check if all formulas are now checked and clear comment if so (after reload)
+        await checkAndClearFormulaCheckComment();
+      } catch (error) {
+        console.error('Error reloading formula data:', error);
       }
-      
-      // Persist to backend
-      saveCheckedStatus(id, isNowChecked);
-      
-      if (onSelectedRowsChange) onSelectedRowsChange(newSet);
-      return newSet;
-    });
+    }
   };
 
   const handleNotesClick = (formula) => {
@@ -387,6 +442,10 @@ const FormulaCheckTable = ({
       <style>
         {`
           .group:hover .transition-opacity {
+            opacity: 1 !important;
+          }
+          /* Keep filter icon visible when dropdown is open */
+          .transition-opacity[data-filter-open="true"] {
             opacity: 1 !important;
           }
         `}
@@ -446,6 +505,7 @@ const FormulaCheckTable = ({
                           src="/assets/Vector (1).png"
                           alt="Filter"
                           className="transition-opacity"
+                          data-filter-open={openFilterColumn === column.key ? 'true' : 'false'}
                           style={{
                             width: '12px',
                             height: '12px',
@@ -457,6 +517,14 @@ const FormulaCheckTable = ({
                           }}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.opacity = '1';
+                          }}
+                          onMouseLeave={(e) => {
+                            // Keep visible if dropdown is open for this column
+                            if (openFilterColumn !== column.key) {
+                              e.currentTarget.style.opacity = '0';
+                            } else {
+                              e.currentTarget.style.opacity = '1';
+                            }
                           }}
                           onClick={(e) => {
                             e.stopPropagation();

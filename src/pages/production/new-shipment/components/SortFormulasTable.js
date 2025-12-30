@@ -45,10 +45,57 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
   const locksLoadedRef = useRef(null); // Track which shipmentId we've loaded locks for
 
   // Filter and sort state
-  const [filters, setFilters] = useState({});
+  // Initialize from localStorage immediately to prevent save effect from overwriting
+  const [filters, setFilters] = useState(() => {
+    if (shipmentId) {
+      try {
+        const stored = localStorage.getItem(`sortFormulasFilters_${shipmentId}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && typeof parsed === 'object') {
+            // Convert Set objects back from arrays
+            const restored = {};
+            Object.keys(parsed).forEach(key => {
+              if (parsed[key] && parsed[key].selectedValues && Array.isArray(parsed[key].selectedValues)) {
+                restored[key] = {
+                  ...parsed[key],
+                  selectedValues: new Set(parsed[key].selectedValues)
+                };
+              } else {
+                restored[key] = parsed[key];
+              }
+            });
+            return restored;
+          }
+        }
+      } catch (error) {
+        console.error('Error loading filters from localStorage on init:', error);
+      }
+    }
+    return {};
+  });
   // sortConfig is now an array of sort objects: [{column: 'formula', order: 'asc'}, {column: 'qty', order: 'desc'}]
   // The order in the array determines the sort priority (first = primary, second = secondary, etc.)
-  const [sortConfig, setSortConfig] = useState([]);
+  // Initialize from localStorage immediately to prevent save effect from overwriting
+  const [sortConfig, setSortConfig] = useState(() => {
+    if (shipmentId) {
+      try {
+        const stored = localStorage.getItem(`sortFormulasSortConfig_${shipmentId}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            return parsed;
+          }
+        }
+      } catch (error) {
+        console.error('Error loading sort config from localStorage on init:', error);
+      }
+    }
+    return [];
+  });
+  const sortConfigLoadedRef = useRef(shipmentId); // Track which shipmentId we've loaded sortConfig for
+  const filtersLoadedRef = useRef(shipmentId); // Track which shipmentId we've loaded filters for
+  const isInitialLoadRef = useRef(true); // Track if we're in initial load phase
   
   // Selection state for bulk operations
   const [selectedIndices, setSelectedIndices] = useState(() => new Set());
@@ -56,14 +103,145 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
 
   // Transform shipment products into formula data
   const [formulas, setFormulas] = useState([]);
+  const previousShipmentIdRef = useRef(null); // Track previous shipmentId to detect actual changes
+  const splitsLoadedRef = useRef(null); // Track which shipmentId we've loaded splits for
 
-  // Reset locks loaded flag when shipmentId changes
+  // Reset locks and splits loaded flags when shipmentId actually changes (not on remount)
   useEffect(() => {
-    if (locksLoadedRef.current !== shipmentId) {
+    const previousShipmentId = previousShipmentIdRef.current;
+    previousShipmentIdRef.current = shipmentId;
+    
+    // Only clear locks and splits if shipmentId actually changed to a different value
+    if (previousShipmentId !== null && previousShipmentId !== shipmentId) {
       locksLoadedRef.current = null;
+      splitsLoadedRef.current = null;
+      sortConfigLoadedRef.current = null;
+      filtersLoadedRef.current = null;
+      isInitialLoadRef.current = true;
       setLockedFormulaIds(new Set());
+      setSortConfig([]);
+      setFilters({});
     }
   }, [shipmentId]);
+
+  // Load sortConfig and filters from localStorage when shipmentId changes (not on initial mount since we load in useState)
+  useEffect(() => {
+    if (!shipmentId) return;
+    
+    // Only load if shipmentId changed (not on initial mount)
+    if (sortConfigLoadedRef.current !== shipmentId) {
+      // Load sortConfig
+      try {
+        const stored = localStorage.getItem(`sortFormulasSortConfig_${shipmentId}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            setSortConfig(parsed);
+            console.log('Loaded sort config:', parsed);
+          }
+        } else {
+          setSortConfig([]);
+        }
+      } catch (error) {
+        console.error('Error loading sort config from localStorage:', error);
+        setSortConfig([]);
+      }
+      
+      // Load filters
+      try {
+        const stored = localStorage.getItem(`sortFormulasFilters_${shipmentId}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && typeof parsed === 'object') {
+            // Convert Set objects back from arrays
+            const restored = {};
+            Object.keys(parsed).forEach(key => {
+              if (parsed[key] && parsed[key].selectedValues && Array.isArray(parsed[key].selectedValues)) {
+                restored[key] = {
+                  ...parsed[key],
+                  selectedValues: new Set(parsed[key].selectedValues)
+                };
+              } else {
+                restored[key] = parsed[key];
+              }
+            });
+            setFilters(restored);
+            console.log('Loaded filters:', restored);
+          }
+        } else {
+          setFilters({});
+        }
+      } catch (error) {
+        console.error('Error loading filters from localStorage:', error);
+        setFilters({});
+      }
+      
+      sortConfigLoadedRef.current = shipmentId;
+      filtersLoadedRef.current = shipmentId;
+      
+      // Mark that initial load is complete after a short delay to prevent save effect from running
+      setTimeout(() => {
+        isInitialLoadRef.current = false;
+      }, 200);
+    } else {
+      // If same shipmentId, we already loaded in useState, just mark initial load as complete
+      setTimeout(() => {
+        isInitialLoadRef.current = false;
+      }, 200);
+    }
+  }, [shipmentId]);
+
+  // Persist sortConfig to localStorage whenever it changes (but not during initial load)
+  useEffect(() => {
+    if (!shipmentId) return;
+    // Don't save during initial load to avoid overwriting with empty array
+    if (isInitialLoadRef.current) {
+      return;
+    }
+    // Don't save if we haven't loaded yet (prevent saving before load completes)
+    if (sortConfigLoadedRef.current !== shipmentId) {
+      return;
+    }
+
+    try {
+      localStorage.setItem(`sortFormulasSortConfig_${shipmentId}`, JSON.stringify(sortConfig));
+      console.log('Saved sort config:', sortConfig);
+    } catch (error) {
+      console.error('Error saving sort config to localStorage:', error);
+    }
+  }, [sortConfig, shipmentId]);
+
+  // Persist filters to localStorage whenever they change (but not during initial load)
+  useEffect(() => {
+    if (!shipmentId) return;
+    // Don't save during initial load to avoid overwriting
+    if (isInitialLoadRef.current) {
+      return;
+    }
+    // Don't save if we haven't loaded yet (prevent saving before load completes)
+    if (filtersLoadedRef.current !== shipmentId) {
+      return;
+    }
+
+    try {
+      // Convert Set objects to arrays for JSON serialization
+      const serializable = {};
+      Object.keys(filters).forEach(key => {
+        if (filters[key] && filters[key].selectedValues instanceof Set) {
+          serializable[key] = {
+            ...filters[key],
+            selectedValues: Array.from(filters[key].selectedValues)
+          };
+        } else {
+          serializable[key] = filters[key];
+        }
+      });
+      localStorage.setItem(`sortFormulasFilters_${shipmentId}`, JSON.stringify(serializable));
+      console.log('Saved filters:', serializable);
+    } catch (error) {
+      console.error('Error saving filters to localStorage:', error);
+    }
+  }, [filters, shipmentId]);
 
   // Update formulas when shipmentProducts prop changes
   useEffect(() => {
@@ -118,25 +296,134 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
         });
       });
 
-      setFormulas(transformedFormulas);
+      // Load and apply saved splits before setting formulas
+      // Always reload splits when formulas are regenerated to ensure they persist across navigation
+      let finalFormulas = [...transformedFormulas];
+      // Find the max ID to ensure unique IDs for split formulas
+      const maxId = finalFormulas.length > 0 ? Math.max(...finalFormulas.map(f => f.id || 0), 0) : 0;
+      let nextId = maxId + 1;
       
-      // Load locked formula names after formulas are set, but only once per shipmentId
-      if (shipmentId && locksLoadedRef.current !== shipmentId) {
+      if (shipmentId) {
         try {
-          const stored = localStorage.getItem(`sortFormulasLocks_${shipmentId}`);
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            if (Array.isArray(parsed)) {
-              // Filter to only include formula names that exist in current formulas
-              const formulaNames = new Set(transformedFormulas.map(f => f.formula));
-              const validLockedNames = parsed.filter(name => formulaNames.has(name));
-              setLockedFormulaIds(new Set(validLockedNames));
-              console.log('Loaded locked formula names:', validLockedNames);
+          const storedSplits = localStorage.getItem(`sortFormulasSplits_${shipmentId}`);
+          if (storedSplits) {
+            const parsedSplits = JSON.parse(storedSplits);
+            if (Array.isArray(parsedSplits) && parsedSplits.length > 0) {
+              // Group splits by formula name to handle multiple splits on the same formula
+              const splitsByFormula = {};
+              parsedSplits.forEach((splitInfo) => {
+                const { formulaName } = splitInfo;
+                if (!splitsByFormula[formulaName]) {
+                  splitsByFormula[formulaName] = [];
+                }
+                splitsByFormula[formulaName].push(splitInfo);
+              });
+              
+              // Apply splits: for each formula name with splits, replace ALL formulas with that name
+              // (whether they have splitTag or not) with the stored split formulas
+              Object.keys(splitsByFormula).forEach((formulaName) => {
+                // Find all formulas with this name (including already split ones)
+                const matchingIndices = [];
+                finalFormulas.forEach((f, idx) => {
+                  if (f.formula === formulaName) {
+                    matchingIndices.push(idx);
+                  }
+                });
+                
+                if (matchingIndices.length > 0) {
+                  // Get the most recent split info for this formula (last one in array)
+                  const splitInfo = splitsByFormula[formulaName][splitsByFormula[formulaName].length - 1];
+                  const { firstBatch, secondBatch, additionalBatches = [] } = splitInfo;
+                  
+                  // Get the first matching formula as template (use the first unsplit one if available, otherwise any)
+                  const templateIndex = matchingIndices.find(idx => !finalFormulas[idx].splitTag) || matchingIndices[0];
+                  const templateFormula = finalFormulas[templateIndex];
+                  
+                  // Remove all formulas with this name
+                  // Sort indices descending to remove from end first
+                  matchingIndices.sort((a, b) => b - a).forEach(idx => {
+                    finalFormulas.splice(idx, 1);
+                  });
+                  
+                  // Create all split formulas
+                  const splitFormulas = [];
+                  
+                  // First batch
+                  splitFormulas.push({
+                    ...templateFormula,
+                    id: nextId++,
+                    qty: firstBatch.qty,
+                    volume: firstBatch.volume,
+                    splitTag: '1/2',
+                    originalId: templateFormula.id,
+                  });
+                  
+                  // Second batch
+                  splitFormulas.push({
+                    ...templateFormula,
+                    id: nextId++,
+                    qty: secondBatch.qty,
+                    volume: secondBatch.volume,
+                    splitTag: '2/2',
+                    originalId: templateFormula.id,
+                  });
+                  
+                  // Additional batches (for multiple splits)
+                  additionalBatches.forEach((batch, idx) => {
+                    splitFormulas.push({
+                      ...templateFormula,
+                      id: nextId++,
+                      qty: batch.qty,
+                      volume: batch.volume,
+                      splitTag: `${idx + 3}/${splitFormulas.length + additionalBatches.length}`,
+                      originalId: templateFormula.id,
+                    });
+                  });
+                  
+                  // Insert at the position of the first removed formula
+                  const insertIndex = Math.min(...matchingIndices);
+                  finalFormulas.splice(insertIndex, 0, ...splitFormulas);
+                  
+                  console.log('Applied split for formula:', formulaName, 'total batches:', splitFormulas.length, 'batches:', splitFormulas.map(f => ({ qty: f.qty, volume: f.volume, tag: f.splitTag })));
+                } else {
+                  console.warn('Could not find formula to apply split:', formulaName, 'Available formulas:', finalFormulas.map(f => f.formula));
+                }
+              });
+              console.log('Applied', parsedSplits.length, 'saved splits');
             }
           }
-          locksLoadedRef.current = shipmentId;
+          splitsLoadedRef.current = shipmentId;
         } catch (error) {
-          console.error('Error loading sort formulas locks from localStorage:', error);
+          console.error('Error loading sort formulas splits from localStorage:', error);
+        }
+      }
+
+      setFormulas(finalFormulas);
+      
+      // Load locked formula names from localStorage whenever formulas are set
+      // This handles both initial mount and remount scenarios
+      if (shipmentId) {
+        // Only load if we haven't loaded for this shipmentId yet, or if shipmentId changed
+        if (locksLoadedRef.current !== shipmentId) {
+          try {
+            const stored = localStorage.getItem(`sortFormulasLocks_${shipmentId}`);
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              if (Array.isArray(parsed)) {
+                // Filter to only include formula names that exist in current formulas
+                const formulaNames = new Set(finalFormulas.map(f => f.formula));
+                const validLockedNames = parsed.filter(name => formulaNames.has(name));
+                setLockedFormulaIds(new Set(validLockedNames));
+                console.log('Loaded locked formula names:', validLockedNames);
+              }
+            } else {
+              // If no stored locks, ensure we start with empty set
+              setLockedFormulaIds(new Set());
+            }
+            locksLoadedRef.current = shipmentId;
+          } catch (error) {
+            console.error('Error loading sort formulas locks from localStorage:', error);
+          }
         }
       }
     } else {
@@ -492,6 +779,80 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
     newFormulas.splice(formulaIndex, 1, firstBatch, secondBatch);
     setFormulas(newFormulas);
     
+    // Save split information to localStorage
+    // Store the current state of all split formulas for this formula name
+    if (shipmentId) {
+      try {
+        const formulaName = selectedFormula.formula;
+        
+        // Get all formulas with this name from the new formulas array (after split)
+        const newFormulas = [...formulas];
+        newFormulas.splice(formulaIndex, 1, firstBatch, secondBatch);
+        const formulasWithThisName = newFormulas.filter(f => f.formula === formulaName);
+        
+        // Get all formulas that have been split (have splitTag)
+        const splitFormulas = formulasWithThisName.filter(f => f.splitTag);
+        
+        // Only save if there are split formulas
+        if (splitFormulas.length > 0) {
+          const storedSplits = localStorage.getItem(`sortFormulasSplits_${shipmentId}`);
+          const existingSplits = storedSplits ? JSON.parse(storedSplits) : [];
+          
+          // Remove any existing split for this formula name (in case it was split before)
+          const filteredSplits = existingSplits.filter(s => s.formulaName !== formulaName);
+          
+          // Save all split formulas for this name
+          // Sort by splitTag to ensure consistent order
+          const sortedSplitFormulas = [...splitFormulas].sort((a, b) => {
+            if (a.splitTag && b.splitTag) {
+              return a.splitTag.localeCompare(b.splitTag);
+            }
+            return 0;
+          });
+          
+          // Store as batches - if there are 2, store as firstBatch/secondBatch
+          // If there are more (multiple splits), store the first two as firstBatch/secondBatch
+          // and the rest will be handled by the loading logic
+          if (sortedSplitFormulas.length >= 2) {
+            filteredSplits.push({
+              formulaName: formulaName,
+              firstBatch: {
+                qty: sortedSplitFormulas[0].qty,
+                volume: sortedSplitFormulas[0].volume,
+              },
+              secondBatch: {
+                qty: sortedSplitFormulas[1].qty,
+                volume: sortedSplitFormulas[1].volume,
+              },
+              // Store additional batches if there are more than 2
+              additionalBatches: sortedSplitFormulas.slice(2).map(f => ({
+                qty: f.qty,
+                volume: f.volume,
+              })),
+            });
+          } else if (sortedSplitFormulas.length === 1) {
+            // Edge case: only one split formula (shouldn't happen, but handle it)
+            filteredSplits.push({
+              formulaName: formulaName,
+              firstBatch: {
+                qty: sortedSplitFormulas[0].qty,
+                volume: sortedSplitFormulas[0].volume,
+              },
+              secondBatch: {
+                qty: 0,
+                volume: 0,
+              },
+            });
+          }
+          
+          localStorage.setItem(`sortFormulasSplits_${shipmentId}`, JSON.stringify(filteredSplits));
+          console.log('Saved split for formula:', formulaName, 'total split formulas:', sortedSplitFormulas.length, 'batches:', sortedSplitFormulas.map(f => ({ qty: f.qty, volume: f.volume, tag: f.splitTag })));
+        }
+      } catch (error) {
+        console.error('Error saving sort formulas splits to localStorage:', error);
+      }
+    }
+    
     handleCloseSplitModal();
   };
 
@@ -550,26 +911,70 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
       [columnKey]: filterData,
     }));
     
-    // Update sort config: if sortOrder is set, add/update this column in the sort array
-    // If sortOrder is empty, remove this column from the sort array
-    setSortConfig(prev => {
-      if (filterData.sortOrder) {
-        // Check if this column already has a sort
-        const existingIndex = prev.findIndex(sort => sort.column === columnKey);
-        if (existingIndex >= 0) {
-          // Update existing sort
-          const newConfig = [...prev];
-          newConfig[existingIndex] = { column: columnKey, order: filterData.sortOrder };
-          return newConfig;
-        } else {
-          // Add new sort (appends to end, making it the lowest priority)
-          return [...prev, { column: columnKey, order: filterData.sortOrder }];
+    // If sortOrder is provided, apply one-time sort to formulas array
+    // Locked items maintain their positions, only unlocked items are sorted
+    if (filterData.sortOrder) {
+      setFormulas(prevFormulas => {
+        // Separate locked and unlocked formulas
+        const lockedFormulas = [];
+        const unlockedFormulas = [];
+        
+        prevFormulas.forEach((formula, index) => {
+          if (lockedFormulaIds.has(formula.formula)) {
+            lockedFormulas.push({ formula, originalIndex: index });
+          } else {
+            unlockedFormulas.push(formula);
+          }
+        });
+        
+        // Sort only unlocked formulas
+        unlockedFormulas.sort((a, b) => {
+          const aVal = a[columnKey];
+          const bVal = b[columnKey];
+          
+          let comparison = 0;
+          
+          // Handle numeric values
+          if (typeof aVal === 'number' && typeof bVal === 'number') {
+            comparison = filterData.sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+          } else {
+            // Handle string values
+            const aStr = String(aVal || '').toLowerCase();
+            const bStr = String(bVal || '').toLowerCase();
+            
+            if (filterData.sortOrder === 'asc') {
+              comparison = aStr.localeCompare(bStr);
+            } else {
+              comparison = bStr.localeCompare(aStr);
+            }
+          }
+          
+          return comparison;
+        });
+        
+        // Rebuild the array: locked items at their original positions, sorted unlocked items fill the rest
+        const result = [];
+        let unlockedIndex = 0;
+        
+        for (let i = 0; i < prevFormulas.length; i++) {
+          const lockedItem = lockedFormulas.find(lf => lf.originalIndex === i);
+          if (lockedItem) {
+            result.push(lockedItem.formula);
+          } else if (unlockedIndex < unlockedFormulas.length) {
+            result.push(unlockedFormulas[unlockedIndex]);
+            unlockedIndex++;
+          }
         }
-      } else {
-        // Remove sort for this column
-        return prev.filter(sort => sort.column !== columnKey);
-      }
-    });
+        
+        return result;
+      });
+      
+      // Clear sort config for this column (one-time sort, not persistent)
+      setSortConfig(prev => prev.filter(sort => sort.column !== columnKey));
+    } else {
+      // If sortOrder is empty, remove sort from config
+      setSortConfig(prev => prev.filter(sort => sort.column !== columnKey));
+    }
     // Keep the dropdown open so user can continue configuring multiple filters
     // setOpenFilterColumn(null);
   };
@@ -660,8 +1065,9 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
     }
   };
 
-  // Apply filters and sorting to formulas
-  // Locked items maintain their positions and are not affected by filters/sorting
+  // Apply filters to formulas
+  // Locked items maintain their positions and are not affected by filters
+  // Note: Sorting is now one-time (applied directly to formulas array), not continuous
   const getFilteredAndSortedFormulas = () => {
     // Separate locked and unlocked formulas
     const lockedFormulas = [];
@@ -705,45 +1111,7 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
       }
     });
 
-    // Apply hierarchical sorting to unlocked formulas only
-    // Sort by each column in priority order (primary first, then secondary, etc.)
-    if (sortConfig.length > 0) {
-      filteredUnlocked.sort((a, b) => {
-        // Try each sort level in order
-        for (const sort of sortConfig) {
-          const aVal = a[sort.column];
-          const bVal = b[sort.column];
-          
-          let comparison = 0;
-          
-          // Handle numeric values
-          if (typeof aVal === 'number' && typeof bVal === 'number') {
-            comparison = sort.order === 'asc' ? aVal - bVal : bVal - aVal;
-          } else {
-            // Handle string values
-            const aStr = String(aVal || '').toLowerCase();
-            const bStr = String(bVal || '').toLowerCase();
-            
-            if (sort.order === 'asc') {
-              comparison = aStr.localeCompare(bStr);
-            } else {
-              comparison = bStr.localeCompare(aStr);
-            }
-          }
-          
-          // If values are different at this level, return the comparison
-          // Otherwise, continue to the next sort level
-          if (comparison !== 0) {
-            return comparison;
-          }
-        }
-        
-        // If all sort levels are equal, maintain original order
-        return 0;
-      });
-    }
-
-    // Rebuild the array: locked items at their original positions, unlocked items fill the rest
+    // Rebuild the array: locked items at their original positions, filtered unlocked items fill the rest
     const result = [];
     let unlockedIndex = 0;
     

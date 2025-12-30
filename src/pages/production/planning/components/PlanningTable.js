@@ -9,6 +9,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
   const filterDropdownRef = useRef(null);
   const [filters, setFilters] = useState({});
   const [sortConfig, setSortConfig] = useState({ field: '', order: '' });
+  const [sortedRowOrder, setSortedRowOrder] = useState(null); // Store sorted row IDs for one-time sort
   const [addProductsFilterValues, setAddProductsFilterValues] = useState(new Set(['completed', 'pending', 'in progress'])); // Default: both Added and Not Added checked
   const [hoveredCommentId, setHoveredCommentId] = useState(null);
   const iconRefs = useRef({});
@@ -149,6 +150,9 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
   const renderStatusCircle = (status, hasComment = false, commentText = '', rowId = null, commentData = {}, statusFieldName = null, row = null) => {
     // Base status from row field
     const baseStatus = (status || 'pending').toLowerCase();
+    
+    // Don't show comment icon if status is completed (comments should be cleared when completed)
+    const shouldShowComment = hasComment && baseStatus !== 'completed';
 
     // Derive "in progress" from the shipment's current workflow status
     // so that when you're actively working a step in New Shipment, Planning shows it as blue.
@@ -233,7 +237,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
 
     // Create unique identifier for this status field in this row
     const uniqueCommentId = rowId && statusFieldName ? `${rowId}-${statusFieldName}` : null;
-    const isHovered = hoveredCommentId === uniqueCommentId && hasComment && commentText;
+    const isHovered = hoveredCommentId === uniqueCommentId && shouldShowComment && commentText;
     const { commentDate, commentUser, commentUserInitials } = commentData;
     const userName = commentUser || 'User';
     const userInitials = commentUserInitials || 'U';
@@ -256,10 +260,8 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
           });
           setHoveredCommentId(uniqueCommentId);
         }
-      } else if (onStatusCommentClick && statusFieldName && row) {
-        // If no comment, allow adding one by clicking the circle
-        onStatusCommentClick(row, statusFieldName);
       }
+      // Removed: clicking status circle no longer opens comment modal
     };
 
     return (
@@ -268,7 +270,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         style={{ 
           position: 'relative', 
           display: 'inline-block',
-          cursor: (onStatusCommentClick && statusFieldName && row) || (hasComment && commentText) ? 'pointer' : 'default'
+          cursor: (shouldShowComment && commentText) ? 'pointer' : 'default'
         }}
         onClick={handleIconClick}
       >
@@ -282,7 +284,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
             display: 'inline-block',
           }}
         />
-        {hasComment && (
+        {shouldShowComment && (
           <svg
             width="12"
             height="12"
@@ -517,9 +519,83 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
 
   // Handle filter apply
   const handleApplyFilter = (filterConfig) => {
+    // Prepare filter values to use for sorting (use new values from config if provided, otherwise current state)
+    const addProductsValuesToUse = filterConfig.addProductsFilterValues !== undefined 
+      ? filterConfig.addProductsFilterValues 
+      : addProductsFilterValues;
+    
+    const filtersToUse = { ...filters };
+    if (filterConfig.filterField && filterConfig.filterCondition && filterConfig.filterValue) {
+      filtersToUse[filterConfig.filterField] = {
+        condition: filterConfig.filterCondition,
+        value: filterConfig.filterValue,
+      };
+    }
+    
     // Update sort config
     if (filterConfig.sortField && filterConfig.sortOrder) {
       setSortConfig({ field: filterConfig.sortField, order: filterConfig.sortOrder });
+      
+      // Perform one-time sort and store the order
+      let rowsToSort = [...rows];
+      
+      // Apply addProducts filter first if needed
+      if (addProductsValuesToUse.size > 0 && addProductsValuesToUse.size < 3) {
+        rowsToSort = rowsToSort.filter(row => {
+          const status = row.addProducts?.toLowerCase() || 'pending';
+          return addProductsValuesToUse.has(status);
+        });
+      }
+      
+      // Apply other filters
+      Object.keys(filtersToUse).forEach(field => {
+        const filter = filtersToUse[field];
+        rowsToSort = rowsToSort.filter(row => {
+          const value = row[field];
+          const filterValue = filter.value.toLowerCase();
+          const rowValue = String(value || '').toLowerCase();
+
+          switch (filter.condition) {
+            case 'equals':
+              return rowValue === filterValue;
+            case 'contains':
+              return rowValue.includes(filterValue);
+            case 'greaterThan':
+              return rowValue > filterValue;
+            case 'lessThan':
+              return rowValue < filterValue;
+            default:
+              return true;
+          }
+        });
+      });
+      
+      // Apply sorting
+      rowsToSort.sort((a, b) => {
+        // Special handling for timestamp sorting
+        if (filterConfig.sortField === 'createdAt' && a.createdAt && b.createdAt) {
+          const aDate = new Date(a.createdAt);
+          const bDate = new Date(b.createdAt);
+          return filterConfig.sortOrder === 'asc' 
+            ? aDate - bDate 
+            : bDate - aDate;
+        }
+        
+        const aVal = String(a[filterConfig.sortField] || '').toLowerCase();
+        const bVal = String(b[filterConfig.sortField] || '').toLowerCase();
+        
+        if (filterConfig.sortOrder === 'asc') {
+          return aVal.localeCompare(bVal);
+        } else {
+          return bVal.localeCompare(aVal);
+        }
+      });
+      
+      // Store the sorted order (array of IDs)
+      setSortedRowOrder(rowsToSort.map(row => row.id));
+    } else {
+      // If no sort is being applied, clear the sorted order (filters changed, need to re-sort)
+      setSortedRowOrder(null);
     }
     
     // Update filters
@@ -531,11 +607,19 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
           value: filterConfig.filterValue,
         }
       }));
+      // If filters changed but sort wasn't reapplied, clear sorted order
+      if (!filterConfig.sortField || !filterConfig.sortOrder) {
+        setSortedRowOrder(null);
+      }
     }
 
     // Update addProducts filter values if provided
     if (filterConfig.addProductsFilterValues !== undefined) {
       setAddProductsFilterValues(filterConfig.addProductsFilterValues);
+      // If addProducts filter changed but sort wasn't reapplied, clear sorted order
+      if (!filterConfig.sortField || !filterConfig.sortOrder) {
+        setSortedRowOrder(null);
+      }
     }
     
     setOpenFilterColumn(null);
@@ -544,6 +628,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
   // Handle filter reset
   const handleResetFilter = () => {
     setSortConfig({ field: '', order: '' });
+    setSortedRowOrder(null); // Clear stored sorted order
     setFilters({});
     setAddProductsFilterValues(new Set(['completed', 'pending', 'in progress'])); // Reset to default
   };
@@ -584,8 +669,41 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
       });
     });
 
-    // Apply sorting
-    if (sortConfig.field && sortConfig.order) {
+    // Apply sorting - use stored sorted order if available (one-time sort)
+    if (sortedRowOrder && sortedRowOrder.length > 0) {
+      // Create a map for quick lookup
+      const rowMap = new Map(filteredRows.map(row => [row.id, row]));
+      
+      // Order rows according to stored sorted order
+      const orderedRows = [];
+      const remainingRows = [];
+      
+      sortedRowOrder.forEach(id => {
+        if (rowMap.has(id)) {
+          orderedRows.push(rowMap.get(id));
+          rowMap.delete(id);
+        }
+      });
+      
+      // Add any rows that weren't in the original sorted order (new rows)
+      rowMap.forEach(row => {
+        remainingRows.push(row);
+      });
+      
+      // Sort remaining rows by default (newest first)
+      remainingRows.sort((a, b) => {
+        if (a.createdAt && b.createdAt) {
+          const aDate = new Date(a.createdAt);
+          const bDate = new Date(b.createdAt);
+          return bDate - aDate; // Newest first
+        }
+        return (b.id || 0) - (a.id || 0);
+      });
+      
+      // Combine: sorted rows first, then new rows
+      filteredRows = [...orderedRows, ...remainingRows];
+    } else if (sortConfig.field && sortConfig.order) {
+      // If sort config exists but no stored order, apply sorting (shouldn't happen normally, but fallback)
       filteredRows.sort((a, b) => {
         // Special handling for timestamp sorting
         if (sortConfig.field === 'createdAt' && a.createdAt && b.createdAt) {
@@ -1499,6 +1617,9 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
   const [filterCondition, setFilterCondition] = useState(existingFilter ? existingFilter[1].condition : '');
   const [filterValue, setFilterValue] = useState(existingFilter ? existingFilter[1].value : '');
   
+  // State to control if "Filter by condition" section is expanded
+  const [isFilterConditionOpen, setIsFilterConditionOpen] = useState(false);
+  
   // For addProducts column: Filter by values
   const defaultAddProductsValues = new Set(['completed', 'pending', 'in progress']);
   const [addProductsFilterValues, setAddProductsFilterValues] = useState(
@@ -1789,86 +1910,122 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
       {/* Filter by condition section */}
       {columnKey !== 'addProducts' && (
         <div style={{ marginBottom: '16px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
-          <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', textTransform: 'uppercase', marginBottom: '12px', display: 'block' }}>
-            Filter by condition:
-          </label>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <select
-              value={filterField}
-              onChange={(e) => setFilterField(e.target.value)}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: isFilterConditionOpen ? '12px' : '0',
+              cursor: 'pointer',
+            }}
+            onClick={() => setIsFilterConditionOpen(!isFilterConditionOpen)}
+          >
+            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', textTransform: 'uppercase', display: 'block' }}>
+              Filter by condition:
+            </label>
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#374151"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
               style={{
-                width: '100%',
-                padding: '8px 12px',
-                border: '1px solid #D1D5DB',
-                borderRadius: '6px',
-                fontSize: '0.875rem',
-                color: filterField ? '#374151' : '#9CA3AF',
-                backgroundColor: '#FFFFFF',
-                cursor: 'pointer',
+                transform: isFilterConditionOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.2s ease',
               }}
             >
-              {filterFields.map((field) => (
-                <option key={field.value} value={field.value}>
-                  {field.label}
-                </option>
-              ))}
-            </select>
-            
-            <select
-              value={filterCondition}
-              onChange={(e) => setFilterCondition(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                border: '1px solid #D1D5DB',
-                borderRadius: '6px',
-                fontSize: '0.875rem',
-                color: filterCondition ? '#374151' : '#9CA3AF',
-                backgroundColor: '#FFFFFF',
-                cursor: 'pointer',
-              }}
-            >
-              {filterConditions.map((condition) => (
-                <option key={condition.value} value={condition.value}>
-                  {condition.label}
-                </option>
-              ))}
-            </select>
-            
-            <input
-              type="text"
-              placeholder="Value here..."
-              value={filterValue}
-              onChange={(e) => setFilterValue(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                border: '1px solid #D1D5DB',
-                borderRadius: '6px',
-                fontSize: '0.875rem',
-                color: '#374151',
-                backgroundColor: '#FFFFFF',
-              }}
-            />
+              <path d="M6 9l6 6 6-6" />
+            </svg>
           </div>
+          
+          {isFilterConditionOpen && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <select
+                value={filterField}
+                onChange={(e) => setFilterField(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  color: filterField ? '#374151' : '#9CA3AF',
+                  backgroundColor: '#FFFFFF',
+                  cursor: 'pointer',
+                }}
+              >
+                {filterFields.map((field) => (
+                  <option key={field.value} value={field.value}>
+                    {field.label}
+                  </option>
+                ))}
+              </select>
+              
+              <select
+                value={filterCondition}
+                onChange={(e) => setFilterCondition(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  color: filterCondition ? '#374151' : '#9CA3AF',
+                  backgroundColor: '#FFFFFF',
+                  cursor: 'pointer',
+                }}
+              >
+                {filterConditions.map((condition) => (
+                  <option key={condition.value} value={condition.value}>
+                    {condition.label}
+                  </option>
+                ))}
+              </select>
+              
+              <input
+                type="text"
+                placeholder="Value here..."
+                value={filterValue}
+                onChange={(e) => setFilterValue(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '6px',
+                  fontSize: '0.875rem',
+                  color: '#374151',
+                  backgroundColor: '#FFFFFF',
+                }}
+              />
+            </div>
+          )}
         </div>
       )}
 
       {/* Action buttons */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
         <button
           type="button"
           onClick={handleLocalReset}
           style={{
-            padding: '8px 16px',
+            width: '57px',
+            height: '23px',
+            padding: '0',
             border: '1px solid #D1D5DB',
-            borderRadius: '6px',
+            borderRadius: '4px',
             backgroundColor: '#FFFFFF',
             color: '#374151',
             fontSize: '0.875rem',
             fontWeight: 500,
             cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            whiteSpace: 'nowrap',
+            boxSizing: 'border-box',
           }}
         >
           Reset
@@ -1877,14 +2034,21 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
           type="button"
           onClick={handleLocalApply}
           style={{
-            padding: '8px 16px',
+            width: '57px',
+            height: '23px',
+            padding: '0',
             border: 'none',
-            borderRadius: '6px',
+            borderRadius: '4px',
             backgroundColor: '#3B82F6',
             color: '#FFFFFF',
             fontSize: '0.875rem',
             fontWeight: 500,
             cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            whiteSpace: 'nowrap',
+            boxSizing: 'border-box',
           }}
         >
           Apply

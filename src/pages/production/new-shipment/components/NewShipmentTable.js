@@ -27,6 +27,7 @@ const NewShipmentTable = ({
   const qtyInputRefs = useRef({});
   const addButtonRefs = useRef({});
   const addPopupRefs = useRef({});
+  const manuallyEditedIndices = useRef(new Set()); // Track which fields have been manually edited by user
   const [openFilterIndex, setOpenFilterIndex] = useState(null);
   const filterRefs = useRef({});
   const filterModalRefs = useRef({});
@@ -36,6 +37,10 @@ const NewShipmentTable = ({
   const filterIconRefs = useRef({});
   const [columnFilters, setColumnFilters] = useState({});
   const [columnSortConfig, setColumnSortConfig] = useState([]);
+  // Store the sorted order (array of row IDs) to preserve positions after sorting
+  const [sortedRowOrder, setSortedRowOrder] = useState(null);
+  // Track the last sort config to detect when sorting changes
+  const lastSortConfigRef = useRef(null);
   
   // Filter state
   const [activeFilters, setActiveFilters] = useState({
@@ -297,78 +302,143 @@ const NewShipmentTable = ({
     });
 
     // Apply column sorting
+    // Check if sort config has changed by comparing with ref
+    const currentSortConfigStr = JSON.stringify(columnSortConfig);
+    const lastSortConfigStr = lastSortConfigRef.current ? JSON.stringify(lastSortConfigRef.current) : null;
+    const sortConfigChanged = currentSortConfigStr !== lastSortConfigStr;
+    
     if (columnSortConfig.length > 0) {
-      result.sort((a, b) => {
-        for (const sort of columnSortConfig) {
-          let aVal, bVal;
-          switch(sort.column) {
-            case 'bottles':
-              aVal = a.bottleInventory || a.bottle_inventory || 0;
-              bVal = b.bottleInventory || b.bottle_inventory || 0;
-              break;
-            case 'closures':
-              aVal = a.closureInventory || a.closure_inventory || 0;
-              bVal = b.closureInventory || b.closure_inventory || 0;
-              break;
-            case 'boxes':
-              aVal = a.boxInventory || a.box_inventory || 0;
-              bVal = b.boxInventory || b.box_inventory || 0;
-              break;
-            case 'labels':
-              aVal = a.labelsAvailable || a.label_inventory || a.labels_available || 0;
-              bVal = b.labelsAvailable || b.label_inventory || b.labels_available || 0;
-              break;
-            case 'size':
-              aVal = a.size || '';
-              bVal = b.size || '';
-              // For size, compare as strings
-              const aStr = String(aVal).toLowerCase();
-              const bStr = String(bVal).toLowerCase();
-              if (aStr !== bStr) {
-                return sort.order === 'asc' ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
+      // If sort config changed or we don't have a stored order, perform sorting
+      if (sortConfigChanged || sortedRowOrder === null) {
+        result.sort((a, b) => {
+          for (const sort of columnSortConfig) {
+            let aVal, bVal;
+            switch(sort.column) {
+              case 'bottles':
+                aVal = a.bottleInventory || a.bottle_inventory || 0;
+                bVal = b.bottleInventory || b.bottle_inventory || 0;
+                break;
+              case 'closures':
+                aVal = a.closureInventory || a.closure_inventory || 0;
+                bVal = b.closureInventory || b.closure_inventory || 0;
+                break;
+              case 'boxes':
+                aVal = a.boxInventory || a.box_inventory || 0;
+                bVal = b.boxInventory || b.box_inventory || 0;
+                break;
+              case 'labels':
+                aVal = a.labelsAvailable || a.label_inventory || a.labels_available || 0;
+                bVal = b.labelsAvailable || b.label_inventory || b.labels_available || 0;
+                break;
+              case 'size':
+                aVal = a.size || '';
+                bVal = b.size || '';
+                // For size, compare as strings
+                const aStr = String(aVal).toLowerCase();
+                const bStr = String(bVal).toLowerCase();
+                if (aStr !== bStr) {
+                  return sort.order === 'asc' ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
+                }
+                continue;
+              case 'normal-4':
+              case 'qty': {
+                // Qty values are stored in effectiveQtyValues, indexed by original row index
+                const aIndex = a._originalIndex !== undefined ? a._originalIndex : rows.indexOf(a);
+                const bIndex = b._originalIndex !== undefined ? b._originalIndex : rows.indexOf(b);
+                const aQty = effectiveQtyValues[aIndex];
+                const bQty = effectiveQtyValues[bIndex];
+                aVal = typeof aQty === 'number' ? aQty : (aQty === '' || aQty === null || aQty === undefined ? 0 : parseInt(aQty, 10) || 0);
+                bVal = typeof bQty === 'number' ? bQty : (bQty === '' || bQty === null || bQty === undefined ? 0 : parseInt(bQty, 10) || 0);
+                break;
               }
-              continue;
-            case 'normal-4':
-            case 'qty': {
-              // Qty values are stored in effectiveQtyValues, indexed by original row index
-              const aIndex = a._originalIndex !== undefined ? a._originalIndex : rows.indexOf(a);
-              const bIndex = b._originalIndex !== undefined ? b._originalIndex : rows.indexOf(b);
-              const aQty = effectiveQtyValues[aIndex];
-              const bQty = effectiveQtyValues[bIndex];
-              aVal = typeof aQty === 'number' ? aQty : (aQty === '' || aQty === null || aQty === undefined ? 0 : parseInt(aQty, 10) || 0);
-              bVal = typeof bQty === 'number' ? bQty : (bQty === '' || bQty === null || bQty === undefined ? 0 : parseInt(bQty, 10) || 0);
-              break;
+              default: {
+                const field = getFieldForHeaderFilter(sort.column);
+                aVal = a[field];
+                bVal = b[field];
+              }
             }
-            default: {
-              const field = getFieldForHeaderFilter(sort.column);
-              aVal = a[field];
-              bVal = b[field];
-            }
-          }
 
-          // Brand/Product/Size/etc are text fields; Qty/Add may be numeric/boolean
-          if (sort.column === 'normal-0' || sort.column === 'normal-1' || sort.column === 'normal-2') {
-            const aStr = String(aVal ?? '').toLowerCase();
-            const bStr = String(bVal ?? '').toLowerCase();
-            const cmp = aStr.localeCompare(bStr);
-            if (cmp !== 0) {
-              return sort.order === 'asc' ? cmp : -cmp;
-            }
-          } else {
-            const aNum = typeof aVal === 'number' ? aVal : parseFloat(aVal) || 0;
-            const bNum = typeof bVal === 'number' ? bVal : parseFloat(bVal) || 0;
-            
-            if (aNum !== bNum) {
-              return sort.order === 'asc' ? aNum - bNum : bNum - aNum;
+            // Brand/Product/Size/etc are text fields; Qty/Add may be numeric/boolean
+            if (sort.column === 'normal-0' || sort.column === 'normal-1' || sort.column === 'normal-2') {
+              const aStr = String(aVal ?? '').toLowerCase();
+              const bStr = String(bVal ?? '').toLowerCase();
+              const cmp = aStr.localeCompare(bStr);
+              if (cmp !== 0) {
+                return sort.order === 'asc' ? cmp : -cmp;
+              }
+            } else {
+              const aNum = typeof aVal === 'number' ? aVal : parseFloat(aVal) || 0;
+              const bNum = typeof bVal === 'number' ? bVal : parseFloat(bVal) || 0;
+              
+              if (aNum !== bNum) {
+                return sort.order === 'asc' ? aNum - bNum : bNum - aNum;
+              }
             }
           }
+          return 0;
+        });
+      } else {
+        // Sort config hasn't changed - preserve the stored order
+        // Create a map of row ID to row for quick lookup
+        const rowMap = new Map(result.map(row => [row.id, row]));
+        
+        // Reorder result based on stored order
+        const orderedResult = [];
+        const processedIds = new Set();
+        
+        // First, add rows in the stored order
+        if (sortedRowOrder) {
+          sortedRowOrder.forEach(id => {
+            if (rowMap.has(id)) {
+              orderedResult.push(rowMap.get(id));
+              processedIds.add(id);
+            }
+          });
         }
-        return 0;
-      });
+        
+        // Then, add any new rows that weren't in the original sort (e.g., newly added rows)
+        result.forEach(row => {
+          if (!processedIds.has(row.id)) {
+            orderedResult.push(row);
+          }
+        });
+        
+        result = orderedResult;
+      }
     }
     
     return result;
-  }, [rows, activeFilters, columnFilters, columnSortConfig, effectiveQtyValues]);
+  }, [rows, activeFilters, columnFilters, columnSortConfig, effectiveQtyValues, sortedRowOrder]);
+
+  // Store sorted order when sort config changes
+  useEffect(() => {
+    if (columnSortConfig.length > 0) {
+      const currentSortConfigStr = JSON.stringify(columnSortConfig);
+      const lastSortConfigStr = lastSortConfigRef.current ? JSON.stringify(lastSortConfigRef.current) : null;
+      
+      if (currentSortConfigStr !== lastSortConfigStr) {
+        // Sort config changed - clear stored order to trigger re-sort in useMemo
+        setSortedRowOrder(null);
+        lastSortConfigRef.current = JSON.parse(JSON.stringify(columnSortConfig));
+      }
+    } else {
+      // No sorting - clear stored order
+      if (sortedRowOrder !== null) {
+        setSortedRowOrder(null);
+        lastSortConfigRef.current = null;
+      }
+    }
+  }, [columnSortConfig, sortedRowOrder]);
+
+  // Store the sorted order after a sort operation completes
+  // This runs when filteredRows changes AND we have a sort config but no stored order
+  useEffect(() => {
+    if (columnSortConfig.length > 0 && sortedRowOrder === null && filteredRows.length > 0) {
+      // We just sorted (because sortedRowOrder was null) - store the order now
+      const sortedIds = filteredRows.map(row => row.id);
+      setSortedRowOrder(sortedIds);
+    }
+  }, [filteredRows, columnSortConfig, sortedRowOrder]);
 
   // Apply selection filter only in table mode
   const filteredRowsWithSelection = useMemo(() => {
@@ -437,11 +507,17 @@ const NewShipmentTable = ({
         if (existingIndex >= 0) {
           const newConfig = [...prev];
           newConfig[existingIndex] = { column: columnKey, order: filterData.sortOrder };
+          // Clear stored order to force re-sort when user clicks ascending/descending again
+          setSortedRowOrder(null);
           return newConfig;
         } else {
+          // Clear stored order to force re-sort when user clicks ascending/descending
+          setSortedRowOrder(null);
           return [...prev, { column: columnKey, order: filterData.sortOrder }];
         }
       } else {
+        // Removing sort - clear stored order
+        setSortedRowOrder(null);
         return prev.filter(sort => sort.column !== columnKey);
       }
     });
@@ -1264,9 +1340,9 @@ const NewShipmentTable = ({
                               style={{
                                 position: 'fixed',
                                 backgroundColor: '#FFFFFF',
-                                borderRadius: '12px',
-                                padding: '14px 16px',
-                                minWidth: '220px',
+                                borderRadius: '8px',
+                                padding: '8px 12px',
+                                minWidth: '180px',
                                 boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
                                 zIndex: 9999,
                                 border: '1px solid #E5E7EB',
@@ -1281,12 +1357,12 @@ const NewShipmentTable = ({
                               onMouseDown={(e) => e.stopPropagation()}
                               onMouseUp={(e) => e.stopPropagation()}
                             >
-                              <div style={{ marginBottom: '10px' }}>
+                              <div style={{ marginBottom: '6px' }}>
                                 <h3 style={{
-                                  fontSize: '14px',
+                                  fontSize: '12px',
                                   fontWeight: 600,
                                   color: '#111827',
-                                  marginBottom: '4px',
+                                  marginBottom: '2px',
                                   lineHeight: '1.3',
                                 }}>
                                   0 quantity. Add quantity to include in shipment
@@ -1315,6 +1391,8 @@ const NewShipmentTable = ({
                           value={effectiveQtyValues[index] !== undefined && effectiveQtyValues[index] !== null && effectiveQtyValues[index] !== '' ? String(effectiveQtyValues[index]) : ''}
                           onChange={(e) => {
                             const inputValue = e.target.value;
+                            // Mark this field as manually edited
+                            manuallyEditedIndices.current.add(index);
                             // Allow empty string while typing, or parse the number
                             if (inputValue === '' || inputValue === '-') {
                               effectiveSetQtyValues(prev => ({
@@ -1357,12 +1435,16 @@ const NewShipmentTable = ({
                         />
                         {(() => {
                           const forecastValue = Math.round(row.weeklyForecast || row.forecast || 0);
-                          const currentQty = typeof effectiveQtyValues[index] === 'number' 
-                            ? effectiveQtyValues[index] 
-                            : (effectiveQtyValues[index] === '' || effectiveQtyValues[index] === null || effectiveQtyValues[index] === undefined) 
-                              ? 0 
-                              : parseInt(effectiveQtyValues[index], 10) || 0;
-                          const hasChanged = currentQty !== forecastValue;
+                          const qtyValue = effectiveQtyValues[index];
+                          // Only show reset if value has been manually edited by user and differs from forecast
+                          const isValueSet = qtyValue !== undefined && qtyValue !== null && qtyValue !== '';
+                          const isManuallyEdited = manuallyEditedIndices.current.has(index);
+                          const currentQty = typeof qtyValue === 'number' 
+                            ? qtyValue 
+                            : isValueSet 
+                              ? parseInt(qtyValue, 10) || 0
+                              : 0;
+                          const hasChanged = isValueSet && isManuallyEdited && currentQty !== forecastValue;
                           
                           return hasChanged ? (
                             <button
@@ -1374,6 +1456,8 @@ const NewShipmentTable = ({
                                   ...prev,
                                   [index]: forecastValue,
                                 }));
+                                // Remove from manually edited set when reset to forecast
+                                manuallyEditedIndices.current.delete(index);
                               }}
                               style={{
                                 position: 'absolute',
@@ -1510,6 +1594,8 @@ const NewShipmentTable = ({
                                 
                                 const maxQty = Math.floor(labelsAvailable / increment) * increment;
                                 
+                                // Mark as manually edited since user clicked "Use Available"
+                                manuallyEditedIndices.current.add(index);
                                 effectiveSetQtyValues(prev => ({
                                   ...prev,
                                   [index]: maxQty
@@ -2838,12 +2924,16 @@ const NewShipmentTable = ({
                     >
                       {(() => {
                         const forecastValue = Math.round(row.weeklyForecast || row.forecast || 0);
-                        const currentQty = typeof effectiveQtyValues[index] === 'number' 
-                          ? effectiveQtyValues[index] 
-                          : (effectiveQtyValues[index] === '' || effectiveQtyValues[index] === null || effectiveQtyValues[index] === undefined) 
-                            ? 0 
-                            : parseInt(effectiveQtyValues[index], 10) || 0;
-                        const hasChanged = currentQty !== forecastValue;
+                        const qtyValue = effectiveQtyValues[index];
+                        // Only show reset if value has been manually edited by user and differs from forecast
+                        const isValueSet = qtyValue !== undefined && qtyValue !== null && qtyValue !== '';
+                        const isManuallyEdited = manuallyEditedIndices.current.has(index);
+                        const currentQty = typeof qtyValue === 'number' 
+                          ? qtyValue 
+                          : isValueSet 
+                            ? parseInt(qtyValue, 10) || 0
+                            : 0;
+                        const hasChanged = isValueSet && isManuallyEdited && currentQty !== forecastValue;
                         
                         return hasChanged ? (
                           <button
@@ -2855,6 +2945,8 @@ const NewShipmentTable = ({
                                 ...prev,
                                 [index]: forecastValue,
                               }));
+                              // Remove from manually edited set when reset to forecast
+                              manuallyEditedIndices.current.delete(index);
                             }}
                             style={{
                               display: 'flex',
@@ -2898,6 +2990,8 @@ const NewShipmentTable = ({
                         value={effectiveQtyValues[index] !== undefined && effectiveQtyValues[index] !== null && effectiveQtyValues[index] !== '' ? String(effectiveQtyValues[index]) : (effectiveQtyValues[index] === '' ? '' : '0')}
                         onChange={(e) => {
                           const inputValue = e.target.value;
+                          // Mark this field as manually edited
+                          manuallyEditedIndices.current.add(index);
                           // Allow empty string while typing, or parse the number
                           if (inputValue === '' || inputValue === '-') {
                             effectiveSetQtyValues(prev => ({
@@ -3046,6 +3140,8 @@ const NewShipmentTable = ({
                               }
                               
                               const newQty = Math.max(0, numQty + increment);
+                              // Mark as manually edited since user clicked increment button
+                              manuallyEditedIndices.current.add(index);
                               effectiveSetQtyValues(prev => ({
                                 ...prev,
                                 [index]: newQty,
@@ -3107,6 +3203,8 @@ const NewShipmentTable = ({
                               }
                               
                               const newQty = Math.max(0, numQty - increment);
+                              // Mark as manually edited since user clicked decrement button
+                              manuallyEditedIndices.current.add(index);
                               effectiveSetQtyValues(prev => ({
                                 ...prev,
                                 [index]: newQty,
@@ -3257,6 +3355,8 @@ const NewShipmentTable = ({
                             
                             const maxQty = Math.floor(labelsAvailable / increment) * increment;
                             
+                            // Mark as manually edited since user clicked "Use Available"
+                            manuallyEditedIndices.current.add(index);
                             effectiveSetQtyValues(prev => ({
                               ...prev,
                               [index]: maxQty
@@ -3492,7 +3592,7 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
   const [sortField, setSortField] = useState(currentFilters.sortField || '');
   const [isSortFieldOpen, setIsSortFieldOpen] = useState(false);
   const [sortOrder, setSortOrder] = useState(currentFilters.sortOrder || '');
-  const [isFilterConditionExpanded, setIsFilterConditionExpanded] = useState(true);
+  const [isFilterConditionExpanded, setIsFilterConditionExpanded] = useState(false);
   const [filterField, setFilterField] = useState(currentFilters.filterField || '');
   const [filterCondition, setFilterCondition] = useState(currentFilters.filterCondition || '');
   const [filterValue, setFilterValue] = useState(currentFilters.filterValue || '');
@@ -3502,7 +3602,7 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
   useEffect(() => {
     if (filterIconRef) {
       const rect = filterIconRef.getBoundingClientRect();
-      const dropdownWidth = 320;
+      const dropdownWidth = 300;
       const dropdownHeight = 500;
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
@@ -3640,19 +3740,19 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
         position: 'fixed',
         top: `${position.top}px`,
         left: `${position.left}px`,
-        width: '320px',
+        width: '300px',
         backgroundColor: '#FFFFFF',
         borderRadius: '12px',
         boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
         border: '1px solid #E5E7EB',
         zIndex: 10000,
-        padding: '16px',
+        padding: '12px',
       }}
       onClick={(e) => e.stopPropagation()}
     >
       {/* Popular filters section */}
-      <div style={{ marginBottom: '16px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+      <div style={{ marginBottom: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
           <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', textTransform: 'uppercase' }}>
             Popular filters:
           </label>
@@ -3673,12 +3773,12 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
         </div>
         
         <div style={{ position: 'relative' }} ref={popularFilterRef}>
-          <button
+            <button
             type="button"
             onClick={() => setIsPopularFilterOpen(!isPopularFilterOpen)}
             style={{
               width: '100%',
-              padding: '8px 12px',
+              padding: '6px 10px',
               border: '1px solid #D1D5DB',
               borderRadius: '6px',
               fontSize: '0.875rem',
@@ -3799,8 +3899,8 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
       </div>
 
       {/* Sort by section */}
-      <div style={{ marginBottom: '16px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+      <div style={{ marginBottom: '12px', paddingTop: '12px', borderTop: '1px solid #E5E7EB' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
           <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#374151', textTransform: 'uppercase' }}>
             Sort by:
           </label>
@@ -3820,14 +3920,14 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
           </button>
         </div>
         
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           <div style={{ position: 'relative' }} ref={sortFieldRef}>
             <button
               type="button"
               onClick={() => setIsSortFieldOpen(!isSortFieldOpen)}
               style={{
                 width: '100%',
-                padding: '8px 12px',
+                padding: '6px 10px',
                 border: '1px solid #D1D5DB',
                 borderRadius: '6px',
                 fontSize: '0.875rem',
@@ -3887,7 +3987,7 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
                     style={{
                       width: '100%',
                       textAlign: 'left',
-                      padding: '10px 12px',
+                      padding: '8px 10px',
                       fontSize: '0.875rem',
                       color: '#374151',
                       backgroundColor: sortField === field.value ? '#F9FAFB' : '#FFFFFF',
@@ -3915,7 +4015,7 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
             onChange={(e) => setSortOrder(e.target.value)}
             style={{
               width: '100%',
-              padding: '8px 12px',
+              padding: '6px 36px 6px 10px',
               border: sortOrder ? '1px solid #3B82F6' : '1px solid #D1D5DB',
               borderRadius: '6px',
               fontSize: '0.875rem',
@@ -3939,13 +4039,13 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
       </div>
 
       {/* Filter by condition section - collapsible */}
-      <div style={{ marginBottom: '16px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
+      <div style={{ marginBottom: '12px', paddingTop: '12px', borderTop: '1px solid #E5E7EB' }}>
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: isFilterConditionExpanded ? '12px' : 0,
+            marginBottom: isFilterConditionExpanded ? '8px' : 0,
             cursor: 'pointer',
           }}
           onClick={() => setIsFilterConditionExpanded(!isFilterConditionExpanded)}
@@ -3968,13 +4068,13 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
         </div>
         
         {isFilterConditionExpanded && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <select
               value={filterField}
               onChange={(e) => setFilterField(e.target.value)}
               style={{
                 width: '100%',
-                padding: '8px 12px',
+                padding: '6px 36px 6px 10px',
                 border: '1px solid #D1D5DB',
                 borderRadius: '6px',
                 fontSize: '0.875rem',
@@ -4000,7 +4100,7 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
               onChange={(e) => setFilterCondition(e.target.value)}
               style={{
                 width: '100%',
-                padding: '8px 12px',
+                padding: '6px 36px 6px 10px',
                 border: '1px solid #D1D5DB',
                 borderRadius: '6px',
                 fontSize: '0.875rem',
@@ -4029,7 +4129,7 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
                 onChange={(e) => setFilterValue(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '8px 36px 8px 12px',
+                  padding: '6px 36px 6px 10px',
                   border: '1px solid #D1D5DB',
                   borderRadius: '6px',
                   fontSize: '0.875rem',
@@ -4052,19 +4152,26 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
       </div>
 
       {/* Action buttons */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '12px', borderTop: '1px solid #E5E7EB' }}>
         <button
           type="button"
           onClick={handleReset}
           style={{
-            padding: '8px 16px',
+            width: '57px',
+            height: '23px',
+            padding: '0',
             border: '1px solid #D1D5DB',
-            borderRadius: '6px',
+            borderRadius: '4px',
             backgroundColor: '#FFFFFF',
             color: '#374151',
             fontSize: '0.875rem',
             fontWeight: 500,
             cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            whiteSpace: 'nowrap',
+            boxSizing: 'border-box',
           }}
         >
           Reset
@@ -4073,14 +4180,21 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
           type="button"
           onClick={handleApply}
           style={{
-            padding: '8px 16px',
+            width: '57px',
+            height: '23px',
+            padding: '0',
             border: 'none',
-            borderRadius: '6px',
+            borderRadius: '4px',
             backgroundColor: '#3B82F6',
             color: '#FFFFFF',
             fontSize: '0.875rem',
             fontWeight: 500,
             cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            whiteSpace: 'nowrap',
+            boxSizing: 'border-box',
           }}
         >
           Apply

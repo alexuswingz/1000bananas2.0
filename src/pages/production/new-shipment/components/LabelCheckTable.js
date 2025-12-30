@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
-import { getShipmentProducts, getLabelFormulaByLocation, updateLabelInventoryByLocation, updateShipmentProductLabelCheck } from '../../../../services/productionApi';
+import { getShipmentProducts, getLabelFormulaByLocation, updateLabelInventoryByLocation, updateShipmentProductLabelCheck, updateShipment } from '../../../../services/productionApi';
 import VarianceStillExceededModal from './VarianceStillExceededModal';
 import SortFormulasFilterDropdown from './SortFormulasFilterDropdown';
 
@@ -138,6 +138,53 @@ const LabelCheckTable = ({
       setRows([]); // Use empty array on error instead of dummy data
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Check if all label checks are complete and clear comment if so
+  const checkAndClearLabelCheckComment = async () => {
+    if (!shipmentId) return;
+    
+    try {
+      // Reload data to get current status
+      const data = await getShipmentProducts(shipmentId);
+      
+      // Check if all products are complete (confirmed or counted)
+      const allComplete = data.length > 0 && data.every(product => 
+        product.label_check_status === 'confirmed' || product.label_check_status === 'counted'
+      );
+      
+      console.log('Checking label check completion:', {
+        totalProducts: data.length,
+        allComplete,
+        statuses: data.map(p => ({ id: p.id, status: p.label_check_status }))
+      });
+      
+      if (allComplete) {
+        // Clear the label_check_comment since all are now complete
+        // Use empty string to ensure it's cleared (some databases prefer empty string over null)
+        try {
+          const result = await updateShipment(shipmentId, { label_check_comment: '' });
+          console.log('Label check comment cleared - all products are complete', result);
+        } catch (updateError) {
+          console.error('Error clearing label check comment:', updateError);
+          // Try with null as fallback
+          try {
+            const result = await updateShipment(shipmentId, { label_check_comment: null });
+            console.log('Label check comment cleared (using null)', result);
+          } catch (nullError) {
+            console.error('Error clearing label check comment with null:', nullError);
+          }
+        }
+      } else {
+        console.log('Not all products are complete yet:', {
+          total: data.length,
+          completed: data.filter(p => p.label_check_status === 'confirmed' || p.label_check_status === 'counted').length
+        });
+      }
+    } catch (error) {
+      console.error('Error checking and clearing label check comment:', error);
+      // Don't throw - this is a cleanup operation
     }
   };
 
@@ -410,6 +457,9 @@ const LabelCheckTable = ({
       // Reload data from API to ensure consistency
       await loadLabelData();
       
+      // Check if all products are now complete and clear comment if so (after reload)
+      await checkAndClearLabelCheckComment();
+      
       handleCloseModal();
     }
   };
@@ -446,6 +496,9 @@ const LabelCheckTable = ({
       
       // Reload data from API to ensure consistency
       await loadLabelData();
+      
+      // Check if all products are now complete and clear comment if so (after reload)
+      await checkAndClearLabelCheckComment();
     }
     setIsVarianceStillExceededOpen(false);
     handleCloseModal();
@@ -536,10 +589,11 @@ const LabelCheckTable = ({
         isComplete: completedRows.has(row.id) || confirmedRows.has(row.id),
         isConfirmed: confirmedRows.has(row.id),
         isCounted: completedRows.has(row.id) && !confirmedRows.has(row.id),
+        isInsufficient: completedRowStatus[row.id] || false, // Include insufficient status
       }));
       onRowsDataChange(rowsWithStatus);
     }
-  }, [rows, completedRows, confirmedRows, onRowsDataChange]);
+  }, [rows, completedRows, confirmedRows, completedRowStatus, onRowsDataChange]);
 
   // Close filter dropdown when clicking outside
   useEffect(() => {
@@ -1601,6 +1655,9 @@ const LabelCheckTable = ({
                         setCompletedRowStatus(prev => ({ ...prev, [selectedRow.id]: false }));
                         // Reload data from API to ensure consistency
                         await loadLabelData();
+                        
+                        // Check if all products are now complete and clear comment if so (after reload)
+                        await checkAndClearLabelCheckComment();
                       }
                       handleCloseModal();
                     }}
@@ -1706,6 +1763,9 @@ const LabelCheckTable = ({
                         setCompletedRowStatus(prev => ({ ...prev, [selectedRow.id]: false })); // Not insufficient
                         // Reload data from API to ensure consistency
                         await loadLabelData();
+                        
+                        // Check if all products are now complete and clear comment if so (after reload)
+                        await checkAndClearLabelCheckComment();
                       }
                       handleCloseModal();
                     }}

@@ -1199,7 +1199,7 @@ const Bottles = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 overflow-y-auto">
           <div
             className="bg-white rounded-xl shadow-2xl w-[800px] my-auto flex flex-col"
-            style={{ height: '524px' }}
+            style={{ height: '540px' }}
           >
             {/* Header */}
             <div className={`${themeClasses.headerBg} flex items-center justify-between px-6 py-3`}>
@@ -1299,10 +1299,10 @@ const Bottles = () => {
             </div>
 
             {/* Content */}
-            <div className="px-6 py-5 overflow-y-auto flex-1">
+             <div className="px-6 py-5 overflow-y-auto flex-1">
               {activeDetailsTab === 'core' && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between border-b border-gray-200 pb-2">
                   <h3 className="text-sm font-semibold text-gray-900">Core Info</h3>
                     {!isEditingCoreInfo && (
                       <button
@@ -1328,7 +1328,7 @@ const Bottles = () => {
                     )}
                   </div>
                   <div style={getSectionLockStyles(isEditingCoreInfo)}>
-                  <div className="grid grid-cols-12 gap-4">
+                  <div className="grid grid-cols-12 gap-2.5">
                     <div className="col-span-6">
                       <label className="block text-xs font-medium text-gray-500 mb-1">
                         Packaging Name
@@ -1405,7 +1405,7 @@ const Bottles = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-4 gap-4">
+                  <div className="grid grid-cols-4 gap-2.5">
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">Shape</label>
                       <input
@@ -1500,7 +1500,7 @@ const Bottles = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-3 gap-2.5">
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">
                         Material
@@ -1575,7 +1575,7 @@ const Bottles = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-2.5">
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">
                         Description
@@ -1647,8 +1647,8 @@ const Bottles = () => {
               )}
 
               {activeDetailsTab === 'supplier' && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between border-b border-gray-200 pb-2">
                     <h3 className="text-sm font-semibold text-gray-900">Supplier Info</h3>
                     {!isEditingSupplierInfo && (
                       <button
@@ -1674,7 +1674,7 @@ const Bottles = () => {
                     )}
                   </div>
                   <div style={getSectionLockStyles(isEditingSupplierInfo)}>
-                  <div className="grid grid-cols-4 gap-4">
+                  <div className="grid grid-cols-4 gap-2.5">
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">
                         Lead Time (Weeks)
@@ -1833,8 +1833,8 @@ const Bottles = () => {
               )}
 
               {activeDetailsTab === 'dimensions' && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between border-b border-gray-200 pb-2">
                     <h3 className="text-sm font-semibold text-gray-900">Dimensions</h3>
                     {!isEditingDimensionsInfo && (
                       <button
@@ -1860,7 +1860,7 @@ const Bottles = () => {
                     )}
                   </div>
                   <div style={getSectionLockStyles(isEditingDimensionsInfo)}>
-                  <div className="grid grid-cols-4 gap-4">
+                  <div className="grid grid-cols-4 gap-2.5">
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">
                         Length (in)
@@ -1970,7 +1970,7 @@ const Bottles = () => {
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-4 gap-4">
+                  <div className="grid grid-cols-4 gap-2.5">
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">
                         Label Size
@@ -2023,9 +2023,9 @@ const Bottles = () => {
               )}
 
               {activeDetailsTab === 'inventory' && (
-                <div className="space-y-4">
+                <div className="space-y-2">
                   <h3 className="text-sm font-semibold text-gray-900">Inventory</h3>
-                  <div className="grid grid-cols-4 gap-4">
+                  <div className="grid grid-cols-4 gap-2.5">
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">
                         Supplier Order Strategy

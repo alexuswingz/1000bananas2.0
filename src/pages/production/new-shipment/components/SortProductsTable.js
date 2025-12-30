@@ -22,10 +22,15 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
   // Transform shipment products into table format
   const [products, setProducts] = useState([]);
   const locksLoadedRef = useRef(null); // Track which shipmentId we've loaded locks for
+  const previousShipmentIdRef = useRef(null); // Track previous shipmentId to detect actual changes
 
-  // Reset locks loaded flag when shipmentId changes
+  // Reset locks loaded flag when shipmentId actually changes (not on remount)
   useEffect(() => {
-    if (locksLoadedRef.current !== shipmentId) {
+    const previousShipmentId = previousShipmentIdRef.current;
+    previousShipmentIdRef.current = shipmentId;
+    
+    // Only clear locks if shipmentId actually changed to a different value
+    if (previousShipmentId !== null && previousShipmentId !== shipmentId) {
       locksLoadedRef.current = null;
       setLockedProductIds(new Set());
     }
@@ -47,23 +52,30 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
       }));
       setProducts(transformedProducts);
       
-      // Load locked IDs after products are set, but only once per shipmentId
-      if (shipmentId && locksLoadedRef.current !== shipmentId) {
-        try {
-          const stored = localStorage.getItem(`sortProductsLocks_${shipmentId}`);
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            if (Array.isArray(parsed)) {
-              // Filter to only include IDs that exist in current products
-              const productIds = new Set(transformedProducts.map(p => p.id));
-              const validLockedIds = parsed.filter(id => productIds.has(id));
-              setLockedProductIds(new Set(validLockedIds));
-              console.log('Loaded locked product IDs:', validLockedIds);
+      // Load locked IDs from localStorage whenever products are set
+      // This handles both initial mount and remount scenarios
+      if (shipmentId) {
+        // Only load if we haven't loaded for this shipmentId yet, or if shipmentId changed
+        if (locksLoadedRef.current !== shipmentId) {
+          try {
+            const stored = localStorage.getItem(`sortProductsLocks_${shipmentId}`);
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              if (Array.isArray(parsed)) {
+                // Filter to only include IDs that exist in current products
+                const productIds = new Set(transformedProducts.map(p => p.id));
+                const validLockedIds = parsed.filter(id => productIds.has(id));
+                setLockedProductIds(new Set(validLockedIds));
+                console.log('Loaded locked product IDs:', validLockedIds);
+              }
+            } else {
+              // If no stored locks, ensure we start with empty set
+              setLockedProductIds(new Set());
             }
+            locksLoadedRef.current = shipmentId;
+          } catch (error) {
+            console.error('Error loading sort products locks from localStorage:', error);
           }
-          locksLoadedRef.current = shipmentId;
-        } catch (error) {
-          console.error('Error loading sort products locks from localStorage:', error);
         }
       }
     } else {
@@ -368,26 +380,70 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
       [columnKey]: filterData,
     }));
     
-    // Update sort config: if sortOrder is set, add/update this column in the sort array
-    // If sortOrder is empty, remove this column from the sort array
-    setSortConfig(prev => {
-      if (filterData.sortOrder) {
-        // Check if this column already has a sort
-        const existingIndex = prev.findIndex(sort => sort.column === columnKey);
-        if (existingIndex >= 0) {
-          // Update existing sort
-          const newConfig = [...prev];
-          newConfig[existingIndex] = { column: columnKey, order: filterData.sortOrder };
-          return newConfig;
-        } else {
-          // Add new sort (appends to end, making it the lowest priority)
-          return [...prev, { column: columnKey, order: filterData.sortOrder }];
+    // If sortOrder is provided, apply one-time sort to products array
+    // Locked items maintain their positions, only unlocked items are sorted
+    if (filterData.sortOrder) {
+      setProducts(prevProducts => {
+        // Separate locked and unlocked products
+        const lockedProducts = [];
+        const unlockedProducts = [];
+        
+        prevProducts.forEach((product, index) => {
+          if (lockedProductIds.has(product.id)) {
+            lockedProducts.push({ product, originalIndex: index });
+          } else {
+            unlockedProducts.push(product);
+          }
+        });
+        
+        // Sort only unlocked products
+        unlockedProducts.sort((a, b) => {
+          const aVal = a[columnKey];
+          const bVal = b[columnKey];
+          
+          let comparison = 0;
+          
+          // Handle numeric values
+          if (typeof aVal === 'number' && typeof bVal === 'number') {
+            comparison = filterData.sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+          } else {
+            // Handle string values
+            const aStr = String(aVal || '').toLowerCase();
+            const bStr = String(bVal || '').toLowerCase();
+            
+            if (filterData.sortOrder === 'asc') {
+              comparison = aStr.localeCompare(bStr);
+            } else {
+              comparison = bStr.localeCompare(aStr);
+            }
+          }
+          
+          return comparison;
+        });
+        
+        // Rebuild the array: locked items at their original positions, sorted unlocked items fill the rest
+        const result = [];
+        let unlockedIndex = 0;
+        
+        for (let i = 0; i < prevProducts.length; i++) {
+          const lockedItem = lockedProducts.find(lp => lp.originalIndex === i);
+          if (lockedItem) {
+            result.push(lockedItem.product);
+          } else if (unlockedIndex < unlockedProducts.length) {
+            result.push(unlockedProducts[unlockedIndex]);
+            unlockedIndex++;
+          }
         }
-      } else {
-        // Remove sort for this column
-        return prev.filter(sort => sort.column !== columnKey);
-      }
-    });
+        
+        return result;
+      });
+      
+      // Clear sort config for this column (one-time sort, not persistent)
+      setSortConfig(prev => prev.filter(sort => sort.column !== columnKey));
+    } else {
+      // If sortOrder is empty, remove sort from config
+      setSortConfig(prev => prev.filter(sort => sort.column !== columnKey));
+    }
     // Keep the dropdown open so user can continue configuring multiple filters
     // setOpenFilterColumns((prev) => {
     //   const next = new Set(prev);
@@ -482,9 +538,10 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     }
   };
 
-  // Apply filters and sorting to products
-  // Locked items maintain their positions and are not affected by filters/sorting
-  // Unlocked items are filtered and sorted, filling in the gaps
+  // Apply filters to products
+  // Locked items maintain their positions and are not affected by filters
+  // Unlocked items are filtered, filling in the gaps
+  // Note: Sorting is now one-time (applied directly to products array), not continuous
   const getFilteredAndSortedProducts = () => {
     // Separate locked and unlocked products
     const lockedProducts = [];
@@ -528,45 +585,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
       }
     });
 
-    // Apply hierarchical sorting to unlocked products only
-    // Sort by each column in priority order (primary first, then secondary, etc.)
-    if (sortConfig.length > 0) {
-      filteredUnlocked.sort((a, b) => {
-        // Try each sort level in order
-        for (const sort of sortConfig) {
-          const aVal = a[sort.column];
-          const bVal = b[sort.column];
-          
-          let comparison = 0;
-          
-          // Handle numeric values
-          if (typeof aVal === 'number' && typeof bVal === 'number') {
-            comparison = sort.order === 'asc' ? aVal - bVal : bVal - aVal;
-          } else {
-            // Handle string values
-            const aStr = String(aVal || '').toLowerCase();
-            const bStr = String(bVal || '').toLowerCase();
-            
-            if (sort.order === 'asc') {
-              comparison = aStr.localeCompare(bStr);
-            } else {
-              comparison = bStr.localeCompare(aStr);
-            }
-          }
-          
-          // If values are different at this level, return the comparison
-          // Otherwise, continue to the next sort level
-          if (comparison !== 0) {
-            return comparison;
-          }
-        }
-        
-        // If all sort levels are equal, maintain original order
-        return 0;
-      });
-    }
-
-    // Rebuild the array: locked items at their original positions, unlocked items fill the rest
+    // Rebuild the array: locked items at their original positions, filtered unlocked items fill the rest
     const result = [];
     let unlockedIndex = 0;
     

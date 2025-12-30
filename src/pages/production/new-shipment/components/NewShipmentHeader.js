@@ -23,33 +23,25 @@ const NewShipmentHeader = ({
   productsAddedAfterExport = false,
 }) => {
   // Stepper logic - determine which tabs are accessible
-  // Workflow: Add Products → Label Check → Formula Check → Book Shipment → Sort Products → Sort Formulas
+  // Workflow: Add Products → (Label Check & Formula Check in any order) → Book Shipment → Sort Products → Sort Formulas
   const tabOrder = ['add-products', 'label-check', 'formula-check', 'book-shipment', 'sort-products', 'sort-formulas'];
   
   const isTabAccessible = (tabName) => {
     // add-products is always accessible
     if (tabName === 'add-products') return true;
     
-    // Completed tabs are always accessible
+    // Completed tabs are always accessible (even if there are unresolved issues or missing prerequisites)
+    // This allows users to go back to previously completed steps
     if (completedTabs.has(tabName)) return true;
     
-    // Label Check comes first after Add Products, then Formula Check
-    if (tabName === 'label-check') {
+    // Label Check and Formula Check are both accessible once products are added (can be done in any order)
+    if (tabName === 'label-check' || tabName === 'formula-check') {
       // Block if there are unexported products
       if (productsAddedAfterExport) {
         return false;
       }
       // Accessible once add-products is completed
       return completedTabs.has('add-products');
-    }
-    
-    if (tabName === 'formula-check') {
-      // Block if there are unexported products
-      if (productsAddedAfterExport) {
-        return false;
-      }
-      // Accessible once label-check is completed
-      return completedTabs.has('label-check');
     }
     
     // Book Shipment, Sort Products, Sort Formulas require BOTH formula-check AND label-check
@@ -61,7 +53,7 @@ const NewShipmentHeader = ({
         return false;
       }
       
-      // Block if there are unresolved issues
+      // Block if there are unresolved issues (only for non-completed tabs)
       if (hasUnresolvedCheckIssues) {
         return false;
       }
@@ -979,7 +971,11 @@ const NewShipmentHeader = ({
         </button>
         <button
           type="button"
-          onClick={() => onActionChange && onActionChange('label-check')}
+          onClick={() => {
+            if (isTabAccessible('label-check') && onActionChange) {
+              onActionChange('label-check');
+            }
+          }}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -991,7 +987,8 @@ const NewShipmentHeader = ({
             backgroundColor: activeAction === 'label-check' ? (isDarkMode ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.05)') : 'transparent',
             border: 'none',
             borderBottom: activeAction === 'label-check' ? '2px solid #007AFF' : '2px solid transparent',
-            cursor: 'pointer',
+            cursor: isTabAccessible('label-check') ? 'pointer' : 'not-allowed',
+            opacity: isTabAccessible('label-check') ? 1 : 0.5,
             transition: 'all 0.2s',
             whiteSpace: 'nowrap',
           }}
@@ -1017,7 +1014,11 @@ const NewShipmentHeader = ({
         </button>
         <button
           type="button"
-          onClick={() => onActionChange && onActionChange('formula-check')}
+          onClick={() => {
+            if (isTabAccessible('formula-check') && onActionChange) {
+              onActionChange('formula-check');
+            }
+          }}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -1029,7 +1030,8 @@ const NewShipmentHeader = ({
             backgroundColor: activeAction === 'formula-check' ? (isDarkMode ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.05)') : 'transparent',
             border: 'none',
             borderBottom: activeAction === 'formula-check' ? '2px solid #007AFF' : '2px solid transparent',
-            cursor: 'pointer',
+            cursor: isTabAccessible('formula-check') ? 'pointer' : 'not-allowed',
+            opacity: isTabAccessible('formula-check') ? 1 : 0.5,
             transition: 'all 0.2s',
             whiteSpace: 'nowrap',
           }}
@@ -1055,7 +1057,11 @@ const NewShipmentHeader = ({
         </button>
         <button
           type="button"
-          onClick={() => onActionChange && onActionChange('book-shipment')}
+          onClick={() => {
+            if (isTabAccessible('book-shipment') && onActionChange) {
+              onActionChange('book-shipment');
+            }
+          }}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -1067,7 +1073,8 @@ const NewShipmentHeader = ({
             backgroundColor: activeAction === 'book-shipment' ? (isDarkMode ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.05)') : 'transparent',
             border: 'none',
             borderBottom: activeAction === 'book-shipment' ? '2px solid #007AFF' : '2px solid transparent',
-            cursor: 'pointer',
+            cursor: isTabAccessible('book-shipment') ? 'pointer' : 'not-allowed',
+            opacity: isTabAccessible('book-shipment') ? 1 : 0.5,
             transition: 'all 0.2s',
             whiteSpace: 'nowrap',
           }}
@@ -1089,7 +1096,11 @@ const NewShipmentHeader = ({
         </button>
         <button
           type="button"
-          onClick={() => onActionChange && onActionChange('sort-products')}
+          onClick={() => {
+            if (isTabAccessible('sort-products') && onActionChange) {
+              onActionChange('sort-products');
+            }
+          }}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -1101,7 +1112,8 @@ const NewShipmentHeader = ({
             backgroundColor: activeAction === 'sort-products' ? (isDarkMode ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.05)') : 'transparent',
             border: 'none',
             borderBottom: activeAction === 'sort-products' ? '2px solid #007AFF' : '2px solid transparent',
-            cursor: 'pointer',
+            cursor: isTabAccessible('sort-products') ? 'pointer' : 'not-allowed',
+            opacity: isTabAccessible('sort-products') ? 1 : 0.5,
             transition: 'all 0.2s',
             whiteSpace: 'nowrap',
           }}
@@ -1123,7 +1135,11 @@ const NewShipmentHeader = ({
         </button>
         <button
           type="button"
-          onClick={() => onActionChange && onActionChange('sort-formulas')}
+          onClick={() => {
+            if (isTabAccessible('sort-formulas') && onActionChange) {
+              onActionChange('sort-formulas');
+            }
+          }}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -1135,7 +1151,8 @@ const NewShipmentHeader = ({
             backgroundColor: activeAction === 'sort-formulas' ? (isDarkMode ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.05)') : 'transparent',
             border: 'none',
             borderBottom: activeAction === 'sort-formulas' ? '2px solid #007AFF' : '2px solid transparent',
-            cursor: 'pointer',
+            cursor: isTabAccessible('sort-formulas') ? 'pointer' : 'not-allowed',
+            opacity: isTabAccessible('sort-formulas') ? 1 : 0.5,
             transition: 'all 0.2s',
             whiteSpace: 'nowrap',
           }}
