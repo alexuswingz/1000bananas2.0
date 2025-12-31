@@ -32,6 +32,7 @@ const Planning = () => {
   const [isStatusCommentOpen, setIsStatusCommentOpen] = useState(false);
   const [statusCommentRow, setStatusCommentRow] = useState(null);
   const [statusCommentField, setStatusCommentField] = useState(null);
+  const preventNavigationRef = useRef(false);
 
   const extractComment = (notes, prefix) => {
     if (!notes || !prefix) return { hasComment: false, commentText: '' };
@@ -143,6 +144,26 @@ const Planning = () => {
 
   // Track last fetch time to prevent unnecessary refetches
   const lastFetchRef = useRef(0);
+
+  // Read activeTab from location state if provided
+  useEffect(() => {
+    if (location.state?.activeTab) {
+      setActiveTab(location.state.activeTab);
+    }
+    
+    // Clear preventRowNavigation and stayOnShipments flags after navigation completes
+    if (location.state?.preventRowNavigation || location.state?.stayOnShipments) {
+      // Clear the flags after a delay to allow navigation to complete and prevent accidental row clicks
+      const timer = setTimeout(() => {
+        // Replace state without the flags
+        const newState = { ...location.state };
+        delete newState.preventRowNavigation;
+        delete newState.stayOnShipments;
+        window.history.replaceState(newState, '', location.pathname);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [location.state]);
 
   // Fetch shipments from API
   useEffect(() => {
@@ -372,6 +393,39 @@ const Planning = () => {
         }
         return s;
       }));
+    }
+
+    // Navigate to shipments dashboard after completing Label Check or Formula Check
+    if (fieldName === 'labelCheck' || fieldName === 'formulaCheck') {
+      // Set flag to prevent any row navigation immediately
+      preventNavigationRef.current = true;
+      
+      // Immediately set the active tab to shipments
+      setActiveTab('shipments');
+      
+      // Refresh shipments data first
+      await fetchShipments();
+      
+      // Use a small delay to ensure state updates, then navigate
+      // This ensures we're definitely on the shipments tab
+      setTimeout(() => {
+        // Force navigation to planning page with shipments tab
+        navigate('/dashboard/production/planning', { 
+          replace: true,
+          state: { 
+            activeTab: 'shipments', 
+            refresh: Date.now(),
+            fromCommentComplete: true,
+            preventRowNavigation: true,
+            stayOnShipments: true
+          }
+        });
+        
+        // Clear the prevent navigation flag after navigation completes
+        setTimeout(() => {
+          preventNavigationRef.current = false;
+        }, 1500);
+      }, 100);
     }
   };
 
@@ -716,6 +770,11 @@ const Planning = () => {
   };
 
   const handleRowClick = (row) => {
+    // Don't navigate if we just completed a comment (prevent navigation after comment modal)
+    if (location.state?.preventRowNavigation || location.state?.stayOnShipments || preventNavigationRef.current) {
+      return;
+    }
+    
     const nextStep = getNextIncompleteStep(row);
     
     // Navigate to shipment order page with shipment data and step

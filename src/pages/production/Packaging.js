@@ -18,6 +18,7 @@ const Packaging = () => {
   const [showQualityChecksModal, setShowQualityChecksModal] = useState(false);
   const [showProductionStartedModal, setShowProductionStartedModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [isSortMode, setIsSortMode] = useState(false);
 
   const themeClasses = {
     pageBg: isDarkMode ? 'bg-dark-bg-primary' : 'bg-light-bg-primary',
@@ -74,8 +75,7 @@ const Packaging = () => {
   };
 
   const handleSortClick = () => {
-    console.log('Sort clicked');
-    // Add sort logic here
+    setIsSortMode(!isSortMode);
   };
 
   return (
@@ -207,6 +207,8 @@ const Packaging = () => {
             data={[]}
             searchQuery={searchQuery}
             onStartClick={handleStartClick}
+            isSortMode={isSortMode}
+            onExitSortMode={() => setIsSortMode(false)}
           />
         )}
       </div>

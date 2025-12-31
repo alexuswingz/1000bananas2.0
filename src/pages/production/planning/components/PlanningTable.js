@@ -174,24 +174,41 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
     let circleColor;
     let borderStyle = 'none';
 
+    // Special handling for addProducts: light blue when pending, regular blue when completed
+    const isAddProducts = statusFieldName === 'addProducts';
+    
     switch (normalizedStatus) {
       case 'pending':
-        circleColor = '#FFFFFF'; // White/transparent
-        borderStyle = '1px solid #D1D5DB'; // Light gray outline
+        if (isAddProducts) {
+          circleColor = '#93C5FD'; // Light blue for addProducts pending
+          borderStyle = 'none';
+        } else {
+          circleColor = '#FFFFFF'; // White/transparent
+          borderStyle = '1px solid #D1D5DB'; // Light gray outline
+        }
         break;
       case 'in progress':
         circleColor = '#3B82F6'; // Blue for in progress
         break;
       case 'completed':
-        circleColor = '#10B981'; // Green
+        if (isAddProducts) {
+          circleColor = '#3B82F6'; // Regular blue for addProducts completed
+        } else {
+          circleColor = '#10B981'; // Green for other statuses
+        }
         break;
       case 'incomplete':
         circleColor = '#F59E0B'; // Orange for incomplete
         borderStyle = 'none';
         break;
       default:
-        circleColor = '#FFFFFF'; // Default to white (Pending)
-        borderStyle = '1px solid #D1D5DB'; // Light gray outline
+        if (isAddProducts) {
+          circleColor = '#93C5FD'; // Light blue for addProducts default
+          borderStyle = 'none';
+        } else {
+          circleColor = '#FFFFFF'; // Default to white (Pending)
+          borderStyle = '1px solid #D1D5DB'; // Light gray outline
+        }
     }
 
     // Force orange when incomplete (status is 'incomplete' OR has comment OR workflow moved past without completing)

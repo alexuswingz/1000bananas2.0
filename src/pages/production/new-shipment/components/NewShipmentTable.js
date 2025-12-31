@@ -1743,7 +1743,7 @@ const NewShipmentTable = ({
                                     <div style={{ 
                                       width: `${bluePercent}%`, 
                                       height: '100%',
-                                      backgroundColor: '#3B82F6',
+                                      backgroundColor: addedRows.has(row.id) ? '#3B82F6' : '#93C5FD', // Regular blue when added, light blue when not added
                                       position: 'absolute',
                                       left: `${fbaPercent + greenPercent}%`,
                                       top: 0,
