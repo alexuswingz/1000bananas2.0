@@ -221,27 +221,44 @@ const Planning = () => {
         
         // Helper function to determine step status
         const getStepStatus = (completed, currentStepStatus, workflowStatus, hasComment) => {
-          // If completed, always show as completed
-          if (completed) return 'completed';
+          // If completed, always show as completed (handle both boolean true and string "true")
+          // This check MUST come first to ensure completed status takes priority
+          // Also handle PostgreSQL boolean which might come as True/False
+          const isCompleted = completed === true || 
+                              completed === 'true' || 
+                              completed === 'True' ||
+                              completed === 1 || 
+                              completed === '1' ||
+                              (typeof completed === 'string' && completed.toLowerCase() === 'true');
+          
+          if (isCompleted) {
+            return 'completed';
+          }
+          
+          // If workflow has moved past this step, it's implicitly completed
+          // (workflow can't progress without completing previous steps)
+          if (workflowStatus) {
+            const workflowSteps = ['add_products', 'label_check', 'formula_check', 'book_shipment', 'sort_products', 'sort_formulas'];
+            const currentStepIndex = workflowSteps.indexOf(currentStepStatus);
+            const workflowStepIndex = workflowSteps.indexOf(workflowStatus);
+            
+            // If workflow has moved past this step, it means it was completed
+            // (even if the flag wasn't set correctly in the database)
+            if (currentStepIndex >= 0 && workflowStepIndex > currentStepIndex) {
+              // Only return 'completed' if there's no comment (comments indicate incomplete)
+              if (!hasComment) {
+                return 'completed';
+              } else {
+                return 'incomplete'; // Has comment, so it was marked incomplete
+              }
+            }
+          }
           
           // If workflow is currently on this step, show as in progress
           if (workflowStatus && workflowStatus === currentStepStatus) return 'in progress';
           
           // If has comment, it's incomplete
           if (hasComment) return 'incomplete';
-          
-          // Check if workflow has moved past this step (incomplete)
-          // Only check if workflowStatus is valid
-          if (workflowStatus) {
-            const workflowSteps = ['add_products', 'label_check', 'formula_check', 'book_shipment', 'sort_products', 'sort_formulas'];
-            const currentStepIndex = workflowSteps.indexOf(currentStepStatus);
-            const workflowStepIndex = workflowSteps.indexOf(workflowStatus);
-            
-            // If workflow has moved past this step and it's not completed, it's incomplete
-            if (currentStepIndex >= 0 && workflowStepIndex > currentStepIndex) {
-              return 'incomplete'; // Workflow moved past without completing
-            }
-          }
           
           // Otherwise, it's pending
           return 'pending';

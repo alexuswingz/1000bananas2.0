@@ -80,6 +80,11 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck, p
       try {
         setIsExporting(true);
         
+        // Update shipment type in parent component before exporting
+        if (onExport && (selectedType === 'fba' || selectedType === 'awd')) {
+          onExport(selectedType);
+        }
+        
         // Call the export function with the selected template type, products, and shipment data
         await exportShipmentTemplate(selectedType, products || [], shipmentData || {});
         

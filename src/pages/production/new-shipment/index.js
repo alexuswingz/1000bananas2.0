@@ -25,6 +25,7 @@ import VarianceExceededModal from './components/VarianceExceededModal';
 import UncheckedFormulaModal from './components/UncheckedFormulaModal';
 import FormulaCheckCommentModal from './components/FormulaCheckCommentModal';
 import LabelCheckCommentModal from './components/LabelCheckCommentModal';
+import LabelCheckCompleteModal from './components/LabelCheckCompleteModal';
 
 // Utility function to handle Google Drive image URLs
 const getImageUrl = (url) => {
@@ -82,6 +83,7 @@ const NewShipment = () => {
   const [isLabelCheckCommentOpen, setIsLabelCheckCommentOpen] = useState(false);
   const [isLabelIncompleteComment, setIsLabelIncompleteComment] = useState(false);
   const [labelCheckHasComment, setLabelCheckHasComment] = useState(false);
+  const [isLabelCheckCompleteOpen, setIsLabelCheckCompleteOpen] = useState(false);
   const [selectedCarrier, setSelectedCarrier] = useState('');
   const [isCarrierDropdownOpen, setIsCarrierDropdownOpen] = useState(false);
   const [customCarrierName, setCustomCarrierName] = useState('');
@@ -244,12 +246,12 @@ const NewShipment = () => {
   const [shipmentData, setShipmentData] = useState({
     shipmentNumber: generateShipmentNumber(),
     shipmentDate: new Date().toISOString().split('T')[0], // YYYY-MM-DD format
-    shipmentType: 'AWD',
+    shipmentType: '', // Only set after user selects FBA or AWD in export template
     location: '',
     account: 'TPS Nutrients',
     shipFrom: '',
     shipTo: '',
-    amazonShipmentNumber: 'STAR-XXXXXXXXXXXXX', // Default for AWD
+    amazonShipmentNumber: '', // Only set after shipment type is selected
     amazonRefId: 'XXXXXXXX',
   });
   const [dataAsOfDate, setDataAsOfDate] = useState(new Date()); // Track when data was loaded
@@ -264,14 +266,16 @@ const NewShipment = () => {
     return 'FBAXXXXXXXXX'; // Default
   };
   
-  // Update Amazon Shipment # format when shipment type changes
+  // Update Amazon Shipment # format when shipment type changes (only if type is set)
   useEffect(() => {
-    const format = getAmazonShipmentFormat(shipmentData.shipmentType);
-    if (shipmentData.amazonShipmentNumber !== format && shipmentData.shipmentType) {
-      setShipmentData(prev => ({
-        ...prev,
-        amazonShipmentNumber: format,
-      }));
+    if (shipmentData.shipmentType) {
+      const format = getAmazonShipmentFormat(shipmentData.shipmentType);
+      if (shipmentData.amazonShipmentNumber !== format) {
+        setShipmentData(prev => ({
+          ...prev,
+          amazonShipmentNumber: format,
+        }));
+      }
     }
   }, [shipmentData.shipmentType]);
 
@@ -949,10 +953,17 @@ const NewShipment = () => {
         const shipmentNumber = currentShipmentData.shipmentNumber || generateShipmentNumber();
         const shipmentDate = currentShipmentData.shipmentDate || new Date().toISOString().split('T')[0];
         
+        // Require shipment type to be selected before creating shipment
+        if (!currentShipmentData.shipmentType) {
+          toast.error('Please select a shipment type (FBA or AWD) in the export template before booking the shipment.');
+          setLoading(false);
+          return;
+        }
+        
         const newShipment = await createShipment({
           shipment_number: shipmentNumber,
           shipment_date: shipmentDate,
-          shipment_type: currentShipmentData.shipmentType || 'AWD',
+          shipment_type: currentShipmentData.shipmentType,
           marketplace: 'Amazon',
           account: currentShipmentData.account || 'TPS Nutrients',
           location: currentShipmentData.location || '',
@@ -1151,30 +1162,26 @@ const NewShipment = () => {
       return newSet;
     });
 
-    // If Formula Check is already completed, proceed directly to Book Shipment,
-    // otherwise move to Formula Check
-    if (formulaCheckCompleted) {
-      setActiveAction('book-shipment');
-      if (isIncomplete) {
+    // If incomplete, proceed with the old flow (auto-navigate)
+    if (isIncomplete) {
+      if (formulaCheckCompleted) {
+        setActiveAction('book-shipment');
         if (hasComment) {
           toast.info('Label Check comment saved. Proceeding to Book Shipment.');
         } else {
           toast.info('Proceeding to Book Shipment.');
         }
       } else {
-        toast.success('Label Check completed! Moving to Book Shipment.');
-      }
-    } else {
-      setActiveAction('formula-check');
-      if (isIncomplete) {
+        setActiveAction('formula-check');
         if (hasComment) {
           toast.info('Label Check comment saved. Proceeding to Formula Check.');
         } else {
           toast.info('Proceeding to Formula Check.');
         }
-      } else {
-        toast.success('Label Check completed! Moving to Formula Check.');
       }
+    } else {
+      // If complete, show the modal instead of auto-navigating
+      setIsLabelCheckCompleteOpen(true);
     }
   };
 
@@ -2840,7 +2847,16 @@ const NewShipment = () => {
       <ExportTemplateModal
         isOpen={isExportTemplateOpen}
         onClose={() => setIsExportTemplateOpen(false)}
-        onExport={() => {
+        onExport={(selectedType) => {
+          // Update shipment type based on export template selection
+          if (selectedType === 'fba' || selectedType === 'awd') {
+            const newType = selectedType.toUpperCase();
+            setShipmentData(prev => ({
+              ...prev,
+              shipmentType: newType,
+              amazonShipmentNumber: getAmazonShipmentFormat(newType),
+            }));
+          }
           // Mark export as completed
           setCompletedTabs(prev => {
             const newSet = new Set(prev);
@@ -2875,13 +2891,20 @@ const NewShipment = () => {
               }
               
               // Create shipment - ensure shipment number and date are always set
+              // Require shipment type to be selected before creating shipment
+              if (!shipmentData.shipmentType) {
+                toast.error('Please select a shipment type (FBA or AWD) in the export template before proceeding.');
+                setLoading(false);
+                return;
+              }
+              
               const shipmentNumber = shipmentData.shipmentNumber || generateShipmentNumber();
               const shipmentDate = shipmentData.shipmentDate || new Date().toISOString().split('T')[0];
               
               const newShipment = await createShipment({
                 shipment_number: shipmentNumber,
                 shipment_date: shipmentDate,
-                shipment_type: shipmentData.shipmentType || 'AWD',
+                shipment_type: shipmentData.shipmentType,
                 marketplace: 'Amazon',
                 account: shipmentData.account || 'TPS Nutrients',
                 location: shipmentData.location || '',
@@ -3017,6 +3040,17 @@ const NewShipment = () => {
         isDarkMode={isDarkMode}
       />
 
+      <LabelCheckCompleteModal
+        isOpen={isLabelCheckCompleteOpen}
+        onClose={() => setIsLabelCheckCompleteOpen(false)}
+        onGoToShipments={() => {
+          setIsLabelCheckCompleteOpen(false);
+        }}
+        onBeginFormulaCheck={() => {
+          setIsLabelCheckCompleteOpen(false);
+          setActiveAction('formula-check');
+        }}
+      />
 
       {/* Book Shipment Complete Modal */}
       {isBookShipmentCompleteOpen && (

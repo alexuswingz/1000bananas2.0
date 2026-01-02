@@ -29,7 +29,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
     } else if (type === 'AWD') {
       return 'STAR-XXXXXXXXXXXXX';
     }
-    return 'FBAXXXXXXXXX'; // Default
+    return 'Select shipment type first'; // When no type is selected
   };
 
   // Update editable data when shipmentData changes
@@ -39,7 +39,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
       const shipmentType = shipmentData.shipmentType || '';
       const format = getAmazonShipmentFormat(shipmentType);
       setEditableData({
-        shipmentName: `${shipmentName} ${shipmentType}`.trim(),
+        shipmentName: shipmentType ? `${shipmentName} ${shipmentType}`.trim() : shipmentName,
         shipmentType: shipmentType || '',
         amazonShipmentNumber: format,
         amazonRefId: 'XXXXXXXX',
@@ -133,7 +133,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
       // If there are multiple parts, the last is the type and the rest is the name
       // If only one part, it's the name and we use the existing shipmentType
       const name = parts.length > 1 ? parts.slice(0, -1).join(' ') : parts[0];
-      const type = parts.length > 1 ? parts[parts.length - 1] : (shipmentData?.shipmentType || editableData.shipmentType || 'AWD');
+      const type = parts.length > 1 ? parts[parts.length - 1] : (shipmentData?.shipmentType || editableData.shipmentType || '');
       
       const updatedData = {
         shipmentNumber: name, // Use shipmentNumber (backend expects this)

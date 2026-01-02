@@ -28,6 +28,8 @@ const NewShipmentTable = ({
   const addButtonRefs = useRef({});
   const addPopupRefs = useRef({});
   const manuallyEditedIndices = useRef(new Set()); // Track which fields have been manually edited by user
+  const rawQtyInputValues = useRef({}); // Store raw input values while typing (before rounding)
+  const [qtyInputUpdateTrigger, setQtyInputUpdateTrigger] = useState(0); // Trigger re-renders during typing
   const [openFilterIndex, setOpenFilterIndex] = useState(null);
   const filterRefs = useRef({});
   const filterModalRefs = useRef({});
@@ -79,6 +81,29 @@ const NewShipmentTable = ({
     
     const available = getAvailableLabelsForRow(row, rowIndex);
     return numQty > available;
+  };
+
+  // Helper function to round quantity based on case size
+  const roundQuantityToCaseSize = (value, size) => {
+    if (value === '' || value === null || value === undefined) return '';
+    
+    const numValue = parseInt(value, 10);
+    if (isNaN(numValue) || numValue < 0) return '';
+    
+    // Determine increment based on size
+    let increment = 1;
+    const sizeLower = (size || '').toLowerCase();
+    if (sizeLower.includes('8oz')) {
+      increment = 60;
+    } else if (sizeLower.includes('quart')) {
+      increment = 12;
+    } else if (sizeLower.includes('gallon')) {
+      increment = 4;
+    }
+    
+    // Round to nearest increment
+    const rounded = Math.round(numValue / increment) * increment;
+    return rounded > 0 ? rounded : increment;
   };
 
   // Use local state if props not provided (for backward compatibility)
@@ -1388,13 +1413,34 @@ const NewShipmentTable = ({
                             if (size.includes('gallon')) return 4;
                             return 1;
                           })()}
-                          value={effectiveQtyValues[index] !== undefined && effectiveQtyValues[index] !== null && effectiveQtyValues[index] !== '' ? String(effectiveQtyValues[index]) : ''}
+                          value={(() => {
+                            // Show raw input value while typing, otherwise show rounded value
+                            if (rawQtyInputValues.current[index] !== undefined) {
+                              return rawQtyInputValues.current[index];
+                            }
+                            const qtyValue = effectiveQtyValues[index];
+                            return qtyValue !== undefined && qtyValue !== null && qtyValue !== '' ? String(qtyValue) : '';
+                          })()}
                           onChange={(e) => {
                             const inputValue = e.target.value;
                             // Mark this field as manually edited
                             manuallyEditedIndices.current.add(index);
-                            // Allow empty string while typing, or parse the number
+                            
+                            // Store raw input value (no rounding while typing)
                             if (inputValue === '' || inputValue === '-') {
+                              rawQtyInputValues.current[index] = '';
+                            } else {
+                              // Store raw value for display while typing
+                              rawQtyInputValues.current[index] = inputValue;
+                            }
+                            // Force a minimal re-render to update the input value
+                            setQtyInputUpdateTrigger(prev => prev + 1);
+                          }}
+                          onBlur={(e) => {
+                            const inputValue = e.target.value;
+                            // Round and validate when user finishes typing
+                            if (inputValue === '' || inputValue === '-') {
+                              rawQtyInputValues.current[index] = undefined;
                               effectiveSetQtyValues(prev => ({
                                 ...prev,
                                 [index]: ''
@@ -1402,24 +1448,52 @@ const NewShipmentTable = ({
                             } else {
                               const numValue = parseInt(inputValue, 10);
                               if (!isNaN(numValue) && numValue >= 0) {
-                                // Determine increment based on size
-                                let increment = 1;
-                                const size = row.size?.toLowerCase() || '';
-                                if (size.includes('8oz')) {
-                                  increment = 60;
-                                } else if (size.includes('quart')) {
-                                  increment = 12;
-                                } else if (size.includes('gallon')) {
-                                  increment = 4;
-                                }
-                                
-                                // Round immediately as user types
-                                const rounded = Math.round(numValue / increment) * increment;
+                                const rounded = roundQuantityToCaseSize(numValue, row.size);
+                                rawQtyInputValues.current[index] = undefined; // Clear raw value
                                 effectiveSetQtyValues(prev => ({
                                   ...prev,
-                                  [index]: rounded > 0 ? rounded : increment
+                                  [index]: rounded
+                                }));
+                              } else {
+                                // Invalid input, clear it
+                                rawQtyInputValues.current[index] = undefined;
+                                effectiveSetQtyValues(prev => ({
+                                  ...prev,
+                                  [index]: ''
                                 }));
                               }
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            // Round and validate when user presses Enter
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const inputValue = e.target.value;
+                              if (inputValue === '' || inputValue === '-') {
+                                rawQtyInputValues.current[index] = undefined;
+                                effectiveSetQtyValues(prev => ({
+                                  ...prev,
+                                  [index]: ''
+                                }));
+                              } else {
+                                const numValue = parseInt(inputValue, 10);
+                                if (!isNaN(numValue) && numValue >= 0) {
+                                  const rounded = roundQuantityToCaseSize(numValue, row.size);
+                                  rawQtyInputValues.current[index] = undefined; // Clear raw value
+                                  effectiveSetQtyValues(prev => ({
+                                    ...prev,
+                                    [index]: rounded
+                                  }));
+                                } else {
+                                  // Invalid input, clear it
+                                  rawQtyInputValues.current[index] = undefined;
+                                  effectiveSetQtyValues(prev => ({
+                                    ...prev,
+                                    [index]: ''
+                                  }));
+                                }
+                              }
+                              e.target.blur(); // Remove focus after Enter
                             }
                           }}
                           placeholder="0"
@@ -1435,16 +1509,29 @@ const NewShipmentTable = ({
                         />
                         {(() => {
                           const forecastValue = Math.round(row.weeklyForecast || row.forecast || 0);
+                          // Check both the raw input value (while typing) and the effective value
+                          const rawInputValue = rawQtyInputValues.current[index];
                           const qtyValue = effectiveQtyValues[index];
+                          
+                          // Determine the current displayed value (raw if typing, otherwise effective)
+                          let currentDisplayValue;
+                          if (rawInputValue !== undefined) {
+                            // User is typing - use raw input value
+                            currentDisplayValue = rawInputValue === '' ? 0 : (parseInt(rawInputValue, 10) || 0);
+                          } else {
+                            // Use effective value
+                            const isValueSet = qtyValue !== undefined && qtyValue !== null && qtyValue !== '';
+                            currentDisplayValue = typeof qtyValue === 'number' 
+                              ? qtyValue 
+                              : isValueSet 
+                                ? parseInt(qtyValue, 10) || 0
+                                : 0;
+                          }
+                          
                           // Only show reset if value has been manually edited by user and differs from forecast
-                          const isValueSet = qtyValue !== undefined && qtyValue !== null && qtyValue !== '';
                           const isManuallyEdited = manuallyEditedIndices.current.has(index);
-                          const currentQty = typeof qtyValue === 'number' 
-                            ? qtyValue 
-                            : isValueSet 
-                              ? parseInt(qtyValue, 10) || 0
-                              : 0;
-                          const hasChanged = isValueSet && isManuallyEdited && currentQty !== forecastValue;
+                          const hasValue = rawInputValue !== undefined ? rawInputValue !== '' : (qtyValue !== undefined && qtyValue !== null && qtyValue !== '');
+                          const hasChanged = hasValue && isManuallyEdited && currentDisplayValue !== forecastValue;
                           
                           return hasChanged ? (
                             <button
@@ -1452,6 +1539,8 @@ const NewShipmentTable = ({
                               onClick={(e) => {
                                 e.stopPropagation();
                                 e.preventDefault();
+                                // Clear raw input value
+                                rawQtyInputValues.current[index] = undefined;
                                 effectiveSetQtyValues(prev => ({
                                   ...prev,
                                   [index]: forecastValue,

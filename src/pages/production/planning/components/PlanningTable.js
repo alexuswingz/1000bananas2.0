@@ -148,29 +148,44 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
 
   // Render status circle based on status
   const renderStatusCircle = (status, hasComment = false, commentText = '', rowId = null, commentData = {}, statusFieldName = null, row = null) => {
-    // Base status from row field
-    const baseStatus = (status || 'pending').toLowerCase();
+    // Base status from row field - normalize to lowercase and trim whitespace
+    const baseStatus = (status || 'pending').toLowerCase().trim();
     
-    // Don't show comment icon if status is completed (comments should be cleared when completed)
-    const shouldShowComment = hasComment && baseStatus !== 'completed';
-
-    // Derive "in progress" from the shipment's current workflow status
-    // so that when you're actively working a step in New Shipment, Planning shows it as blue.
+    // CRITICAL: If the status is "completed", ALWAYS use "completed" and skip all workflow logic
+    // This ensures that once a step is marked completed, it stays completed regardless of workflowStatus
     let normalizedStatus = baseStatus;
     const workflowStatus = row?.workflowStatus; // e.g. 'label_check', 'formula_check', 'book_shipment', 'sort_products', 'sort_formulas'
-
-    // Only override to "in progress" if status is not already "completed" or "incomplete"
-    if (normalizedStatus !== 'completed' && normalizedStatus !== 'incomplete' && workflowStatus) {
-      if (
-        (statusFieldName === 'labelCheck' && workflowStatus === 'label_check') ||
-        (statusFieldName === 'formulaCheck' && workflowStatus === 'formula_check') ||
-        (statusFieldName === 'bookShipment' && workflowStatus === 'book_shipment') ||
-        (statusFieldName === 'sortProducts' && workflowStatus === 'sort_products') ||
-        (statusFieldName === 'sortFormulas' && workflowStatus === 'sort_formulas')
-      ) {
-        normalizedStatus = 'in progress';
+    
+    // If status is "completed", force it to stay "completed" and skip workflow override logic
+    if (baseStatus === 'completed') {
+      normalizedStatus = 'completed';
+    } else {
+      // Only apply workflow logic if status is NOT completed
+      // Derive "in progress" from the shipment's current workflow status
+      // so that when you're actively working a step in New Shipment, Planning shows it as blue.
+      if (normalizedStatus !== 'incomplete' && workflowStatus) {
+        if (
+          (statusFieldName === 'addProducts' && workflowStatus === 'add_products') ||
+          (statusFieldName === 'labelCheck' && workflowStatus === 'label_check') ||
+          (statusFieldName === 'formulaCheck' && workflowStatus === 'formula_check') ||
+          (statusFieldName === 'bookShipment' && workflowStatus === 'book_shipment') ||
+          (statusFieldName === 'sortProducts' && workflowStatus === 'sort_products') ||
+          (statusFieldName === 'sortFormulas' && workflowStatus === 'sort_formulas')
+        ) {
+          normalizedStatus = 'in progress';
+        }
       }
     }
+    
+    // Don't show comment icon if status is completed (comments should be cleared when completed)
+    const shouldShowComment = hasComment && normalizedStatus !== 'completed';
+    
+    // FINAL SAFEGUARD: If original status was "completed", force normalizedStatus to "completed"
+    // This prevents any edge cases where normalizedStatus might have been changed
+    if (baseStatus === 'completed') {
+      normalizedStatus = 'completed';
+    }
+    
     let circleColor;
     let borderStyle = 'none';
 

@@ -105,6 +105,27 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
   const [formulas, setFormulas] = useState([]);
   const previousShipmentIdRef = useRef(null); // Track previous shipmentId to detect actual changes
   const splitsLoadedRef = useRef(null); // Track which shipmentId we've loaded splits for
+  const orderLoadedRef = useRef(null); // Track which shipmentId we've loaded order for
+  const isInitialOrderLoadRef = useRef(true); // Track if we're in initial order load phase
+
+  // Helper function to get a stable identifier for a formula
+  // Uses formula name + splitTag (if exists) as unique identifier
+  const getFormulaIdentifier = (formula) => {
+    return `${formula.formula}${formula.splitTag ? `::${formula.splitTag}` : ''}`;
+  };
+
+  // Save formula order to localStorage
+  const saveFormulaOrder = (formulasToSave) => {
+    if (!shipmentId || isInitialOrderLoadRef.current) return;
+    
+    try {
+      const order = formulasToSave.map(f => getFormulaIdentifier(f));
+      localStorage.setItem(`sortFormulasOrder_${shipmentId}`, JSON.stringify(order));
+      console.log('Saved formula order:', order);
+    } catch (error) {
+      console.error('Error saving formula order to localStorage:', error);
+    }
+  };
 
   // Reset locks and splits loaded flags when shipmentId actually changes (not on remount)
   useEffect(() => {
@@ -117,10 +138,15 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
       splitsLoadedRef.current = null;
       sortConfigLoadedRef.current = null;
       filtersLoadedRef.current = null;
+      orderLoadedRef.current = null;
       isInitialLoadRef.current = true;
+      isInitialOrderLoadRef.current = true;
       setLockedFormulaIds(new Set());
       setSortConfig([]);
       setFilters({});
+    } else if (previousShipmentId === null && shipmentId !== null) {
+      // Initial mount with shipmentId - mark order load as initial
+      isInitialOrderLoadRef.current = true;
     }
   }, [shipmentId]);
 
@@ -398,7 +424,73 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
         }
       }
 
-      setFormulas(finalFormulas);
+      // Restore saved order if it exists
+      let orderedFormulas = finalFormulas;
+      if (shipmentId) {
+        try {
+          const storedOrder = localStorage.getItem(`sortFormulasOrder_${shipmentId}`);
+          if (storedOrder) {
+            const parsedOrder = JSON.parse(storedOrder);
+            if (Array.isArray(parsedOrder) && parsedOrder.length > 0) {
+              // Create a map of identifier -> formula for quick lookup
+              const formulaMap = new Map();
+              finalFormulas.forEach(f => {
+                const identifier = getFormulaIdentifier(f);
+                formulaMap.set(identifier, f);
+              });
+              
+              // Reorder formulas according to saved order
+              const ordered = [];
+              const usedIdentifiers = new Set();
+              
+              // First, add formulas in the saved order
+              parsedOrder.forEach(identifier => {
+                if (formulaMap.has(identifier) && !usedIdentifiers.has(identifier)) {
+                  ordered.push(formulaMap.get(identifier));
+                  usedIdentifiers.add(identifier);
+                }
+              });
+              
+              // Then, add any formulas that weren't in the saved order (new formulas)
+              finalFormulas.forEach(f => {
+                const identifier = getFormulaIdentifier(f);
+                if (!usedIdentifiers.has(identifier)) {
+                  ordered.push(f);
+                  usedIdentifiers.add(identifier);
+                }
+              });
+              
+              orderedFormulas = ordered;
+              console.log('Restored formula order:', parsedOrder);
+              orderLoadedRef.current = shipmentId;
+              // Mark that initial order load is complete after a short delay
+              setTimeout(() => {
+                isInitialOrderLoadRef.current = false;
+              }, 200);
+            } else {
+              // No saved order, mark as loaded
+              orderLoadedRef.current = shipmentId;
+              setTimeout(() => {
+                isInitialOrderLoadRef.current = false;
+              }, 200);
+            }
+          } else {
+            // No saved order, mark as loaded
+            orderLoadedRef.current = shipmentId;
+            setTimeout(() => {
+              isInitialOrderLoadRef.current = false;
+            }, 200);
+          }
+        } catch (error) {
+          console.error('Error loading formula order from localStorage:', error);
+          orderLoadedRef.current = shipmentId;
+          setTimeout(() => {
+            isInitialOrderLoadRef.current = false;
+          }, 200);
+        }
+      }
+
+      setFormulas(orderedFormulas);
       
       // Load locked formula names from localStorage whenever formulas are set
       // This handles both initial mount and remount scenarios
@@ -411,7 +503,7 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
               const parsed = JSON.parse(stored);
               if (Array.isArray(parsed)) {
                 // Filter to only include formula names that exist in current formulas
-                const formulaNames = new Set(finalFormulas.map(f => f.formula));
+                const formulaNames = new Set(orderedFormulas.map(f => f.formula));
                 const validLockedNames = parsed.filter(name => formulaNames.has(name));
                 setLockedFormulaIds(new Set(validLockedNames));
                 console.log('Loaded locked formula names:', validLockedNames);
@@ -604,6 +696,7 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
       
       setTimeout(() => {
         setFormulas(newFormulas);
+        saveFormulaOrder(newFormulas);
         setDraggedIndex(null);
         setSelectedIndices(new Set());
         setLastSelectedIndex(null);
@@ -650,6 +743,7 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
       // Small delay to allow drop line to fade out smoothly
       setTimeout(() => {
         setFormulas(newFormulas);
+        saveFormulaOrder(newFormulas);
         setDraggedIndex(null);
         setSelectedIndices(new Set());
         setLastSelectedIndex(null);
@@ -778,6 +872,7 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
     const newFormulas = [...formulas];
     newFormulas.splice(formulaIndex, 1, firstBatch, secondBatch);
     setFormulas(newFormulas);
+    saveFormulaOrder(newFormulas);
     
     // Save split information to localStorage
     // Store the current state of all split formulas for this formula name

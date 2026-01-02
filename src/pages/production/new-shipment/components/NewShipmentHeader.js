@@ -86,7 +86,7 @@ const NewShipmentHeader = ({
   
   // Default values if shipmentData is not provided
   const shipmentNumber = shipmentData?.shipmentName || shipmentData?.shipmentNumber || '2025.11.18';
-  const shipmentType = shipmentData?.shipmentType || 'AWD';
+  const shipmentType = shipmentData?.shipmentType || ''; // Only show type if it's been selected
   const marketplace = shipmentData?.marketplace || 'Amazon';
   const account = shipmentData?.account || 'TPS Nutrients';
   
@@ -211,7 +211,7 @@ const NewShipmentHeader = ({
                 fontWeight: 400,
                 color: isDarkMode ? '#FFFFFF' : '#000000',
               }}>
-                {shipmentNumber} {shipmentType}
+                {shipmentNumber}{shipmentType ? ` ${shipmentType}` : ''}
               </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>

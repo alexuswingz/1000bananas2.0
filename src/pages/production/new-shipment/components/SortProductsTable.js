@@ -23,6 +23,28 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
   const [products, setProducts] = useState([]);
   const locksLoadedRef = useRef(null); // Track which shipmentId we've loaded locks for
   const previousShipmentIdRef = useRef(null); // Track previous shipmentId to detect actual changes
+  const orderLoadedRef = useRef(null); // Track which shipmentId we've loaded order for
+  const isInitialOrderLoadRef = useRef(true); // Track if we're in initial order load phase
+  const isRestoringRef = useRef(false); // Track if we're currently restoring order
+
+  // Helper function to get a stable identifier for a product
+  // Uses product ID as unique identifier
+  const getProductIdentifier = (product) => {
+    return product.id;
+  };
+
+  // Save product order to localStorage
+  const saveProductOrder = (productsToSave) => {
+    if (!shipmentId || isInitialOrderLoadRef.current) return;
+    
+    try {
+      const order = productsToSave.map(p => getProductIdentifier(p));
+      localStorage.setItem(`sortProductsOrder_${shipmentId}`, JSON.stringify(order));
+      console.log('Saved product order:', order);
+    } catch (error) {
+      console.error('Error saving product order to localStorage:', error);
+    }
+  };
 
   // Reset locks loaded flag when shipmentId actually changes (not on remount)
   useEffect(() => {
@@ -32,7 +54,12 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     // Only clear locks if shipmentId actually changed to a different value
     if (previousShipmentId !== null && previousShipmentId !== shipmentId) {
       locksLoadedRef.current = null;
+      orderLoadedRef.current = null;
+      isInitialOrderLoadRef.current = true;
       setLockedProductIds(new Set());
+    } else if (previousShipmentId === null && shipmentId !== null) {
+      // Initial mount with shipmentId - mark order load as initial
+      isInitialOrderLoadRef.current = true;
     }
   }, [shipmentId]);
 
@@ -50,7 +77,86 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
         volume: product.volume || product.volume_gallons || '',
         productType: 'Liquid', // Default to Liquid for fertilizers
       }));
-      setProducts(transformedProducts);
+      
+      // Restore saved order if it exists
+      // Always restore order when products are regenerated (on mount or when shipmentProducts changes)
+      let orderedProducts = transformedProducts;
+      
+      if (shipmentId) {
+        // Set initial load flag to true before restoring to prevent saving during restoration
+        const wasInitialLoad = isInitialOrderLoadRef.current;
+        if (orderLoadedRef.current !== shipmentId) {
+          isInitialOrderLoadRef.current = true;
+        }
+        
+        try {
+          const storedOrder = localStorage.getItem(`sortProductsOrder_${shipmentId}`);
+          if (storedOrder) {
+            const parsedOrder = JSON.parse(storedOrder);
+            if (Array.isArray(parsedOrder) && parsedOrder.length > 0) {
+              // Create a map of identifier -> product for quick lookup
+              const productMap = new Map();
+              transformedProducts.forEach(p => {
+                const identifier = getProductIdentifier(p);
+                productMap.set(identifier, p);
+              });
+              
+              // Reorder products according to saved order
+              const ordered = [];
+              const usedIdentifiers = new Set();
+              
+              // First, add products in the saved order
+              parsedOrder.forEach(identifier => {
+                if (productMap.has(identifier) && !usedIdentifiers.has(identifier)) {
+                  ordered.push(productMap.get(identifier));
+                  usedIdentifiers.add(identifier);
+                }
+              });
+              
+              // Then, add any products that weren't in the saved order (new products)
+              transformedProducts.forEach(p => {
+                const identifier = getProductIdentifier(p);
+                if (!usedIdentifiers.has(identifier)) {
+                  ordered.push(p);
+                  usedIdentifiers.add(identifier);
+                }
+              });
+              
+              // Only use restored order if we got all products
+              if (ordered.length === transformedProducts.length) {
+                orderedProducts = ordered;
+                console.log('Restored product order:', parsedOrder, 'from', transformedProducts.length, 'to', ordered.length, 'products');
+              } else {
+                console.warn('Order restoration incomplete:', ordered.length, 'vs', transformedProducts.length);
+              }
+            }
+          }
+          
+          // Mark that we've checked for order and allow saving after a delay
+          if (orderLoadedRef.current !== shipmentId) {
+            orderLoadedRef.current = shipmentId;
+            // Mark that initial order load is complete after a short delay
+            setTimeout(() => {
+              isInitialOrderLoadRef.current = false;
+            }, 200);
+          } else if (wasInitialLoad) {
+            // If we were in initial load but already loaded order before, still wait a bit
+            setTimeout(() => {
+              isInitialOrderLoadRef.current = false;
+            }, 200);
+          }
+        } catch (error) {
+          console.error('Error loading product order from localStorage:', error);
+          if (orderLoadedRef.current !== shipmentId) {
+            orderLoadedRef.current = shipmentId;
+            setTimeout(() => {
+              isInitialOrderLoadRef.current = false;
+            }, 200);
+          }
+        }
+      }
+      
+      setProducts(orderedProducts);
       
       // Load locked IDs from localStorage whenever products are set
       // This handles both initial mount and remount scenarios
@@ -63,7 +169,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
               const parsed = JSON.parse(stored);
               if (Array.isArray(parsed)) {
                 // Filter to only include IDs that exist in current products
-                const productIds = new Set(transformedProducts.map(p => p.id));
+                const productIds = new Set(orderedProducts.map(p => p.id));
                 const validLockedIds = parsed.filter(id => productIds.has(id));
                 setLockedProductIds(new Set(validLockedIds));
                 console.log('Loaded locked product IDs:', validLockedIds);
@@ -82,6 +188,74 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
       setProducts([]);
     }
   }, [shipmentProducts, shipmentType, shipmentId]);
+
+  // Restore order when products are set and we have a saved order
+  // This runs after products are set to ensure order is always restored
+  useEffect(() => {
+    if (!shipmentId || products.length === 0 || isInitialOrderLoadRef.current || isRestoringRef.current) return;
+    
+    // Check if current order matches any saved order
+    try {
+      const storedOrder = localStorage.getItem(`sortProductsOrder_${shipmentId}`);
+      if (storedOrder) {
+        const parsedOrder = JSON.parse(storedOrder);
+        if (Array.isArray(parsedOrder) && parsedOrder.length > 0) {
+          const currentOrder = products.map(p => getProductIdentifier(p));
+          const orderMatches = currentOrder.length === parsedOrder.length && 
+            currentOrder.every((id, idx) => id === parsedOrder[idx]);
+          
+          if (!orderMatches && parsedOrder.length === products.length) {
+            // Order doesn't match, restore it
+            isRestoringRef.current = true;
+            
+            const productMap = new Map();
+            products.forEach(p => {
+              const identifier = getProductIdentifier(p);
+              productMap.set(identifier, p);
+            });
+            
+            const ordered = [];
+            const usedIdentifiers = new Set();
+            
+            // First, add products in the saved order
+            parsedOrder.forEach(identifier => {
+              if (productMap.has(identifier) && !usedIdentifiers.has(identifier)) {
+                ordered.push(productMap.get(identifier));
+                usedIdentifiers.add(identifier);
+              }
+            });
+            
+            // Then, add any products that weren't in the saved order (new products)
+            products.forEach(p => {
+              const identifier = getProductIdentifier(p);
+              if (!usedIdentifiers.has(identifier)) {
+                ordered.push(p);
+                usedIdentifiers.add(identifier);
+              }
+            });
+            
+            if (ordered.length === products.length) {
+              // Temporarily prevent saving during restoration
+              isInitialOrderLoadRef.current = true;
+              setProducts(ordered);
+              console.log('Restored product order from useEffect:', parsedOrder);
+              
+              // Allow saving after a delay
+              setTimeout(() => {
+                isInitialOrderLoadRef.current = false;
+                isRestoringRef.current = false;
+              }, 200);
+            } else {
+              isRestoringRef.current = false;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error checking/restoring product order in useEffect:', error);
+      isRestoringRef.current = false;
+    }
+  }, [products, shipmentId]); // Run when products or shipmentId changes
 
   // Persist locked product IDs to localStorage whenever they change
   useEffect(() => {
@@ -284,6 +458,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
       
       setTimeout(() => {
         setProducts(newProducts);
+        saveProductOrder(newProducts);
         setDraggedIndex(null);
         setSelectedIndices(new Set());
         setLastSelectedIndex(null);
@@ -330,6 +505,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
       // Small delay to allow drop line to fade out smoothly
       setTimeout(() => {
         setProducts(newProducts);
+        saveProductOrder(newProducts);
         setDraggedIndex(null);
         setSelectedIndices(new Set());
         setLastSelectedIndex(null);
