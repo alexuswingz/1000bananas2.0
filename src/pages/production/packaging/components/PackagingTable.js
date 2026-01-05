@@ -820,16 +820,53 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
               }}
               onClick={() => {
                 // TODO: Implement mark as floor inventory - shiners functionality
-                console.log('Mark as Floor Inventory - Shiners clicked for:', selectedRow);
+                console.log('Mark as Floor Inv. (Shiners) clicked for:', selectedRow);
                 setActionMenuId(null);
               }}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="7" width="18" height="12" rx="2" />
-                <path d="M7 7V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2" />
-                <line x1="7" y1="13" x2="17" y2="13" />
+                <rect x="6" y="4" width="12" height="16" rx="1" />
+                <path d="M9 4v4M15 4v4" />
+                <line x1="9" y1="12" x2="15" y2="12" />
               </svg>
-              <span>Mark as Floor Inventory - Shiners</span>
+              <span>Mark as Floor Inv. (Shiners)</span>
+            </button>
+            <button
+              type="button"
+              style={{
+                width: '100%',
+                textAlign: 'left',
+                padding: '10px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                fontSize: '14px',
+                fontWeight: 400,
+                color: '#111827',
+                borderRadius: '6px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'background-color 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#F3F4F6';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+              onClick={() => {
+                // TODO: Implement mark as floor inventory - finished goods functionality
+                console.log('Mark as Floor Inv. (Finished Goods) clicked for:', selectedRow);
+                setActionMenuId(null);
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="#111827" stroke="#111827" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="6" y="4" width="12" height="16" rx="1" />
+                <path d="M9 4v4M15 4v4" />
+                <line x1="9" y1="12" x2="15" y2="12" />
+              </svg>
+              <span>Mark as Floor Inv. (Finished Goods)</span>
             </button>
           </div>,
           document.body

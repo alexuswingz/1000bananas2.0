@@ -54,6 +54,7 @@ const LabelCheckTable = ({
   const [completedRows, setCompletedRows] = useState(new Set());
   const [confirmedRows, setConfirmedRows] = useState(new Set()); // Rows confirmed without counting
   const [completedRowStatus, setCompletedRowStatus] = useState({}); // id -> insufficient?: true/false
+  const [selectedRows, setSelectedRows] = useState(new Set()); // Track selected rows for checkboxes
   const [isVarianceStillExceededOpen, setIsVarianceStillExceededOpen] = useState(false);
   const [labelFormula, setLabelFormula] = useState(null); // Current label formula for weight conversion
   const hideActionsDropdown = Boolean(shipmentId);
@@ -192,6 +193,7 @@ const LabelCheckTable = ({
   const [rows, setRows] = useState([]);
 
   const columns = [
+    { key: 'checkbox', label: '', width: '40px' },
     { key: 'start', label: '', width: '100px' },
     { key: 'brand', label: 'BRAND', width: '150px' },
     { key: 'product', label: 'PRODUCT', width: '200px' },
@@ -830,27 +832,59 @@ const LabelCheckTable = ({
           }}>
             <thead style={{ backgroundColor: '#1C2634' }}>
               <tr style={{ height: '40px', maxHeight: '40px' }}>
-                {columns.map((column) => (
-                  <th
-                    key={column.key}
-                    className={column.key !== 'start' ? 'group cursor-pointer' : ''}
-                    style={{
-                      padding: column.key === 'start' ? '0 8px' : '0 16px',
-                      textAlign: column.key === 'start' ? 'center' : 'left',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      color: '#9CA3AF',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      width: column.width,
-                      whiteSpace: 'nowrap',
-                      borderRight: column.key === 'start' ? 'none' : '1px solid #FFFFFF',
-                      height: '40px',
-                      position: column.key !== 'start' ? 'relative' : 'static',
-                    }}
-                  >
-                    {column.label}
-                    {!disableFilters && column.key !== 'start' && (
+                {(() => {
+                  const filteredRows = getFilteredRows();
+                  return columns.map((column) => (
+                    <th
+                      key={column.key}
+                      className={column.key !== 'start' && column.key !== 'checkbox' ? 'group cursor-pointer' : ''}
+                      style={{
+                        padding: column.key === 'start' || column.key === 'checkbox' ? '0 8px' : '0 16px',
+                        textAlign: column.key === 'start' || column.key === 'checkbox' ? 'center' : 'left',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        color: '#9CA3AF',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        width: column.width,
+                        whiteSpace: 'nowrap',
+                        borderRight: column.key === 'start' || column.key === 'checkbox' ? 'none' : '1px solid #FFFFFF',
+                        height: '40px',
+                        position: column.key !== 'start' && column.key !== 'checkbox' ? 'relative' : 'static',
+                      }}
+                    >
+                      {column.key === 'checkbox' ? (() => {
+                        const allSelected = filteredRows.length > 0 && filteredRows.every(row => selectedRows.has(row.id));
+                        const someSelected = filteredRows.some(row => selectedRows.has(row.id));
+                        return (
+                          <input
+                            type="checkbox"
+                            checked={allSelected}
+                            ref={(input) => {
+                              if (input) {
+                                input.indeterminate = someSelected && !allSelected;
+                              }
+                            }}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedRows(new Set(filteredRows.map(row => row.id)));
+                              } else {
+                                setSelectedRows(new Set());
+                              }
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              width: '16px',
+                              height: '16px',
+                              cursor: 'pointer',
+                              accentColor: '#3B82F6',
+                            }}
+                          />
+                        );
+                      })() : (
+                        column.label
+                      )}
+                    {!disableFilters && column.key !== 'start' && column.key !== 'checkbox' && (
                       <img
                         ref={(el) => { if (el) filterIconRefs.current[column.key] = el; }}
                         src="/assets/Vector (1).png"
@@ -881,7 +915,8 @@ const LabelCheckTable = ({
                       />
                     )}
                   </th>
-                ))}
+                  ));
+                })()}
               </tr>
             </thead>
 
@@ -909,6 +944,35 @@ const LabelCheckTable = ({
                       : (isDarkMode ? '#1A1F2E' : '#F9FAFB');
                   }}
                 >
+                  <td style={{
+                    padding: '0 8px',
+                    textAlign: 'center',
+                    height: '40px',
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedRows.has(row.id)}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        setSelectedRows(prev => {
+                          const newSet = new Set(prev);
+                          if (newSet.has(row.id)) {
+                            newSet.delete(row.id);
+                          } else {
+                            newSet.add(row.id);
+                          }
+                          return newSet;
+                        });
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        cursor: 'pointer',
+                        accentColor: '#3B82F6',
+                      }}
+                    />
+                  </td>
                   <td style={{
                     padding: '0 8px',
                     textAlign: 'center',

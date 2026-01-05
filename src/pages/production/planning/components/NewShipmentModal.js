@@ -5,13 +5,13 @@ import { useTheme } from '../../../../context/ThemeContext';
 // Account to Brand mapping based on Amazon Seller Account Structure
 const ACCOUNT_OPTIONS = [
   {
-    name: 'TPS Nutrients',
-    brands: ['TPS Nutrients', 'Bloom City', 'TPS Plant Foods'],
+    name: 'The Plant Shoppe, LLC',
+    brands: ['TPS Nutrients', 'TPS Plant Foods', 'Bloom City'],
     description: 'Plant nutrients and fertilizers',
   },
   {
     name: 'Total Pest Spray',
-    brands: ['NatureStop', 'GreenThumbs'],
+    brands: ['NatureStop', "Ms. Pixie's", "Burke's", 'Mint+'],
     description: 'Pest control products',
   },
 ];

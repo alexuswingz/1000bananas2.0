@@ -1707,7 +1707,7 @@ const NewShipmentTable = ({
                             }}
                             style={{
                               position: 'absolute',
-                              right: '20px',
+                              left: '96px',
                               top: '50%',
                               transform: 'translateY(-50%)',
                               display: 'inline-flex',
@@ -1721,6 +1721,7 @@ const NewShipmentTable = ({
                               fontSize: '12px',
                               fontWeight: 700,
                               cursor: 'pointer',
+                              zIndex: 10,
                             }}
                           >
                             !
@@ -3106,7 +3107,7 @@ const NewShipmentTable = ({
                   borderTop: '1px solid #E5E7EB',
                   borderLeft: 'none',
                 }}>
-                  <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                  <div style={{ position: 'relative', display: 'block' }}>
                     <div
                       ref={(el) => {
                         if (el) qtyContainerRefs.current[index] = el;
@@ -3127,7 +3128,7 @@ const NewShipmentTable = ({
                         height: '24px',
                         boxSizing: 'border-box',
                         position: 'relative',
-                        overflow: 'visible',
+                        overflow: 'hidden',
                       }}
                     >
                       {(() => {
@@ -3463,7 +3464,7 @@ const NewShipmentTable = ({
                         </div>
                       )}
                     </div>
-                    {/* Label warning icon - shown when QTY exceeds labels, positioned after input box */}
+                    {/* Label warning icon - shown when QTY exceeds labels, positioned absolutely to not affect alignment */}
                     {(() => {
                       const labelsAvailable = getAvailableLabelsForRow(row, index);
                       const labelsNeeded = effectiveQtyValues[index] ?? 0;
@@ -3476,6 +3477,10 @@ const NewShipmentTable = ({
                               setClickedQtyIndex(clickedQtyIndex === index ? null : index);
                             }}
                             style={{
+                              position: 'absolute',
+                              left: '119px',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
                               display: 'inline-flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -3486,9 +3491,8 @@ const NewShipmentTable = ({
                               color: '#DC2626',
                               fontSize: '12px',
                               fontWeight: 700,
-                              marginLeft: '6px',
                               cursor: 'pointer',
-                              flexShrink: 0,
+                              zIndex: 10,
                             }}
                           >
                             !
