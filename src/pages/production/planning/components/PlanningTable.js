@@ -206,11 +206,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         circleColor = '#3B82F6'; // Blue for in progress
         break;
       case 'completed':
-        if (isAddProducts) {
-          circleColor = '#3B82F6'; // Regular blue for addProducts completed
-        } else {
-          circleColor = '#10B981'; // Green for other statuses
-        }
+        circleColor = '#10B981'; // Green for completed (all statuses)
         break;
       case 'incomplete':
         circleColor = '#F59E0B'; // Orange for incomplete
