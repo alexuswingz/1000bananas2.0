@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
-const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabelCheckClick, onStatusCommentClick, onDeleteRow }) => {
+const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabelCheckClick, onStatusCommentClick, onStatusClick, onDeleteRow }) => {
   const { isDarkMode } = useTheme();
   const [openFilterColumn, setOpenFilterColumn] = useState(null);
   const filterIconRefs = useRef({});
@@ -274,6 +274,13 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
     const handleIconClick = (e) => {
       e.stopPropagation();
       e.preventDefault();
+      
+      // If status is completed, navigate to that section
+      if (normalizedStatus === 'completed' && onStatusClick && rowId && statusFieldName && row) {
+        onStatusClick(row, statusFieldName);
+        return;
+      }
+      
       if (hasComment && commentText && uniqueCommentId) {
         // If has comment, show tooltip
         if (hoveredCommentId === uniqueCommentId) {
@@ -292,13 +299,16 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
       // Removed: clicking status circle no longer opens comment modal
     };
 
+    // Determine if circle should be clickable (completed status or has comment)
+    const isClickable = normalizedStatus === 'completed' || (shouldShowComment && commentText);
+    
     return (
       <div 
         ref={(el) => { if (el && uniqueCommentId) iconRefs.current[uniqueCommentId] = el; }}
         style={{ 
           position: 'relative', 
           display: 'inline-block',
-          cursor: (shouldShowComment && commentText) ? 'pointer' : 'default'
+          cursor: isClickable ? 'pointer' : 'default'
         }}
         onClick={handleIconClick}
       >

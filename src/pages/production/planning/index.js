@@ -817,6 +817,44 @@ const Planning = () => {
     });
   };
 
+  // Handle clicking on completed status circles to navigate to that specific section
+  const handleStatusClick = (row, statusFieldName) => {
+    // Map status field names to action names
+    const statusToActionMap = {
+      'addProducts': 'add-products',
+      'labelCheck': 'label-check',
+      'formulaCheck': 'formula-check',
+      'bookShipment': 'book-shipment',
+      'sortProducts': 'sort-products',
+      'sortFormulas': 'sort-formulas',
+    };
+
+    const action = statusToActionMap[statusFieldName];
+    if (!action) return;
+
+    // Navigate to shipment order page with the specific action
+    navigate('/dashboard/production/shipment/new', {
+      state: {
+        shipmentId: row.id,
+        shipmentNumber: row.shipment,
+        marketplace: row.marketplace,
+        account: row.account,
+        shipmentType: row.shipment?.includes('AWD') ? 'AWD' : row.shipment?.includes('FBA') ? 'FBA' : 'AWD',
+        initialAction: action,
+        existingShipment: true,
+        // Pass the current status of each step
+        stepStatuses: {
+          addProducts: row.addProducts,
+          formulaCheck: row.formulaCheck,
+          labelCheck: row.labelCheck,
+          bookShipment: row.bookShipment,
+          sortProducts: row.sortProducts,
+          sortFormulas: row.sortFormulas,
+        }
+      }
+    });
+  };
+
   const handleDeleteRow = async (row) => {
     try {
       await deleteShipment(row.id);
@@ -873,6 +911,7 @@ const Planning = () => {
                 onRowClick={handleRowClick}
                 onLabelCheckClick={handleLabelCheckClick}
                 onStatusCommentClick={handleStatusCommentClick}
+                onStatusClick={handleStatusClick}
                 onDeleteRow={handleDeleteRow}
               />
             )}
