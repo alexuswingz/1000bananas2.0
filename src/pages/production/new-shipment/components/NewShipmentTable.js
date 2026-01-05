@@ -3195,79 +3195,92 @@ const NewShipmentTable = ({
                           return 1;
                         })()}
                         data-row-index={index}
-                        value={effectiveQtyValues[index] !== undefined && effectiveQtyValues[index] !== null && effectiveQtyValues[index] !== '' ? String(effectiveQtyValues[index]) : (effectiveQtyValues[index] === '' ? '' : '0')}
+                        value={(() => {
+                          // Show raw input value while typing, otherwise show rounded value
+                          if (rawQtyInputValues.current[index] !== undefined) {
+                            return rawQtyInputValues.current[index];
+                          }
+                          const qtyValue = effectiveQtyValues[index];
+                          return qtyValue !== undefined && qtyValue !== null && qtyValue !== '' ? String(qtyValue) : '';
+                        })()}
                         onChange={(e) => {
                           const inputValue = e.target.value;
                           // Mark this field as manually edited
                           manuallyEditedIndices.current.add(index);
-                          // Allow empty string while typing, or parse the number
+                          
+                          // Store raw input value (no rounding while typing)
                           if (inputValue === '' || inputValue === '-') {
+                            rawQtyInputValues.current[index] = '';
+                          } else {
+                            // Store raw value for display while typing
+                            rawQtyInputValues.current[index] = inputValue;
+                          }
+                          // Force a minimal re-render to update the input value
+                          setQtyInputUpdateTrigger(prev => prev + 1);
+                        }}
+                        onBlur={(e) => {
+                          const inputValue = e.target.value;
+                          // Round and validate when user finishes typing
+                          if (inputValue === '' || inputValue === '-') {
+                            rawQtyInputValues.current[index] = undefined;
                             effectiveSetQtyValues(prev => ({
                               ...prev,
                               [index]: ''
                             }));
                           } else {
-                            const newValue = parseInt(inputValue, 10);
-                            if (!isNaN(newValue) && newValue >= 0) {
-                              // Determine increment based on size
-                              let increment = 1;
-                              const size = row.size?.toLowerCase() || '';
-                              if (size.includes('8oz')) {
-                                increment = 60;
-                              } else if (size.includes('quart')) {
-                                increment = 12;
-                              } else if (size.includes('gallon')) {
-                                increment = 4;
-                              }
-                              
-                              // Round immediately as user types
-                              const rounded = Math.round(newValue / increment) * increment;
+                            const numValue = parseInt(inputValue, 10);
+                            if (!isNaN(numValue) && numValue >= 0) {
+                              const rounded = roundQuantityToCaseSize(numValue, row.size);
+                              rawQtyInputValues.current[index] = undefined; // Clear raw value
                               effectiveSetQtyValues(prev => ({
                                 ...prev,
-                                [index]: rounded > 0 ? rounded : increment
+                                [index]: rounded
                               }));
-                            }
-                          }
-                        }}
-                        onBlur={(e) => {
-                          const currentValue = effectiveQtyValues[index];
-                          
-                          // Set default value if empty on blur
-                          if (currentValue === '' || currentValue === null || currentValue === undefined) {
-                            effectiveSetQtyValues(prev => ({
-                              ...prev,
-                              [index]: 0
-                            }));
-                          } else {
-                            // Round to nearest multiple based on size
-                            const numValue = typeof currentValue === 'number' ? currentValue : parseInt(currentValue, 10);
-                            if (!isNaN(numValue) && numValue > 0) {
-                              // Determine increment based on size
-                              let increment = 0;
-                              const size = row.size?.toLowerCase() || '';
-                              if (size.includes('8oz')) {
-                                increment = 60;
-                              } else if (size.includes('quart')) {
-                                increment = 12;
-                              } else if (size.includes('gallon')) {
-                                increment = 4;
-                              }
-                              
-                              // Round to nearest multiple of increment
-                              if (increment > 0) {
-                                const rounded = Math.round(numValue / increment) * increment;
-                                // Always set the rounded value
-                                effectiveSetQtyValues(prev => ({
-                                  ...prev,
-                                  [index]: rounded > 0 ? rounded : increment
-                                }));
-                              }
+                            } else {
+                              // Invalid input, clear it
+                              rawQtyInputValues.current[index] = undefined;
+                              effectiveSetQtyValues(prev => ({
+                                ...prev,
+                                [index]: ''
+                              }));
                             }
                           }
                           
                           // Close popup if open when blurring
                           if (clickedQtyIndex === index) {
                             setClickedQtyIndex(null);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          // Round and validate when user presses Enter
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const inputValue = e.target.value;
+                            if (inputValue === '' || inputValue === '-') {
+                              rawQtyInputValues.current[index] = undefined;
+                              effectiveSetQtyValues(prev => ({
+                                ...prev,
+                                [index]: ''
+                              }));
+                            } else {
+                              const numValue = parseInt(inputValue, 10);
+                              if (!isNaN(numValue) && numValue >= 0) {
+                                const rounded = roundQuantityToCaseSize(numValue, row.size);
+                                rawQtyInputValues.current[index] = undefined; // Clear raw value
+                                effectiveSetQtyValues(prev => ({
+                                  ...prev,
+                                  [index]: rounded
+                                }));
+                              } else {
+                                // Invalid input, clear it
+                                rawQtyInputValues.current[index] = undefined;
+                                effectiveSetQtyValues(prev => ({
+                                  ...prev,
+                                  [index]: ''
+                                }));
+                              }
+                            }
+                            e.target.blur(); // Remove focus after Enter
                           }
                         }}
                         onClick={(e) => {
