@@ -41,8 +41,8 @@ const NewShipmentTable = ({
   const [columnSortConfig, setColumnSortConfig] = useState([]);
   // Store the sorted order (array of row IDs) to preserve positions after sorting
   const [sortedRowOrder, setSortedRowOrder] = useState(null);
-  // Track the last sort config to detect when sorting changes
-  const lastSortConfigRef = useRef(null);
+  // Ref to store current filtered rows (without sorting) for use in sort handler
+  const currentFilteredRowsRef = useRef([]);
   
   // Filter state
   const [activeFilters, setActiveFilters] = useState({
@@ -326,144 +326,35 @@ const NewShipmentTable = ({
       }
     });
 
-    // Apply column sorting
-    // Check if sort config has changed by comparing with ref
-    const currentSortConfigStr = JSON.stringify(columnSortConfig);
-    const lastSortConfigStr = lastSortConfigRef.current ? JSON.stringify(lastSortConfigRef.current) : null;
-    const sortConfigChanged = currentSortConfigStr !== lastSortConfigStr;
-    
-    if (columnSortConfig.length > 0) {
-      // If sort config changed or we don't have a stored order, perform sorting
-      if (sortConfigChanged || sortedRowOrder === null) {
-        result.sort((a, b) => {
-          for (const sort of columnSortConfig) {
-            let aVal, bVal;
-            switch(sort.column) {
-              case 'bottles':
-                aVal = a.bottleInventory || a.bottle_inventory || 0;
-                bVal = b.bottleInventory || b.bottle_inventory || 0;
-                break;
-              case 'closures':
-                aVal = a.closureInventory || a.closure_inventory || 0;
-                bVal = b.closureInventory || b.closure_inventory || 0;
-                break;
-              case 'boxes':
-                aVal = a.boxInventory || a.box_inventory || 0;
-                bVal = b.boxInventory || b.box_inventory || 0;
-                break;
-              case 'labels':
-                aVal = a.labelsAvailable || a.label_inventory || a.labels_available || 0;
-                bVal = b.labelsAvailable || b.label_inventory || b.labels_available || 0;
-                break;
-              case 'size':
-                aVal = a.size || '';
-                bVal = b.size || '';
-                // For size, compare as strings
-                const aStr = String(aVal).toLowerCase();
-                const bStr = String(bVal).toLowerCase();
-                if (aStr !== bStr) {
-                  return sort.order === 'asc' ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
-                }
-                continue;
-              case 'normal-4':
-              case 'qty': {
-                // Qty values are stored in effectiveQtyValues, indexed by original row index
-                const aIndex = a._originalIndex !== undefined ? a._originalIndex : rows.indexOf(a);
-                const bIndex = b._originalIndex !== undefined ? b._originalIndex : rows.indexOf(b);
-                const aQty = effectiveQtyValues[aIndex];
-                const bQty = effectiveQtyValues[bIndex];
-                aVal = typeof aQty === 'number' ? aQty : (aQty === '' || aQty === null || aQty === undefined ? 0 : parseInt(aQty, 10) || 0);
-                bVal = typeof bQty === 'number' ? bQty : (bQty === '' || bQty === null || bQty === undefined ? 0 : parseInt(bQty, 10) || 0);
-                break;
-              }
-              default: {
-                const field = getFieldForHeaderFilter(sort.column);
-                aVal = a[field];
-                bVal = b[field];
-              }
-            }
-
-            // Brand/Product/Size/etc are text fields; Qty/Add may be numeric/boolean
-            if (sort.column === 'normal-0' || sort.column === 'normal-1' || sort.column === 'normal-2') {
-              const aStr = String(aVal ?? '').toLowerCase();
-              const bStr = String(bVal ?? '').toLowerCase();
-              const cmp = aStr.localeCompare(bStr);
-              if (cmp !== 0) {
-                return sort.order === 'asc' ? cmp : -cmp;
-              }
-            } else {
-              const aNum = typeof aVal === 'number' ? aVal : parseFloat(aVal) || 0;
-              const bNum = typeof bVal === 'number' ? bVal : parseFloat(bVal) || 0;
-              
-              if (aNum !== bNum) {
-                return sort.order === 'asc' ? aNum - bNum : bNum - aNum;
-              }
-            }
-          }
-          return 0;
-        });
-      } else {
-        // Sort config hasn't changed - preserve the stored order
-        // Create a map of row ID to row for quick lookup
-        const rowMap = new Map(result.map(row => [row.id, row]));
-        
-        // Reorder result based on stored order
-        const orderedResult = [];
-        const processedIds = new Set();
-        
-        // First, add rows in the stored order
-        if (sortedRowOrder) {
-          sortedRowOrder.forEach(id => {
-            if (rowMap.has(id)) {
-              orderedResult.push(rowMap.get(id));
-              processedIds.add(id);
-            }
-          });
+    // Apply column sorting - use stored order if available (one-time sort like SortProductsTable)
+    if (sortedRowOrder && sortedRowOrder.length > 0) {
+      // Create a map of row ID to row for quick lookup
+      const rowMap = new Map(result.map(row => [row.id, row]));
+      
+      // Reorder result based on stored order
+      const orderedResult = [];
+      const processedIds = new Set();
+      
+      // First, add rows in the stored order
+      sortedRowOrder.forEach(id => {
+        if (rowMap.has(id)) {
+          orderedResult.push(rowMap.get(id));
+          processedIds.add(id);
         }
-        
-        // Then, add any new rows that weren't in the original sort (e.g., newly added rows)
-        result.forEach(row => {
-          if (!processedIds.has(row.id)) {
-            orderedResult.push(row);
-          }
-        });
-        
-        result = orderedResult;
-      }
+      });
+      
+      // Then, add any new rows that weren't in the original sort (e.g., newly added rows)
+      result.forEach(row => {
+        if (!processedIds.has(row.id)) {
+          orderedResult.push(row);
+        }
+      });
+      
+      result = orderedResult;
     }
     
     return result;
-  }, [rows, activeFilters, columnFilters, columnSortConfig, effectiveQtyValues, sortedRowOrder]);
-
-  // Store sorted order when sort config changes
-  useEffect(() => {
-    if (columnSortConfig.length > 0) {
-      const currentSortConfigStr = JSON.stringify(columnSortConfig);
-      const lastSortConfigStr = lastSortConfigRef.current ? JSON.stringify(lastSortConfigRef.current) : null;
-      
-      if (currentSortConfigStr !== lastSortConfigStr) {
-        // Sort config changed - clear stored order to trigger re-sort in useMemo
-        setSortedRowOrder(null);
-        lastSortConfigRef.current = JSON.parse(JSON.stringify(columnSortConfig));
-      }
-    } else {
-      // No sorting - clear stored order
-      if (sortedRowOrder !== null) {
-        setSortedRowOrder(null);
-        lastSortConfigRef.current = null;
-      }
-    }
-  }, [columnSortConfig, sortedRowOrder]);
-
-  // Store the sorted order after a sort operation completes
-  // This runs when filteredRows changes AND we have a sort config but no stored order
-  useEffect(() => {
-    if (columnSortConfig.length > 0 && sortedRowOrder === null && filteredRows.length > 0) {
-      // We just sorted (because sortedRowOrder was null) - store the order now
-      const sortedIds = filteredRows.map(row => row.id);
-      setSortedRowOrder(sortedIds);
-    }
-  }, [filteredRows, columnSortConfig, sortedRowOrder]);
+  }, [rows, activeFilters, columnFilters, sortedRowOrder, forecastRange]);
 
   // Apply selection filter only in table mode
   const filteredRowsWithSelection = useMemo(() => {
@@ -519,33 +410,261 @@ const NewShipmentTable = ({
     });
   };
 
+  // Store current filtered rows (without sorting) in ref for use in sort handler
+  useEffect(() => {
+    // Compute filtered rows without sorting
+    let result = rows.map((row, index) => ({ 
+      ...row, 
+      _originalIndex: row._originalIndex !== undefined ? row._originalIndex : index 
+    }));
+    
+    // Apply all filters except column sorting
+    if (activeFilters.popularFilter) {
+      switch (activeFilters.popularFilter) {
+        case 'bestSellers':
+          result = result.filter(r => (r.sales30Day || 0) > 0);
+          result.sort((a, b) => (b.sales30Day || 0) - (a.sales30Day || 0));
+          result = result.slice(0, 50);
+          break;
+        case 'fastestMovers':
+          result = result.filter(r => (r.sales30Day || 0) > 0);
+          result.sort((a, b) => ((b.sales30Day || 0) / 30) - ((a.sales30Day || 0) / 30));
+          result = result.slice(0, 50);
+          break;
+        case 'topProfit':
+          result = result.filter(r => (r.profit || r.margin || r.sales30Day || 0) > 0);
+          result.sort((a, b) => (b.profit || b.margin || b.sales30Day || 0) - (a.profit || a.margin || a.sales30Day || 0));
+          result = result.slice(0, 50);
+          break;
+        case 'topTraffic':
+          result = result.filter(r => (r.sessions || r.pageViews || 0) > 0);
+          result.sort((a, b) => (b.sessions || b.pageViews || 0) - (a.sessions || a.pageViews || 0));
+          result = result.slice(0, 50);
+          break;
+        case 'outOfStock':
+          result = result.filter(r => (r.fbaAvailable || 0) === 0 && (r.sales30Day || 0) > 0);
+          break;
+        case 'overstock':
+          result = result.filter(r => (r.doiTotal || r.daysOfInventory || 0) > forecastRange);
+          break;
+      }
+    }
+    
+    if (activeFilters.filterField && activeFilters.filterCondition && activeFilters.filterValue) {
+      const fieldMap = {
+        'brand': 'brand',
+        'product': 'product',
+        'size': 'size',
+        'fbaAvailable': 'fbaAvailable',
+        'totalInventory': 'totalInventory',
+        'forecast': 'weeklyForecast',
+        'qty': 'qty',
+      };
+      const field = fieldMap[activeFilters.filterField] || activeFilters.filterField;
+      const value = activeFilters.filterValue.toLowerCase();
+      
+      result = result.filter(row => {
+        const rowValue = row[field];
+        const strValue = String(rowValue || '').toLowerCase();
+        const numValue = parseFloat(rowValue) || 0;
+        const filterNum = parseFloat(activeFilters.filterValue) || 0;
+        
+        switch (activeFilters.filterCondition) {
+          case 'equals':
+            return strValue === value;
+          case 'contains':
+            return strValue.includes(value);
+          case 'greaterThan':
+            return numValue > filterNum;
+          case 'lessThan':
+            return numValue < filterNum;
+          default:
+            return true;
+        }
+      });
+    }
+    
+    // Apply column filters (but not sorting)
+    Object.keys(columnFilters).forEach(key => {
+      const filter = columnFilters[key];
+      if (!filter || filter.sortOrder) return; // Skip if it's a sort-only filter
+
+      if (filter.selectedValues && filter.selectedValues.size > 0) {
+        result = result.filter(row => {
+          let rowValue;
+          switch(key) {
+            case 'bottles':
+              rowValue = row.bottleInventory || row.bottle_inventory;
+              break;
+            case 'closures':
+              rowValue = row.closureInventory || row.closure_inventory;
+              break;
+            case 'boxes':
+              rowValue = row.boxInventory || row.box_inventory;
+              break;
+            case 'labels':
+              rowValue = row.labelsAvailable || row.label_inventory || row.labels_available;
+              break;
+            default: {
+              const field = getFieldForHeaderFilter(key);
+              rowValue = row[field];
+              break;
+            }
+          }
+          return filter.selectedValues.has(rowValue) || 
+                 filter.selectedValues.has(String(rowValue));
+        });
+      }
+
+      if (filter.conditionType && filter.conditionType !== '') {
+        result = result.filter(row => {
+          let rowValue;
+          switch(key) {
+            case 'bottles':
+              rowValue = row.bottleInventory || row.bottle_inventory || 0;
+              break;
+            case 'closures':
+              rowValue = row.closureInventory || row.closure_inventory || 0;
+              break;
+            case 'boxes':
+              rowValue = row.boxInventory || row.box_inventory || 0;
+              break;
+            case 'labels':
+              rowValue = row.labelsAvailable || row.label_inventory || row.labels_available || 0;
+              break;
+            default: {
+              const field = getFieldForHeaderFilter(key);
+              rowValue = row[field] || 0;
+              break;
+            }
+          }
+
+          const numValue = typeof rowValue === 'number' ? rowValue : parseFloat(rowValue) || 0;
+          const filterNum = parseFloat(filter.conditionValue) || 0;
+          const strValue = String(rowValue || '').toLowerCase();
+          const filterStr = (filter.conditionValue || '').toLowerCase();
+
+          switch (filter.conditionType) {
+            case 'equals':
+              return numValue === filterNum || strValue === filterStr;
+            case 'notEquals':
+              return numValue !== filterNum && strValue !== filterStr;
+            case 'greaterThan':
+              return numValue > filterNum;
+            case 'lessThan':
+              return numValue < filterNum;
+            case 'greaterOrEqual':
+              return numValue >= filterNum;
+            case 'lessOrEqual':
+              return numValue <= filterNum;
+            case 'contains':
+              return strValue.includes(filterStr);
+            case 'notContains':
+              return !strValue.includes(filterStr);
+            case 'startsWith':
+              return strValue.startsWith(filterStr);
+            case 'endsWith':
+              return strValue.endsWith(filterStr);
+            case 'isEmpty':
+              return rowValue === null || rowValue === undefined || rowValue === '' || rowValue === 0;
+            case 'isNotEmpty':
+              return rowValue !== null && rowValue !== undefined && rowValue !== '' && rowValue !== 0;
+            default:
+              return true;
+          }
+        });
+      }
+    });
+    
+    currentFilteredRowsRef.current = result;
+  }, [rows, activeFilters, columnFilters, forecastRange]);
+
   const handleApplyColumnFilter = (columnKey, filterData) => {
     setColumnFilters(prev => ({
       ...prev,
       [columnKey]: filterData,
     }));
     
-    // Update sort config
-    setColumnSortConfig(prev => {
-      if (filterData.sortOrder) {
-        const existingIndex = prev.findIndex(sort => sort.column === columnKey);
-        if (existingIndex >= 0) {
-          const newConfig = [...prev];
-          newConfig[existingIndex] = { column: columnKey, order: filterData.sortOrder };
-          // Clear stored order to force re-sort when user clicks ascending/descending again
-          setSortedRowOrder(null);
-          return newConfig;
-        } else {
-          // Clear stored order to force re-sort when user clicks ascending/descending
-          setSortedRowOrder(null);
-          return [...prev, { column: columnKey, order: filterData.sortOrder }];
+    // If sortOrder is provided, apply one-time sort directly (like SortProductsTable)
+    if (filterData.sortOrder) {
+      // Get current filtered rows from ref (updated by useEffect)
+      // Use setTimeout to ensure filters are applied and ref is updated
+      setTimeout(() => {
+        const rowsToSort = [...currentFilteredRowsRef.current];
+        
+        // Sort the rows
+        rowsToSort.sort((a, b) => {
+        let aVal, bVal;
+        
+        // Get the field value based on columnKey
+        switch(columnKey) {
+          case 'bottles':
+            aVal = a.bottleInventory || a.bottle_inventory || 0;
+            bVal = b.bottleInventory || b.bottle_inventory || 0;
+            break;
+          case 'closures':
+            aVal = a.closureInventory || a.closure_inventory || 0;
+            bVal = b.closureInventory || b.closure_inventory || 0;
+            break;
+          case 'boxes':
+            aVal = a.boxInventory || a.box_inventory || 0;
+            bVal = b.boxInventory || b.box_inventory || 0;
+            break;
+          case 'labels':
+            aVal = a.labelsAvailable || a.label_inventory || a.labels_available || 0;
+            bVal = b.labelsAvailable || b.label_inventory || b.labels_available || 0;
+            break;
+          case 'normal-4':
+          case 'qty': {
+            // Qty values are stored in effectiveQtyValues, indexed by original row index
+            const aIndex = a._originalIndex !== undefined ? a._originalIndex : rows.indexOf(a);
+            const bIndex = b._originalIndex !== undefined ? b._originalIndex : rows.indexOf(b);
+            const aQty = effectiveQtyValues[aIndex];
+            const bQty = effectiveQtyValues[bIndex];
+            aVal = typeof aQty === 'number' ? aQty : (aQty === '' || aQty === null || aQty === undefined ? 0 : parseInt(aQty, 10) || 0);
+            bVal = typeof bQty === 'number' ? bQty : (bQty === '' || bQty === null || bQty === undefined ? 0 : parseInt(bQty, 10) || 0);
+            break;
+          }
+          default: {
+            const field = getFieldForHeaderFilter(columnKey);
+            aVal = a[field];
+            bVal = b[field];
+            break;
+          }
         }
-      } else {
-        // Removing sort - clear stored order
-        setSortedRowOrder(null);
-        return prev.filter(sort => sort.column !== columnKey);
-      }
-    });
+        
+        let comparison = 0;
+        
+        // Handle numeric values
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+          comparison = filterData.sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+        } else {
+          // Handle string values
+          const aStr = String(aVal || '').toLowerCase();
+          const bStr = String(bVal || '').toLowerCase();
+          
+          if (filterData.sortOrder === 'asc') {
+            comparison = aStr.localeCompare(bStr);
+          } else {
+            comparison = bStr.localeCompare(aStr);
+          }
+        }
+        
+          return comparison;
+        });
+        
+        // Store the sorted order (array of row IDs)
+        const sortedIds = rowsToSort.map(row => row.id);
+        setSortedRowOrder(sortedIds);
+        
+        // Clear sort config for this column (one-time sort, not persistent)
+        setColumnSortConfig(prev => prev.filter(sort => sort.column !== columnKey));
+      }, 0);
+    } else {
+      // If sortOrder is empty, remove sort from config and clear stored order
+      setColumnSortConfig(prev => prev.filter(sort => sort.column !== columnKey));
+      setSortedRowOrder(null);
+    }
   };
 
   // Map normal header filter keys to row fields
