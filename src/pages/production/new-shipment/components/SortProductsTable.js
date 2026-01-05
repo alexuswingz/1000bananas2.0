@@ -20,6 +20,14 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
   const [selectedIndices, setSelectedIndices] = useState(() => new Set());
   const [lastSelectedIndex, setLastSelectedIndex] = useState(null);
 
+  // Split functionality state
+  const [openMenuIndex, setOpenMenuIndex] = useState(null);
+  const menuRefs = useRef({});
+  const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [firstBatchQty, setFirstBatchQty] = useState(1);
+  const splitsLoadedRef = useRef(null); // Track which shipmentId we've loaded splits for
+
   // Transform shipment products into table format
   const [products, setProducts] = useState([]);
   const locksLoadedRef = useRef(null); // Track which shipmentId we've loaded locks for
@@ -29,9 +37,11 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
   const isRestoringRef = useRef(false); // Track if we're currently restoring order
 
   // Helper function to get a stable identifier for a product
-  // Uses product ID as unique identifier
+  // Uses product properties (brand + product + size) + splitTag (if exists) as unique identifier
+  // This ensures the identifier is stable even if product IDs change
   const getProductIdentifier = (product) => {
-    return product.id;
+    const baseIdentifier = `${product.brand || ''}::${product.product || ''}::${product.size || ''}`;
+    return product.splitTag ? `${baseIdentifier}::${product.splitTag}` : baseIdentifier;
   };
 
   // Save product order to localStorage
@@ -56,6 +66,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     if (previousShipmentId !== null && previousShipmentId !== shipmentId) {
       locksLoadedRef.current = null;
       orderLoadedRef.current = null;
+      splitsLoadedRef.current = null;
       isInitialOrderLoadRef.current = true;
       setLockedProductIds(new Set());
     } else if (previousShipmentId === null && shipmentId !== null) {
@@ -79,9 +90,144 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
         productType: 'Liquid', // Default to Liquid for fertilizers
       }));
       
+      // Load and apply saved splits before setting products
+      // Always reload splits when products are regenerated to ensure they persist across navigation
+      let finalProducts = [...transformedProducts];
+      // Find the max ID to ensure unique IDs for split products
+      const maxId = finalProducts.length > 0 ? Math.max(...finalProducts.map(p => p.id || 0), 0) : 0;
+      let nextId = maxId + 1;
+      
+      if (shipmentId) {
+        try {
+          const storedSplits = localStorage.getItem(`sortProductsSplits_${shipmentId}`);
+          if (storedSplits) {
+            const parsedSplits = JSON.parse(storedSplits);
+            if (Array.isArray(parsedSplits) && parsedSplits.length > 0) {
+              // Group splits by product ID to handle multiple splits on the same product
+              // Note: productId in splits is the base product ID, but we'll match by stable identifier
+              const splitsByProductId = {};
+              parsedSplits.forEach((splitInfo) => {
+                const { productId } = splitInfo;
+                if (!splitsByProductId[productId]) {
+                  splitsByProductId[productId] = [];
+                }
+                splitsByProductId[productId].push(splitInfo);
+              });
+              
+              // Apply splits: for each product ID with splits, find the product by ID or by stable identifier
+              // and replace ALL products with that identifier with the stored split products
+              Object.keys(splitsByProductId).forEach((productId) => {
+                const splitInfo = splitsByProductId[productId][splitsByProductId[productId].length - 1];
+                const stableIdentifier = splitInfo.stableIdentifier;
+                
+                // First, try to find products by ID (for backward compatibility)
+                let matchingIndices = [];
+                finalProducts.forEach((p, idx) => {
+                  if (p.id === productId || (p.originalId && p.originalId === productId)) {
+                    matchingIndices.push(idx);
+                  }
+                });
+                
+                // If no match by ID and we have a stable identifier, try to find by stable identifier
+                if (matchingIndices.length === 0 && stableIdentifier) {
+                  finalProducts.forEach((p, idx) => {
+                    // Match by stable identifier (base identifier without splitTag)
+                    const pFullIdentifier = getProductIdentifier(p);
+                    const pStableIdentifier = p.splitTag 
+                      ? pFullIdentifier.replace(`::${p.splitTag}`, '')
+                      : pFullIdentifier;
+                    if (pStableIdentifier === stableIdentifier && !p.splitTag) {
+                      matchingIndices.push(idx);
+                    }
+                  });
+                }
+                
+                // If still no match, try to find products that might be the base product
+                if (matchingIndices.length === 0) {
+                  // Look for products without splitTag that could be the original
+                  finalProducts.forEach((p, idx) => {
+                    if (!p.splitTag && (p.id === productId || p.id?.startsWith(productId))) {
+                      matchingIndices.push(idx);
+                    }
+                  });
+                }
+                
+                if (matchingIndices.length === 0) {
+                  console.warn('Could not find product to restore split. ProductId:', productId, 'StableIdentifier:', stableIdentifier, 'Available products:', finalProducts.map(p => ({ id: p.id, identifier: getProductIdentifier(p) })));
+                }
+                
+                if (matchingIndices.length > 0) {
+                  // Get the most recent split info for this product (already retrieved above)
+                  const { firstBatch, secondBatch, additionalBatches = [] } = splitInfo;
+                  
+                  // Get the first matching product as template (use the first unsplit one if available, otherwise any)
+                  const templateIndex = matchingIndices.find(idx => !finalProducts[idx].splitTag) || matchingIndices[0];
+                  const templateProduct = finalProducts[templateIndex];
+                  
+                  // Use the template product's ID as the base (not the saved productId which might be outdated)
+                  const baseIdForSplits = templateProduct.id;
+                  
+                  // Remove all products with this ID
+                  // Sort indices descending to remove from end first
+                  matchingIndices.sort((a, b) => b - a).forEach(idx => {
+                    finalProducts.splice(idx, 1);
+                  });
+                  
+                  // Create all split products
+                  const splitProducts = [];
+                  
+                  // First batch
+                  splitProducts.push({
+                    ...templateProduct,
+                    id: `${baseIdForSplits}_split_1`,
+                    qty: firstBatch.qty,
+                    splitTag: '1/2',
+                    originalId: baseIdForSplits,
+                  });
+                  
+                  // Second batch
+                  splitProducts.push({
+                    ...templateProduct,
+                    id: `${baseIdForSplits}_split_2`,
+                    qty: secondBatch.qty,
+                    splitTag: '2/2',
+                    originalId: baseIdForSplits,
+                  });
+                  
+                  // Additional batches (for multiple splits)
+                  additionalBatches.forEach((batch, idx) => {
+                    const totalBatches = 2 + additionalBatches.length;
+                    splitProducts.push({
+                      ...templateProduct,
+                      id: `${baseIdForSplits}_split_${idx + 3}`,
+                      qty: batch.qty,
+                      splitTag: `${idx + 3}/${totalBatches}`,
+                      originalId: baseIdForSplits,
+                    });
+                  });
+                  
+                  // Insert at the position of the first removed product
+                  const insertIndex = Math.min(...matchingIndices);
+                  finalProducts.splice(insertIndex, 0, ...splitProducts);
+                  
+                  console.log('Applied split for product:', productId, 'total batches:', splitProducts.length, 'split product IDs:', splitProducts.map(p => p.id), 'batches:', splitProducts.map(p => ({ qty: p.qty, tag: p.splitTag })));
+                } else {
+                  console.warn('Could not find product to apply split:', productId, 'Available products:', finalProducts.map(p => p.id));
+                }
+              });
+              console.log('Applied', parsedSplits.length, 'saved splits');
+            }
+          }
+          splitsLoadedRef.current = shipmentId;
+        } catch (error) {
+          console.error('Error loading sort products splits from localStorage:', error);
+        }
+      }
+      
       // Restore saved order if it exists
       // Always restore order when products are regenerated (on mount or when shipmentProducts changes)
-      let orderedProducts = transformedProducts;
+      // Use finalProducts (which includes splits) for order restoration
+      let orderedProducts = finalProducts;
       
       if (shipmentId) {
         // Set initial load flag to true before restoring to prevent saving during restoration
@@ -96,39 +242,84 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
             const parsedOrder = JSON.parse(storedOrder);
             if (Array.isArray(parsedOrder) && parsedOrder.length > 0) {
               // Create a map of identifier -> product for quick lookup
+              // Use finalProducts which includes split products
+              // Support both stable identifiers and product IDs for backward compatibility
               const productMap = new Map();
-              transformedProducts.forEach(p => {
+              const productIdMap = new Map(); // Map for backward compatibility with old product ID-based orders
+              
+              finalProducts.forEach(p => {
                 const identifier = getProductIdentifier(p);
                 productMap.set(identifier, p);
+                // Also map by product ID for backward compatibility
+                productIdMap.set(p.id, p);
               });
               
               // Reorder products according to saved order
               const ordered = [];
               const usedIdentifiers = new Set();
+              const usedIds = new Set(); // Track used product IDs for backward compatibility
               
               // First, add products in the saved order
+              // Try to match by stable identifier first, then by product ID (for backward compatibility)
               parsedOrder.forEach(identifier => {
+                // Try stable identifier first (new format)
                 if (productMap.has(identifier) && !usedIdentifiers.has(identifier)) {
                   ordered.push(productMap.get(identifier));
                   usedIdentifiers.add(identifier);
+                  usedIds.add(productMap.get(identifier).id);
+                } 
+                // Try product ID for backward compatibility (old format)
+                else if (productIdMap.has(identifier) && !usedIds.has(identifier)) {
+                  const product = productIdMap.get(identifier);
+                  ordered.push(product);
+                  usedIds.add(identifier);
+                  usedIdentifiers.add(getProductIdentifier(product));
+                } 
+                else if (!productMap.has(identifier) && !productIdMap.has(identifier)) {
+                  // Log missing products for debugging
+                  console.warn('Product identifier in saved order not found:', identifier);
                 }
               });
               
-              // Then, add any products that weren't in the saved order (new products)
-              transformedProducts.forEach(p => {
+              // Then, add any products that weren't in the saved order (new products, split products, or products with changed identifiers)
+              finalProducts.forEach(p => {
                 const identifier = getProductIdentifier(p);
-                if (!usedIdentifiers.has(identifier)) {
+                if (!usedIdentifiers.has(identifier) && !usedIds.has(p.id)) {
                   ordered.push(p);
                   usedIdentifiers.add(identifier);
+                  usedIds.add(p.id);
                 }
               });
               
-              // Only use restored order if we got all products
-              if (ordered.length === transformedProducts.length) {
-                orderedProducts = ordered;
-                console.log('Restored product order:', parsedOrder, 'from', transformedProducts.length, 'to', ordered.length, 'products');
-              } else {
-                console.warn('Order restoration incomplete:', ordered.length, 'vs', transformedProducts.length);
+              // Always use the ordered products (they include all products, just reordered)
+              // The ordered array should contain all products from finalProducts
+              orderedProducts = ordered;
+              console.log('Restored product order:', parsedOrder.length, 'IDs in saved order,', finalProducts.length, 'products available,', ordered.length, 'products in restored order');
+              console.log('Final product IDs:', orderedProducts.map(p => p.id));
+              
+              // Warn if count doesn't match (shouldn't happen, but log for debugging)
+              if (ordered.length !== finalProducts.length) {
+                console.warn('Order restoration count mismatch - some products may be missing or extra:', {
+                  savedOrderCount: parsedOrder.length,
+                  availableCount: finalProducts.length,
+                  restoredCount: ordered.length,
+                  missingFromOrder: finalProducts.filter(p => {
+                    const id = getProductIdentifier(p);
+                    return !usedIdentifiers.has(id) && !usedIds.has(p.id);
+                  }).map(p => ({ id: p.id, identifier: getProductIdentifier(p) })),
+                  missingFromAvailable: parsedOrder.filter(id => !productMap.has(id) && !productIdMap.has(id))
+                });
+                
+                // If we're missing products, add them at the end to ensure nothing is lost
+                if (ordered.length < finalProducts.length) {
+                  finalProducts.forEach(p => {
+                    const identifier = getProductIdentifier(p);
+                    if (!usedIdentifiers.has(identifier) && !usedIds.has(p.id)) {
+                      orderedProducts.push(p);
+                      console.log('Added missing product to restored order:', p.id, identifier);
+                    }
+                  });
+                }
               }
             }
           }
@@ -192,71 +383,73 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
 
   // Restore order when products are set and we have a saved order
   // This runs after products are set to ensure order is always restored
-  useEffect(() => {
-    if (!shipmentId || products.length === 0 || isInitialOrderLoadRef.current || isRestoringRef.current) return;
-    
-    // Check if current order matches any saved order
-    try {
-      const storedOrder = localStorage.getItem(`sortProductsOrder_${shipmentId}`);
-      if (storedOrder) {
-        const parsedOrder = JSON.parse(storedOrder);
-        if (Array.isArray(parsedOrder) && parsedOrder.length > 0) {
-          const currentOrder = products.map(p => getProductIdentifier(p));
-          const orderMatches = currentOrder.length === parsedOrder.length && 
-            currentOrder.every((id, idx) => id === parsedOrder[idx]);
-          
-          if (!orderMatches && parsedOrder.length === products.length) {
-            // Order doesn't match, restore it
-            isRestoringRef.current = true;
-            
-            const productMap = new Map();
-            products.forEach(p => {
-              const identifier = getProductIdentifier(p);
-              productMap.set(identifier, p);
-            });
-            
-            const ordered = [];
-            const usedIdentifiers = new Set();
-            
-            // First, add products in the saved order
-            parsedOrder.forEach(identifier => {
-              if (productMap.has(identifier) && !usedIdentifiers.has(identifier)) {
-                ordered.push(productMap.get(identifier));
-                usedIdentifiers.add(identifier);
-              }
-            });
-            
-            // Then, add any products that weren't in the saved order (new products)
-            products.forEach(p => {
-              const identifier = getProductIdentifier(p);
-              if (!usedIdentifiers.has(identifier)) {
-                ordered.push(p);
-                usedIdentifiers.add(identifier);
-              }
-            });
-            
-            if (ordered.length === products.length) {
-              // Temporarily prevent saving during restoration
-              isInitialOrderLoadRef.current = true;
-              setProducts(ordered);
-              console.log('Restored product order from useEffect:', parsedOrder);
-              
-              // Allow saving after a delay
-              setTimeout(() => {
-                isInitialOrderLoadRef.current = false;
-                isRestoringRef.current = false;
-              }, 200);
-            } else {
-              isRestoringRef.current = false;
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error checking/restoring product order in useEffect:', error);
-      isRestoringRef.current = false;
-    }
-  }, [products, shipmentId]); // Run when products or shipmentId changes
+  // NOTE: Disabled this useEffect because order restoration is already handled in the main useEffect
+  // This was causing issues with split products disappearing
+  // useEffect(() => {
+  //   if (!shipmentId || products.length === 0 || isInitialOrderLoadRef.current || isRestoringRef.current) return;
+  //   
+  //   // Check if current order matches any saved order
+  //   try {
+  //     const storedOrder = localStorage.getItem(`sortProductsOrder_${shipmentId}`);
+  //     if (storedOrder) {
+  //       const parsedOrder = JSON.parse(storedOrder);
+  //       if (Array.isArray(parsedOrder) && parsedOrder.length > 0) {
+  //         const currentOrder = products.map(p => getProductIdentifier(p));
+  //         const orderMatches = currentOrder.length === parsedOrder.length && 
+  //           currentOrder.every((id, idx) => id === parsedOrder[idx]);
+  //         
+  //         if (!orderMatches && parsedOrder.length === products.length) {
+  //           // Order doesn't match, restore it
+  //           isRestoringRef.current = true;
+  //           
+  //           const productMap = new Map();
+  //           products.forEach(p => {
+  //             const identifier = getProductIdentifier(p);
+  //             productMap.set(identifier, p);
+  //           });
+  //           
+  //           const ordered = [];
+  //           const usedIdentifiers = new Set();
+  //           
+  //           // First, add products in the saved order
+  //           parsedOrder.forEach(identifier => {
+  //             if (productMap.has(identifier) && !usedIdentifiers.has(identifier)) {
+  //               ordered.push(productMap.get(identifier));
+  //               usedIdentifiers.add(identifier);
+  //             }
+  //           });
+  //           
+  //           // Then, add any products that weren't in the saved order (new products)
+  //           products.forEach(p => {
+  //             const identifier = getProductIdentifier(p);
+  //             if (!usedIdentifiers.has(identifier)) {
+  //               ordered.push(p);
+  //               usedIdentifiers.add(identifier);
+  //             }
+  //           });
+  //           
+  //           if (ordered.length === products.length) {
+  //             // Temporarily prevent saving during restoration
+  //             isInitialOrderLoadRef.current = true;
+  //             setProducts(ordered);
+  //             console.log('Restored product order from useEffect:', parsedOrder);
+  //             
+  //             // Allow saving after a delay
+  //             setTimeout(() => {
+  //               isInitialOrderLoadRef.current = false;
+  //               isRestoringRef.current = false;
+  //             }, 200);
+  //           } else {
+  //             isRestoringRef.current = false;
+  //           }
+  //         }
+  //       }
+  //     }
+  //   } catch (error) {
+  //     console.error('Error checking/restoring product order in useEffect:', error);
+  //     isRestoringRef.current = false;
+  //   }
+  // }, [products, shipmentId]); // Run when products or shipmentId changes
 
   // Persist locked product IDs to localStorage whenever they change
   useEffect(() => {
@@ -301,11 +494,34 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     }
   }, [openFilterColumns]);
 
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (openMenuIndex !== null) {
+        const menuRef = menuRefs.current[openMenuIndex];
+        const tdElement = menuRef?.parentElement;
+        // Check if click is outside both the menu and its parent td
+        if (tdElement && !tdElement.contains(event.target)) {
+          setOpenMenuIndex(null);
+        }
+      }
+    };
+
+    if (openMenuIndex !== null) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [openMenuIndex]);
+
   // Clear selection when clicking outside the table
   useEffect(() => {
     const handleClickOutside = (event) => {
       // Don't clear if clicking on interactive elements
       if (
+        openMenuIndex !== null ||
+        isSplitModalOpen ||
         openFilterColumns.size > 0 ||
         event.target.closest('[data-filter-dropdown]') ||
         event.target.closest('button') ||
@@ -325,7 +541,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [openFilterColumns]);
+  }, [openMenuIndex, isSplitModalOpen, openFilterColumns]);
 
   const columns = [
     { key: 'drag', label: '', width: '50px' },
@@ -338,11 +554,12 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     { key: 'volume', label: 'VOLUME', width: '100px' },
     { key: 'productType', label: 'TYPE', width: '100px' },
     { key: 'notes', label: 'NOTES', width: '80px' },
+    { key: 'menu', label: '', width: '50px' },
   ];
 
   const handleRowClick = (e, index) => {
     // Don't handle selection if clicking on interactive elements
-    if (e.target.closest('button') || e.target.closest('input') || e.target.closest('img[alt="Lock"]') || e.target.closest('img[alt="Unlock"]')) {
+    if (e.target.closest('button') || e.target.closest('input') || e.target.closest('img[alt="Lock"]') || e.target.closest('img[alt="Unlock"]') || e.target.closest('img[alt="Split"]')) {
       return;
     }
 
@@ -590,6 +807,158 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
       return next;
     });
   };
+
+  const handleMenuClick = (e, index) => {
+    e.stopPropagation();
+    setOpenMenuIndex(openMenuIndex === index ? null : index);
+  };
+
+  const handleMenuAction = (action, product) => {
+    if (action === 'split') {
+      setSelectedProduct(product);
+      setFirstBatchQty(1); // Always set first batch to 1
+      setIsSplitModalOpen(true);
+    }
+    setOpenMenuIndex(null);
+  };
+
+  const handleCloseSplitModal = () => {
+    setIsSplitModalOpen(false);
+    setSelectedProduct(null);
+    setFirstBatchQty(1);
+  };
+
+  const handleConfirmSplit = () => {
+    if (!selectedProduct) return;
+    
+    // First quantity is always 1 unit, second is the remaining quantity
+    const originalQty = selectedProduct.qty || 1;
+    const firstBatchQty = 1;
+    const secondBatchQty = originalQty - firstBatchQty;
+    
+    // Find the index of the product to split
+    const productIndex = products.findIndex(p => p.id === selectedProduct.id);
+    
+    if (productIndex === -1) return;
+    
+    // Always use the base originalId for creating split product IDs
+    // This ensures consistent IDs when restoring splits
+    const baseProductId = selectedProduct.originalId || selectedProduct.id;
+    
+    // Create two new products from the split
+    const firstBatch = {
+      ...selectedProduct,
+      id: `${baseProductId}_split_1`,
+      qty: firstBatchQty,
+      splitTag: '1/2',
+      originalId: baseProductId,
+    };
+    
+    const secondBatch = {
+      ...selectedProduct,
+      id: `${baseProductId}_split_2`,
+      qty: secondBatchQty,
+      splitTag: '2/2',
+      originalId: baseProductId,
+    };
+    
+    // Replace the original product with the two split products
+    const newProducts = [...products];
+    newProducts.splice(productIndex, 1, firstBatch, secondBatch);
+    setProducts(newProducts);
+    saveProductOrder(newProducts);
+    
+    // Save split information to localStorage
+    // Store the current state of all split products for this product ID
+    if (shipmentId) {
+      try {
+        // Always use the base originalId for saving splits
+        // This ensures we always reference the base product, not a split product
+        const productId = baseProductId;
+        
+        // Also save the stable identifier for matching when product IDs might change
+        // Get base identifier without splitTag (remove everything after the last :: if it's a splitTag)
+        const fullIdentifier = getProductIdentifier(selectedProduct);
+        const stableIdentifier = selectedProduct.splitTag 
+          ? fullIdentifier.replace(`::${selectedProduct.splitTag}`, '')
+          : fullIdentifier;
+        
+        // Get all products with this original ID from the new products array (after split)
+        const newProducts = [...products];
+        newProducts.splice(productIndex, 1, firstBatch, secondBatch);
+        const productsWithThisId = newProducts.filter(p => {
+          // Match by originalId if it exists, otherwise match by id
+          const pOriginalId = p.originalId || p.id;
+          return pOriginalId === productId;
+        });
+        
+        // Get all products that have been split (have splitTag)
+        const splitProducts = productsWithThisId.filter(p => p.splitTag);
+        
+        // Only save if there are split products
+        if (splitProducts.length > 0) {
+          const storedSplits = localStorage.getItem(`sortProductsSplits_${shipmentId}`);
+          const existingSplits = storedSplits ? JSON.parse(storedSplits) : [];
+          
+          // Remove any existing split for this product (by ID or stable identifier)
+          const filteredSplits = existingSplits.filter(s => 
+            s.productId !== productId && s.stableIdentifier !== stableIdentifier
+          );
+          
+          // Save all split products for this ID
+          // Sort by splitTag to ensure consistent order
+          const sortedSplitProducts = [...splitProducts].sort((a, b) => {
+            if (a.splitTag && b.splitTag) {
+              return a.splitTag.localeCompare(b.splitTag);
+            }
+            return 0;
+          });
+          
+          // Store as batches - if there are 2, store as firstBatch/secondBatch
+          // If there are more (multiple splits), store the first two as firstBatch/secondBatch
+          // and the rest will be handled by the loading logic
+          if (sortedSplitProducts.length >= 2) {
+            filteredSplits.push({
+              productId: productId,
+              stableIdentifier: stableIdentifier, // Save stable identifier for matching
+              firstBatch: {
+                qty: sortedSplitProducts[0].qty,
+              },
+              secondBatch: {
+                qty: sortedSplitProducts[1].qty,
+              },
+              // Store additional batches if there are more than 2
+              additionalBatches: sortedSplitProducts.slice(2).map(p => ({
+                qty: p.qty,
+              })),
+            });
+          } else if (sortedSplitProducts.length === 1) {
+            // Edge case: only one split product (shouldn't happen, but handle it)
+            filteredSplits.push({
+              productId: productId,
+              stableIdentifier: stableIdentifier,
+              firstBatch: {
+                qty: sortedSplitProducts[0].qty,
+              },
+              secondBatch: {
+                qty: 0,
+              },
+            });
+          }
+          
+          localStorage.setItem(`sortProductsSplits_${shipmentId}`, JSON.stringify(filteredSplits));
+          console.log('Saved split for product:', productId, 'stable identifier:', stableIdentifier, 'total split products:', sortedSplitProducts.length, 'batches:', sortedSplitProducts.map(p => ({ qty: p.qty, tag: p.splitTag })));
+        }
+      } catch (error) {
+        console.error('Error saving sort products splits to localStorage:', error);
+      }
+    }
+    
+    handleCloseSplitModal();
+  };
+
+  // Second batch quantity is always the remaining (total - 1)
+  const secondBatchQty = selectedProduct ? (selectedProduct.qty || 1) - 1 : 0;
 
   const handleFilterClick = (columnKey, event) => {
     event.stopPropagation();
@@ -875,10 +1244,10 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                 return (
                 <th
                   key={column.key}
-                  className={column.key === 'drag' ? undefined : 'group'}
+                  className={column.key === 'drag' || column.key === 'menu' ? undefined : 'group'}
                   style={{
-                    padding: column.key === 'drag' ? '0 8px' : '12px 16px',
-                    textAlign: column.key === 'drag' ? 'center' : 'center',
+                    padding: column.key === 'drag' || column.key === 'menu' ? '0 8px' : '12px 16px',
+                    textAlign: column.key === 'drag' || column.key === 'menu' ? 'center' : 'center',
                     fontSize: '11px',
                     fontWeight: 600,
                     color: isActive ? '#3B82F6' : '#9CA3AF',
@@ -886,13 +1255,13 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                     letterSpacing: '0.05em',
                     width: column.width,
                     whiteSpace: 'nowrap',
-                    borderRight: column.key === 'drag' ? 'none' : '1px solid #FFFFFF',
+                    borderRight: column.key === 'drag' || column.key === 'menu' ? 'none' : '1px solid #FFFFFF',
                     height: '40px',
-                    position: column.key === 'drag' ? 'static' : 'relative',
+                    position: column.key === 'drag' || column.key === 'menu' ? 'static' : 'relative',
                     backgroundColor: isActive ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
                   }}
                 >
-                  {column.key === 'drag' ? (
+                  {column.key === 'drag' || column.key === 'menu' ? (
                     column.label
                   ) : (
                     <div
@@ -1146,8 +1515,22 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                   fontWeight: 400,
                   color: isDarkMode ? '#E5E7EB' : '#374151',
                   height: '40px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
                 }}>
-                  {product.product}
+                  <span>{product.product}</span>
+                  {product.splitTag && (
+                    <img
+                      src="/assets/split.png"
+                      alt="Split"
+                      style={{
+                        width: 'auto',
+                        height: '16px',
+                        display: 'inline-block',
+                      }}
+                    />
+                  )}
                 </td>
                 <td style={{
                   padding: '0 16px',
@@ -1238,6 +1621,136 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                     </svg>
                   </button>
                 </td>
+                <td style={{
+                  padding: '0 8px',
+                  textAlign: 'center',
+                  height: '40px',
+                  position: 'relative',
+                }}>
+                  <button
+                    type="button"
+                    onClick={(e) => handleMenuClick(e, index)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: '50%',
+                      transition: 'background-color 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#E5E7EB';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isDarkMode ? '#9CA3AF' : '#6B7280'} strokeWidth="2">
+                      <circle cx="12" cy="5" r="1" fill="currentColor"/>
+                      <circle cx="12" cy="12" r="1" fill="currentColor"/>
+                      <circle cx="12" cy="19" r="1" fill="currentColor"/>
+                    </svg>
+                  </button>
+                  
+                  {/* Dropdown Menu */}
+                  {openMenuIndex === index && (
+                    <div
+                      ref={(el) => { menuRefs.current[index] = el; }}
+                      style={{
+                        position: 'absolute',
+                        top: '50%',
+                        right: '100%',
+                        transform: 'translateY(-50%)',
+                        marginRight: '-4px',
+                        backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                        border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                        borderRadius: '8px',
+                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                        minWidth: '160px',
+                        zIndex: 1000,
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleMenuAction('split', product)}
+                        style={{
+                          width: '100%',
+                          padding: '10px 16px',
+                          textAlign: 'left',
+                          background: 'transparent',
+                          border: 'none',
+                          color: isDarkMode ? '#E5E7EB' : '#374151',
+                          fontSize: '14px',
+                          fontWeight: 400,
+                          cursor: 'pointer',
+                          transition: 'background-color 0.2s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                      >
+                        <svg 
+                          width="16" 
+                          height="16" 
+                          viewBox="0 0 16 16" 
+                          fill="none" 
+                          xmlns="http://www.w3.org/2000/svg"
+                          style={{ flexShrink: 0 }}
+                        >
+                          {/* Vertical line */}
+                          <line 
+                            x1="8" 
+                            y1="10" 
+                            x2="8" 
+                            y2="14" 
+                            stroke="currentColor" 
+                            strokeWidth="1.5" 
+                            strokeLinecap="round"
+                          />
+                          {/* Left branch pointing up and left */}
+                          <line 
+                            x1="8" 
+                            y1="10" 
+                            x2="4.5" 
+                            y2="6.5" 
+                            stroke="currentColor" 
+                            strokeWidth="1.5" 
+                            strokeLinecap="round"
+                          />
+                          <polygon 
+                            points="4.5,6.5 4,6 3.5,6.5" 
+                            fill="currentColor"
+                          />
+                          {/* Right branch pointing up and right */}
+                          <line 
+                            x1="8" 
+                            y1="10" 
+                            x2="11.5" 
+                            y2="6.5" 
+                            stroke="currentColor" 
+                            strokeWidth="1.5" 
+                            strokeLinecap="round"
+                          />
+                          <polygon 
+                            points="11.5,6.5 12,6 12.5,6.5" 
+                            fill="currentColor"
+                          />
+                        </svg>
+                        <span>Split Product</span>
+                      </button>
+                    </div>
+                  )}
+                </td>
                   </tr>
                   {/* Drop line below the row */}
                   {showDropLineBelow && (
@@ -1295,6 +1808,268 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
           />
         );
       })}
+
+      {/* Split Product Modal */}
+      {isSplitModalOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 10000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            onClick={handleCloseSplitModal}
+          >
+            {/* Modal */}
+            <div
+              style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: '12px',
+                width: '500px',
+                maxWidth: '90vw',
+                border: '1px solid #E5E7EB',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                zIndex: 10001,
+                position: 'relative',
+                display: 'flex',
+                flexDirection: 'column',
+                maxHeight: '90vh',
+                overflow: 'hidden',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div style={{ 
+                padding: '16px 24px',
+                borderBottom: '1px solid #E5E7EB',
+                borderTopLeftRadius: '12px',
+                borderTopRightRadius: '12px',
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                backgroundColor: '#1C2634',
+              }}>
+                <h2 style={{
+                  fontSize: '18px',
+                  fontWeight: 600,
+                  color: '#FFFFFF',
+                  margin: 0,
+                }}>
+                  Split Product Quantity
+                </h2>
+                <button
+                  type="button"
+                  onClick={handleCloseSplitModal}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#FFFFFF',
+                    width: '24px',
+                    height: '24px',
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Content */}
+              <div style={{ 
+                flex: '1 1 auto',
+                minHeight: 0,
+                overflowY: 'auto',
+                padding: '24px',
+              }}>
+                {/* Product Info */}
+                {selectedProduct && (
+                  <div style={{
+                    backgroundColor: '#F3F4F6',
+                    borderRadius: '8px',
+                    padding: '12px 16px',
+                    marginBottom: '20px',
+                  }}>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827', marginBottom: '4px' }}>
+                      {selectedProduct.brand} - {selectedProduct.product} ({selectedProduct.size})
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#6B7280' }}>
+                      Total: {selectedProduct.qty} unit{selectedProduct.qty > 1 ? 's' : ''}
+                    </div>
+                  </div>
+                )}
+
+                {/* First Batch */}
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '8px',
+                  }}>
+                    First Batch
+                  </label>
+                  <p style={{
+                    fontSize: '12px',
+                    color: '#6B7280',
+                    margin: '0 0 12px 0',
+                  }}>
+                    The first batch is always 1 unit.
+                  </p>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '11px', color: '#6B7280', marginBottom: '4px', display: 'block' }}>
+                        Quantity
+                      </label>
+                      <input
+                        type="number"
+                        value={1}
+                        readOnly
+                        style={{
+                          width: '100%',
+                          height: '40px',
+                          padding: '0 12px',
+                          borderRadius: '6px',
+                          border: '1px solid #D1D5DB',
+                          backgroundColor: '#F9FAFB',
+                          color: '#6B7280',
+                          fontSize: '14px',
+                          fontWeight: 400,
+                          outline: 'none',
+                          cursor: 'not-allowed',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Second Batch */}
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '8px',
+                  }}>
+                    Second Batch
+                  </label>
+                  <p style={{
+                    fontSize: '12px',
+                    color: '#6B7280',
+                    margin: '0 0 12px 0',
+                  }}>
+                    The remaining units after the split.
+                  </p>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '11px', color: '#6B7280', marginBottom: '4px', display: 'block' }}>
+                        Quantity
+                      </label>
+                      <input
+                        type="number"
+                        value={secondBatchQty}
+                        readOnly
+                        style={{
+                          width: '100%',
+                          height: '40px',
+                          padding: '0 12px',
+                          borderRadius: '6px',
+                          border: '1px solid #D1D5DB',
+                          backgroundColor: '#F9FAFB',
+                          color: '#6B7280',
+                          fontSize: '14px',
+                          fontWeight: 400,
+                          outline: 'none',
+                          cursor: 'not-allowed',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div style={{ 
+                padding: '16px 24px',
+                borderTop: '1px solid #E5E7EB',
+                display: 'flex', 
+                justifyContent: 'flex-end',
+                alignItems: 'center',
+                gap: '12px',
+                backgroundColor: '#FFFFFF',
+              }}>
+                <button
+                  type="button"
+                  onClick={handleCloseSplitModal}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: '1px solid #D1D5DB',
+                    backgroundColor: '#FFFFFF',
+                    color: '#374151',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#F9FAFB';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmSplit}
+                  disabled={!selectedProduct || (selectedProduct?.qty || 1) <= 1}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: (!selectedProduct || (selectedProduct?.qty || 1) <= 1) ? '#9CA3AF' : '#3B82F6',
+                    color: '#FFFFFF',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: (!selectedProduct || (selectedProduct?.qty || 1) <= 1) ? 'not-allowed' : 'pointer',
+                    transition: 'background-color 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selectedProduct && (selectedProduct?.qty || 1) > 1) {
+                      e.currentTarget.style.backgroundColor = '#2563EB';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedProduct && (selectedProduct?.qty || 1) > 1) {
+                      e.currentTarget.style.backgroundColor = '#3B82F6';
+                    }
+                  }}
+                >
+                  Confirm Split
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
       </div>
     </>
   );
