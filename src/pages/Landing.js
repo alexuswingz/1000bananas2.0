@@ -33,7 +33,7 @@ import LabelCycleCounts from './supply-chain/labels/components/CycleCounts';
 import LabelCycleCountDetail from './supply-chain/labels/components/CycleCountDetail';
 import RawMaterials from './supply-chain/rawMaterials/index';
 import Planning from './production/planning';
-import Manufacturing from './production/Manufacturing';
+import Manufacturing from './production/manufacturing';
 import Packaging from './production/Packaging';
 import Inventory from './production/Inventory';
 import NewShipment from './production/new-shipment';
