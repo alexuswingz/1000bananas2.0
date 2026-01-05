@@ -10,6 +10,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
   const [lockedProductIds, setLockedProductIds] = useState(() => new Set());
   const [openFilterColumns, setOpenFilterColumns] = useState(() => new Set());
   const filterIconRefs = useRef({});
+  const tableContainerRef = useRef(null);
   const [filters, setFilters] = useState({});
   // sortConfig is now an array of sort objects: [{column: 'size', order: 'asc'}, {column: 'formula', order: 'asc'}]
   // The order in the array determines the sort priority (first = primary, second = secondary, etc.)
@@ -300,6 +301,32 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     }
   }, [openFilterColumns]);
 
+  // Clear selection when clicking outside the table
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Don't clear if clicking on interactive elements
+      if (
+        openFilterColumns.size > 0 ||
+        event.target.closest('[data-filter-dropdown]') ||
+        event.target.closest('button') ||
+        event.target.closest('input')
+      ) {
+        return;
+      }
+
+      // Check if click is outside the table container
+      if (tableContainerRef.current && !tableContainerRef.current.contains(event.target)) {
+        setSelectedIndices(new Set());
+        setLastSelectedIndex(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [openFilterColumns]);
+
   const columns = [
     { key: 'drag', label: '', width: '50px' },
     { key: 'type', label: 'TYPE', width: '80px' },
@@ -452,7 +479,10 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
       // Insert all dragged items at the new position
       newProducts.splice(insertIndex, 0, ...draggedItems);
       
-      // Clear drag states and selection
+      // Track which items were moved (by ID) to preserve selection
+      const movedItemIds = new Set(draggedItems.map(item => item.id));
+      
+      // Clear drag states
       setDragOverIndex(null);
       setDropPosition(null);
       
@@ -460,8 +490,20 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
         setProducts(newProducts);
         saveProductOrder(newProducts);
         setDraggedIndex(null);
-        setSelectedIndices(new Set());
-        setLastSelectedIndex(null);
+        
+        // Update selection to reflect new positions of moved items
+        // Find the new indices of the moved items in the updated products array
+        const newSelectedIndices = new Set();
+        newProducts.forEach((product, index) => {
+          if (movedItemIds.has(product.id)) {
+            newSelectedIndices.add(index);
+          }
+        });
+        setSelectedIndices(newSelectedIndices);
+        // Set lastSelectedIndex to the first moved item's new position
+        if (newSelectedIndices.size > 0) {
+          setLastSelectedIndex(Math.min(...Array.from(newSelectedIndices)));
+        }
       }, 50);
     } else {
       // Single drag: original logic
@@ -498,6 +540,9 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
       // Insert it at the new position
       newProducts.splice(insertIndex, 0, draggedItem);
       
+      // Track the moved item ID to preserve selection
+      const movedItemId = draggedItem.id;
+      
       // Clear drag states first for smooth transition
       setDragOverIndex(null);
       setDropPosition(null);
@@ -507,8 +552,17 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
         setProducts(newProducts);
         saveProductOrder(newProducts);
         setDraggedIndex(null);
-        setSelectedIndices(new Set());
-        setLastSelectedIndex(null);
+        
+        // Find the new index of the moved item and keep it selected
+        const newIndex = newProducts.findIndex(p => p.id === movedItemId);
+        if (newIndex !== -1) {
+          setSelectedIndices(new Set([newIndex]));
+          setLastSelectedIndex(newIndex);
+        } else {
+          // Fallback: clear selection if item not found
+          setSelectedIndices(new Set());
+          setLastSelectedIndex(null);
+        }
       }, 50);
     }
   };
@@ -794,12 +848,15 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
           }
         }
       `}</style>
-      <div style={{
-        backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-        borderRadius: '12px',
-        border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
-        overflow: 'hidden',
-      }}>
+      <div 
+        ref={tableContainerRef}
+        style={{
+          backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+          borderRadius: '12px',
+          border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+          overflow: 'hidden',
+        }}
+      >
       {/* Table Container */}
       <div style={{ overflowX: 'auto' }}>
         <table style={{
