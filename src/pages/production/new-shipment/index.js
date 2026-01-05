@@ -1123,7 +1123,6 @@ const NewShipment = () => {
       return newSet;
     });
 
-<<<<<<< HEAD
     // Navigate based on whether label check is completed
     if (labelCheckCompleted) {
       // Both are completed, go to book shipment
@@ -1137,25 +1136,27 @@ const NewShipment = () => {
       } else {
         toast.success('Formula Check completed! Moving to Book Shipment');
       }
-    // Navigate back to shipments table after completing formula check
-    if (isIncomplete) {
-      if (hasComment) {
-        toast.info('Formula Check comment saved. Returning to shipments table.');
-      } else {
-        toast.info('Returning to shipments table.');
-      }
     } else {
-      toast.success('Formula Check completed! Returning to shipments table.');
-    }
-    
-    // Navigate back to planning page with shipments tab
-    navigate('/dashboard/production/planning', {
-      state: {
-        activeTab: 'shipments',
-        refresh: Date.now(),
-        fromFormulaCheckComplete: true,
+      // Navigate back to shipments table after completing formula check
+      if (isIncomplete) {
+        if (hasComment) {
+          toast.info('Formula Check comment saved. Returning to shipments table.');
+        } else {
+          toast.info('Returning to shipments table.');
+        }
+      } else {
+        toast.success('Formula Check completed! Returning to shipments table.');
       }
-    });
+      
+      // Navigate back to planning page with shipments tab
+      navigate('/dashboard/production/planning', {
+        state: {
+          activeTab: 'shipments',
+          refresh: Date.now(),
+          fromFormulaCheckComplete: true,
+        }
+      });
+    }
   };
 
   const completeLabelCheck = async (comment = '', isIncomplete = false) => {
