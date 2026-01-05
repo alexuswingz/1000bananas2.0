@@ -101,6 +101,7 @@ const NewShipment = () => {
   const [activeAction, setActiveAction] = useState('add-products');
   const [completedTabs, setCompletedTabs] = useState(new Set());
   const [addedRows, setAddedRows] = useState(new Set());
+  const [firstAccessedTab, setFirstAccessedTab] = useState(null); // Track which tab (label-check or formula-check) was accessed first
   const [isFloorInventoryOpen, setIsFloorInventoryOpen] = useState(false);
   const [selectedFloorInventory, setSelectedFloorInventory] = useState(null);
   const [activeView, setActiveView] = useState('all-products'); // 'all-products' or 'floor-inventory'
@@ -538,7 +539,7 @@ const NewShipment = () => {
       
       // Set initial action if provided
       if (location.state.initialAction && location.state.initialAction !== 'completed') {
-        setActiveAction(location.state.initialAction);
+        handleActionChange(location.state.initialAction);
       }
     }
   }, [location.state]);
@@ -922,6 +923,13 @@ const NewShipment = () => {
 
   const handleActionChange = (action) => {
     setActiveAction(action);
+    // Track which tab (label-check or formula-check) was accessed first
+    // Only set if neither has been completed yet
+    if ((action === 'label-check' || action === 'formula-check') && !firstAccessedTab) {
+      if (!completedTabs.has('label-check') && !completedTabs.has('formula-check')) {
+        setFirstAccessedTab(action);
+      }
+    }
   };
 
   const handleBookAndProceed = async (updatedShipmentData = null) => {
@@ -1010,7 +1018,7 @@ const NewShipment = () => {
         newSet.add('add-products');
         return newSet;
       });
-      setActiveAction('label-check');
+      handleActionChange('label-check');
       setIsShipmentDetailsOpen(false);
       toast.success('Moving to Label Check');
     } catch (error) {
@@ -1081,7 +1089,11 @@ const NewShipment = () => {
     }
 
     const hasComment = !!(comment && comment.trim());
-    const nextStatus = 'book_shipment';
+    const labelCheckCompleted = completedTabs.has('label-check');
+    
+    // Determine next status based on whether label check is completed
+    // If label check is not completed, go to label check; otherwise go to book shipment
+    const nextStatus = labelCheckCompleted ? 'book_shipment' : 'label_check';
 
     const updateData = isIncomplete
       ? {
@@ -1111,16 +1123,31 @@ const NewShipment = () => {
       return newSet;
     });
 
-    // Always proceed to Book Shipment after completing Formula Check
-    setActiveAction('book-shipment');
-    if (isIncomplete) {
-      if (hasComment) {
-        toast.info('Formula Check comment saved. Proceeding to Book Shipment.');
+    // Navigate based on whether label check is completed
+    if (labelCheckCompleted) {
+      // Both are completed, go to book shipment
+      setActiveAction('book-shipment');
+      if (isIncomplete) {
+        if (hasComment) {
+          toast.info('Formula Check comment saved. Proceeding to Book Shipment.');
+        } else {
+          toast.info('Proceeding to Book Shipment.');
+        }
       } else {
-        toast.info('Proceeding to Book Shipment.');
+        toast.success('Formula Check completed! Moving to Book Shipment');
       }
     } else {
-      toast.success('Formula Check completed! Moving to Book Shipment');
+      // Label check not completed yet, go to label check
+      setActiveAction('label-check');
+      if (isIncomplete) {
+        if (hasComment) {
+          toast.info('Formula Check comment saved. Proceeding to Label Check.');
+        } else {
+          toast.info('Proceeding to Label Check.');
+        }
+      } else {
+        toast.success('Formula Check completed! Moving to Label Check');
+      }
     }
   };
 
@@ -1172,7 +1199,7 @@ const NewShipment = () => {
           toast.info('Proceeding to Book Shipment.');
         }
       } else {
-        setActiveAction('formula-check');
+        handleActionChange('formula-check');
         if (hasComment) {
           toast.info('Label Check comment saved. Proceeding to Formula Check.');
         } else {
@@ -2951,7 +2978,7 @@ const NewShipment = () => {
           }
           
           // After exporting, move to Label Check and keep footer visible
-          setActiveAction('label-check');
+          handleActionChange('label-check');
         }}
         products={products.map((product, index) => ({
           ...product,
@@ -3048,8 +3075,14 @@ const NewShipment = () => {
         }}
         onBeginFormulaCheck={() => {
           setIsLabelCheckCompleteOpen(false);
-          setActiveAction('formula-check');
+          // Navigate to formula-check if not completed, otherwise to book-shipment
+          if (completedTabs.has('formula-check')) {
+            setActiveAction('book-shipment');
+          } else {
+            handleActionChange('formula-check');
+          }
         }}
+        isFormulaCheckCompleted={completedTabs.has('formula-check')}
       />
 
       {/* Book Shipment Complete Modal */}

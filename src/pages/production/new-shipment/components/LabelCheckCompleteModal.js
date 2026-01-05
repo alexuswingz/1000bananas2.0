@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const LabelCheckCompleteModal = ({ isOpen, onClose, onGoToShipments, onBeginFormulaCheck }) => {
+const LabelCheckCompleteModal = ({ isOpen, onClose, onGoToShipments, onBeginFormulaCheck, isFormulaCheckCompleted }) => {
   const navigate = useNavigate();
 
   if (!isOpen) return null;
@@ -155,7 +155,7 @@ const LabelCheckCompleteModal = ({ isOpen, onClose, onGoToShipments, onBeginForm
               Go to Shipments
             </button>
 
-            {/* Begin Formula Check button */}
+            {/* Begin Formula Check / Begin Book Shipment button */}
             <button
               type="button"
               onClick={handleBeginFormulaCheck}
@@ -183,7 +183,7 @@ const LabelCheckCompleteModal = ({ isOpen, onClose, onGoToShipments, onBeginForm
                 e.currentTarget.style.backgroundColor = '#007AFF';
               }}
             >
-              Begin Formula Check
+              {isFormulaCheckCompleted ? 'Begin Book Shipment' : 'Begin Formula Check'}
             </button>
           </div>
         </div>
