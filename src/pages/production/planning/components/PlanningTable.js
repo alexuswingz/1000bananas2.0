@@ -1624,6 +1624,26 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
             width: '20px',
             height: '20px',
             borderRadius: '20px',
+            backgroundColor: '#F59E0B',
+            border: 'none',
+            display: 'inline-block',
+          }}
+        />
+        <span
+          style={{
+            fontSize: '14px',
+            color: isDarkMode ? '#9CA3AF' : '#6B7280',
+          }}
+        >
+          Incomplete
+        </span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div
+          style={{
+            width: '20px',
+            height: '20px',
+            borderRadius: '20px',
             backgroundColor: '#10B981',
             border: 'none',
             display: 'inline-block',
