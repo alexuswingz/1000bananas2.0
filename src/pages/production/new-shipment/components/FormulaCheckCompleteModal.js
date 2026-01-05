@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const LabelCheckCompleteModal = ({ isOpen, onClose, onGoToShipments, onBeginFormulaCheck, onBeginBookShipment, isFormulaCheckCompleted }) => {
+const FormulaCheckCompleteModal = ({ isOpen, onClose, onGoToShipments, onBeginLabelCheck }) => {
   const navigate = useNavigate();
 
   if (!isOpen) return null;
@@ -17,17 +17,9 @@ const LabelCheckCompleteModal = ({ isOpen, onClose, onGoToShipments, onBeginForm
     });
   };
 
-  const handleBeginNextStep = () => {
-    if (isFormulaCheckCompleted) {
-      // If Formula Check is completed, go to Book Shipment
-      if (onBeginBookShipment) {
-        onBeginBookShipment();
-      }
-    } else {
-      // Otherwise, go to Formula Check
-      if (onBeginFormulaCheck) {
-        onBeginFormulaCheck();
-      }
+  const handleBeginLabelCheck = () => {
+    if (onBeginLabelCheck) {
+      onBeginLabelCheck();
     }
     onClose();
   };
@@ -123,7 +115,7 @@ const LabelCheckCompleteModal = ({ isOpen, onClose, onGoToShipments, onBeginForm
               margin: 0,
               textAlign: 'center',
             }}>
-              Label Check Complete!
+              Formula Check Complete!
             </h2>
           </div>
 
@@ -163,10 +155,10 @@ const LabelCheckCompleteModal = ({ isOpen, onClose, onGoToShipments, onBeginForm
               Go to Shipments
             </button>
 
-            {/* Begin Formula Check / Begin Book Shipment button */}
+            {/* Begin Label Check button */}
             <button
               type="button"
-              onClick={handleBeginNextStep}
+              onClick={handleBeginLabelCheck}
               style={{
                 minWidth: '170px',
                 height: '31px',
@@ -191,7 +183,7 @@ const LabelCheckCompleteModal = ({ isOpen, onClose, onGoToShipments, onBeginForm
                 e.currentTarget.style.backgroundColor = '#007AFF';
               }}
             >
-              {isFormulaCheckCompleted ? 'Begin Book Shipment' : 'Begin Formula Check'}
+              Begin Label Check
             </button>
           </div>
         </div>
@@ -200,8 +192,5 @@ const LabelCheckCompleteModal = ({ isOpen, onClose, onGoToShipments, onBeginForm
   );
 };
 
-export default LabelCheckCompleteModal;
-
-
-
+export default FormulaCheckCompleteModal;
 

@@ -26,6 +26,7 @@ import UncheckedFormulaModal from './components/UncheckedFormulaModal';
 import FormulaCheckCommentModal from './components/FormulaCheckCommentModal';
 import LabelCheckCommentModal from './components/LabelCheckCommentModal';
 import LabelCheckCompleteModal from './components/LabelCheckCompleteModal';
+import FormulaCheckCompleteModal from './components/FormulaCheckCompleteModal';
 
 // Utility function to handle Google Drive image URLs
 const getImageUrl = (url) => {
@@ -84,6 +85,7 @@ const NewShipment = () => {
   const [isLabelIncompleteComment, setIsLabelIncompleteComment] = useState(false);
   const [labelCheckHasComment, setLabelCheckHasComment] = useState(false);
   const [isLabelCheckCompleteOpen, setIsLabelCheckCompleteOpen] = useState(false);
+  const [isFormulaCheckCompleteOpen, setIsFormulaCheckCompleteOpen] = useState(false);
   const [selectedCarrier, setSelectedCarrier] = useState('');
   const [isCarrierDropdownOpen, setIsCarrierDropdownOpen] = useState(false);
   const [customCarrierName, setCustomCarrierName] = useState('');
@@ -1137,25 +1139,28 @@ const NewShipment = () => {
         toast.success('Formula Check completed! Moving to Book Shipment');
       }
     } else {
-      // Navigate back to shipments table after completing formula check
-      if (isIncomplete) {
+      // If formula check is completed, show completion modal instead of auto-navigating
+      if (!isIncomplete) {
+        toast.success('Formula Check completed!');
+        // Show the completion modal instead of automatically navigating
+        setIsFormulaCheckCompleteOpen(true);
+      } else {
+        // If incomplete, navigate back to planning page
         if (hasComment) {
           toast.info('Formula Check comment saved. Returning to shipments table.');
         } else {
           toast.info('Returning to shipments table.');
         }
-      } else {
-        toast.success('Formula Check completed! Returning to shipments table.');
+        
+        // Navigate back to planning page with shipments tab
+        navigate('/dashboard/production/planning', {
+          state: {
+            activeTab: 'shipments',
+            refresh: Date.now(),
+            fromFormulaCheckComplete: true,
+          }
+        });
       }
-      
-      // Navigate back to planning page with shipments tab
-      navigate('/dashboard/production/planning', {
-        state: {
-          activeTab: 'shipments',
-          refresh: Date.now(),
-          fromFormulaCheckComplete: true,
-        }
-      });
     }
   };
 
@@ -1197,25 +1202,28 @@ const NewShipment = () => {
       return newSet;
     });
 
-    // Navigate back to shipments table after completing label check
-    if (isIncomplete) {
+    // If label check is completed, show completion modal instead of auto-navigating
+    if (!isIncomplete) {
+      toast.success('Label Check completed!');
+      // Show the completion modal instead of automatically navigating
+      setIsLabelCheckCompleteOpen(true);
+    } else {
+      // If incomplete, navigate back to planning page
       if (hasComment) {
         toast.info('Label Check comment saved. Returning to shipments table.');
       } else {
         toast.info('Returning to shipments table.');
       }
-    } else {
-      toast.success('Label Check completed! Returning to shipments table.');
+      
+      // Navigate back to planning page with shipments tab
+      navigate('/dashboard/production/planning', {
+        state: {
+          activeTab: 'shipments',
+          refresh: Date.now(),
+          fromLabelCheckComplete: true,
+        }
+      });
     }
-    
-    // Navigate back to planning page with shipments tab
-    navigate('/dashboard/production/planning', {
-      state: {
-        activeTab: 'shipments',
-        refresh: Date.now(),
-        fromLabelCheckComplete: true,
-      }
-    });
   };
 
   const handleCompleteClick = async () => {
@@ -3081,14 +3089,28 @@ const NewShipment = () => {
         }}
         onBeginFormulaCheck={() => {
           setIsLabelCheckCompleteOpen(false);
-          // Navigate to formula-check if not completed, otherwise to book-shipment
-          if (completedTabs.has('formula-check')) {
-            setActiveAction('book-shipment');
-          } else {
-            handleActionChange('formula-check');
-          }
+          // Navigate to formula-check section
+          handleActionChange('formula-check');
+        }}
+        onBeginBookShipment={() => {
+          setIsLabelCheckCompleteOpen(false);
+          // Navigate to book-shipment section
+          handleActionChange('book-shipment');
         }}
         isFormulaCheckCompleted={completedTabs.has('formula-check')}
+      />
+
+      <FormulaCheckCompleteModal
+        isOpen={isFormulaCheckCompleteOpen}
+        onClose={() => setIsFormulaCheckCompleteOpen(false)}
+        onGoToShipments={() => {
+          setIsFormulaCheckCompleteOpen(false);
+        }}
+        onBeginLabelCheck={() => {
+          setIsFormulaCheckCompleteOpen(false);
+          // Navigate to label-check section
+          handleActionChange('label-check');
+        }}
       />
 
       {/* Book Shipment Complete Modal */}
