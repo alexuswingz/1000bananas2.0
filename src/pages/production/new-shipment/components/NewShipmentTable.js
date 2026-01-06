@@ -254,6 +254,41 @@ const NewShipmentTable = ({
             case 'labels':
               rowValue = row.labelsAvailable || row.label_inventory || row.labels_available;
               break;
+            case 'brand':
+              rowValue = row.brand;
+              break;
+            case 'product':
+              rowValue = row.product;
+              break;
+            case 'size':
+              rowValue = row.size;
+              break;
+            case 'qty': {
+              const index = row._originalIndex !== undefined ? row._originalIndex : rows.findIndex(r => r.id === row.id);
+              rowValue = effectiveQtyValues[index] || 0;
+              break;
+            }
+            case 'fbaAvailable':
+              rowValue = row.doiFba || row.doiTotal || 0;
+              break;
+            case 'totalInventory':
+              rowValue = row.doiTotal || row.daysOfInventory || 0;
+              break;
+            case 'forecast':
+              rowValue = Math.round(row.weeklyForecast || row.forecast || 0);
+              break;
+            case 'sales7Day':
+              rowValue = row.sales7Day || 0;
+              break;
+            case 'sales30Day':
+              rowValue = row.sales30Day || 0;
+              break;
+            case 'sales4Month':
+              rowValue = Math.round((row.sales30Day || 0) * 4);
+              break;
+            case 'formula':
+              rowValue = row.formula_name || '';
+              break;
             default: {
               const field = getFieldForHeaderFilter(columnKey);
               rowValue = row[field];
@@ -281,6 +316,42 @@ const NewShipmentTable = ({
               break;
             case 'labels':
               rowValue = row.labelsAvailable || row.label_inventory || row.labels_available || 0;
+              break;
+            case 'brand':
+              rowValue = row.brand || '';
+              break;
+            case 'product':
+              rowValue = row.product || '';
+              break;
+            case 'size':
+              rowValue = row.size || '';
+              break;
+            case 'qty': {
+              const index = row._originalIndex !== undefined ? row._originalIndex : rows.findIndex(r => r.id === row.id);
+              const qty = effectiveQtyValues[index];
+              rowValue = typeof qty === 'number' ? qty : (qty === '' || qty === null || qty === undefined ? 0 : parseInt(qty, 10) || 0);
+              break;
+            }
+            case 'fbaAvailable':
+              rowValue = row.doiFba || row.doiTotal || 0;
+              break;
+            case 'totalInventory':
+              rowValue = row.doiTotal || row.daysOfInventory || 0;
+              break;
+            case 'forecast':
+              rowValue = Math.round(row.weeklyForecast || row.forecast || 0);
+              break;
+            case 'sales7Day':
+              rowValue = row.sales7Day || 0;
+              break;
+            case 'sales30Day':
+              rowValue = row.sales30Day || 0;
+              break;
+            case 'sales4Month':
+              rowValue = Math.round((row.sales30Day || 0) * 4);
+              break;
+            case 'formula':
+              rowValue = row.formula_name || '';
               break;
             default: {
               const field = getFieldForHeaderFilter(columnKey);
@@ -505,6 +576,41 @@ const NewShipmentTable = ({
             case 'labels':
               rowValue = row.labelsAvailable || row.label_inventory || row.labels_available;
               break;
+            case 'brand':
+              rowValue = row.brand;
+              break;
+            case 'product':
+              rowValue = row.product;
+              break;
+            case 'size':
+              rowValue = row.size;
+              break;
+            case 'qty': {
+              const index = row._originalIndex !== undefined ? row._originalIndex : rows.findIndex(r => r.id === row.id);
+              rowValue = effectiveQtyValues[index] || 0;
+              break;
+            }
+            case 'fbaAvailable':
+              rowValue = row.doiFba || row.doiTotal || 0;
+              break;
+            case 'totalInventory':
+              rowValue = row.doiTotal || row.daysOfInventory || 0;
+              break;
+            case 'forecast':
+              rowValue = Math.round(row.weeklyForecast || row.forecast || 0);
+              break;
+            case 'sales7Day':
+              rowValue = row.sales7Day || 0;
+              break;
+            case 'sales30Day':
+              rowValue = row.sales30Day || 0;
+              break;
+            case 'sales4Month':
+              rowValue = Math.round((row.sales30Day || 0) * 4);
+              break;
+            case 'formula':
+              rowValue = row.formula_name || '';
+              break;
             default: {
               const field = getFieldForHeaderFilter(key);
               rowValue = row[field];
@@ -531,6 +637,42 @@ const NewShipmentTable = ({
               break;
             case 'labels':
               rowValue = row.labelsAvailable || row.label_inventory || row.labels_available || 0;
+              break;
+            case 'brand':
+              rowValue = row.brand || '';
+              break;
+            case 'product':
+              rowValue = row.product || '';
+              break;
+            case 'size':
+              rowValue = row.size || '';
+              break;
+            case 'qty': {
+              const index = row._originalIndex !== undefined ? row._originalIndex : rows.findIndex(r => r.id === row.id);
+              const qty = effectiveQtyValues[index];
+              rowValue = typeof qty === 'number' ? qty : (qty === '' || qty === null || qty === undefined ? 0 : parseInt(qty, 10) || 0);
+              break;
+            }
+            case 'fbaAvailable':
+              rowValue = row.doiFba || row.doiTotal || 0;
+              break;
+            case 'totalInventory':
+              rowValue = row.doiTotal || row.daysOfInventory || 0;
+              break;
+            case 'forecast':
+              rowValue = Math.round(row.weeklyForecast || row.forecast || 0);
+              break;
+            case 'sales7Day':
+              rowValue = row.sales7Day || 0;
+              break;
+            case 'sales30Day':
+              rowValue = row.sales30Day || 0;
+              break;
+            case 'sales4Month':
+              rowValue = Math.round((row.sales30Day || 0) * 4);
+              break;
+            case 'formula':
+              rowValue = row.formula_name || '';
               break;
             default: {
               const field = getFieldForHeaderFilter(key);
@@ -625,6 +767,46 @@ const NewShipmentTable = ({
             bVal = typeof bQty === 'number' ? bQty : (bQty === '' || bQty === null || bQty === undefined ? 0 : parseInt(bQty, 10) || 0);
             break;
           }
+          case 'brand':
+            aVal = a.brand || '';
+            bVal = b.brand || '';
+            break;
+          case 'product':
+            aVal = a.product || '';
+            bVal = b.product || '';
+            break;
+          case 'size':
+            aVal = a.size || '';
+            bVal = b.size || '';
+            break;
+          case 'fbaAvailable':
+            aVal = a.doiFba || a.doiTotal || 0;
+            bVal = b.doiFba || b.doiTotal || 0;
+            break;
+          case 'totalInventory':
+            aVal = a.doiTotal || a.daysOfInventory || 0;
+            bVal = b.doiTotal || b.daysOfInventory || 0;
+            break;
+          case 'forecast':
+            aVal = Math.round(a.weeklyForecast || a.forecast || 0);
+            bVal = Math.round(b.weeklyForecast || b.forecast || 0);
+            break;
+          case 'sales7Day':
+            aVal = a.sales7Day || 0;
+            bVal = b.sales7Day || 0;
+            break;
+          case 'sales30Day':
+            aVal = a.sales30Day || 0;
+            bVal = b.sales30Day || 0;
+            break;
+          case 'sales4Month':
+            aVal = Math.round((a.sales30Day || 0) * 4);
+            bVal = Math.round((b.sales30Day || 0) * 4);
+            break;
+          case 'formula':
+            aVal = a.formula_name || '';
+            bVal = b.formula_name || '';
+            break;
           default: {
             const field = getFieldForHeaderFilter(columnKey);
             aVal = a[field];
@@ -706,8 +888,35 @@ const NewShipmentTable = ({
         case 'size':
           val = row.size;
           break;
+        case 'brand':
+          val = row.brand;
+          break;
+        case 'product':
+          val = row.product;
+          break;
         case 'qty':
           val = effectiveQtyValues[row._originalIndex !== undefined ? row._originalIndex : index] || 0;
+          break;
+        case 'fbaAvailable':
+          val = row.doiFba || row.doiTotal || 0;
+          break;
+        case 'totalInventory':
+          val = row.doiTotal || row.daysOfInventory || 0;
+          break;
+        case 'forecast':
+          val = Math.round(row.weeklyForecast || row.forecast || 0);
+          break;
+        case 'sales7Day':
+          val = row.sales7Day || 0;
+          break;
+        case 'sales30Day':
+          val = row.sales30Day || 0;
+          break;
+        case 'sales4Month':
+          val = Math.round((row.sales30Day || 0) * 4);
+          break;
+        case 'formula':
+          val = row.formula_name || '';
           break;
         default: {
           const field = getFieldForHeaderFilter(columnKey);
@@ -2408,13 +2617,22 @@ const NewShipmentTable = ({
                   borderRight: '1px solid #FFFFFF',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', position: 'relative' }}>
                   <span>BRAND</span>
                   <img
+                    ref={(el) => {
+                      if (el) filterIconRefs.current['brand'] = el;
+                    }}
                     src="/assets/Vector (1).png"
                     alt="Filter"
-                    className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
-                    style={{ width: '12px', height: '12px' }}
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('brand') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    style={{ 
+                      width: '12px', 
+                      height: '12px',
+                      cursor: 'pointer',
+                      filter: hasActiveColumnFilter('brand') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                    }}
+                    onClick={(e) => handleFilterClick('brand', e)}
                   />
                 </div>
               </th>
@@ -2444,13 +2662,22 @@ const NewShipmentTable = ({
                   borderRight: '1px solid #FFFFFF',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', position: 'relative' }}>
                   <span>PRODUCT</span>
                   <img
+                    ref={(el) => {
+                      if (el) filterIconRefs.current['product'] = el;
+                    }}
                     src="/assets/Vector (1).png"
                     alt="Filter"
-                    className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
-                    style={{ width: '12px', height: '12px' }}
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('product') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    style={{ 
+                      width: '12px', 
+                      height: '12px',
+                      cursor: 'pointer',
+                      filter: hasActiveColumnFilter('product') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                    }}
+                    onClick={(e) => handleFilterClick('product', e)}
                   />
                 </div>
               </th>
@@ -2478,13 +2705,22 @@ const NewShipmentTable = ({
                   color: '#FFFFFF',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', position: 'relative' }}>
                   <span>SIZE</span>
                   <img
+                    ref={(el) => {
+                      if (el) filterIconRefs.current['size'] = el;
+                    }}
                     src="/assets/Vector (1).png"
                     alt="Filter"
-                    className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
-                    style={{ width: '12px', height: '12px' }}
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('size') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    style={{ 
+                      width: '12px', 
+                      height: '12px',
+                      cursor: 'pointer',
+                      filter: hasActiveColumnFilter('size') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                    }}
+                    onClick={(e) => handleFilterClick('size', e)}
                   />
                 </div>
               </th>
@@ -2567,9 +2803,12 @@ const NewShipmentTable = ({
                     }}>FBA AVAILABLE (DAYS)</span>
                   </div>
                   <img
+                    ref={(el) => {
+                      if (el) filterIconRefs.current['fbaAvailable'] = el;
+                    }}
                     src="/assets/Vector (1).png"
                     alt="Filter"
-                    className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('fbaAvailable') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                     style={{ 
                       width: '12px', 
                       height: '12px',
@@ -2577,7 +2816,10 @@ const NewShipmentTable = ({
                       right: '0',
                       top: '50%',
                       transform: 'translateY(-50%)',
+                      cursor: 'pointer',
+                      filter: hasActiveColumnFilter('fbaAvailable') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
                     }}
+                    onClick={(e) => handleFilterClick('fbaAvailable', e)}
                   />
                 </div>
               </th>
@@ -2620,9 +2862,12 @@ const NewShipmentTable = ({
                     }}>TOTAL (DAYS)</span>
                   </div>
                   <img
+                    ref={(el) => {
+                      if (el) filterIconRefs.current['totalInventory'] = el;
+                    }}
                     src="/assets/Vector (1).png"
                     alt="Filter"
-                    className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('totalInventory') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                     style={{ 
                       width: '12px', 
                       height: '12px',
@@ -2630,7 +2875,10 @@ const NewShipmentTable = ({
                       right: '0',
                       top: '50%',
                       transform: 'translateY(-50%)',
+                      cursor: 'pointer',
+                      filter: hasActiveColumnFilter('totalInventory') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
                     }}
+                    onClick={(e) => handleFilterClick('totalInventory', e)}
                   />
                 </div>
               </th>
@@ -2654,13 +2902,22 @@ const NewShipmentTable = ({
                   backgroundColor: '#1C2634',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', position: 'relative' }}>
                   <span>FORECAST</span>
                   <img
+                    ref={(el) => {
+                      if (el) filterIconRefs.current['forecast'] = el;
+                    }}
                     src="/assets/Vector (1).png"
                     alt="Filter"
-                    className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
-                    style={{ width: '12px', height: '12px' }}
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('forecast') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    style={{ 
+                      width: '12px', 
+                      height: '12px',
+                      cursor: 'pointer',
+                      filter: hasActiveColumnFilter('forecast') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                    }}
+                    onClick={(e) => handleFilterClick('forecast', e)}
                   />
                 </div>
               </th>
@@ -2684,13 +2941,22 @@ const NewShipmentTable = ({
                   backgroundColor: '#1C2634',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', position: 'relative' }}>
                   <span>7 DAY SALES</span>
                   <img
+                    ref={(el) => {
+                      if (el) filterIconRefs.current['sales7Day'] = el;
+                    }}
                     src="/assets/Vector (1).png"
                     alt="Filter"
-                    className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
-                    style={{ width: '12px', height: '12px' }}
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('sales7Day') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    style={{ 
+                      width: '12px', 
+                      height: '12px',
+                      cursor: 'pointer',
+                      filter: hasActiveColumnFilter('sales7Day') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                    }}
+                    onClick={(e) => handleFilterClick('sales7Day', e)}
                   />
                 </div>
               </th>
@@ -2714,13 +2980,22 @@ const NewShipmentTable = ({
                   backgroundColor: '#1C2634',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', position: 'relative' }}>
                   <span>30 DAY SALES</span>
                   <img
+                    ref={(el) => {
+                      if (el) filterIconRefs.current['sales30Day'] = el;
+                    }}
                     src="/assets/Vector (1).png"
                     alt="Filter"
-                    className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
-                    style={{ width: '12px', height: '12px' }}
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('sales30Day') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    style={{ 
+                      width: '12px', 
+                      height: '12px',
+                      cursor: 'pointer',
+                      filter: hasActiveColumnFilter('sales30Day') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                    }}
+                    onClick={(e) => handleFilterClick('sales30Day', e)}
                   />
                 </div>
               </th>
@@ -2744,13 +3019,22 @@ const NewShipmentTable = ({
                   backgroundColor: '#1C2634',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', position: 'relative' }}>
                   <span>4 MONTH SALES</span>
                   <img
+                    ref={(el) => {
+                      if (el) filterIconRefs.current['sales4Month'] = el;
+                    }}
                     src="/assets/Vector (1).png"
                     alt="Filter"
-                    className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
-                    style={{ width: '12px', height: '12px' }}
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('sales4Month') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    style={{ 
+                      width: '12px', 
+                      height: '12px',
+                      cursor: 'pointer',
+                      filter: hasActiveColumnFilter('sales4Month') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                    }}
+                    onClick={(e) => handleFilterClick('sales4Month', e)}
                   />
                 </div>
               </th>
@@ -2774,13 +3058,22 @@ const NewShipmentTable = ({
                   backgroundColor: '#1C2634',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', position: 'relative' }}>
                   <span>FORMULA</span>
                   <img
+                    ref={(el) => {
+                      if (el) filterIconRefs.current['formula'] = el;
+                    }}
                     src="/assets/Vector (1).png"
                     alt="Filter"
-                    className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
-                    style={{ width: '12px', height: '12px' }}
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('formula') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    style={{ 
+                      width: '12px', 
+                      height: '12px',
+                      cursor: 'pointer',
+                      filter: hasActiveColumnFilter('formula') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                    }}
+                    onClick={(e) => handleFilterClick('formula', e)}
                   />
                 </div>
               </th>
@@ -3782,7 +4075,7 @@ const NewShipmentTable = ({
       />
     )}
 
-    {/* Column Filter Dropdowns for Bottles, Closures, Boxes, Labels */}
+    {/* Column Filter Dropdowns for all columns */}
     {Array.from(openFilterColumns).map((columnKey) => {
       if (!filterIconRefs.current[columnKey]) return null;
       return (
