@@ -267,7 +267,7 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
                       left: `${lineStart}px`,
                       width: `${lineWidth}px`,
                       height: '3px',
-                      backgroundColor: '#2563EB',
+                      backgroundColor: '#22C55E',
                       top: '50%',
                       transform: 'translateY(-50%)',
                       zIndex: 1,
@@ -296,7 +296,7 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
                       width: '32px',
                       height: '32px',
                       borderRadius: '50%',
-                      backgroundColor: step.active || step.completed ? '#2563EB' : '#E5E7EB',
+                      backgroundColor: step.active || step.completed ? '#22C55E' : '#E5E7EB',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -311,7 +311,7 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
                   <span
                     style={{
                       fontSize: '10px',
-                      color: step.active || step.completed ? '#2563EB' : '#6B7280',
+                      color: step.active || step.completed ? '#22C55E' : '#6B7280',
                       fontWeight: step.active ? '600' : '400',
                       textAlign: 'center',
                       whiteSpace: 'nowrap',
@@ -332,7 +332,7 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
                 ? (
                   <>
                     Confirm Correct Formula:{' '}
-                    <span style={{ color: '#2563EB', fontWeight: '600' }}>
+                    <span style={{ color: '#3B82F6', fontWeight: '600' }}>
                       {productData.formula}
                     </span>
                   </>
@@ -441,7 +441,7 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
             style={{
               padding: '0.5rem 1.5rem',
               borderRadius: '6px',
-              backgroundColor: '#2563EB',
+              backgroundColor: '#3B82F6',
               color: 'white',
               fontSize: '14px',
               fontWeight: '500',
@@ -450,10 +450,10 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
               transition: 'all 0.2s ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#1D4ED8';
+              e.currentTarget.style.backgroundColor = '#2563EB';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#2563EB';
+              e.currentTarget.style.backgroundColor = '#3B82F6';
             }}
           >
             {isLastStep ? 'Start Production' : 'Continue'}

@@ -19,6 +19,61 @@ const Packaging = () => {
   const [showProductionStartedModal, setShowProductionStartedModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isSortMode, setIsSortMode] = useState(false);
+  
+  // Sample data - initialize with packaging products
+  const [products, setProducts] = useState([
+    {
+      id: 1,
+      status: 'pending',
+      tpsShipNumber: '10-01-2025',
+      type: 'AWD',
+      brand: 'TPS Plant Foods',
+      product: 'Cherry Tree Fertilizer',
+      size: '1 Gallon',
+      qty: 72000,
+      caseNumber: 488,
+      sku: 'HPINDOOR8OZ-FBA-UPC-0123',
+      formula: 'F.Indoor Plant Food',
+      labelLocation: 'LBL-PLANT-218',
+      cap: 'VENTED Berry',
+      productType: 'Liquid',
+      filter: 'Metal',
+    },
+    {
+      id: 2,
+      status: 'pending',
+      tpsShipNumber: '10-01-2025',
+      type: 'AWD',
+      brand: 'TPS Plant Foods',
+      product: 'Cherry Tree Fertilizer',
+      size: '1 Gallon',
+      qty: 72000,
+      caseNumber: 488,
+      sku: 'HPINDOOR8OZ-FBA-UPC-0123',
+      formula: 'F.Indoor Plant Food',
+      labelLocation: 'LBL-PLANT-218',
+      cap: 'VENTED Berry',
+      productType: 'Liquid',
+      filter: 'Metal',
+    },
+    {
+      id: 3,
+      status: 'pending',
+      tpsShipNumber: '10-01-2025',
+      type: 'AWD',
+      brand: 'TPS Plant Foods',
+      product: 'Cherry Tree Fertilizer',
+      size: '1 Gallon',
+      qty: 72000,
+      caseNumber: 488,
+      sku: 'HPINDOOR8OZ-FBA-UPC-0123',
+      formula: 'F.Indoor Plant Food',
+      labelLocation: 'LBL-PLANT-218',
+      cap: 'VENTED Berry',
+      productType: 'Liquid',
+      filter: 'Metal',
+    },
+  ]);
 
   const themeClasses = {
     pageBg: isDarkMode ? 'bg-dark-bg-primary' : 'bg-light-bg-primary',
@@ -33,21 +88,45 @@ const Packaging = () => {
   ];
 
   const handleStartClick = (row) => {
+    // Close all modals first
+    setShowProductionStartedModal(false);
+    setShowQualityChecksModal(false);
+    setShowProductInfoModal(false);
+    
+    // Set new product and open Product Info modal
     setSelectedProduct(row);
     setShowProductInfoModal(true);
   };
 
   const handleBeginQC = () => {
+    // Update status to "In Progress" when Quality Checks modal opens
+    if (selectedProduct) {
+      setProducts(prevProducts => 
+        prevProducts.map(product => 
+          product.id === selectedProduct.id 
+            ? { ...product, status: 'in_progress' }
+            : product
+        )
+      );
+      console.log('Setting status to In Progress for product:', selectedProduct.id);
+    }
+    // Close all other modals
     setShowProductInfoModal(false);
+    setShowProductionStartedModal(false);
+    // Open Quality Checks modal
     setShowQualityChecksModal(true);
   };
 
   const handleStartProduction = () => {
+    // Close all other modals
     setShowQualityChecksModal(false);
+    setShowProductInfoModal(false);
+    // Open Production Started modal
     setShowProductionStartedModal(true);
   };
 
   const handleCloseProductionStarted = () => {
+    // When closing via X button, just close the modal (status already set to in_progress)
     setShowProductionStartedModal(false);
     setSelectedProduct(null);
   };
@@ -65,17 +144,33 @@ const Packaging = () => {
   };
 
   const handleCloseProductInfo = () => {
+    // Close all modals when Product Info is closed
     setShowProductInfoModal(false);
+    setShowQualityChecksModal(false);
+    setShowProductionStartedModal(false);
     setSelectedProduct(null);
   };
 
   const handleCloseQualityChecks = () => {
+    // Close all modals when Quality Checks is closed
     setShowQualityChecksModal(false);
+    setShowProductInfoModal(false);
+    setShowProductionStartedModal(false);
     setSelectedProduct(null);
   };
 
   const handleSortClick = () => {
     setIsSortMode(!isSortMode);
+  };
+
+  const handleInProgressClick = (row) => {
+    // Close all other modals
+    setShowProductInfoModal(false);
+    setShowQualityChecksModal(false);
+    
+    // Set selected product and open Production Started modal
+    setSelectedProduct(row);
+    setShowProductionStartedModal(true);
   };
 
   return (
@@ -204,9 +299,10 @@ const Packaging = () => {
           />
         ) : (
           <PackagingTable
-            data={[]}
+            data={products}
             searchQuery={searchQuery}
             onStartClick={handleStartClick}
+            onInProgressClick={handleInProgressClick}
             isSortMode={isSortMode}
             onExitSortMode={() => setIsSortMode(false)}
           />

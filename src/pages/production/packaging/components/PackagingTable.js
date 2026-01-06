@@ -3,8 +3,9 @@ import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 import SortFormulasFilterDropdown from '../../new-shipment/components/SortFormulasFilterDropdown';
 import ProductionNotesModal from './ProductionNotesModal';
+import SplitProductModal from './SplitProductModal';
 
-const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode = false, onExitSortMode }) => {
+const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuery = '', isSortMode = false, onExitSortMode }) => {
   const { isDarkMode } = useTheme();
   const [openFilterColumn, setOpenFilterColumn] = useState(null);
   const [sortConfig, setSortConfig] = useState({ column: null, order: '' });
@@ -15,11 +16,15 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
   const actionButtonRefs = useRef({});
   const [selectedProductForNotes, setSelectedProductForNotes] = useState(null);
   const [productionNotes, setProductionNotes] = useState({}); // Map of product id to notes array
+  const [selectedProductForSplit, setSelectedProductForSplit] = useState(null);
   const [draggedRowIndex, setDraggedRowIndex] = useState(null);
   const [draggedOverRowIndex, setDraggedOverRowIndex] = useState(null);
+  const [justMovedRowId, setJustMovedRowId] = useState(null);
+  const [justMovedRowIndex, setJustMovedRowIndex] = useState(null);
   const [localTableData, setLocalTableData] = useState([]);
   const [originalTableData, setOriginalTableData] = useState([]);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [recentlyMovedRowId, setRecentlyMovedRowId] = useState(null);
 
   // Handle click outside action menu
   useEffect(() => {
@@ -27,24 +32,28 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
       if (actionMenuId) {
         const buttonElement = actionButtonRefs.current[actionMenuId];
         const clickedElement = event.target;
+        const menuElement = document.querySelector('[data-action-menu-portal]');
+        
+        // Check if click is inside the menu (including buttons)
+        if (menuElement && menuElement.contains(clickedElement)) {
+          // Don't close if clicking inside menu
+          return;
+        }
         
         // Check if click is outside both the menu and the button
         if (buttonElement && !buttonElement.contains(clickedElement)) {
-          const menuElement = document.querySelector('[data-action-menu-portal]');
-          if (menuElement && !menuElement.contains(clickedElement)) {
-            setActionMenuId(null);
-          }
+          setActionMenuId(null);
         }
       }
     };
 
     if (actionMenuId) {
       document.addEventListener('mousedown', handleClickOutside);
+      
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
     }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
   }, [actionMenuId]);
 
   const themeClasses = {
@@ -111,12 +120,15 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
     },
   ];
 
-  // Initialize local table data
+  // Initialize local table data and update when data changes
   useEffect(() => {
     const initialData = data.length > 0 ? data : sampleData;
     setLocalTableData(initialData);
-    setOriginalTableData(initialData);
-  }, [data.length]);
+    // Only update originalTableData if we're not in sort mode to preserve sort changes
+    if (!isSortMode) {
+      setOriginalTableData(initialData);
+    }
+  }, [data, isSortMode]);
 
   const tableData = localTableData.length > 0 ? localTableData : (data.length > 0 ? data : sampleData);
 
@@ -213,6 +225,25 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
     newData.splice(dropIndex, 0, draggedItem);
     
     setLocalTableData(newData);
+    
+    // Highlight the row that was just moved
+    const rowIdToHighlight = draggedItem.id;
+    console.log('Highlighting row after move:', rowIdToHighlight, draggedItem, 'at new index:', dropIndex);
+    
+    // Set highlight immediately
+    if (rowIdToHighlight) {
+      setJustMovedRowId(rowIdToHighlight);
+    }
+    // Also use index as fallback
+    setJustMovedRowIndex(dropIndex);
+    
+    // Clear the highlight after 2 seconds
+    setTimeout(() => {
+      console.log('Clearing highlight');
+      setJustMovedRowId(null);
+      setJustMovedRowIndex(null);
+    }, 2000);
+    
     setDraggedRowIndex(null);
     setDraggedOverRowIndex(null);
   };
@@ -258,22 +289,22 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
   };
 
   const columns = [
-    { key: 'status', label: 'STATUS', width: '140px', align: 'left' },
-    { key: 'tpsShipNumber', label: 'TPS SHIP #', width: '140px', align: 'left' },
-    { key: 'type', label: 'TYPE', width: '100px', align: 'left' },
-    { key: 'brand', label: 'BRAND', width: '160px', align: 'left' },
-    { key: 'product', label: 'PRODUCT', width: '200px', align: 'left', sortable: true },
-    { key: 'size', label: 'SIZE', width: '120px', align: 'left' },
-    { key: 'qty', label: 'QTY', width: '140px', align: 'right' },
-    { key: 'caseNumber', label: 'CASE #', width: '100px', align: 'right' },
-    { key: 'sku', label: 'SKU', width: '220px', align: 'left', sortable: true },
-    { key: 'formula', label: 'FORMULA', width: '160px', align: 'left' },
-    { key: 'labelLocation', label: 'LABEL LOCATION', width: '140px', align: 'left' },
-    { key: 'cap', label: 'CAP', width: '120px', align: 'left' },
-    { key: 'productType', label: 'TYPE', width: '100px', align: 'left' },
-    { key: 'filter', label: 'FILTER', width: '100px', align: 'left' },
-    { key: 'notes', label: 'NOTES', width: '100px', align: 'center' },
-    { key: 'actions', label: '', width: '60px', align: 'right' },
+    { key: 'status', label: 'STATUS', minWidth: '50px', flex: '0.7', align: 'center' },
+    { key: 'tpsShipNumber', label: 'TPS SHIP #', minWidth: '60px', flex: '0.8', align: 'center' },
+    { key: 'type', label: 'TYPE', minWidth: '40px', flex: '0.5', align: 'center' },
+    { key: 'brand', label: 'BRAND', minWidth: '60px', flex: '1.1', align: 'center' },
+    { key: 'product', label: 'PRODUCT', minWidth: '80px', flex: '1.6', align: 'center', sortable: true },
+    { key: 'size', label: 'SIZE', minWidth: '50px', flex: '0.6', align: 'center' },
+    { key: 'qty', label: 'QTY', minWidth: '50px', flex: '0.7', align: 'center' },
+    { key: 'caseNumber', label: 'CASE #', minWidth: '50px', flex: '0.6', align: 'center' },
+    { key: 'sku', label: 'SKU', minWidth: '80px', flex: '2.2', align: 'center', sortable: true },
+    { key: 'formula', label: 'FORMULA', minWidth: '60px', flex: '1.1', align: 'center' },
+    { key: 'labelLocation', label: 'LABEL LOCATION', minWidth: '60px', flex: '1.0', align: 'center' },
+    { key: 'cap', label: 'CAP', minWidth: '50px', flex: '0.6', align: 'center' },
+    { key: 'productType', label: 'TYPE', minWidth: '40px', flex: '0.5', align: 'center' },
+    { key: 'filter', label: 'FILTER', minWidth: '40px', flex: '0.5', align: 'center' },
+    { key: 'notes', label: 'NOTES', minWidth: '40px', flex: '0.5', align: 'center' },
+    { key: 'actions', label: '', minWidth: '25px', flex: '0.3', align: 'center' },
   ];
 
   const getColumnValues = (columnKey) => {
@@ -305,29 +336,44 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
           borderRadius: '8px',
           border: '1px solid #E5E7EB',
           overflow: 'hidden',
+          width: '100%',
+          maxWidth: '100%',
+          boxSizing: 'border-box',
         }}
       >
         {/* Table header */}
         <div
           className="bg-[#2C3544] border-b border-[#3C4656] w-full"
-          style={{ height: '40px', borderRadius: '8px 8px 0 0' }}
+          style={{ 
+            height: '40px', 
+            borderRadius: '8px 8px 0 0',
+            width: '100%',
+          }}
         >
           <div
             className="grid h-full"
             style={{
-              gridTemplateColumns: columns.slice(0, -1).map((col) => col.width).join(' ') + ' 1fr',
+              gridTemplateColumns: columns.map((col) => {
+                // Use minmax with fr units - allows columns to shrink below preferred but maintain minimum
+                // At 90% zoom, columns can shrink more aggressively
+                return `minmax(${col.minWidth}, ${col.flex}fr)`;
+              }).join(' '),
               gap: '0',
+              width: '100%',
+              minWidth: '0', // Allow grid to shrink below content size
             }}
           >
             {columns.map((column, idx) => (
               <div
                 key={column.key}
-                className="h-full text-xs font-bold text-white uppercase tracking-wider flex items-center justify-center group"
+                className={`h-full text-xs font-bold text-white uppercase tracking-wider flex items-center group ${
+                  column.align === 'right' ? 'justify-end' : column.align === 'center' ? 'justify-center' : 'justify-start'
+                }`}
                 style={{
-                  paddingLeft: column.key === 'actions' ? '4px' : '16px',
-                  paddingRight: column.key === 'actions' ? '16px' : '16px',
-                  paddingTop: '12px',
-                  paddingBottom: '12px',
+                  paddingLeft: column.key === 'actions' ? '4px' : '6px',
+                  paddingRight: column.key === 'actions' ? '6px' : '6px',
+                  paddingTop: '10px',
+                  paddingBottom: '10px',
                   position: 'relative',
                   borderRight: idx < columns.length - 1 && column.key !== 'actions' ? '1px solid rgba(255, 255, 255, 0.15)' : 'none',
                 }}
@@ -335,43 +381,85 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
                 {column.key === 'actions' ? (
                   <div />
                 ) : (
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      width: '100%',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <span
+                  column.align === 'center' ? (
+                    <div
                       style={{
-                        color: openFilterColumn === column.key ? '#007AFF' : '#FFFFFF',
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        letterSpacing: '0.05em',
-                        whiteSpace: 'nowrap',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        justifyContent: 'center',
+                        width: '100%',
                       }}
                     >
-                      {column.label}
-                    </span>
-                    {column.sortable && (
-                      <img
-                        ref={(el) => {
-                          if (el) {
-                            filterIconRefs.current[column.key] = el;
-                          }
+                      <span
+                        style={{
+                          color: openFilterColumn === column.key ? '#007AFF' : '#FFFFFF',
+                          fontSize: '9px',
+                          fontWeight: 700,
+                          letterSpacing: '0.03em',
+                          whiteSpace: 'nowrap',
                         }}
-                        src="/assets/Vector (1).png"
-                        alt="Filter"
-                        className={`w-3 h-3 transition-opacity cursor-pointer ${
-                          openFilterColumn === column.key ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                        }`}
-                        onClick={(e) => handleFilterClick(column.key, e)}
-                        style={{ width: '12px', height: '12px', flexShrink: 0 }}
-                      />
-                    )}
-                  </div>
+                      >
+                        {column.label}
+                      </span>
+                      {column.sortable && (
+                        <img
+                          ref={(el) => {
+                            if (el) {
+                              filterIconRefs.current[column.key] = el;
+                            }
+                          }}
+                          src="/assets/Vector (1).png"
+                          alt="Filter"
+                          className={`w-3 h-3 transition-opacity cursor-pointer ${
+                            openFilterColumn === column.key ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                          }`}
+                          onClick={(e) => handleFilterClick(column.key, e)}
+                          style={{ width: '12px', height: '12px', flexShrink: 0 }}
+                        />
+                      )}
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        width: '100%',
+                        justifyContent: column.align === 'right' ? 'flex-end' : 'flex-start',
+                      }}
+                    >
+                      <span
+                        style={{
+                          color: openFilterColumn === column.key ? '#007AFF' : '#FFFFFF',
+                          fontSize: '9px',
+                          fontWeight: 700,
+                          letterSpacing: '0.03em',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {column.label}
+                      </span>
+                      {column.sortable && (
+                        <img
+                          ref={(el) => {
+                            if (el) {
+                              filterIconRefs.current[column.key] = el;
+                            }
+                          }}
+                          src="/assets/Vector (1).png"
+                          alt="Filter"
+                          className={`w-3 h-3 transition-opacity cursor-pointer ${
+                            openFilterColumn === column.key ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                          }`}
+                          onClick={(e) => handleFilterClick(column.key, e)}
+                          style={{ width: '12px', height: '12px', flexShrink: 0 }}
+                        />
+                      )}
+                    </div>
+                  )
                 )}
               </div>
             ))}
@@ -390,18 +478,48 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
             filteredData.map((row, index) => (
               <div
                 key={row.id || index}
-                className={`grid text-sm ${themeClasses.cardBg} ${themeClasses.rowHover}`}
+                className={`grid ${themeClasses.cardBg} ${themeClasses.rowHover}`}
                 style={{
-                  gridTemplateColumns: columns.slice(0, -1).map((col) => col.width).join(' ') + ' 1fr',
+                  gridTemplateColumns: columns.map((col) => {
+                    // Use minmax with fr units - allows columns to shrink below preferred but maintain minimum
+                    // At 90% zoom, columns can shrink more aggressively
+                    return `minmax(${col.minWidth}, ${col.flex}fr)`;
+                  }).join(' '),
                   gap: '0',
                   borderBottom:
                     index === filteredData.length - 1
                       ? 'none'
                       : '1px solid #e5e7eb',
-                  minHeight: '40px',
-                  opacity: draggedRowIndex === index ? 0.5 : 1,
-                  backgroundColor: draggedOverRowIndex === index && isSortMode ? '#F3F4F6' : 'transparent',
+                  minHeight: '38px',
+                  opacity: draggedRowIndex === index ? 0.4 : 1,
+                  backgroundColor: justMovedRowId && (justMovedRowId === row.id || justMovedRowId === row.key || justMovedRowId === `row-${index}`)
+                    ? '#BFDBFE' 
+                    : draggedOverRowIndex === index && isSortMode 
+                      ? '#E0F2FE' 
+                      : justMovedRowIndex === index
+                        ? '#BFDBFE'
+                        : 'transparent',
+                  border: draggedRowIndex === index 
+                    ? '2px dashed #3B82F6' 
+                    : draggedOverRowIndex === index && isSortMode 
+                      ? '2px solid #3B82F6' 
+                      : justMovedRowId && (justMovedRowId === row.id || justMovedRowId === row.key || justMovedRowId === `row-${index}`)
+                        ? '2px solid #3B82F6'
+                        : 'none',
+                  boxShadow: draggedRowIndex === index 
+                    ? '0 4px 12px rgba(59, 130, 246, 0.3)' 
+                    : draggedOverRowIndex === index && isSortMode 
+                      ? '0 2px 8px rgba(59, 130, 246, 0.2)' 
+                      : justMovedRowId && (justMovedRowId === row.id || justMovedRowId === row.key || justMovedRowId === `row-${index}`)
+                        ? '0 2px 8px rgba(59, 130, 246, 0.3)'
+                        : 'none',
+                  transform: draggedRowIndex === index ? 'scale(0.98)' : 'scale(1)',
+                  transition: draggedRowIndex === index || draggedOverRowIndex === index || (justMovedRowId && (justMovedRowId === row.id || justMovedRowId === row.key || justMovedRowId === `row-${index}`)) ? 'all 0.2s ease' : 'none',
                   cursor: isSortMode ? 'grab' : 'default',
+                  width: '100%',
+                  minWidth: '0', // Allow grid to shrink below content size
+                  fontSize: '12px',
+                  zIndex: draggedRowIndex === index ? 10 : draggedOverRowIndex === index ? 5 : justMovedRowIndex === index ? 3 : 1,
                 }}
                 draggable={isSortMode}
                 onDragStart={(e) => handleDragStart(e, index)}
@@ -414,10 +532,10 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
                 <div
                   className="flex items-center justify-center"
                   style={{ 
-                    paddingLeft: '16px',
-                    paddingRight: '16px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
+                    paddingLeft: '6px',
+                    paddingRight: '6px',
+                    paddingTop: '10px',
+                    paddingBottom: '10px',
                   }}
                 >
                   {isSortMode ? (
@@ -441,17 +559,54 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
                         <line x1="2" y1="10" x2="10" y2="10" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round"/>
                       </svg>
                     </div>
+                  ) : row.status === 'paused' ? (
+                    <button
+                      className="bg-gray-400 text-gray-800 text-xs font-semibold px-3 py-1 rounded hover:bg-gray-500 transition-colors"
+                      style={{ 
+                        whiteSpace: 'nowrap',
+                        borderRadius: '4px',
+                        cursor: 'default',
+                      }}
+                      disabled
+                    >
+                      Paused
+                    </button>
+                  ) : row.status === 'in_progress' ? (
+                    <div
+                      className="text-blue-600 text-xs font-semibold px-3 py-1 rounded"
+                      style={{ 
+                        whiteSpace: 'nowrap',
+                        borderRadius: '4px',
+                        backgroundColor: 'transparent',
+                        border: '1px solid #3B82F6',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => {
+                        if (onInProgressClick) {
+                          onInProgressClick(row);
+                        }
+                      }}
+                    >
+                      In Progress
+                    </div>
                   ) : (
-                  <button
-                    onClick={() => onStartClick && onStartClick(row)}
-                    className="bg-blue-600 text-white text-xs font-semibold px-3 py-1 rounded hover:bg-blue-700 transition-colors"
-                    style={{ 
-                      whiteSpace: 'nowrap',
-                      borderRadius: '4px',
-                    }}
-                  >
-                    Start
-                  </button>
+                    <button
+                      onClick={() => {
+                        if (onStartClick) {
+                          onStartClick(row);
+                        }
+                      }}
+                      className="bg-blue-600 text-white text-xs font-semibold px-3 py-1 rounded hover:bg-blue-700 transition-colors"
+                      style={{ 
+                        whiteSpace: 'nowrap',
+                        borderRadius: '4px',
+                      }}
+                    >
+                      Start
+                    </button>
                   )}
                 </div>
 
@@ -459,10 +614,13 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
                 <div
                   className={`flex items-center justify-center ${themeClasses.textPrimary}`}
                   style={{ 
-                    paddingLeft: '16px',
-                    paddingRight: '16px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
+                    paddingLeft: '6px',
+                    paddingRight: '6px',
+                    paddingTop: '10px',
+                    paddingBottom: '10px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {row.tpsShipNumber}
@@ -472,10 +630,13 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
                 <div
                   className={`flex items-center justify-center ${themeClasses.textPrimary}`}
                   style={{ 
-                    paddingLeft: '16px',
-                    paddingRight: '16px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
+                    paddingLeft: '6px',
+                    paddingRight: '6px',
+                    paddingTop: '10px',
+                    paddingBottom: '10px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {row.type}
@@ -485,11 +646,14 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
                 <div
                   className={`flex items-center justify-center ${themeClasses.textPrimary}`}
                   style={{ 
-                    paddingLeft: '16px',
-                    paddingRight: '16px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
+                    paddingLeft: '6px',
+                    paddingRight: '6px',
+                    paddingTop: '10px',
+                    paddingBottom: '10px',
                     cursor: 'pointer',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -509,10 +673,13 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
                 <div
                   className={`flex items-center justify-center ${themeClasses.textPrimary}`}
                   style={{ 
-                    paddingLeft: '16px',
-                    paddingRight: '16px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
+                    paddingLeft: '6px',
+                    paddingRight: '6px',
+                    paddingTop: '10px',
+                    paddingBottom: '10px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {row.product}
@@ -522,10 +689,13 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
                 <div
                   className={`flex items-center justify-center ${themeClasses.textPrimary}`}
                   style={{ 
-                    paddingLeft: '16px',
-                    paddingRight: '16px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
+                    paddingLeft: '6px',
+                    paddingRight: '6px',
+                    paddingTop: '10px',
+                    paddingBottom: '10px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {row.size}
@@ -535,10 +705,10 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
                 <div
                   className={`flex items-center justify-center ${themeClasses.textPrimary}`}
                   style={{ 
-                    paddingLeft: '16px',
-                    paddingRight: '16px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
+                    paddingLeft: '6px',
+                    paddingRight: '6px',
+                    paddingTop: '10px',
+                    paddingBottom: '10px',
                   }}
                 >
                   <input
@@ -547,11 +717,13 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
                     className={`${themeClasses.inputBg} border border-gray-300 rounded px-2 py-1 text-sm`}
                     style={{
                       width: '100%',
-                      maxWidth: '120px',
+                      maxWidth: '100px',
                       backgroundColor: '#F9FAFB',
                       border: '1px solid #E5E7EB',
-                      borderRadius: '8px',
+                      borderRadius: '6px',
                       textAlign: 'center',
+                      fontSize: '12px',
+                      padding: '4px 6px',
                     }}
                   />
                 </div>
@@ -560,10 +732,13 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
                 <div
                   className={`flex items-center justify-center ${themeClasses.textPrimary}`}
                   style={{ 
-                    paddingLeft: '16px',
-                    paddingRight: '16px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
+                    paddingLeft: '6px',
+                    paddingRight: '6px',
+                    paddingTop: '10px',
+                    paddingBottom: '10px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {row.caseNumber}
@@ -571,32 +746,31 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
 
                 {/* SKU */}
                 <div
-                  className={`flex items-center ${themeClasses.textPrimary}`}
+                  className={`flex items-center justify-center ${themeClasses.textPrimary}`}
                   style={{ 
-                    paddingLeft: '16px',
-                    paddingRight: '16px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
-                    justifyContent: 'flex-start',
+                    paddingLeft: '6px',
+                    paddingRight: '6px',
+                    paddingTop: '10px',
+                    paddingBottom: '10px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
                   }}
                 >
-                  <span
-                    style={{
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {row.sku}
-                  </span>
+                  {row.sku}
                 </div>
 
                 {/* FORMULA */}
                 <div
                   className={`flex items-center justify-center ${themeClasses.textPrimary}`}
                   style={{ 
-                    paddingLeft: '16px',
-                    paddingRight: '16px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
+                    paddingLeft: '6px',
+                    paddingRight: '6px',
+                    paddingTop: '10px',
+                    paddingBottom: '10px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {row.formula || 'F.Indoor Plant Food'}
@@ -606,10 +780,13 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
                 <div
                   className={`flex items-center justify-center ${themeClasses.textPrimary}`}
                   style={{ 
-                    paddingLeft: '16px',
-                    paddingRight: '16px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
+                    paddingLeft: '6px',
+                    paddingRight: '6px',
+                    paddingTop: '10px',
+                    paddingBottom: '10px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {row.labelLocation || 'LBL-PLANT-218'}
@@ -619,10 +796,13 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
                 <div
                   className={`flex items-center justify-center ${themeClasses.textPrimary}`}
                   style={{ 
-                    paddingLeft: '16px',
-                    paddingRight: '16px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
+                    paddingLeft: '6px',
+                    paddingRight: '6px',
+                    paddingTop: '10px',
+                    paddingBottom: '10px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {row.cap || 'VENTED Berry'}
@@ -632,10 +812,13 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
                 <div
                   className={`flex items-center justify-center ${themeClasses.textPrimary}`}
                   style={{ 
-                    paddingLeft: '16px',
-                    paddingRight: '16px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
+                    paddingLeft: '6px',
+                    paddingRight: '6px',
+                    paddingTop: '10px',
+                    paddingBottom: '10px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {row.productType || 'Liquid'}
@@ -645,10 +828,13 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
                 <div
                   className={`flex items-center justify-center ${themeClasses.textPrimary}`}
                   style={{ 
-                    paddingLeft: '16px',
-                    paddingRight: '16px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
+                    paddingLeft: '6px',
+                    paddingRight: '6px',
+                    paddingTop: '10px',
+                    paddingBottom: '10px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {row.filter || 'Metal'}
@@ -658,10 +844,10 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
                 <div
                   className="flex items-center justify-center"
                   style={{ 
-                    paddingLeft: '16px',
-                    paddingRight: '16px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
+                    paddingLeft: '6px',
+                    paddingRight: '6px',
+                    paddingTop: '10px',
+                    paddingBottom: '10px',
                   }}
                 >
                   <button
@@ -782,15 +968,24 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = 'transparent';
               }}
-              onClick={() => {
-                // TODO: Implement split product functionality
-                console.log('Split Product clicked for:', selectedRow);
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Split Product clicked, row:', selectedRow);
+                // Immediately set the product and close menu
+                setSelectedProductForSplit(selectedRow);
                 setActionMenuId(null);
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
               }}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2v20" />
-                <path d="M8 8l4-4 4 4M8 16l4 4 4-4" />
+                <path d="M12 3v8" />
+                <path d="M8 11l4 4 4-4" />
+                <path d="M8 11h8" />
+                <path d="M6 19l6-6 6 6" />
               </svg>
               <span>Split Product</span>
             </button>
@@ -961,6 +1156,66 @@ const PackagingTable = ({ data = [], onStartClick, searchQuery = '', isSortMode 
             // TODO: Save to backend API here
           }}
           isDarkMode={isDarkMode}
+        />
+      )}
+
+      {/* Split Product Modal */}
+      {selectedProductForSplit && (
+        <SplitProductModal
+          isOpen={true}
+          onClose={() => {
+            console.log('Closing split product modal');
+            setSelectedProductForSplit(null);
+          }}
+          product={selectedProductForSplit}
+          onConfirm={(splitData) => {
+            console.log('Split product confirmed, splitData:', splitData);
+            const { firstBatchQty, secondBatchQty, product } = splitData;
+            
+            // Use current tableData to find the product
+            const currentData = localTableData.length > 0 ? localTableData : (data.length > 0 ? data : sampleData);
+            const productIndex = currentData.findIndex(row => row.id === product.id);
+            
+            console.log('Product index:', productIndex, 'Current data length:', currentData.length);
+            
+            if (productIndex !== -1) {
+              // Create two new rows from the split
+              const firstRow = {
+                ...product,
+                id: product.id, // Keep original ID for first batch
+                status: 'paused', // First batch is paused
+                qty: firstBatchQty,
+              };
+              
+              // Generate a new ID for the second batch (using timestamp or incrementing)
+              const maxId = Math.max(...currentData.map(r => r.id || 0), 0);
+              const secondRow = {
+                ...product,
+                id: maxId + 1, // New ID for second batch
+                status: 'pending', // Second batch is pending (shows Start button)
+                qty: secondBatchQty,
+              };
+              
+              console.log('First row:', firstRow);
+              console.log('Second row:', secondRow);
+              
+              // Replace the original row with the two new rows
+              const newTableData = [...currentData];
+              newTableData.splice(productIndex, 1, firstRow, secondRow);
+              
+              console.log('New table data length:', newTableData.length);
+              
+              // Update both local and original data
+              setLocalTableData(newTableData);
+              setOriginalTableData(newTableData);
+              
+              // TODO: Save to backend API here
+            } else {
+              console.error('Product not found in table data');
+            }
+            
+            setSelectedProductForSplit(null);
+          }}
         />
       )}
 
