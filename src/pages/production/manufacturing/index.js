@@ -40,7 +40,7 @@ const Manufacturing = () => {
 
       {/* Sub-navigation tabs - only show for active tab */}
       {activeTab === 'active' && (
-        <div
+      <div
           className={`${themeClasses.pageBg}`}
           style={{
             padding: '1rem 2rem',
@@ -81,27 +81,55 @@ const Manufacturing = () => {
           <div style={{ position: 'relative' }}>
             <button
               onClick={() => setShowShipmentDropdown(!showShipmentDropdown)}
-              className={`${isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white'} ${isDarkMode ? 'text-dark-text-primary' : 'text-gray-900'} ${isDarkMode ? 'border-dark-border-primary' : 'border-gray-200'} border text-sm transition-all hover:shadow-sm`}
               style={{
-                padding: '0.5rem 1rem',
-                paddingRight: '2rem',
-                borderRadius: '8px',
+                width: '142px',
+                height: '24px',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #E5E7EB',
+                borderRadius: '4px',
+                padding: '0',
+                paddingLeft: '10px',
+                paddingRight: '10px',
                 display: 'flex',
+                flexDirection: 'row',
                 alignItems: 'center',
-                gap: '0.5rem',
+                justifyContent: 'space-between',
                 whiteSpace: 'nowrap',
-                minWidth: '150px',
                 position: 'relative',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                boxSizing: 'border-box',
+                gap: '8px',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = '#D1D5DB';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = '#E5E7EB';
               }}
             >
-              <span>{selectedShipment || 'Select Shipment'}</span>
+              <span style={{
+                display: 'flex',
+                flexDirection: 'row',
+                alignItems: 'center',
+                width: '94px',
+                height: '15px',
+                textAlign: 'left',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                fontSize: '13px',
+                fontWeight: 400,
+                color: '#374151',
+                lineHeight: '1',
+              }}>
+                {selectedShipment || 'Select Shipment'}
+              </span>
               <svg
-                className={isDarkMode ? 'text-dark-text-secondary' : 'text-gray-500'}
                 style={{
-                  position: 'absolute',
-                  right: '0.75rem',
-                  width: '1rem',
-                  height: '1rem',
+                  width: '10px',
+                  height: '10px',
+                  color: '#374151',
+                  flexShrink: 0,
                 }}
                 fill="none"
                 stroke="currentColor"

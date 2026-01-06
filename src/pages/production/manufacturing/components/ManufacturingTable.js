@@ -25,7 +25,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
   };
 
   // Sample data - replace with actual data from props
-  const sampleData = Array.from({ length: 3 }, (_, i) => ({
+  const sampleData = Array.from({ length: 20 }, (_, i) => ({
     id: i + 1,
     status: 'Not Started',
     tpsShipNumber: '10-01-2025',
@@ -42,9 +42,16 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
 
   // Filter data based on activeSubTab
   const filteredByType = tableData.filter((row) => {
-    if (activeSubTab === 'all') return true;
-    if (activeSubTab === 'bottling') return row.type === 'Bottling' || row.size?.includes('Bottle') || row.size?.includes('Gallon');
-    if (activeSubTab === 'bagging') return row.type === 'Bagging' || row.size?.includes('Bag');
+    if (activeSubTab === 'all') {
+      // Exclude AWD type from 'all' tab - it should only show in bottling
+      return row.type !== 'AWD';
+    }
+    if (activeSubTab === 'bottling') {
+      return row.type === 'Bottling' || row.type === 'AWD' || row.size?.includes('Bottle') || row.size?.includes('Gallon') || row.size === 'Barrel';
+    }
+    if (activeSubTab === 'bagging') {
+      return row.type === 'Bagging' || row.size?.includes('Bag');
+    }
     return true;
   });
 
@@ -389,11 +396,8 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                 style={{
                   gridTemplateColumns: columns.map((col) => col.width).join(' '),
                   gap: '0',
-                  borderBottom:
-                    index === finalData.length - 1
-                      ? 'none'
-                      : '1px solid #e5e7eb',
-                  minHeight: '50px',
+                  borderBottom: '1px solid #e5e7eb',
+                  height: '41px',
                 }}
               >
                 {/* STATUS */}
@@ -402,57 +406,93 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                   style={{
                     paddingLeft: '22px',
                     paddingRight: '22px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
+                    paddingTop: '8px',
+                    paddingBottom: '8px',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', justifyContent: 'center' }}>
+                  <button
+                    ref={(el) => {
+                      if (el) statusButtonRefs.current[row.id] = el;
+                    }}
+                    onClick={(e) => handleStatusClick(row.id, e)}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: '8px',
+                      width: '100%',
+                      maxWidth: '135px',
+                      minHeight: '24px',
+                      height: 'auto',
+                      backgroundColor: '#FFFFFF',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '4px',
+                      paddingTop: '4px',
+                      paddingRight: '12px',
+                      paddingBottom: '4px',
+                      paddingLeft: '12px',
+                      cursor: 'pointer',
+                      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+                      transition: 'all 0.2s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#D1D5DB';
+                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = '#E5E7EB';
+                      e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
+                    }}
+                  >
                     <input
                       type="radio"
                       checked={false}
                       onChange={() => {}}
-                      style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                    />
-                    <button
-                      ref={(el) => {
-                        if (el) statusButtonRefs.current[row.id] = el;
-                      }}
-                      onClick={(e) => handleStatusClick(row.id, e)}
-                      className={`${themeClasses.textPrimary} flex items-center gap-1`}
+                      onClick={(e) => e.stopPropagation()}
                       style={{
-                        backgroundColor: 'transparent',
-                        border: 'none',
+                        width: '14px',
+                        height: '14px',
                         cursor: 'pointer',
-                        fontSize: '14px',
-                        padding: '4px',
+                        margin: 0,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontSize: '13px',
+                        fontWeight: 400,
+                        color: '#374151',
+                        flex: 1,
+                        textAlign: 'left',
+                        lineHeight: '1',
                       }}
                     >
-                      <span>{row.status || 'Not Started'}</span>
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 12 12"
-                        fill="none"
-                      >
-                        <path
-                          d="M3 4.5L6 7.5L9 4.5"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </button>
-                  </div>
+                      {row.status || 'Not Started'}
+                    </span>
+                    <svg
+                      width="10"
+                      height="10"
+                      viewBox="0 0 12 12"
+                      fill="none"
+                      style={{ flexShrink: 0 }}
+                    >
+                      <path
+                        d="M3 4.5L6 7.5L9 4.5"
+                        stroke="#6B7280"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
                   {statusDropdowns[row.id] && (
                     <div
                       data-status-dropdown={row.id}
                       style={{
                         position: 'absolute',
-                        top: '100%',
+                        top: 'calc(100% + 4px)',
                         left: '22px',
                         right: '22px',
-                        marginTop: '4px',
                         zIndex: 1000,
                         backgroundColor: '#FFFFFF',
                         border: '1px solid #E5E7EB',
@@ -496,8 +536,8 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                   style={{
                     paddingLeft: '22px',
                     paddingRight: '22px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
+                    paddingTop: '8px',
+                    paddingBottom: '8px',
                   }}
                 >
                   {row.tpsShipNumber}
@@ -509,8 +549,8 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                   style={{
                     paddingLeft: '22px',
                     paddingRight: '22px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
+                    paddingTop: '8px',
+                    paddingBottom: '8px',
                   }}
                 >
                   {row.type}
@@ -522,8 +562,8 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                   style={{
                     paddingLeft: '22px',
                     paddingRight: '22px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
+                    paddingTop: '8px',
+                    paddingBottom: '8px',
                   }}
                 >
                   {row.formula}
@@ -535,8 +575,8 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                   style={{
                     paddingLeft: '22px',
                     paddingRight: '22px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
+                    paddingTop: '8px',
+                    paddingBottom: '8px',
                   }}
                 >
                   {row.size}
@@ -548,8 +588,8 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                   style={{
                     paddingLeft: '22px',
                     paddingRight: '22px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
+                    paddingTop: '8px',
+                    paddingBottom: '8px',
                   }}
                 >
                   {row.qty}
@@ -561,8 +601,8 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                   style={{
                     paddingLeft: '22px',
                     paddingRight: '22px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
+                    paddingTop: '8px',
+                    paddingBottom: '8px',
                   }}
                 >
                   {row.tote}
@@ -574,22 +614,37 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                   style={{
                     paddingLeft: '22px',
                     paddingRight: '22px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
+                    paddingTop: '8px',
+                    paddingBottom: '8px',
                   }}
                 >
                   <input
                     type="text"
                     value={volumes[row.id] !== undefined ? volumes[row.id] : (row.volume || '')}
                     onChange={(e) => handleVolumeChange(row.id, e.target.value)}
-                    className={`${themeClasses.inputBg} border border-gray-300 rounded px-2 py-1 text-sm ${themeClasses.textPrimary}`}
                     style={{
-                      width: '100%',
-                      maxWidth: '100px',
+                      width: '88px',
+                      height: '24px',
                       backgroundColor: '#F9FAFB',
                       border: '1px solid #E5E7EB',
-                      borderRadius: '6px',
+                      borderRadius: '8px',
+                      paddingTop: '4px',
+                      paddingRight: '6px',
+                      paddingBottom: '4px',
+                      paddingLeft: '6px',
                       textAlign: 'center',
+                      fontSize: '13px',
+                      color: isDarkMode ? '#E5E7EB' : '#374151',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#3B82F6';
+                      e.currentTarget.style.backgroundColor = '#FFFFFF';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = '#E5E7EB';
+                      e.currentTarget.style.backgroundColor = '#F9FAFB';
                     }}
                   />
                 </div>
@@ -600,8 +655,8 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                   style={{
                     paddingLeft: '22px',
                     paddingRight: '22px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
+                    paddingTop: '8px',
+                    paddingBottom: '8px',
                   }}
                 >
                   {row.measure}
@@ -613,11 +668,11 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                   style={{
                     paddingLeft: '22px',
                     paddingRight: '22px',
-                    paddingTop: '12px',
-                    paddingBottom: '12px',
+                    paddingTop: '8px',
+                    paddingBottom: '8px',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', position: 'relative' }}>
                     <button
                       style={{
                         backgroundColor: 'transparent',
@@ -629,10 +684,14 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                         justifyContent: 'center',
                       }}
                     >
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <rect x="2" y="2" width="12" height="12" rx="2" fill="#007AFF" />
-                        <path d="M5 5h6M5 8h6M5 11h4" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-                      </svg>
+                      <img
+                        src="/assets/Vector (3).png"
+                        alt="Notes"
+                        style={{
+                          width: '20px',
+                          height: '16px',
+                        }}
+                      />
                     </button>
                     <button
                       ref={(el) => {
@@ -664,6 +723,8 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '2px',
+                        position: 'absolute',
+                        right: 0,
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.backgroundColor = '#F3F4F6';

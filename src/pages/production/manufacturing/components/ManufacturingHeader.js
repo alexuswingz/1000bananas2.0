@@ -4,7 +4,6 @@ import { useTheme } from '../../../../context/ThemeContext';
 const ManufacturingHeader = ({ activeTab, onTabChange, onSearch, onSortClick }) => {
   const { isDarkMode } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
-  const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -97,7 +96,7 @@ const ManufacturingHeader = ({ activeTab, onTabChange, onSearch, onSortClick }) 
                     ? (isDarkMode ? '#1F2937' : '#FFFFFF')
                     : 'transparent',
                   color: isActive
-                    ? (isDarkMode ? '#FFFFFF' : '#111827')
+                    ? (isDarkMode ? '#FFFFFF' : '#374151')
                     : (isDarkMode ? '#9CA3AF' : '#6B7280'),
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
@@ -122,47 +121,24 @@ const ManufacturingHeader = ({ activeTab, onTabChange, onSearch, onSortClick }) 
           gap: '0.75rem',
         }}
       >
-        {/* Settings Icon */}
-        <button
-          style={{
-            padding: '0.5rem',
-            borderRadius: '8px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            backgroundColor: 'transparent',
-            border: 'none',
-          }}
-          onClick={() => setShowSettingsDropdown(!showSettingsDropdown)}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'transparent';
-          }}
-        >
-          <img
-            src="/assets/Vector.png"
-            alt="Settings"
-            style={{ width: '1.25rem', height: '1.25rem' }}
-          />
-        </button>
-
         {/* Sort Button */}
         <button
           onClick={onSortClick}
           style={{
             backgroundColor: '#FCD34D',
-            padding: '0.5rem 1rem',
-            borderRadius: '9999px',
+            width: '73px',
+            height: '24px',
+            borderRadius: '4px',
             display: 'flex',
+            flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
             border: 'none',
-            gap: '0.5rem',
+            gap: '10px',
+            padding: '0',
             transition: 'all 0.2s ease',
+            boxSizing: 'border-box',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.opacity = '0.9';
@@ -172,7 +148,7 @@ const ManufacturingHeader = ({ activeTab, onTabChange, onSearch, onSortClick }) 
           }}
         >
           <svg
-            style={{ width: '1rem', height: '1rem', color: '#111827' }}
+            style={{ width: '14px', height: '14px', color: '#111827', flexShrink: 0 }}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 20 12"
@@ -186,49 +162,106 @@ const ManufacturingHeader = ({ activeTab, onTabChange, onSearch, onSortClick }) 
             {/* Bottom bar - shortest */}
             <line x1="2" y1="10" x2="7" y2="10" />
           </svg>
-          <span style={{ fontSize: '0.875rem', fontWeight: '500', color: '#111827' }}>
+          <span style={{ fontSize: '13px', fontWeight: '500', color: '#111827', lineHeight: '1', whiteSpace: 'nowrap' }}>
             Sort
           </span>
         </button>
 
         {/* Search */}
-        <div style={{ position: 'relative', width: '200px' }}>
-          <input
-            type="text"
-            placeholder="Search..."
-            value={searchQuery}
-            onChange={handleSearchChange}
-            className={`${themeClasses.inputBg} ${themeClasses.text} ${themeClasses.border} border text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all`}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ position: 'relative', width: '264px' }}>
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={handleSearchChange}
+              style={{
+                width: '100%',
+                height: '32px',
+                paddingLeft: '2.5rem',
+                paddingRight: '8px',
+                paddingTop: '8px',
+                paddingBottom: '8px',
+                borderRadius: '6px',
+                border: '1px solid #E5E7EB',
+                backgroundColor: '#FFFFFF',
+                fontSize: '14px',
+                color: isDarkMode ? '#E5E7EB' : '#111827',
+                outline: 'none',
+                transition: 'all 0.2s ease',
+                boxSizing: 'border-box',
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = '#3B82F6';
+                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = '#E5E7EB';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            />
+            <svg
+              fill="none"
+              stroke="#9CA3AF"
+              viewBox="0 0 24 24"
+              style={{
+                position: 'absolute',
+                left: '0.9rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: '1rem',
+                height: '1rem',
+                pointerEvents: 'none',
+              }}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+          </div>
+          {/* Arrow buttons - outside search bar */}
+          <div
             style={{
-              width: '100%',
-              paddingLeft: '2.5rem',
-              paddingRight: '1rem',
-              paddingTop: '0.5rem',
-              paddingBottom: '0.5rem',
-              borderRadius: '8px',
-            }}
-          />
-          <svg
-            className={themeClasses.textSecondary}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            style={{
-              position: 'absolute',
-              left: '0.9rem',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              width: '1rem',
-              height: '1rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '2px',
+              alignItems: 'center',
             }}
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 12 12"
+              fill="none"
+              style={{ color: '#9CA3AF', cursor: 'pointer' }}
+            >
+              <path
+                d="M3 8L6 5L9 8"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 12 12"
+              fill="none"
+              style={{ color: '#9CA3AF', cursor: 'pointer' }}
+            >
+              <path
+                d="M3 4L6 7L9 4"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
         </div>
       </div>
     </div>
