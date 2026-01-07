@@ -320,10 +320,8 @@ const Planning = () => {
   };
 
   const handleStatusCommentClick = (row, statusFieldName) => {
-    // Don't show modal if status is completed
-    if (row[statusFieldName] === 'completed') {
-      return;
-    }
+    // Allow opening modal for any status (completed statuses will navigate via onStatusClick instead)
+    // This allows viewing/editing comments even if status changed
     setStatusCommentRow(row);
     setStatusCommentField(statusFieldName);
     setIsStatusCommentOpen(true);
@@ -364,13 +362,26 @@ const Planning = () => {
         return;
       }
 
+      // Map field names to their dedicated comment columns
+      const commentFieldMap = {
+        'addProducts': 'add_products_comment',
+        'formulaCheck': 'formula_check_comment',
+        'labelCheck': 'label_check_comment',
+        'bookShipment': 'book_shipment_comment',
+        'sortProducts': 'sort_products_comment',
+        'sortFormulas': 'sort_formulas_comment',
+      };
+
       const updateData = {
         [backendField]: false, // Mark as incomplete since comment was added
       };
       
-      // Add comment to notes if provided
+      // Add comment to dedicated comment column if provided
       if (commentText.trim()) {
-        updateData.notes = commentText.trim();
+        const commentField = commentFieldMap[fieldName];
+        if (commentField) {
+          updateData[commentField] = commentText.trim();
+        }
       }
 
       // Update shipment in backend
@@ -904,6 +915,7 @@ const Planning = () => {
         onComplete={handleStatusCommentComplete}
         isDarkMode={isDarkMode}
         statusFieldName={statusCommentField}
+        existingComment={statusCommentRow && statusCommentField ? statusCommentRow[`${statusCommentField}CommentText`] || '' : ''}
       />
 
       {/* Content */}

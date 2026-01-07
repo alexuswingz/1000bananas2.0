@@ -250,14 +250,8 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         return;
       }
       
-      // If status is incomplete, open comment modal
-      if (normalizedStatus === 'incomplete' && onStatusCommentClick && rowId && statusFieldName && row) {
-        onStatusCommentClick(row, statusFieldName);
-        return;
-      }
-      
+      // If has comment, toggle tooltip (no modal)
       if (hasComment && commentText && uniqueCommentId) {
-        // If has comment, show tooltip
         if (hoveredCommentId === uniqueCommentId) {
           // If already showing, close it
           setHoveredCommentId(null);
@@ -276,6 +270,25 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
     // Determine if circle should be clickable (completed status, incomplete status, or has comment)
     const isClickable = normalizedStatus === 'completed' || normalizedStatus === 'incomplete' || (shouldShowComment && commentText);
     
+    const handleIconHover = (e) => {
+      // Show tooltip on hover if there's a comment
+      if (hasComment && commentText && uniqueCommentId) {
+        const rect = e.currentTarget.getBoundingClientRect();
+        setTooltipPos({
+          top: rect.bottom + window.scrollY + 12,
+          left: rect.left + rect.width / 2 + window.scrollX,
+        });
+        setHoveredCommentId(uniqueCommentId);
+      }
+    };
+
+    const handleIconLeave = () => {
+      // Hide tooltip when mouse leaves
+      if (hoveredCommentId === uniqueCommentId) {
+        setHoveredCommentId(null);
+      }
+    };
+
     return (
       <div 
         ref={(el) => { if (el && uniqueCommentId) iconRefs.current[uniqueCommentId] = el; }}
@@ -285,6 +298,8 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
           cursor: isClickable ? 'pointer' : 'default'
         }}
         onClick={handleIconClick}
+        onMouseEnter={handleIconHover}
+        onMouseLeave={handleIconLeave}
       >
         <div
           style={{
