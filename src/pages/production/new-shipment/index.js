@@ -3,7 +3,7 @@ import { useTheme } from '../../../context/ThemeContext';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
-import { createShipment, getShipmentById, updateShipment, addShipmentProducts, getShipmentProducts, getShipmentFormulaCheck, getLabelsAvailability } from '../../../services/productionApi';
+import { createShipment, getShipmentById, updateShipment, addShipmentProducts, getShipmentProducts, getShipmentFormulaCheck, getLabelsAvailability, updateShipmentFormulaCheck } from '../../../services/productionApi';
 import CatalogAPI from '../../../services/catalogApi';
 import NgoosAPI from '../../../services/ngoosApi';
 import { extractFileId, getDriveImageUrl } from '../../../services/googleDriveApi';
@@ -97,6 +97,7 @@ const NewShipment = () => {
   const [labelCheckRows, setLabelCheckRows] = useState([]);
   const [formulaCheckData, setFormulaCheckData] = useState({ total: 0, completed: 0, remaining: 0 });
   const [formulaSelectedRows, setFormulaSelectedRows] = useState(new Set());
+  const [formulaCheckRefreshKey, setFormulaCheckRefreshKey] = useState(0);
   const [labelCheckData, setLabelCheckData] = useState({ total: 0, completed: 0, remaining: 0 });
   const [shipmentProducts, setShipmentProducts] = useState([]); // Products loaded from existing shipment
   const [tableMode, setTableMode] = useState(false);
@@ -1225,6 +1226,40 @@ const NewShipment = () => {
     }
   };
 
+  const handleMarkAllAsCompleted = async () => {
+    try {
+      if (!shipmentId) {
+        toast.error('Please book the shipment first');
+        return;
+      }
+
+      // Get all formulas for the shipment
+      const formulas = await getShipmentFormulaCheck(shipmentId);
+      
+      if (formulas.length === 0) {
+        toast.info('No formulas to mark as completed');
+        return;
+      }
+
+      // Get all formula IDs
+      const allFormulaIds = formulas.map(formula => formula.id);
+
+      // Mark all formulas as checked
+      await updateShipmentFormulaCheck(shipmentId, {
+        checked_formula_ids: allFormulaIds,
+        uncheck_formula_ids: []
+      });
+
+      toast.success(`All ${allFormulaIds.length} formula(s) marked as completed`);
+      
+      // Trigger a refresh by incrementing the refresh key
+      setFormulaCheckRefreshKey(prev => prev + 1);
+    } catch (error) {
+      console.error('Error marking all formulas as completed:', error);
+      toast.error('Failed to mark all formulas as completed');
+    }
+  };
+
   const handleCompleteClick = async () => {
     try {
       if (!shipmentId) {
@@ -2059,6 +2094,7 @@ const NewShipment = () => {
               onFormulaDataChange={setFormulaCheckData}
               selectedRows={formulaSelectedRows}
               onSelectedRowsChange={setFormulaSelectedRows}
+              refreshKey={formulaCheckRefreshKey}
             />
           </div>
         )}
@@ -2508,6 +2544,53 @@ const NewShipment = () => {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                {formulaCheckData.completed > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleMarkAllAsCompleted}
+                    style={{
+                      height: '31px',
+                      padding: '0 16px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      backgroundColor: '#007AFF',
+                      color: '#FFFFFF',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#0056CC';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#007AFF';
+                    }}
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      style={{ flexShrink: 0 }}
+                    >
+                      <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" fill="none" />
+                      <path
+                        d="M5 8L7 10L11 6"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    Mark All as Completed
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleCompleteClick}
