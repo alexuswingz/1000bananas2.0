@@ -1734,6 +1734,7 @@ const NewShipmentTable = ({
                       >
                         <input
                           type="number"
+                          min="0"
                           step={(() => {
                             const size = row.size?.toLowerCase() || '';
                             if (size.includes('8oz')) return 60;
@@ -3481,6 +3482,7 @@ const NewShipmentTable = ({
                           if (el) qtyInputRefs.current[index] = el;
                         }}
                         type="number"
+                        min="0"
                         step={(() => {
                           const size = row.size?.toLowerCase() || '';
                           if (size.includes('8oz')) return 60;
@@ -3705,6 +3707,11 @@ const NewShipmentTable = ({
                                     currentQty === undefined
                                   ? 0
                                   : parseInt(currentQty, 10) || 0;
+                              
+                              // Stop at 0 - don't allow going negative
+                              if (numQty <= 0) {
+                                return;
+                              }
                               
                               // Determine increment based on size
                               let increment = 0;
