@@ -427,7 +427,8 @@ const FormulaCheckTable = ({
 
   const columns = [
     { key: 'checkbox', label: '', width: '50px' },
-    { key: 'formula', label: 'FORMULA', width: '200px' },
+    { key: 'complete', label: '', width: '112px' },
+    { key: 'formula', label: 'FORMULA', width: '150px' },
     { key: 'vessel', label: 'VESSEL', width: '120px' },
     { key: 'qty', label: 'QTY', width: '80px' },
     { key: 'vesselType', label: 'VESSEL TYPE', width: '120px' },
@@ -474,8 +475,8 @@ const FormulaCheckTable = ({
                   key={column.key}
                   className="group"
                   style={{
-                    padding: column.key === 'checkbox' ? '0 8px' : '0 16px',
-                    textAlign: column.key === 'checkbox' ? 'center' : 'left',
+                    padding: column.key === 'checkbox' || column.key === 'complete' ? '0 8px' : '0 16px',
+                    textAlign: column.key === 'checkbox' || column.key === 'complete' ? 'center' : 'left',
                     fontSize: '11px',
                     fontWeight: 600,
                     color: '#9CA3AF',
@@ -483,13 +484,13 @@ const FormulaCheckTable = ({
                     letterSpacing: '0.05em',
                     width: column.width,
                     whiteSpace: 'nowrap',
-                    borderRight: column.key === 'checkbox' ? 'none' : '1px solid #FFFFFF',
+                    borderRight: column.key === 'checkbox' || column.key === 'complete' ? 'none' : '1px solid #FFFFFF',
                     height: '40px',
-                    cursor: column.key !== 'checkbox' ? 'pointer' : 'default',
+                    cursor: column.key !== 'checkbox' && column.key !== 'complete' ? 'pointer' : 'default',
                     position: 'relative',
                   }}
                 >
-                  {column.key === 'checkbox' ? (
+                  {column.key === 'checkbox' || column.key === 'complete' ? (
                     column.label
                   ) : (
                     <div style={{
@@ -606,6 +607,50 @@ const FormulaCheckTable = ({
                       accentColor: hasNote ? '#F59E0B' : undefined, // turn orange when a comment/note exists
                     }}
                   />
+                </td>
+                <td style={{
+                  padding: '0 8px',
+                  textAlign: 'center',
+                  height: '40px',
+                }}>
+                  {(() => {
+                    const isCompleted = selectedRows.has(formula.id);
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => handleCheckboxChange(formula.id)}
+                        style={{
+                          backgroundColor: isCompleted ? '#34C759' : '#3B82F6',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          borderRadius: '8px',
+                          width: '96px',
+                          height: '24px',
+                          padding: '0',
+                          fontSize: '14px',
+                          fontWeight: 500,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          textShadow: '0 0 8px rgba(255, 255, 255, 0.5), 0 0 4px rgba(135, 206, 250, 0.6)',
+                          boxShadow: isCompleted 
+                            ? '0 2px 4px rgba(52, 199, 89, 0.2)' 
+                            : '0 2px 4px rgba(59, 130, 246, 0.2)',
+                          outline: 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = isCompleted ? '#30B955' : '#2563EB';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = isCompleted ? '#34C759' : '#3B82F6';
+                        }}
+                      >
+                        {isCompleted ? 'Completed' : 'Complete'}
+                      </button>
+                    );
+                  })()}
                 </td>
                 <td style={{
                   padding: '0 16px',
