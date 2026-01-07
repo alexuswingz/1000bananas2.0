@@ -222,7 +222,6 @@ const Planning = () => {
         // Helper function to determine step status
         const getStepStatus = (completed, currentStepStatus, workflowStatus, hasComment) => {
           // If completed, always show as completed (handle both boolean true and string "true")
-          // This check MUST come first to ensure completed status takes priority
           // Also handle PostgreSQL boolean which might come as True/False
           const isCompleted = completed === true || 
                               completed === 'true' || 
@@ -231,13 +230,28 @@ const Planning = () => {
                               completed === '1' ||
                               (typeof completed === 'string' && completed.toLowerCase() === 'true');
           
-          // If explicitly completed in database, always return completed (comments don't override completion)
+          // Check for explicit incompleteness (has comment AND completed is explicitly false)
+          // This check MUST come first - if a user marked it incomplete, respect that
+          const isExplicitlyIncomplete = completed === false || 
+                                         completed === 'false' || 
+                                         completed === 'False' ||
+                                         completed === 0 ||
+                                         completed === '0' ||
+                                         (typeof completed === 'string' && completed.toLowerCase() === 'false');
+          
+          // If has comment and explicitly marked incomplete, it's incomplete regardless of workflow
+          if (hasComment && isExplicitlyIncomplete) {
+            return 'incomplete';
+          }
+          
+          // If explicitly completed in database, return completed
           if (isCompleted) {
             return 'completed';
           }
           
           // If workflow has moved past this step, it's implicitly completed
           // (workflow can't progress without completing previous steps)
+          // BUT only if it wasn't explicitly marked as incomplete
           if (workflowStatus) {
             const workflowSteps = ['add_products', 'label_check', 'formula_check', 'book_shipment', 'sort_products', 'sort_formulas'];
             const currentStepIndex = workflowSteps.indexOf(currentStepStatus);
@@ -246,7 +260,6 @@ const Planning = () => {
             // If workflow has moved past this step, it means it was completed
             // (even if the flag wasn't set correctly in the database)
             if (currentStepIndex >= 0 && workflowStepIndex > currentStepIndex) {
-              // If workflow moved past, it's completed (comments are just notes, not indicators of incompleteness)
               return 'completed';
             }
           }
@@ -254,7 +267,7 @@ const Planning = () => {
           // If workflow is currently on this step, show as in progress
           if (workflowStatus && workflowStatus === currentStepStatus) return 'in progress';
           
-          // If has comment but not completed, it's incomplete
+          // If has comment but not explicitly marked (shouldn't happen, but handle it)
           if (hasComment) return 'incomplete';
           
           // Otherwise, it's pending
