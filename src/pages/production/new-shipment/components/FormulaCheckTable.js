@@ -11,6 +11,7 @@ const FormulaCheckTable = ({
   selectedRows: externalSelectedRows = null,
   onSelectedRowsChange,
   refreshKey = 0, // Increment to trigger reload while preserving checked status
+  isAdmin = false, // Admin role check for bulk actions
 }) => {
   const { isDarkMode } = useTheme();
   const [selectedRows, setSelectedRows] = useState(new Set());
@@ -24,6 +25,7 @@ const FormulaCheckTable = ({
   const [notesModalOpen, setNotesModalOpen] = useState(false);
   const [selectedFormulaForNotes, setSelectedFormulaForNotes] = useState(null);
   const [dataLoaded, setDataLoaded] = useState(false); // Track if we've loaded from backend
+  const [bulkSelectedRows, setBulkSelectedRows] = useState(new Set()); // Track rows selected for bulk actions
 
   // Load formula data from API - reload when shipmentId OR refreshKey changes
   useEffect(() => {
@@ -407,6 +409,44 @@ const FormulaCheckTable = ({
     }
   };
 
+  // Handle bulk checkbox change (for bulk actions)
+  const handleBulkCheckboxChange = (id) => {
+    setBulkSelectedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  // Handle bulk complete action
+  const handleBulkComplete = async () => {
+    if (bulkSelectedRows.size === 0) return;
+    
+    try {
+      setLoading(true);
+      // Complete all selected formulas
+      const promises = Array.from(bulkSelectedRows).map(id => 
+        saveCheckedStatus(id, true)
+      );
+      await Promise.all(promises);
+      
+      // Reload data
+      await loadFormulaData();
+      await checkAndClearFormulaCheckComment();
+      
+      // Clear bulk selection
+      setBulkSelectedRows(new Set());
+    } catch (error) {
+      console.error('Error bulk completing formulas:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleNotesClick = (formula) => {
     setSelectedFormulaForNotes(formula);
     setNotesModalOpen(true);
@@ -457,6 +497,54 @@ const FormulaCheckTable = ({
         border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
         overflow: 'hidden',
       }}>
+        {/* Bulk Action Bar (Admin only, shown when items are selected) */}
+        {isAdmin && bulkSelectedRows.size > 0 && (
+          <div style={{
+            backgroundColor: isDarkMode ? '#374151' : '#F3F4F6',
+            borderBottom: isDarkMode ? '1px solid #4B5563' : '1px solid #E5E7EB',
+            padding: '12px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}>
+            <span style={{
+              fontSize: '14px',
+              fontWeight: 500,
+              color: isDarkMode ? '#E5E7EB' : '#374151',
+            }}>
+              {bulkSelectedRows.size} {bulkSelectedRows.size === 1 ? 'formula' : 'formulas'} selected
+            </span>
+            <button
+              type="button"
+              onClick={handleBulkComplete}
+              disabled={loading}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: '#10B981',
+                color: '#FFFFFF',
+                fontSize: '14px',
+                fontWeight: 500,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.6 : 1,
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                if (!loading) {
+                  e.currentTarget.style.backgroundColor = '#059669';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!loading) {
+                  e.currentTarget.style.backgroundColor = '#10B981';
+                }
+              }}
+            >
+              Complete Selected
+            </button>
+          </div>
+        )}
         {/* Table Container */}
         <div style={{ overflowX: 'auto' }}>
         <table style={{
@@ -598,14 +686,22 @@ const FormulaCheckTable = ({
                 }}>
                   <input
                     type="checkbox"
-                    checked={selectedRows.has(formula.id)}
-                    onChange={() => handleCheckboxChange(formula.id)}
+                    checked={isAdmin ? bulkSelectedRows.has(formula.id) : selectedRows.has(formula.id)}
+                    onChange={() => {
+                      if (isAdmin) {
+                        handleBulkCheckboxChange(formula.id);
+                      } else {
+                        handleCheckboxChange(formula.id);
+                      }
+                    }}
+                    onClick={(e) => e.stopPropagation()}
                     style={{
                       width: '16px',
                       height: '16px',
                       cursor: 'pointer',
-                      accentColor: hasNote ? '#F59E0B' : undefined, // turn orange when a comment/note exists
+                      accentColor: hasNote ? '#F59E0B' : '#3B82F6',
                     }}
+                    title={isAdmin ? "Select for bulk action" : "Check to mark as complete"}
                   />
                 </td>
                 <td style={{
@@ -619,35 +715,83 @@ const FormulaCheckTable = ({
                       <button
                         type="button"
                         onClick={() => handleCheckboxChange(formula.id)}
+                        className="done-badge-btn"
                         style={{
-                          backgroundColor: isCompleted ? '#34C759' : '#3B82F6',
-                          color: '#FFFFFF',
+                          height: '26px',
+                          padding: '0 12px',
+                          borderRadius: '13px',
                           border: 'none',
-                          borderRadius: '8px',
-                          width: '96px',
-                          height: '24px',
-                          padding: '0',
-                          fontSize: '14px',
-                          fontWeight: 500,
+                          backgroundColor: isCompleted ? '#10B981' : '#3B82F6',
+                          color: '#FFFFFF',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          letterSpacing: '0.025em',
                           cursor: 'pointer',
-                          transition: 'all 0.2s',
-                          textShadow: '0 0 8px rgba(255, 255, 255, 0.5), 0 0 4px rgba(135, 206, 250, 0.6)',
-                          boxShadow: isCompleted 
-                            ? '0 2px 4px rgba(52, 199, 89, 0.2)' 
-                            : '0 2px 4px rgba(59, 130, 246, 0.2)',
-                          outline: 'none',
-                          display: 'flex',
+                          transition: 'all 0.2s ease',
+                          display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
+                          gap: '5px',
+                          whiteSpace: 'nowrap',
+                          minWidth: '60px',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                          position: 'relative',
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = isCompleted ? '#30B955' : '#2563EB';
+                          const baseColor = isCompleted ? '#059669' : '#2563EB';
+                          e.currentTarget.style.backgroundColor = baseColor;
+                          e.currentTarget.style.transform = 'scale(1.02)';
+                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+                          // Show edit icon
+                          const icon = e.currentTarget.querySelector('.edit-icon');
+                          if (icon) icon.style.opacity = '1';
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = isCompleted ? '#34C759' : '#3B82F6';
+                          const baseColor = isCompleted ? '#10B981' : '#3B82F6';
+                          e.currentTarget.style.backgroundColor = baseColor;
+                          e.currentTarget.style.transform = 'scale(1)';
+                          e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
+                          // Hide edit icon
+                          const icon = e.currentTarget.querySelector('.edit-icon');
+                          if (icon) icon.style.opacity = '0';
                         }}
+                        title={isCompleted ? "Click to edit" : "Click to complete"}
                       >
-                        {isCompleted ? 'Completed' : 'Complete'}
+                        {isCompleted ? (
+                          <>
+                            <svg 
+                              width="12" 
+                              height="12" 
+                              viewBox="0 0 24 24" 
+                              fill="none" 
+                              stroke="currentColor" 
+                              strokeWidth="2.5"
+                              style={{ marginRight: '-2px' }}
+                            >
+                              <polyline points="20 6 9 17 4 12" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                            <span>Done</span>
+                            <svg 
+                              className="edit-icon"
+                              width="10" 
+                              height="10" 
+                              viewBox="0 0 24 24" 
+                              fill="none" 
+                              stroke="currentColor" 
+                              strokeWidth="2.5"
+                              style={{ 
+                                opacity: 0, 
+                                transition: 'opacity 0.15s ease',
+                                marginLeft: '2px',
+                              }}
+                            >
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </>
+                        ) : (
+                          <span>Complete</span>
+                        )}
                       </button>
                     );
                   })()}

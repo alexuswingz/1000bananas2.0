@@ -2146,6 +2146,7 @@ const NewShipment = () => {
               selectedRows={formulaSelectedRows}
               onSelectedRowsChange={setFormulaSelectedRows}
               refreshKey={formulaCheckRefreshKey}
+              isAdmin={false} // TODO: Connect to actual user role check (e.g., user?.role === 'admin')
             />
           </div>
         )}
@@ -2164,6 +2165,7 @@ const NewShipment = () => {
               onRowsDataChange={setLabelCheckRows}
               refreshKey={labelCheckRefreshKey}
               checkAllIncompleteTrigger={checkAllIncompleteTrigger}
+              isAdmin={false} // TODO: Connect to actual user role check (e.g., user?.role === 'admin')
             />
           </div>
         )}

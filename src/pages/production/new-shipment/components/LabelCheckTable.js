@@ -15,6 +15,7 @@ const LabelCheckTable = ({
   hideHeader = false,
   refreshKey = 0, // Increment to trigger reload while preserving checked status
   checkAllIncompleteTrigger = 0, // Increment to check all incomplete row checkboxes
+  isAdmin = false, // Admin role check for bulk actions
 }) => {
   const { isDarkMode } = useTheme();
   const location = useLocation();
@@ -56,6 +57,7 @@ const LabelCheckTable = ({
   const [confirmedRows, setConfirmedRows] = useState(new Set()); // Rows confirmed without counting
   const [completedRowStatus, setCompletedRowStatus] = useState({}); // id -> insufficient?: true/false
   const [selectedRows, setSelectedRows] = useState(new Set()); // Track selected rows for checkboxes
+  const [bulkSelectedRows, setBulkSelectedRows] = useState(new Set()); // Track rows selected for bulk actions
   const [isVarianceStillExceededOpen, setIsVarianceStillExceededOpen] = useState(false);
   const [labelFormula, setLabelFormula] = useState(null); // Current label formula for weight conversion
   const hideActionsDropdown = Boolean(shipmentId);
@@ -138,6 +140,48 @@ const LabelCheckTable = ({
     } catch (error) {
       console.error('Error loading label data:', error);
       setRows([]); // Use empty array on error instead of dummy data
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle bulk checkbox change (for bulk actions)
+  const handleBulkCheckboxChange = (id) => {
+    setBulkSelectedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  // Handle bulk complete action
+  const handleBulkComplete = async () => {
+    if (bulkSelectedRows.size === 0) return;
+    
+    try {
+      setLoading(true);
+      // Complete all selected products by marking them as confirmed
+      const promises = Array.from(bulkSelectedRows).map(async (id) => {
+        try {
+          await updateShipmentProductLabelCheck(shipmentId, id, 'confirmed');
+        } catch (error) {
+          console.error(`Error completing product ${id}:`, error);
+        }
+      });
+      await Promise.all(promises);
+      
+      // Reload data
+      await loadLabelData();
+      await checkAndClearLabelCheckComment();
+      
+      // Clear bulk selection
+      setBulkSelectedRows(new Set());
+    } catch (error) {
+      console.error('Error bulk completing label checks:', error);
     } finally {
       setLoading(false);
     }
@@ -661,6 +705,54 @@ const LabelCheckTable = ({
       width: '100%',
       marginBottom: '16px',
     }}>
+      {/* Bulk Action Bar (Admin only, shown when items are selected) */}
+      {isAdmin && bulkSelectedRows.size > 0 && (
+        <div style={{
+          backgroundColor: isDarkMode ? '#374151' : '#F3F4F6',
+          borderBottom: isDarkMode ? '1px solid #4B5563' : '1px solid #E5E7EB',
+          padding: '12px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          <span style={{
+            fontSize: '14px',
+            fontWeight: 500,
+            color: isDarkMode ? '#E5E7EB' : '#374151',
+          }}>
+            {bulkSelectedRows.size} {bulkSelectedRows.size === 1 ? 'product' : 'products'} selected
+          </span>
+          <button
+            type="button"
+            onClick={handleBulkComplete}
+            disabled={loading}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: 'none',
+              backgroundColor: '#10B981',
+              color: '#FFFFFF',
+              fontSize: '14px',
+              fontWeight: 500,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.6 : 1,
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              if (!loading) {
+                e.currentTarget.style.backgroundColor = '#059669';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!loading) {
+                e.currentTarget.style.backgroundColor = '#10B981';
+              }
+            }}
+          >
+            Complete Selected
+          </button>
+        </div>
+      )}
       {/* Recount Mode Banner */}
       {isRecountMode && (
         <div style={{
@@ -939,18 +1031,22 @@ const LabelCheckTable = ({
                   }}>
                     <input
                       type="checkbox"
-                      checked={selectedRows.has(row.id)}
+                      checked={isAdmin ? bulkSelectedRows.has(row.id) : selectedRows.has(row.id)}
                       onChange={(e) => {
                         e.stopPropagation();
-                        setSelectedRows(prev => {
-                          const newSet = new Set(prev);
-                          if (e.target.checked) {
-                            newSet.add(row.id);
-                          } else {
-                            newSet.delete(row.id);
-                          }
-                          return newSet;
-                        });
+                        if (isAdmin) {
+                          handleBulkCheckboxChange(row.id);
+                        } else {
+                          setSelectedRows(prev => {
+                            const newSet = new Set(prev);
+                            if (e.target.checked) {
+                              newSet.add(row.id);
+                            } else {
+                              newSet.delete(row.id);
+                            }
+                            return newSet;
+                          });
+                        }
                       }}
                       onClick={(e) => e.stopPropagation()}
                       style={{
@@ -959,6 +1055,7 @@ const LabelCheckTable = ({
                         cursor: 'pointer',
                         accentColor: '#3B82F6',
                       }}
+                      title={isAdmin ? "Select for bulk action" : undefined}
                     />
                   </td>
                   <td style={{
