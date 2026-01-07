@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
-const LabelCheckCommentModal = ({ isOpen, onClose, onComplete, isDarkMode }) => {
+const LabelCheckCommentModal = ({ isOpen, onClose, onComplete, isDarkMode, isIncomplete = false }) => {
   const [comment, setComment] = useState('');
   const [internalIsOpen, setInternalIsOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
@@ -160,7 +160,9 @@ const LabelCheckCommentModal = ({ isOpen, onClose, onComplete, isDarkMode }) => 
               margin: '0 0 16px 0',
               lineHeight: '1.5',
             }}>
-              Label Check has been marked as incomplete. Add a comment to provide more details for your team.
+              {isIncomplete 
+                ? 'Label Check has been marked as incomplete. Add a comment to provide more details for your team.'
+                : 'Add an optional comment before completing the Label Check step.'}
             </p>
 
             <label style={{

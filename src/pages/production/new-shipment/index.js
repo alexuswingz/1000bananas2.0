@@ -140,39 +140,42 @@ const NewShipment = () => {
   const labelCheckRemainingCount = totalLabelCheckRows - labelCheckCompletedCount;
   const isLabelCheckReadyToComplete = totalLabelCheckRows > 0 && labelCheckRemainingCount === 0;
 
-  // Auto-complete label check when all products are checked
-  useEffect(() => {
-    // Only auto-complete if:
-    // 1. We have products to check
-    // 2. All products are completed
-    // 3. Label check is not already marked as completed
-    // 4. We have a shipmentId
-    // 5. We're currently on the label-check step
-    if (
-      shipmentId &&
-      activeAction === 'label-check' &&
-      isLabelCheckReadyToComplete &&
-      !completedTabs.has('label-check') &&
-      totalLabelCheckRows > 0
-    ) {
-      // Check for variance/incomplete status - if any row is insufficient, mark as incomplete
-      const hasVariance = labelCheckRows.some(row => {
-        // A row is incomplete if it's counted and has insufficient labels
-        return row.isCounted && row.isInsufficient === true;
-      });
-      
-      // Auto-complete the label check step (only once)
-      const autoComplete = async () => {
-        try {
-          await completeLabelCheck('', hasVariance);
-        } catch (error) {
-          console.error('Error auto-completing label check:', error);
-        }
-      };
-      autoComplete();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLabelCheckReadyToComplete, shipmentId, activeAction, completedTabs, totalLabelCheckRows, labelCheckRows]);
+  // REMOVED: Auto-complete label check when all products are checked
+  // This was causing automatic navigation to planning table when the last row was completed,
+  // even if the user didn't click the "Complete" button in the footer.
+  // Users must now manually click the "Complete" button to finish the label check step.
+  // useEffect(() => {
+  //   // Only auto-complete if:
+  //   // 1. We have products to check
+  //   // 2. All products are completed
+  //   // 3. Label check is not already marked as completed
+  //   // 4. We have a shipmentId
+  //   // 5. We're currently on the label-check step
+  //   if (
+  //     shipmentId &&
+  //     activeAction === 'label-check' &&
+  //     isLabelCheckReadyToComplete &&
+  //     !completedTabs.has('label-check') &&
+  //     totalLabelCheckRows > 0
+  //   ) {
+  //     // Check for variance/incomplete status - if any row is insufficient, mark as incomplete
+  //     const hasVariance = labelCheckRows.some(row => {
+  //       // A row is incomplete if it's counted and has insufficient labels
+  //       return row.isCounted && row.isInsufficient === true;
+  //     });
+  //     
+  //     // Auto-complete the label check step (only once)
+  //     const autoComplete = async () => {
+  //       try {
+  //         await completeLabelCheck('', hasVariance);
+  //       } catch (error) {
+  //         console.error('Error auto-completing label check:', error);
+  //       }
+  //     };
+  //     autoComplete();
+  //   }
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [isLabelCheckReadyToComplete, shipmentId, activeAction, completedTabs, totalLabelCheckRows, labelCheckRows]);
 
   // Close tooltip when clicking outside if it's pinned
   useEffect(() => {
@@ -1202,18 +1205,29 @@ const NewShipment = () => {
       return newSet;
     });
 
-    // If label check is completed, show completion modal instead of auto-navigating
-    if (!isIncomplete) {
+    // If a comment was added, navigate back to shipments table
+    if (hasComment) {
+      if (!isIncomplete) {
+        toast.success('Label Check completed with comment!');
+      } else {
+        toast.info('Label Check comment saved. Returning to shipments table.');
+      }
+      
+      // Navigate back to planning page with shipments tab
+      navigate('/dashboard/production/planning', {
+        state: {
+          activeTab: 'shipments',
+          refresh: Date.now(),
+          fromLabelCheckComplete: true,
+        }
+      });
+    } else if (!isIncomplete) {
+      // If completed without comment, show completion modal
       toast.success('Label Check completed!');
-      // Show the completion modal instead of automatically navigating
       setIsLabelCheckCompleteOpen(true);
     } else {
-      // If incomplete, navigate back to planning page
-      if (hasComment) {
-        toast.info('Label Check comment saved. Returning to shipments table.');
-      } else {
-        toast.info('Returning to shipments table.');
-      }
+      // If incomplete without comment, navigate back to planning page
+      toast.info('Returning to shipments table.');
       
       // Navigate back to planning page with shipments tab
       navigate('/dashboard/production/planning', {
@@ -1304,9 +1318,9 @@ const NewShipment = () => {
           setIsVarianceExceededOpen(true);
           return;
         }
-        // Label Check: Complete and move to the next appropriate step
-        // - When incomplete, mark status as incomplete (orange) but still advance
-        await completeLabelCheck('', isIncomplete);
+
+        // If all checks are done and no variance, complete directly without showing comment modal
+        await completeLabelCheck('', false);
         return;
       }
 
@@ -3161,6 +3175,7 @@ const NewShipment = () => {
           setIsLabelIncompleteComment(false);
         }}
         isDarkMode={isDarkMode}
+        isIncomplete={isLabelIncompleteComment}
       />
 
       <LabelCheckCompleteModal

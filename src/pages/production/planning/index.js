@@ -231,6 +231,7 @@ const Planning = () => {
                               completed === '1' ||
                               (typeof completed === 'string' && completed.toLowerCase() === 'true');
           
+          // If explicitly completed in database, always return completed (comments don't override completion)
           if (isCompleted) {
             return 'completed';
           }
@@ -245,19 +246,15 @@ const Planning = () => {
             // If workflow has moved past this step, it means it was completed
             // (even if the flag wasn't set correctly in the database)
             if (currentStepIndex >= 0 && workflowStepIndex > currentStepIndex) {
-              // Only return 'completed' if there's no comment (comments indicate incomplete)
-              if (!hasComment) {
-                return 'completed';
-              } else {
-                return 'incomplete'; // Has comment, so it was marked incomplete
-              }
+              // If workflow moved past, it's completed (comments are just notes, not indicators of incompleteness)
+              return 'completed';
             }
           }
           
           // If workflow is currently on this step, show as in progress
           if (workflowStatus && workflowStatus === currentStepStatus) return 'in progress';
           
-          // If has comment, it's incomplete
+          // If has comment but not completed, it's incomplete
           if (hasComment) return 'incomplete';
           
           // Otherwise, it's pending
@@ -268,10 +265,10 @@ const Planning = () => {
         const formulaCheckStatus = getStepStatus(shipment.formula_check_completed, 'formula_check', shipment.status, hasFormulaComment);
         const labelCheckStatus = getStepStatus(shipment.label_check_completed, 'label_check', shipment.status, hasLabelComment);
         
-        // Only show comment icon if step is NOT completed (comments should be cleared when completed)
-        // If status is 'completed', don't show comment even if it exists in DB (it should have been cleared)
-        const showFormulaComment = hasFormulaComment && formulaCheckStatus !== 'completed';
-        const showLabelComment = hasLabelComment && labelCheckStatus !== 'completed';
+        // Show comment icon if there's a comment (even if status is completed, comments can still exist)
+        // Comments are now preserved when completing with a comment, so show them regardless of status
+        const showFormulaComment = hasFormulaComment;
+        const showLabelComment = hasLabelComment;
         
         return {
         id: shipment.id,

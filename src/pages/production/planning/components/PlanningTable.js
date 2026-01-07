@@ -151,40 +151,47 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
     // Base status from row field - normalize to lowercase and trim whitespace
     const baseStatus = (status || 'pending').toLowerCase().trim();
     
-    // CRITICAL: If the status is "completed", ALWAYS use "completed" and skip all workflow logic
-    // This ensures that once a step is marked completed, it stays completed regardless of workflowStatus
     let normalizedStatus = baseStatus;
     const workflowStatus = row?.workflowStatus; // e.g. 'label_check', 'formula_check', 'book_shipment', 'sort_products', 'sort_formulas'
     
-    // If status is "completed", force it to stay "completed" and skip workflow override logic
+    // FIRST: If status is "completed", always keep it as completed (comments don't override completion)
+    // This must be checked FIRST to ensure completed status takes priority
     if (baseStatus === 'completed') {
       normalizedStatus = 'completed';
-    } else {
-      // Only apply workflow logic if status is NOT completed
-      // Derive "in progress" from the shipment's current workflow status
-      // so that when you're actively working a step in New Shipment, Planning shows it as blue.
-      if (normalizedStatus !== 'incomplete' && workflowStatus) {
-        if (
-          (statusFieldName === 'addProducts' && workflowStatus === 'add_products') ||
-          (statusFieldName === 'labelCheck' && workflowStatus === 'label_check') ||
-          (statusFieldName === 'formulaCheck' && workflowStatus === 'formula_check') ||
-          (statusFieldName === 'bookShipment' && workflowStatus === 'book_shipment') ||
-          (statusFieldName === 'sortProducts' && workflowStatus === 'sort_products') ||
-          (statusFieldName === 'sortFormulas' && workflowStatus === 'sort_formulas')
-        ) {
-          normalizedStatus = 'in progress';
-        }
+    }
+    // SECOND: Check if it should be incomplete (only if not already completed)
+    else {
+      let shouldBeIncomplete = false;
+      
+      // Check if has comment (indicates incomplete, but only if not explicitly completed)
+      if (hasComment && commentText) {
+        shouldBeIncomplete = true;
+      }
+      
+      // If it should be incomplete, override any other status
+      if (shouldBeIncomplete) {
+        normalizedStatus = 'incomplete';
       }
     }
     
-    // Don't show comment icon if status is completed (comments should be cleared when completed)
-    const shouldShowComment = hasComment && normalizedStatus !== 'completed';
-    
-    // FINAL SAFEGUARD: If original status was "completed", force normalizedStatus to "completed"
-    // This prevents any edge cases where normalizedStatus might have been changed
-    if (baseStatus === 'completed') {
-      normalizedStatus = 'completed';
+    // THIRD: Apply workflow logic to determine "in progress" (only if not completed and not incomplete)
+    if (normalizedStatus !== 'completed' && normalizedStatus !== 'incomplete' && workflowStatus) {
+      // Derive "in progress" from the shipment's current workflow status
+      // so that when you're actively working a step in New Shipment, Planning shows it as blue.
+      if (
+        (statusFieldName === 'addProducts' && workflowStatus === 'add_products') ||
+        (statusFieldName === 'labelCheck' && workflowStatus === 'label_check') ||
+        (statusFieldName === 'formulaCheck' && workflowStatus === 'formula_check') ||
+        (statusFieldName === 'bookShipment' && workflowStatus === 'book_shipment') ||
+        (statusFieldName === 'sortProducts' && workflowStatus === 'sort_products') ||
+        (statusFieldName === 'sortFormulas' && workflowStatus === 'sort_formulas')
+      ) {
+        normalizedStatus = 'in progress';
+      }
     }
+    
+    // Show comment icon if there's a comment (comments are now preserved even when completed)
+    const shouldShowComment = hasComment && commentText;
     
     let circleColor;
     let borderStyle = 'none';
@@ -222,46 +229,8 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         }
     }
 
-    // Force orange when incomplete (status is 'incomplete' OR has comment OR workflow moved past without completing)
-    // Priority: Completed (green) > In Progress (blue) > Incomplete (orange) > Pending (white)
-    // If status is already 'incomplete', it's already orange from the switch statement
-    // Otherwise, check if it should be incomplete
-    if (normalizedStatus === 'incomplete') {
-      // Already handled in switch statement above
-    } else if (normalizedStatus !== 'completed' && normalizedStatus !== 'in progress') {
-      let isIncomplete = false;
-      
-      // Check if has comment
-      if (hasComment && commentText) {
-        isIncomplete = true;
-      }
-      // OR check if workflow has moved past this step (indicating it was marked incomplete)
-      else if (workflowStatus) {
-        const workflowSteps = ['add_products', 'label_check', 'formula_check', 'book_shipment', 'sort_products', 'sort_formulas'];
-        const currentStepIndex = workflowSteps.findIndex(step => {
-          const stepMap = {
-            'addProducts': 'add_products',
-            'labelCheck': 'label_check',
-            'formulaCheck': 'formula_check',
-            'bookShipment': 'book_shipment',
-            'sortProducts': 'sort_products',
-            'sortFormulas': 'sort_formulas'
-          };
-          return step === stepMap[statusFieldName];
-        });
-        const workflowStepIndex = workflowSteps.indexOf(workflowStatus);
-        
-        // If workflow has moved past this step, it means it was marked incomplete
-        if (currentStepIndex >= 0 && workflowStepIndex > currentStepIndex) {
-          isIncomplete = true;
-        }
-      }
-      
-      if (isIncomplete) {
-        circleColor = '#F59E0B'; // Orange for incomplete
-        borderStyle = 'none';
-      }
-    }
+    // Status priority: Incomplete (orange) > Completed (green) > In Progress (blue) > Pending (white)
+    // The incomplete check is now done at the beginning of the function, so we don't need to check again here
 
     // Create unique identifier for this status field in this row
     const uniqueCommentId = rowId && statusFieldName ? `${rowId}-${statusFieldName}` : null;
@@ -281,6 +250,12 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         return;
       }
       
+      // If status is incomplete, open comment modal
+      if (normalizedStatus === 'incomplete' && onStatusCommentClick && rowId && statusFieldName && row) {
+        onStatusCommentClick(row, statusFieldName);
+        return;
+      }
+      
       if (hasComment && commentText && uniqueCommentId) {
         // If has comment, show tooltip
         if (hoveredCommentId === uniqueCommentId) {
@@ -296,11 +271,10 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
           setHoveredCommentId(uniqueCommentId);
         }
       }
-      // Removed: clicking status circle no longer opens comment modal
     };
 
-    // Determine if circle should be clickable (completed status or has comment)
-    const isClickable = normalizedStatus === 'completed' || (shouldShowComment && commentText);
+    // Determine if circle should be clickable (completed status, incomplete status, or has comment)
+    const isClickable = normalizedStatus === 'completed' || normalizedStatus === 'incomplete' || (shouldShowComment && commentText);
     
     return (
       <div 
