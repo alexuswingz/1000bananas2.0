@@ -14,6 +14,7 @@ const LabelCheckTable = ({
   onRowsDataChange,
   hideHeader = false,
   refreshKey = 0, // Increment to trigger reload while preserving checked status
+  checkAllIncompleteTrigger = 0, // Increment to check all incomplete row checkboxes
 }) => {
   const { isDarkMode } = useTheme();
   const location = useLocation();
@@ -191,6 +192,23 @@ const LabelCheckTable = ({
 
   // Initialize rows state with empty array - only use real data from API
   const [rows, setRows] = useState([]);
+
+  // Check all incomplete row checkboxes when trigger changes
+  useEffect(() => {
+    if (checkAllIncompleteTrigger > 0 && rows.length > 0) {
+      setSelectedRows(prev => {
+        const newSet = new Set(prev);
+        // Add all incomplete rows (rows without confirmed or counted status) to selectedRows
+        rows.forEach(row => {
+          const isCompleted = row.label_check_status === 'confirmed' || row.label_check_status === 'counted';
+          if (!isCompleted) {
+            newSet.add(row.id);
+          }
+        });
+        return newSet;
+      });
+    }
+  }, [checkAllIncompleteTrigger, rows]);
 
   const columns = [
     { key: 'checkbox', label: '', width: '50px' },

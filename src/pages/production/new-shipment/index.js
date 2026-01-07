@@ -3,7 +3,7 @@ import { useTheme } from '../../../context/ThemeContext';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
-import { createShipment, getShipmentById, updateShipment, addShipmentProducts, getShipmentProducts, getShipmentFormulaCheck, getLabelsAvailability, updateShipmentFormulaCheck } from '../../../services/productionApi';
+import { createShipment, getShipmentById, updateShipment, addShipmentProducts, getShipmentProducts, getShipmentFormulaCheck, getLabelsAvailability, updateShipmentFormulaCheck, updateShipmentProductLabelCheck } from '../../../services/productionApi';
 import CatalogAPI from '../../../services/catalogApi';
 import NgoosAPI from '../../../services/ngoosApi';
 import { extractFileId, getDriveImageUrl } from '../../../services/googleDriveApi';
@@ -98,6 +98,8 @@ const NewShipment = () => {
   const [formulaCheckData, setFormulaCheckData] = useState({ total: 0, completed: 0, remaining: 0 });
   const [formulaSelectedRows, setFormulaSelectedRows] = useState(new Set());
   const [formulaCheckRefreshKey, setFormulaCheckRefreshKey] = useState(0);
+  const [labelCheckRefreshKey, setLabelCheckRefreshKey] = useState(0);
+  const [checkAllIncompleteTrigger, setCheckAllIncompleteTrigger] = useState(0);
   const [labelCheckData, setLabelCheckData] = useState({ total: 0, completed: 0, remaining: 0 });
   const [shipmentProducts, setShipmentProducts] = useState([]); // Products loaded from existing shipment
   const [tableMode, setTableMode] = useState(false);
@@ -1274,6 +1276,41 @@ const NewShipment = () => {
     }
   };
 
+  const handleMarkAllLabelChecksAsDone = async () => {
+    try {
+      if (!shipmentId) {
+        toast.error('Please book the shipment first');
+        return;
+      }
+
+      // Get all label check rows that are not yet completed
+      const incompleteRows = labelCheckRows.filter(row => !row.isComplete);
+
+      if (incompleteRows.length === 0) {
+        toast.info('All label checks are already completed');
+        return;
+      }
+
+      // Mark all incomplete rows as confirmed
+      const updatePromises = incompleteRows.map(row =>
+        updateShipmentProductLabelCheck(shipmentId, row.id, 'confirmed')
+      );
+
+      await Promise.all(updatePromises);
+
+      toast.success(`All ${incompleteRows.length} label check(s) marked as done`);
+      
+      // Check all incomplete row checkboxes
+      setCheckAllIncompleteTrigger(prev => prev + 1);
+      
+      // Trigger a refresh by incrementing the refresh key
+      setLabelCheckRefreshKey(prev => prev + 1);
+    } catch (error) {
+      console.error('Error marking all label checks as done:', error);
+      toast.error('Failed to mark all label checks as done');
+    }
+  };
+
   const handleCompleteClick = async () => {
     try {
       if (!shipmentId) {
@@ -2125,6 +2162,8 @@ const NewShipment = () => {
                 setVarianceExceededRowIds([]);
               }}
               onRowsDataChange={setLabelCheckRows}
+              refreshKey={labelCheckRefreshKey}
+              checkAllIncompleteTrigger={checkAllIncompleteTrigger}
             />
           </div>
         )}
@@ -2691,6 +2730,53 @@ const NewShipment = () => {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                {labelCheckRemainingCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleMarkAllLabelChecksAsDone}
+                    style={{
+                      height: '31px',
+                      padding: '0 16px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      backgroundColor: '#007AFF',
+                      color: '#FFFFFF',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#0056CC';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#007AFF';
+                    }}
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      style={{ flexShrink: 0 }}
+                    >
+                      <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" fill="none" />
+                      <path
+                        d="M5 8L7 10L11 6"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    Mark All as Done
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleCompleteClick}
