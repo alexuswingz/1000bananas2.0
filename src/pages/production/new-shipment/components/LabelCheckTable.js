@@ -289,6 +289,36 @@ const LabelCheckTable = ({
   const isNumericColumn = (columnKey) =>
     columnKey === 'quantity' || columnKey === 'lblCurrentInv';
 
+  // Check if a column has active filters (excludes sort - only checks for Filter by Values and Filter by Conditions)
+  const hasActiveFilter = (columnKey) => {
+    const filter = filters[columnKey];
+    if (!filter || filter === null || filter === undefined) return false;
+    
+    // Check for condition filter
+    const hasCondition = filter.conditionType && filter.conditionType !== '';
+    if (hasCondition) return true;
+    
+    // Check for value filters - only active if not all values are selected
+    if (!filter.selectedValues || filter.selectedValues.size === 0) return false;
+    
+    // Get all available values for this column
+    const allAvailableValues = getColumnValues(columnKey);
+    if (allAvailableValues.length === 0) return false;
+    
+    const allValuesSet = new Set(allAvailableValues.map(v => String(v)));
+    const selectedValuesSet = filter.selectedValues instanceof Set 
+      ? new Set(Array.from(filter.selectedValues).map(v => String(v)))
+      : new Set(Array.from(filter.selectedValues || []).map(v => String(v)));
+    
+    // Check if all available values are selected - if so, it's not an active filter
+    const allSelected = allValuesSet.size > 0 && 
+      selectedValuesSet.size === allValuesSet.size &&
+      Array.from(allValuesSet).every(val => selectedValuesSet.has(val));
+    
+    // Filter is active only if not all values are selected
+    return !allSelected;
+  };
+
   const applyConditionFilter = (value, conditionType, conditionValue, numeric) => {
     if (!conditionType) return true;
 
@@ -326,6 +356,21 @@ const LabelCheckTable = ({
   };
 
   const handleApplyFilter = (columnKey, filterData) => {
+    // If filterData is null, remove the filter (Reset was clicked)
+    if (filterData === null) {
+      setFilters(prev => {
+        const newFilters = { ...prev };
+        delete newFilters[columnKey];
+        return newFilters;
+      });
+      // Also clear sort for this column
+      if (sortField === columnKey) {
+        setSortField('');
+        setSortOrder('');
+      }
+      return;
+    }
+    
     setFilters(prev => ({
       ...prev,
       [columnKey]: {
@@ -944,7 +989,9 @@ const LabelCheckTable = ({
               <tr style={{ height: '40px', maxHeight: '40px' }}>
                 {(() => {
                   const filteredRows = getFilteredRows();
-                  return columns.map((column) => (
+                  return columns.map((column) => {
+                    const isActive = hasActiveFilter(column.key);
+                    return (
                     <th
                       key={column.key}
                       className={column.key !== 'start' ? 'group cursor-pointer' : ''}
@@ -953,7 +1000,7 @@ const LabelCheckTable = ({
                         textAlign: (column.key === 'start' || column.key === 'checkbox') ? 'center' : 'left',
                         fontSize: '11px',
                         fontWeight: 600,
-                        color: '#9CA3AF',
+                        color: isActive ? '#3B82F6' : '#9CA3AF',
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em',
                         width: column.width,
@@ -961,41 +1008,57 @@ const LabelCheckTable = ({
                         borderRight: (column.key === 'start' || column.key === 'checkbox') ? 'none' : '1px solid #FFFFFF',
                         height: '40px',
                         position: (column.key !== 'start' && column.key !== 'checkbox') ? 'relative' : 'static',
+                        backgroundColor: isActive ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
                       }}
                     >
-                      {column.label}
-                    {!disableFilters && column.key !== 'start' && column.key !== 'checkbox' && (
-                      <img
-                        ref={(el) => { if (el) filterIconRefs.current[column.key] = el; }}
-                        src="/assets/Vector (1).png"
-                        alt="Filter"
-                        className={`w-3 h-3 transition-opacity cursor-pointer ${
-                          openFilterColumn === column.key
-                            ? 'opacity-100'
-                            : 'opacity-0 group-hover:opacity-100'
-                        }`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenFilterColumn(openFilterColumn === column.key ? null : column.key);
-                        }}
-                        style={{
-                          position: 'absolute',
-                          top: '50%',
-                          right: '8px',
-                          transform: 'translateY(-50%)',
-                          width: '12px',
-                          height: '12px',
-                          ...(openFilterColumn === column.key
-                            ? {
-                                filter:
-                                  'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
-                              }
-                            : undefined)
-                        }}
-                      />
-                    )}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '0.5rem',
+                      }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          {column.label}
+                          {isActive && (
+                            <span style={{ 
+                              display: 'inline-block',
+                              width: '6px', 
+                              height: '6px', 
+                              borderRadius: '50%', 
+                              backgroundColor: '#10B981',
+                            }} />
+                          )}
+                        </span>
+                        {!disableFilters && column.key !== 'start' && column.key !== 'checkbox' && (
+                          <img
+                            ref={(el) => { if (el) filterIconRefs.current[column.key] = el; }}
+                            src="/assets/Vector (1).png"
+                            alt="Filter"
+                            className={`w-3 h-3 transition-opacity cursor-pointer ${
+                              isActive || openFilterColumn === column.key
+                                ? 'opacity-100'
+                                : 'opacity-0 group-hover:opacity-100'
+                            }`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenFilterColumn(openFilterColumn === column.key ? null : column.key);
+                            }}
+                            style={{
+                              width: '12px',
+                              height: '12px',
+                              ...(isActive || openFilterColumn === column.key
+                                ? {
+                                    filter:
+                                      'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
+                                  }
+                                : undefined)
+                            }}
+                          />
+                        )}
+                      </div>
                   </th>
-                  ));
+                  );
+                  });
                 })()}
               </tr>
             </thead>

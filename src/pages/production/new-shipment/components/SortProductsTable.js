@@ -1324,7 +1324,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                       <img
                         src="/assets/Vector (1).png"
                         alt="Filter"
-                        className={`w-3 h-3 transition-opacity ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                        className={`w-3 h-3 transition-opacity ${isActive || openFilterColumns.has(column.key) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                         ref={(el) => {
                           if (el) {
                             filterIconRefs.current[column.key] = el;
@@ -1335,7 +1335,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                           width: '12px', 
                           height: '12px', 
                           cursor: 'pointer',
-                          filter: isActive ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                          filter: isActive || openFilterColumns.has(column.key) ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
                         }}
                       />
                     </div>
