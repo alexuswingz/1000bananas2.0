@@ -729,136 +729,148 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
       }
       
       // Step 2: Get the actual product objects from the original products array
-      // Build a map of all products by ID for quick lookup
-      const productMap = new Map();
-      products.forEach(p => {
-        if (p && p.id) {
-          // Store products by ID, but handle multiple products with same ID by storing in array
-          if (!productMap.has(p.id)) {
-            productMap.set(p.id, []);
-          }
-          productMap.get(p.id).push(p);
-        }
-      });
-      
+      // Use selectedItemsFromFiltered directly to ensure we get ALL items in the correct order
       const draggedItems = [];
       const draggedItemIds = new Set();
       const usedProductRefs = new Set(); // Track actual product object references to avoid duplicates
       
-      // First, try to get items by ID from products array (preserves order)
-      selectedItemIds.forEach(id => {
-        const productsWithId = productMap.get(id);
-        if (productsWithId && productsWithId.length > 0) {
-          // Get the first unused product with this ID
-          const product = productsWithId.find(p => !usedProductRefs.has(p));
-          if (product) {
-            draggedItems.push(product);
-            draggedItemIds.add(id);
-            usedProductRefs.add(product);
-          } else {
-            // All products with this ID have been used, but we need this one
-            // This shouldn't happen if IDs are unique, but handle it
-            console.warn('All products with ID already used:', id);
-            // Add the first one anyway to ensure we have the item
-            draggedItems.push(productsWithId[0]);
-            draggedItemIds.add(id);
+      // Match each selected item from filtered list to products array
+      // This ensures we get all items even if there are edge cases with IDs
+      selectedItemsFromFiltered.forEach((filteredItem, idx) => {
+        // First, try to find by ID
+        let matchingProduct = null;
+        
+        if (filteredItem.id) {
+          matchingProduct = products.find(p => 
+            !usedProductRefs.has(p) && 
+            p.id === filteredItem.id
+          );
+        }
+        
+        // If not found by ID, try matching by all properties (for edge cases)
+        if (!matchingProduct) {
+          matchingProduct = products.find(p => 
+            !usedProductRefs.has(p) &&
+            p.brand === filteredItem.brand && 
+            p.product === filteredItem.product && 
+            p.size === filteredItem.size &&
+            p.formula === filteredItem.formula &&
+            (p.splitTag || '') === (filteredItem.splitTag || '') &&
+            p.qty === filteredItem.qty
+          );
+        }
+        
+        // If still not found, try matching by stable identifier (brand + product + size + splitTag)
+        if (!matchingProduct && filteredItem.id) {
+          // Try to find by stable identifier as last resort
+          const stableId = `${filteredItem.brand || ''}::${filteredItem.product || ''}::${filteredItem.size || ''}${filteredItem.splitTag ? `::${filteredItem.splitTag}` : ''}`;
+          matchingProduct = products.find(p => {
+            if (usedProductRefs.has(p)) return false;
+            const pStableId = `${p.brand || ''}::${p.product || ''}::${p.size || ''}${p.splitTag ? `::${p.splitTag}` : ''}`;
+            return pStableId === stableId && p.qty === filteredItem.qty;
+          });
+        }
+        
+        if (matchingProduct) {
+          draggedItems.push(matchingProduct);
+          if (matchingProduct.id) {
+            draggedItemIds.add(matchingProduct.id);
           }
+          usedProductRefs.add(matchingProduct);
         } else {
-          console.warn('Selected item ID not found in products array:', id);
+          console.error('Could not find matching product for filtered item:', {
+            index: idx,
+            filteredItem: {
+              id: filteredItem.id,
+              brand: filteredItem.brand,
+              product: filteredItem.product,
+              size: filteredItem.size,
+              splitTag: filteredItem.splitTag,
+              qty: filteredItem.qty
+            },
+            availableProducts: products.slice(0, 10).map(p => ({
+              id: p.id,
+              brand: p.brand,
+              product: p.product,
+              size: p.size,
+              splitTag: p.splitTag,
+              qty: p.qty
+            }))
+          });
         }
       });
       
-      // Fallback: If we're missing items, try to match by comparing with selectedItemsFromFiltered
-      if (draggedItems.length < selectedItemsFromFiltered.length) {
-        console.warn('Missing items after ID lookup, using fallback matching:', {
-          draggedItemsCount: draggedItems.length,
-          selectedItemsFromFilteredCount: selectedItemsFromFiltered.length
-        });
-        
-        selectedItemsFromFiltered.forEach((filteredItem, idx) => {
-          // Check if we already have this item
-          const alreadyHave = draggedItems.some(d => 
-            d.id === filteredItem.id ||
-            (d.brand === filteredItem.brand && 
-             d.product === filteredItem.product && 
-             d.size === filteredItem.size &&
-             d.splitTag === filteredItem.splitTag &&
-             d.qty === filteredItem.qty)
-          );
-          
-          if (!alreadyHave) {
-            // Try to find it in products array by matching properties
-            const matchingProduct = products.find(p => 
-              !usedProductRefs.has(p) &&
-              (p.id === filteredItem.id ||
-               (p.brand === filteredItem.brand && 
-                p.product === filteredItem.product && 
-                p.size === filteredItem.size &&
-                p.splitTag === filteredItem.splitTag &&
-                p.qty === filteredItem.qty))
-            );
-            
-            if (matchingProduct) {
-              draggedItems.push(matchingProduct);
-              if (matchingProduct.id) {
-                draggedItemIds.add(matchingProduct.id);
-              }
-              usedProductRefs.add(matchingProduct);
-              console.log('Recovered missing item via fallback:', matchingProduct.id || 'no-id', matchingProduct.product);
-            } else {
-              console.warn('Could not find matching product for filtered item:', filteredItem);
-            }
-          }
-        });
-      }
-      
-      // Log for debugging
+      // Validate we have all items
       if (draggedItems.length !== selectedIndices.size) {
-        console.error('Final mismatch in dragged items:', {
+        console.error('Mismatch in dragged items count:', {
           selectedIndicesCount: selectedIndices.size,
           draggedItemsCount: draggedItems.length,
-          selectedItemIdsCount: selectedItemIds.length,
           selectedItemsFromFilteredCount: selectedItemsFromFiltered.length,
-          selectedItemIds: selectedItemIds,
           draggedItemIds: Array.from(draggedItemIds),
-          productsLength: products.length,
-          filteredListLength: filteredList.length,
           draggedItems: draggedItems.map(d => ({ id: d.id, product: d.product, size: d.size, splitTag: d.splitTag, qty: d.qty }))
         });
-      }
-      
-      // If no valid items, abort
-      if (draggedItems.length === 0) {
-        setDraggedIndex(null);
-        setDragOverIndex(null);
-        setDropPosition(null);
-        return;
-      }
-      
-      // Verify we got all selected items
-      if (draggedItems.length !== draggedItemIds.size) {
-        console.warn('Some selected items not found in products array:', {
-          expected: draggedItemIds.size,
-          found: draggedItems.length,
-          missingIds: Array.from(draggedItemIds).filter(id => !products.some(p => p.id === id))
-        });
-        // Try to get missing items directly from products array as fallback
-        const missingIds = Array.from(draggedItemIds).filter(id => !draggedItems.some(item => item.id === id));
-        missingIds.forEach(id => {
-          const missingItem = products.find(p => p.id === id);
-          if (missingItem) {
-            draggedItems.push(missingItem);
+        
+        // If we're missing items, try one more time with a more aggressive matching
+        if (draggedItems.length < selectedItemsFromFiltered.length) {
+          console.warn('Attempting aggressive recovery of missing items...');
+          const missingCount = selectedItemsFromFiltered.length - draggedItems.length;
+          let recovered = 0;
+          
+          selectedItemsFromFiltered.forEach(filteredItem => {
+            // Check if we already have this item
+            const alreadyHave = draggedItems.some(d => 
+              d === filteredItem || // Same object reference
+              (d.id && filteredItem.id && d.id === filteredItem.id) || // Same ID
+              (d.brand === filteredItem.brand && 
+               d.product === filteredItem.product && 
+               d.size === filteredItem.size &&
+               d.formula === filteredItem.formula &&
+               (d.splitTag || '') === (filteredItem.splitTag || '') &&
+               d.qty === filteredItem.qty) // Same properties
+            );
+            
+            if (!alreadyHave) {
+              // Try to find ANY product that matches, even if already used
+              const anyMatch = products.find(p => 
+                (p.id && filteredItem.id && p.id === filteredItem.id) ||
+                (p.brand === filteredItem.brand && 
+                 p.product === filteredItem.product && 
+                 p.size === filteredItem.size &&
+                 p.formula === filteredItem.formula &&
+                 (p.splitTag || '') === (filteredItem.splitTag || '') &&
+                 p.qty === filteredItem.qty)
+              );
+              
+              if (anyMatch && !draggedItems.some(d => d === anyMatch)) {
+                draggedItems.push(anyMatch);
+                if (anyMatch.id) {
+                  draggedItemIds.add(anyMatch.id);
+                }
+                usedProductRefs.add(anyMatch);
+                recovered++;
+                console.log('Aggressively recovered item:', anyMatch.id || 'no-id', anyMatch.product);
+              }
+            }
+          });
+          
+          if (recovered > 0) {
+            console.log(`Recovered ${recovered} missing item(s)`);
           }
-        });
+        }
       }
       
-      // Final check - if we still don't have all items, something is wrong
+      // Final validation - if we still don't have all items, abort but log details
       if (draggedItems.length === 0) {
-        console.error('No items to drag in multi-drag operation');
+        console.error('No items to drag in multi-drag operation - aborting');
         setDraggedIndex(null);
         setDragOverIndex(null);
         setDropPosition(null);
         return;
+      }
+      
+      // If we're still missing items, log warning but proceed with what we have
+      if (draggedItems.length < selectedIndices.size) {
+        console.warn(`Proceeding with ${draggedItems.length} items out of ${selectedIndices.size} selected`);
       }
       
       // Ensure ALL dragged items have their IDs in draggedItemIds set
@@ -916,28 +928,64 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
         // If we didn't remove all items, try to identify which ones weren't removed
         const notRemoved = draggedItems.filter(item => {
           const stillExists = newProducts.some(p => 
-            (p.id && item.id && p.id === item.id) ||
-            p === item ||
+            p === item || // Same object reference (most reliable)
+            (p.id && item.id && p.id === item.id) || // Same ID
             (p.brand === item.brand && 
              p.product === item.product && 
              p.size === item.size &&
-             p.splitTag === item.splitTag &&
-             p.qty === item.qty)
+             p.formula === item.formula &&
+             (p.splitTag || '') === (item.splitTag || '') &&
+             p.qty === item.qty) // Same properties
           );
           return stillExists;
         });
         
         if (notRemoved.length > 0) {
-          console.error('Items that were NOT removed:', notRemoved.map(item => ({ id: item.id, product: item.product, size: item.size, splitTag: item.splitTag, qty: item.qty })));
+          console.error('Items that were NOT removed - forcing removal:', notRemoved.map(item => ({ id: item.id, product: item.product, size: item.size, splitTag: item.splitTag, qty: item.qty })));
           
-          // Force remove them by object reference
+          // Force remove them - check by object reference first, then by ID, then by properties
           notRemoved.forEach(item => {
-            const index = newProducts.findIndex(p => p === item);
-            if (index !== -1) {
-              newProducts.splice(index, 1);
-              console.log('Force removed item:', item.id, item.product);
+            let removed = false;
+            
+            // Try to remove by object reference first (most reliable)
+            const indexByRef = newProducts.findIndex(p => p === item);
+            if (indexByRef !== -1) {
+              newProducts.splice(indexByRef, 1);
+              removed = true;
+              console.log('Force removed item by reference:', item.id, item.product);
+            } else if (item.id) {
+              // Try to remove by ID
+              const indexById = newProducts.findIndex(p => p.id === item.id);
+              if (indexById !== -1) {
+                newProducts.splice(indexById, 1);
+                removed = true;
+                console.log('Force removed item by ID:', item.id, item.product);
+              } else {
+                // Try to remove by properties as last resort
+                const indexByProps = newProducts.findIndex(p => 
+                  p.brand === item.brand && 
+                  p.product === item.product && 
+                  p.size === item.size &&
+                  p.formula === item.formula &&
+                  (p.splitTag || '') === (item.splitTag || '') &&
+                  p.qty === item.qty
+                );
+                if (indexByProps !== -1) {
+                  newProducts.splice(indexByProps, 1);
+                  removed = true;
+                  console.log('Force removed item by properties:', item.id, item.product);
+                }
+              }
+            }
+            
+            if (!removed) {
+              console.error('Could not remove item even with force removal:', item);
             }
           });
+          
+          // Verify removal was successful
+          const finalRemovedCount = products.length - newProducts.length;
+          console.log('Final removed count after force removal:', finalRemovedCount, 'expected:', draggedItems.length);
         }
       }
       
@@ -963,38 +1011,131 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
       insertIndex = Math.max(0, Math.min(insertIndex, newProducts.length));
       
       // Final verification: ensure none of the dragged items are already in newProducts
-      const existingIds = new Set(newProducts.map(p => p.id));
-      const itemsToInsert = draggedItems.filter(item => !existingIds.has(item.id));
+      // Check by both ID and object reference to catch any duplicates
+      const existingIds = new Set(newProducts.map(p => p && p.id ? p.id : null).filter(Boolean));
+      const existingRefs = new Set(newProducts);
+      
+      const itemsToInsert = draggedItems.filter(item => {
+        // Don't insert if it's already in the array (by reference or ID)
+        if (existingRefs.has(item)) {
+          return false;
+        }
+        if (item.id && existingIds.has(item.id)) {
+          // Double check - maybe the ID exists but it's a different object
+          const existingById = newProducts.find(p => p && p.id === item.id);
+          if (existingById === item) {
+            return false; // Same object, don't insert
+          }
+          // Different object with same ID - log warning but still insert
+          console.warn('Different object with same ID found, will insert anyway:', item.id);
+        }
+        return true;
+      });
       
       if (itemsToInsert.length !== draggedItems.length) {
-        console.warn('Some dragged items already exist in new array:', {
+        const skippedItems = draggedItems.filter(item => {
+          return existingRefs.has(item) || (item.id && existingIds.has(item.id) && newProducts.find(p => p && p.id === item.id) === item);
+        });
+        
+        console.warn('Some dragged items already exist in new array (skipping insertion):', {
           expected: draggedItems.length,
           toInsert: itemsToInsert.length,
-          duplicateIds: draggedItems
-            .filter(item => existingIds.has(item.id))
-            .map(item => item.id)
+          skipped: skippedItems.length,
+          skippedItems: skippedItems.map(item => ({ id: item.id, product: item.product, size: item.size, splitTag: item.splitTag, qty: item.qty }))
         });
       }
       
       // Insert all dragged items at the new position
-      newProducts.splice(insertIndex, 0, ...itemsToInsert);
+      if (itemsToInsert.length > 0) {
+        newProducts.splice(insertIndex, 0, ...itemsToInsert);
+      } else {
+        console.error('No items to insert after filtering duplicates!');
+      }
       
       // Track which items were moved (by ID) to preserve selection
       const movedItemIds = new Set(draggedItems.map(item => item.id));
       
-      // Clear drag states
+      // Final validation: ensure newProducts doesn't contain duplicates
+      // Use both ID and object reference to detect duplicates
+      const finalProductIds = new Set();
+      const finalProductRefs = new Set();
+      const finalProducts = [];
+      const duplicateIds = [];
+      const duplicateRefs = [];
+      
+      newProducts.forEach((product, idx) => {
+        if (!product) {
+          console.warn('Null/undefined product found at index:', idx);
+          return; // Skip null/undefined products
+        }
+        
+        // Check for duplicate by object reference (most reliable)
+        if (finalProductRefs.has(product)) {
+          duplicateRefs.push({ index: idx, id: product.id, product: product.product });
+          console.warn('Duplicate product by reference found, skipping:', product.id, product.product);
+          return; // Skip this duplicate
+        }
+        
+        // Check for duplicate by ID
+        if (product.id && finalProductIds.has(product.id)) {
+          // Check if it's the same object or a different one
+          const existingProduct = finalProducts.find(p => p.id === product.id);
+          if (existingProduct !== product) {
+            // Different object with same ID - this is a duplicate
+            duplicateIds.push({ index: idx, id: product.id, product: product.product });
+            console.warn('Duplicate product by ID found, skipping:', product.id, product.product);
+            return; // Skip this duplicate
+          }
+        }
+        
+        // Add to final arrays
+        if (product.id) {
+          finalProductIds.add(product.id);
+        }
+        finalProductRefs.add(product);
+        finalProducts.push(product);
+      });
+      
+      if (duplicateIds.length > 0 || duplicateRefs.length > 0) {
+        console.error('Found duplicates in newProducts before state update:', {
+          duplicateIds: duplicateIds,
+          duplicateRefs: duplicateRefs,
+          originalCount: newProducts.length,
+          finalCount: finalProducts.length
+        });
+      }
+      
+      // Verify we have the correct number of products
+      const expectedCount = products.length - draggedItems.length + itemsToInsert.length;
+      if (finalProducts.length !== expectedCount) {
+        console.error('Product count mismatch:', {
+          expected: expectedCount,
+          actual: finalProducts.length,
+          originalCount: products.length,
+          draggedItemsCount: draggedItems.length,
+          itemsToInsertCount: itemsToInsert.length
+        });
+      }
+      
+      // Update state immediately to ensure UI reflects changes
+      // Use a new array reference to force React to re-render
+      setProducts([...finalProducts]);
+      saveProductOrder(finalProducts);
+      
+      // Clear drag states after a short delay for smooth animation
       setDragOverIndex(null);
       setDropPosition(null);
       
       setTimeout(() => {
-        setProducts(newProducts);
-        saveProductOrder(newProducts);
         setDraggedIndex(null);
         
         // Update selection to reflect new positions of moved items
-        // Find the new indices of the moved items in the updated products array
+        // Use filteredProducts to get the correct indices in the displayed list
+        // But first, we need to recalculate filteredProducts with the new state
+        // Since state update is async, we'll use the finalProducts we just set
+        const tempFiltered = getFilteredAndSortedProductsForArray(finalProducts);
         const newSelectedIndices = new Set();
-        newProducts.forEach((product, index) => {
+        tempFiltered.forEach((product, index) => {
           if (movedItemIds.has(product.id)) {
             newSelectedIndices.add(index);
           }
@@ -1115,7 +1256,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
       const step = getIncrementStep(selectedProduct.size);
       setFirstBatchQty(step);
     } else {
-      setFirstBatchQty(1);
+    setFirstBatchQty(1);
     }
   };
 
@@ -1490,16 +1631,14 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     }
   };
 
-  // Apply filters to products
-  // Locked items maintain their positions and are not affected by filters
-  // Unlocked items are filtered, filling in the gaps
-  // Note: Sorting is now one-time (applied directly to products array), not continuous
-  const getFilteredAndSortedProducts = () => {
+  // Helper function to calculate filtered products for a given array
+  // This allows us to calculate filtered products for arrays other than the current state
+  const getFilteredAndSortedProductsForArray = (productsArray) => {
     // Separate locked and unlocked products
     const lockedProducts = [];
     const unlockedProducts = [];
     
-    products.forEach((product, index) => {
+    productsArray.forEach((product, index) => {
       if (lockedProductIds.has(product.id)) {
         lockedProducts.push({ product, originalIndex: index });
       } else {
@@ -1541,7 +1680,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     const result = [];
     let unlockedIndex = 0;
     
-    for (let i = 0; i < products.length; i++) {
+    for (let i = 0; i < productsArray.length; i++) {
       const lockedItem = lockedProducts.find(lp => lp.originalIndex === i);
       if (lockedItem) {
         result.push(lockedItem.product);
@@ -1552,6 +1691,14 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     }
 
     return result;
+  };
+
+  // Apply filters to products
+  // Locked items maintain their positions and are not affected by filters
+  // Unlocked items are filtered, filling in the gaps
+  // Note: Sorting is now one-time (applied directly to products array), not continuous
+  const getFilteredAndSortedProducts = () => {
+    return getFilteredAndSortedProductsForArray(products);
   };
 
   const filteredProducts = getFilteredAndSortedProducts();
