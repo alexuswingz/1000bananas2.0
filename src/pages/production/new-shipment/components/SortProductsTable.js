@@ -45,6 +45,24 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     return product.splitTag ? `${baseIdentifier}::${product.splitTag}` : baseIdentifier;
   };
 
+  // Helper function to get the increment step based on product size
+  // Returns the step value for the number input (e.g., 4 for Gallons, 12 for Quarts, 60 for 8oz, 1 for others)
+  const getIncrementStep = (size) => {
+    if (!size) return 1;
+    const sizeLower = (size || '').toLowerCase();
+    if (sizeLower.includes('gallon') && !sizeLower.includes('5')) {
+      return 4; // Gallons increment by 4
+    }
+    if (sizeLower.includes('quart') || sizeLower.includes('32oz') || sizeLower === '32 oz') {
+      return 12; // Quarts increment by 12
+    }
+    if (sizeLower.includes('8oz') || sizeLower.includes('8 oz')) {
+      return 60; // 8oz increment by 60
+    }
+    // For other sizes, increment by 1
+    return 1;
+  };
+
   // Save product order to localStorage
   const saveProductOrder = (productsToSave) => {
     if (!shipmentId || isInitialOrderLoadRef.current) return;
@@ -667,24 +685,270 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     if (isMultiDrag) {
       // Multi-drag: move all selected items
       const sortedSelectedIndices = Array.from(selectedIndices).sort((a, b) => a - b);
-      const draggedItems = sortedSelectedIndices.map(idx => filteredList[idx]);
       
-      // Find drop item in original products array
-      const dropOriginalIndex = products.findIndex(p => p.id === dropItem.id);
+      // Step 1: Collect all selected item IDs from the filtered list
+      // This preserves the visual order of selection
+      const selectedItemIds = [];
+      const selectedItemIdsSet = new Set();
+      const selectedItemsFromFiltered = []; // Store the actual items for fallback
       
-      const newProducts = [...products];
-      
-      // Remove all dragged items (in reverse order to maintain indices)
-      const draggedOriginalIndices = draggedItems.map(item => 
-        products.findIndex(p => p.id === item.id)
-      ).sort((a, b) => b - a); // Sort descending to remove from end first
-      
-      draggedOriginalIndices.forEach(originalIdx => {
-        newProducts.splice(originalIdx, 1);
+      sortedSelectedIndices.forEach(idx => {
+        if (idx >= 0 && idx < filteredList.length) {
+          const item = filteredList[idx];
+          if (item) {
+            selectedItemsFromFiltered.push(item); // Always store the item
+            if (item.id) {
+              // Track unique IDs
+              if (!selectedItemIdsSet.has(item.id)) {
+                selectedItemIds.push(item.id);
+                selectedItemIdsSet.add(item.id);
+              } else {
+                // If we've seen this ID before, still add it to handle potential duplicates
+                console.warn('Duplicate ID found in selection:', item.id, 'at index:', idx);
+                selectedItemIds.push(item.id);
+              }
+            } else {
+              console.warn('Selected item has no ID at index:', idx, 'item:', item);
+            }
+          } else {
+            console.warn('Selected item is null/undefined at index:', idx);
+          }
+        } else {
+          console.warn('Selected index out of bounds:', idx, 'filteredList length:', filteredList.length, 'selectedIndices:', Array.from(selectedIndices));
+        }
       });
+      
+      // Ensure we have the same number of items as selected indices
+      if (selectedItemsFromFiltered.length !== selectedIndices.size) {
+        console.error('Mismatch in selected items from filtered list:', {
+          selectedIndicesCount: selectedIndices.size,
+          collectedItemsCount: selectedItemsFromFiltered.length,
+          sortedSelectedIndices: sortedSelectedIndices,
+          filteredListLength: filteredList.length
+        });
+      }
+      
+      // Step 2: Get the actual product objects from the original products array
+      // Build a map of all products by ID for quick lookup
+      const productMap = new Map();
+      products.forEach(p => {
+        if (p && p.id) {
+          // Store products by ID, but handle multiple products with same ID by storing in array
+          if (!productMap.has(p.id)) {
+            productMap.set(p.id, []);
+          }
+          productMap.get(p.id).push(p);
+        }
+      });
+      
+      const draggedItems = [];
+      const draggedItemIds = new Set();
+      const usedProductRefs = new Set(); // Track actual product object references to avoid duplicates
+      
+      // First, try to get items by ID from products array (preserves order)
+      selectedItemIds.forEach(id => {
+        const productsWithId = productMap.get(id);
+        if (productsWithId && productsWithId.length > 0) {
+          // Get the first unused product with this ID
+          const product = productsWithId.find(p => !usedProductRefs.has(p));
+          if (product) {
+            draggedItems.push(product);
+            draggedItemIds.add(id);
+            usedProductRefs.add(product);
+          } else {
+            // All products with this ID have been used, but we need this one
+            // This shouldn't happen if IDs are unique, but handle it
+            console.warn('All products with ID already used:', id);
+            // Add the first one anyway to ensure we have the item
+            draggedItems.push(productsWithId[0]);
+            draggedItemIds.add(id);
+          }
+        } else {
+          console.warn('Selected item ID not found in products array:', id);
+        }
+      });
+      
+      // Fallback: If we're missing items, try to match by comparing with selectedItemsFromFiltered
+      if (draggedItems.length < selectedItemsFromFiltered.length) {
+        console.warn('Missing items after ID lookup, using fallback matching:', {
+          draggedItemsCount: draggedItems.length,
+          selectedItemsFromFilteredCount: selectedItemsFromFiltered.length
+        });
+        
+        selectedItemsFromFiltered.forEach((filteredItem, idx) => {
+          // Check if we already have this item
+          const alreadyHave = draggedItems.some(d => 
+            d.id === filteredItem.id ||
+            (d.brand === filteredItem.brand && 
+             d.product === filteredItem.product && 
+             d.size === filteredItem.size &&
+             d.splitTag === filteredItem.splitTag &&
+             d.qty === filteredItem.qty)
+          );
+          
+          if (!alreadyHave) {
+            // Try to find it in products array by matching properties
+            const matchingProduct = products.find(p => 
+              !usedProductRefs.has(p) &&
+              (p.id === filteredItem.id ||
+               (p.brand === filteredItem.brand && 
+                p.product === filteredItem.product && 
+                p.size === filteredItem.size &&
+                p.splitTag === filteredItem.splitTag &&
+                p.qty === filteredItem.qty))
+            );
+            
+            if (matchingProduct) {
+              draggedItems.push(matchingProduct);
+              if (matchingProduct.id) {
+                draggedItemIds.add(matchingProduct.id);
+              }
+              usedProductRefs.add(matchingProduct);
+              console.log('Recovered missing item via fallback:', matchingProduct.id || 'no-id', matchingProduct.product);
+            } else {
+              console.warn('Could not find matching product for filtered item:', filteredItem);
+            }
+          }
+        });
+      }
+      
+      // Log for debugging
+      if (draggedItems.length !== selectedIndices.size) {
+        console.error('Final mismatch in dragged items:', {
+          selectedIndicesCount: selectedIndices.size,
+          draggedItemsCount: draggedItems.length,
+          selectedItemIdsCount: selectedItemIds.length,
+          selectedItemsFromFilteredCount: selectedItemsFromFiltered.length,
+          selectedItemIds: selectedItemIds,
+          draggedItemIds: Array.from(draggedItemIds),
+          productsLength: products.length,
+          filteredListLength: filteredList.length,
+          draggedItems: draggedItems.map(d => ({ id: d.id, product: d.product, size: d.size, splitTag: d.splitTag, qty: d.qty }))
+        });
+      }
+      
+      // If no valid items, abort
+      if (draggedItems.length === 0) {
+        setDraggedIndex(null);
+        setDragOverIndex(null);
+        setDropPosition(null);
+        return;
+      }
+      
+      // Verify we got all selected items
+      if (draggedItems.length !== draggedItemIds.size) {
+        console.warn('Some selected items not found in products array:', {
+          expected: draggedItemIds.size,
+          found: draggedItems.length,
+          missingIds: Array.from(draggedItemIds).filter(id => !products.some(p => p.id === id))
+        });
+        // Try to get missing items directly from products array as fallback
+        const missingIds = Array.from(draggedItemIds).filter(id => !draggedItems.some(item => item.id === id));
+        missingIds.forEach(id => {
+          const missingItem = products.find(p => p.id === id);
+          if (missingItem) {
+            draggedItems.push(missingItem);
+          }
+        });
+      }
+      
+      // Final check - if we still don't have all items, something is wrong
+      if (draggedItems.length === 0) {
+        console.error('No items to drag in multi-drag operation');
+        setDraggedIndex(null);
+        setDragOverIndex(null);
+        setDropPosition(null);
+        return;
+      }
+      
+      // Ensure ALL dragged items have their IDs in draggedItemIds set
+      // This is critical for proper removal
+      draggedItems.forEach(item => {
+        if (item && item.id) {
+          draggedItemIds.add(item.id);
+        } else {
+          console.warn('Dragged item has no ID:', item);
+        }
+      });
+      
+      // Create a set of all dragged item IDs for removal
+      // Also track by object reference as a fallback for items without IDs
+      const draggedItemIdsForRemoval = new Set(draggedItemIds);
+      const draggedItemRefs = new Set(draggedItems);
+      
+      // Check if drop item is one of the selected items BEFORE removing (shouldn't happen, but handle it)
+      if (draggedItemIdsForRemoval.has(dropItem.id)) {
+        // If dropping on a selected item, don't move anything
+        setDraggedIndex(null);
+        setDragOverIndex(null);
+        setDropPosition(null);
+        return;
+      }
+      
+      // Create new products array and remove all dragged items
+      // Remove by ID first, then by object reference as fallback for items without IDs
+      const newProducts = products.filter(p => {
+        // Remove if ID matches
+        if (p.id && draggedItemIdsForRemoval.has(p.id)) {
+          return false;
+        }
+        // Remove if it's the same object reference (fallback for items without IDs)
+        if (draggedItemRefs.has(p)) {
+          return false;
+        }
+        return true;
+      });
+      
+      // Verify we removed the correct number of items
+      const removedCount = products.length - newProducts.length;
+      if (removedCount !== draggedItems.length) {
+        console.error('Mismatch in removed items - some items may be duplicated!', {
+          expected: draggedItems.length,
+          removed: removedCount,
+          draggedItemIds: Array.from(draggedItemIdsForRemoval),
+          draggedItems: draggedItems.map(d => ({ id: d.id, product: d.product, size: d.size, splitTag: d.splitTag, qty: d.qty })),
+          originalProductsCount: products.length,
+          newProductsCount: newProducts.length,
+          productsBeforeRemoval: products.map(p => ({ id: p.id, product: p.product, size: p.size, splitTag: p.splitTag, qty: p.qty })),
+          productsAfterRemoval: newProducts.map(p => ({ id: p.id, product: p.product, size: p.size, splitTag: p.splitTag, qty: p.qty }))
+        });
+        
+        // If we didn't remove all items, try to identify which ones weren't removed
+        const notRemoved = draggedItems.filter(item => {
+          const stillExists = newProducts.some(p => 
+            (p.id && item.id && p.id === item.id) ||
+            p === item ||
+            (p.brand === item.brand && 
+             p.product === item.product && 
+             p.size === item.size &&
+             p.splitTag === item.splitTag &&
+             p.qty === item.qty)
+          );
+          return stillExists;
+        });
+        
+        if (notRemoved.length > 0) {
+          console.error('Items that were NOT removed:', notRemoved.map(item => ({ id: item.id, product: item.product, size: item.size, splitTag: item.splitTag, qty: item.qty })));
+          
+          // Force remove them by object reference
+          notRemoved.forEach(item => {
+            const index = newProducts.findIndex(p => p === item);
+            if (index !== -1) {
+              newProducts.splice(index, 1);
+              console.log('Force removed item:', item.id, item.product);
+            }
+          });
+        }
+      }
       
       // Find new position after removal
       let newDropIndex = newProducts.findIndex(p => p.id === dropItem.id);
+      
+      // If drop item not found (shouldn't happen, but handle it)
+      if (newDropIndex === -1) {
+        // Insert at the end
+        newDropIndex = newProducts.length;
+      }
       
       // Use drop position to determine insert index
       let insertIndex;
@@ -695,8 +959,25 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
         insertIndex = newDropIndex + 1;
       }
       
+      // Ensure insertIndex is within bounds
+      insertIndex = Math.max(0, Math.min(insertIndex, newProducts.length));
+      
+      // Final verification: ensure none of the dragged items are already in newProducts
+      const existingIds = new Set(newProducts.map(p => p.id));
+      const itemsToInsert = draggedItems.filter(item => !existingIds.has(item.id));
+      
+      if (itemsToInsert.length !== draggedItems.length) {
+        console.warn('Some dragged items already exist in new array:', {
+          expected: draggedItems.length,
+          toInsert: itemsToInsert.length,
+          duplicateIds: draggedItems
+            .filter(item => existingIds.has(item.id))
+            .map(item => item.id)
+        });
+      }
+      
       // Insert all dragged items at the new position
-      newProducts.splice(insertIndex, 0, ...draggedItems);
+      newProducts.splice(insertIndex, 0, ...itemsToInsert);
       
       // Track which items were moved (by ID) to preserve selection
       const movedItemIds = new Set(draggedItems.map(item => item.id));
@@ -818,7 +1099,9 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
   const handleMenuAction = (action, product) => {
     if (action === 'split') {
       setSelectedProduct(product);
-      setFirstBatchQty(1); // Always set first batch to 1
+      // Initialize first batch with the increment step for this product size
+      const step = getIncrementStep(product.size);
+      setFirstBatchQty(step); // Set to the increment step (e.g., 4 for Gallons, 1 for others)
       setIsSplitModalOpen(true);
     }
     setOpenMenuIndex(null);
@@ -827,16 +1110,51 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
   const handleCloseSplitModal = () => {
     setIsSplitModalOpen(false);
     setSelectedProduct(null);
-    setFirstBatchQty(1);
+    // Reset to default step when closing
+    if (selectedProduct) {
+      const step = getIncrementStep(selectedProduct.size);
+      setFirstBatchQty(step);
+    } else {
+      setFirstBatchQty(1);
+    }
+  };
+
+  const handleFirstBatchQtyChange = (e) => {
+    const newValue = parseFloat(e.target.value) || 0;
+    if (!selectedProduct) return;
+    
+    const originalQty = selectedProduct.qty || 1;
+    const step = getIncrementStep(selectedProduct.size);
+    
+    // Round to nearest step
+    const roundedValue = Math.round(newValue / step) * step;
+    
+    // Ensure value is within valid range (at least step, at most originalQty - step)
+    // But allow it to be up to originalQty if that's what user wants
+    const minValue = step;
+    const maxValue = originalQty;
+    
+    if (roundedValue < minValue) {
+      setFirstBatchQty(minValue);
+    } else if (roundedValue > maxValue) {
+      setFirstBatchQty(maxValue);
+    } else {
+      setFirstBatchQty(roundedValue);
+    }
   };
 
   const handleConfirmSplit = () => {
     if (!selectedProduct) return;
     
-    // First quantity is always 1 unit, second is the remaining quantity
+    // Use the firstBatchQty from state (editable value)
     const originalQty = selectedProduct.qty || 1;
-    const firstBatchQty = 1;
-    const secondBatchQty = originalQty - firstBatchQty;
+    const firstBatchQtyValue = firstBatchQty;
+    const secondBatchQty = originalQty - firstBatchQtyValue;
+    
+    // Validate that first batch is valid
+    if (firstBatchQtyValue <= 0 || firstBatchQtyValue >= originalQty) {
+      return; // Don't proceed if invalid
+    }
     
     // Find the index of the product to split
     const productIndex = products.findIndex(p => p.id === selectedProduct.id);
@@ -851,7 +1169,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     const firstBatch = {
       ...selectedProduct,
       id: `${baseProductId}_split_1`,
-      qty: firstBatchQty,
+      qty: firstBatchQtyValue,
       splitTag: '1/2',
       originalId: baseProductId,
     };
@@ -959,8 +1277,11 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     handleCloseSplitModal();
   };
 
-  // Second batch quantity is always the remaining (total - 1)
-  const secondBatchQty = selectedProduct ? (selectedProduct.qty || 1) - 1 : 0;
+  // Second batch quantity is the remaining (total - firstBatchQty)
+  const secondBatchQty = selectedProduct ? Math.max(0, (selectedProduct.qty || 1) - firstBatchQty) : 0;
+  
+  // Get increment step for the selected product
+  const incrementStep = selectedProduct ? getIncrementStep(selectedProduct.size) : 1;
 
   const handleFilterClick = (columnKey, event) => {
     event.stopPropagation();
@@ -1964,7 +2285,9 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                     color: '#6B7280',
                     margin: '0 0 12px 0',
                   }}>
-                    The first batch is always 1 unit.
+                    {selectedProduct && incrementStep > 1 
+                      ? `Increments by ${incrementStep} unit${incrementStep > 1 ? 's' : ''} (based on product size).`
+                      : 'Enter the quantity for the first batch.'}
                   </p>
                   <div style={{ display: 'flex', gap: '12px' }}>
                     <div style={{ flex: 1 }}>
@@ -1973,20 +2296,23 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                       </label>
                       <input
                         type="number"
-                        value={1}
-                        readOnly
+                        value={firstBatchQty}
+                        onChange={handleFirstBatchQtyChange}
+                        min={incrementStep}
+                        max={selectedProduct ? (selectedProduct.qty || 1) : 1}
+                        step={incrementStep}
                         style={{
                           width: '100%',
                           height: '40px',
                           padding: '0 12px',
                           borderRadius: '6px',
                           border: '1px solid #D1D5DB',
-                          backgroundColor: '#F9FAFB',
-                          color: '#6B7280',
+                          backgroundColor: '#FFFFFF',
+                          color: '#374151',
                           fontSize: '14px',
                           fontWeight: 400,
                           outline: 'none',
-                          cursor: 'not-allowed',
+                          cursor: 'text',
                           boxSizing: 'border-box',
                         }}
                       />
@@ -2077,25 +2403,25 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                 <button
                   type="button"
                   onClick={handleConfirmSplit}
-                  disabled={!selectedProduct || (selectedProduct?.qty || 1) <= 1}
+                  disabled={!selectedProduct || (selectedProduct?.qty || 1) <= incrementStep || firstBatchQty <= 0 || firstBatchQty >= (selectedProduct?.qty || 1)}
                   style={{
                     padding: '8px 16px',
                     borderRadius: '6px',
                     border: 'none',
-                    backgroundColor: (!selectedProduct || (selectedProduct?.qty || 1) <= 1) ? '#9CA3AF' : '#3B82F6',
+                    backgroundColor: (!selectedProduct || (selectedProduct?.qty || 1) <= incrementStep || firstBatchQty <= 0 || firstBatchQty >= (selectedProduct?.qty || 1)) ? '#9CA3AF' : '#3B82F6',
                     color: '#FFFFFF',
                     fontSize: '14px',
                     fontWeight: 500,
-                    cursor: (!selectedProduct || (selectedProduct?.qty || 1) <= 1) ? 'not-allowed' : 'pointer',
+                    cursor: (!selectedProduct || (selectedProduct?.qty || 1) <= incrementStep || firstBatchQty <= 0 || firstBatchQty >= (selectedProduct?.qty || 1)) ? 'not-allowed' : 'pointer',
                     transition: 'background-color 0.2s',
                   }}
                   onMouseEnter={(e) => {
-                    if (selectedProduct && (selectedProduct?.qty || 1) > 1) {
+                    if (selectedProduct && (selectedProduct?.qty || 1) > incrementStep && firstBatchQty > 0 && firstBatchQty < (selectedProduct?.qty || 1)) {
                       e.currentTarget.style.backgroundColor = '#2563EB';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (selectedProduct && (selectedProduct?.qty || 1) > 1) {
+                    if (selectedProduct && (selectedProduct?.qty || 1) > incrementStep && firstBatchQty > 0 && firstBatchQty < (selectedProduct?.qty || 1)) {
                       e.currentTarget.style.backgroundColor = '#3B82F6';
                     }
                   }}
