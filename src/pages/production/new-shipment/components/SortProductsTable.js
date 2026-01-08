@@ -1273,6 +1273,8 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
             }}>
               {columns.map((column) => {
                 const isActive = hasActiveFilter(column.key);
+                const isDropdownOpen = openFilterColumns.has(column.key);
+                const isActiveOrOpen = isActive || isDropdownOpen;
                 return (
                 <th
                   key={column.key}
@@ -1282,7 +1284,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                     textAlign: column.key === 'drag' || column.key === 'menu' ? 'center' : 'center',
                     fontSize: '11px',
                     fontWeight: 600,
-                    color: isActive ? '#3B82F6' : '#9CA3AF',
+                    color: isActiveOrOpen ? '#3B82F6' : '#9CA3AF',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
                     width: column.width,
@@ -1290,7 +1292,6 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                     borderRight: column.key === 'drag' || column.key === 'menu' ? 'none' : '1px solid #FFFFFF',
                     height: '40px',
                     position: column.key === 'drag' || column.key === 'menu' ? 'static' : 'relative',
-                    backgroundColor: isActive ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
                   }}
                 >
                   {column.key === 'drag' || column.key === 'menu' ? (
@@ -1307,7 +1308,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         {column.label}
                         {(() => {
-                          if (isActive) {
+                          if (isActiveOrOpen) {
                             return (
                               <span style={{ 
                                 display: 'inline-block',
@@ -1324,7 +1325,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                       <img
                         src="/assets/Vector (1).png"
                         alt="Filter"
-                        className={`w-3 h-3 transition-opacity ${isActive || openFilterColumns.has(column.key) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                        className={`w-3 h-3 transition-opacity ${isActiveOrOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                         ref={(el) => {
                           if (el) {
                             filterIconRefs.current[column.key] = el;
@@ -1335,7 +1336,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                           width: '12px', 
                           height: '12px', 
                           cursor: 'pointer',
-                          filter: isActive || openFilterColumns.has(column.key) ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                          filter: isActiveOrOpen ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
                         }}
                       />
                     </div>

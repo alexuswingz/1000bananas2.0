@@ -1410,10 +1410,13 @@ const NewShipmentTable = ({
             >
               <thead className={themeClasses.headerBg}>
                 <tr style={{ height: '40px', maxHeight: '40px', borderRadius: '16px', overflow: 'hidden' }}>
-                  {['Brand', 'Product', 'Size', 'Add', 'Qty'].map((col, idx) => (
+                  {['Brand', 'Product', 'Size', 'Add', 'Qty'].map((col, idx) => {
+                    const filterKey = `normal-${idx}`;
+                    const isActiveOrOpen = hasActiveColumnFilter(filterKey) || openFilterColumns.has(filterKey);
+                    return (
                     <th
                       key={col}
-                      className="group text-xs font-bold text-white uppercase tracking-wider"
+                      className="group text-xs font-bold uppercase tracking-wider"
                       style={{
                         padding: '0 1rem',
                         height: '40px',
@@ -1424,6 +1427,7 @@ const NewShipmentTable = ({
                         borderRight: idx === 3 ? 'none' : '1px solid #FFFFFF',
                         position: 'relative',
                         borderTopLeftRadius: idx === 0 ? '16px' : undefined,
+                        color: isActiveOrOpen ? '#3B82F6' : '#FFFFFF',
                         width:
                           idx === 0
                             ? 160
@@ -1443,7 +1447,7 @@ const NewShipmentTable = ({
                         }}
                         src="/assets/Vector (1).png"
                         alt="Filter"
-                        className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
+                        className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter(`normal-${idx}`) || openFilterColumns.has(`normal-${idx}`) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                         style={{ 
                           width: '12px', 
                           height: '12px',
@@ -1452,6 +1456,7 @@ const NewShipmentTable = ({
                           top: '50%',
                           transform: 'translateY(-50%)',
                           cursor: 'pointer',
+                          filter: hasActiveColumnFilter(`normal-${idx}`) || openFilterColumns.has(`normal-${idx}`) ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1468,7 +1473,8 @@ const NewShipmentTable = ({
                         }}
                       />
                     </th>
-                  ))}
+                    );
+                  })}
                   <th
                     className="group text-xs font-bold text-white tracking-wider"
                     style={{
@@ -2727,7 +2733,7 @@ const NewShipmentTable = ({
                   lineHeight: '100%',
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
-                  color: '#FFFFFF',
+                  color: (hasActiveColumnFilter('brand') || openFilterColumns.has('brand')) ? '#3B82F6' : '#FFFFFF',
                   borderRight: '1px solid #FFFFFF',
                 }}
               >
@@ -2739,12 +2745,12 @@ const NewShipmentTable = ({
                     }}
                     src="/assets/Vector (1).png"
                     alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('brand') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('brand') || openFilterColumns.has('brand') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                     style={{ 
                       width: '12px', 
                       height: '12px',
                       cursor: 'pointer',
-                      filter: hasActiveColumnFilter('brand') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                      filter: hasActiveColumnFilter('brand') || openFilterColumns.has('brand') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
                     }}
                     onClick={(e) => handleFilterClick('brand', e)}
                   />
@@ -2772,7 +2778,7 @@ const NewShipmentTable = ({
                   lineHeight: '100%',
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
-                  color: '#FFFFFF',
+                  color: (hasActiveColumnFilter('product') || openFilterColumns.has('product')) ? '#3B82F6' : '#FFFFFF',
                   borderRight: '1px solid #FFFFFF',
                 }}
               >
@@ -2784,12 +2790,12 @@ const NewShipmentTable = ({
                     }}
                     src="/assets/Vector (1).png"
                     alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('product') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('product') || openFilterColumns.has('product') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                     style={{ 
                       width: '12px', 
                       height: '12px',
                       cursor: 'pointer',
-                      filter: hasActiveColumnFilter('product') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                      filter: hasActiveColumnFilter('product') || openFilterColumns.has('product') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
                     }}
                     onClick={(e) => handleFilterClick('product', e)}
                   />
@@ -2816,7 +2822,7 @@ const NewShipmentTable = ({
                   lineHeight: '100%',
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
-                  color: '#FFFFFF',
+                  color: (hasActiveColumnFilter('size') || openFilterColumns.has('size')) ? '#3B82F6' : '#FFFFFF',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', position: 'relative' }}>
@@ -2827,12 +2833,12 @@ const NewShipmentTable = ({
                     }}
                     src="/assets/Vector (1).png"
                     alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('size') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('size') || openFilterColumns.has('size') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                     style={{ 
                       width: '12px', 
                       height: '12px',
                       cursor: 'pointer',
-                      filter: hasActiveColumnFilter('size') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                      filter: hasActiveColumnFilter('size') || openFilterColumns.has('size') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
                     }}
                     onClick={(e) => handleFilterClick('size', e)}
                   />
@@ -2855,8 +2861,7 @@ const NewShipmentTable = ({
                   lineHeight: '100%',
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
-                  color: '#FFFFFF',
-                  backgroundColor: '#1C2634',
+                  color: (hasActiveColumnFilter('qty') || openFilterColumns.has('qty')) ? '#3B82F6' : '#FFFFFF',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
@@ -2867,12 +2872,12 @@ const NewShipmentTable = ({
                     }}
                     src="/assets/Vector (1).png"
                     alt="Filter"
-                    className="w-3 h-3 transition-opacity opacity-0 group-hover:opacity-100"
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('qty') || openFilterColumns.has('qty') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                     style={{ 
                       width: '12px', 
                       height: '12px',
                       cursor: 'pointer',
-                      filter: hasActiveColumnFilter('qty') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                      filter: hasActiveColumnFilter('qty') || openFilterColumns.has('qty') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
                     }}
                     onClick={(e) => handleFilterClick('qty', e)}
                   />
@@ -2903,7 +2908,7 @@ const NewShipmentTable = ({
                       fontSize: '0.75rem', 
                       fontWeight: 700, 
                       lineHeight: 1.1, 
-                      color: '#FFFFFF',
+                      color: (hasActiveColumnFilter('fbaAvailable') || openFilterColumns.has('fbaAvailable')) ? '#3B82F6' : '#FFFFFF',
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em',
                     }}>INVENTORY</span>
@@ -2911,7 +2916,7 @@ const NewShipmentTable = ({
                       fontSize: '0.6rem', 
                       fontWeight: 400, 
                       lineHeight: 1.1, 
-                      color: '#FFFFFF',
+                      color: (hasActiveColumnFilter('fbaAvailable') || openFilterColumns.has('fbaAvailable')) ? '#3B82F6' : '#FFFFFF',
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em',
                     }}>FBA AVAILABLE (DAYS)</span>
@@ -2922,7 +2927,7 @@ const NewShipmentTable = ({
                     }}
                     src="/assets/Vector (1).png"
                     alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('fbaAvailable') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('fbaAvailable') || openFilterColumns.has('fbaAvailable') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                     style={{ 
                       width: '12px', 
                       height: '12px',
@@ -2931,7 +2936,7 @@ const NewShipmentTable = ({
                       top: '50%',
                       transform: 'translateY(-50%)',
                       cursor: 'pointer',
-                      filter: hasActiveColumnFilter('fbaAvailable') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                      filter: hasActiveColumnFilter('fbaAvailable') || openFilterColumns.has('fbaAvailable') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
                     }}
                     onClick={(e) => handleFilterClick('fbaAvailable', e)}
                   />
@@ -2962,7 +2967,7 @@ const NewShipmentTable = ({
                       fontSize: '0.75rem', 
                       fontWeight: 700, 
                       lineHeight: 1.1, 
-                      color: '#FFFFFF',
+                      color: (hasActiveColumnFilter('totalInventory') || openFilterColumns.has('totalInventory')) ? '#3B82F6' : '#FFFFFF',
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em',
                     }}>INVENTORY</span>
@@ -2970,7 +2975,7 @@ const NewShipmentTable = ({
                       fontSize: '0.6rem', 
                       fontWeight: 400, 
                       lineHeight: 1.1, 
-                      color: '#FFFFFF',
+                      color: (hasActiveColumnFilter('totalInventory') || openFilterColumns.has('totalInventory')) ? '#3B82F6' : '#FFFFFF',
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em',
                     }}>TOTAL (DAYS)</span>
@@ -2981,7 +2986,7 @@ const NewShipmentTable = ({
                     }}
                     src="/assets/Vector (1).png"
                     alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('totalInventory') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('totalInventory') || openFilterColumns.has('totalInventory') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                     style={{ 
                       width: '12px', 
                       height: '12px',
@@ -2990,7 +2995,7 @@ const NewShipmentTable = ({
                       top: '50%',
                       transform: 'translateY(-50%)',
                       cursor: 'pointer',
-                      filter: hasActiveColumnFilter('totalInventory') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                      filter: hasActiveColumnFilter('totalInventory') || openFilterColumns.has('totalInventory') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
                     }}
                     onClick={(e) => handleFilterClick('totalInventory', e)}
                   />
@@ -3012,7 +3017,7 @@ const NewShipmentTable = ({
                   lineHeight: '100%',
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
-                  color: '#FFFFFF',
+                  color: (hasActiveColumnFilter('forecast') || openFilterColumns.has('forecast')) ? '#3B82F6' : '#FFFFFF',
                   backgroundColor: '#1C2634',
                 }}
               >
@@ -3024,12 +3029,12 @@ const NewShipmentTable = ({
                     }}
                     src="/assets/Vector (1).png"
                     alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('forecast') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('forecast') || openFilterColumns.has('forecast') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                     style={{ 
                       width: '12px', 
                       height: '12px',
                       cursor: 'pointer',
-                      filter: hasActiveColumnFilter('forecast') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                      filter: hasActiveColumnFilter('forecast') || openFilterColumns.has('forecast') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
                     }}
                     onClick={(e) => handleFilterClick('forecast', e)}
                   />
@@ -3051,7 +3056,7 @@ const NewShipmentTable = ({
                   lineHeight: '100%',
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
-                  color: '#FFFFFF',
+                  color: (hasActiveColumnFilter('sales7Day') || openFilterColumns.has('sales7Day')) ? '#3B82F6' : '#FFFFFF',
                   backgroundColor: '#1C2634',
                 }}
               >
@@ -3063,12 +3068,12 @@ const NewShipmentTable = ({
                     }}
                     src="/assets/Vector (1).png"
                     alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('sales7Day') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('sales7Day') || openFilterColumns.has('sales7Day') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                     style={{ 
                       width: '12px', 
                       height: '12px',
                       cursor: 'pointer',
-                      filter: hasActiveColumnFilter('sales7Day') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                      filter: hasActiveColumnFilter('sales7Day') || openFilterColumns.has('sales7Day') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
                     }}
                     onClick={(e) => handleFilterClick('sales7Day', e)}
                   />
@@ -3090,7 +3095,7 @@ const NewShipmentTable = ({
                   lineHeight: '100%',
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
-                  color: '#FFFFFF',
+                  color: (hasActiveColumnFilter('sales30Day') || openFilterColumns.has('sales30Day')) ? '#3B82F6' : '#FFFFFF',
                   backgroundColor: '#1C2634',
                 }}
               >
@@ -3102,12 +3107,12 @@ const NewShipmentTable = ({
                     }}
                     src="/assets/Vector (1).png"
                     alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('sales30Day') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('sales30Day') || openFilterColumns.has('sales30Day') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                     style={{ 
                       width: '12px', 
                       height: '12px',
                       cursor: 'pointer',
-                      filter: hasActiveColumnFilter('sales30Day') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                      filter: hasActiveColumnFilter('sales30Day') || openFilterColumns.has('sales30Day') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
                     }}
                     onClick={(e) => handleFilterClick('sales30Day', e)}
                   />
@@ -3129,7 +3134,7 @@ const NewShipmentTable = ({
                   lineHeight: '100%',
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
-                  color: '#FFFFFF',
+                  color: (hasActiveColumnFilter('sales4Month') || openFilterColumns.has('sales4Month')) ? '#3B82F6' : '#FFFFFF',
                   backgroundColor: '#1C2634',
                 }}
               >
@@ -3141,12 +3146,12 @@ const NewShipmentTable = ({
                     }}
                     src="/assets/Vector (1).png"
                     alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('sales4Month') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('sales4Month') || openFilterColumns.has('sales4Month') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                     style={{ 
                       width: '12px', 
                       height: '12px',
                       cursor: 'pointer',
-                      filter: hasActiveColumnFilter('sales4Month') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                      filter: hasActiveColumnFilter('sales4Month') || openFilterColumns.has('sales4Month') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
                     }}
                     onClick={(e) => handleFilterClick('sales4Month', e)}
                   />
@@ -3168,7 +3173,7 @@ const NewShipmentTable = ({
                   lineHeight: '100%',
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
-                  color: '#FFFFFF',
+                  color: (hasActiveColumnFilter('formula') || openFilterColumns.has('formula')) ? '#3B82F6' : '#FFFFFF',
                   backgroundColor: '#1C2634',
                 }}
               >
@@ -3180,12 +3185,12 @@ const NewShipmentTable = ({
                     }}
                     src="/assets/Vector (1).png"
                     alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('formula') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('formula') || openFilterColumns.has('formula') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                     style={{ 
                       width: '12px', 
                       height: '12px',
                       cursor: 'pointer',
-                      filter: hasActiveColumnFilter('formula') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                      filter: hasActiveColumnFilter('formula') || openFilterColumns.has('formula') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
                     }}
                     onClick={(e) => handleFilterClick('formula', e)}
                   />
@@ -3208,14 +3213,19 @@ const NewShipmentTable = ({
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
                   color: '#FFFFFF',
-                  backgroundColor: hasActiveColumnFilter('bottles') ? 'rgba(59, 130, 246, 0.1)' : '#1C2634',
+                  backgroundColor: '#1C2634',
                   position: 'relative',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', position: 'relative', width: '100%' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '4px',
+                    color: (hasActiveColumnFilter('bottles') || openFilterColumns.has('bottles')) ? '#3B82F6' : '#FFFFFF',
+                  }}>
                     BOTTLES
-                    {hasActiveColumnFilter('bottles') && (
+                    {(hasActiveColumnFilter('bottles') || openFilterColumns.has('bottles')) && (
                       <span style={{ 
                         display: 'inline-block',
                         width: '6px', 
@@ -3228,7 +3238,7 @@ const NewShipmentTable = ({
                   <img
                     src="/assets/Vector (1).png"
                     alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('bottles') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('bottles') || openFilterColumns.has('bottles') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                     ref={(el) => {
                       if (el) filterIconRefs.current['bottles'] = el;
                     }}
@@ -3237,7 +3247,7 @@ const NewShipmentTable = ({
                       width: '12px', 
                       height: '12px',
                       cursor: 'pointer',
-                      filter: hasActiveColumnFilter('bottles') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                      filter: hasActiveColumnFilter('bottles') || openFilterColumns.has('bottles') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
                       position: 'absolute',
                       right: '0',
                     }}
@@ -3261,13 +3271,18 @@ const NewShipmentTable = ({
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
                   color: '#FFFFFF',
-                  backgroundColor: hasActiveColumnFilter('closures') ? 'rgba(59, 130, 246, 0.1)' : '#1C2634',
+                  backgroundColor: '#1C2634',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '4px',
+                    color: (hasActiveColumnFilter('closures') || openFilterColumns.has('closures')) ? '#3B82F6' : '#FFFFFF',
+                  }}>
                     CLOSURES
-                    {hasActiveColumnFilter('closures') && (
+                    {(hasActiveColumnFilter('closures') || openFilterColumns.has('closures')) && (
                       <span style={{ 
                         display: 'inline-block',
                         width: '6px', 
@@ -3280,7 +3295,7 @@ const NewShipmentTable = ({
                   <img
                     src="/assets/Vector (1).png"
                     alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('closures') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('closures') || openFilterColumns.has('closures') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                     ref={(el) => {
                       if (el) filterIconRefs.current['closures'] = el;
                     }}
@@ -3289,7 +3304,7 @@ const NewShipmentTable = ({
                       width: '12px', 
                       height: '12px',
                       cursor: 'pointer',
-                      filter: hasActiveColumnFilter('closures') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                      filter: hasActiveColumnFilter('closures') || openFilterColumns.has('closures') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
                     }}
                   />
                 </div>
@@ -3311,13 +3326,18 @@ const NewShipmentTable = ({
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
                   color: '#FFFFFF',
-                  backgroundColor: hasActiveColumnFilter('boxes') ? 'rgba(59, 130, 246, 0.1)' : '#1C2634',
+                  backgroundColor: '#1C2634',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '4px',
+                    color: (hasActiveColumnFilter('boxes') || openFilterColumns.has('boxes')) ? '#3B82F6' : '#FFFFFF',
+                  }}>
                     BOXES
-                    {hasActiveColumnFilter('boxes') && (
+                    {(hasActiveColumnFilter('boxes') || openFilterColumns.has('boxes')) && (
                       <span style={{ 
                         display: 'inline-block',
                         width: '6px', 
@@ -3330,7 +3350,7 @@ const NewShipmentTable = ({
                   <img
                     src="/assets/Vector (1).png"
                     alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('boxes') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('boxes') || openFilterColumns.has('boxes') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                     ref={(el) => {
                       if (el) filterIconRefs.current['boxes'] = el;
                     }}
@@ -3339,7 +3359,7 @@ const NewShipmentTable = ({
                       width: '12px', 
                       height: '12px',
                       cursor: 'pointer',
-                      filter: hasActiveColumnFilter('boxes') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                      filter: hasActiveColumnFilter('boxes') || openFilterColumns.has('boxes') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
                     }}
                   />
                 </div>
@@ -3361,13 +3381,18 @@ const NewShipmentTable = ({
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
                   color: '#FFFFFF',
-                  backgroundColor: hasActiveColumnFilter('labels') ? 'rgba(59, 130, 246, 0.1)' : '#1C2634',
+                  backgroundColor: '#1C2634',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '4px',
+                    color: (hasActiveColumnFilter('labels') || openFilterColumns.has('labels')) ? '#3B82F6' : '#FFFFFF',
+                  }}>
                     LABELS
-                    {hasActiveColumnFilter('labels') && (
+                    {(hasActiveColumnFilter('labels') || openFilterColumns.has('labels')) && (
                       <span style={{ 
                         display: 'inline-block',
                         width: '6px', 
@@ -3380,7 +3405,7 @@ const NewShipmentTable = ({
                   <img
                     src="/assets/Vector (1).png"
                     alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('labels') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('labels') || openFilterColumns.has('labels') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                     ref={(el) => {
                       if (el) filterIconRefs.current['labels'] = el;
                     }}
@@ -3389,7 +3414,7 @@ const NewShipmentTable = ({
                       width: '12px', 
                       height: '12px',
                       cursor: 'pointer',
-                      filter: hasActiveColumnFilter('labels') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                      filter: hasActiveColumnFilter('labels') || openFilterColumns.has('labels') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
                     }}
                   />
                 </div>
