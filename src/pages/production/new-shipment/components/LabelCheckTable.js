@@ -664,27 +664,27 @@ const LabelCheckTable = ({
     const handleClickOutside = (event) => {
       if (openFilterColumn !== null) {
         const filterIcon = filterIconRefs.current[openFilterColumn];
-        const dropdown = filterDropdownRef.current;
         
-        if (filterIcon && dropdown) {
-          const isClickInsideIcon = filterIcon.contains(event.target);
-          const isClickInsideDropdown = dropdown.contains(event.target);
-          
-          if (!isClickInsideIcon && !isClickInsideDropdown) {
-            setOpenFilterColumn(null);
-          }
+        // Check if click is on the filter icon
+        const clickedOnFilterIcon = filterIcon && filterIcon.contains && filterIcon.contains(event.target);
+        
+        // Check if click is inside the dropdown (by ref or attribute)
+        const clickedInsideDropdown = 
+          (filterDropdownRef.current && filterDropdownRef.current.contains && filterDropdownRef.current.contains(event.target)) ||
+          event.target.closest('[data-filter-dropdown]');
+        
+        if (!clickedOnFilterIcon && !clickedInsideDropdown) {
+          setOpenFilterColumn(null);
         }
       }
     };
 
     if (openFilterColumn !== null) {
-      const timeoutId = setTimeout(() => {
-        document.addEventListener('click', handleClickOutside);
-      }, 0);
+      // Use mousedown with capture phase to catch clicks early
+      document.addEventListener('mousedown', handleClickOutside, true);
       
       return () => {
-        clearTimeout(timeoutId);
-        document.removeEventListener('click', handleClickOutside);
+        document.removeEventListener('mousedown', handleClickOutside, true);
       };
     }
   }, [openFilterColumn]);
@@ -1988,6 +1988,9 @@ const LabelCheckTable = ({
       {/* Filter Dropdown */}
       {!disableFilters && openFilterColumn && filterIconRefs.current[openFilterColumn] && (
         <SortFormulasFilterDropdown
+          ref={(el) => {
+            filterDropdownRef.current = el;
+          }}
           filterIconRef={filterIconRefs.current[openFilterColumn]}
           columnKey={openFilterColumn}
           availableValues={getColumnValues(openFilterColumn)}

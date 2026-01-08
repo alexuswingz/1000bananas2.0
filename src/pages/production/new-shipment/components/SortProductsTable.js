@@ -10,6 +10,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
   const [lockedProductIds, setLockedProductIds] = useState(() => new Set());
   const [openFilterColumns, setOpenFilterColumns] = useState(() => new Set());
   const filterIconRefs = useRef({});
+  const filterDropdownRefs = useRef({}); // Store refs to dropdown DOM elements
   const tableContainerRef = useRef(null);
   const [filters, setFilters] = useState({});
   // sortConfig is now an array of sort objects: [{column: 'size', order: 'asc'}, {column: 'formula', order: 'asc'}]
@@ -469,12 +470,15 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
       if (openFilterColumns.size > 0) {
         // Check if click is on any filter icon
         const clickedOnFilterIcon = Object.values(filterIconRefs.current).some(ref => 
-          ref && ref.contains(event.target)
+          ref && ref.contains && ref.contains(event.target)
         );
         
-        // Check if click is inside any dropdown (they use portals, so we check by class or data attribute)
-        // Since dropdowns are portals, we need to check if the click target is within a dropdown
-        const clickedInsideDropdown = event.target.closest('[data-filter-dropdown]');
+        // Check if click is inside any dropdown (by attribute or ref)
+        const clickedInsideDropdown = 
+          event.target.closest('[data-filter-dropdown]') ||
+          Object.values(filterDropdownRefs.current).some(ref => 
+            ref && ref.contains && ref.contains(event.target)
+          );
         
         if (!clickedOnFilterIcon && !clickedInsideDropdown) {
           setOpenFilterColumns(new Set());
@@ -483,13 +487,11 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     };
 
     if (openFilterColumns.size > 0) {
-      const timeoutId = setTimeout(() => {
-        document.addEventListener('click', handleClickOutside);
-      }, 0);
+      // Use mousedown with capture phase to catch clicks early
+      document.addEventListener('mousedown', handleClickOutside, true);
       
       return () => {
-        clearTimeout(timeoutId);
-        document.removeEventListener('click', handleClickOutside);
+        document.removeEventListener('mousedown', handleClickOutside, true);
       };
     }
   }, [openFilterColumns]);
@@ -974,6 +976,18 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
   };
 
   const handleApplyFilter = (columnKey, filterData) => {
+    // If filterData is null, remove the filter (Reset was clicked)
+    if (filterData === null) {
+      setFilters(prev => {
+        const newFilters = { ...prev };
+        delete newFilters[columnKey];
+        return newFilters;
+      });
+      // Also clear sort config for this column
+      setSortConfig(prev => prev.filter(sort => sort.column !== columnKey));
+      return;
+    }
+    
     setFilters(prev => ({
       ...prev,
       [columnKey]: filterData,
@@ -1075,11 +1089,29 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     const filter = filters[columnKey];
     if (!filter) return false;
     
-    // Only check for custom filters, not sort
-    const hasValues = filter.selectedValues && filter.selectedValues.size > 0;
+    // Check for condition filter
     const hasCondition = filter.conditionType && filter.conditionType !== '';
+    if (hasCondition) return true;
     
-    return hasValues || hasCondition;
+    // Check for value filters - only active if not all values are selected
+    if (!filter.selectedValues || filter.selectedValues.size === 0) return false;
+    
+    // Get all available values for this column
+    const allAvailableValues = getColumnValues(columnKey);
+    if (allAvailableValues.length === 0) return false;
+    
+    const allValuesSet = new Set(allAvailableValues.map(v => String(v)));
+    const selectedValuesSet = filter.selectedValues instanceof Set 
+      ? new Set(Array.from(filter.selectedValues).map(v => String(v)))
+      : new Set(Array.from(filter.selectedValues || []).map(v => String(v)));
+    
+    // Check if all available values are selected - if so, it's not an active filter
+    const allSelected = allValuesSet.size > 0 && 
+      selectedValuesSet.size === allValuesSet.size &&
+      Array.from(allValuesSet).every(val => selectedValuesSet.has(val));
+    
+    // Filter is active only if not all values are selected
+    return !allSelected;
   };
 
   // Get sort priority for a column (1 = primary, 2 = secondary, etc., or null if not sorted)
@@ -1792,6 +1824,10 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
         return (
           <SortProductsFilterDropdown
             key={columnKey}
+            ref={(el) => {
+              if (el) filterDropdownRefs.current[columnKey] = el;
+              else delete filterDropdownRefs.current[columnKey];
+            }}
             filterIconRef={filterIconRefs.current[columnKey]}
             columnKey={columnKey}
             availableValues={getColumnValues(columnKey)}

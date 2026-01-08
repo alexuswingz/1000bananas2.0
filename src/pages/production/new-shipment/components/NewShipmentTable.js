@@ -37,6 +37,7 @@ const NewShipmentTable = ({
   // Filter dropdown state for bottles, closures, boxes, labels
   const [openFilterColumns, setOpenFilterColumns] = useState(() => new Set());
   const filterIconRefs = useRef({});
+  const filterDropdownRefs = useRef({}); // Store refs to dropdown DOM elements
   const [columnFilters, setColumnFilters] = useState({});
   const [columnSortConfig, setColumnSortConfig] = useState([]);
   // Store the sorted order (array of row IDs) to preserve positions after sorting
@@ -240,6 +241,22 @@ const NewShipmentTable = ({
       // Apply value filters (checkbox selections)
       if (filter.selectedValues && filter.selectedValues.size > 0) {
         result = result.filter(row => {
+          // Special handling for Add column
+          if (columnKey === 'normal-3' || columnKey === 'add') {
+            const isAdded = addedRows.has(row.id);
+            const wantsAdded = filter.selectedValues.has('Added');
+            const wantsNotAdded = filter.selectedValues.has('Not Added');
+            
+            // If both are selected, show all rows
+            if (wantsAdded && wantsNotAdded) return true;
+            // If only Added is selected, show only added rows
+            if (wantsAdded && !wantsNotAdded) return isAdded;
+            // If only Not Added is selected, show only non-added rows
+            if (!wantsAdded && wantsNotAdded) return !isAdded;
+            // If neither is selected, show nothing
+            return false;
+          }
+          
           let rowValue;
           switch(columnKey) {
             case 'bottles':
@@ -470,13 +487,17 @@ const NewShipmentTable = ({
   // Filter handlers for bottles, closures, boxes, labels columns
   const handleFilterClick = (columnKey, event) => {
     event.stopPropagation();
+    // Close timeline filter if open
+    if (openFilterIndex === 'doi-goal') {
+      setOpenFilterIndex(null);
+    }
     setOpenFilterColumns((prev) => {
-      const next = new Set(prev);
-      if (next.has(columnKey)) {
-        next.delete(columnKey);
-      } else {
+      const next = new Set();
+      // Close all other filters and open only the clicked one (if not already open)
+      if (!prev.has(columnKey)) {
         next.add(columnKey);
       }
+      // If it was already open, close it (empty set)
       return next;
     });
   };
@@ -562,6 +583,22 @@ const NewShipmentTable = ({
 
       if (filter.selectedValues && filter.selectedValues.size > 0) {
         result = result.filter(row => {
+          // Special handling for Add column
+          if (key === 'normal-3' || key === 'add') {
+            const isAdded = addedRows.has(row.id);
+            const wantsAdded = filter.selectedValues.has('Added');
+            const wantsNotAdded = filter.selectedValues.has('Not Added');
+            
+            // If both are selected, show all rows
+            if (wantsAdded && wantsNotAdded) return true;
+            // If only Added is selected, show only added rows
+            if (wantsAdded && !wantsNotAdded) return isAdded;
+            // If only Not Added is selected, show only non-added rows
+            if (!wantsAdded && wantsNotAdded) return !isAdded;
+            // If neither is selected, show nothing
+            return false;
+          }
+          
           let rowValue;
           switch(key) {
             case 'bottles':
@@ -722,6 +759,16 @@ const NewShipmentTable = ({
   }, [rows, activeFilters, columnFilters, forecastRange]);
 
   const handleApplyColumnFilter = (columnKey, filterData) => {
+    // If filterData is null, remove the filter (Reset was clicked)
+    if (filterData === null) {
+      setColumnFilters(prev => {
+        const newFilters = { ...prev };
+        delete newFilters[columnKey];
+        return newFilters;
+      });
+      return;
+    }
+    
     setColumnFilters(prev => ({
       ...prev,
       [columnKey]: filterData,
@@ -869,8 +916,14 @@ const NewShipmentTable = ({
 
   // Get unique values for a column
   const getColumnValues = (columnKey) => {
+    // Special handling for Add column
+    if (columnKey === 'normal-3' || columnKey === 'add') {
+      return ['Added', 'Not Added'];
+    }
+    
+    // Always use all rows (not filteredRows) to show all available values
     const values = new Set();
-    filteredRows.forEach((row, index) => {
+    rows.forEach((row, index) => {
       let val;
       switch(columnKey) {
         case 'bottles':
@@ -947,37 +1000,89 @@ const NewShipmentTable = ({
   const hasActiveColumnFilter = (columnKey) => {
     const filter = columnFilters[columnKey];
     if (!filter) return false;
-    const hasValues = filter.selectedValues && filter.selectedValues.size > 0;
+    
+    // Check for condition filter
     const hasCondition = filter.conditionType && filter.conditionType !== '';
-    return hasValues || hasCondition;
+    if (hasCondition) return true;
+    
+    // Check for value filters - only active if not all values are selected
+    if (!filter.selectedValues || filter.selectedValues.size === 0) return false;
+    
+    // Special handling for Add column
+    if (columnKey === 'normal-3' || columnKey === 'add') {
+      // For Add column, both "Added" and "Not Added" selected means no active filter
+      return filter.selectedValues.size < 2;
+    }
+    
+    // Get all available values for this column
+    const allAvailableValues = getColumnValues(columnKey);
+    if (allAvailableValues.length === 0) return false;
+    
+    const allValuesSet = new Set(allAvailableValues.map(v => String(v)));
+    const selectedValuesSet = filter.selectedValues instanceof Set 
+      ? new Set(Array.from(filter.selectedValues).map(v => String(v)))
+      : new Set(Array.from(filter.selectedValues || []).map(v => String(v)));
+    
+    // Check if all available values are selected - if so, it's not an active filter
+    const allSelected = allValuesSet.size > 0 && 
+      selectedValuesSet.size === allValuesSet.size &&
+      Array.from(allValuesSet).every(val => selectedValuesSet.has(val));
+    
+    // Filter is active only if not all values are selected
+    return !allSelected;
   };
 
   // Close filter dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (openFilterColumns.size > 0) {
-        const clickedOnFilterIcon = Object.values(filterIconRefs.current).some(ref => 
-          ref && ref.contains(event.target)
+      // Check if click is on a filter icon (any column filter icon)
+      const clickedOnFilterIcon = Object.values(filterIconRefs.current).some(ref => 
+        ref && ref.contains && ref.contains(event.target)
+      );
+      
+      // Check if click is inside a filter dropdown (by attribute or ref)
+      const clickedInsideDropdown = event.target.closest('[data-filter-dropdown]') ||
+        Object.values(filterDropdownRefs.current).some(ref => 
+          ref && ref.contains && ref.contains(event.target)
         );
-        const clickedInsideDropdown = event.target.closest('[data-filter-dropdown]');
-        
-        if (!clickedOnFilterIcon && !clickedInsideDropdown) {
+      
+      // Check if click is on timeline filter icon
+      const clickedOnTimelineFilter = filterRefs.current['doi-goal'] && 
+        filterRefs.current['doi-goal'].contains && 
+        filterRefs.current['doi-goal'].contains(event.target);
+      
+      // Check if click is inside timeline filter dropdown
+      const clickedInsideTimelineFilter = event.target.closest('[data-timeline-filter]') ||
+        (filterModalRefs.current['doi-goal'] && 
+         filterModalRefs.current['doi-goal'].contains && 
+         filterModalRefs.current['doi-goal'].contains(event.target));
+      
+      // Close column filters if open and click is outside
+      if (openFilterColumns.size > 0) {
+        if (!clickedOnFilterIcon && !clickedInsideDropdown && 
+            !clickedOnTimelineFilter && !clickedInsideTimelineFilter) {
           setOpenFilterColumns(new Set());
+        }
+      }
+      
+      // Close timeline filter if open and click is outside
+      if (openFilterIndex === 'doi-goal') {
+        if (!clickedOnTimelineFilter && !clickedInsideTimelineFilter && 
+            !clickedOnFilterIcon && !clickedInsideDropdown) {
+          setOpenFilterIndex(null);
         }
       }
     };
 
-    if (openFilterColumns.size > 0) {
-      const timeoutId = setTimeout(() => {
-        document.addEventListener('click', handleClickOutside);
-      }, 0);
+    // Use mousedown with capture phase to catch clicks early
+    if (openFilterColumns.size > 0 || openFilterIndex === 'doi-goal') {
+      document.addEventListener('mousedown', handleClickOutside, true);
       
       return () => {
-        clearTimeout(timeoutId);
-        document.removeEventListener('click', handleClickOutside);
+        document.removeEventListener('mousedown', handleClickOutside, true);
       };
     }
-  }, [openFilterColumns]);
+  }, [openFilterColumns, openFilterIndex]);
 
   const currentRows = filteredRowsWithSelection;
 
@@ -1404,6 +1509,10 @@ const NewShipmentTable = ({
                       }}
                       onClick={(e) => {
                         e.stopPropagation();
+                        // Close all column filters if open
+                        if (openFilterColumns.size > 0) {
+                          setOpenFilterColumns(new Set());
+                        }
                         setOpenFilterIndex(openFilterIndex === 'doi-goal' ? null : 'doi-goal');
                       }}
                     />
@@ -2189,6 +2298,10 @@ const NewShipmentTable = ({
           return (
             <SortFormulasFilterDropdown
               key={columnKey}
+              ref={(el) => {
+                if (el) filterDropdownRefs.current[columnKey] = el;
+                else delete filterDropdownRefs.current[columnKey];
+              }}
               filterIconRef={filterIconRefs.current[columnKey]}
               columnKey={columnKey}
               availableValues={getColumnValues(columnKey)}
@@ -4088,6 +4201,10 @@ const NewShipmentTable = ({
       return (
         <SortFormulasFilterDropdown
           key={columnKey}
+          ref={(el) => {
+            if (el) filterDropdownRefs.current[columnKey] = el;
+            else delete filterDropdownRefs.current[columnKey];
+          }}
           filterIconRef={filterIconRefs.current[columnKey]}
           columnKey={columnKey}
           availableValues={getColumnValues(columnKey)}

@@ -15,9 +15,51 @@ const SortFormulasFilterDropdown = forwardRef(({
   const [filterConditionExpanded, setFilterConditionExpanded] = useState(true);
   const [filterValuesExpanded, setFilterValuesExpanded] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedValues, setSelectedValues] = useState(
-    currentFilter.selectedValues ? new Set(currentFilter.selectedValues) : new Set()
-  );
+  const hasInitializedRef = useRef(false);
+  
+  // Initialize with all available values checked (unless there's an existing filter)
+  const [selectedValues, setSelectedValues] = useState(() => {
+    // If there's an existing filter with selectedValues, use those
+    if (currentFilter.selectedValues && currentFilter.selectedValues.size > 0) {
+      return new Set(currentFilter.selectedValues);
+    }
+    // Otherwise, start with all values checked
+    const allValues = (columnKey === 'normal-3' || columnKey === 'add')
+      ? ['Added', 'Not Added']
+      : availableValues.map(v => String(v));
+    return new Set(allValues);
+  });
+  
+  // Update selectedValues when dropdown opens - respect existing filter or start with all checked
+  useEffect(() => {
+    if (filterIconRef) {
+      // Check if there's an existing filter with selectedValues
+      const existingFilterValues = currentFilter.selectedValues;
+      const hasFilter = existingFilterValues && 
+        (existingFilterValues instanceof Set ? existingFilterValues.size > 0 : 
+         Array.isArray(existingFilterValues) ? existingFilterValues.length > 0 :
+         false);
+      
+      if (hasFilter) {
+        // Use existing filter values - always respect the saved filter
+        const filterValues = existingFilterValues instanceof Set 
+          ? Array.from(existingFilterValues)
+          : existingFilterValues;
+        setSelectedValues(new Set(filterValues));
+      } else if (!hasInitializedRef.current) {
+        // First time opening this dropdown with no filter - start with all checked
+        const allValues = (columnKey === 'normal-3' || columnKey === 'add')
+          ? ['Added', 'Not Added']
+          : availableValues.map(v => String(v));
+        setSelectedValues(new Set(allValues));
+        hasInitializedRef.current = true;
+      }
+      // If hasInitializedRef is true and no filter, keep current selectedValues (don't reset)
+    } else {
+      // Dropdown closed - reset initialization flag for next open
+      hasInitializedRef.current = false;
+    }
+  }, [filterIconRef, columnKey, currentFilter.selectedValues, availableValues]);
   
   // Condition filter state
   const [conditionType, setConditionType] = useState(currentFilter.conditionType || '');
@@ -54,7 +96,10 @@ const SortFormulasFilterDropdown = forwardRef(({
   const conditions = isNumericColumn ? numericConditions : textConditions;
 
   // Convert values to strings for filtering
-  const stringValues = availableValues.map(v => String(v));
+  // Special handling for Add column
+  const stringValues = (columnKey === 'normal-3' || columnKey === 'add')
+    ? ['Added', 'Not Added']
+    : availableValues.map(v => String(v));
   
   const filteredValues = stringValues.filter(value =>
     value.toLowerCase().includes(searchTerm.toLowerCase())
@@ -107,16 +152,16 @@ const SortFormulasFilterDropdown = forwardRef(({
   const handleReset = () => {
     setSortOrder('');
     setSearchTerm('');
-    setSelectedValues(new Set());
+    // Reset to all values checked
+    const allValues = (columnKey === 'normal-3' || columnKey === 'add')
+      ? ['Added', 'Not Added']
+      : availableValues.map(v => String(v));
+    setSelectedValues(new Set(allValues));
     setConditionType('');
     setConditionValue('');
     if (onApply) {
-      onApply({
-        sortOrder: '',
-        selectedValues: new Set(),
-        conditionType: '',
-        conditionValue: '',
-      });
+      // Pass null to indicate filter should be cleared
+      onApply(null);
     }
   };
 

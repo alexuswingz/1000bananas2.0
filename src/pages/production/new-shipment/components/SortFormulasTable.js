@@ -1057,6 +1057,18 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
   };
 
   const handleApplyFilter = (columnKey, filterData) => {
+    // If filterData is null, remove the filter (Reset was clicked)
+    if (filterData === null) {
+      setFilters(prev => {
+        const newFilters = { ...prev };
+        delete newFilters[columnKey];
+        return newFilters;
+      });
+      // Also clear sort config for this column
+      setSortConfig(prev => prev.filter(sort => sort.column !== columnKey));
+      return;
+    }
+    
     setFilters(prev => ({
       ...prev,
       [columnKey]: filterData,
@@ -1166,11 +1178,29 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
     const filter = filters[columnKey];
     if (!filter) return false;
     
-    // Only check for custom filters, not sort
-    const hasValues = filter.selectedValues && filter.selectedValues.size > 0;
+    // Check for condition filter
     const hasCondition = filter.conditionType && filter.conditionType !== '';
+    if (hasCondition) return true;
     
-    return hasValues || hasCondition;
+    // Check for value filters - only active if not all values are selected
+    if (!filter.selectedValues || filter.selectedValues.size === 0) return false;
+    
+    // Get all available values for this column
+    const allAvailableValues = getColumnValues(columnKey);
+    if (allAvailableValues.length === 0) return false;
+    
+    const allValuesSet = new Set(allAvailableValues.map(v => String(v)));
+    const selectedValuesSet = filter.selectedValues instanceof Set 
+      ? new Set(Array.from(filter.selectedValues).map(v => String(v)))
+      : new Set(Array.from(filter.selectedValues || []).map(v => String(v)));
+    
+    // Check if all available values are selected - if so, it's not an active filter
+    const allSelected = allValuesSet.size > 0 && 
+      selectedValuesSet.size === allValuesSet.size &&
+      Array.from(allValuesSet).every(val => selectedValuesSet.has(val));
+    
+    // Filter is active only if not all values are selected
+    return !allSelected;
   };
 
   // Apply condition filter to a value

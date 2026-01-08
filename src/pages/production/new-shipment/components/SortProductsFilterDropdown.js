@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, forwardRef, useRef, useImperativeHandle } from 'react';
 import { createPortal } from 'react-dom';
 
-const SortProductsFilterDropdown = ({ 
+const SortProductsFilterDropdown = forwardRef(({ 
   filterIconRef, 
   columnKey, 
   availableValues = [], 
@@ -9,15 +9,53 @@ const SortProductsFilterDropdown = ({
   currentSort = '',
   onApply,
   onClose 
-}) => {
+}, ref) => {
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [sortOrder, setSortOrder] = useState(''); // Always start with empty, don't show blue state
   const [filterConditionExpanded, setFilterConditionExpanded] = useState(true);
   const [filterValuesExpanded, setFilterValuesExpanded] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedValues, setSelectedValues] = useState(
-    currentFilter.selectedValues ? new Set(currentFilter.selectedValues) : new Set()
-  );
+  const hasInitializedRef = useRef(false);
+  
+  // Initialize with all available values checked (unless there's an existing filter)
+  const [selectedValues, setSelectedValues] = useState(() => {
+    // If there's an existing filter with selectedValues, use those
+    if (currentFilter.selectedValues && currentFilter.selectedValues.size > 0) {
+      return new Set(currentFilter.selectedValues);
+    }
+    // Otherwise, start with all values checked
+    const allValues = availableValues.map(v => String(v));
+    return new Set(allValues);
+  });
+  
+  // Update selectedValues when dropdown opens - respect existing filter or start with all checked
+  useEffect(() => {
+    if (filterIconRef) {
+      // Check if there's an existing filter with selectedValues
+      const existingFilterValues = currentFilter.selectedValues;
+      const hasFilter = existingFilterValues && 
+        (existingFilterValues instanceof Set ? existingFilterValues.size > 0 : 
+         Array.isArray(existingFilterValues) ? existingFilterValues.length > 0 :
+         false);
+      
+      if (hasFilter) {
+        // Use existing filter values - always respect the saved filter
+        const filterValues = existingFilterValues instanceof Set 
+          ? Array.from(existingFilterValues)
+          : existingFilterValues;
+        setSelectedValues(new Set(filterValues));
+      } else if (!hasInitializedRef.current) {
+        // First time opening this dropdown with no filter - start with all checked
+        const allValues = availableValues.map(v => String(v));
+        setSelectedValues(new Set(allValues));
+        hasInitializedRef.current = true;
+      }
+      // If hasInitializedRef is true and no filter, keep current selectedValues (don't reset)
+    } else {
+      // Dropdown closed - reset initialization flag for next open
+      hasInitializedRef.current = false;
+    }
+  }, [filterIconRef, columnKey, currentFilter.selectedValues, availableValues]);
   
   // Condition filter state
   const [conditionType, setConditionType] = useState(currentFilter.conditionType || '');
@@ -106,16 +144,14 @@ const SortProductsFilterDropdown = ({
   const handleReset = () => {
     setSortOrder('');
     setSearchTerm('');
-    setSelectedValues(new Set());
+    // Reset to all values checked
+    const allValues = availableValues.map(v => String(v));
+    setSelectedValues(new Set(allValues));
     setConditionType('');
     setConditionValue('');
     if (onApply) {
-      onApply({
-        sortOrder: '',
-        selectedValues: new Set(),
-        conditionType: '',
-        conditionValue: '',
-      });
+      // Pass null to indicate filter should be cleared
+      onApply(null);
     }
   };
 
@@ -132,8 +168,14 @@ const SortProductsFilterDropdown = ({
     onClose?.();
   };
 
+  const dropdownRef = useRef(null);
+
+  // Expose the DOM element via ref
+  useImperativeHandle(ref, () => dropdownRef.current, []);
+
   return createPortal(
     <div
+      ref={dropdownRef}
       data-filter-dropdown={columnKey}
       style={{
         position: 'fixed',
@@ -622,6 +664,8 @@ const SortProductsFilterDropdown = ({
     </div>,
     document.body
   );
-};
+});
+
+SortProductsFilterDropdown.displayName = 'SortProductsFilterDropdown';
 
 export default SortProductsFilterDropdown;
