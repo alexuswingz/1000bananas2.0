@@ -219,6 +219,36 @@ const FormulaCheckTable = ({
   const isNumericColumn = (columnKey) =>
     columnKey === 'qty' || columnKey === 'totalVolume';
 
+  // Check if a column has active filters (excludes sort - only checks for Filter by Values and Filter by Conditions)
+  const hasActiveFilter = (columnKey) => {
+    const filter = filters[columnKey];
+    if (!filter) return false;
+    
+    // Check for condition filter
+    const hasCondition = filter.conditionType && filter.conditionType !== '';
+    if (hasCondition) return true;
+    
+    // Check for value filters - only active if not all values are selected
+    if (!filter.selectedValues || filter.selectedValues.size === 0) return false;
+    
+    // Get all available values for this column
+    const allAvailableValues = getColumnValues(columnKey);
+    if (allAvailableValues.length === 0) return false;
+    
+    const allValuesSet = new Set(allAvailableValues.map(v => String(v)));
+    const selectedValuesSet = filter.selectedValues instanceof Set 
+      ? new Set(Array.from(filter.selectedValues).map(v => String(v)))
+      : new Set(Array.from(filter.selectedValues || []).map(v => String(v)));
+    
+    // Check if all available values are selected - if so, it's not an active filter
+    const allSelected = allValuesSet.size > 0 && 
+      selectedValuesSet.size === allValuesSet.size &&
+      Array.from(allValuesSet).every(val => selectedValuesSet.has(val));
+    
+    // Filter is active only if not all values are selected
+    return !allSelected;
+  };
+
   const applyConditionFilter = (value, conditionType, conditionValue, numeric) => {
     if (!conditionType) return true;
 
@@ -558,7 +588,12 @@ const FormulaCheckTable = ({
               borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
               height: '40px',
             }}>
-              {columns.map((column) => (
+              {columns.map((column) => {
+                const isActive = hasActiveFilter(column.key);
+                const isDropdownOpen = openFilterColumn === column.key;
+                const shouldShowIcon = isActive || isDropdownOpen;
+                
+                return (
                 <th
                   key={column.key}
                   className="group"
@@ -567,7 +602,7 @@ const FormulaCheckTable = ({
                     textAlign: column.key === 'checkbox' || column.key === 'complete' ? 'center' : 'left',
                     fontSize: '11px',
                     fontWeight: 600,
-                    color: '#9CA3AF',
+                    color: isActive ? '#3B82F6' : '#9CA3AF',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
                     width: column.width,
@@ -576,6 +611,7 @@ const FormulaCheckTable = ({
                     height: '40px',
                     cursor: column.key !== 'checkbox' && column.key !== 'complete' ? 'pointer' : 'default',
                     position: 'relative',
+                    backgroundColor: isActive ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
                   }}
                 >
                   {column.key === 'checkbox' || column.key === 'complete' ? (
@@ -587,20 +623,31 @@ const FormulaCheckTable = ({
                       justifyContent: 'space-between',
                       gap: '8px',
                     }}>
-                      <span>{column.label}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {column.label}
+                        {isActive && (
+                          <span style={{ 
+                            display: 'inline-block',
+                            width: '6px', 
+                            height: '6px', 
+                            borderRadius: '50%', 
+                            backgroundColor: '#10B981',
+                          }} />
+                        )}
+                      </span>
                       {column.key !== 'notes' && (
                         <img
                           ref={(el) => { if (el) filterIconRefs.current[column.key] = el; }}
                           src="/assets/Vector (1).png"
                           alt="Filter"
                           className="transition-opacity"
-                          data-filter-open={openFilterColumn === column.key ? 'true' : 'false'}
+                          data-filter-open={isDropdownOpen ? 'true' : 'false'}
                           style={{
                             width: '12px',
                             height: '12px',
                             cursor: 'pointer',
-                            opacity: openFilterColumn === column.key ? 1 : 0,
-                            filter: openFilterColumn === column.key
+                            opacity: shouldShowIcon ? 1 : 0,
+                            filter: shouldShowIcon
                               ? 'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)'
                               : undefined,
                           }}
@@ -608,11 +655,11 @@ const FormulaCheckTable = ({
                             e.currentTarget.style.opacity = '1';
                           }}
                           onMouseLeave={(e) => {
-                            // Keep visible if dropdown is open for this column
-                            if (openFilterColumn !== column.key) {
-                              e.currentTarget.style.opacity = '0';
-                            } else {
+                            // Keep visible if dropdown is open or filter is active
+                            if (shouldShowIcon) {
                               e.currentTarget.style.opacity = '1';
+                            } else {
+                              e.currentTarget.style.opacity = '0';
                             }
                           }}
                           onClick={(e) => {
@@ -624,7 +671,8 @@ const FormulaCheckTable = ({
                     </div>
                   )}
                 </th>
-              ))}
+                );
+              })}
             </tr>
           </thead>
 
