@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 
-const ManufacturingHeader = ({ activeTab, onTabChange, onSearch, onSortClick }) => {
+const ManufacturingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, isSortMode = false }) => {
   const { isDarkMode } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -121,51 +121,53 @@ const ManufacturingHeader = ({ activeTab, onTabChange, onSearch, onSortClick }) 
           gap: '0.75rem',
         }}
       >
-        {/* Sort Button */}
-        <button
-          onClick={onSortClick}
-          style={{
-            backgroundColor: '#FCD34D',
-            width: '73px',
-            height: '24px',
-            borderRadius: '4px',
-            display: 'flex',
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            border: 'none',
-            gap: '10px',
-            padding: '0',
-            transition: 'all 0.2s ease',
-            boxSizing: 'border-box',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.opacity = '0.9';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.opacity = '1';
-          }}
-        >
-          <svg
-            style={{ width: '14px', height: '14px', color: '#111827', flexShrink: 0 }}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 20 12"
-            strokeWidth={2.5}
-            strokeLinecap="round"
+        {/* Sort Button - Hidden when in sort mode */}
+        {!isSortMode && (
+          <button
+            onClick={onSortClick}
+            style={{
+              backgroundColor: '#FCD34D',
+              width: '73px',
+              height: '24px',
+              borderRadius: '4px',
+              display: 'flex',
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              border: 'none',
+              gap: '10px',
+              padding: '0',
+              transition: 'all 0.2s ease',
+              boxSizing: 'border-box',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '0.9';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '1';
+            }}
           >
-            {/* Top bar - longest */}
-            <line x1="2" y1="2" x2="14" y2="2" />
-            {/* Middle bar - shorter */}
-            <line x1="2" y1="6" x2="10" y2="6" />
-            {/* Bottom bar - shortest */}
-            <line x1="2" y1="10" x2="7" y2="10" />
-          </svg>
-          <span style={{ fontSize: '13px', fontWeight: '500', color: '#111827', lineHeight: '1', whiteSpace: 'nowrap' }}>
-            Sort
-          </span>
-        </button>
+            <svg
+              style={{ width: '14px', height: '14px', color: '#111827', flexShrink: 0 }}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 20 12"
+              strokeWidth={2.5}
+              strokeLinecap="round"
+            >
+              {/* Top bar - longest */}
+              <line x1="2" y1="2" x2="14" y2="2" />
+              {/* Middle bar - shorter */}
+              <line x1="2" y1="6" x2="10" y2="6" />
+              {/* Bottom bar - shortest */}
+              <line x1="2" y1="10" x2="7" y2="10" />
+            </svg>
+            <span style={{ fontSize: '13px', fontWeight: '500', color: '#111827', lineHeight: '1', whiteSpace: 'nowrap' }}>
+              Sort
+            </span>
+          </button>
+        )}
 
         {/* Search */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

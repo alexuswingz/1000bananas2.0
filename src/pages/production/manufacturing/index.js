@@ -36,6 +36,7 @@ const Manufacturing = () => {
         onTabChange={setActiveTab}
         onSearch={setSearchQuery}
         onSortClick={handleSortClick}
+        isSortMode={isSortMode}
       />
 
       {/* Sub-navigation tabs - only show for active tab */}
@@ -180,6 +181,8 @@ const Manufacturing = () => {
           searchQuery={searchQuery}
           selectedShipment={selectedShipment}
           activeSubTab={activeSubTab}
+          isSortMode={isSortMode}
+          onExitSortMode={() => setIsSortMode(false)}
         />
       </div>
     </div>
