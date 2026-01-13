@@ -151,7 +151,29 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
   useEffect(() => {
     if (!isSortMode && !hasSplitsRef.current) {
       // Only reset if we don't have splits
-      setLocalData(filteredByShipment);
+      // Preserve status changes when resetting
+      setLocalData(prevData => {
+        if (prevData.length === 0) {
+          return filteredByShipment;
+        }
+        // Merge status changes from prevData into new filteredByShipment
+        const statusMap = new Map();
+        prevData.forEach(row => {
+          if (row.status && row.status !== 'Not Started') {
+            statusMap.set(row.id, row.status);
+          }
+        });
+        
+        const merged = filteredByShipment.map(row => {
+          const savedStatus = statusMap.get(row.id);
+          if (savedStatus) {
+            return { ...row, status: savedStatus };
+          }
+          return row;
+        });
+        
+        return merged;
+      });
       setOriginalData(filteredByShipment);
     } else if (!isSortMode && hasSplitsRef.current) {
       // We have splits, merge them with new filtered data
@@ -259,7 +281,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
     };
   }, [actionMenuId]);
 
-  const statusOptions = ['Not Started', 'In Progress', 'Completed', 'On Hold'];
+  const statusOptions = ['In Progress', 'Completed', 'Not Started'];
 
   const handleStatusClick = (rowId, e) => {
     e.stopPropagation();
@@ -272,6 +294,38 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
   const handleStatusSelect = (rowId, status) => {
     // TODO: Update status in backend
     console.log(`Updating status for row ${rowId} to ${status}`);
+    
+    // Update the status in localData using functional update
+    setLocalData((prevData) => {
+      // Always use current localData if it exists, otherwise initialize from filteredByShipment
+      const currentData = prevData.length > 0 ? prevData : filteredByShipment;
+      const dataToUpdate = [...currentData];
+      
+      const updated = dataToUpdate.map((row) => {
+        // Check both id and originalId for split rows
+        if (row.id === rowId || (row.originalId && row.originalId === rowId)) {
+          return { ...row, status: status };
+        }
+        return row;
+      });
+      
+      console.log('Updated localData:', updated.find(r => r.id === rowId || r.originalId === rowId));
+      return updated;
+    });
+    
+    // Also update originalData to preserve the status change
+    setOriginalData((prevData) => {
+      const currentData = prevData.length > 0 ? prevData : filteredByShipment;
+      const dataToUpdate = [...currentData];
+      
+      return dataToUpdate.map((row) => {
+        if (row.id === rowId || (row.originalId && row.originalId === rowId)) {
+          return { ...row, status: status };
+        }
+        return row;
+      });
+    });
+    
     setStatusDropdowns((prev) => {
       const newState = { ...prev };
       delete newState[rowId];
@@ -659,17 +713,17 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                           e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
                         }}
                       >
-                        <input
-                          type="radio"
-                          checked={false}
-                          onChange={() => {}}
-                          onClick={(e) => e.stopPropagation()}
+                        <div
                           style={{
                             width: '14px',
                             height: '14px',
-                            cursor: 'pointer',
-                            margin: 0,
+                            borderRadius: '50%',
+                            backgroundColor: 
+                              (row.status || 'Not Started') === 'In Progress' ? '#3B82F6' :
+                              (row.status || 'Not Started') === 'Completed' ? '#10B981' :
+                              '#9CA3AF',
                             flexShrink: 0,
+                            border: 'none',
                           }}
                         />
                         <span
@@ -730,6 +784,9 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                                 border: 'none',
                                 cursor: 'pointer',
                                 borderBottom: status !== statusOptions[statusOptions.length - 1] ? '1px solid #E5E7EB' : 'none',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
                               }}
                               onMouseEnter={(e) => {
                                 e.currentTarget.style.backgroundColor = '#F3F4F6';
@@ -738,6 +795,18 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                                 e.currentTarget.style.backgroundColor = 'transparent';
                               }}
                             >
+                              <div
+                                style={{
+                                  width: '14px',
+                                  height: '14px',
+                                  borderRadius: '50%',
+                                  backgroundColor: 
+                                    status === 'In Progress' ? '#3B82F6' :
+                                    status === 'Completed' ? '#10B981' :
+                                    '#9CA3AF',
+                                  flexShrink: 0,
+                                }}
+                              />
                               {status}
                             </button>
                           ))}
