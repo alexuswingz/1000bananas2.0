@@ -887,6 +887,17 @@ const Planning = () => {
     }
   };
 
+  const handleUpdateShipment = async (shipmentId, updates) => {
+    try {
+      await updateShipment(shipmentId, updates);
+      // Refresh the shipments list after update
+      await fetchShipments();
+    } catch (error) {
+      console.error('Error updating shipment:', error);
+      alert('Failed to update shipment. Please try again.');
+    }
+  };
+
   return (
     <div className={`min-h-screen ${themeClasses.pageBg}`}>
       <PlanningHeader
@@ -935,6 +946,7 @@ const Planning = () => {
                 onStatusCommentClick={handleStatusCommentClick}
                 onStatusClick={handleStatusClick}
                 onDeleteRow={handleDeleteRow}
+                onUpdateShipment={handleUpdateShipment}
               />
             )}
           </>

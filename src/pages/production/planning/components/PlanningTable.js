@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
+import ShipmentDetailsModal from './ShipmentDetailsModal';
 
-const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabelCheckClick, onStatusCommentClick, onStatusClick, onDeleteRow }) => {
+const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabelCheckClick, onStatusCommentClick, onStatusClick, onDeleteRow, onUpdateShipment }) => {
   const { isDarkMode } = useTheme();
   const [openFilterColumn, setOpenFilterColumn] = useState(null);
   const filterIconRefs = useRef({});
@@ -17,6 +18,8 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
   const [openActionMenu, setOpenActionMenu] = useState(null); // Track which row's menu is open
   const actionMenuRefs = useRef({});
   const actionMenuDropdownRef = useRef(null);
+  const [showShipmentDetailsModal, setShowShipmentDetailsModal] = useState(false);
+  const [selectedRow, setSelectedRow] = useState(null);
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -1535,6 +1538,11 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                       row={row}
                       menuIconRef={actionMenuRefs.current[row.id]}
                       onClose={() => setOpenActionMenu(null)}
+                      onShipmentDetails={() => {
+                        setSelectedRow(row);
+                        setShowShipmentDetailsModal(true);
+                        setOpenActionMenu(null);
+                      }}
                       onDelete={() => {
                         if (onDeleteRow) {
                           onDeleteRow(row);
@@ -1567,6 +1575,17 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         />
       )}
     </div>
+    
+    {/* Shipment Details Modal */}
+    <ShipmentDetailsModal
+      isOpen={showShipmentDetailsModal}
+      onClose={() => {
+        setShowShipmentDetailsModal(false);
+        setSelectedRow(null);
+      }}
+      row={selectedRow}
+      onUpdate={onUpdateShipment}
+    />
     
     {/* Key/Legend - Outside table container */}
     <div
@@ -2129,14 +2148,14 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
 FilterDropdown.displayName = 'FilterDropdown';
 
 // ActionMenuDropdown Component
-const ActionMenuDropdown = React.forwardRef(({ row, menuIconRef, onClose, onDelete, isDarkMode }, ref) => {
+const ActionMenuDropdown = React.forwardRef(({ row, menuIconRef, onClose, onShipmentDetails, onDelete, isDarkMode }, ref) => {
   const [position, setPosition] = useState({ top: 0, left: 0 });
 
   useEffect(() => {
     if (menuIconRef) {
       const rect = menuIconRef.getBoundingClientRect();
       const dropdownWidth = 150;
-      const dropdownHeight = 50;
+      const dropdownHeight = 100;
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
       
@@ -2186,6 +2205,43 @@ const ActionMenuDropdown = React.forwardRef(({ row, menuIconRef, onClose, onDele
       }}
       onClick={(e) => e.stopPropagation()}
     >
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (onShipmentDetails) {
+            onShipmentDetails();
+          }
+        }}
+        style={{
+          padding: '8px 12px',
+          borderRadius: '4px',
+          border: 'none',
+          backgroundColor: 'transparent',
+          color: isDarkMode ? '#E5E7EB' : '#111827',
+          fontSize: '14px',
+          fontWeight: 500,
+          cursor: 'pointer',
+          textAlign: 'left',
+          width: '100%',
+          transition: 'background-color 0.2s',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'transparent';
+        }}
+      >
+        Shipment Details
+      </button>
+      <div
+        style={{
+          height: '1px',
+          backgroundColor: isDarkMode ? '#374151' : '#E5E7EB',
+          margin: '4px 0',
+        }}
+      />
       <button
         type="button"
         onClick={(e) => {
