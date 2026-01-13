@@ -6,7 +6,7 @@ import ManufacturingTable from './components/ManufacturingTable';
 const Manufacturing = () => {
   const { isDarkMode } = useTheme();
   const [activeTab, setActiveTab] = useState('active');
-  const [activeSubTab, setActiveSubTab] = useState('bottling');
+  const [activeSubTab, setActiveSubTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedShipment, setSelectedShipment] = useState('');
   const [showShipmentDropdown, setShowShipmentDropdown] = useState(false);
@@ -20,8 +20,6 @@ const Manufacturing = () => {
 
   const subTabs = [
     { id: 'all', label: 'All' },
-    { id: 'bottling', label: 'Bottling' },
-    { id: 'bagging', label: 'Bagging' },
   ];
 
   const handleSortClick = () => {

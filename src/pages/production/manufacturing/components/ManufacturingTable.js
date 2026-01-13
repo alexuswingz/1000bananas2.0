@@ -11,6 +11,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
   const actionButtonRefs = useRef({});
   const statusButtonRefs = useRef({});
   const filterIconRefs = useRef({});
+  const hasSplitsRef = useRef(false);
   const [openFilterColumn, setOpenFilterColumn] = useState(null);
   const [filters, setFilters] = useState({});
   const [volumes, setVolumes] = useState({});
@@ -21,7 +22,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showSplitModal, setShowSplitModal] = useState(false);
   const [selectedRowForSplit, setSelectedRowForSplit] = useState(null);
-  const [secondBatchQty, setSecondBatchQty] = useState(5);
+  const [firstBatchQty, setFirstBatchQty] = useState(1);
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -40,7 +41,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
     type: 'AWD',
     formula: 'F.Ultra Grow',
     size: 'Barrel',
-    qty: 1,
+    qty: i === 0 ? 3 : 1,
     tote: 'Clean',
     volume: 275,
     measure: 'Gallons',
@@ -51,14 +52,8 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
   // Filter data based on activeSubTab
   const filteredByType = tableData.filter((row) => {
     if (activeSubTab === 'all') {
-      // Exclude AWD type from 'all' tab - it should only show in bottling
-      return row.type !== 'AWD';
-    }
-    if (activeSubTab === 'bottling') {
-      return row.type === 'Bottling' || row.type === 'AWD' || row.size?.includes('Bottle') || row.size?.includes('Gallon') || row.size === 'Barrel';
-    }
-    if (activeSubTab === 'bagging') {
-      return row.type === 'Bagging' || row.size?.includes('Bag');
+      // Include all types including bottling data (Bottling, AWD, or sizes with 'Bottle', 'Gallon', or 'Barrel')
+      return true;
     }
     return true;
   });
@@ -152,9 +147,51 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
     : filteredData;
 
   // Initialize localData when filteredByShipment changes (outside sort mode)
+  // Preserve splits if they exist
   useEffect(() => {
-    if (!isSortMode) {
+    if (!isSortMode && !hasSplitsRef.current) {
+      // Only reset if we don't have splits
       setLocalData(filteredByShipment);
+      setOriginalData(filteredByShipment);
+    } else if (!isSortMode && hasSplitsRef.current) {
+      // We have splits, merge them with new filtered data
+      setLocalData(prevData => {
+        if (!prevData || prevData.length === 0) {
+          hasSplitsRef.current = false;
+          return filteredByShipment;
+        }
+        
+        // Create a map of split rows by originalId
+        const splitMap = new Map();
+        prevData.forEach(row => {
+          if (row.splitTag && row.originalId) {
+            const key = row.originalId;
+            if (!splitMap.has(key)) {
+              splitMap.set(key, []);
+            }
+            splitMap.get(key).push(row);
+          }
+        });
+        
+        // If no splits found, reset the ref
+        if (splitMap.size === 0) {
+          hasSplitsRef.current = false;
+          return filteredByShipment;
+        }
+        
+        // Start with new filtered data
+        const result = [...filteredByShipment];
+        
+        // Replace original rows with their split versions
+        splitMap.forEach((splitRows, originalId) => {
+          const index = result.findIndex(r => r.id === originalId);
+          if (index !== -1) {
+            result.splice(index, 1, ...splitRows);
+          }
+        });
+        
+        return result;
+      });
       setOriginalData(filteredByShipment);
     }
   }, [filteredByShipment, isSortMode]);
@@ -167,8 +204,8 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
     }
   }, [isSortMode]);
 
-  // Use localData for display when in sort mode, otherwise use filteredByShipment
-  const finalData = isSortMode ? localData : filteredByShipment;
+  // Use localData for display (it contains splits if any), fallback to filteredByShipment
+  const finalData = localData.length > 0 ? localData : filteredByShipment;
 
   // Handle click outside status dropdown
   useEffect(() => {
@@ -406,6 +443,27 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
   const handleCancelConfirm = () => {
     setShowConfirmModal(false);
   };
+
+  // Handle first batch quantity change
+  const handleFirstBatchQtyChange = (e) => {
+    const newValue = parseFloat(e.target.value) || 0;
+    if (!selectedRowForSplit) return;
+
+    const originalQty = selectedRowForSplit.qty || 1;
+    const minValue = 1;
+    const maxValue = originalQty - 1;
+
+    if (newValue < minValue) {
+      setFirstBatchQty(minValue);
+    } else if (newValue > maxValue) {
+      setFirstBatchQty(maxValue);
+    } else {
+      setFirstBatchQty(newValue);
+    }
+  };
+
+  // Calculate second batch quantity (auto-calculated)
+  const secondBatchQty = selectedRowForSplit ? Math.max(0, (selectedRowForSplit.qty || 1) - firstBatchQty) : 0;
 
   const columns = [
     { key: 'status', label: 'STATUS', width: '190px' },
@@ -723,9 +781,23 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                     paddingRight: '22px',
                     paddingTop: '8px',
                     paddingBottom: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
                   }}
                 >
-                  {row.formula}
+                  <span>{row.formula}</span>
+                  {row.splitTag && (
+                    <img
+                      src="/assets/split.png"
+                      alt="Split"
+                      style={{
+                        width: 'auto',
+                        height: '16px',
+                        display: 'inline-block',
+                      }}
+                    />
+                  )}
                 </div>
 
                 {/* SIZE */}
@@ -957,6 +1029,9 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
               }}
               onClick={() => {
                 setSelectedRowForSplit(selectedRow);
+                // Initialize first batch with 1 (or the row's qty if it's less)
+                const initialQty = selectedRow.qty && selectedRow.qty > 0 ? Math.min(1, selectedRow.qty) : 1;
+                setFirstBatchQty(initialQty);
                 setShowSplitModal(true);
                 setActionMenuId(null);
               }}
@@ -1340,7 +1415,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
           onClick={() => {
             setShowSplitModal(false);
             setSelectedRowForSplit(null);
-            setSecondBatchQty(5);
+            setFirstBatchQty(1);
           }}
         >
           <div
@@ -1382,7 +1457,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                 onClick={() => {
                   setShowSplitModal(false);
                   setSelectedRowForSplit(null);
-                  setSecondBatchQty(5);
+                  setFirstBatchQty(1);
                 }}
                 style={{
                   backgroundColor: 'transparent',
@@ -1419,7 +1494,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                     color: '#374151',
                   }}
                 >
-                  First Batch Quantity (Tote)
+                  First Batch Quantity
                 </label>
                 <p
                   style={{
@@ -1428,23 +1503,33 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                     margin: 0,
                   }}
                 >
-                  The first batch is always 1 tote
+                  Enter the quantity for the first batch.
                 </p>
                 <input
                   type="number"
-                  value="1"
-                  readOnly
+                  value={firstBatchQty}
+                  onChange={handleFirstBatchQtyChange}
+                  min={1}
+                  max={selectedRowForSplit ? (selectedRowForSplit.qty || 1) - 1 : 1}
+                  step={1}
                   style={{
                     width: '100%',
                     height: '40px',
                     padding: '8px 12px',
                     borderRadius: '6px',
                     border: '1px solid #D1D5DB',
-                    backgroundColor: '#F9FAFB',
+                    backgroundColor: '#FFFFFF',
                     fontSize: '14px',
-                    color: '#6B7280',
-                    cursor: 'not-allowed',
+                    color: '#111827',
+                    outline: 'none',
+                    cursor: 'text',
                     boxSizing: 'border-box',
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#3B82F6';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#D1D5DB';
                   }}
                 />
               </div>
@@ -1458,7 +1543,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                     color: '#374151',
                   }}
                 >
-                  Second Batch Quantity (Tote)
+                  Second Batch Quantity
                 </label>
                 <p
                   style={{
@@ -1467,29 +1552,23 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                     margin: 0,
                   }}
                 >
-                  The remaining totes after the split
+                  The remaining units after the split.
                 </p>
                 <input
                   type="number"
                   value={secondBatchQty}
-                  onChange={(e) => setSecondBatchQty(Number(e.target.value))}
+                  readOnly
                   style={{
                     width: '100%',
                     height: '40px',
                     padding: '8px 12px',
                     borderRadius: '6px',
                     border: '1px solid #D1D5DB',
-                    backgroundColor: '#FFFFFF',
+                    backgroundColor: '#F9FAFB',
                     fontSize: '14px',
-                    color: '#111827',
-                    outline: 'none',
+                    color: '#6B7280',
+                    cursor: 'not-allowed',
                     boxSizing: 'border-box',
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#3B82F6';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = '#D1D5DB';
                   }}
                 />
               </div>
@@ -1509,7 +1588,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                 onClick={() => {
                   setShowSplitModal(false);
                   setSelectedRowForSplit(null);
-                  setSecondBatchQty(5);
+                  setFirstBatchQty(1);
                 }}
                 style={{
                   padding: '8px 16px',
@@ -1533,28 +1612,97 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
               </button>
               <button
                 onClick={() => {
-                  console.log('Confirm Split for:', selectedRowForSplit, 'Second Batch Qty:', secondBatchQty);
-                  // TODO: Implement split logic
+                  if (!selectedRowForSplit) return;
+                  
+                  const originalQty = selectedRowForSplit.qty || 1;
+                  const firstBatchQtyValue = firstBatchQty;
+                  const secondBatchQty = originalQty - firstBatchQtyValue;
+                  
+                  // Validate that first batch is valid
+                  if (firstBatchQtyValue <= 0 || firstBatchQtyValue >= originalQty) {
+                    return; // Don't proceed if invalid
+                  }
+                  
+                  // Create two new rows from the split
+                  const baseId = selectedRowForSplit.id;
+                  const firstBatch = {
+                    ...selectedRowForSplit,
+                    id: `${baseId}_split_1`,
+                    qty: firstBatchQtyValue,
+                    splitTag: '1/2',
+                    originalId: baseId,
+                  };
+                  
+                  const secondBatch = {
+                    ...selectedRowForSplit,
+                    id: `${baseId}_split_2`,
+                    qty: secondBatchQty,
+                    splitTag: '2/2',
+                    originalId: baseId,
+                  };
+                  
+                  // Find the row in finalData (what's currently displayed) to get the correct index
+                  const displayData = localData.length > 0 ? localData : filteredByShipment;
+                  const rowIndex = displayData.findIndex(r => r.id === selectedRowForSplit.id);
+                  
+                  if (rowIndex === -1) {
+                    console.error('Row not found for split:', {
+                      rowId: selectedRowForSplit.id,
+                      localDataLength: localData.length,
+                      filteredByShipmentLength: filteredByShipment.length,
+                      displayDataLength: displayData.length
+                    });
+                    setShowSplitModal(false);
+                    setSelectedRowForSplit(null);
+                    setFirstBatchQty(1);
+                    return;
+                  }
+                  
+                  // Create new array with split rows replacing the original
+                  const newData = [...displayData];
+                  newData.splice(rowIndex, 1, firstBatch, secondBatch);
+                  
+                  // Update localData to show the split immediately
+                  setLocalData(newData);
+                  setOriginalData(newData);
+                  hasSplitsRef.current = true; // Mark that we have splits
+                  
+                  console.log('Split confirmed:', { 
+                    originalId: baseId,
+                    originalQty: originalQty,
+                    firstBatchQty: firstBatchQtyValue,
+                    secondBatchQty: secondBatchQty,
+                    firstBatch, 
+                    secondBatch,
+                    newDataLength: newData.length,
+                    rowIndex,
+                    beforeSplitLength: displayData.length
+                  });
                   setShowSplitModal(false);
                   setSelectedRowForSplit(null);
-                  setSecondBatchQty(5);
+                  setFirstBatchQty(1);
                 }}
+                disabled={!selectedRowForSplit || firstBatchQty <= 0 || firstBatchQty >= (selectedRowForSplit?.qty || 1)}
                 style={{
                   padding: '8px 16px',
                   borderRadius: '6px',
                   border: 'none',
-                  backgroundColor: '#3B82F6',
+                  backgroundColor: (!selectedRowForSplit || firstBatchQty <= 0 || firstBatchQty >= (selectedRowForSplit?.qty || 1)) ? '#9CA3AF' : '#3B82F6',
                   color: '#FFFFFF',
                   fontSize: '14px',
                   fontWeight: 500,
-                  cursor: 'pointer',
+                  cursor: (!selectedRowForSplit || firstBatchQty <= 0 || firstBatchQty >= (selectedRowForSplit?.qty || 1)) ? 'not-allowed' : 'pointer',
                   transition: 'background-color 0.2s',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#2563EB';
+                  if (selectedRowForSplit && firstBatchQty > 0 && firstBatchQty < (selectedRowForSplit?.qty || 1)) {
+                    e.currentTarget.style.backgroundColor = '#2563EB';
+                  }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#3B82F6';
+                  if (selectedRowForSplit && firstBatchQty > 0 && firstBatchQty < (selectedRowForSplit?.qty || 1)) {
+                    e.currentTarget.style.backgroundColor = '#3B82F6';
+                  }
                 }}
               >
                 Confirm Split
