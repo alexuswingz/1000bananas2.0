@@ -200,6 +200,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                     ...templateProduct,
                     id: `${baseIdForSplits}_split_1`,
                     qty: firstBatch.qty,
+                    volume: firstBatch.volume !== undefined ? firstBatch.volume : templateProduct.volume,
                     splitTag: '1/2',
                     originalId: baseIdForSplits,
                   });
@@ -209,6 +210,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                     ...templateProduct,
                     id: `${baseIdForSplits}_split_2`,
                     qty: secondBatch.qty,
+                    volume: secondBatch.volume !== undefined ? secondBatch.volume : templateProduct.volume,
                     splitTag: '2/2',
                     originalId: baseIdForSplits,
                   });
@@ -220,6 +222,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                       ...templateProduct,
                       id: `${baseIdForSplits}_split_${idx + 3}`,
                       qty: batch.qty,
+                      volume: batch.volume !== undefined ? batch.volume : templateProduct.volume,
                       splitTag: `${idx + 3}/${totalBatches}`,
                       originalId: baseIdForSplits,
                     });
@@ -571,7 +574,6 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     { key: 'size', label: 'SIZE', width: '100px' },
     { key: 'qty', label: 'QTY', width: '80px' },
     { key: 'formula', label: 'FORMULA', width: '180px' },
-    { key: 'volume', label: 'VOLUME', width: '100px' },
     { key: 'productType', label: 'TYPE', width: '100px' },
     { key: 'notes', label: 'NOTES', width: '80px' },
     { key: 'menu', label: '', width: '50px' },
@@ -1384,13 +1386,16 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
               stableIdentifier: stableIdentifier, // Save stable identifier for matching
               firstBatch: {
                 qty: sortedSplitProducts[0].qty,
+                volume: sortedSplitProducts[0].volume,
               },
               secondBatch: {
                 qty: sortedSplitProducts[1].qty,
+                volume: sortedSplitProducts[1].volume,
               },
               // Store additional batches if there are more than 2
               additionalBatches: sortedSplitProducts.slice(2).map(p => ({
                 qty: p.qty,
+                volume: p.volume,
               })),
             });
           } else if (sortedSplitProducts.length === 1) {
@@ -1400,9 +1405,11 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
               stableIdentifier: stableIdentifier,
               firstBatch: {
                 qty: sortedSplitProducts[0].qty,
+                volume: sortedSplitProducts[0].volume,
               },
               secondBatch: {
                 qty: 0,
+                volume: 0,
               },
             });
           }
@@ -1651,7 +1658,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     
     Object.keys(filters).forEach(columnKey => {
       const filter = filters[columnKey];
-      const isNumericColumn = columnKey === 'qty' || columnKey === 'volume';
+      const isNumericColumn = columnKey === 'qty';
       
       // Apply value filters (checkbox selections)
       if (filter.selectedValues && filter.selectedValues.size > 0) {
@@ -2075,15 +2082,6 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                   height: '40px',
                 }}>
                   {product.formula}
-                </td>
-                <td style={{
-                  padding: '0 16px',
-                  fontSize: '14px',
-                  fontWeight: 400,
-                  color: isDarkMode ? '#E5E7EB' : '#374151',
-                  height: '40px',
-                }}>
-                  {product.volume || ''}
                 </td>
                 <td style={{
                   padding: '0 16px',
