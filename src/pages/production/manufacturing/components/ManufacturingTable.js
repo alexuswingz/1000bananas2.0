@@ -31,6 +31,9 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
   const [touchStartY, setTouchStartY] = useState(null);
   const [touchStartIndex, setTouchStartIndex] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [lastMovedIndex, setLastMovedIndex] = useState(null);
+  const [selectedRows, setSelectedRows] = useState(new Set()); // For single click selection
+  const [bulkSelectedRows, setBulkSelectedRows] = useState(new Set()); // For bulk selection (Ctrl/Cmd + click)
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -240,6 +243,11 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
     if (isSortMode && filteredByShipment.length > 0) {
       setOriginalData(filteredByShipment);
       setLocalData(filteredByShipment);
+    } else if (!isSortMode) {
+      // Clear last moved index and selections when exiting sort mode
+      setLastMovedIndex(null);
+      setSelectedRows(new Set());
+      setBulkSelectedRows(new Set());
     }
   }, [isSortMode]);
 
@@ -453,10 +461,26 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
     
     const newData = [...localData];
     const draggedItem = newData[draggedRowIndex];
+    const draggedItemId = draggedItem.id;
+    
     newData.splice(draggedRowIndex, 1);
     newData.splice(dropIndex, 0, draggedItem);
     
     setLocalData(newData);
+    
+    // Keep the moved item highlighted - use the new index after drop
+    setLastMovedIndex(dropIndex);
+    
+    // Preserve selection state for the moved item
+    // If the dragged item was selected, keep it selected
+    if (selectedRows.has(draggedItemId)) {
+      // Selection is already tracked by ID, so it will persist
+    }
+    // If the dragged item was bulk selected, keep it bulk selected
+    if (bulkSelectedRows.has(draggedItemId)) {
+      // Bulk selection is already tracked by ID, so it will persist
+    }
+    
     setDraggedRowIndex(null);
     setDraggedOverRowIndex(null);
   };
@@ -523,6 +547,8 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
       newData.splice(draggedRowIndex, 1);
       newData.splice(draggedOverRowIndex, 0, draggedItem);
       setLocalData(newData);
+      // Keep the moved item highlighted - use the new index after drop
+      setLastMovedIndex(draggedOverRowIndex);
     }
     
     setTouchStartY(null);
@@ -551,6 +577,9 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
   // Handle cancel changes - revert to original order and exit sort mode
   const handleCancelChanges = () => {
     setLocalData([...originalData]);
+    setLastMovedIndex(null); // Clear highlight when canceling
+    setSelectedRows(new Set()); // Clear selections
+    setBulkSelectedRows(new Set()); // Clear bulk selections
     if (onExitSortMode) {
       onExitSortMode();
     }
@@ -568,6 +597,9 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
     // TODO: Save to backend API here
     console.log('Saving order:', localData);
     setShowConfirmModal(false);
+    setLastMovedIndex(null); // Clear highlight when saving
+    setSelectedRows(new Set()); // Clear selections
+    setBulkSelectedRows(new Set()); // Clear bulk selections
     // Exit sort mode after saving
     if (onExitSortMode) {
       onExitSortMode();
@@ -683,7 +715,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                       maxWidth: '343px',
                       minHeight: '150px',
                       borderRadius: '12px',
-                      border: '1px solid #E5E7EB',
+                      border: lastMovedIndex === index ? '2px solid #007AFF' : (draggedOverRowIndex === index ? '1px solid #007AFF' : '1px solid #E5E7EB'),
                       position: 'relative',
                       overflow: 'hidden',
                       padding: '16px',
@@ -691,12 +723,12 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                       boxSizing: 'border-box',
                       cursor: isSortMode ? 'grab' : 'default',
                       opacity: draggedRowIndex === index ? 0.5 : 1,
-                      borderColor: draggedOverRowIndex === index ? '#007AFF' : '#E5E7EB',
+                      backgroundColor: lastMovedIndex === index ? (isDarkMode ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.05)') : 'transparent',
                       userSelect: isSortMode ? 'none' : 'auto',
                       WebkitUserSelect: isSortMode ? 'none' : 'auto',
                       touchAction: isSortMode ? 'pan-y' : 'auto',
                       transform: isDragging && touchStartIndex === index ? 'scale(1.02)' : 'scale(1)',
-                      transition: isDragging ? 'none' : 'transform 0.2s ease',
+                      transition: isDragging ? 'none' : 'transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease',
                     }}
                   >
                     {/* Left side - Drag handle in sort mode, colored bar otherwise */}
@@ -1479,7 +1511,13 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
               No data available.
             </div>
           ) : (
-            finalData.map((row, index) => (
+            finalData.map((row, index) => {
+              const isSelected = selectedRows.has(row.id);
+              const isBulkSelected = bulkSelectedRows.has(row.id);
+              const isMoved = lastMovedIndex === index;
+              const isHighlighted = isMoved || isSelected || isBulkSelected;
+              
+              return (
               <div
                 key={row.id || index}
                 draggable={isSortMode}
@@ -1488,6 +1526,31 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, index)}
                 onDragEnd={handleDragEnd}
+                onClick={(e) => {
+                  if (!isSortMode) return;
+                  // Handle row selection
+                  if (e.ctrlKey || e.metaKey) {
+                    // Bulk selection with Ctrl/Cmd
+                    setBulkSelectedRows(prev => {
+                      const newSet = new Set(prev);
+                      if (newSet.has(row.id)) {
+                        newSet.delete(row.id);
+                      } else {
+                        newSet.add(row.id);
+                      }
+                      return newSet;
+                    });
+                  } else {
+                    // Single selection
+                    setSelectedRows(prev => {
+                      const newSet = new Set();
+                      newSet.add(row.id);
+                      return newSet;
+                    });
+                    // Clear bulk selection when single clicking
+                    setBulkSelectedRows(new Set());
+                  }
+                }}
                 className={`grid text-sm ${themeClasses.cardBg} ${themeClasses.rowHover}`}
                 style={{
                   gridTemplateColumns: columns.map((col) => col.width).join(' '),
@@ -1495,7 +1558,11 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                   borderBottom: '1px solid #e5e7eb',
                   height: '41px',
                   cursor: isSortMode ? 'grab' : 'default',
-                  backgroundColor: draggedOverRowIndex === index ? (isDarkMode ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)') : 'transparent',
+                  backgroundColor: isHighlighted 
+                    ? (isDarkMode ? 'rgba(0, 122, 255, 0.15)' : 'rgba(0, 122, 255, 0.1)')
+                    : (draggedOverRowIndex === index ? (isDarkMode ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)') : 'transparent'),
+                  borderLeft: isHighlighted ? '3px solid #007AFF' : 'none',
+                  transition: 'background-color 0.2s ease, border-left 0.2s ease',
                 }}
               >
                 {/* STATUS */}
@@ -1910,7 +1977,8 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                   </div>
                 </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
