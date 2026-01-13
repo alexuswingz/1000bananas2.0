@@ -77,7 +77,7 @@ const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote,
         <div
           style={{
             width: '90%',
-            maxWidth: '600px',
+            maxWidth: '640px',
             maxHeight: '90vh',
             backgroundColor: darkMode ? '#1F2937' : '#FFFFFF',
             borderRadius: '12px',
@@ -92,12 +92,17 @@ const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote,
           <div
             style={{
               backgroundColor: '#1C2634',
-              padding: '1rem 1.5rem',
+              padding: '16px 24px',
               display: 'flex',
+              flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
+              height: '56px',
+              width: '100%',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
               borderTopLeftRadius: '12px',
               borderTopRightRadius: '12px',
+              boxSizing: 'border-box',
             }}
           >
             <h2
@@ -135,11 +140,21 @@ const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote,
           {/* Content */}
           <div
             style={{
-              flex: '1 1 auto',
-              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              width: '100%',
+              maxWidth: '640px',
+              minHeight: '174px',
               overflowY: 'auto',
-              padding: '24px',
+              padding: '16px 24px 32px 24px',
+              gap: '24px',
               backgroundColor: darkMode ? '#1F2937' : '#FFFFFF',
+              border: '1px solid',
+              borderColor: darkMode ? '#374151' : '#E5E7EB',
+              borderTop: 'none',
+              borderBottomLeftRadius: '12px',
+              borderBottomRightRadius: '12px',
+              boxSizing: 'border-box',
             }}
           >
             {/* Production Notes Header */}
@@ -148,7 +163,6 @@ const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote,
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                marginBottom: '1rem',
               }}
             >
               <h3
@@ -166,35 +180,34 @@ const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote,
                   type="button"
                   onClick={handleAddNote}
                   style={{
-                    padding: '0.5rem 1rem',
-                    backgroundColor: '#2563EB',
-                    color: 'white',
+                    backgroundColor: 'transparent',
                     border: 'none',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    fontWeight: 500,
+                    padding: 0,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.5rem',
-                    transition: 'background-color 0.2s',
+                    color: '#007AFF',
+                    fontSize: '14px',
+                    fontWeight: 400,
+                    fontFamily: 'inherit',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#1D4ED8';
+                    e.currentTarget.style.opacity = '0.8';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#2563EB';
+                    e.currentTarget.style.opacity = '1';
                   }}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#007AFF" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 5v14M5 12h14" />
                   </svg>
-                  Add Note
+                  <span>Add Note</span>
                 </button>
               )}
             </div>
 
-            {/* Notes List */}
+            {/* Notes List - Most recent at bottom, scroll up for older notes */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {notes.length === 0 ? (
                 <p
@@ -209,28 +222,32 @@ const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote,
                   No production notes yet.
                 </p>
               ) : (
-                notes.map((note, index) => (
+                [...notes].reverse().map((note, index) => (
                   <div
                     key={index}
                     style={{
+                      backgroundColor: darkMode ? '#374151' : '#F9FAFB',
+                      borderRadius: '8px',
+                      border: darkMode ? '1px solid #4B5563' : '1px solid #E5E7EB',
+                      boxShadow: darkMode ? 'none' : '0 1px 2px rgba(0, 0, 0, 0.05)',
+                      padding: '12px',
                       display: 'flex',
                       alignItems: 'flex-start',
                       gap: '12px',
-                      padding: '0.75rem',
                     }}
                   >
                     {/* Avatar */}
                     <div
                       style={{
-                        width: '32px',
-                        height: '32px',
+                        width: '24px',
+                        height: '24px',
                         borderRadius: '50%',
                         backgroundColor: '#F59E0B',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         color: '#FFFFFF',
-                        fontSize: '12px',
+                        fontSize: '10px',
                         fontWeight: 600,
                         flexShrink: 0,
                       }}
@@ -244,8 +261,8 @@ const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote,
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '6px',
-                          marginBottom: '4px',
+                          gap: '8px',
+                          marginBottom: '8px',
                           flexWrap: 'wrap',
                         }}
                       >
@@ -291,74 +308,109 @@ const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote,
             {isAddingNote && (
               <div
                 style={{
-                  padding: '1rem',
-                  backgroundColor: darkMode ? '#374151' : '#F9FAFB',
-                  borderRadius: '8px',
-                  border: `1px solid ${darkMode ? '#4B5563' : '#D1D5DB'}`,
                   display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '12px',
+                  flexDirection: 'column',
+                  width: '100%',
+                  maxWidth: '592px',
+                  minHeight: '63px',
+                  padding: '12px',
+                  gap: '8px',
+                  borderRadius: '8px',
+                  border: darkMode ? '1px solid #4B5563' : '1px solid #007AFF',
+                  backgroundColor: darkMode ? '#1F2937' : '#FFFFFF',
+                  boxSizing: 'border-box',
                 }}
               >
-                {/* User Avatar */}
+                {/* User Avatar and Name */}
                 <div
                   style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '50%',
-                    backgroundColor: '#F59E0B',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#FFFFFF',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    flexShrink: 0,
+                    gap: '8px',
                   }}
                 >
-                  {userInitials}
+                  {/* User Avatar */}
+                  <div
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      backgroundColor: '#F59E0B',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#FFFFFF',
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {userInitials}
+                  </div>
+                  {/* User Name */}
+                  <span
+                    style={{
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      color: darkMode ? '#F9FAFB' : '#111827',
+                    }}
+                  >
+                    {userName}
+                  </span>
                 </div>
 
                 {/* Input Field */}
-                <div style={{ flex: 1 }}>
-                  <textarea
-                    ref={textareaRef}
-                    value={newNoteText}
-                    onChange={(e) => setNewNoteText(e.target.value)}
-                    placeholder="Add a comment..."
-                    style={{
-                      width: '100%',
-                      minHeight: '80px',
-                      padding: '12px',
-                      borderRadius: '6px',
-                      border: darkMode ? '1px solid #4B5563' : '1px solid #60A5FA',
-                      backgroundColor: darkMode ? '#1F2937' : '#FFFFFF',
-                      color: darkMode ? '#E5E7EB' : '#374151',
-                      fontSize: '14px',
-                      fontWeight: 400,
-                      fontFamily: 'inherit',
-                      outline: 'none',
-                      resize: 'vertical',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                </div>
+                <textarea
+                  ref={textareaRef}
+                  value={newNoteText}
+                  onChange={(e) => setNewNoteText(e.target.value)}
+                  placeholder=""
+                  style={{
+                    width: '100%',
+                    minHeight: '40px',
+                    padding: '0',
+                    borderRadius: '0',
+                    border: 'none',
+                    backgroundColor: 'transparent',
+                    color: darkMode ? '#E5E7EB' : '#374151',
+                    fontSize: '14px',
+                    fontWeight: 400,
+                    fontFamily: 'inherit',
+                    outline: 'none',
+                    resize: 'vertical',
+                    boxSizing: 'border-box',
+                  }}
+                />
               </div>
             )}
           </div>
 
-          {/* Footer with Cancel and Comment buttons - Only visible when isAddingNote is true */}
+          {/* Footer with Cancel and Save Changes buttons - Only visible when isAddingNote is true */}
           {isAddingNote && (
             <div
               style={{
-                padding: '1rem 1.5rem',
-                borderTop: `1px solid ${darkMode ? '#374151' : '#E5E7EB'}`,
                 display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '0.5rem',
+                flexDirection: 'column',
+                width: '100%',
+                maxWidth: '640px',
+                minHeight: '63px',
+                padding: '16px 24px',
+                borderRight: `1px solid ${darkMode ? '#374151' : '#E5E7EB'}`,
+                borderBottom: `1px solid ${darkMode ? '#374151' : '#E5E7EB'}`,
+                borderLeft: `1px solid ${darkMode ? '#374151' : '#E5E7EB'}`,
+                borderBottomLeftRadius: '12px',
+                borderBottomRightRadius: '12px',
                 backgroundColor: darkMode ? '#1F2937' : '#FFFFFF',
+                boxSizing: 'border-box',
               }}
             >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  gap: '10px',
+                }}
+              >
               <button
                 type="button"
                 onClick={handleCancelNote}
@@ -388,10 +440,12 @@ const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote,
                   fontSize: '14px',
                   fontWeight: 500,
                   cursor: newNoteText.trim() ? 'pointer' : 'not-allowed',
+                  opacity: newNoteText.trim() ? 1 : 0.6,
                 }}
               >
                 Comment
               </button>
+              </div>
             </div>
           )}
         </div>

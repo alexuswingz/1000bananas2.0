@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 import SortFormulasFilterDropdown from '../../new-shipment/components/SortFormulasFilterDropdown';
+import ProductionNotesModal from '../../packaging/components/ProductionNotesModal';
 
 const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = '', activeSubTab = 'all', isSortMode = false, onExitSortMode }) => {
   const { isDarkMode } = useTheme();
@@ -23,6 +24,9 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
   const [showSplitModal, setShowSplitModal] = useState(false);
   const [selectedRowForSplit, setSelectedRowForSplit] = useState(null);
   const [firstBatchQty, setFirstBatchQty] = useState(1);
+  const [notesModalOpen, setNotesModalOpen] = useState(false);
+  const [selectedRowForNotes, setSelectedRowForNotes] = useState(null);
+  const [rowNotes, setRowNotes] = useState({});
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -974,6 +978,11 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', position: 'relative' }}>
                     <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedRowForNotes(row);
+                        setNotesModalOpen(true);
+                      }}
                       style={{
                         backgroundColor: 'transparent',
                         border: 'none',
@@ -982,6 +991,13 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#F3F4F6';
+                        e.currentTarget.style.borderRadius = '4px';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
                       }}
                     >
                       <img
@@ -1779,6 +1795,45 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
             </div>
           </div>
         </div>
+      )}
+
+      {/* Production Notes Modal */}
+      {notesModalOpen && selectedRowForNotes && (
+        <ProductionNotesModal
+          isOpen={notesModalOpen}
+          onClose={() => {
+            setNotesModalOpen(false);
+            setSelectedRowForNotes(null);
+          }}
+          product={{
+            product: selectedRowForNotes.formula || 'Product',
+            product_name: selectedRowForNotes.formula || 'Product',
+            size: selectedRowForNotes.size || '',
+          }}
+          notes={rowNotes[selectedRowForNotes.id] || []}
+          onAddNote={(noteText) => {
+            const newNote = {
+              text: noteText,
+              userName: localStorage.getItem('userName') || 'User',
+              userInitials: (localStorage.getItem('userName') || 'User')
+                .split(' ')
+                .map(n => n[0])
+                .join('')
+                .toUpperCase()
+                .slice(0, 2),
+              date: new Date().toLocaleDateString('en-US', { 
+                month: 'short', 
+                day: 'numeric', 
+                year: 'numeric' 
+              }),
+            };
+            setRowNotes(prev => ({
+              ...prev,
+              [selectedRowForNotes.id]: [...(prev[selectedRowForNotes.id] || []), newNote],
+            }));
+          }}
+          isDarkMode={isDarkMode}
+        />
       )}
     </>
   );
