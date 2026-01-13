@@ -78,7 +78,7 @@ const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote,
           style={{
             width: '90%',
             maxWidth: '640px',
-            maxHeight: '90vh',
+            maxHeight: 'calc(90vh - 10px)',
             backgroundColor: darkMode ? '#1F2937' : '#FFFFFF',
             borderRadius: '12px',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',

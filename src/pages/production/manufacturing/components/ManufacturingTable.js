@@ -6,6 +6,7 @@ import ProductionNotesModal from '../../packaging/components/ProductionNotesModa
 
 const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = '', activeSubTab = 'all', isSortMode = false, onExitSortMode }) => {
   const { isDarkMode } = useTheme();
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [statusDropdowns, setStatusDropdowns] = useState({});
   const [actionMenuId, setActionMenuId] = useState(null);
   const [actionMenuPosition, setActionMenuPosition] = useState({ top: 0, right: 0 });
@@ -27,6 +28,9 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
   const [notesModalOpen, setNotesModalOpen] = useState(false);
   const [selectedRowForNotes, setSelectedRowForNotes] = useState(null);
   const [rowNotes, setRowNotes] = useState({});
+  const [touchStartY, setTouchStartY] = useState(null);
+  const [touchStartIndex, setTouchStartIndex] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -149,6 +153,15 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
   const filteredByShipment = selectedShipment
     ? filteredData.filter((row) => row.tpsShipNumber === selectedShipment)
     : filteredData;
+
+  // Handle window resize for mobile detection
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Initialize localData when filteredByShipment changes (outside sort mode)
   // Preserve splits if they exist
@@ -409,11 +422,12 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
   // Drag and drop handlers
   const handleDragStart = (e, index) => {
     if (!isSortMode) return;
-    // Prevent dragging if clicking on interactive elements (except the grip icon area)
-    if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('button') || e.target.closest('input')) {
+    // Prevent dragging if clicking on interactive elements
+    if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) {
       e.preventDefault();
       return;
     }
+    // For mobile, allow dragging from anywhere on the card (except interactive elements)
     setDraggedRowIndex(index);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/html', e.target.outerHTML);
@@ -451,6 +465,69 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
     const rowElement = e.currentTarget;
     rowElement.style.opacity = '1';
     rowElement.style.cursor = isSortMode ? 'grab' : 'default';
+    setDraggedRowIndex(null);
+    setDraggedOverRowIndex(null);
+  };
+
+  // Touch-based drag handlers for mobile
+  const handleTouchStart = (e, index) => {
+    if (!isSortMode) return;
+    // Don't start drag if clicking on interactive elements
+    if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) {
+      return;
+    }
+    const touch = e.touches[0];
+    setTouchStartY(touch.clientY);
+    setTouchStartIndex(index);
+    setIsDragging(false);
+  };
+
+  const handleTouchMove = (e, index) => {
+    if (!isSortMode || touchStartIndex === null) return;
+    const touch = e.touches[0];
+    const deltaY = Math.abs(touch.clientY - touchStartY);
+    
+    // Start dragging after 10px movement
+    if (deltaY > 10 && !isDragging) {
+      setIsDragging(true);
+      setDraggedRowIndex(touchStartIndex);
+      e.preventDefault();
+    }
+    
+    if (isDragging) {
+      e.preventDefault();
+      // Find which card we're over
+      const cards = document.querySelectorAll('[data-card-index]');
+      let newOverIndex = null;
+      cards.forEach((card) => {
+        const rect = card.getBoundingClientRect();
+        if (touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+          const cardIndex = parseInt(card.getAttribute('data-card-index'));
+          if (cardIndex !== draggedOverRowIndex) {
+            newOverIndex = cardIndex;
+          }
+        }
+      });
+      if (newOverIndex !== null) {
+        setDraggedOverRowIndex(newOverIndex);
+      }
+    }
+  };
+
+  const handleTouchEnd = (e, index) => {
+    if (!isSortMode || touchStartIndex === null) return;
+    
+    if (isDragging && draggedRowIndex !== null && draggedOverRowIndex !== null && draggedRowIndex !== draggedOverRowIndex) {
+      const newData = [...localData];
+      const draggedItem = newData[draggedRowIndex];
+      newData.splice(draggedRowIndex, 1);
+      newData.splice(draggedOverRowIndex, 0, draggedItem);
+      setLocalData(newData);
+    }
+    
+    setTouchStartY(null);
+    setTouchStartIndex(null);
+    setIsDragging(false);
     setDraggedRowIndex(null);
     setDraggedOverRowIndex(null);
   };
@@ -536,6 +613,780 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
     { key: 'notes', label: 'NOTES', width: '170px' },
   ];
 
+  // Helper function to get status color
+  const getStatusColor = (status) => {
+    if (status === 'Completed') return '#10B981'; // green
+    if (status === 'In Progress') return '#3B82F6'; // blue
+    return 'transparent'; // no color for not started
+  };
+
+  // Helper function to get status icon
+  const getStatusIcon = (status) => {
+    if (status === 'Completed') {
+      return (
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M11.6667 3.5L5.25 9.91667L2.33334 7" stroke="#10B981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      );
+    }
+    if (status === 'In Progress') {
+      return (
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M7 1.16667L9.33333 5.25L13.4167 6.125L10.5 9.33333L10.6667 13.4167L7 11.6667L3.33333 13.4167L3.5 9.33333L0.583336 6.125L4.66667 5.25L7 1.16667Z" stroke="#3B82F6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      );
+    }
+    return (
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="7" cy="7" r="5.5" stroke="#9CA3AF" strokeWidth="1.5"/>
+      </svg>
+    );
+  };
+
+  // Mobile Card View
+  if (isMobile) {
+    return (
+      <>
+        <div className="w-full" style={{ padding: '0 1rem' }}>
+          {finalData.length === 0 ? (
+            <div
+              className={`px-6 py-6 text-center text-sm ${themeClasses.textSecondary}`}
+            >
+              No data available.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '1rem' }}>
+              {finalData.map((row, index) => {
+                const status = row.status || 'Not Started';
+                const statusColor = getStatusColor(status);
+                const totalGallons = (row.volume || 0) * (row.qty || 0);
+                const formattedGallons = totalGallons.toLocaleString('en-US');
+                
+                return (
+                  <div
+                    key={row.id || index}
+                    data-card-index={index}
+                    className={`${themeClasses.cardBg}`}
+                    draggable={isSortMode && !isMobile}
+                    onDragStart={(e) => !isMobile && handleDragStart(e, index)}
+                    onDragOver={(e) => !isMobile && handleDragOver(e, index)}
+                    onDragLeave={!isMobile ? handleDragLeave : undefined}
+                    onDrop={(e) => !isMobile && handleDrop(e, index)}
+                    onDragEnd={!isMobile ? handleDragEnd : undefined}
+                    onTouchStart={(e) => isMobile && handleTouchStart(e, index)}
+                    onTouchMove={(e) => isMobile && handleTouchMove(e, index)}
+                    onTouchEnd={(e) => isMobile && handleTouchEnd(e, index)}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      width: '100%',
+                      maxWidth: '343px',
+                      minHeight: '150px',
+                      borderRadius: '12px',
+                      border: '1px solid #E5E7EB',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      padding: '16px',
+                      gap: '10px',
+                      boxSizing: 'border-box',
+                      cursor: isSortMode ? 'grab' : 'default',
+                      opacity: draggedRowIndex === index ? 0.5 : 1,
+                      borderColor: draggedOverRowIndex === index ? '#007AFF' : '#E5E7EB',
+                      userSelect: isSortMode ? 'none' : 'auto',
+                      WebkitUserSelect: isSortMode ? 'none' : 'auto',
+                      touchAction: isSortMode ? 'pan-y' : 'auto',
+                      transform: isDragging && touchStartIndex === index ? 'scale(1.02)' : 'scale(1)',
+                      transition: isDragging ? 'none' : 'transform 0.2s ease',
+                    }}
+                  >
+                    {/* Left side - Drag handle in sort mode, colored bar otherwise */}
+                    {isSortMode ? (
+                      <div
+                        data-drag-handle
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: '24px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: '#F9FAFB',
+                          borderTopLeftRadius: '12px',
+                          borderBottomLeftRadius: '12px',
+                          cursor: 'grab',
+                          touchAction: 'none',
+                          pointerEvents: 'auto',
+                        }}
+                      >
+                        <svg width="12" height="16" viewBox="0 0 12 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <circle cx="3" cy="4" r="1.5" fill="#9CA3AF"/>
+                          <circle cx="9" cy="4" r="1.5" fill="#9CA3AF"/>
+                          <circle cx="3" cy="8" r="1.5" fill="#9CA3AF"/>
+                          <circle cx="9" cy="8" r="1.5" fill="#9CA3AF"/>
+                          <circle cx="3" cy="12" r="1.5" fill="#9CA3AF"/>
+                          <circle cx="9" cy="12" r="1.5" fill="#9CA3AF"/>
+                        </svg>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Left colored bar - Green rounded bar for Completed status */}
+                        {status === 'Completed' && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              left: 0,
+                              top: 0,
+                              bottom: 0,
+                              width: '6px',
+                              backgroundColor: '#10B981',
+                              borderTopLeftRadius: '12px',
+                              borderBottomLeftRadius: '12px',
+                            }}
+                          />
+                        )}
+                        {/* Left colored bar - Blue rounded bar for In Progress status */}
+                        {status === 'In Progress' && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              left: 0,
+                              top: 0,
+                              bottom: 0,
+                              width: '6px',
+                              backgroundColor: '#3B82F6',
+                              borderTopLeftRadius: '12px',
+                              borderBottomLeftRadius: '12px',
+                            }}
+                          />
+                        )}
+                        {/* Left colored bar - Gray rounded bar for Not Started status */}
+                        {status === 'Not Started' && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              left: 0,
+                              top: 0,
+                              bottom: 0,
+                              width: '6px',
+                              backgroundColor: '#9CA3AF',
+                              borderTopLeftRadius: '12px',
+                              borderBottomLeftRadius: '12px',
+                            }}
+                          />
+                        )}
+                      </>
+                    )}
+
+                    {/* Card Header */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={{ flex: 1, paddingLeft: isSortMode ? '28px' : '8px' }}>
+                        <div style={{ fontSize: '16px', fontWeight: 600, color: themeClasses.textPrimary, marginBottom: '2px' }}>
+                          {row.formula}
+                        </div>
+                        <div style={{ fontSize: '11px', color: themeClasses.textSecondary }}>
+                          TPS #{row.tpsShipNumber} • {row.type}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {/* Split Icon - Show when product is split */}
+                        {row.splitTag && (
+                          <img
+                            src="/assets/split.png"
+                            alt="Split"
+                            style={{
+                              width: 'auto',
+                              height: '16px',
+                              display: 'inline-block',
+                              flexShrink: 0,
+                            }}
+                          />
+                        )}
+                        <button
+                          ref={(el) => {
+                            if (el) actionButtonRefs.current[row.id] = el;
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (actionMenuId === row.id) {
+                              setActionMenuId(null);
+                            } else {
+                              const buttonElement = actionButtonRefs.current[row.id];
+                              if (buttonElement) {
+                                const rect = buttonElement.getBoundingClientRect();
+                                setActionMenuPosition({
+                                  top: rect.top + window.scrollY,
+                                  right: window.innerWidth - rect.right - window.scrollX,
+                                });
+                              }
+                              setActionMenuId(row.id);
+                            }
+                          }}
+                          style={{
+                            backgroundColor: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '2px',
+                          }}
+                        >
+                          <svg width="4" height="14" viewBox="0 0 4 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="2" cy="2" r="1.5" fill="#6B7280" />
+                            <circle cx="2" cy="7" r="1.5" fill="#6B7280" />
+                            <circle cx="2" cy="12" r="1.5" fill="#6B7280" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* SIZE, QTY, TOTE Row */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'row',
+                        width: '100%',
+                        maxWidth: isSortMode ? '295px' : '319px',
+                        height: '45px',
+                        marginLeft: isSortMode ? '28px' : '4px',
+                        backgroundColor: '#F9FAFB',
+                        borderRadius: '8px',
+                        border: '1px solid #E5E7EB',
+                        paddingTop: '8px',
+                        paddingRight: '16px',
+                        paddingBottom: '8px',
+                        paddingLeft: '16px',
+                        gap: '16px',
+                        boxSizing: 'border-box',
+                        transition: 'max-width 0.2s ease',
+                      }}
+                    >
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid #E5E7EB', paddingRight: '16px' }}>
+                        <div style={{ fontSize: '11px', color: themeClasses.textSecondary, marginBottom: '4px', fontWeight: 500 }}>SIZE</div>
+                        <div style={{ fontSize: '14px', fontWeight: 600, color: themeClasses.textPrimary }}>{row.size}</div>
+                      </div>
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid #E5E7EB', paddingLeft: '16px', paddingRight: '16px' }}>
+                        <div style={{ fontSize: '11px', color: themeClasses.textSecondary, marginBottom: '4px', fontWeight: 500 }}>QTY</div>
+                        <div style={{ fontSize: '14px', fontWeight: 600, color: themeClasses.textPrimary }}>{row.qty}</div>
+                      </div>
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingLeft: '16px' }}>
+                        <div style={{ fontSize: '11px', color: themeClasses.textSecondary, marginBottom: '4px', fontWeight: 500 }}>TOTE</div>
+                        <div style={{ fontSize: '14px', fontWeight: 600, color: themeClasses.textPrimary }}>{row.tote}</div>
+                      </div>
+                    </div>
+
+                    {/* Status and Total Gallons Row */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingLeft: isSortMode ? '28px' : '4px' }}>
+                      {/* Status Dropdown */}
+                      <div style={{ position: 'relative', zIndex: 1001 }}>
+                        <button
+                          ref={(el) => {
+                            if (el) statusButtonRefs.current[row.id] = el;
+                          }}
+                          onClick={(e) => handleStatusClick(row.id, e)}
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: '8px',
+                            width: '135px',
+                            height: '24px',
+                            backgroundColor: '#FFFFFF',
+                            border: '1px solid #E5E7EB',
+                            borderRadius: '4px',
+                            paddingTop: '4px',
+                            paddingRight: '12px',
+                            paddingBottom: '4px',
+                            paddingLeft: '12px',
+                            cursor: 'pointer',
+                            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+                            boxSizing: 'border-box',
+                          }}
+                        >
+                          {getStatusIcon(status)}
+                          <span
+                            style={{
+                              fontSize: '13px',
+                              fontWeight: 400,
+                              color: '#374151',
+                              flex: 1,
+                              textAlign: 'left',
+                            }}
+                          >
+                            {status}
+                          </span>
+                          <svg
+                            width="10"
+                            height="10"
+                            viewBox="0 0 12 12"
+                            fill="none"
+                            style={{ flexShrink: 0 }}
+                          >
+                            <path
+                              d="M3 4.5L6 7.5L9 4.5"
+                              stroke="#6B7280"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </button>
+                        {statusDropdowns[row.id] && createPortal(
+                          <div
+                            data-status-dropdown={row.id}
+                            style={{
+                              position: 'fixed',
+                              top: statusButtonRefs.current[row.id] ? `${statusButtonRefs.current[row.id].getBoundingClientRect().bottom + 4}px` : '0',
+                              left: statusButtonRefs.current[row.id] ? `${statusButtonRefs.current[row.id].getBoundingClientRect().left}px` : '0',
+                              width: '135px',
+                              zIndex: 10000,
+                              backgroundColor: '#FFFFFF',
+                              border: '1px solid #E5E7EB',
+                              borderRadius: '8px',
+                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                              overflow: 'hidden',
+                            }}
+                          >
+                            {statusOptions.map((statusOption) => (
+                              <button
+                                key={statusOption}
+                                onClick={() => handleStatusSelect(row.id, statusOption)}
+                                style={{
+                                  width: '100%',
+                                  textAlign: 'left',
+                                  padding: '8px 12px',
+                                  fontSize: '14px',
+                                  color: '#111827',
+                                  backgroundColor: 'transparent',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  borderBottom: statusOption !== statusOptions[statusOptions.length - 1] ? '1px solid #E5E7EB' : 'none',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#F3F4F6';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                {getStatusIcon(statusOption)}
+                                {statusOption}
+                              </button>
+                            ))}
+                          </div>,
+                          document.body
+                        )}
+                      </div>
+
+                      {/* Total Gallons - Right Aligned */}
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '14px', fontWeight: 500, color: themeClasses.textPrimary }}>
+                          {formattedGallons} {row.measure || 'Gallons'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Action Menu Portal for Mobile */}
+        {actionMenuId && (() => {
+          const selectedRow = finalData.find((r) => r.id === actionMenuId);
+          if (!selectedRow) return null;
+
+          return createPortal(
+            <div
+              data-action-menu-portal
+              style={{
+                position: 'fixed',
+                top: `${actionMenuPosition.top}px`,
+                right: `${actionMenuPosition.right}px`,
+                transform: 'translate(calc(-20px), calc(-50% + 11px))',
+                zIndex: 10000,
+                width: '146px',
+                minHeight: '108px',
+                display: 'flex',
+                flexDirection: 'column',
+                padding: '8px',
+                gap: '4px',
+                backgroundColor: '#FFFFFF',
+                borderBottom: '1px solid #E5E7EB',
+                borderRadius: '8px',
+                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                boxSizing: 'border-box',
+                overflow: 'visible',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Split Formula */}
+              <button
+                type="button"
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '8px',
+                  fontSize: '13px',
+                  fontWeight: 400,
+                  color: '#374151',
+                  borderRadius: '4px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.15s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#F3F4F6';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+                onClick={() => {
+                  setSelectedRowForSplit(selectedRow);
+                  const initialQty = selectedRow.qty && selectedRow.qty > 0 ? Math.min(1, selectedRow.qty) : 1;
+                  setFirstBatchQty(initialQty);
+                  setShowSplitModal(true);
+                  setActionMenuId(null);
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M8 2V14" stroke="#111827" strokeWidth="1.5" strokeLinecap="round"/>
+                  <path d="M3 6L8 2L13 6" stroke="#111827" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M3 10L8 14L13 10" stroke="#111827" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <span>Split Formula</span>
+              </button>
+
+              {/* Product Notes */}
+              <button
+                type="button"
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '8px',
+                  fontSize: '13px',
+                  fontWeight: 400,
+                  color: '#374151',
+                  borderRadius: '4px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.15s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#F3F4F6';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+                onClick={() => {
+                  setSelectedRowForNotes(selectedRow);
+                  setNotesModalOpen(true);
+                  setActionMenuId(null);
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M4 2H12C12.5523 2 13 2.44772 13 3V13C13 13.5523 12.5523 14 12 14H4C3.44772 14 3 13.5523 3 13V3C3 2.44772 3.44772 2 4 2Z" stroke="#111827" strokeWidth="1.5"/>
+                  <path d="M4 5H12" stroke="#111827" strokeWidth="1.5" strokeLinecap="round"/>
+                  <path d="M4 8H12" stroke="#111827" strokeWidth="1.5" strokeLinecap="round"/>
+                  <path d="M4 11H8" stroke="#111827" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+                <span>Product Notes</span>
+              </button>
+
+              {/* More Details */}
+              <button
+                type="button"
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '8px',
+                  fontSize: '13px',
+                  fontWeight: 400,
+                  color: '#374151',
+                  borderRadius: '4px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.15s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#F3F4F6';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+                onClick={() => {
+                  console.log('More Details for:', selectedRow);
+                  setActionMenuId(null);
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="8" cy="8" r="6" stroke="#111827" strokeWidth="1.5"/>
+                  <path d="M8 5V8" stroke="#111827" strokeWidth="1.5" strokeLinecap="round"/>
+                  <path d="M8 11H8.01" stroke="#111827" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+                <span>More Details</span>
+              </button>
+            </div>,
+            document.body
+          );
+        })()}
+
+        {/* Shared Modals - accessible from mobile view */}
+        {showSplitModal && selectedRowForSplit && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10002,
+            }}
+            onClick={() => {
+              setShowSplitModal(false);
+              setSelectedRowForSplit(null);
+              setFirstBatchQty(1);
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: '12px',
+                width: '90%',
+                maxWidth: '500px',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '20px 24px',
+                  backgroundColor: '#2C3544',
+                  borderTopLeftRadius: '12px',
+                  borderTopRightRadius: '12px',
+                }}
+              >
+                <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#FFFFFF', margin: 0 }}>
+                  Split Formula Volume
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowSplitModal(false);
+                    setSelectedRowForSplit(null);
+                    setFirstBatchQty(1);
+                  }}
+                  style={{
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '4px',
+                  }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+              <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '14px', fontWeight: 500, color: '#374151' }}>
+                    First Batch Quantity
+                  </label>
+                  <p style={{ fontSize: '12px', color: '#6B7280', margin: 0 }}>
+                    Enter the quantity for the first batch.
+                  </p>
+                  <input
+                    type="number"
+                    value={firstBatchQty}
+                    onChange={handleFirstBatchQtyChange}
+                    min={1}
+                    max={selectedRowForSplit ? (selectedRowForSplit.qty || 1) - 1 : 1}
+                    step={1}
+                    style={{
+                      width: '100%',
+                      height: '40px',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid #D1D5DB',
+                      backgroundColor: '#FFFFFF',
+                      fontSize: '14px',
+                      color: '#111827',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '14px', fontWeight: 500, color: '#374151' }}>
+                    Second Batch Quantity
+                  </label>
+                  <p style={{ fontSize: '12px', color: '#6B7280', margin: 0 }}>
+                    The remaining units after the split.
+                  </p>
+                  <input
+                    type="number"
+                    value={secondBatchQty}
+                    readOnly
+                    style={{
+                      width: '100%',
+                      height: '40px',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid #D1D5DB',
+                      backgroundColor: '#F9FAFB',
+                      fontSize: '14px',
+                      color: '#6B7280',
+                      cursor: 'not-allowed',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              </div>
+              <div style={{ padding: '20px 24px', borderTop: '1px solid #E5E7EB', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                <button
+                  onClick={() => {
+                    setShowSplitModal(false);
+                    setSelectedRowForSplit(null);
+                    setFirstBatchQty(1);
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: '1px solid #D1D5DB',
+                    backgroundColor: '#FFFFFF',
+                    color: '#374151',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (!selectedRowForSplit) return;
+                    const originalQty = selectedRowForSplit.qty || 1;
+                    const firstBatchQtyValue = firstBatchQty;
+                    const secondBatchQty = originalQty - firstBatchQtyValue;
+                    if (firstBatchQtyValue <= 0 || firstBatchQtyValue >= originalQty) return;
+                    const baseId = selectedRowForSplit.id;
+                    const firstBatch = { ...selectedRowForSplit, id: `${baseId}_split_1`, qty: firstBatchQtyValue, splitTag: '1/2', originalId: baseId };
+                    const secondBatch = { ...selectedRowForSplit, id: `${baseId}_split_2`, qty: secondBatchQty, splitTag: '2/2', originalId: baseId };
+                    const displayData = localData.length > 0 ? localData : filteredByShipment;
+                    const rowIndex = displayData.findIndex(r => r.id === selectedRowForSplit.id);
+                    if (rowIndex === -1) {
+                      setShowSplitModal(false);
+                      setSelectedRowForSplit(null);
+                      setFirstBatchQty(1);
+                      return;
+                    }
+                    const newData = [...displayData];
+                    newData.splice(rowIndex, 1, firstBatch, secondBatch);
+                    setLocalData(newData);
+                    setOriginalData(newData);
+                    hasSplitsRef.current = true;
+                    setShowSplitModal(false);
+                    setSelectedRowForSplit(null);
+                    setFirstBatchQty(1);
+                  }}
+                  disabled={!selectedRowForSplit || firstBatchQty <= 0 || firstBatchQty >= (selectedRowForSplit?.qty || 1)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: (!selectedRowForSplit || firstBatchQty <= 0 || firstBatchQty >= (selectedRowForSplit?.qty || 1)) ? '#9CA3AF' : '#3B82F6',
+                    color: '#FFFFFF',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: (!selectedRowForSplit || firstBatchQty <= 0 || firstBatchQty >= (selectedRowForSplit?.qty || 1)) ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  Confirm Split
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {notesModalOpen && selectedRowForNotes && (
+          <ProductionNotesModal
+            isOpen={notesModalOpen}
+            onClose={() => {
+              setNotesModalOpen(false);
+              setSelectedRowForNotes(null);
+            }}
+            product={{
+              product: selectedRowForNotes.formula || 'Product',
+              product_name: selectedRowForNotes.formula || 'Product',
+              size: selectedRowForNotes.size || '',
+            }}
+            notes={rowNotes[selectedRowForNotes.id] || []}
+            onAddNote={(noteText) => {
+              const newNote = {
+                text: noteText,
+                userName: localStorage.getItem('userName') || 'User',
+                userInitials: (localStorage.getItem('userName') || 'User')
+                  .split(' ')
+                  .map(n => n[0])
+                  .join('')
+                  .toUpperCase()
+                  .slice(0, 2),
+                date: new Date().toLocaleDateString('en-US', { 
+                  month: 'short', 
+                  day: 'numeric', 
+                  year: 'numeric' 
+                }),
+              };
+              setRowNotes(prev => ({
+                ...prev,
+                [selectedRowForNotes.id]: [...(prev[selectedRowForNotes.id] || []), newNote],
+              }));
+            }}
+            isDarkMode={isDarkMode}
+          />
+        )}
+      </>
+    );
+  }
+
+  // Desktop Table View
   return (
     <>
       <div
