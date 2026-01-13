@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const FormulaCheckCompleteModal = ({ isOpen, onClose, onGoToShipments, onBeginLabelCheck }) => {
+const FormulaCheckCompleteModal = ({ isOpen, onClose, onGoToShipments, onBeginLabelCheck, onBeginBookShipment, isLabelCheckCompleted = false }) => {
   const navigate = useNavigate();
 
   if (!isOpen) return null;
@@ -17,9 +17,17 @@ const FormulaCheckCompleteModal = ({ isOpen, onClose, onGoToShipments, onBeginLa
     });
   };
 
-  const handleBeginLabelCheck = () => {
-    if (onBeginLabelCheck) {
-      onBeginLabelCheck();
+  const handleBeginNextStep = () => {
+    if (isLabelCheckCompleted) {
+      // If Label Check is completed, go to Book Shipment
+      if (onBeginBookShipment) {
+        onBeginBookShipment();
+      }
+    } else {
+      // Otherwise, go to Label Check
+      if (onBeginLabelCheck) {
+        onBeginLabelCheck();
+      }
     }
     onClose();
   };
@@ -115,7 +123,7 @@ const FormulaCheckCompleteModal = ({ isOpen, onClose, onGoToShipments, onBeginLa
               margin: 0,
               textAlign: 'center',
             }}>
-              Formula Check Complete!
+              {isLabelCheckCompleted ? 'Formula Check completed! Moving to Book Shipment' : 'Formula Check Complete!'}
             </h2>
           </div>
 
@@ -155,10 +163,10 @@ const FormulaCheckCompleteModal = ({ isOpen, onClose, onGoToShipments, onBeginLa
               Go to Shipments
             </button>
 
-            {/* Begin Label Check button */}
+            {/* Begin Label Check / Begin Book Shipment button */}
             <button
               type="button"
-              onClick={handleBeginLabelCheck}
+              onClick={handleBeginNextStep}
               style={{
                 minWidth: '170px',
                 height: '31px',
@@ -183,7 +191,7 @@ const FormulaCheckCompleteModal = ({ isOpen, onClose, onGoToShipments, onBeginLa
                 e.currentTarget.style.backgroundColor = '#007AFF';
               }}
             >
-              Begin Label Check
+              {isLabelCheckCompleted ? 'Begin Book Shipment' : 'Begin Label Check'}
             </button>
           </div>
         </div>
