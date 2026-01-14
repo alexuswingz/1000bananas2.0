@@ -77,7 +77,8 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
       row.tpsShipNumber?.toLowerCase().includes(query) ||
       row.type?.toLowerCase().includes(query) ||
       row.formula?.toLowerCase().includes(query) ||
-      row.size?.toLowerCase().includes(query)
+      row.size?.toLowerCase().includes(query) ||
+      String(row.qty || '').includes(query)
     );
   });
 
@@ -224,11 +225,59 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
         // Start with new filtered data
         const result = [...filteredByShipment];
         
-        // Replace original rows with their split versions
+        // Replace original rows with their split versions, but only if the original row matches the current filters
         splitMap.forEach((splitRows, originalId) => {
           const index = result.findIndex(r => r.id === originalId);
           if (index !== -1) {
+            // Original row exists in filtered results, replace with splits
             result.splice(index, 1, ...splitRows);
+          } else {
+            // Original row doesn't match current filters, check if split rows themselves match
+            // Filter split rows based on current search query and filters
+            const matchingSplits = splitRows.filter(splitRow => {
+              // Check if split row matches search query
+              if (searchQuery.trim()) {
+                const query = searchQuery.toLowerCase();
+                const matchesSearch = 
+                  splitRow.tpsShipNumber?.toLowerCase().includes(query) ||
+                  splitRow.type?.toLowerCase().includes(query) ||
+                  splitRow.formula?.toLowerCase().includes(query) ||
+                  splitRow.size?.toLowerCase().includes(query) ||
+                  String(splitRow.qty || '').includes(query);
+                if (!matchesSearch) return false;
+              }
+              // Check if split row matches column filters
+              for (const columnKey of Object.keys(filters)) {
+                const filter = filters[columnKey];
+                const isNumericColumn = columnKey === 'qty' || columnKey === 'volume';
+                
+                if (filter.selectedValues && filter.selectedValues.size > 0) {
+                  const rowValue = splitRow[columnKey];
+                  const matchesValue = filter.selectedValues.has(rowValue) || 
+                                      filter.selectedValues.has(String(rowValue));
+                  if (!matchesValue) return false;
+                }
+                
+                if (filter.conditionType) {
+                  const matchesCondition = applyConditionFilter(
+                    splitRow[columnKey],
+                    filter.conditionType,
+                    filter.conditionValue,
+                    isNumericColumn
+                  );
+                  if (!matchesCondition) return false;
+                }
+              }
+              // Check shipment filter
+              if (selectedShipment && splitRow.tpsShipNumber !== selectedShipment) {
+                return false;
+              }
+              return true;
+            });
+            // Add matching split rows to result
+            if (matchingSplits.length > 0) {
+              result.push(...matchingSplits);
+            }
           }
         });
         
@@ -236,7 +285,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
       });
       setOriginalData(filteredByShipment);
     }
-  }, [filteredByShipment, isSortMode]);
+  }, [filteredByShipment, isSortMode, searchQuery, filters, selectedShipment]);
 
   // Capture original data when entering sort mode
   useEffect(() => {
@@ -252,6 +301,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
   }, [isSortMode]);
 
   // Use localData for display (it contains splits if any), fallback to filteredByShipment
+  // Ensure localData is synced with filteredByShipment when search changes (status changes preserved via useEffect)
   const finalData = localData.length > 0 ? localData : filteredByShipment;
 
   // Handle click outside status dropdown
