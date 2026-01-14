@@ -1414,6 +1414,265 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
             isDarkMode={isDarkMode}
           />
         )}
+
+        {/* Unsaved Changes Notification Bar - Mobile */}
+        {isSortMode && unsavedChangesCount > 0 && (
+          <div
+            style={{
+              position: 'fixed',
+              bottom: '24px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 10000,
+              backgroundColor: '#2C3544',
+              borderRadius: '8px',
+              padding: '8px 12px',
+              display: 'flex',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: '12px',
+              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2)',
+              width: '303px',
+              height: '39px',
+              boxSizing: 'border-box',
+            }}
+          >
+            {/* Pencil Icon */}
+            <div
+              style={{
+                width: '20px',
+                height: '20px',
+                borderRadius: '50%',
+                backgroundColor: '#3B82F6',
+                border: '1px solid rgba(59, 130, 246, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+            </div>
+
+            {/* Unsaved Changes Text */}
+            <span
+              style={{
+                color: '#FFFFFF',
+                fontSize: '12px',
+                fontWeight: 500,
+                flex: 1,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {unsavedChangesCount} Unsaved Change{unsavedChangesCount !== 1 ? 's' : ''}
+            </span>
+
+            {/* Buttons */}
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <button
+                onClick={handleCancelChanges}
+                style={{
+                  width: '64px',
+                  height: '23px',
+                  borderRadius: '4px',
+                  border: '1px solid #E5E7EB',
+                  backgroundColor: '#FFFFFF',
+                  color: '#374151',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
+                  boxSizing: 'border-box',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#F9FAFB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveChanges}
+                style={{
+                  width: '52px',
+                  height: '23px',
+                  borderRadius: '4px',
+                  border: 'none',
+                  backgroundColor: '#3B82F6',
+                  color: '#FFFFFF',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
+                  boxSizing: 'border-box',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#2563EB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#3B82F6';
+                }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Confirmation Modal - Mobile */}
+        {showConfirmModal && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10001,
+            }}
+            onClick={handleCancelConfirm}
+          >
+            <div
+              style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: '12px',
+                border: '1px solid #E5E7EB',
+                padding: '24px',
+                width: '90%',
+                maxWidth: '473px',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                display: 'flex',
+                flexDirection: 'column',
+                boxSizing: 'border-box',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Title */}
+              <h2
+                style={{
+                  fontSize: '18px',
+                  fontWeight: 700,
+                  color: '#111827',
+                  margin: 0,
+                  textAlign: 'center',
+                  marginBottom: '12px',
+                }}
+              >
+                Are you sure?
+              </h2>
+
+              {/* Message */}
+              <p
+                style={{
+                  fontSize: '14px',
+                  color: '#6B7280',
+                  margin: 0,
+                  lineHeight: '1.5',
+                  textAlign: 'center',
+                  marginBottom: '24px',
+                }}
+              >
+                Your changes will be applied to the current manufacturing order.
+              </p>
+
+              {/* Buttons */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  gap: '10px',
+                  justifyContent: 'center',
+                  marginTop: 'auto',
+                }}
+              >
+                <button
+                  onClick={handleCancelConfirm}
+                  style={{
+                    flex: 1,
+                    height: '31px',
+                    borderRadius: '4px',
+                    border: '1px solid #D1D5DB',
+                    backgroundColor: '#FFFFFF',
+                    color: '#374151',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0,
+                    boxSizing: 'border-box',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#F9FAFB';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  }}
+                >
+                  Go back
+                </button>
+                <button
+                  onClick={handleConfirmSave}
+                  style={{
+                    flex: 1,
+                    height: '31px',
+                    borderRadius: '4px',
+                    border: '1px solid #3B82F6',
+                    backgroundColor: '#3B82F6',
+                    color: '#FFFFFF',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0,
+                    boxSizing: 'border-box',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#2563EB';
+                    e.currentTarget.style.borderColor = '#2563EB';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#3B82F6';
+                    e.currentTarget.style.borderColor = '#3B82F6';
+                  }}
+                >
+                  Confirm ({unsavedChangesCount})
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </>
     );
   }
