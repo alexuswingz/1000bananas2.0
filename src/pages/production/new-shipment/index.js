@@ -1262,21 +1262,23 @@ const NewShipment = () => {
 
     // Navigate based on whether label check is completed
     if (labelCheckCompleted) {
-      // Both are completed, go to book shipment
-      setActiveAction('book-shipment');
+      // Both are completed, show modal (user will click button to navigate)
       if (isIncomplete) {
         if (hasComment) {
           toast.info('Formula Check comment saved. Proceeding to Book Shipment.');
         } else {
           toast.info('Proceeding to Book Shipment.');
         }
+        // For incomplete, still auto-navigate
+        setActiveAction('book-shipment');
       } else {
+        // Show the completion modal - user will click "Begin Book Shipment" to navigate
         toast.success('Formula Check completed! Moving to Book Shipment');
+        setIsFormulaCheckCompleteOpen(true);
       }
     } else {
       // If formula check is completed, show completion modal instead of auto-navigating
       if (!isIncomplete) {
-        toast.success('Formula Check completed!');
         // Show the completion modal instead of automatically navigating
         setIsFormulaCheckCompleteOpen(true);
       } else {
@@ -3196,6 +3198,12 @@ const NewShipment = () => {
           // Navigate to label-check section
           handleActionChange('label-check');
         }}
+        onBeginBookShipment={() => {
+          setIsFormulaCheckCompleteOpen(false);
+          // Navigate to book-shipment section
+          handleActionChange('book-shipment');
+        }}
+        isLabelCheckCompleted={completedTabs.has('label-check')}
       />
 
       {/* Book Shipment Complete Modal */}

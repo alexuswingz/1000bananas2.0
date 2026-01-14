@@ -1129,7 +1129,7 @@ const LabelCheckTable = ({
                     {completedRows.has(row.id) ? (
                       <button
                         type="button"
-                        onClick={() => handleEditClick(row, index)}
+                        onClick={() => handleStartClick(row, index)}
                         className="done-badge-btn"
                         style={{
                           height: '26px',
@@ -1854,24 +1854,28 @@ const LabelCheckTable = ({
                     type="button"
                     onClick={async () => {
                       // Re-confirm action: Update confirmation
-                      if (selectedRow && selectedRow.id && shipmentId) {
+                      const rowId = selectedRow?.id;
+                      
+                      // Close modal immediately
+                      handleCloseModal();
+                      
+                      if (rowId && shipmentId) {
                         try {
-                          await updateShipmentProductLabelCheck(shipmentId, selectedRow.id, 'confirmed');
-                          console.log(`Label check re-confirmed for product ${selectedRow.id}`);
+                          await updateShipmentProductLabelCheck(shipmentId, rowId, 'confirmed');
+                          console.log(`Label check re-confirmed for product ${rowId}`);
                         } catch (error) {
                           console.error('Error saving label check confirmation:', error);
                         }
                         
-                        setConfirmedRows(prev => new Set(prev).add(selectedRow.id));
-                        setCompletedRows(prev => new Set(prev).add(selectedRow.id));
-                        setCompletedRowStatus(prev => ({ ...prev, [selectedRow.id]: false }));
+                        setConfirmedRows(prev => new Set(prev).add(rowId));
+                        setCompletedRows(prev => new Set(prev).add(rowId));
+                        setCompletedRowStatus(prev => ({ ...prev, [rowId]: false }));
                         // Reload data from API to ensure consistency
                         await loadLabelData();
                         
                         // Check if all products are now complete and clear comment if so (after reload)
                         await checkAndClearLabelCheckComment();
                       }
-                      handleCloseModal();
                     }}
                     style={{
                       height: '40px',
@@ -1960,26 +1964,30 @@ const LabelCheckTable = ({
                     onClick={async () => {
                       // Confirm action: Mark row as confirmed without counting
                       // This is a checkpoint to verify labels are sufficient
-                      if (selectedRow && selectedRow.id && shipmentId) {
+                      const rowId = selectedRow?.id;
+                      
+                      // Close modal immediately
+                      handleCloseModal();
+                      
+                      if (rowId && shipmentId) {
                         try {
                           // Save to database
-                          await updateShipmentProductLabelCheck(shipmentId, selectedRow.id, 'confirmed');
-                          console.log(`Label check confirmed for product ${selectedRow.id}`);
+                          await updateShipmentProductLabelCheck(shipmentId, rowId, 'confirmed');
+                          console.log(`Label check confirmed for product ${rowId}`);
                         } catch (error) {
                           console.error('Error saving label check confirmation:', error);
                           // Continue with local update even if API fails
                         }
                         
-                        setConfirmedRows(prev => new Set(prev).add(selectedRow.id));
-                        setCompletedRows(prev => new Set(prev).add(selectedRow.id));
-                        setCompletedRowStatus(prev => ({ ...prev, [selectedRow.id]: false })); // Not insufficient
+                        setConfirmedRows(prev => new Set(prev).add(rowId));
+                        setCompletedRows(prev => new Set(prev).add(rowId));
+                        setCompletedRowStatus(prev => ({ ...prev, [rowId]: false })); // Not insufficient
                         // Reload data from API to ensure consistency
                         await loadLabelData();
                         
                         // Check if all products are now complete and clear comment if so (after reload)
                         await checkAndClearLabelCheckComment();
                       }
-                      handleCloseModal();
                     }}
                     style={{
                       height: '40px',
