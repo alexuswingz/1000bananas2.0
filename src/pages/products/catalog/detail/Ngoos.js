@@ -19,7 +19,7 @@ import {
   Brush
 } from 'recharts';
 
-const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
+const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = null, overrideUnitsToMake = null }) => {
   const { isDarkMode } = useTheme();
   const [selectedView, setSelectedView] = useState('2 Years');
   const [loading, setLoading] = useState(true);
@@ -128,9 +128,11 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
               // When inventoryOnly is true (production planning modal), only fetch essential data
               // Skip metrics/sales/ads APIs that may fail and aren't needed for inventory forecast
               if (inventoryOnly) {
+                // Use doiSettings object if provided, otherwise fall back to doiGoalDays
+                const forecastSettings = doiSettings || doiGoalDays;
                 const results = await Promise.allSettled([
                   NgoosAPI.getProductDetails(childAsin),
-                  NgoosAPI.getForecast(childAsin, doiGoalDays), // Pass DOI goal for accurate units_to_make
+                  NgoosAPI.getForecast(childAsin, forecastSettings), // Pass DOI settings for accurate units_to_make
                   NgoosAPI.getChartData(childAsin, weeks, salesVelocityWeight, svVelocityWeight)
                 ]);
 
@@ -152,9 +154,11 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
                 // Don't set metrics/salesChart/adsChart - not needed for inventory-only mode
               } else {
                 // Full mode - fetch all data including metrics/sales/ads
+                // Use doiSettings object if provided, otherwise fall back to doiGoalDays
+                const forecastSettings = doiSettings || doiGoalDays;
                 const results = await Promise.allSettled([
                   NgoosAPI.getProductDetails(childAsin),
-                  NgoosAPI.getForecast(childAsin, doiGoalDays), // Pass DOI goal for accurate units_to_make
+                  NgoosAPI.getForecast(childAsin, forecastSettings), // Pass DOI settings for accurate units_to_make
                   NgoosAPI.getChartData(childAsin, weeks, salesVelocityWeight, svVelocityWeight),
                   NgoosAPI.getMetrics(childAsin, metricsDays),
                   NgoosAPI.getSalesChart(childAsin, metricsDays),
@@ -199,7 +203,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
     };
 
       fetchNgoosData();
-    }, [data?.child_asin, data?.childAsin, selectedView, metricsDays, salesVelocityWeight, svVelocityWeight, inventoryOnly, doiGoalDays]);
+    }, [data?.child_asin, data?.childAsin, selectedView, metricsDays, salesVelocityWeight, svVelocityWeight, inventoryOnly, doiGoalDays, doiSettings]);
 
   // Extract inventory data from API response or use fallback
   const inventoryData = productDetails?.inventory || {
@@ -226,8 +230,8 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
     const totalUnits = fbaUnits + awdUnits;
     const additionalUnits = awdUnits; // Additional inventory beyond FBA
     
-    // Get units_to_make from forecast API (matches backend calculation)
-    const unitsToMake = forecastData?.units_to_make || 0;
+    // Get units_to_make - use override if provided (from parent component), otherwise from forecast API
+    const unitsToMake = overrideUnitsToMake ?? forecastData?.units_to_make ?? 0;
     const adjustment = forecastData?.forecast_adjustment || 0;
     
     // Get DOI days from API
@@ -272,7 +276,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
       forecast: Math.round(unitsToMake), // Show units to make, not days
       adjustment: Math.round(adjustment)
     };
-  }, [forecastData, inventoryData]);
+  }, [forecastData, inventoryData, overrideUnitsToMake]);
 
   // Calculate bar widths proportionally based on inventory units (matches backend logic)
   // Total span = FBA inventory + Additional inventory + Units to Make
@@ -315,7 +319,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
 
   // Prepare chart data for visualization with inventory bars
   const chartDisplayData = useMemo(() => {
-    if (!chartData || !forecastData) return { data: [], maxValue: 0 };
+    if (!chartData) return { data: [], maxValue: 0 };
 
     const historical = chartData.historical || [];
     let forecast = chartData.forecast || [];
@@ -324,17 +328,24 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
     const maxForecastWeeks = getWeeksForView(selectedView) / 2;
     forecast = forecast.slice(0, maxForecastWeeks);
     
-    // Get current date and DOI goal date from forecast
-    // When doiGoalDays is provided (from production planning), calculate DOI goal date from it
-    const currentDate = new Date(forecastData.current_date || Date.now());
-    const doiGoalDate = doiGoalDays 
-      ? new Date(currentDate.getTime() + doiGoalDays * 24 * 60 * 60 * 1000)
-      : new Date(forecastData.doi_goal_date || Date.now());
+    // Get current date - prefer from chart data metadata, then forecastData, then today
+    const currentDate = new Date(
+      chartData.metadata?.today || 
+      chartData.today || 
+      forecastData?.current_date || 
+      Date.now()
+    );
     
-    // Calculate runout dates based on DOI days from current date
+    // Get DOI goal date - calculate from doiGoalDays/doiSettings or use API value
+    const totalDoiDays = doiGoalDays || (doiSettings ? 
+      (doiSettings.amazonDoiGoal + doiSettings.inboundLeadTime + doiSettings.manufactureLeadTime) : 
+      130);
+    const doiGoalDate = new Date(currentDate.getTime() + totalDoiDays * 24 * 60 * 60 * 1000);
+    
+    // Calculate runout dates based on DOI days from chart data or forecastData
     // Per CALCULATIONS.md: Runout Date = Current Date + DOI (days)
-    const fbaAvailableDays = forecastData.fba_available_days || 0;
-    const totalDays = forecastData.total_days || 0;
+    const fbaAvailableDays = chartData.doi?.fba_days || forecastData?.doi_fba || forecastData?.fba_available_days || 0;
+    const totalDays = chartData.doi?.total_days || forecastData?.doi_total || forecastData?.total_days || 0;
     
     // FBA Runout = Current Date + FBA Available Days
     const runoutDate = forecastData.runout_date 
@@ -422,7 +433,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
     });
     
     return { data: combinedData, maxValue: chartMaxValue };
-  }, [chartData, forecastData, selectedView, doiGoalDays]);
+  }, [chartData, forecastData, selectedView, doiGoalDays, doiSettings]);
 
   // Timeline periods are now provided by the backend via forecastData.chart_rendering
   // This eliminates complex date calculations on the frontend
@@ -1170,25 +1181,42 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
         {/* Timeline Bar - Compact when inventoryOnly */}
         <div className={themeClasses.cardBg} style={{ borderRadius: '0.5rem', padding: inventoryOnly ? '0.75rem' : '1.5rem', marginBottom: inventoryOnly ? '0.75rem' : '2rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: inventoryOnly ? '0.5rem' : '1rem' }}>
-            <div style={{ fontSize: inventoryOnly ? '0.65rem' : '0.75rem', color: '#94a3b8' }}>
-              Today<br />{forecastData?.current_date ? new Date(forecastData.current_date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) : '11/11/25'}
-            </div>
-            <div style={{ fontSize: inventoryOnly ? '0.65rem' : '0.75rem', color: '#94a3b8' }}>Dec</div>
-            <div style={{ fontSize: inventoryOnly ? '0.65rem' : '0.75rem', color: '#94a3b8' }}>Jan</div>
-            <div style={{ fontSize: inventoryOnly ? '0.65rem' : '0.75rem', color: '#94a3b8' }}>Feb</div>
-            <div style={{ fontSize: inventoryOnly ? '0.65rem' : '0.75rem', color: '#94a3b8' }}>Mar</div>
-            <div style={{ fontSize: inventoryOnly ? '0.65rem' : '0.75rem', color: '#94a3b8', textAlign: 'right' }}>
-              DOI Goal{doiGoalDays ? ` (${doiGoalDays}d)` : ''}<br />
-              {(() => {
-                if (doiGoalDays) {
-                  const goalDate = new Date(Date.now() + doiGoalDays * 24 * 60 * 60 * 1000);
-                  return goalDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
-                }
-                return forecastData?.doi_goal_date 
-                  ? new Date(forecastData.doi_goal_date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }) 
-                  : '4/13/25';
-              })()}
-            </div>
+            {(() => {
+              // Calculate dynamic timeline dates
+              const today = new Date();
+              const totalDoiDays = doiGoalDays || (doiSettings ? 
+                (doiSettings.amazonDoiGoal + doiSettings.inboundLeadTime + doiSettings.manufactureLeadTime) : 
+                130);
+              const goalDate = new Date(today.getTime() + totalDoiDays * 24 * 60 * 60 * 1000);
+              
+              // Calculate intermediate months between today and goal
+              const monthLabels = [];
+              const monthsSpan = Math.ceil(totalDoiDays / 30);
+              for (let i = 1; i <= Math.min(monthsSpan - 1, 4); i++) {
+                const monthDate = new Date(today.getTime() + (totalDoiDays * i / (monthsSpan)) * 24 * 60 * 60 * 1000);
+                monthLabels.push(monthDate.toLocaleDateString('en-US', { month: 'short' }));
+              }
+              // Pad to 4 months if needed
+              while (monthLabels.length < 4) {
+                const nextMonth = new Date(today.getFullYear(), today.getMonth() + monthLabels.length + 1, 1);
+                monthLabels.push(nextMonth.toLocaleDateString('en-US', { month: 'short' }));
+              }
+              
+              return (
+                <>
+                  <div style={{ fontSize: inventoryOnly ? '0.65rem' : '0.75rem', color: '#94a3b8' }}>
+                    Today<br />{today.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}
+                  </div>
+                  {monthLabels.map((month, idx) => (
+                    <div key={idx} style={{ fontSize: inventoryOnly ? '0.65rem' : '0.75rem', color: '#94a3b8' }}>{month}</div>
+                  ))}
+                  <div style={{ fontSize: inventoryOnly ? '0.65rem' : '0.75rem', color: '#94a3b8', textAlign: 'right' }}>
+                    DOI Goal ({totalDoiDays}d)<br />
+                    {goalDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}
+                  </div>
+                </>
+              );
+            })()}
           </div>
           
           <div style={{ display: 'flex', height: inventoryOnly ? '40px' : '60px', borderRadius: '0.375rem', overflow: 'hidden', position: 'relative' }}>
@@ -1282,64 +1310,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null }) => {
               </p>
             </div>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontSize: '0.875rem', color: '#3b82f6' }}>All Variations</span>
-                <label style={{ position: 'relative', display: 'inline-block', width: '44px', height: '24px' }}>
-                  <input type="checkbox" style={{ opacity: 0, width: 0, height: 0 }} />
-                  <span style={{ 
-                    position: 'absolute', 
-                    cursor: 'pointer', 
-                    top: 0, 
-                    left: 0, 
-                    right: 0, 
-                    bottom: 0, 
-                    backgroundColor: '#475569', 
-                    transition: '0.4s',
-                    borderRadius: '24px'
-                  }}>
-                    <span style={{ 
-                      position: 'absolute', 
-                      content: '', 
-                      height: '18px', 
-                      width: '18px', 
-                      left: '3px', 
-                      bottom: '3px', 
-                      backgroundColor: 'white', 
-                      transition: '0.4s',
-                      borderRadius: '50%'
-                    }}></span>
-                  </span>
-                </label>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Forecast View</span>
-                <label style={{ position: 'relative', display: 'inline-block', width: '44px', height: '24px' }}>
-                  <input type="checkbox" defaultChecked style={{ opacity: 0, width: 0, height: 0 }} />
-                  <span style={{ 
-                    position: 'absolute', 
-                    cursor: 'pointer', 
-                    top: 0, 
-                    left: 0, 
-                    right: 0, 
-                    bottom: 0, 
-                    backgroundColor: '#3b82f6', 
-                    transition: '0.4s',
-                    borderRadius: '24px'
-                  }}>
-                    <span style={{ 
-                      position: 'absolute', 
-                      content: '', 
-                      height: '18px', 
-                      width: '18px', 
-                      right: '3px', 
-                      bottom: '3px', 
-                      backgroundColor: 'white', 
-                      transition: '0.4s',
-                      borderRadius: '50%'
-                    }}></span>
-                  </span>
-                </label>
-              </div>
               <button 
                 onClick={handleOpenAdjustmentModal}
                 title="Adjustment Weights"

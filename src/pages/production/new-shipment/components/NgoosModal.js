@@ -30,6 +30,7 @@ const NgoosModal = ({
   onAddUnits = null,
   currentQty = 0,
   forecastRange = 150, // DOI goal in days from the order page
+  doiSettings = null, // Full DOI settings object: { amazonDoiGoal, inboundLeadTime, manufactureLeadTime }
 }) => {
   const { isDarkMode } = useTheme();
   const [forecastData, setForecastData] = useState(null);
@@ -42,7 +43,7 @@ const NgoosModal = ({
     textSecondary: isDarkMode ? 'text-dark-text-secondary' : 'text-gray-500',
   };
 
-  // Fetch forecast data for Add Units button (refetch when forecastRange changes)
+  // Fetch forecast data for Add Units button (refetch when forecastRange or doiSettings changes)
   useEffect(() => {
     const fetchForecastData = async () => {
       if (!isOpen || !selectedRow) return;
@@ -51,8 +52,10 @@ const NgoosModal = ({
       if (!childAsin) return;
 
       try {
-        // Pass the forecastRange (DOI goal) to get updated units_to_make calculation
-        const forecast = await NgoosAPI.getForecast(childAsin, forecastRange);
+        // Pass DOI settings object for accurate units_to_make calculation
+        // Falls back to forecastRange if doiSettings not provided
+        const settings = doiSettings || forecastRange;
+        const forecast = await NgoosAPI.getForecast(childAsin, settings);
         setForecastData(forecast);
       } catch (error) {
         console.error('Error fetching forecast data:', error);
@@ -60,7 +63,7 @@ const NgoosModal = ({
     };
 
     fetchForecastData();
-  }, [isOpen, selectedRow, forecastRange]);
+  }, [isOpen, selectedRow, forecastRange, doiSettings]);
 
   // Fetch catalog data to get image if not available in selectedRow
   useEffect(() => {
@@ -314,7 +317,7 @@ const NgoosModal = ({
               <p className={themeClasses.textSecondary} style={{ fontSize: '0.8rem' }}>This product does not have an ASIN.</p>
             </div>
           ) : (
-            <Ngoos data={ngoosData} inventoryOnly={true} doiGoalDays={forecastRange} />
+            <Ngoos data={ngoosData} inventoryOnly={true} doiGoalDays={forecastRange} doiSettings={doiSettings} overrideUnitsToMake={forecastUnits} />
           )}
         </div>
       </div>

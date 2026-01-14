@@ -1843,7 +1843,7 @@ const NewShipmentTable = ({
                     </td>
                     <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }}>
                       <div
-                        style={{ position: 'relative', display: 'inline-block' }}
+                        style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                         onMouseEnter={() => setHoveredQtyIndex(index)}
                         onMouseLeave={() => setHoveredQtyIndex(null)}
                       >
@@ -1857,6 +1857,7 @@ const NewShipmentTable = ({
                             if (size.includes('gallon')) return 4;
                             return 1;
                           })()}
+                          title={row.needsSeasonality ? 'Needs seasonality data for accurate forecast' : ''}
                           value={(() => {
                             // Show raw input value while typing, otherwise show rounded value
                             if (rawQtyInputValues.current[index] !== undefined) {
@@ -1947,10 +1948,40 @@ const NewShipmentTable = ({
                             width: '90px',
                             textAlign: 'center',
                             cursor: 'text',
-                            borderColor: isQtyExceedingLabels(row, index) ? '#EF4444' : (isDarkMode ? '#374151' : '#D1D5DB'),
-                            backgroundColor: isQtyExceedingLabels(row, index) ? (isDarkMode ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.05)') : undefined,
+                            borderColor: isQtyExceedingLabels(row, index) 
+                              ? '#EF4444' // Red for exceeding labels
+                              : row.needsSeasonality 
+                                ? '#F59E0B' // Orange/amber for needs seasonality
+                                : (isDarkMode ? '#374151' : '#D1D5DB'),
+                            backgroundColor: isQtyExceedingLabels(row, index) 
+                              ? (isDarkMode ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.05)') 
+                              : row.needsSeasonality 
+                                ? (isDarkMode ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.05)') 
+                                : undefined,
                           }}
                         />
+                        {/* Warning icon for products needing seasonality data */}
+                        {row.needsSeasonality && (
+                          <div
+                            title="Needs seasonality data for accurate forecast"
+                            style={{
+                              width: '18px',
+                              height: '18px',
+                              borderRadius: '50%',
+                              backgroundColor: '#F59E0B',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#FFFFFF',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              cursor: 'help',
+                              flexShrink: 0,
+                            }}
+                          >
+                            !
+                          </div>
+                        )}
                         {(() => {
                           const forecastValue = Math.round(row.weeklyForecast || row.forecast || 0);
                           // Check both the raw input value (while typing) and the effective value

@@ -27,6 +27,24 @@ import FormulaCheckCommentModal from './components/FormulaCheckCommentModal';
 import LabelCheckCommentModal from './components/LabelCheckCommentModal';
 import LabelCheckCompleteModal from './components/LabelCheckCompleteModal';
 import FormulaCheckCompleteModal from './components/FormulaCheckCompleteModal';
+import DOISettingsPopover from './components/DOISettingsPopover';
+
+// Utility function to extract size from product name
+const extractSizeFromProductName = (productName) => {
+  if (!productName) return null;
+  const patterns = [
+    /(\d+\s*oz)/i,
+    /(\d+\s*ml)/i,
+    /(Quart)/i,
+    /(Gallon)/i,
+    /(\d+\s*Gallon)/i,
+  ];
+  for (const pattern of patterns) {
+    const match = productName.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
+};
 
 // Utility function to handle Google Drive image URLs
 const getImageUrl = (url) => {
@@ -118,7 +136,40 @@ const NewShipment = () => {
   const bookShipmentButtonRef = useRef(null);
   const [bookShipmentTooltipPosition, setBookShipmentTooltipPosition] = useState({ top: 0, left: 0 });
   const [exportCompleted, setExportCompleted] = useState(false);
+  
+  // DOI Settings - managed by DOISettingsPopover component
   const [forecastRange, setForecastRange] = useState('150');
+  const [doiSettingsValues, setDoiSettingsValues] = useState({
+    amazonDoiGoal: 130,
+    inboundLeadTime: 30,
+    manufactureLeadTime: 7
+  });
+  
+  // Track DOI settings change counter to trigger reload
+  const [doiSettingsChangeCount, setDoiSettingsChangeCount] = useState(0);
+  const doiSettingsInitialized = useRef(false);
+  
+  // Sort option for product table
+  const [sortOption, setSortOption] = useState('doi'); // 'doi', 'qty', 'name'
+  
+  // Callback when DOI settings change from the popover
+  const handleDoiSettingsChange = (newSettings, totalDoi) => {
+    const prevSettings = doiSettingsValues;
+    setDoiSettingsValues(newSettings);
+    setForecastRange(String(totalDoi));
+    
+    // Trigger reload if settings actually changed (but not on initial mount)
+    if (doiSettingsInitialized.current && 
+        (prevSettings.amazonDoiGoal !== newSettings.amazonDoiGoal ||
+         prevSettings.inboundLeadTime !== newSettings.inboundLeadTime ||
+         prevSettings.manufactureLeadTime !== newSettings.manufactureLeadTime)) {
+      console.log('DOI settings changed, will reload products with new settings:', newSettings);
+      setDoiSettingsChangeCount(c => c + 1);
+    }
+    doiSettingsInitialized.current = true;
+  };
+  
+  // Legacy state for tooltip (keeping for backward compatibility)
   const [showDOITooltip, setShowDOITooltip] = useState(false);
   const [isTooltipPinned, setIsTooltipPinned] = useState(false);
   const [showDateCalculationInfo, setShowDateCalculationInfo] = useState(false);
@@ -293,6 +344,41 @@ const NewShipment = () => {
     loadProducts();
   }, [id]); // Re-run when ID changes to get fresh labels availability
 
+  // Reload products when DOI settings change (triggered by Apply button in DOISettingsPopover)
+  useEffect(() => {
+    if (doiSettingsChangeCount > 0) {
+      console.log('Reloading products due to DOI settings change...');
+      loadProducts();
+    }
+  }, [doiSettingsChangeCount]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-sort products when sort option changes
+  useEffect(() => {
+    if (products.length > 0) {
+      const sorted = [...products].sort((a, b) => {
+        if (sortOption === 'doi') {
+          const aDOI = a.doiTotal || a.daysOfInventory || 999;
+          const bDOI = b.doiTotal || b.daysOfInventory || 999;
+          if (aDOI !== bDOI) return aDOI - bDOI;
+          return (b.suggestedQty || 0) - (a.suggestedQty || 0);
+        } else if (sortOption === 'qty') {
+          const aQty = a.suggestedQty || 0;
+          const bQty = b.suggestedQty || 0;
+          if (aQty !== bQty) return bQty - aQty;
+          const aDOI = a.doiTotal || a.daysOfInventory || 999;
+          const bDOI = b.doiTotal || b.daysOfInventory || 999;
+          return aDOI - bDOI;
+        } else if (sortOption === 'name') {
+          const aName = (a.name || a.productName || '').toLowerCase();
+          const bName = (b.name || b.productName || '').toLowerCase();
+          return aName.localeCompare(bName);
+        }
+        return 0;
+      });
+      setProducts(sorted);
+    }
+  }, [sortOption]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Reset shipment number for new shipments (when no ID in route)
   // Also read account from navigation state if coming from Planning modal
   useEffect(() => {
@@ -316,16 +402,37 @@ const NewShipment = () => {
     try {
       setLoadingProducts(true);
       
-      // Load Amazon forecast data, production supply chain data, and labels availability
+      // Load TPS Forecast data (Railway/Lambda API), production supply chain data, and labels availability
       // Use production inventory as PRIMARY source (all products from our database)
       // Merge in forecast data where available
-      const [planningData, productionInventory, labelsAvailability] = await Promise.all([
-        NgoosAPI.getPlanning(1, 5000), // Increase limit for forecast data
+      const [tpsForecastData, productionInventory, labelsAvailability] = await Promise.all([
+        NgoosAPI.getTpsAllForecasts({
+          amazonDoiGoal: doiSettingsValues.amazonDoiGoal,
+          inboundLeadTime: doiSettingsValues.inboundLeadTime,
+          manufactureLeadTime: doiSettingsValues.manufactureLeadTime
+        }), // Use TPS Forecast API with DOI settings
         import('../../../services/productionApi').then(api => api.getProductsInventory()),
         getLabelsAvailability(shipmentId) // Pass shipment ID to exclude current shipment
       ]);
       
-      console.log('Loaded planning data:', planningData.products?.length || 0, 'products with forecast');
+      // Map TPS forecast data to planning format
+      const planningData = {
+        products: (tpsForecastData.products || []).map(p => ({
+          asin: p.asin,
+          brand: 'TPS Plant Foods',
+          product: p.product_name,
+          size: p.inventory?.size || extractSizeFromProductName(p.product_name),
+          doi_total: p.doi_total_days || 0,
+          doi_fba: p.doi_fba_days || 0,
+          inventory: p.inventory?.total_inventory || p.total_inventory || 0,
+          units_to_make: p.units_to_make || 0,
+          algorithm: p.algorithm,
+          needs_seasonality: p.needs_seasonality,
+          status: p.status,
+        }))
+      };
+      
+      console.log('Loaded TPS forecast data:', planningData.products?.length || 0, 'products with forecast (source:', tpsForecastData.source || 'api', ')');
       console.log('Loaded production inventory:', productionInventory.length, 'total products from database');
       console.log('Loaded labels availability:', Object.keys(labelsAvailability.byLocation || {}).length, 'label locations');
       
@@ -364,8 +471,9 @@ const NewShipment = () => {
       // USE PRODUCTION INVENTORY AS PRIMARY SOURCE (all products from our database)
       // This ensures we show ALL products, not just those with forecast data
       const formattedProducts = uniqueProducts.map((item, index) => {
-        // Get forecast data for this product if available
-        const forecast = forecastMap[item.child_asin] || {};
+        // Get forecast data for this product if available - try multiple ASIN fields
+        const asinKey = item.child_asin || item.asin || item.childAsin || '';
+        const forecast = forecastMap[asinKey] || {};
         
         // Get sales data from forecast API if available
         const salesData = forecast.sales_30_day || item.units_sold_30_days || 0;
@@ -442,6 +550,10 @@ const NewShipment = () => {
           formulaGallonsAvailable: item.formula_gallons_available || 0,
           formulaGallonsPerUnit: item.gallons_per_unit || 0,
           maxUnitsProducible: item.max_units_producible || 0,
+          // TPS Forecast data (from TPS API)
+          unitsToMake: forecast.units_to_make || 0, // Store TPS units_to_make for suggestedQty calculation
+          tpsAlgorithm: forecast.algorithm || '',
+          tpsNeedsSeasonality: forecast.needs_seasonality || false,
           // Packaging calculation fields (for pallets, weight, time)
           box_weight_lbs: parseFloat(item.box_weight_lbs) || 0,
           boxes_per_pallet: parseFloat(item.boxes_per_pallet) || 50,
@@ -453,52 +565,83 @@ const NewShipment = () => {
       
       console.log('Loaded products with supply chain:', formattedProducts.length);
       
-      // Calculate suggested qty for each product based on forecast
-      // Formula: unitsNeeded = (targetDOI - currentDOI) * dailySalesRate
-      // Then round up to nearest units_per_case
+      // Use units_to_make from TPS Forecast API as suggested qty
+      // This already accounts for DOI goals, lead times, and seasonality
       const productsWithSuggestedQty = formattedProducts.map(product => {
-        const dailySalesRate = (product.sales30Day || 0) / 30;
-        const currentDOI = product.doiTotal || product.daysOfInventory || 0;
-        const targetDOI = parseInt(forecastRange) || 120;
+        // Get forecast data for this product - use the stored units_to_make from formattedProducts
+        // This ensures we use the same lookup that was done earlier
         const unitsPerCase = product.units_per_case || 60;
+        const needsSeasonality = product.tpsNeedsSeasonality || false;
         
-        let suggestedQty = 0;
+        // If product needs seasonality data, set QTY to 0 and flag it
+        if (needsSeasonality) {
+          return {
+            ...product,
+            suggestedQty: 0,
+            algorithm: product.tpsAlgorithm || '',
+            needsSeasonality: true,
+          };
+        }
         
-        // Only calculate if there are sales and we're below target DOI
-        if (dailySalesRate > 0 && currentDOI < targetDOI) {
-          const daysNeeded = targetDOI - currentDOI;
-          const rawUnitsNeeded = daysNeeded * dailySalesRate;
+        // Use units_to_make directly from product (set in formattedProducts from forecastMap)
+        // This avoids a second lookup that might fail
+        let suggestedQty = product.unitsToMake || 0;
+        
+        // Round to nearest case pack
+        if (suggestedQty > 0) {
+          suggestedQty = Math.ceil(suggestedQty / unitsPerCase) * unitsPerCase;
+        }
+        
+        // Fallback: calculate if TPS forecast not available AND product doesn't need seasonality
+        if (suggestedQty === 0 && !needsSeasonality) {
+          const dailySalesRate = (product.sales30Day || 0) / 30;
+          const currentDOI = product.doiTotal || product.daysOfInventory || 0;
+          const targetDOI = parseInt(forecastRange) || 120;
           
-          // Round up to nearest units_per_case (case pack)
-          suggestedQty = Math.ceil(rawUnitsNeeded / unitsPerCase) * unitsPerCase;
-          
-          // Ensure minimum of 1 case if there's any need
-          if (suggestedQty === 0 && rawUnitsNeeded > 0) {
-            suggestedQty = unitsPerCase;
+          if (dailySalesRate > 0 && currentDOI < targetDOI) {
+            const daysNeeded = targetDOI - currentDOI;
+            const rawUnitsNeeded = daysNeeded * dailySalesRate;
+            suggestedQty = Math.ceil(rawUnitsNeeded / unitsPerCase) * unitsPerCase;
+            if (suggestedQty === 0 && rawUnitsNeeded > 0) {
+              suggestedQty = unitsPerCase;
+            }
           }
         }
         
         return {
           ...product,
           suggestedQty,
+          // Keep original TPS values from formattedProducts
+          algorithm: product.tpsAlgorithm || '',
+          needsSeasonality: needsSeasonality,
         };
       });
       
-      // Sort by DOI ascending (lowest DOI first = most urgent)
-      // Products with sales but low DOI need to be prioritized
+      // Sort products based on selected sort option
       const sortedProducts = productsWithSuggestedQty.sort((a, b) => {
-        // First: items with sales > 0 come first
-        const aHasSales = a.sales30Day > 0 ? 0 : 1;
-        const bHasSales = b.sales30Day > 0 ? 0 : 1;
-        if (aHasSales !== bHasSales) return aHasSales - bHasSales;
-        
-        // Second: sort by DOI ascending (lowest DOI = most urgent)
-        const aDOI = a.doiTotal || a.daysOfInventory || 999;
-        const bDOI = b.doiTotal || b.daysOfInventory || 999;
-        if (aDOI !== bDOI) return aDOI - bDOI;
-        
-        // Third: higher sales first (as tiebreaker)
-        return (b.sales30Day || 0) - (a.sales30Day || 0);
+        if (sortOption === 'doi') {
+          // Sort by DOI ascending (lowest DOI = most urgent)
+          const aDOI = a.doiTotal || a.daysOfInventory || 999;
+          const bDOI = b.doiTotal || b.daysOfInventory || 999;
+          if (aDOI !== bDOI) return aDOI - bDOI;
+          // Secondary: higher qty first
+          return (b.suggestedQty || 0) - (a.suggestedQty || 0);
+        } else if (sortOption === 'qty') {
+          // Sort by QTY descending (highest units to make first)
+          const aQty = a.suggestedQty || 0;
+          const bQty = b.suggestedQty || 0;
+          if (aQty !== bQty) return bQty - aQty;
+          // Secondary: lower DOI first
+          const aDOI = a.doiTotal || a.daysOfInventory || 999;
+          const bDOI = b.doiTotal || b.daysOfInventory || 999;
+          return aDOI - bDOI;
+        } else if (sortOption === 'name') {
+          // Sort by product name alphabetically
+          const aName = (a.name || a.productName || '').toLowerCase();
+          const bName = (b.name || b.productName || '').toLowerCase();
+          return aName.localeCompare(bName);
+        }
+        return 0;
       });
       
       // Store all products (unfiltered) for account switching
@@ -682,6 +825,7 @@ const NewShipment = () => {
           newQtyValues[index] = product.suggestedQty;
         }
       });
+      
       setQtyValues(newQtyValues);
       setAddedRows(new Set());
       
@@ -745,40 +889,25 @@ const NewShipment = () => {
       return;
     }
     
-    console.log(`ForecastRange changed from ${lastForecastRange} to ${forecastRange}. Recalculating QTY values.`);
+    console.log(`ForecastRange changed from ${lastForecastRange} to ${forecastRange}. Preserving TPS units_to_make values.`);
     setLastForecastRange(forecastRange);
     
-    const targetDOI = parseInt(forecastRange) || 120;
+    // NOTE: ForecastRange changes should NOT recalculate QTY values from scratch.
+    // The TPS API already provides accurate units_to_make based on DOI goals.
+    // We should preserve the product.suggestedQty values (from TPS) for products not manually added.
     
     const newQtyValues = {};
     products.forEach((product, index) => {
-      // Only update qty for products that haven't been manually added yet
-      if (!addedRows.has(product.id)) {
-        const dailySalesRate = (product.sales30Day || 0) / 30;
-        const currentDOI = product.doiTotal || product.daysOfInventory || 0;
-        const unitsPerCase = product.units_per_case || 60;
-        
-        let suggestedQty = 0;
-        
-        if (dailySalesRate > 0 && currentDOI < targetDOI) {
-          const daysNeeded = targetDOI - currentDOI;
-          const rawUnitsNeeded = daysNeeded * dailySalesRate;
-          
-          // Round up to nearest units_per_case (case pack)
-          suggestedQty = Math.ceil(rawUnitsNeeded / unitsPerCase) * unitsPerCase;
-          
-          if (suggestedQty === 0 && rawUnitsNeeded > 0) {
-            suggestedQty = unitsPerCase;
-          }
-        }
-        
-        if (suggestedQty > 0) {
-          newQtyValues[index] = suggestedQty;
-        }
-      } else {
-        // Keep existing quantity for already added products
+      // Keep existing quantity for already added products
+      if (addedRows.has(product.id)) {
         if (qtyValues[index] !== undefined) {
           newQtyValues[index] = qtyValues[index];
+        }
+      } else {
+        // Use the TPS suggestedQty (which is based on units_to_make)
+        // This preserves the accurate TPS forecast values
+        if (product.suggestedQty > 0) {
+          newQtyValues[index] = product.suggestedQty;
         }
       }
     });
@@ -1580,24 +1709,31 @@ const NewShipment = () => {
   // Filter products based on search term
   // This is computed directly, not memoized, to ensure immediate updates
   const getFilteredProducts = () => {
-    // If no search term or empty, return all products
+    // IMPORTANT: Add _originalIndex to ALL products so qtyValues lookup works after filtering
+    const productsWithIndex = products.map((product, index) => ({
+      ...product,
+      _originalIndex: index, // Store original position in products array for qtyValues lookup
+    }));
+    
+    // If no search term or empty, return all products with index
     if (!searchTerm || searchTerm.trim() === '') {
       console.log(`🔍 Search empty, returning all ${products.length} products`);
-      return products;
+      return productsWithIndex;
     }
     
     const searchLower = searchTerm.toLowerCase().trim();
     
-    // If search is empty after trim, return all products
+    // If search is empty after trim, return all products with index
     if (searchLower === '') {
-      return products;
+      return productsWithIndex;
     }
     
     // Split into words for AND logic
     const searchWords = searchLower.split(/\s+/).filter(w => w.length > 0);
     console.log(`🔍 Searching for words: [${searchWords.join(', ')}] in ${products.length} products`);
     
-    const filtered = products.filter(product => {
+    // Filter products but preserve _originalIndex
+    const filtered = productsWithIndex.filter(product => {
       // Create a single searchable string from all relevant fields
       const searchableText = [
         product.brand || '',
@@ -1744,276 +1880,39 @@ const NewShipment = () => {
                 )}
               </div>
 
-              {/* Right: Forecast Range and Search Input */}
+              {/* Right: DOI Settings, Sort, and Search Input */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-                {/* Forecast Range */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', position: 'relative' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <svg
-                      ref={doiIconRef}
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                      onMouseEnter={() => setShowDOITooltip(true)}
-                      onMouseLeave={() => {
-                        if (!isTooltipPinned) {
-                          setShowDOITooltip(false);
-                        }
-                      }}
-                      onClick={() => {
-                        setIsTooltipPinned(!isTooltipPinned);
-                        setShowDOITooltip(true);
-                      }}
-                      style={{ cursor: 'pointer', flexShrink: 0, display: 'block' }}
-                      role="button"
-                      aria-label="Forecast Range info"
-                    >
-                      <defs>
-                        <linearGradient id="infoGradient" x1="12" y1="0" x2="12" y2="24" gradientUnits="userSpaceOnUse">
-                          <stop stopColor="#3B82F6" />
-                          <stop offset="1" stopColor="#1D4ED8" />
-                        </linearGradient>
-                      </defs>
-                      <circle cx="12" cy="12" r="11" fill="url(#infoGradient)" stroke="#1E3A8A" strokeWidth="1" />
-                      <rect x="11.25" y="10" width="1.5" height="6" rx="0.75" fill="#FFFFFF" />
-                      <rect x="11.25" y="6" width="1.5" height="1.5" rx="0.75" fill="#FFFFFF" />
-                    </svg>
-                    <span style={{ fontSize: '14px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
-                      Forecast Range
-                    </span>
-                  </div>
-                  
-                  {/* Forecast Range Tooltip */}
-                  {showDOITooltip && (
-                    <div
-                      ref={doiTooltipRef}
-                      onMouseEnter={() => setShowDOITooltip(true)}
-                      onMouseLeave={() => {
-                        if (!isTooltipPinned) {
-                          setShowDOITooltip(false);
-                        }
-                      }}
-                      style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: '0',
-                        marginTop: '8px',
-                        backgroundColor: '#FFFFFF',
-                        borderRadius: '6px',
-                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                        padding: '12px',
-                        width: '360px',
-                        zIndex: 10000,
-                        boxSizing: 'border-box',
-                        border: '1px solid #E5E7EB',
-                      }}
-                    >
-                      {/* Arrow pointing up - aligned with icon center */}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '-6px',
-                          left: '8px',
-                          transform: 'translateX(-50%) rotate(45deg)',
-                          width: '12px',
-                          height: '12px',
-                          backgroundColor: '#FFFFFF',
-                          borderLeft: '1px solid #E5E7EB',
-                          borderTop: '1px solid #E5E7EB',
-                        }}
-                      />
-                      
-                      {/* Header with icon and title */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
-                        <svg 
-                          width="20" 
-                          height="20" 
-                          viewBox="0 0 24 24" 
-                          fill="none" 
-                          xmlns="http://www.w3.org/2000/svg"
-                          style={{ flexShrink: 0 }}
-                        >
-                          {/* Calendar */}
-                          <rect x="3" y="4" width="18" height="18" rx="2" stroke="#2563EB" strokeWidth="2" fill="none"/>
-                          <line x1="8" y1="2" x2="8" y2="6" stroke="#2563EB" strokeWidth="2" strokeLinecap="round"/>
-                          <line x1="16" y1="2" x2="16" y2="6" stroke="#2563EB" strokeWidth="2" strokeLinecap="round"/>
-                          <line x1="3" y1="10" x2="21" y2="10" stroke="#2563EB" strokeWidth="2"/>
-                          {/* Clock inside calendar */}
-                          <circle cx="12" cy="15" r="4" stroke="#2563EB" strokeWidth="1.5" fill="none"/>
-                          <line x1="12" y1="15" x2="12" y2="13" stroke="#2563EB" strokeWidth="1.5" strokeLinecap="round"/>
-                          <line x1="12" y1="15" x2="13.5" y2="15" stroke="#2563EB" strokeWidth="1.5" strokeLinecap="round"/>
-                        </svg>
-                        <h3 style={{ 
-                          fontSize: '16px', 
-                          fontWeight: 600, 
-                          color: '#111827', 
-                          margin: 0 
-                        }}>
-                          Forecast Range Guide
-                        </h3>
-                      </div>
-                      
-                      {/* Body text */}
-                      <div style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5', marginBottom: '4px' }}>
-                        <p style={{ margin: 0 }}>
-                          The Forecast Range determines the future period for calculating inventory needs. It sets the target date for your{' '}
-                          <span style={{ color: '#2563EB', fontWeight: 500 }}>DOI Goal</span>
-                          {' '}(Days of Inventory), the number of days your inventory will last based on sales data.
-                        </p>
-                        <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#6B7280' }}>
-                          This range actively manipulates the DOI Goal and products react accordingly to help you maintain optimal inventory levels.
-                        </p>
-                      </div>
-                      
-                      {/* Recommended Range section */}
-                      <div style={{ marginBottom: '4px' }}>
-                        <span style={{ 
-                          fontSize: '14px', 
-                          fontWeight: 600, 
-                          color: '#2563EB'
-                        }}>
-                          Recommended Range:{' '}
-                        </span>
-                        <span style={{ 
-                          fontSize: '14px', 
-                          color: '#2563EB',
-                          lineHeight: '1.5'
-                        }}>
-                          90-180 days for optimal coverage and planning flexibility.
-                        </span>
-                      </div>
-                      
-                      {/* View Date Calculation Info */}
-                      <div 
-                        onClick={() => setShowDateCalculationInfo(!showDateCalculationInfo)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          cursor: 'pointer',
-                          color: '#6B7280',
-                          fontSize: '14px',
-                          paddingTop: '4px',
-                          marginTop: '4px',
-                          borderTop: '1px solid #E5E7EB',
-                        }}
-                      >
-                        <span>View Date Calculation Info</span>
-                        <svg 
-                          width="16" 
-                          height="16" 
-                          viewBox="0 0 24 24" 
-                          fill="none" 
-                          xmlns="http://www.w3.org/2000/svg"
-                          style={{
-                            transform: showDateCalculationInfo ? 'rotate(180deg)' : 'rotate(0deg)',
-                            transition: 'transform 0.2s',
-                          }}
-                        >
-                          <path 
-                            d="M6 9L12 15L18 9" 
-                            stroke="currentColor" 
-                            strokeWidth="2" 
-                            strokeLinecap="round" 
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      </div>
-                      
-                      {/* Expanded Date Calculation Info */}
-                      {showDateCalculationInfo && (
-                        <div style={{ 
-                          marginTop: '12px',
-                        }}>
-                          {/* Formula */}
-                          <div style={{
-                            fontSize: '14px',
-                            color: '#111827',
-                            fontWeight: 400,
-                            marginBottom: '12px',
-                            lineHeight: '1.5'
-                          }}>
-                            DOI Goal Date = Current Date + Forecast Range
-                          </div>
-                          
-                          {/* Pro Tip Box */}
-                          <div style={{
-                            backgroundColor: '#F3E8FF',
-                            borderRadius: '8px',
-                            padding: '12px',
-                            border: '1px solid #E9D5FF'
-                          }}>
-                            {/* Pro Tip Header */}
-                            <div style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              marginBottom: '8px'
-                            }}>
-                              <svg 
-                                width="16" 
-                                height="16" 
-                                viewBox="0 0 24 24" 
-                                fill="none" 
-                                xmlns="http://www.w3.org/2000/svg"
-                                style={{ flexShrink: 0 }}
-                              >
-                                <path 
-                                  d="M9 21c0 .5.4 1 1 1h4c.6 0 1-.5 1-1v-1H9v1zm3-19C8.1 2 5 5.1 5 9c0 2.4 1.2 4.5 3 5.7V17c0 .5.4 1 1 1h6c.6 0 1-.5 1-1v-2.3c1.8-1.3 3-3.4 3-5.7 0-3.9-3.1-7-7-7z" 
-                                  fill="#9333EA"
-                                />
-                              </svg>
-                              <span style={{
-                                fontSize: '14px',
-                                fontWeight: 600,
-                                color: '#9333EA'
-                              }}>
-                                Pro Tip:
-                              </span>
-                            </div>
-                            
-                            {/* Pro Tip Body */}
-                            <div style={{
-                              fontSize: '14px',
-                              color: '#9333EA',
-                              lineHeight: '1.5'
-                            }}>
-                              Set your range to cover <strong>Lead Time</strong> + <strong>Manufacturing Cycle</strong> + <strong>Safety Buffer</strong>. This ensures you never run out of stock before the next shipment arrives.
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  <input
-                    type="text"
-                    value={forecastRange}
-                    onChange={(e) => setForecastRange(e.target.value)}
+                {/* DOI Settings Popover */}
+                <DOISettingsPopover
+                  isDarkMode={isDarkMode}
+                  onSettingsChange={handleDoiSettingsChange}
+                />
+
+                {/* Sort Dropdown */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '14px', fontWeight: 400, color: '#94a3b8' }}>Sort</span>
+                  <select
+                    value={sortOption}
+                    onChange={(e) => setSortOption(e.target.value)}
                     style={{
-                      width: '80px',
-                      height: '32px',
-                      padding: '6px 12px',
+                      backgroundColor: '#1e293b',
+                      color: '#fff',
+                      border: '1px solid #334155',
                       borderRadius: '6px',
-                      border: '1px solid #D1D5DB',
-                      backgroundColor: '#FFFFFF',
-                      color: '#111827',
+                      padding: '6px 28px 6px 12px',
                       fontSize: '14px',
-                      textAlign: 'center',
-                      outline: 'none',
-                      boxSizing: 'border-box',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      appearance: 'none',
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'right 8px center',
                     }}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = '#3B82F6';
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = '#D1D5DB';
-                    }}
-                  />
-                  <span style={{ fontSize: '14px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
-                    days
-                  </span>
+                  >
+                    <option value="doi">DOI (Low → High)</option>
+                    <option value="qty">QTY (High → Low)</option>
+                    <option value="name">Name (A → Z)</option>
+                  </select>
                 </div>
 
                 {/* Search Input */}
@@ -3006,6 +2905,7 @@ const NewShipment = () => {
         }}
         selectedRow={selectedRow}
         forecastRange={parseInt(forecastRange) || 150}
+        doiSettings={doiSettingsValues}
         labelsAvailable={(() => {
           if (!selectedRow?.label_location) return null;
           const labelLoc = selectedRow.label_location;
