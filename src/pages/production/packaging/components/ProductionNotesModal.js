@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
-const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote, onSaveNote, isDarkMode }) => {
+const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote, onSaveNote, isDarkMode, hideFooter = false }) => {
   const { isDarkMode: themeDarkMode } = useTheme();
   const darkMode = isDarkMode ?? themeDarkMode ?? false;
   const [isAddingNote, setIsAddingNote] = useState(false);
@@ -383,10 +383,70 @@ const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote,
                 />
               </div>
             )}
+
+            {/* Buttons outside container for mobile view */}
+            {isAddingNote && hideFooter && (
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: '10px',
+                  width: '100%',
+                  maxWidth: '592px',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={handleCancelNote}
+                  style={{
+                    width: '80px',
+                    height: '23px',
+                    borderRadius: '4px',
+                    border: `1px solid ${darkMode ? '#4B5563' : '#D1D5DB'}`,
+                    backgroundColor: darkMode ? '#374151' : '#FFFFFF',
+                    color: darkMode ? '#E5E7EB' : '#374151',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    padding: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveNote}
+                  disabled={!newNoteText.trim()}
+                  style={{
+                    width: '80px',
+                    height: '23px',
+                    borderRadius: '4px',
+                    border: 'none',
+                    backgroundColor: newNoteText.trim() ? '#2563EB' : '#9CA3AF',
+                    color: '#FFFFFF',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: newNoteText.trim() ? 'pointer' : 'not-allowed',
+                    opacity: newNoteText.trim() ? 1 : 0.6,
+                    padding: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  Comment
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Footer with Cancel and Save Changes buttons - Only visible when isAddingNote is true */}
-          {isAddingNote && (
+          {/* Footer with Cancel and Comment buttons - Only visible when isAddingNote is true */}
+          {isAddingNote && !hideFooter && (
             <div
               style={{
                 display: 'flex',
@@ -407,7 +467,7 @@ const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote,
               <div
                 style={{
                   display: 'flex',
-                  justifyContent: 'flex-end',
+                  justifyContent: 'space-between',
                   gap: '10px',
                 }}
               >
@@ -415,14 +475,20 @@ const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote,
                 type="button"
                 onClick={handleCancelNote}
                 style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: '6px',
+                  width: '80px',
+                  height: '23px',
+                  borderRadius: '4px',
                   border: `1px solid ${darkMode ? '#4B5563' : '#D1D5DB'}`,
                   backgroundColor: darkMode ? '#374151' : '#FFFFFF',
                   color: darkMode ? '#E5E7EB' : '#374151',
                   fontSize: '14px',
                   fontWeight: 500,
                   cursor: 'pointer',
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxSizing: 'border-box',
                 }}
               >
                 Cancel
@@ -432,8 +498,9 @@ const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote,
                 onClick={handleSaveNote}
                 disabled={!newNoteText.trim()}
                 style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: '6px',
+                  width: '80px',
+                  height: '23px',
+                  borderRadius: '4px',
                   border: 'none',
                   backgroundColor: newNoteText.trim() ? '#2563EB' : '#9CA3AF',
                   color: '#FFFFFF',
@@ -441,6 +508,11 @@ const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote,
                   fontWeight: 500,
                   cursor: newNoteText.trim() ? 'pointer' : 'not-allowed',
                   opacity: newNoteText.trim() ? 1 : 0.6,
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxSizing: 'border-box',
                 }}
               >
                 Comment

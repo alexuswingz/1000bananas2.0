@@ -1412,6 +1412,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
               }));
             }}
             isDarkMode={isDarkMode}
+            hideFooter={isMobile}
           />
         )}
 
