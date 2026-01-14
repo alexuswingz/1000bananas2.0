@@ -679,7 +679,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
   if (isMobile) {
     return (
       <>
-        <div className="w-full" style={{ padding: '0 1rem' }}>
+        <div className="w-full" style={{ padding: '0 1rem', boxSizing: 'border-box' }}>
           {finalData.length === 0 ? (
             <div
               className={`px-6 py-6 text-center text-sm ${themeClasses.textSecondary}`}
@@ -687,7 +687,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
               No data available.
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '1rem', width: '100%' }}>
               {finalData.map((row, index) => {
                 const status = row.status || 'Not Started';
                 const statusColor = getStatusColor(status);
@@ -712,7 +712,6 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                       display: 'flex',
                       flexDirection: 'column',
                       width: '100%',
-                      maxWidth: '343px',
                       minHeight: '150px',
                       borderRadius: '12px',
                       border: lastMovedIndex === index ? '2px solid #007AFF' : (draggedOverRowIndex === index ? '1px solid #007AFF' : '1px solid #E5E7EB'),
@@ -881,8 +880,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                       style={{
                         display: 'flex',
                         flexDirection: 'row',
-                        width: '100%',
-                        maxWidth: isSortMode ? '295px' : '319px',
+                        width: isSortMode ? 'calc(100% - 28px)' : 'calc(100% - 4px)',
                         height: '45px',
                         marginLeft: isSortMode ? '28px' : '4px',
                         backgroundColor: '#F9FAFB',
@@ -894,7 +892,6 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                         paddingLeft: '16px',
                         gap: '16px',
                         boxSizing: 'border-box',
-                        transition: 'max-width 0.2s ease',
                       }}
                     >
                       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid #E5E7EB', paddingRight: '16px' }}>
