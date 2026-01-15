@@ -2500,8 +2500,26 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                         overflow: 'hidden',
                       }}
                     >
-                      {/* Show Split Product option for all products (parent and split items) */}
-                      {product.qty > 1 && (
+                      {/* Show Split Product option - for split products, only on the one with highest qty (parent) */}
+                      {product.qty > 1 && (() => {
+                        // If this is not a split product, show the button
+                        if (!product.splitTag) return true;
+                        
+                        // If this is a split product, only show if it has the highest qty among siblings
+                        const originalId = product.originalId || product.id;
+                        const siblingProducts = products.filter(p => {
+                          const pOriginalId = p.originalId || p.id;
+                          return pOriginalId === originalId && p.splitTag;
+                        });
+                        
+                        if (siblingProducts.length <= 1) return true; // Only one split, show it
+                        
+                        // Find the max qty among siblings
+                        const maxQty = Math.max(...siblingProducts.map(p => p.qty));
+                        
+                        // Only show on the product with the highest qty (parent)
+                        return product.qty === maxQty;
+                      })() && (
                         <button
                           type="button"
                           onClick={() => handleMenuAction('split', product)}
