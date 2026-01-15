@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 import SortFormulasFilterDropdown from './SortFormulasFilterDropdown';
+import { showInfoToast } from '../../../../utils/notifications';
 
 // Helper: Convert product size to gallons per unit
 const sizeToGallons = (size) => {
@@ -876,6 +877,10 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
       setSelectedFormula(formula);
       setFirstBatchQty(1); // Always set first batch to 1
       setIsSplitModalOpen(true);
+    } else if (action === 'undoSplit') {
+      handleUndoSplit(formula);
+    } else if (action === 'undoAllSplits') {
+      handleUndoAllSplits(formula);
     }
     setOpenMenuIndex(null);
   };
@@ -1005,6 +1010,162 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
     }
     
     handleCloseSplitModal();
+  };
+
+  // Helper function to check if a formula has splits
+  const hasSplits = (formula) => {
+    if (!formula) return false;
+    const formulaName = formula.formula;
+    // Count how many split formulas share this formula name
+    const splitCount = formulas.filter(f => 
+      f.formula === formulaName && f.splitTag
+    ).length;
+    return splitCount > 0;
+  };
+
+  // Handler for undoing a single split (from a split item)
+  const handleUndoSplit = (splitFormula) => {
+    if (!splitFormula || !splitFormula.splitTag) return;
+    
+    const formulaName = splitFormula.formula;
+    
+    // Find all split formulas with the same formula name
+    const allSplitFormulas = formulas.filter(f => 
+      f.formula === formulaName && f.splitTag
+    );
+    
+    if (allSplitFormulas.length === 0) return;
+    
+    // Calculate the combined quantity and volume
+    const combinedQty = allSplitFormulas.reduce((sum, f) => sum + (f.qty || 0), 0);
+    const combinedVolume = allSplitFormulas.reduce((sum, f) => sum + (f.volume || 0), 0);
+    
+    // Find the first split formula to use as template
+    const templateFormula = allSplitFormulas[0];
+    
+    // Get the original ID (from the first split's originalId, or generate a new one)
+    const originalId = templateFormula.originalId || templateFormula.id;
+    
+    // Create the merged formula (remove splitTag and originalId)
+    const mergedFormula = {
+      ...templateFormula,
+      id: originalId,
+      qty: combinedQty,
+      volume: Math.round(combinedVolume * 100) / 100,
+      splitTag: undefined,
+      originalId: undefined,
+    };
+    
+    // Remove all split formulas and add the merged formula
+    const newFormulas = formulas.filter(f => 
+      f.formula !== formulaName || !f.splitTag
+    );
+    
+    // Find the position of the first split formula to insert the merged formula there
+    const firstSplitIndex = formulas.findIndex(f => 
+      f.formula === formulaName && f.splitTag
+    );
+    
+    if (firstSplitIndex !== -1) {
+      newFormulas.splice(firstSplitIndex, 0, mergedFormula);
+    } else {
+      newFormulas.push(mergedFormula);
+    }
+    
+    setFormulas(newFormulas);
+    saveFormulaOrder(newFormulas);
+    
+    // Remove split from localStorage
+    if (shipmentId) {
+      try {
+        const storedSplits = localStorage.getItem(`sortFormulasSplits_${shipmentId}`);
+        if (storedSplits) {
+          const existingSplits = JSON.parse(storedSplits);
+          const filteredSplits = existingSplits.filter(s => s.formulaName !== formulaName);
+          localStorage.setItem(`sortFormulasSplits_${shipmentId}`, JSON.stringify(filteredSplits));
+        }
+      } catch (error) {
+        console.error('Error removing split from localStorage:', error);
+      }
+    }
+    
+    // Show info toast
+    showInfoToast(`Split undone for ${formulaName}`, `Combined ${allSplitFormulas.length} split item(s) back into one.`);
+  };
+
+  // Handler for undoing all splits (from a parent item or any split item)
+  const handleUndoAllSplits = (formula) => {
+    if (!formula) return;
+    
+    // If it's a split item, use the same logic as handleUndoSplit
+    if (formula.splitTag) {
+      handleUndoSplit(formula);
+      return;
+    }
+    
+    // If it's not a split item, find all splits with the same formula name
+    const formulaName = formula.formula;
+    
+    // Find all split formulas with this formula name
+    const allSplitFormulas = formulas.filter(f => 
+      f.formula === formulaName && f.splitTag
+    );
+    
+    if (allSplitFormulas.length === 0) return;
+    
+    // Calculate the combined quantity and volume
+    const combinedQty = allSplitFormulas.reduce((sum, f) => sum + (f.qty || 0), 0);
+    const combinedVolume = allSplitFormulas.reduce((sum, f) => sum + (f.volume || 0), 0);
+    
+    // Use the first split formula as template
+    const templateFormula = allSplitFormulas[0];
+    const originalId = templateFormula.originalId || templateFormula.id;
+    
+    // Create the merged formula
+    const mergedFormula = {
+      ...templateFormula,
+      id: originalId,
+      qty: combinedQty,
+      volume: Math.round(combinedVolume * 100) / 100,
+      splitTag: undefined,
+      originalId: undefined,
+    };
+    
+    // Remove all split formulas and add the merged formula
+    const newFormulas = formulas.filter(f => 
+      f.formula !== formulaName || !f.splitTag
+    );
+    
+    // Find the position of the first split formula to insert the merged formula there
+    const firstSplitIndex = formulas.findIndex(f => 
+      f.formula === formulaName && f.splitTag
+    );
+    
+    if (firstSplitIndex !== -1) {
+      newFormulas.splice(firstSplitIndex, 0, mergedFormula);
+    } else {
+      newFormulas.push(mergedFormula);
+    }
+    
+    setFormulas(newFormulas);
+    saveFormulaOrder(newFormulas);
+    
+    // Remove split from localStorage
+    if (shipmentId) {
+      try {
+        const storedSplits = localStorage.getItem(`sortFormulasSplits_${shipmentId}`);
+        if (storedSplits) {
+          const existingSplits = JSON.parse(storedSplits);
+          const filteredSplits = existingSplits.filter(s => s.formulaName !== formulaName);
+          localStorage.setItem(`sortFormulasSplits_${shipmentId}`, JSON.stringify(filteredSplits));
+        }
+      } catch (error) {
+        console.error('Error removing split from localStorage:', error);
+      }
+    }
+    
+    // Show info toast
+    showInfoToast(`All splits undone for ${formulaName}`, `Combined ${allSplitFormulas.length} split item(s) back into one.`);
   };
 
   // Second batch quantity is always the remaining (total - 1)
@@ -1764,80 +1925,140 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
                         overflow: 'hidden',
                       }}
                     >
-                      <button
-                        type="button"
-                        onClick={() => handleMenuAction('split', formula)}
-                        style={{
-                          width: '100%',
-                          padding: '10px 16px',
-                          textAlign: 'left',
-                          background: 'transparent',
-                          border: 'none',
-                          color: isDarkMode ? '#E5E7EB' : '#374151',
-                          fontSize: '14px',
-                          fontWeight: 400,
-                          cursor: 'pointer',
-                          transition: 'background-color 0.2s',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '12px',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                        }}
-                      >
-                        <svg 
-                          width="16" 
-                          height="16" 
-                          viewBox="0 0 16 16" 
-                          fill="none" 
-                          xmlns="http://www.w3.org/2000/svg"
-                          style={{ flexShrink: 0 }}
+                      {/* Show Split Formula option for all formulas (parent and split items) */}
+                      {formula.qty > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleMenuAction('split', formula)}
+                          style={{
+                            width: '100%',
+                            padding: '10px 16px',
+                            textAlign: 'left',
+                            background: 'transparent',
+                            border: 'none',
+                            color: isDarkMode ? '#E5E7EB' : '#374151',
+                            fontSize: '14px',
+                            fontWeight: 400,
+                            cursor: 'pointer',
+                            transition: 'background-color 0.2s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
                         >
-                          {/* Vertical line */}
-                          <line 
-                            x1="8" 
-                            y1="10" 
-                            x2="8" 
-                            y2="14" 
-                            stroke="currentColor" 
-                            strokeWidth="1.5" 
-                            strokeLinecap="round"
-                          />
-                          {/* Left branch pointing up and left */}
-                          <line 
-                            x1="8" 
-                            y1="10" 
-                            x2="4.5" 
-                            y2="6.5" 
-                            stroke="currentColor" 
-                            strokeWidth="1.5" 
-                            strokeLinecap="round"
-                          />
-                          <polygon 
-                            points="4.5,6.5 4,6 3.5,6.5" 
-                            fill="currentColor"
-                          />
-                          {/* Right branch pointing up and right */}
-                          <line 
-                            x1="8" 
-                            y1="10" 
-                            x2="11.5" 
-                            y2="6.5" 
-                            stroke="currentColor" 
-                            strokeWidth="1.5" 
-                            strokeLinecap="round"
-                          />
-                          <polygon 
-                            points="11.5,6.5 12,6 12.5,6.5" 
-                            fill="currentColor"
-                          />
-                        </svg>
-                        <span>Split Formula</span>
-                      </button>
+                          <svg 
+                            width="16" 
+                            height="16" 
+                            viewBox="0 0 16 16" 
+                            fill="none" 
+                            xmlns="http://www.w3.org/2000/svg"
+                            style={{ flexShrink: 0 }}
+                          >
+                            {/* Vertical line */}
+                            <line 
+                              x1="8" 
+                              y1="10" 
+                              x2="8" 
+                              y2="14" 
+                              stroke="currentColor" 
+                              strokeWidth="1.5" 
+                              strokeLinecap="round"
+                            />
+                            {/* Left branch pointing up and left */}
+                            <line 
+                              x1="8" 
+                              y1="10" 
+                              x2="4.5" 
+                              y2="6.5" 
+                              stroke="currentColor" 
+                              strokeWidth="1.5" 
+                              strokeLinecap="round"
+                            />
+                            <polygon 
+                              points="4.5,6.5 4,6 3.5,6.5" 
+                              fill="currentColor"
+                            />
+                            {/* Right branch pointing up and right */}
+                            <line 
+                              x1="8" 
+                              y1="10" 
+                              x2="11.5" 
+                              y2="6.5" 
+                              stroke="currentColor" 
+                              strokeWidth="1.5" 
+                              strokeLinecap="round"
+                            />
+                            <polygon 
+                              points="11.5,6.5 12,6 12.5,6.5" 
+                              fill="currentColor"
+                            />
+                          </svg>
+                          <span>Split Formula</span>
+                        </button>
+                      )}
+                      
+                      {/* Show Undo All Splits option for split items */}
+                      {formula.splitTag && (
+                        <button
+                          type="button"
+                          onClick={() => handleMenuAction('undoAllSplits', formula)}
+                          style={{
+                            width: '100%',
+                            padding: '10px 16px',
+                            textAlign: 'left',
+                            background: 'transparent',
+                            border: 'none',
+                            color: isDarkMode ? '#E5E7EB' : '#374151',
+                            fontSize: '14px',
+                            fontWeight: 400,
+                            cursor: 'pointer',
+                            transition: 'background-color 0.2s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
+                        >
+                          <svg 
+                            width="16" 
+                            height="16" 
+                            viewBox="0 0 16 16" 
+                            fill="none" 
+                            xmlns="http://www.w3.org/2000/svg"
+                            style={{ flexShrink: 0 }}
+                          >
+                            {/* Arrow pointing left (undo icon) */}
+                            <path 
+                              d="M3 8L1 6L3 4" 
+                              stroke="currentColor" 
+                              strokeWidth="1.5" 
+                              strokeLinecap="round" 
+                              strokeLinejoin="round"
+                            />
+                            <line 
+                              x1="1" 
+                              y1="6" 
+                              x2="15" 
+                              y2="6" 
+                              stroke="currentColor" 
+                              strokeWidth="1.5" 
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                          <span>Undo All Splits</span>
+                        </button>
+                      )}
                     </div>
                   )}
                 </td>

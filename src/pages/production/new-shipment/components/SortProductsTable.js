@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 import SortProductsFilterDropdown from './SortProductsFilterDropdown';
+import { showInfoToast } from '../../../../utils/notifications';
 
 const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipmentId = null }) => {
   const { isDarkMode } = useTheme();
@@ -28,6 +29,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [firstBatchQty, setFirstBatchQty] = useState(1);
   const splitsLoadedRef = useRef(null); // Track which shipmentId we've loaded splits for
+  const isUndoingSplitRef = useRef(false); // Flag to prevent reloading splits during undo
 
   // Transform shipment products into table format
   const [products, setProducts] = useState([]);
@@ -96,6 +98,12 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
 
   // Update products when shipmentProducts prop changes
   useEffect(() => {
+    // Don't reload if we're in the middle of undoing a split
+    if (isUndoingSplitRef.current) {
+      isUndoingSplitRef.current = false;
+      return;
+    }
+    
     if (shipmentProducts && shipmentProducts.length > 0) {
       const transformedProducts = shipmentProducts.map((product, index) => ({
         id: product.id || product.catalogId || product.catalog_id || `product_${index}`,
@@ -1246,6 +1254,10 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
       const step = getIncrementStep(product.size);
       setFirstBatchQty(step); // Set to the increment step (e.g., 4 for Gallons, 1 for others)
       setIsSplitModalOpen(true);
+    } else if (action === 'undoSplit') {
+      handleUndoSplit(product);
+    } else if (action === 'undoAllSplits') {
+      handleUndoAllSplits(product);
     }
     setOpenMenuIndex(null);
   };
@@ -1423,6 +1435,268 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     }
     
     handleCloseSplitModal();
+  };
+
+  // Helper function to check if a product has splits (is a parent with split children)
+  // For split items, check if there are other splits with the same originalId
+  // For non-split items, check if there are any split items with this id as originalId
+  const hasSplits = (product) => {
+    if (!product) return false;
+    const originalId = product.originalId || product.id;
+    // Count how many split products share this originalId
+    const splitCount = products.filter(p => {
+      const pOriginalId = p.originalId || p.id;
+      return pOriginalId === originalId && p.splitTag;
+    }).length;
+    return splitCount > 0;
+  };
+
+  // Helper function to get all split products for a given product
+  const getSplitProducts = (product) => {
+    if (!product) return [];
+    const originalId = product.originalId || product.id;
+    return products.filter(p => {
+      const pOriginalId = p.originalId || p.id;
+      return pOriginalId === originalId && p.splitTag;
+    });
+  };
+
+  // Handler for undoing a single split (from a split item)
+  const handleUndoSplit = (splitProduct) => {
+    if (!splitProduct || !splitProduct.splitTag) return;
+    
+    // Get the stable identifier (brand + product + size) without splitTag - this is the key
+    const fullIdentifier = getProductIdentifier(splitProduct);
+    const stableIdentifier = splitProduct.splitTag 
+      ? fullIdentifier.replace(`::${splitProduct.splitTag}`, '')
+      : fullIdentifier;
+    
+    // Find all split products with the same stable identifier (like formulas use formula name)
+    const allSplitProducts = products.filter(p => {
+      if (!p.splitTag) return false;
+      const pFullIdentifier = getProductIdentifier(p);
+      const pStableIdentifier = p.splitTag 
+        ? pFullIdentifier.replace(`::${p.splitTag}`, '')
+        : pFullIdentifier;
+      return pStableIdentifier === stableIdentifier;
+    });
+    
+    if (allSplitProducts.length === 0) return;
+    
+    // Calculate the combined quantity and volume
+    const combinedQty = allSplitProducts.reduce((sum, p) => sum + (p.qty || 0), 0);
+    const combinedVolume = allSplitProducts.reduce((sum, p) => sum + (p.volume || 0), 0);
+    
+    // Find the first split product to use as template
+    const templateProduct = allSplitProducts[0];
+    const originalId = templateProduct.originalId || templateProduct.id.replace(/_split_\d+$/, '');
+    
+    // Create the merged product (remove splitTag and originalId)
+    const mergedProduct = {
+      ...templateProduct,
+      id: originalId,
+      qty: combinedQty,
+      volume: Math.round(combinedVolume * 100) / 100,
+      splitTag: undefined,
+      originalId: undefined,
+    };
+    
+    // Remove all split products with this stable identifier (simple filter like formulas)
+    const newProducts = products.filter(p => {
+      if (!p.splitTag) return true; // Keep all non-split products
+      const pFullIdentifier = getProductIdentifier(p);
+      const pStableIdentifier = p.splitTag 
+        ? pFullIdentifier.replace(`::${p.splitTag}`, '')
+        : pFullIdentifier;
+      // Remove if it matches our stable identifier
+      return pStableIdentifier !== stableIdentifier;
+    });
+    
+    // Find the position of the first split product to insert the merged product there
+    const firstSplitIndex = products.findIndex(p => {
+      if (!p.splitTag) return false;
+      const pFullIdentifier = getProductIdentifier(p);
+      const pStableIdentifier = p.splitTag 
+        ? pFullIdentifier.replace(`::${p.splitTag}`, '')
+        : pFullIdentifier;
+      return pStableIdentifier === stableIdentifier;
+    });
+    
+    // Insert merged product at the correct position (don't mutate)
+    let finalProducts;
+    if (firstSplitIndex !== -1) {
+      // Count how many non-split products come before the first split
+      let insertIndex = 0;
+      for (let i = 0; i < firstSplitIndex; i++) {
+        if (!products[i].splitTag) {
+          insertIndex++;
+        }
+      }
+      // Create new array with merged product inserted
+      finalProducts = [
+        ...newProducts.slice(0, insertIndex),
+        mergedProduct,
+        ...newProducts.slice(insertIndex)
+      ];
+    } else {
+      finalProducts = [...newProducts, mergedProduct];
+    }
+    
+    // Set flag to prevent useEffect from reloading splits
+    isUndoingSplitRef.current = true;
+    
+    // Remove split from localStorage FIRST, before updating state
+    if (shipmentId) {
+      try {
+        const storedSplits = localStorage.getItem(`sortProductsSplits_${shipmentId}`);
+        if (storedSplits) {
+          const existingSplits = JSON.parse(storedSplits);
+          const filteredSplits = existingSplits.filter(s => s.stableIdentifier !== stableIdentifier);
+          localStorage.setItem(`sortProductsSplits_${shipmentId}`, JSON.stringify(filteredSplits));
+        }
+      } catch (error) {
+        console.error('Error removing split from localStorage:', error);
+      }
+    }
+    
+    // Close menu and clear selection before updating products
+    setOpenMenuIndex(null);
+    setSelectedIndices(new Set());
+    setLastSelectedIndex(null);
+    
+    // Update products state with new array reference
+    setProducts(finalProducts);
+    saveProductOrder(finalProducts);
+    
+    // Clear flag after state update completes
+    setTimeout(() => {
+      isUndoingSplitRef.current = false;
+    }, 200);
+    
+    // Show info toast
+    const productName = `${splitProduct.brand || ''} ${splitProduct.product || ''} ${splitProduct.size || ''}`.trim();
+    showInfoToast(`Split undone for ${productName}`, `Combined ${allSplitProducts.length} split item(s) back into one.`);
+  };
+
+  // Handler for undoing all splits (from a parent item or any split item)
+  // This is the same as handleUndoSplit but called from a parent context
+  const handleUndoAllSplits = (product) => {
+    if (!product) return;
+    
+    // If it's a split item, use the same logic as handleUndoSplit
+    if (product.splitTag) {
+      handleUndoSplit(product);
+      return;
+    }
+    
+    // If it's not a split item, find all splits using the stable identifier
+    const stableIdentifier = getProductIdentifier(product);
+    
+    // Find all split products with this stable identifier
+    const allSplitProducts = products.filter(p => {
+      if (!p.splitTag) return false;
+      const pFullIdentifier = getProductIdentifier(p);
+      const pStableIdentifier = p.splitTag 
+        ? pFullIdentifier.replace(`::${p.splitTag}`, '')
+        : pFullIdentifier;
+      return pStableIdentifier === stableIdentifier;
+    });
+    
+    if (allSplitProducts.length === 0) return;
+    
+    // Calculate the combined quantity and volume
+    const combinedQty = allSplitProducts.reduce((sum, p) => sum + (p.qty || 0), 0);
+    const combinedVolume = allSplitProducts.reduce((sum, p) => sum + (p.volume || 0), 0);
+    
+    // Use the first split product as template
+    const templateProduct = allSplitProducts[0];
+    const originalId = templateProduct.originalId || product.id;
+    
+    // Create the merged product
+    const mergedProduct = {
+      ...templateProduct,
+      id: originalId,
+      qty: combinedQty,
+      volume: Math.round(combinedVolume * 100) / 100,
+      splitTag: undefined,
+      originalId: undefined,
+    };
+    
+    // Remove all split products with this stable identifier (simple filter like formulas)
+    const newProducts = products.filter(p => {
+      if (!p.splitTag) return true; // Keep all non-split products
+      const pFullIdentifier = getProductIdentifier(p);
+      const pStableIdentifier = p.splitTag 
+        ? pFullIdentifier.replace(`::${p.splitTag}`, '')
+        : pFullIdentifier;
+      // Remove if it matches our stable identifier
+      return pStableIdentifier !== stableIdentifier;
+    });
+    
+    // Find the position of the first split product to insert the merged product there
+    const firstSplitIndex = products.findIndex(p => {
+      if (!p.splitTag) return false;
+      const pFullIdentifier = getProductIdentifier(p);
+      const pStableIdentifier = p.splitTag 
+        ? pFullIdentifier.replace(`::${p.splitTag}`, '')
+        : pFullIdentifier;
+      return pStableIdentifier === stableIdentifier;
+    });
+    
+    // Insert merged product at the correct position (don't mutate)
+    let finalProducts;
+    if (firstSplitIndex !== -1) {
+      // Count how many non-split products come before the first split
+      let insertIndex = 0;
+      for (let i = 0; i < firstSplitIndex; i++) {
+        if (!products[i].splitTag) {
+          insertIndex++;
+        }
+      }
+      // Create new array with merged product inserted
+      finalProducts = [
+        ...newProducts.slice(0, insertIndex),
+        mergedProduct,
+        ...newProducts.slice(insertIndex)
+      ];
+    } else {
+      finalProducts = [...newProducts, mergedProduct];
+    }
+    
+    // Set flag to prevent useEffect from reloading splits
+    isUndoingSplitRef.current = true;
+    
+    // Remove split from localStorage FIRST, before updating state
+    if (shipmentId) {
+      try {
+        const storedSplits = localStorage.getItem(`sortProductsSplits_${shipmentId}`);
+        if (storedSplits) {
+          const existingSplits = JSON.parse(storedSplits);
+          const filteredSplits = existingSplits.filter(s => s.stableIdentifier !== stableIdentifier);
+          localStorage.setItem(`sortProductsSplits_${shipmentId}`, JSON.stringify(filteredSplits));
+        }
+      } catch (error) {
+        console.error('Error removing split from localStorage:', error);
+      }
+    }
+    
+    // Close menu and clear selection before updating products
+    setOpenMenuIndex(null);
+    setSelectedIndices(new Set());
+    setLastSelectedIndex(null);
+    
+    // Update products state with new array reference
+    setProducts(finalProducts);
+    saveProductOrder(finalProducts);
+    
+    // Clear flag after state update completes
+    setTimeout(() => {
+      isUndoingSplitRef.current = false;
+    }, 200);
+    
+    // Show info toast
+    const productName = `${product.brand || ''} ${product.product || ''} ${product.size || ''}`.trim();
+    showInfoToast(`All splits undone for ${productName}`, `Combined ${allSplitProducts.length} split item(s) back into one.`);
   };
 
   // Second batch quantity is the remaining (total - firstBatchQty)
@@ -2173,80 +2447,140 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                         overflow: 'hidden',
                       }}
                     >
-                      <button
-                        type="button"
-                        onClick={() => handleMenuAction('split', product)}
-                        style={{
-                          width: '100%',
-                          padding: '10px 16px',
-                          textAlign: 'left',
-                          background: 'transparent',
-                          border: 'none',
-                          color: isDarkMode ? '#E5E7EB' : '#374151',
-                          fontSize: '14px',
-                          fontWeight: 400,
-                          cursor: 'pointer',
-                          transition: 'background-color 0.2s',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '12px',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                        }}
-                      >
-                        <svg 
-                          width="16" 
-                          height="16" 
-                          viewBox="0 0 16 16" 
-                          fill="none" 
-                          xmlns="http://www.w3.org/2000/svg"
-                          style={{ flexShrink: 0 }}
+                      {/* Show Split Product option for all products (parent and split items) */}
+                      {product.qty > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleMenuAction('split', product)}
+                          style={{
+                            width: '100%',
+                            padding: '10px 16px',
+                            textAlign: 'left',
+                            background: 'transparent',
+                            border: 'none',
+                            color: isDarkMode ? '#E5E7EB' : '#374151',
+                            fontSize: '14px',
+                            fontWeight: 400,
+                            cursor: 'pointer',
+                            transition: 'background-color 0.2s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
                         >
-                          {/* Vertical line */}
-                          <line 
-                            x1="8" 
-                            y1="10" 
-                            x2="8" 
-                            y2="14" 
-                            stroke="currentColor" 
-                            strokeWidth="1.5" 
-                            strokeLinecap="round"
-                          />
-                          {/* Left branch pointing up and left */}
-                          <line 
-                            x1="8" 
-                            y1="10" 
-                            x2="4.5" 
-                            y2="6.5" 
-                            stroke="currentColor" 
-                            strokeWidth="1.5" 
-                            strokeLinecap="round"
-                          />
-                          <polygon 
-                            points="4.5,6.5 4,6 3.5,6.5" 
-                            fill="currentColor"
-                          />
-                          {/* Right branch pointing up and right */}
-                          <line 
-                            x1="8" 
-                            y1="10" 
-                            x2="11.5" 
-                            y2="6.5" 
-                            stroke="currentColor" 
-                            strokeWidth="1.5" 
-                            strokeLinecap="round"
-                          />
-                          <polygon 
-                            points="11.5,6.5 12,6 12.5,6.5" 
-                            fill="currentColor"
-                          />
-                        </svg>
-                        <span>Split Product</span>
-                      </button>
+                          <svg 
+                            width="16" 
+                            height="16" 
+                            viewBox="0 0 16 16" 
+                            fill="none" 
+                            xmlns="http://www.w3.org/2000/svg"
+                            style={{ flexShrink: 0 }}
+                          >
+                            {/* Vertical line */}
+                            <line 
+                              x1="8" 
+                              y1="10" 
+                              x2="8" 
+                              y2="14" 
+                              stroke="currentColor" 
+                              strokeWidth="1.5" 
+                              strokeLinecap="round"
+                            />
+                            {/* Left branch pointing up and left */}
+                            <line 
+                              x1="8" 
+                              y1="10" 
+                              x2="4.5" 
+                              y2="6.5" 
+                              stroke="currentColor" 
+                              strokeWidth="1.5" 
+                              strokeLinecap="round"
+                            />
+                            <polygon 
+                              points="4.5,6.5 4,6 3.5,6.5" 
+                              fill="currentColor"
+                            />
+                            {/* Right branch pointing up and right */}
+                            <line 
+                              x1="8" 
+                              y1="10" 
+                              x2="11.5" 
+                              y2="6.5" 
+                              stroke="currentColor" 
+                              strokeWidth="1.5" 
+                              strokeLinecap="round"
+                            />
+                            <polygon 
+                              points="11.5,6.5 12,6 12.5,6.5" 
+                              fill="currentColor"
+                            />
+                          </svg>
+                          <span>Split Product</span>
+                        </button>
+                      )}
+                      
+                      {/* Show Undo All Splits option for split items */}
+                      {product.splitTag && (
+                        <button
+                          type="button"
+                          onClick={() => handleMenuAction('undoAllSplits', product)}
+                          style={{
+                            width: '100%',
+                            padding: '10px 16px',
+                            textAlign: 'left',
+                            background: 'transparent',
+                            border: 'none',
+                            color: isDarkMode ? '#E5E7EB' : '#374151',
+                            fontSize: '14px',
+                            fontWeight: 400,
+                            cursor: 'pointer',
+                            transition: 'background-color 0.2s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
+                        >
+                          <svg 
+                            width="16" 
+                            height="16" 
+                            viewBox="0 0 16 16" 
+                            fill="none" 
+                            xmlns="http://www.w3.org/2000/svg"
+                            style={{ flexShrink: 0 }}
+                          >
+                            {/* Arrow pointing left (undo icon) */}
+                            <path 
+                              d="M3 8L1 6L3 4" 
+                              stroke="currentColor" 
+                              strokeWidth="1.5" 
+                              strokeLinecap="round" 
+                              strokeLinejoin="round"
+                            />
+                            <line 
+                              x1="1" 
+                              y1="6" 
+                              x2="15" 
+                              y2="6" 
+                              stroke="currentColor" 
+                              strokeWidth="1.5" 
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                          <span>Undo All Splits</span>
+                        </button>
+                      )}
                     </div>
                   )}
                 </td>
