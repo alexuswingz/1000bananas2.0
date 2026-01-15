@@ -73,7 +73,6 @@ const SortFormulasFilterDropdown = forwardRef(({
   
   // Universal conditions - apply to ALL filters
   const conditions = [
-    { value: '', label: 'None' },
     { value: 'greaterThan', label: 'Greater than' },
     { value: 'greaterOrEqual', label: 'Greater than or equal to' },
     { value: 'lessThan', label: 'Less than' },
@@ -372,6 +371,7 @@ const SortFormulasFilterDropdown = forwardRef(({
               onFocus={(e) => { e.target.style.borderColor = '#3B82F6'; }}
               onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
             >
+              <option value="">Select condition...</option>
               {conditions.map(c => (
                 <option key={c.value} value={c.value}>{c.label}</option>
               ))}

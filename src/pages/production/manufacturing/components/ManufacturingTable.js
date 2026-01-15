@@ -90,10 +90,6 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
     const strCondition = String(conditionValue || '').toLowerCase();
     
     switch (conditionType) {
-      case 'contains':
-        return strValue.includes(strCondition);
-      case 'notContains':
-        return !strValue.includes(strCondition);
       case 'equals':
         if (isNumeric) {
           return Number(value) === Number(conditionValue);
@@ -104,14 +100,6 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
           return Number(value) !== Number(conditionValue);
         }
         return strValue !== strCondition;
-      case 'startsWith':
-        return strValue.startsWith(strCondition);
-      case 'endsWith':
-        return strValue.endsWith(strCondition);
-      case 'isEmpty':
-        return !value || strValue === '';
-      case 'isNotEmpty':
-        return value && strValue !== '';
       case 'greaterThan':
         return Number(value) > Number(conditionValue);
       case 'lessThan':
@@ -120,6 +108,20 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
         return Number(value) >= Number(conditionValue);
       case 'lessOrEqual':
         return Number(value) <= Number(conditionValue);
+      case 'between':
+        if (conditionValue && conditionValue.includes('-')) {
+          const [min, max] = conditionValue.split('-').map(v => Number(v.trim()));
+          const numValue = Number(value);
+          return numValue >= min && numValue <= max;
+        }
+        return false;
+      case 'notBetween':
+        if (conditionValue && conditionValue.includes('-')) {
+          const [min, max] = conditionValue.split('-').map(v => Number(v.trim()));
+          const numValue = Number(value);
+          return numValue < min || numValue > max;
+        }
+        return true;
       default:
         return true;
     }
@@ -129,6 +131,8 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
     // Apply column filters
     for (const columnKey of Object.keys(filters)) {
       const filter = filters[columnKey];
+      if (!filter) continue; // Skip if filter is null or undefined
+      
       const isNumericColumn = columnKey === 'qty' || columnKey === 'volume';
       
       // Apply value filters (checkbox selections)
@@ -249,6 +253,8 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
               // Check if split row matches column filters
               for (const columnKey of Object.keys(filters)) {
                 const filter = filters[columnKey];
+                if (!filter) continue; // Skip if filter is null or undefined
+                
                 const isNumericColumn = columnKey === 'qty' || columnKey === 'volume';
                 
                 if (filter.selectedValues && filter.selectedValues.size > 0) {
