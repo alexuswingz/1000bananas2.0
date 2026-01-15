@@ -577,10 +577,15 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
     
     const filtersToUse = { ...filters };
     if (filterConfig.filterField && filterConfig.filterCondition && filterConfig.filterValue) {
-      filtersToUse[filterConfig.filterField] = {
+      const filterObj = {
         condition: filterConfig.filterCondition,
         value: filterConfig.filterValue,
       };
+      // Include second value for between conditions
+      if (filterConfig.filterValue2) {
+        filterObj.value2 = filterConfig.filterValue2;
+      }
+      filtersToUse[filterConfig.filterField] = filterObj;
     }
     
     // Update sort config
@@ -607,14 +612,30 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
           const rowValue = String(value || '').toLowerCase();
 
           switch (filter.condition) {
-            case 'equals':
-              return rowValue === filterValue;
-            case 'contains':
-              return rowValue.includes(filterValue);
             case 'greaterThan':
               return rowValue > filterValue;
+            case 'greaterThanOrEqual':
+              return rowValue >= filterValue;
             case 'lessThan':
               return rowValue < filterValue;
+            case 'lessThanOrEqual':
+              return rowValue <= filterValue;
+            case 'isEqual':
+              return rowValue === filterValue;
+            case 'isNotEqual':
+              return rowValue !== filterValue;
+            case 'isBetween':
+              if (filter.value2) {
+                const filterValue2 = filter.value2.toLowerCase();
+                return rowValue >= filterValue && rowValue <= filterValue2;
+              }
+              return true;
+            case 'isNotBetween':
+              if (filter.value2) {
+                const filterValue2 = filter.value2.toLowerCase();
+                return !(rowValue >= filterValue && rowValue <= filterValue2);
+              }
+              return true;
             default:
               return true;
           }
@@ -651,12 +672,17 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
     
     // Update filters
     if (filterConfig.filterField && filterConfig.filterCondition && filterConfig.filterValue) {
+      const filterObj = {
+        condition: filterConfig.filterCondition,
+        value: filterConfig.filterValue,
+      };
+      // Include second value for between conditions
+      if (filterConfig.filterValue2) {
+        filterObj.value2 = filterConfig.filterValue2;
+      }
       setFilters(prev => ({
         ...prev,
-        [filterConfig.filterField]: {
-          condition: filterConfig.filterCondition,
-          value: filterConfig.filterValue,
-        }
+        [filterConfig.filterField]: filterObj
       }));
       // If filters changed but sort wasn't reapplied, clear sorted order
       if (!filterConfig.sortField || !filterConfig.sortOrder) {
@@ -706,14 +732,30 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         const rowValue = String(value || '').toLowerCase();
 
         switch (filter.condition) {
-          case 'equals':
-            return rowValue === filterValue;
-          case 'contains':
-            return rowValue.includes(filterValue);
           case 'greaterThan':
             return rowValue > filterValue;
+          case 'greaterThanOrEqual':
+            return rowValue >= filterValue;
           case 'lessThan':
             return rowValue < filterValue;
+          case 'lessThanOrEqual':
+            return rowValue <= filterValue;
+          case 'isEqual':
+            return rowValue === filterValue;
+          case 'isNotEqual':
+            return rowValue !== filterValue;
+          case 'isBetween':
+            if (filter.value2) {
+              const filterValue2 = filter.value2.toLowerCase();
+              return rowValue >= filterValue && rowValue <= filterValue2;
+            }
+            return true;
+          case 'isNotBetween':
+            if (filter.value2) {
+              const filterValue2 = filter.value2.toLowerCase();
+              return !(rowValue >= filterValue && rowValue <= filterValue2);
+            }
+            return true;
           default:
             return true;
         }
@@ -1703,6 +1745,7 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
   const [filterField, setFilterField] = useState(existingFilter ? existingFilter[0] : '');
   const [filterCondition, setFilterCondition] = useState(existingFilter ? existingFilter[1].condition : '');
   const [filterValue, setFilterValue] = useState(existingFilter ? existingFilter[1].value : '');
+  const [filterValue2, setFilterValue2] = useState(existingFilter ? existingFilter[1].value2 || '' : '');
   
   // State to control if "Filter by condition" section is expanded
   const [isFilterConditionOpen, setIsFilterConditionOpen] = useState(false);
@@ -1759,6 +1802,7 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
     setFilterField('');
     setFilterCondition('');
     setFilterValue('');
+    setFilterValue2('');
     if (columnKey === 'addProducts') {
       setAddProductsFilterValues(defaultAddProductsValues);
     }
@@ -1777,6 +1821,10 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
         filterCondition,
         filterValue,
       };
+      // Include second value for between conditions
+      if (filterCondition === 'isBetween' || filterCondition === 'isNotBetween') {
+        applyData.filterValue2 = filterValue2;
+      }
       if (columnKey === 'addProducts') {
         applyData.addProductsFilterValues = addProductsFilterValues;
       }
@@ -1825,10 +1873,14 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
 
   const filterConditions = [
     { value: '', label: 'Select condition' },
-    { value: 'equals', label: 'Equals' },
-    { value: 'contains', label: 'Contains' },
     { value: 'greaterThan', label: 'Greater than' },
+    { value: 'greaterThanOrEqual', label: 'Greater than or equal to' },
     { value: 'lessThan', label: 'Less than' },
+    { value: 'lessThanOrEqual', label: 'Less than or equal to' },
+    { value: 'isEqual', label: 'Is equal to' },
+    { value: 'isNotEqual', label: 'Is not equal to' },
+    { value: 'isBetween', label: 'Is between' },
+    { value: 'isNotBetween', label: 'Is not between' },
   ];
 
   return (
@@ -2053,7 +2105,13 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
               
               <select
                 value={filterCondition}
-                onChange={(e) => setFilterCondition(e.target.value)}
+                onChange={(e) => {
+                  setFilterCondition(e.target.value);
+                  // Clear second value if condition is not between
+                  if (e.target.value !== 'isBetween' && e.target.value !== 'isNotBetween') {
+                    setFilterValue2('');
+                  }
+                }}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
@@ -2087,6 +2145,23 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
                   backgroundColor: '#FFFFFF',
                 }}
               />
+              {(filterCondition === 'isBetween' || filterCondition === 'isNotBetween') && (
+                <input
+                  type="text"
+                  placeholder="Second value here..."
+                  value={filterValue2}
+                  onChange={(e) => setFilterValue2(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                    color: '#374151',
+                    backgroundColor: '#FFFFFF',
+                  }}
+                />
+              )}
             </div>
           )}
         </div>
