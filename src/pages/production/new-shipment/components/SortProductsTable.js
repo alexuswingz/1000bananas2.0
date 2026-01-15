@@ -2500,7 +2500,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                         overflow: 'hidden',
                       }}
                     >
-                      {/* Show Split Product option for all products with qty > 1 (like SortFormulasTable) */}
+                      {/* Show Split Product option for all products (parent and split items) */}
                       {product.qty > 1 && (
                         <button
                           type="button"
@@ -2578,7 +2578,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                         </button>
                       )}
                       
-                      {/* Show Undo All Splits option for split items (like SortFormulasTable) */}
+                      {/* Show Undo All Splits option for split items */}
                       {product.splitTag && (
                         <button
                           type="button"
@@ -2634,7 +2634,6 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                           <span>Undo All Splits</span>
                         </button>
                       )}
-                      
                     </div>
                   )}
                 </td>
