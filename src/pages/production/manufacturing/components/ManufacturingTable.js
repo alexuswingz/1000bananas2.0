@@ -362,7 +362,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
     };
   }, [actionMenuId]);
 
-  const statusOptions = ['In Progress', 'Completed', 'Not Started'];
+  const statusOptions = ['In Progress', 'Completed', 'Not Started', 'On Hold'];
 
   const handleStatusClick = (rowId, e) => {
     e.stopPropagation();
@@ -705,6 +705,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
   const getStatusColor = (status) => {
     if (status === 'Completed') return '#10B981'; // green
     if (status === 'In Progress') return '#3B82F6'; // blue
+    if (status === 'On Hold') return '#F59E0B'; // amber/orange
     return 'transparent'; // no color for not started
   };
 
@@ -719,9 +720,20 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
     }
     if (status === 'In Progress') {
       return (
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M7 1.16667L9.33333 5.25L13.4167 6.125L10.5 9.33333L10.6667 13.4167L7 11.6667L3.33333 13.4167L3.5 9.33333L0.583336 6.125L4.66667 5.25L7 1.16667Z" stroke="#3B82F6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
+        <img 
+          src="/assets/spinner.png" 
+          alt="In Progress" 
+          style={{ width: '14px', height: '14px' }}
+        />
+      );
+    }
+    if (status === 'On Hold') {
+      return (
+        <img 
+          src="/assets/on hold.png" 
+          alt="On Hold" 
+          style={{ width: '14px', height: '14px' }}
+        />
       );
     }
     return (
@@ -858,6 +870,21 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                               bottom: 0,
                               width: '6px',
                               backgroundColor: '#9CA3AF',
+                              borderTopLeftRadius: '12px',
+                              borderBottomLeftRadius: '12px',
+                            }}
+                          />
+                        )}
+                        {/* Left colored bar - Amber rounded bar for On Hold status */}
+                        {status === 'On Hold' && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              left: 0,
+                              top: 0,
+                              bottom: 0,
+                              width: '6px',
+                              backgroundColor: '#F59E0B',
                               borderTopLeftRadius: '12px',
                               borderBottomLeftRadius: '12px',
                             }}
@@ -1948,19 +1975,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                           e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
                         }}
                       >
-                        <div
-                          style={{
-                            width: '14px',
-                            height: '14px',
-                            borderRadius: '50%',
-                            backgroundColor: 
-                              (row.status || 'Not Started') === 'In Progress' ? '#3B82F6' :
-                              (row.status || 'Not Started') === 'Completed' ? '#10B981' :
-                              '#9CA3AF',
-                            flexShrink: 0,
-                            border: 'none',
-                          }}
-                        />
+                        {getStatusIcon(row.status || 'Not Started')}
                         <span
                           style={{
                             fontSize: '13px',
@@ -2030,18 +2045,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                                 e.currentTarget.style.backgroundColor = 'transparent';
                               }}
                             >
-                              <div
-                                style={{
-                                  width: '14px',
-                                  height: '14px',
-                                  borderRadius: '50%',
-                                  backgroundColor: 
-                                    status === 'In Progress' ? '#3B82F6' :
-                                    status === 'Completed' ? '#10B981' :
-                                    '#9CA3AF',
-                                  flexShrink: 0,
-                                }}
-                              />
+                              {getStatusIcon(status)}
                               {status}
                             </button>
                           ))}
