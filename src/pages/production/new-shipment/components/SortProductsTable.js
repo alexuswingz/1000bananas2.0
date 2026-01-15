@@ -202,6 +202,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                   
                   // Create all split products
                   const splitProducts = [];
+                  const totalBatches = 2 + additionalBatches.length;
                   
                   // First batch
                   splitProducts.push({
@@ -209,7 +210,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                     id: `${baseIdForSplits}_split_1`,
                     qty: firstBatch.qty,
                     volume: firstBatch.volume !== undefined ? firstBatch.volume : templateProduct.volume,
-                    splitTag: '1/2',
+                    splitTag: firstBatch.splitTag || `1/${totalBatches}`,
                     originalId: baseIdForSplits,
                   });
                   
@@ -219,19 +220,18 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                     id: `${baseIdForSplits}_split_2`,
                     qty: secondBatch.qty,
                     volume: secondBatch.volume !== undefined ? secondBatch.volume : templateProduct.volume,
-                    splitTag: '2/2',
+                    splitTag: secondBatch.splitTag || `2/${totalBatches}`,
                     originalId: baseIdForSplits,
                   });
                   
                   // Additional batches (for multiple splits)
                   additionalBatches.forEach((batch, idx) => {
-                    const totalBatches = 2 + additionalBatches.length;
                     splitProducts.push({
                       ...templateProduct,
                       id: `${baseIdForSplits}_split_${idx + 3}`,
                       qty: batch.qty,
                       volume: batch.volume !== undefined ? batch.volume : templateProduct.volume,
-                      splitTag: `${idx + 3}/${totalBatches}`,
+                      splitTag: batch.splitTag || `${idx + 3}/${totalBatches}`,
                       originalId: baseIdForSplits,
                     });
                   });
@@ -1320,26 +1320,73 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     // This ensures consistent IDs when restoring splits
     const baseProductId = selectedProduct.originalId || selectedProduct.id;
     
-    // Create two new products from the split
+    // Find the maximum split number currently in use for this base product
+    // This ensures we don't create duplicate IDs when splitting a split product
+    let maxSplitNum = 0;
+    products.forEach(p => {
+      const pOriginalId = p.originalId || p.id;
+      if (pOriginalId === baseProductId && typeof p.id === 'string') {
+        const match = p.id.match(/_split_(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxSplitNum) maxSplitNum = num;
+        }
+      }
+    });
+    
+    // Generate unique split numbers (if no existing splits, start at 1)
+    const firstSplitNum = maxSplitNum > 0 ? maxSplitNum + 1 : 1;
+    const secondSplitNum = firstSplitNum + 1;
+    
+    // Count how many split products will exist after this split
+    const currentSplitCount = products.filter(p => {
+      const pOriginalId = p.originalId || p.id;
+      return pOriginalId === baseProductId && p.splitTag;
+    }).length;
+    // If the product being split has a splitTag, we're replacing 1 with 2
+    // If not, we're adding 2 new splits
+    const totalSplitsAfter = selectedProduct.splitTag 
+      ? currentSplitCount + 1  
+      : currentSplitCount + 2;
+    
+    // Create two new products from the split with unique IDs
     const firstBatch = {
       ...selectedProduct,
-      id: `${baseProductId}_split_1`,
+      id: `${baseProductId}_split_${firstSplitNum}`,
       qty: firstBatchQtyValue,
-      splitTag: '1/2',
+      splitTag: `${firstSplitNum}/${totalSplitsAfter}`,
       originalId: baseProductId,
     };
     
     const secondBatch = {
       ...selectedProduct,
-      id: `${baseProductId}_split_2`,
+      id: `${baseProductId}_split_${secondSplitNum}`,
       qty: secondBatchQty,
-      splitTag: '2/2',
+      splitTag: `${secondSplitNum}/${totalSplitsAfter}`,
       originalId: baseProductId,
     };
     
     // Replace the original product with the two split products
     const newProducts = [...products];
     newProducts.splice(productIndex, 1, firstBatch, secondBatch);
+    
+    // Update splitTags of ALL split products with the same base ID to reflect new total
+    // This ensures all split tags show the correct denominator
+    newProducts.forEach((p, idx) => {
+      const pOriginalId = p.originalId || p.id;
+      if (pOriginalId === baseProductId && p.splitTag && typeof p.id === 'string') {
+        // Extract the split number from the ID
+        const match = p.id.match(/_split_(\d+)$/);
+        if (match) {
+          const splitNum = parseInt(match[1], 10);
+          newProducts[idx] = {
+            ...p,
+            splitTag: `${splitNum}/${totalSplitsAfter}`,
+          };
+        }
+      }
+    });
+    
     setProducts(newProducts);
     saveProductOrder(newProducts);
     
@@ -1358,9 +1405,8 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
           ? fullIdentifier.replace(`::${selectedProduct.splitTag}`, '')
           : fullIdentifier;
         
-        // Get all products with this original ID from the new products array (after split)
-        const newProducts = [...products];
-        newProducts.splice(productIndex, 1, firstBatch, secondBatch);
+        // Get all products with this original ID from the updated products array
+        // Note: We use the newProducts array that was already created and modified above
         const productsWithThisId = newProducts.filter(p => {
           // Match by originalId if it exists, otherwise match by id
           const pOriginalId = p.originalId || p.id;
@@ -1381,12 +1427,15 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
           );
           
           // Save all split products for this ID
-          // Sort by splitTag to ensure consistent order
+          // Sort by the numeric split number in the ID for consistent order
           const sortedSplitProducts = [...splitProducts].sort((a, b) => {
-            if (a.splitTag && b.splitTag) {
-              return a.splitTag.localeCompare(b.splitTag);
-            }
-            return 0;
+            // Extract split numbers from IDs (e.g., "123_split_3" -> 3)
+            const getNum = (id) => {
+              if (typeof id !== 'string') return 0;
+              const match = id.match(/_split_(\d+)$/);
+              return match ? parseInt(match[1], 10) : 0;
+            };
+            return getNum(a.id) - getNum(b.id);
           });
           
           // Store as batches - if there are 2, store as firstBatch/secondBatch
@@ -1399,15 +1448,18 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
               firstBatch: {
                 qty: sortedSplitProducts[0].qty,
                 volume: sortedSplitProducts[0].volume,
+                splitTag: sortedSplitProducts[0].splitTag,
               },
               secondBatch: {
                 qty: sortedSplitProducts[1].qty,
                 volume: sortedSplitProducts[1].volume,
+                splitTag: sortedSplitProducts[1].splitTag,
               },
               // Store additional batches if there are more than 2
               additionalBatches: sortedSplitProducts.slice(2).map(p => ({
                 qty: p.qty,
                 volume: p.volume,
+                splitTag: p.splitTag,
               })),
             });
           } else if (sortedSplitProducts.length === 1) {
@@ -1418,6 +1470,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
               firstBatch: {
                 qty: sortedSplitProducts[0].qty,
                 volume: sortedSplitProducts[0].volume,
+                splitTag: sortedSplitProducts[0].splitTag,
               },
               secondBatch: {
                 qty: 0,
