@@ -350,6 +350,18 @@ const LabelCheckTable = ({
         return Number(value) >= Number(conditionValue);
       case 'lessOrEqual':
         return Number(value) <= Number(conditionValue);
+      case 'between':
+        if (!conditionValue || !conditionValue.includes('-')) return true;
+        const [min, max] = conditionValue.split('-').map(v => Number(v.trim()));
+        if (isNaN(min) || isNaN(max)) return true;
+        const numValue = Number(value);
+        return numValue >= min && numValue <= max;
+      case 'notBetween':
+        if (!conditionValue || !conditionValue.includes('-')) return true;
+        const [minNot, maxNot] = conditionValue.split('-').map(v => Number(v.trim()));
+        if (isNaN(minNot) || isNaN(maxNot)) return true;
+        const numValueNot = Number(value);
+        return numValueNot < minNot || numValueNot > maxNot;
       default:
         return true;
     }

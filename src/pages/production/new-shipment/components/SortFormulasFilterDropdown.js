@@ -68,32 +68,21 @@ const SortFormulasFilterDropdown = forwardRef(({
   // Check if column is numeric
   const isNumericColumn = columnKey === 'qty' || columnKey === 'volume' || 
                           columnKey === 'bottles' || columnKey === 'closures' || 
-                          columnKey === 'boxes' || columnKey === 'labels';
+                          columnKey === 'boxes' || columnKey === 'labels' ||
+                          columnKey === 'quantity' || columnKey === 'lblCurrentInv';
   
-  // Available conditions based on column type
-  const textConditions = [
+  // Universal conditions - apply to ALL filters
+  const conditions = [
     { value: '', label: 'None' },
-    { value: 'contains', label: 'Contains' },
-    { value: 'notContains', label: 'Does not contain' },
-    { value: 'equals', label: 'Equals' },
-    { value: 'notEquals', label: 'Does not equal' },
-    { value: 'startsWith', label: 'Starts with' },
-    { value: 'endsWith', label: 'Ends with' },
-    { value: 'isEmpty', label: 'Is empty' },
-    { value: 'isNotEmpty', label: 'Is not empty' },
-  ];
-  
-  const numericConditions = [
-    { value: '', label: 'None' },
-    { value: 'equals', label: 'Equals' },
-    { value: 'notEquals', label: 'Does not equal' },
     { value: 'greaterThan', label: 'Greater than' },
+    { value: 'greaterOrEqual', label: 'Greater than or equal to' },
     { value: 'lessThan', label: 'Less than' },
-    { value: 'greaterOrEqual', label: 'Greater than or equal' },
-    { value: 'lessOrEqual', label: 'Less than or equal' },
+    { value: 'lessOrEqual', label: 'Less than or equal to' },
+    { value: 'equals', label: 'Is equal to' },
+    { value: 'notEquals', label: 'Is not equal to' },
+    { value: 'between', label: 'Is between' },
+    { value: 'notBetween', label: 'Is not between' },
   ];
-  
-  const conditions = isNumericColumn ? numericConditions : textConditions;
 
   // Convert values to strings for filtering
   // Special handling for Add column
@@ -390,23 +379,91 @@ const SortFormulasFilterDropdown = forwardRef(({
             
             {/* Condition value input - show for most conditions except isEmpty/isNotEmpty */}
             {conditionType && conditionType !== 'isEmpty' && conditionType !== 'isNotEmpty' && (
-              <input
-                type={isNumericColumn ? 'number' : 'text'}
-                value={conditionValue}
-                onChange={(e) => setConditionValue(e.target.value)}
-                placeholder={isNumericColumn ? 'Enter number...' : 'Enter value...'}
-                style={{
-                  width: '100%',
-                  padding: '6px 8px',
-                  border: '1px solid #E5E7EB',
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                }}
-                onFocus={(e) => { e.target.style.borderColor = '#3B82F6'; }}
-                onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
-              />
+              <>
+                {conditionType === 'between' || conditionType === 'notBetween' ? (
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <input
+                      type="number"
+                      value={conditionValue.includes('-') ? conditionValue.split('-')[0] : conditionValue}
+                      onChange={(e) => {
+                        const parts = conditionValue.includes('-') ? conditionValue.split('-') : [conditionValue, ''];
+                        const minValue = e.target.value;
+                        const maxValue = parts[1] || '';
+                        if (minValue && maxValue) {
+                          setConditionValue(`${minValue}-${maxValue}`);
+                        } else if (minValue) {
+                          setConditionValue(minValue);
+                        } else if (maxValue) {
+                          setConditionValue(`-${maxValue}`);
+                        } else {
+                          setConditionValue('');
+                        }
+                      }}
+                      placeholder="Min"
+                      style={{
+                        flex: 1,
+                        padding: '6px 8px',
+                        border: '1px solid #E5E7EB',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                      }}
+                      onFocus={(e) => { e.target.style.borderColor = '#3B82F6'; }}
+                      onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
+                    />
+                    <span style={{ fontSize: '12px', color: '#6B7280' }}>to</span>
+                    <input
+                      type="number"
+                      value={conditionValue.includes('-') ? conditionValue.split('-')[1] : ''}
+                      onChange={(e) => {
+                        const parts = conditionValue.includes('-') ? conditionValue.split('-') : [conditionValue, ''];
+                        const minValue = parts[0] || '';
+                        const maxValue = e.target.value;
+                        if (minValue && maxValue) {
+                          setConditionValue(`${minValue}-${maxValue}`);
+                        } else if (minValue) {
+                          setConditionValue(minValue);
+                        } else if (maxValue) {
+                          setConditionValue(`-${maxValue}`);
+                        } else {
+                          setConditionValue('');
+                        }
+                      }}
+                      placeholder="Max"
+                      style={{
+                        flex: 1,
+                        padding: '6px 8px',
+                        border: '1px solid #E5E7EB',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                      }}
+                      onFocus={(e) => { e.target.style.borderColor = '#3B82F6'; }}
+                      onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
+                    />
+                  </div>
+                ) : (
+                  <input
+                    type={isNumericColumn ? 'number' : 'text'}
+                    value={conditionValue}
+                    onChange={(e) => setConditionValue(e.target.value)}
+                    placeholder={isNumericColumn ? 'Enter number...' : 'Enter value...'}
+                    style={{
+                      width: '100%',
+                      padding: '6px 8px',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '4px',
+                      fontSize: '12px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                    onFocus={(e) => { e.target.style.borderColor = '#3B82F6'; }}
+                    onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
+                  />
+                )}
+              </>
             )}
           </div>
         )}
