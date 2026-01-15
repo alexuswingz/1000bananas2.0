@@ -2500,8 +2500,8 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                         overflow: 'hidden',
                       }}
                     >
-                      {/* Show Split Product option only for parent products (not split items) */}
-                      {product.qty > 1 && !product.splitTag && (
+                      {/* Show Split Product option for all products with qty > 1 (like SortFormulasTable) */}
+                      {product.qty > 1 && (
                         <button
                           type="button"
                           onClick={() => handleMenuAction('split', product)}
@@ -2578,8 +2578,8 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                         </button>
                       )}
                       
-                      {/* Show Undo All Splits option for parent products that have splits */}
-                      {!product.splitTag && hasSplits(product) && (
+                      {/* Show Undo All Splits option for split items (like SortFormulasTable) */}
+                      {product.splitTag && (
                         <button
                           type="button"
                           onClick={() => handleMenuAction('undoAllSplits', product)}
@@ -2635,62 +2635,6 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                         </button>
                       )}
                       
-                      {/* Show Undo Split option for split items (children) */}
-                      {product.splitTag && (
-                        <button
-                          type="button"
-                          onClick={() => handleMenuAction('undoSplit', product)}
-                          style={{
-                            width: '100%',
-                            padding: '10px 16px',
-                            textAlign: 'left',
-                            background: 'transparent',
-                            border: 'none',
-                            color: isDarkMode ? '#E5E7EB' : '#374151',
-                            fontSize: '14px',
-                            fontWeight: 400,
-                            cursor: 'pointer',
-                            transition: 'background-color 0.2s',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '12px',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }}
-                        >
-                          <svg 
-                            width="16" 
-                            height="16" 
-                            viewBox="0 0 16 16" 
-                            fill="none" 
-                            xmlns="http://www.w3.org/2000/svg"
-                            style={{ flexShrink: 0 }}
-                          >
-                            {/* Arrow pointing left (undo icon) */}
-                            <path 
-                              d="M3 8L1 6L3 4" 
-                              stroke="currentColor" 
-                              strokeWidth="1.5" 
-                              strokeLinecap="round" 
-                              strokeLinejoin="round"
-                            />
-                            <line 
-                              x1="1" 
-                              y1="6" 
-                              x2="15" 
-                              y2="6" 
-                              stroke="currentColor" 
-                              strokeWidth="1.5" 
-                              strokeLinecap="round"
-                            />
-                          </svg>
-                          <span>Undo Split</span>
-                        </button>
-                      )}
                     </div>
                   )}
                 </td>
