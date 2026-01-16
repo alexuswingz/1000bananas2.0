@@ -1524,7 +1524,7 @@ const NewShipmentTable = ({
                         lineHeight: '40px',
                         boxSizing: 'border-box',
                         textAlign: idx === 3 || idx === 4 || idx === 5 ? 'center' : 'left',
-                        borderRight: idx === 3 ? 'none' : idx === 4 ? 'none' : idx === 5 ? 'none' : '1px solid #FFFFFF',
+                        borderRight: idx === 3 ? 'none' : idx === 4 ? 'none' : idx === 5 ? 'none' : `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
                         position: 'relative',
                         borderTopLeftRadius: idx === 0 ? '16px' : undefined,
                         borderTopRightRadius: idx === 5 ? '16px' : undefined,
@@ -1596,34 +1596,33 @@ const NewShipmentTable = ({
                     }}
                     onClick={(e) => handleRowClick(e, index)}
                   >
-                    <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} className={themeClasses.text}>
+                    <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} className={themeClasses.text}>
                       {row.brand}
                     </td>
-                    <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }}>
-                      <button
-                        type="button"
-                        onClick={() => onProductClick(row)}
-                        className="text-blue-500 hover:text-blue-600"
+                    <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}` }}>
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onProductClick(row);
+                        }}
+                        className="text-blue-500 hover:text-blue-600 hover:underline"
                         style={{ 
                           cursor: 'pointer',
                           fontSize: '0.85rem',
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
-                          width: '100%',
-                          textAlign: 'left',
-                          background: 'none',
-                          border: 'none',
-                          padding: 0
+                          display: 'inline',
+                          maxWidth: '100%',
                         }}
                       >
                         {row.product}
-                      </button>
+                      </span>
                     </td>
-                    <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} className={themeClasses.textSecondary}>
+                    <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} className={themeClasses.textSecondary}>
                       {row.size}
                     </td>
-                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }}>
+                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}` }}>
                       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', position: 'relative' }}>
                         <div
                           ref={(el) => {
@@ -1734,7 +1733,7 @@ const NewShipmentTable = ({
                         </div>
                       </div>
                     </td>
-                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }}>
+                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}` }}>
                       <div
                         style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                         onMouseEnter={() => setHoveredQtyIndex(index)}
@@ -2261,7 +2260,7 @@ const NewShipmentTable = ({
                         )}
                       </div>
                     </td>
-                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }} className={themeClasses.text}>
+                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}` }} className={themeClasses.text}>
                       {row.doiTotal || row.daysOfInventory || 0}
                     </td>
                   </tr>
@@ -2675,7 +2674,7 @@ const NewShipmentTable = ({
                 backgroundColor: '#1C2634',
                 boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
                 borderTopLeftRadius: '16px',
-                borderRight: '1px solid #FFFFFF',
+                borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
               }}>
                 <input 
                   type="checkbox" 
@@ -2708,7 +2707,7 @@ const NewShipmentTable = ({
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
                   color: (hasActiveColumnFilter('brand') || openFilterColumns.has('brand')) ? '#3B82F6' : '#FFFFFF',
-                  borderRight: '1px solid #FFFFFF',
+                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', position: 'relative' }}>
@@ -2753,7 +2752,7 @@ const NewShipmentTable = ({
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
                   color: (hasActiveColumnFilter('product') || openFilterColumns.has('product')) ? '#3B82F6' : '#FFFFFF',
-                  borderRight: '1px solid #FFFFFF',
+                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', position: 'relative' }}>
@@ -2827,7 +2826,7 @@ const NewShipmentTable = ({
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
-                  borderRight: '1px solid #FFFFFF',
+                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
                   boxSizing: 'border-box',
                   fontFamily: 'Inter, sans-serif',
                   fontWeight: 600,
@@ -2865,7 +2864,7 @@ const NewShipmentTable = ({
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
-                  borderRight: '1px solid #FFFFFF',
+                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
                   boxSizing: 'border-box',
                   backgroundColor: '#1C2634',
                 }}
@@ -2924,7 +2923,7 @@ const NewShipmentTable = ({
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
-                  borderRight: '1px solid #FFFFFF',
+                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
                   boxSizing: 'border-box',
                   backgroundColor: '#1C2634',
                 }}
@@ -2983,7 +2982,7 @@ const NewShipmentTable = ({
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
-                  borderRight: '1px solid #FFFFFF',
+                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
                   boxSizing: 'border-box',
                   fontFamily: 'Inter, sans-serif',
                   fontWeight: 600,
@@ -3022,7 +3021,7 @@ const NewShipmentTable = ({
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
-                  borderRight: '1px solid #FFFFFF',
+                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
                   boxSizing: 'border-box',
                   fontFamily: 'Inter, sans-serif',
                   fontWeight: 600,
@@ -3061,7 +3060,7 @@ const NewShipmentTable = ({
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
-                  borderRight: '1px solid #FFFFFF',
+                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
                   boxSizing: 'border-box',
                   fontFamily: 'Inter, sans-serif',
                   fontWeight: 600,
@@ -3100,7 +3099,7 @@ const NewShipmentTable = ({
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
-                  borderRight: '1px solid #FFFFFF',
+                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
                   boxSizing: 'border-box',
                   fontFamily: 'Inter, sans-serif',
                   fontWeight: 600,
@@ -3139,7 +3138,7 @@ const NewShipmentTable = ({
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
-                  borderRight: '1px solid #FFFFFF',
+                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
                   boxSizing: 'border-box',
                   fontFamily: 'Inter, sans-serif',
                   fontWeight: 600,
@@ -3178,7 +3177,7 @@ const NewShipmentTable = ({
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
-                  borderRight: '1px solid #FFFFFF',
+                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
                   boxSizing: 'border-box',
                   fontFamily: 'Inter, sans-serif',
                   fontWeight: 600,
@@ -3236,7 +3235,7 @@ const NewShipmentTable = ({
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
-                  borderRight: '1px solid #FFFFFF',
+                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
                   boxSizing: 'border-box',
                   fontFamily: 'Inter, sans-serif',
                   fontWeight: 600,
@@ -3291,7 +3290,7 @@ const NewShipmentTable = ({
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
-                  borderRight: '1px solid #FFFFFF',
+                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
                   boxSizing: 'border-box',
                   fontFamily: 'Inter, sans-serif',
                   fontWeight: 600,
@@ -3346,7 +3345,7 @@ const NewShipmentTable = ({
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
-                  borderRight: '1px solid #FFFFFF',
+                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
                   boxSizing: 'border-box',
                   fontFamily: 'Inter, sans-serif',
                   fontWeight: 600,
@@ -3406,7 +3405,7 @@ const NewShipmentTable = ({
                 zIndex: 6,
                 backgroundColor: '#1C2634',
                 boxShadow: '-2px 0 4px rgba(0,0,0,0.1)',
-                borderRight: '1px solid #FFFFFF',
+                borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
                 borderTopRightRadius: '16px',
               }}>
                 <span style={{ color: '#FFFFFF', fontSize: '1rem' }}>⋮</span>
@@ -3442,7 +3441,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
-                  borderTop: '1px solid #E5E7EB',
+                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
                 }}>
                   <input 
                     type="checkbox" 
@@ -3465,7 +3464,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
-                  borderTop: '1px solid #E5E7EB',
+                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
                 }} className={themeClasses.text}>
                   {row.brand}
                 </td>
@@ -3483,16 +3482,18 @@ const NewShipmentTable = ({
                   minWidth: '200px',
                   maxWidth: '200px',
                   boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
-                  borderTop: '1px solid #E5E7EB',
+                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
                 }}>
-                  <button
-                    type="button"
-                    onClick={() => onProductClick(row)}
-                    className="text-xs text-blue-500 hover:text-blue-600"
-                    style={{ textDecoration: 'underline', cursor: 'pointer', margin: '0 auto', display: 'block' }}
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onProductClick(row);
+                    }}
+                    className="text-xs text-blue-500 hover:text-blue-600 hover:underline"
+                    style={{ cursor: 'pointer', display: 'inline' }}
                   >
                     {row.product.length > 18 ? `${row.product.substring(0, 18)}...` : row.product}
-                  </button>
+                  </span>
                 </td>
                 <td style={{ 
                   padding: '0.65rem 1rem', 
@@ -3507,7 +3508,7 @@ const NewShipmentTable = ({
                   maxWidth: '120px',
                   height: '40px',
                   verticalAlign: 'middle',
-                  borderTop: '1px solid #E5E7EB',
+                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
                   borderRight: 'none',
                 }} className={themeClasses.textSecondary}>
                   {row.size}
@@ -3520,7 +3521,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxSizing: 'border-box',
-                  borderTop: '1px solid #E5E7EB',
+                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
                   borderLeft: 'none',
                 }}>
                   <div style={{ position: 'relative', display: 'block' }}>
@@ -4314,7 +4315,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxSizing: 'border-box',
-                  borderTop: '1px solid #E5E7EB',
+                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
                   fontWeight: 600,
                   color: '#A855F7', // Purple - matches FBA Avail. legend
                 }}>
@@ -4328,7 +4329,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxSizing: 'border-box',
-                  borderTop: '1px solid #E5E7EB',
+                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
                   fontWeight: 600,
                   color: '#22C55E', // Green - matches Total Inv. legend
                 }}>
@@ -4342,7 +4343,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxSizing: 'border-box',
-                  borderTop: '1px solid #E5E7EB',
+                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
                   fontWeight: 600,
                   color: '#3B82F6', // Blue - matches Forecast legend
                 }}>
@@ -4356,7 +4357,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxSizing: 'border-box',
-                  borderTop: '1px solid #E5E7EB',
+                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
                 }} className={themeClasses.text}>
                   {row.sales7Day || 0}
                 </td>
@@ -4368,7 +4369,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxSizing: 'border-box',
-                  borderTop: '1px solid #E5E7EB',
+                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
                 }} className={themeClasses.text}>
                   {row.sales30Day || 0}
                 </td>
@@ -4380,7 +4381,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxSizing: 'border-box',
-                  borderTop: '1px solid #E5E7EB',
+                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
                 }} className={themeClasses.text}>
                   {Math.round((row.sales30Day || 0) * 4)}
                 </td>
@@ -4392,7 +4393,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxSizing: 'border-box',
-                  borderTop: '1px solid #E5E7EB',
+                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
                 }} className={themeClasses.text}>
                   {row.formula_name || ''}
                 </td>
@@ -4404,7 +4405,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxSizing: 'border-box',
-                  borderTop: '1px solid #E5E7EB',
+                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
                 }} className={themeClasses.text}>
                   {row.bottleInventory || row.bottle_inventory || 0}
                 </td>
@@ -4416,7 +4417,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxSizing: 'border-box',
-                  borderTop: '1px solid #E5E7EB',
+                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
                 }} className={themeClasses.text}>
                   {row.closureInventory || row.closure_inventory || 0}
                 </td>
@@ -4428,7 +4429,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxSizing: 'border-box',
-                  borderTop: '1px solid #E5E7EB',
+                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
                 }} className={themeClasses.text}>
                   {row.boxInventory || row.box_inventory || 0}
                 </td>
@@ -4440,7 +4441,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxSizing: 'border-box',
-                  borderTop: '1px solid #E5E7EB',
+                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
                 }} className={themeClasses.text}>
                   {row.labelsAvailable || row.label_inventory || row.labels_available || 0}
                 </td>
@@ -4455,7 +4456,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxShadow: '-2px 0 4px rgba(0,0,0,0.1)',
-                  borderTop: '1px solid #E5E7EB',
+                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
                 }}>
                   <button
                     type="button"
