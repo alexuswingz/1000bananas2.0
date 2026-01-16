@@ -26,6 +26,7 @@ const NewShipmentTable = ({
   const [clickedQtyIndex, setClickedQtyIndex] = useState(null);
   const [hoveredQtyIndex, setHoveredQtyIndex] = useState(null);
   const [hoveredAddIndex, setHoveredAddIndex] = useState(null);
+  const [hoveredLabelWarningIndex, setHoveredLabelWarningIndex] = useState(null);
   const qtyContainerRefs = useRef({});
   const popupRefs = useRef({});
   const qtyInputRefs = useRef({});
@@ -2035,32 +2036,102 @@ const NewShipmentTable = ({
                         })()}
                         {/* Label warning icon - positioned absolutely to not affect alignment */}
                         {isQtyExceedingLabels(row, index) && (effectiveQtyValues[index] ?? 0) > 0 && (
-                          <span
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setClickedQtyIndex(clickedQtyIndex === index ? null : index);
-                            }}
-                            style={{
-                              position: 'absolute',
-                              left: '96px',
-                              top: '50%',
-                              transform: 'translateY(-50%)',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: '18px',
-                              height: '18px',
-                              borderRadius: '50%',
-                              backgroundColor: '#FEE2E2',
-                              color: '#DC2626',
-                              fontSize: '12px',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              zIndex: 10,
-                            }}
-                          >
-                            !
-                          </span>
+                          <>
+                            <span
+                              onMouseEnter={(e) => {
+                                e.stopPropagation();
+                                setHoveredLabelWarningIndex(index);
+                              }}
+                              onMouseLeave={(e) => {
+                                e.stopPropagation();
+                                setHoveredLabelWarningIndex(null);
+                              }}
+                              style={{
+                                position: 'absolute',
+                                left: '96px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '18px',
+                                height: '18px',
+                                borderRadius: '50%',
+                                backgroundColor: '#FEE2E2',
+                                color: '#DC2626',
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                zIndex: 10,
+                              }}
+                            >
+                              !
+                            </span>
+                            {/* Label inventory tooltip on hover */}
+                            {hoveredLabelWarningIndex === index && (() => {
+                              const labelsAvailable = getAvailableLabelsForRow(row, index);
+                              
+                              return (
+                                <div
+                                  style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    left: '50%',
+                                    transform: 'translateX(calc(30% - 47px))',
+                                    marginTop: '-63px',
+                                    zIndex: 10000,
+                                    pointerEvents: 'auto',
+                                  }}
+                                  onMouseEnter={() => setHoveredLabelWarningIndex(index)}
+                                  onMouseLeave={() => setHoveredLabelWarningIndex(null)}
+                                >
+                                  <div
+                                    style={{
+                                      backgroundColor: '#FFFFFF',
+                                      borderRadius: '8px',
+                                      padding: '8px',
+                                      width: '134px',
+                                      height: '31px',
+                                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                                      position: 'relative',
+                                      display: 'flex',
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      gap: '4px',
+                                    }}
+                                  >
+                                    <div style={{
+                                      fontSize: '13px',
+                                      color: '#6B7280',
+                                      lineHeight: '1.4',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      whiteSpace: 'nowrap',
+                                    }}>
+                                      <span style={{ color: '#6B7280' }}>Labels Available: </span>
+                                      <span style={{ color: '#111827', fontWeight: 500 }}>{labelsAvailable.toLocaleString()}</span>
+                                    </div>
+                                    {/* Downward arrow */}
+                                    <div
+                                      style={{
+                                        position: 'absolute',
+                                        bottom: '-6px',
+                                        left: '50%',
+                                        transform: 'translateX(-50%)',
+                                        width: 0,
+                                        height: 0,
+                                        borderLeft: '6px solid transparent',
+                                        borderRight: '6px solid transparent',
+                                        borderTop: '6px solid #FFFFFF',
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </>
                         )}
                         {/* Popup for "Use Available" */}
                         {clickedQtyIndex === index && isQtyExceedingLabels(row, index) && (
@@ -3927,32 +3998,100 @@ const NewShipmentTable = ({
                       // Only show warning if labels needed exceed available
                       if (labelsNeeded > labelsAvailable && labelsNeeded > 0) {
                         return (
-                          <span
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setClickedQtyIndex(clickedQtyIndex === index ? null : index);
-                            }}
-                            style={{
-                              position: 'absolute',
-                              left: '119px',
-                              top: '50%',
-                              transform: 'translateY(-50%)',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: '18px',
-                              height: '18px',
-                              borderRadius: '50%',
-                              backgroundColor: '#FEE2E2',
-                              color: '#DC2626',
-                              fontSize: '12px',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              zIndex: 10,
-                            }}
-                          >
-                            !
-                          </span>
+                          <>
+                            <span
+                              onMouseEnter={(e) => {
+                                e.stopPropagation();
+                                setHoveredLabelWarningIndex(index);
+                              }}
+                              onMouseLeave={(e) => {
+                                e.stopPropagation();
+                                setHoveredLabelWarningIndex(null);
+                              }}
+                              style={{
+                                position: 'absolute',
+                                left: '119px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '18px',
+                                height: '18px',
+                                borderRadius: '50%',
+                                backgroundColor: '#FEE2E2',
+                                color: '#DC2626',
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                zIndex: 10,
+                              }}
+                            >
+                              !
+                            </span>
+                            {/* Label inventory tooltip on hover */}
+                            {hoveredLabelWarningIndex === index && (() => {
+                              return (
+                                <div
+                                  style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    left: '50%',
+                                    transform: 'translateX(calc(30% - 47px))',
+                                    marginTop: '-63px',
+                                    zIndex: 10000,
+                                    pointerEvents: 'auto',
+                                  }}
+                                  onMouseEnter={() => setHoveredLabelWarningIndex(index)}
+                                  onMouseLeave={() => setHoveredLabelWarningIndex(null)}
+                                >
+                                  <div
+                                    style={{
+                                      backgroundColor: '#FFFFFF',
+                                      borderRadius: '8px',
+                                      padding: '8px',
+                                      width: '134px',
+                                      height: '31px',
+                                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                                      position: 'relative',
+                                      display: 'flex',
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      gap: '4px',
+                                    }}
+                                  >
+                                    <div style={{
+                                      fontSize: '13px',
+                                      color: '#6B7280',
+                                      lineHeight: '1.4',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      whiteSpace: 'nowrap',
+                                    }}>
+                                      <span style={{ color: '#6B7280' }}>Labels Available: </span>
+                                      <span style={{ color: '#111827', fontWeight: 500 }}>{labelsAvailable.toLocaleString()}</span>
+                                    </div>
+                                    {/* Downward arrow */}
+                                    <div
+                                      style={{
+                                        position: 'absolute',
+                                        bottom: '-6px',
+                                        left: '50%',
+                                        transform: 'translateX(-50%)',
+                                        width: 0,
+                                        height: 0,
+                                        borderLeft: '6px solid transparent',
+                                        borderRight: '6px solid transparent',
+                                        borderTop: '6px solid #FFFFFF',
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </>
                         );
                       }
                       return null;
