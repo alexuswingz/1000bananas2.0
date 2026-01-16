@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
+import { SidebarProvider } from '../context/SidebarContext';
 import Sidebar from '../components/Sidebar';
 
 // Import all page components
@@ -44,13 +45,14 @@ const Landing = () => {
   const { isDarkMode } = useTheme();
   
   return (
-    <div className={`flex h-screen ${isDarkMode ? 'bg-dark-bg-primary' : 'bg-light-bg-primary'}`}>
-      {/* Sidebar */}
-      <Sidebar />
+    <SidebarProvider>
+      <div className={`flex h-screen ${isDarkMode ? 'bg-dark-bg-primary' : 'bg-light-bg-primary'}`}>
+        {/* Sidebar */}
+        <Sidebar />
 
-      {/* Main Content Area */}
-      <div className="flex-1" style={{ overflow: 'auto', height: '100vh' }}>
-        <Routes>
+        {/* Main Content Area */}
+        <div className="flex-1" style={{ overflow: 'auto', height: '100vh' }}>
+          <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/products/selection" element={<Selection />} />
           <Route path="/products/form" element={<ProductForm />} />
@@ -86,9 +88,10 @@ const Landing = () => {
           <Route path="/production/shipment/new" element={<NewShipment />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/settings" element={<Settings />} />
-        </Routes>
+          </Routes>
+        </div>
       </div>
-    </div>
+    </SidebarProvider>
   );
 };
 

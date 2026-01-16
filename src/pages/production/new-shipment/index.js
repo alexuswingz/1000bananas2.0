@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTheme } from '../../../context/ThemeContext';
+import { useSidebar } from '../../../context/SidebarContext';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
@@ -79,6 +80,7 @@ const knownCarriers = ['WeShip', 'TopCarrier', 'Worldwide Express'];
 
 const NewShipment = () => {
   const { isDarkMode } = useTheme();
+  const { sidebarWidth } = useSidebar();
   const location = useLocation();
   const navigate = useNavigate();
   const { id } = useParams();
@@ -2432,7 +2434,7 @@ const NewShipment = () => {
           style={{
             position: 'fixed',
             bottom: 0,
-            left: '256px',
+            left: `${sidebarWidth}px`,
             right: 0,
             backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
             borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
@@ -2441,6 +2443,7 @@ const NewShipment = () => {
             alignItems: 'center',
             justifyContent: 'space-between',
             zIndex: 10,
+            transition: 'left 300ms cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         >
           {activeAction === 'formula-check' ? (

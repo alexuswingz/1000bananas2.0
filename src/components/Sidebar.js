@@ -2,14 +2,15 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useCompany } from '../context/CompanyContext';
+import { useSidebar } from '../context/SidebarContext';
 
 const Sidebar = (props = {}) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isDarkMode, toggleTheme } = useTheme();
   const { company, getEnabledWorkspaceModules, getEnabledProductModules } = useCompany();
+  const { isMinimized, setIsMinimized } = useSidebar();
   
-  const [isMinimized, setIsMinimized] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [expandedMenus, setExpandedMenus] = useState({
     products: false,
@@ -127,7 +128,6 @@ const Sidebar = (props = {}) => {
   };
 
   const toggleSidebar = () => {
-    setIsMinimized(!isMinimized);
     // Close all expanded menus when minimizing
     if (!isMinimized) {
       setExpandedMenus({
@@ -137,6 +137,7 @@ const Sidebar = (props = {}) => {
         production: false,
       });
     }
+    setIsMinimized(!isMinimized);
   };
 
   // Hide sidebar on mobile (unless forced to show)
