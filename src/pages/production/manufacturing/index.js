@@ -255,23 +255,83 @@ const Manufacturing = () => {
               borderBottom: '1px solid #E5E7EB',
             }}
           >
-            <input
-              type="text"
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                flex: 1,
-                height: '40px',
-                padding: '0 16px',
-                borderRadius: '8px',
-                border: '1px solid #E5E7EB',
-                backgroundColor: '#FFFFFF',
-                fontSize: '14px',
-                color: '#111827',
-                outline: 'none',
-              }}
-            />
+            <div style={{ position: 'relative', flex: 1 }}>
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  height: '40px',
+                  padding: '0 16px',
+                  paddingRight: searchQuery ? '48px' : '16px',
+                  borderRadius: '8px',
+                  border: '1px solid #E5E7EB',
+                  backgroundColor: '#FFFFFF',
+                  fontSize: '14px',
+                  color: '#111827',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  style={{
+                    position: 'absolute',
+                    right: '8px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: '24px',
+                    height: '24px',
+                    minWidth: '24px',
+                    minHeight: '24px',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '4px',
+                    backgroundColor: '#FFFFFF',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0,
+                    zIndex: 2,
+                    touchAction: 'manipulation',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = '#9CA3AF';
+                    e.currentTarget.style.backgroundColor = '#F3F4F6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = '#D1D5DB';
+                    e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  }}
+                  onTouchStart={(e) => {
+                    e.currentTarget.style.borderColor = '#9CA3AF';
+                    e.currentTarget.style.backgroundColor = '#F3F4F6';
+                  }}
+                  onTouchEnd={(e) => {
+                    e.currentTarget.style.borderColor = '#D1D5DB';
+                    e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  }}
+                >
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#6B7280"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              )}
+            </div>
             <button
               onClick={handleSortClick}
               style={{

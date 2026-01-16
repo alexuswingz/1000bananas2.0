@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 
 const PlanningHeader = ({ activeTab, onTabChange, onNewShipmentClick, onSearch }) => {
   const { isDarkMode } = useTheme();
+  const [searchValue, setSearchValue] = useState('');
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -119,15 +120,20 @@ const PlanningHeader = ({ activeTab, onTabChange, onNewShipmentClick, onSearch }
           <input
             type="text"
             placeholder="Find a shipment..."
-            onChange={(e) => onSearch && onSearch(e.target.value)}
+            value={searchValue}
+            onChange={(e) => {
+              setSearchValue(e.target.value);
+              onSearch && onSearch(e.target.value);
+            }}
             className={`${themeClasses.inputBg} ${themeClasses.text} ${themeClasses.border} border text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all`}
             style={{
               width: '100%',
               paddingLeft: '2.5rem',
-              paddingRight: '1rem',
+              paddingRight: searchValue ? '2.5rem' : '1rem',
               paddingTop: '0.5rem',
               paddingBottom: '0.5rem',
               borderRadius: '8px',
+              boxSizing: 'border-box',
             }}
           />
           <svg
@@ -142,6 +148,7 @@ const PlanningHeader = ({ activeTab, onTabChange, onNewShipmentClick, onSearch }
               transform: 'translateY(-50%)',
               width: '1rem',
               height: '1rem',
+              pointerEvents: 'none',
             }}
           >
             <path
@@ -151,6 +158,53 @@ const PlanningHeader = ({ activeTab, onTabChange, onNewShipmentClick, onSearch }
               d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
             />
           </svg>
+          {searchValue && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchValue('');
+                onSearch && onSearch('');
+              }}
+              style={{
+                position: 'absolute',
+                right: '8px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: '16px',
+                height: '16px',
+                border: '1px solid #D1D5DB',
+                borderRadius: '4px',
+                backgroundColor: '#FFFFFF',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 0,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = '#9CA3AF';
+                e.currentTarget.style.backgroundColor = '#F3F4F6';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = '#D1D5DB';
+                e.currentTarget.style.backgroundColor = '#FFFFFF';
+              }}
+            >
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#6B7280"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* New Shipment button */}

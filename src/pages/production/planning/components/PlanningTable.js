@@ -2456,37 +2456,133 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
                 ))}
               </select>
               
-              <input
-                type="text"
-                placeholder="Value here..."
-                value={filterValue}
-                onChange={(e) => setFilterValue(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: '1px solid #D1D5DB',
-                  borderRadius: '6px',
-                  fontSize: '0.875rem',
-                  color: '#374151',
-                  backgroundColor: '#FFFFFF',
-                }}
-              />
-              {(filterCondition === 'isBetween' || filterCondition === 'isNotBetween') && (
+              <div style={{ position: 'relative', width: '100%' }}>
                 <input
                   type="text"
-                  placeholder="Second value here..."
-                  value={filterValue2}
-                  onChange={(e) => setFilterValue2(e.target.value)}
+                  placeholder="Value here..."
+                  value={filterValue}
+                  onChange={(e) => setFilterValue(e.target.value)}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
+                    paddingRight: filterValue ? '32px' : '12px',
                     border: '1px solid #D1D5DB',
                     borderRadius: '6px',
                     fontSize: '0.875rem',
                     color: '#374151',
                     backgroundColor: '#FFFFFF',
+                    boxSizing: 'border-box',
                   }}
                 />
+                {filterValue && (
+                  <button
+                    type="button"
+                    onClick={() => setFilterValue('')}
+                    style={{
+                      position: 'absolute',
+                      right: '8px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      width: '16px',
+                      height: '16px',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '4px',
+                      backgroundColor: '#FFFFFF',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: 0,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#9CA3AF';
+                      e.currentTarget.style.backgroundColor = '#F3F4F6';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = '#D1D5DB';
+                      e.currentTarget.style.backgroundColor = '#FFFFFF';
+                    }}
+                  >
+                    <svg
+                      width="10"
+                      height="10"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#6B7280"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+              {(filterCondition === 'isBetween' || filterCondition === 'isNotBetween') && (
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <input
+                    type="text"
+                    placeholder="Second value here..."
+                    value={filterValue2}
+                    onChange={(e) => setFilterValue2(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      paddingRight: filterValue2 ? '32px' : '12px',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      color: '#374151',
+                      backgroundColor: '#FFFFFF',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  {filterValue2 && (
+                    <button
+                      type="button"
+                      onClick={() => setFilterValue2('')}
+                      style={{
+                        position: 'absolute',
+                        right: '8px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        width: '16px',
+                        height: '16px',
+                        border: '1px solid #D1D5DB',
+                        borderRadius: '4px',
+                        backgroundColor: '#FFFFFF',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 0,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = '#9CA3AF';
+                        e.currentTarget.style.backgroundColor = '#F3F4F6';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = '#D1D5DB';
+                        e.currentTarget.style.backgroundColor = '#FFFFFF';
+                      }}
+                    >
+                      <svg
+                        width="10"
+                        height="10"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#6B7280"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           )}

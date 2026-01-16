@@ -367,86 +367,270 @@ const SortProductsFilterDropdown = forwardRef(({
               <>
                 {conditionType === 'between' || conditionType === 'notBetween' ? (
                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <input
-                      type="number"
-                      value={conditionValue.includes('-') ? conditionValue.split('-')[0] : conditionValue}
-                      onChange={(e) => {
-                        const parts = conditionValue.includes('-') ? conditionValue.split('-') : [conditionValue, ''];
-                        const minValue = e.target.value;
-                        const maxValue = parts[1] || '';
-                        if (minValue && maxValue) {
-                          setConditionValue(`${minValue}-${maxValue}`);
-                        } else if (minValue) {
-                          setConditionValue(minValue);
-                        } else if (maxValue) {
-                          setConditionValue(`-${maxValue}`);
-                        } else {
-                          setConditionValue('');
-                        }
-                      }}
-                      placeholder="Min"
-                      style={{
-                        flex: 1,
-                        padding: '6px 8px',
-                        border: '1px solid #E5E7EB',
-                        borderRadius: '4px',
-                        fontSize: '12px',
-                        outline: 'none',
-                        boxSizing: 'border-box',
-                      }}
-                      onFocus={(e) => { e.target.style.borderColor = '#3B82F6'; }}
-                      onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
-                    />
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <input
+                        type="number"
+                        value={conditionValue.includes('-') ? conditionValue.split('-')[0] : conditionValue}
+                        onChange={(e) => {
+                          const parts = conditionValue.includes('-') ? conditionValue.split('-') : [conditionValue, ''];
+                          const minValue = e.target.value;
+                          const maxValue = parts[1] || '';
+                          if (minValue && maxValue) {
+                            setConditionValue(`${minValue}-${maxValue}`);
+                          } else if (minValue) {
+                            setConditionValue(minValue);
+                          } else if (maxValue) {
+                            setConditionValue(`-${maxValue}`);
+                          } else {
+                            setConditionValue('');
+                          }
+                        }}
+                        placeholder="Min"
+                        style={{
+                          width: '100%',
+                          padding: '6px 8px',
+                          paddingRight: (conditionValue.includes('-') ? conditionValue.split('-')[0] : conditionValue) ? '26px' : '8px',
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                        }}
+                        onFocus={(e) => { e.target.style.borderColor = '#3B82F6'; }}
+                        onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
+                      />
+                      {(conditionValue.includes('-') ? conditionValue.split('-')[0] : conditionValue) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const parts = conditionValue.includes('-') ? conditionValue.split('-') : [conditionValue, ''];
+                            const maxValue = parts[1] || '';
+                            if (maxValue) {
+                              setConditionValue(`-${maxValue}`);
+                            } else {
+                              setConditionValue('');
+                            }
+                          }}
+                          style={{
+                            position: 'absolute',
+                            right: '6px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            width: '14px',
+                            height: '14px',
+                            border: '1px solid #D1D5DB',
+                            borderRadius: '3px',
+                            backgroundColor: '#FFFFFF',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: 0,
+                            zIndex: 2,
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = '#9CA3AF';
+                            e.currentTarget.style.backgroundColor = '#F3F4F6';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = '#D1D5DB';
+                            e.currentTarget.style.backgroundColor = '#FFFFFF';
+                          }}
+                          onTouchStart={(e) => {
+                            e.currentTarget.style.borderColor = '#9CA3AF';
+                            e.currentTarget.style.backgroundColor = '#F3F4F6';
+                          }}
+                          onTouchEnd={(e) => {
+                            e.currentTarget.style.borderColor = '#D1D5DB';
+                            e.currentTarget.style.backgroundColor = '#FFFFFF';
+                          }}
+                        >
+                          <svg
+                            width="8"
+                            height="8"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="#6B7280"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
                     <span style={{ fontSize: '12px', color: '#6B7280' }}>to</span>
-                    <input
-                      type="number"
-                      value={conditionValue.includes('-') ? conditionValue.split('-')[1] : ''}
-                      onChange={(e) => {
-                        const parts = conditionValue.includes('-') ? conditionValue.split('-') : [conditionValue, ''];
-                        const minValue = parts[0] || '';
-                        const maxValue = e.target.value;
-                        if (minValue && maxValue) {
-                          setConditionValue(`${minValue}-${maxValue}`);
-                        } else if (minValue) {
-                          setConditionValue(minValue);
-                        } else if (maxValue) {
-                          setConditionValue(`-${maxValue}`);
-                        } else {
-                          setConditionValue('');
-                        }
-                      }}
-                      placeholder="Max"
-                      style={{
-                        flex: 1,
-                        padding: '6px 8px',
-                        border: '1px solid #E5E7EB',
-                        borderRadius: '4px',
-                        fontSize: '12px',
-                        outline: 'none',
-                        boxSizing: 'border-box',
-                      }}
-                      onFocus={(e) => { e.target.style.borderColor = '#3B82F6'; }}
-                      onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
-                    />
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <input
+                        type="number"
+                        value={conditionValue.includes('-') ? conditionValue.split('-')[1] : ''}
+                        onChange={(e) => {
+                          const parts = conditionValue.includes('-') ? conditionValue.split('-') : [conditionValue, ''];
+                          const minValue = parts[0] || '';
+                          const maxValue = e.target.value;
+                          if (minValue && maxValue) {
+                            setConditionValue(`${minValue}-${maxValue}`);
+                          } else if (minValue) {
+                            setConditionValue(minValue);
+                          } else if (maxValue) {
+                            setConditionValue(`-${maxValue}`);
+                          } else {
+                            setConditionValue('');
+                          }
+                        }}
+                        placeholder="Max"
+                        style={{
+                          width: '100%',
+                          padding: '6px 8px',
+                          paddingRight: (conditionValue.includes('-') ? conditionValue.split('-')[1] : '') ? '26px' : '8px',
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                        }}
+                        onFocus={(e) => { e.target.style.borderColor = '#3B82F6'; }}
+                        onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
+                      />
+                      {(conditionValue.includes('-') ? conditionValue.split('-')[1] : '') && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const parts = conditionValue.includes('-') ? conditionValue.split('-') : [conditionValue, ''];
+                            const minValue = parts[0] || '';
+                            if (minValue) {
+                              setConditionValue(minValue);
+                            } else {
+                              setConditionValue('');
+                            }
+                          }}
+                          style={{
+                            position: 'absolute',
+                            right: '6px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            width: '14px',
+                            height: '14px',
+                            border: '1px solid #D1D5DB',
+                            borderRadius: '3px',
+                            backgroundColor: '#FFFFFF',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: 0,
+                            zIndex: 2,
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = '#9CA3AF';
+                            e.currentTarget.style.backgroundColor = '#F3F4F6';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = '#D1D5DB';
+                            e.currentTarget.style.backgroundColor = '#FFFFFF';
+                          }}
+                          onTouchStart={(e) => {
+                            e.currentTarget.style.borderColor = '#9CA3AF';
+                            e.currentTarget.style.backgroundColor = '#F3F4F6';
+                          }}
+                          onTouchEnd={(e) => {
+                            e.currentTarget.style.borderColor = '#D1D5DB';
+                            e.currentTarget.style.backgroundColor = '#FFFFFF';
+                          }}
+                        >
+                          <svg
+                            width="8"
+                            height="8"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="#6B7280"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ) : (
-                  <input
-                    type={isNumericColumn ? 'number' : 'text'}
-                    value={conditionValue}
-                    onChange={(e) => setConditionValue(e.target.value)}
-                    placeholder={isNumericColumn ? 'Enter number...' : 'Enter value...'}
-                    style={{
-                      width: '100%',
-                      padding: '6px 8px',
-                      border: '1px solid #E5E7EB',
-                      borderRadius: '4px',
-                      fontSize: '12px',
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                    }}
-                    onFocus={(e) => { e.target.style.borderColor = '#3B82F6'; }}
-                    onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
-                  />
+                  <div style={{ position: 'relative', width: '100%' }}>
+                    <input
+                      type={isNumericColumn ? 'number' : 'text'}
+                      value={conditionValue}
+                      onChange={(e) => setConditionValue(e.target.value)}
+                      placeholder={isNumericColumn ? 'Enter number...' : 'Enter value...'}
+                      style={{
+                        width: '100%',
+                        padding: '6px 8px',
+                        paddingRight: conditionValue ? '26px' : '8px',
+                        border: '1px solid #E5E7EB',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                      }}
+                      onFocus={(e) => { e.target.style.borderColor = '#3B82F6'; }}
+                      onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
+                    />
+                    {conditionValue && (
+                      <button
+                        type="button"
+                        onClick={() => setConditionValue('')}
+                        style={{
+                          position: 'absolute',
+                          right: '6px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          width: '14px',
+                          height: '14px',
+                          border: '1px solid #D1D5DB',
+                          borderRadius: '3px',
+                          backgroundColor: '#FFFFFF',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: 0,
+                          zIndex: 2,
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = '#9CA3AF';
+                          e.currentTarget.style.backgroundColor = '#F3F4F6';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = '#D1D5DB';
+                          e.currentTarget.style.backgroundColor = '#FFFFFF';
+                        }}
+                        onTouchStart={(e) => {
+                          e.currentTarget.style.borderColor = '#9CA3AF';
+                          e.currentTarget.style.backgroundColor = '#F3F4F6';
+                        }}
+                        onTouchEnd={(e) => {
+                          e.currentTarget.style.borderColor = '#D1D5DB';
+                          e.currentTarget.style.backgroundColor = '#FFFFFF';
+                        }}
+                      >
+                        <svg
+                          width="8"
+                          height="8"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#6B7280"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                 )}
               </>
             )}
@@ -549,6 +733,7 @@ const SortProductsFilterDropdown = forwardRef(({
                   top: '50%',
                   transform: 'translateY(-50%)',
                   pointerEvents: 'none',
+                  zIndex: 1,
                 }}
               >
                 <path
@@ -574,6 +759,7 @@ const SortProductsFilterDropdown = forwardRef(({
                 style={{
                   width: '100%',
                   padding: '5px 8px 5px 26px',
+                  paddingRight: searchTerm ? '24px' : '26px',
                   border: '1px solid #E5E7EB',
                   borderRadius: '4px',
                   fontSize: '11px',
@@ -587,6 +773,59 @@ const SortProductsFilterDropdown = forwardRef(({
                   e.target.style.borderColor = '#E5E7EB';
                 }}
               />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  style={{
+                    position: 'absolute',
+                    right: '20px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: '14px',
+                    height: '14px',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '3px',
+                    backgroundColor: '#FFFFFF',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0,
+                    zIndex: 2,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = '#9CA3AF';
+                    e.currentTarget.style.backgroundColor = '#F3F4F6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = '#D1D5DB';
+                    e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  }}
+                  onTouchStart={(e) => {
+                    e.currentTarget.style.borderColor = '#9CA3AF';
+                    e.currentTarget.style.backgroundColor = '#F3F4F6';
+                  }}
+                  onTouchEnd={(e) => {
+                    e.currentTarget.style.borderColor = '#D1D5DB';
+                    e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  }}
+                >
+                  <svg
+                    width="8"
+                    height="8"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#6B7280"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              )}
               {/* Up/Down arrows */}
               <div
                 style={{
@@ -597,6 +836,8 @@ const SortProductsFilterDropdown = forwardRef(({
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '1px',
+                  pointerEvents: 'none',
+                  zIndex: 1,
                 }}
               >
                 <svg width="10" height="5" viewBox="0 0 12 6" fill="none">

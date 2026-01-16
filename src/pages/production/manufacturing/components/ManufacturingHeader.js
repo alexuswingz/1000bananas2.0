@@ -181,7 +181,7 @@ const ManufacturingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, is
                 width: '100%',
                 height: '32px',
                 paddingLeft: '2.5rem',
-                paddingRight: '8px',
+                paddingRight: searchQuery ? '2.5rem' : '8px',
                 paddingTop: '8px',
                 paddingBottom: '8px',
                 borderRadius: '6px',
@@ -214,6 +214,7 @@ const ManufacturingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, is
                 width: '1rem',
                 height: '1rem',
                 pointerEvents: 'none',
+                zIndex: 1,
               }}
             >
               <path
@@ -223,6 +224,56 @@ const ManufacturingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, is
                 d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
               />
             </svg>
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  if (onSearch) {
+                    onSearch('');
+                  }
+                }}
+                style={{
+                  position: 'absolute',
+                  right: '8px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '16px',
+                  height: '16px',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '4px',
+                  backgroundColor: '#FFFFFF',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
+                  zIndex: 2,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = '#9CA3AF';
+                  e.currentTarget.style.backgroundColor = '#F3F4F6';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = '#D1D5DB';
+                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                }}
+              >
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#6B7280"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
           </div>
           {/* Arrow buttons - outside search bar */}
           <div

@@ -36,6 +36,7 @@ const NewShipmentTable = ({
   const rawQtyInputValues = useRef({}); // Store raw input values while typing (before rounding)
   const [qtyInputUpdateTrigger, setQtyInputUpdateTrigger] = useState(0); // Trigger re-renders during typing
   const [openFilterIndex, setOpenFilterIndex] = useState(null);
+  const [filterModalValue, setFilterModalValue] = useState(''); // State for filter value input in modal
   const filterRefs = useRef({});
   const filterModalRefs = useRef({});
   
@@ -135,6 +136,13 @@ const NewShipmentTable = ({
       setInternalQtyValues(newValues);
     }
   }, [rows.length]);
+
+  // Reset filter modal value when modal closes
+  useEffect(() => {
+    if (openFilterIndex === null) {
+      setFilterModalValue('');
+    }
+  }, [openFilterIndex]);
 
   // Apply filters to rows - preserve original index for qtyValues mapping
   const filteredRows = useMemo(() => {
@@ -2471,20 +2479,69 @@ const NewShipmentTable = ({
                     <option value="lessThan">Less than</option>
                   </select>
                   
-                  <input
-                    type="text"
-                    placeholder="Value here..."
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      border: '1px solid #D1D5DB',
-                      borderRadius: '6px',
-                      fontSize: '0.875rem',
-                      color: '#374151',
-                      backgroundColor: '#FFFFFF',
-                      boxSizing: 'border-box',
-                    }}
-                  />
+                  <div style={{ position: 'relative', width: '100%' }}>
+                    <input
+                      type="text"
+                      placeholder="Value here..."
+                      value={filterModalValue}
+                      onChange={(e) => setFilterModalValue(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        paddingRight: filterModalValue ? '32px' : '12px',
+                        border: '1px solid #D1D5DB',
+                        borderRadius: '6px',
+                        fontSize: '0.875rem',
+                        color: '#374151',
+                        backgroundColor: '#FFFFFF',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    {filterModalValue && (
+                      <button
+                        type="button"
+                        onClick={() => setFilterModalValue('')}
+                        style={{
+                          position: 'absolute',
+                          right: '8px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          width: '16px',
+                          height: '16px',
+                          border: '1px solid #D1D5DB',
+                          borderRadius: '4px',
+                          backgroundColor: '#FFFFFF',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: 0,
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = '#9CA3AF';
+                          e.currentTarget.style.backgroundColor = '#F3F4F6';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = '#D1D5DB';
+                          e.currentTarget.style.backgroundColor = '#FFFFFF';
+                        }}
+                      >
+                        <svg
+                          width="10"
+                          height="10"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#6B7280"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -2492,7 +2549,10 @@ const NewShipmentTable = ({
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
                 <button
                   type="button"
-                  onClick={() => setOpenFilterIndex(null)}
+                  onClick={() => {
+                    setFilterModalValue('');
+                    setOpenFilterIndex(null);
+                  }}
                   style={{
                     padding: '8px 16px',
                     border: '1px solid #D1D5DB',
@@ -5007,7 +5067,8 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
                 onChange={(e) => setFilterValue(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '6px 36px 6px 10px',
+                  padding: '6px 10px',
+                  paddingRight: filterValue ? '60px' : '36px',
                   border: '1px solid #D1D5DB',
                   borderRadius: '6px',
                   fontSize: '0.875rem',
@@ -5016,6 +5077,50 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
                   boxSizing: 'border-box',
                 }}
               />
+              {filterValue && (
+                <button
+                  type="button"
+                  onClick={() => setFilterValue('')}
+                  style={{
+                    position: 'absolute',
+                    right: '28px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: '16px',
+                    height: '16px',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '4px',
+                    backgroundColor: '#FFFFFF',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = '#9CA3AF';
+                    e.currentTarget.style.backgroundColor = '#F3F4F6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = '#D1D5DB';
+                    e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  }}
+                >
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#6B7280"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              )}
               <div style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style={{ cursor: 'pointer' }}>
                   <path d="M1 5L5 1L9 5" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>

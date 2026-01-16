@@ -1933,6 +1933,7 @@ const NewShipment = () => {
                     top: '50%',
                     transform: 'translateY(-50%)',
                     pointerEvents: 'none',
+                    zIndex: 1,
                   }}
                 >
                   <path
@@ -1959,6 +1960,7 @@ const NewShipment = () => {
                     width: '100%',
                     height: '32px',
                     padding: '6px 12px 6px 32px',
+                    paddingRight: searchTerm ? '32px' : '12px',
                     borderRadius: '6px',
                     border: '1px solid #D1D5DB',
                     backgroundColor: '#FFFFFF',
@@ -1974,6 +1976,51 @@ const NewShipment = () => {
                     e.target.style.borderColor = '#D1D5DB';
                   }}
                 />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    style={{
+                      position: 'absolute',
+                      right: '8px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      width: '16px',
+                      height: '16px',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '4px',
+                      backgroundColor: '#FFFFFF',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: 0,
+                      zIndex: 2,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#9CA3AF';
+                      e.currentTarget.style.backgroundColor = '#F3F4F6';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = '#D1D5DB';
+                      e.currentTarget.style.backgroundColor = '#FFFFFF';
+                    }}
+                  >
+                    <svg
+                      width="10"
+                      height="10"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#6B7280"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                )}
                 </div>
               </div>
             </div>
