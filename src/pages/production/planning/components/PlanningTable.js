@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 import ShipmentDetailsModal from './ShipmentDetailsModal';
+import { getProductsInventory } from '../../../../services/productionApi';
 
 const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabelCheckClick, onStatusCommentClick, onStatusClick, onDeleteRow, onUpdateShipment }) => {
   const { isDarkMode } = useTheme();
@@ -20,6 +21,8 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
   const actionMenuDropdownRef = useRef(null);
   const [showShipmentDetailsModal, setShowShipmentDetailsModal] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(false);
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -832,10 +835,333 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
     return filteredRows;
   };
 
+  // Fetch products inventory on mount
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setProductsLoading(true);
+        const productsData = await getProductsInventory();
+        setProducts(productsData || []);
+      } catch (error) {
+        console.error('Error fetching products inventory:', error);
+        setProducts([]);
+      } finally {
+        setProductsLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
   const displayRows = getFilteredAndSortedRows();
+
+  // Calculate card values from rows data
+  const calculateCardValues = () => {
+    // Default DOI goal and lead time (can be made configurable later)
+    const DOI_GOAL = 30; // days
+    const LEAD_TIME = 37; // days (manufacturing + shipping)
+    const FORECAST_DAYS = DOI_GOAL + LEAD_TIME;
+    
+    // Calculate products at risk (products not at "Good" status)
+    // Status is "Good" if DOI >= goal, otherwise it's at risk
+    const productsAtRisk = products.filter(product => {
+      const doi = product.days_of_inventory || 0;
+      // If DOI is 9999 (no sales data), consider it at risk
+      if (doi === 9999 || doi === null || doi === undefined) {
+        return true;
+      }
+      // Status is "Good" if DOI >= goal
+      return doi < DOI_GOAL;
+    }).length;
+
+    // Calculate critical and low risk products
+    // Critical: DOI < 7 days (1 week)
+    // Low: 7 <= DOI < 30 days (between 1 week and goal)
+    const criticalRisk = products.filter(product => {
+      const doi = product.days_of_inventory || 0;
+      return doi > 0 && doi < 7 && doi !== 9999;
+    }).length;
+
+    const lowRisk = products.filter(product => {
+      const doi = product.days_of_inventory || 0;
+      return doi >= 7 && doi < DOI_GOAL && doi !== 9999;
+    }).length;
+
+    // Calculate Total DOI across all products as a whole
+    // Total DOI = Total Inventory / Total Daily Sales Rate
+    const totalDOI = (() => {
+      if (products.length === 0) return 0;
+      
+      // Sum total inventory across all products
+      const totalInventory = products.reduce((sum, p) => {
+        return sum + (p.bottle_inventory || 0);
+      }, 0);
+      
+      // Sum total daily sales velocity across all products
+      const totalDailySalesRate = products.reduce((sum, p) => {
+        // Use daily_sales_velocity if available, otherwise calculate from units_sold_30_days
+        const dailySales = p.daily_sales_velocity || (p.units_sold_30_days ? p.units_sold_30_days / 30.0 : 0);
+        return sum + dailySales;
+      }, 0);
+      
+      // Calculate Total DOI: Total Inventory / Total Daily Sales Rate
+      if (totalDailySalesRate > 0) {
+        return Math.round(totalInventory / totalDailySalesRate);
+      }
+      
+      // If no sales data, return 0
+      return 0;
+    })();
+
+    // Calculate Units to Make - sum of all units to make across all products
+    // Units to Make = (Daily Sales Rate × Forecast Days) - Current Inventory
+    const unitsToMake = Math.round(products.reduce((sum, product) => {
+      const dailySalesRate = product.daily_sales_velocity || 0;
+      const currentInventory = product.bottle_inventory || 0;
+      
+      // Only calculate if we have sales data
+      if (dailySalesRate > 0) {
+        const unitsNeeded = (dailySalesRate * FORECAST_DAYS) - currentInventory;
+        // Only add positive values (negative means we have enough inventory)
+        return sum + Math.max(0, unitsNeeded);
+      }
+      
+      return sum;
+    }, 0));
+    
+    // Calculate Pallets to Make - sum of all pallets needed across all products
+    // For each product: calculate units to make, then convert to pallets
+    const palletsToMake = Math.round(products.reduce((sum, product) => {
+      const dailySalesRate = product.daily_sales_velocity || 0;
+      const currentInventory = product.bottle_inventory || 0;
+      
+      // Only calculate if we have sales data
+      if (dailySalesRate > 0) {
+        const unitsNeeded = (dailySalesRate * FORECAST_DAYS) - currentInventory;
+        
+        // Only calculate pallets if units needed > 0
+        if (unitsNeeded > 0) {
+          // Calculate boxes needed
+          const unitsPerCase = product.finished_units_per_case || product.units_per_case || 60;
+          const boxesNeeded = unitsNeeded / unitsPerCase;
+          
+          // Calculate pallet share using single_box_pallet_share or boxes_per_pallet
+          let palletShare = 0;
+          if (product.single_box_pallet_share && product.single_box_pallet_share > 0) {
+            // Each box takes this fraction of a pallet
+            palletShare = boxesNeeded * product.single_box_pallet_share;
+          } else if (product.boxes_per_pallet && product.boxes_per_pallet > 0) {
+            // boxes_per_pallet is max boxes that fit on one pallet
+            palletShare = boxesNeeded / product.boxes_per_pallet;
+          } else {
+            // Fallback: assume 50 boxes per pallet
+            palletShare = boxesNeeded / 50;
+          }
+          
+          return sum + palletShare;
+        }
+      }
+      
+      return sum;
+    }, 0));
+    
+    return { totalDOI, unitsToMake, palletsToMake, productsAtRisk, criticalRisk, lowRisk };
+  };
+
+  const cardValues = calculateCardValues();
 
   return (
     <>
+      {/* Informational Cards */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: '16px',
+          marginBottom: '24px',
+        }}
+      >
+        {/* Total DOI Card */}
+        <div
+          style={{
+            backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+            borderRadius: '8px',
+            border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+            borderTop: '3px solid #10B981',
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}
+        >
+          <div
+            style={{
+              fontSize: '12px',
+              fontWeight: 500,
+              color: isDarkMode ? '#9CA3AF' : '#6B7280',
+            }}
+          >
+            Total DOI
+          </div>
+          <div
+            style={{
+              fontSize: '24px',
+              fontWeight: 700,
+              color: isDarkMode ? '#F9FAFB' : '#111827',
+            }}
+          >
+            {cardValues.totalDOI.toLocaleString()}
+          </div>
+          <div
+            style={{
+              fontSize: '12px',
+              fontWeight: 400,
+              color: '#10B981',
+            }}
+          >
+            Across all products
+          </div>
+        </div>
+
+        {/* Units to Make Card */}
+        <div
+          style={{
+            backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+            borderRadius: '8px',
+            border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+            borderTop: '3px solid #F59E0B',
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}
+        >
+          <div
+            style={{
+              fontSize: '12px',
+              fontWeight: 500,
+              color: isDarkMode ? '#9CA3AF' : '#6B7280',
+            }}
+          >
+            Units to Make
+          </div>
+          <div
+            style={{
+              fontSize: '24px',
+              fontWeight: 700,
+              color: isDarkMode ? '#F9FAFB' : '#111827',
+            }}
+          >
+            {cardValues.unitsToMake.toLocaleString()}
+          </div>
+          <div
+            style={{
+              fontSize: '12px',
+              fontWeight: 400,
+              color: isDarkMode ? '#9CA3AF' : '#6B7280',
+            }}
+          >
+            Across all products
+          </div>
+        </div>
+
+        {/* Pallets to Make Card */}
+        <div
+          style={{
+            backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+            borderRadius: '8px',
+            border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+            borderTop: '3px solid #06B6D4',
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}
+        >
+          <div
+            style={{
+              fontSize: '12px',
+              fontWeight: 500,
+              color: isDarkMode ? '#9CA3AF' : '#6B7280',
+            }}
+          >
+            Pallets to Make
+          </div>
+          <div
+            style={{
+              fontSize: '24px',
+              fontWeight: 700,
+              color: isDarkMode ? '#F9FAFB' : '#111827',
+            }}
+          >
+            {cardValues.palletsToMake.toLocaleString()}
+          </div>
+          <div
+            style={{
+              fontSize: '12px',
+              fontWeight: 400,
+              color: isDarkMode ? '#9CA3AF' : '#6B7280',
+            }}
+          >
+            With Inventory
+          </div>
+        </div>
+
+        {/* Products at Risk Card */}
+        <div
+          style={{
+            backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+            borderRadius: '8px',
+            border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+            borderTop: '3px solid #EF4444',
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}
+        >
+          <div
+            style={{
+              fontSize: '12px',
+              fontWeight: 500,
+              color: isDarkMode ? '#9CA3AF' : '#6B7280',
+            }}
+          >
+            Products at Risk
+          </div>
+          <div
+            style={{
+              fontSize: '24px',
+              fontWeight: 700,
+              color: isDarkMode ? '#F9FAFB' : '#111827',
+            }}
+          >
+            {cardValues.productsAtRisk.toLocaleString()}
+          </div>
+          <div
+            style={{
+              fontSize: '12px',
+              fontWeight: 400,
+              color: isDarkMode ? '#9CA3AF' : '#6B7280',
+            }}
+          >
+            {cardValues.criticalRisk > 0 || cardValues.lowRisk > 0 ? (
+              <>
+                {cardValues.criticalRisk > 0 && (
+                  <span style={{ color: '#EF4444' }}>{cardValues.criticalRisk} critical</span>
+                )}
+                {cardValues.criticalRisk > 0 && cardValues.lowRisk > 0 && ', '}
+                {cardValues.lowRisk > 0 && (
+                  <span style={{ color: '#F59E0B' }}>{cardValues.lowRisk} low</span>
+                )}
+              </>
+            ) : (
+              <span>No products at risk</span>
+            )}
+          </div>
+        </div>
+      </div>
+
       <div
         className={`${themeClasses.cardBg} ${themeClasses.border} border rounded-xl`}
         style={{ overflowX: 'hidden', position: 'relative' }}

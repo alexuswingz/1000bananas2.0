@@ -1386,12 +1386,6 @@ const NewShipmentTable = ({
     headerBg: 'bg-[#2C3544]',
   };
 
-  const legendItems = [
-    { label: 'FBA Avail.', color: '#A855F7' },
-    { label: 'Total Inv.', color: '#22C55E' },
-    { label: 'Forecast', color: '#3B82F6' },
-  ];
-
   if (!tableMode) {
     // Normal view with timeline
     return (
@@ -1410,7 +1404,7 @@ const NewShipmentTable = ({
             >
               <thead className={themeClasses.headerBg}>
                 <tr style={{ height: '40px', maxHeight: '40px', borderRadius: '16px', overflow: 'hidden' }}>
-                  {['Brand', 'Product', 'Size', 'Add', 'Qty'].map((col, idx) => {
+                  {['Brand', 'Product', 'Size', 'Add', 'Qty', 'DOI'].map((col, idx) => {
                     const filterKey = `normal-${idx}`;
                     const isActiveOrOpen = hasActiveColumnFilter(filterKey) || openFilterColumns.has(filterKey);
                     return (
@@ -1423,10 +1417,11 @@ const NewShipmentTable = ({
                         maxHeight: '40px',
                         lineHeight: '40px',
                         boxSizing: 'border-box',
-                        textAlign: idx === 3 || idx === 4 ? 'center' : 'left',
-                        borderRight: idx === 3 ? 'none' : '1px solid #FFFFFF',
+                        textAlign: idx === 3 || idx === 4 || idx === 5 ? 'center' : 'left',
+                        borderRight: idx === 3 ? 'none' : idx === 4 ? 'none' : idx === 5 ? 'none' : '1px solid #FFFFFF',
                         position: 'relative',
                         borderTopLeftRadius: idx === 0 ? '16px' : undefined,
+                        borderTopRightRadius: idx === 5 ? '16px' : undefined,
                         color: isActiveOrOpen ? '#3B82F6' : '#FFFFFF',
                         width:
                           idx === 0
@@ -1437,6 +1432,8 @@ const NewShipmentTable = ({
                             ? 70
                             : idx === 3 || idx === 4
                             ? 120
+                            : idx === 5
+                            ? 100
                             : undefined,
                       }}
                     >
@@ -1475,227 +1472,6 @@ const NewShipmentTable = ({
                     </th>
                     );
                   })}
-                  <th
-                    className="group text-xs font-bold text-white tracking-wider"
-                    style={{
-                      padding: '0 1rem',
-                      height: '40px',
-                      maxHeight: '40px',
-                      boxSizing: 'border-box',
-                      textAlign: 'left',
-                      verticalAlign: 'middle',
-                      overflow: 'visible',
-                      borderRight: '1px solid #FFFFFF',
-                      position: 'relative',
-                      borderTopRightRadius: '16px',
-                    }}
-                  >
-                    <img
-                      ref={(el) => {
-                        if (el) filterRefs.current['doi-goal'] = el;
-                      }}
-                      src="/assets/Vector (1).png"
-                      alt="Filter"
-                      className={`w-3 h-3 transition-opacity ${
-                        activeFilters.popularFilter || activeFilters.sortField || activeFilters.filterField 
-                          ? 'opacity-100' 
-                          : 'opacity-0 group-hover:opacity-100'
-                      }`}
-                      style={{ 
-                        width: '12px', 
-                        height: '12px',
-                        position: 'absolute',
-                        right: '8px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        cursor: 'pointer',
-                        filter: activeFilters.popularFilter || activeFilters.sortField || activeFilters.filterField 
-                          ? 'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)' 
-                          : undefined,
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        // Close all column filters if open
-                        if (openFilterColumns.size > 0) {
-                          setOpenFilterColumns(new Set());
-                        }
-                        setOpenFilterIndex(openFilterIndex === 'doi-goal' ? null : 'doi-goal');
-                      }}
-                    />
-                    <div
-                      style={{
-                        position: 'relative',
-                        height: '100%',
-                        width: '100%',
-                        paddingTop: '12px',
-                      }}
-                    >
-                      {(() => {
-                        const today = new Date();
-                        const doiGoalDate = new Date(today.getTime() + forecastRange * 24 * 60 * 60 * 1000);
-                        
-                        // Format dates as M/D/YY
-                        const formatDate = (date) => {
-                          const month = date.getMonth() + 1;
-                          const day = date.getDate();
-                          const year = date.getFullYear().toString().slice(-2);
-                          return `${month}/${day}/${year}`;
-                        };
-                        
-                        // Calculate monthly intervals
-                        const months = [];
-                        const totalDays = forecastRange;
-                        const numMonths = 4; // Dec, Jan, Feb, Mar
-                        const daysPerSegment = totalDays / (numMonths + 1);
-                        
-                        for (let i = 1; i <= numMonths; i++) {
-                          const monthDate = new Date(today.getTime() + (daysPerSegment * i) * 24 * 60 * 60 * 1000);
-                          const monthLabel = monthDate.toLocaleDateString('en-US', { month: 'short' });
-                          const leftPercent = (i / (numMonths + 1)) * 100;
-                          months.push({ label: monthLabel, left: `${leftPercent}%` });
-                        }
-                        
-                        return (
-                          <>
-                            {/* Today label and date */}
-                            <div
-                              style={{
-                                position: 'absolute',
-                                top: '0',
-                                left: 'calc(7% - 5px)',
-                                transform: 'translateX(-50%)',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                gap: '1px',
-                              }}
-                            >
-                              <span style={{ fontSize: '11px', fontWeight: 600, color: '#FFFFFF', whiteSpace: 'nowrap', lineHeight: '1.1' }}>
-                                Today
-                              </span>
-                              <span style={{ fontSize: '9px', color: '#FFFFFF', whiteSpace: 'nowrap', lineHeight: '1.1' }}>
-                                {formatDate(today)}
-                              </span>
-                            </div>
-                            
-                            {/* Month labels */}
-                            {months.map((m) => {
-                              // Adjust month label positions to align with the constrained markers
-                              const basePercent = parseFloat(m.left);
-                              const adjustedPercent = 7 + (basePercent * 0.86);
-                              return (
-                                <div
-                                  key={m.left}
-                                  style={{
-                                    position: 'absolute',
-                                    top: '8px',
-                                    left: `${adjustedPercent}%`,
-                                    transform: 'translateX(-50%)',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                  }}
-                                >
-                                  <span style={{ fontSize: '11px', fontWeight: 600, color: '#FFFFFF', whiteSpace: 'nowrap', lineHeight: '1.1' }}>
-                                    {m.label}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                            
-                            {/* DOI Goal label and date */}
-                            <div
-                              style={{
-                                position: 'absolute',
-                                top: '0',
-                                right: 'calc(7% + 5px)',
-                                transform: 'translateX(50%)',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                gap: '1px',
-                              }}
-                            >
-                              <span style={{ fontSize: '11px', fontWeight: 600, color: '#FFFFFF', whiteSpace: 'nowrap', lineHeight: '1.1' }}>
-                                DOI Goal
-                              </span>
-                              <span style={{ fontSize: '9px', color: '#FFFFFF', whiteSpace: 'nowrap', lineHeight: '1.1' }}>
-                                {formatDate(doiGoalDate)}
-                              </span>
-                            </div>
-                            
-                            {/* Horizontal line - thick white line with rounded corners on right */}
-                            <div
-                              style={{
-                                position: 'absolute',
-                                left: '7%',
-                                right: 'calc(7% + 5px)',
-                                top: '30px',
-                                height: '3px',
-                                backgroundColor: '#FFFFFF',
-                                borderTopRightRadius: '6px',
-                                borderBottomRightRadius: '6px',
-                              }}
-                            />
-                            
-                            {/* Today marker - solid white circle */}
-                            <div
-                              style={{
-                                position: 'absolute',
-                                left: 'calc(7% - 5px)',
-                                top: '30px',
-                                transform: 'translate(-50%, -50%)',
-                                width: '12px',
-                                height: '12px',
-                                borderRadius: '50%',
-                                backgroundColor: '#FFFFFF',
-                                zIndex: 1,
-                              }}
-                            />
-                            
-                            {/* Month markers - outlined circles with dark center */}
-                            {months.map((m) => {
-                              // Adjust month marker positions to align with the constrained line
-                              const basePercent = parseFloat(m.left);
-                              const adjustedPercent = 7 + (basePercent * 0.86);
-                              return (
-                                <div
-                                  key={`marker-${m.left}`}
-                                  style={{
-                                    position: 'absolute',
-                                    left: `${adjustedPercent}%`,
-                                    top: '30px',
-                                    transform: 'translate(-50%, -50%)',
-                                    width: '12px',
-                                    height: '12px',
-                                    borderRadius: '50%',
-                                    border: '2px solid #FFFFFF',
-                                    backgroundColor: '#1C2634',
-                                    zIndex: 1,
-                                  }}
-                                />
-                              );
-                            })}
-                            
-                            {/* DOI Goal marker - solid white circle */}
-                            <div
-                              style={{
-                                position: 'absolute',
-                                right: 'calc(7% + 5px)',
-                                top: '30px',
-                                transform: 'translate(50%, -50%)',
-                                width: '12px',
-                                height: '12px',
-                                borderRadius: '50%',
-                                backgroundColor: '#FFFFFF',
-                                zIndex: 1,
-                              }}
-                            />
-                          </>
-                        );
-                      })()}
-                    </div>
-                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -2176,151 +1952,8 @@ const NewShipmentTable = ({
                         )}
                       </div>
                     </td>
-                    <td style={{ padding: '0.65rem 1rem', minWidth: '380px', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }}>
-                      <div
-                        style={{
-                          width: '86%',
-                          margin: '0 auto',
-                          transform: 'translateX(-7px)',
-                          position: 'relative',
-                        }}
-                      >
-                        <div
-                          style={{
-                            position: 'absolute',
-                            top: '-8px',
-                            bottom: '-8px',
-                            left: 0,
-                            borderLeft: `2px dashed ${isDarkMode ? '#9CA3AF' : '#9CA3AF'}`,
-                          }}
-                        />
-                        <div
-                          style={{
-                            position: 'absolute',
-                            top: '-8px',
-                            bottom: '-8px',
-                            right: 0,
-                            borderRight: `2px dashed ${isDarkMode ? '#9CA3AF' : '#9CA3AF'}`,
-                          }}
-                        />
-                        <div
-                          style={{
-                            position: 'relative',
-                          }}
-                        >
-                          <div
-                            onDoubleClick={() => onProductClick(row)}
-                            style={{
-                              borderRadius: '9999px',
-                              backgroundColor: isDarkMode ? '#020617' : '#F3F4F6',
-                              overflow: 'hidden',
-                              height: '18px',
-                              display: 'flex',
-                              cursor: 'pointer',
-                              position: 'relative',
-                            }}
-                            title={`FBA: ${row.fbaAvailable || 0}, Total: ${row.totalInventory || 0}, Forecast: ${Math.round(row.weeklyForecast || row.forecast || 0)}/week, DOI: ${row.daysOfInventory || 0}d | Double-click for N-GOOS details`}
-                          >
-                            {/* Inventory Timeline Visualization - matches backend units_to_make calculation */}
-                            {(() => {
-                              // Use the same logic as the backend:
-                              // Target = weekly_forecast × weeks_to_goal
-                              // units_to_make = Target - current_inventory
-                              
-                              const weeklyForecast = row.weeklyForecast || row.forecast || 0;
-                              const weeksToGoal = forecastRange / 7; // Convert days to weeks
-                              const targetInventory = weeklyForecast * weeksToGoal;
-                              
-                              const fbaInventory = row.fbaAvailable || 0;
-                              const totalInventory = row.totalInventory || 0;
-                              const additionalInventory = Math.max(0, totalInventory - fbaInventory); // AWD etc.
-                              
-                              // units_to_make from the row (calculated by backend)
-                              const unitsToMake = row.units_to_make || row.suggestedQty || 0;
-                              
-                              // Show bars if:
-                              // - units_to_make > 0 (something to produce) - shows all segments
-                              // - OR inventory exists (fbaInventory or additionalInventory > 0) - shows purple/green only
-                              // Hide bars only when there's nothing at all
-                              const hasInventory = fbaInventory > 0 || additionalInventory > 0;
-                              if (unitsToMake === 0 && !hasInventory) {
-                                return null;
-                              }
-                              
-                              // Total bar represents: current inventory + units to make = target
-                              // OR just use target if we have it
-                              const totalBar = Math.max(targetInventory, totalInventory + unitsToMake);
-                              
-                              if (totalBar === 0) {
-                                return null;
-                              }
-                              
-                              // Calculate proportional widths
-                              let fbaPercent = fbaInventory > 0 ? (fbaInventory / totalBar) * 100 : 0;
-                              let greenPercent = additionalInventory > 0 ? (additionalInventory / totalBar) * 100 : 0;
-                              let bluePercent = unitsToMake > 0 ? (unitsToMake / totalBar) * 100 : 0;
-                              
-                              // Add minimum visibility (5%) only for non-zero segments
-                              if (fbaPercent > 0 && fbaPercent < 5) fbaPercent = 5;
-                              if (greenPercent > 0 && greenPercent < 5) greenPercent = 5;
-                              if (bluePercent > 0 && bluePercent < 5) bluePercent = 5;
-                              
-                              // Normalize to 100%
-                              const sum = fbaPercent + greenPercent + bluePercent;
-                              if (sum > 0 && sum !== 100) {
-                                const scale = 100 / sum;
-                                fbaPercent = fbaPercent * scale;
-                                greenPercent = greenPercent * scale;
-                                bluePercent = bluePercent * scale;
-                              }
-                              
-                              // Show as segments: Purple (FBA inventory) + Green (additional inventory) + Blue (units to make)
-                              return (
-                                <>
-                                  {/* Purple segment: FBA Inventory */}
-                                  {fbaInventory > 0 && (
-                                    <div style={{ 
-                                      width: `${fbaPercent}%`, 
-                                      height: '100%',
-                                      backgroundColor: '#A855F7',
-                                      position: 'absolute',
-                                      left: 0,
-                                      top: 0,
-                                      borderRadius: greenPercent === 0 && bluePercent === 0 ? '9999px' : '9999px 0 0 9999px',
-                                    }} />
-                                  )}
-                                  
-                                  {/* Green segment: Additional Inventory (AWD, etc.) */}
-                                  {additionalInventory > 0 && (
-                                    <div style={{ 
-                                      width: `${greenPercent}%`, 
-                                      height: '100%',
-                                      backgroundColor: '#22C55E',
-                                      position: 'absolute',
-                                      left: `${fbaPercent}%`,
-                                      top: 0,
-                                      borderRadius: bluePercent === 0 ? '0 9999px 9999px 0' : 0,
-                                    }} />
-                                  )}
-                                  
-                                  {/* Blue segment: Units to Make (from backend) */}
-                                  {unitsToMake > 0 && (
-                                    <div style={{ 
-                                      width: `${bluePercent}%`, 
-                                      height: '100%',
-                                      backgroundColor: addedRows.has(row.id) ? '#3B82F6' : '#93C5FD', // Regular blue when added, light blue when not added
-                                      position: 'absolute',
-                                      left: `${fbaPercent + greenPercent}%`,
-                                      top: 0,
-                                      borderRadius: '0 9999px 9999px 0',
-                                    }} />
-                                  )}
-                                </>
-                              );
-                            })()}
-                          </div>
-                        </div>
-                      </div>
+                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }} className={themeClasses.text}>
+                      {row.doiTotal || row.daysOfInventory || 0}
                     </td>
                   </tr>
                 ); })}
@@ -2405,57 +2038,6 @@ const NewShipmentTable = ({
             </button>
           </div>
         )}
-
-        {/* Floating Legend */}
-        {typeof document !== 'undefined' &&
-          createPortal(
-            <div
-              style={{
-                position: 'fixed',
-                bottom: '112px',
-                right: '16px',
-                zIndex: 1200,
-                padding: '0.5rem 0.85rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.9rem',
-                borderRadius: '10px',
-                backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
-                border: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`,
-                boxShadow: isDarkMode
-                  ? '0 8px 18px rgba(0, 0, 0, 0.35)'
-                  : '0 8px 18px rgba(0, 0, 0, 0.08)',
-                pointerEvents: 'none',
-                userSelect: 'none',
-              }}
-              className={themeClasses.text}
-            >
-              {legendItems.map((item) => (
-                <div
-                  key={item.label}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                    fontSize: '0.8rem',
-                    whiteSpace: 'nowrap',
-                    color: isDarkMode ? '#E5E7EB' : '#111827',
-                  }}
-                >
-                  <span
-                    style={{
-                      width: '0.85rem',
-                      height: '0.85rem',
-                      borderRadius: 0,
-                      backgroundColor: item.color,
-                    }}
-                  />
-                  <span>{item.label}</span>
-                </div>
-              ))}
-            </div>,
-            document.body
-          )}
 
         {/* Filter Modals */}
         {['normal-0', 'normal-1', 'normal-2', 'normal-3', 'normal-4'].map((filterKey) => (
