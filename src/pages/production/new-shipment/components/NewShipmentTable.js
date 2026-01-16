@@ -19,14 +19,9 @@ const NewShipmentTable = ({
   const [addedRows, setAddedRows] = useState(new Set());
   const [selectionFilter, setSelectionFilter] = useState('all'); // all | checked | unchecked
   const selectAllCheckboxRef = useRef(null);
-  
-  // Selection state for bulk operations (similar to SortProductsTable)
-  const [selectedIndices, setSelectedIndices] = useState(() => new Set());
-  const [lastSelectedIndex, setLastSelectedIndex] = useState(null);
   const [clickedQtyIndex, setClickedQtyIndex] = useState(null);
   const [hoveredQtyIndex, setHoveredQtyIndex] = useState(null);
   const [hoveredAddIndex, setHoveredAddIndex] = useState(null);
-  const [hoveredLabelWarningIndex, setHoveredLabelWarningIndex] = useState(null);
   const qtyContainerRefs = useRef({});
   const popupRefs = useRef({});
   const qtyInputRefs = useRef({});
@@ -36,7 +31,6 @@ const NewShipmentTable = ({
   const rawQtyInputValues = useRef({}); // Store raw input values while typing (before rounding)
   const [qtyInputUpdateTrigger, setQtyInputUpdateTrigger] = useState(0); // Trigger re-renders during typing
   const [openFilterIndex, setOpenFilterIndex] = useState(null);
-  const [filterModalValue, setFilterModalValue] = useState(''); // State for filter value input in modal
   const filterRefs = useRef({});
   const filterModalRefs = useRef({});
   
@@ -136,13 +130,6 @@ const NewShipmentTable = ({
       setInternalQtyValues(newValues);
     }
   }, [rows.length]);
-
-  // Reset filter modal value when modal closes
-  useEffect(() => {
-    if (openFilterIndex === null) {
-      setFilterModalValue('');
-    }
-  }, [openFilterIndex]);
 
   // Apply filters to rows - preserve original index for qtyValues mapping
   const filteredRows = useMemo(() => {
@@ -1362,126 +1349,33 @@ const NewShipmentTable = ({
     }
   };
 
-  // Handle row click for multi-select (similar to SortProductsTable)
-  const handleRowClick = (e, index) => {
-    // Don't handle selection if clicking on interactive elements
-    if (e.target.closest('button') || e.target.closest('input') || e.target.closest('img[alt="Lock"]') || e.target.closest('img[alt="Unlock"]')) {
-      return;
-    }
-
-    const isShiftClick = e.shiftKey;
-    const isCmdClick = e.metaKey || e.ctrlKey;
-
-    if (isShiftClick && lastSelectedIndex !== null) {
-      // Shift + Click: Select range between lastSelectedIndex and current index
-      const start = Math.min(lastSelectedIndex, index);
-      const end = Math.max(lastSelectedIndex, index);
-      const newSelected = new Set(selectedIndices);
-      
-      for (let i = start; i <= end; i++) {
-        newSelected.add(i);
-      }
-      
-      setSelectedIndices(newSelected);
-      setLastSelectedIndex(index);
-    } else if (isCmdClick) {
-      // Cmd/Ctrl + Click: Toggle selection of this item
-      const newSelected = new Set(selectedIndices);
-      if (newSelected.has(index)) {
-        newSelected.delete(index);
-      } else {
-        newSelected.add(index);
-      }
-      setSelectedIndices(newSelected);
-      setLastSelectedIndex(index);
-    } else {
-      // Regular click: Select only this item
-      setSelectedIndices(new Set([index]));
-      setLastSelectedIndex(index);
-    }
-  };
-
-  // Handle Add button click - supports bulk operations
+  // Handle Add button click
   const handleAddClick = (row, index) => {
-    // Check if multiple products are selected
-    const hasMultipleSelected = selectedIndices.size > 1 && selectedIndices.has(index);
+    const newAdded = new Set(addedRows);
     
-    if (hasMultipleSelected) {
-      // Bulk add/remove operation
-      const newAdded = new Set(addedRows);
-      const indicesToProcess = Array.from(selectedIndices);
-      let allAreAdded = true;
-      let allAreNotAdded = true;
-      
-      // Check current state of all selected items (indices are _originalIndex values)
-      indicesToProcess.forEach(originalIdx => {
-        const rowToCheck = currentRows.find(r => r._originalIndex === originalIdx);
-        if (rowToCheck) {
-          if (newAdded.has(rowToCheck.id)) {
-            allAreNotAdded = false;
-          } else {
-            allAreAdded = false;
-          }
-        }
-      });
-      
-      // If all are added, remove all; otherwise add all (if they have qty > 0)
-      if (allAreAdded) {
-        // Remove all selected
-        indicesToProcess.forEach(originalIdx => {
-          const rowToRemove = currentRows.find(r => r._originalIndex === originalIdx);
-          if (rowToRemove) {
-            newAdded.delete(rowToRemove.id);
-          }
-        });
-      } else {
-        // Add all selected (only if they have qty > 0)
-        indicesToProcess.forEach(originalIdx => {
-          const rowToAdd = currentRows.find(r => r._originalIndex === originalIdx);
-          if (rowToAdd) {
-            const currentQty = typeof effectiveQtyValues[originalIdx] === 'number' 
-              ? effectiveQtyValues[originalIdx] 
-              : (effectiveQtyValues[originalIdx] === '' || effectiveQtyValues[originalIdx] === null || effectiveQtyValues[originalIdx] === undefined) 
-                ? 0 
-                : parseInt(effectiveQtyValues[originalIdx], 10) || 0;
-            
-            if (currentQty > 0) {
-              newAdded.add(rowToAdd.id);
-            }
-          }
-        });
-      }
-      
-      setAddedRows(newAdded);
-      if (onAddedRowsChange) onAddedRowsChange(newAdded);
+    if (newAdded.has(row.id)) {
+      // Remove from added - keep the qty value (don't clear it)
+      newAdded.delete(row.id);
     } else {
-      // Single product operation (original behavior)
-      const newAdded = new Set(addedRows);
+      // Check if quantity is 0 before adding
+      const currentQty = typeof effectiveQtyValues[index] === 'number' 
+        ? effectiveQtyValues[index] 
+        : (effectiveQtyValues[index] === '' || effectiveQtyValues[index] === null || effectiveQtyValues[index] === undefined) 
+          ? 0 
+          : parseInt(effectiveQtyValues[index], 10) || 0;
       
-      if (newAdded.has(row.id)) {
-        // Remove from added - keep the qty value (don't clear it)
-        newAdded.delete(row.id);
-      } else {
-        // Check if quantity is 0 before adding
-        const currentQty = typeof effectiveQtyValues[index] === 'number' 
-          ? effectiveQtyValues[index] 
-          : (effectiveQtyValues[index] === '' || effectiveQtyValues[index] === null || effectiveQtyValues[index] === undefined) 
-            ? 0 
-            : parseInt(effectiveQtyValues[index], 10) || 0;
-        
-        if (currentQty === 0) {
-          // Don't add if quantity is 0 - the hover popup will show
-          return;
-        }
-        
-        // Add - just mark as added, don't change qty value
-        // User should have already entered qty before clicking Add
-        newAdded.add(row.id);
+      if (currentQty === 0) {
+        // Don't add if quantity is 0 - the hover popup will show
+        return;
       }
-      // This will update local state and notify parent
-      setAddedRows(newAdded);
-      if (onAddedRowsChange) onAddedRowsChange(newAdded);
+      
+      // Add - just mark as added, don't change qty value
+      // User should have already entered qty before clicking Add
+      newAdded.add(row.id);
     }
+    // This will update local state and notify parent
+    setAddedRows(newAdded);
+    if (onAddedRowsChange) onAddedRowsChange(newAdded);
   };
 
   const themeClasses = {
@@ -1510,767 +1404,133 @@ const NewShipmentTable = ({
             >
               <thead className={themeClasses.headerBg}>
                 <tr style={{ height: '40px', maxHeight: '40px', borderRadius: '16px', overflow: 'hidden' }}>
-                  {['Brand', 'Product', 'Size', 'Add', 'Qty', 'DOI'].map((col, idx) => {
-                    const filterKey = `normal-${idx}`;
-                    const isActiveOrOpen = hasActiveColumnFilter(filterKey) || openFilterColumns.has(filterKey);
-                    return (
-                    <th
-                      key={col}
-                      className="group text-xs font-bold uppercase tracking-wider"
-                      style={{
-                        padding: '0 1rem',
-                        height: '40px',
-                        maxHeight: '40px',
-                        lineHeight: '40px',
-                        boxSizing: 'border-box',
-                        textAlign: idx === 3 || idx === 4 || idx === 5 ? 'center' : 'left',
-                        borderRight: idx === 3 ? 'none' : idx === 4 ? 'none' : idx === 5 ? 'none' : `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
-                        position: 'relative',
-                        borderTopLeftRadius: idx === 0 ? '16px' : undefined,
-                        borderTopRightRadius: idx === 5 ? '16px' : undefined,
-                        color: isActiveOrOpen ? '#3B82F6' : '#FFFFFF',
-                        width:
-                          idx === 0
-                            ? 160
-                            : idx === 1
-                            ? 200
-                            : idx === 2
-                            ? 70
-                            : idx === 3 || idx === 4
-                            ? 120
-                            : idx === 5
-                            ? 100
-                            : undefined,
-                      }}
-                    >
-                      <span>{col}</span>
+                  {/* PRODUCT NAME column */}
+                  <th 
+                    className="group"
+                    style={{
+                      padding: '0 1rem',
+                      height: '40px',
+                      maxHeight: '40px',
+                      lineHeight: '40px',
+                      boxSizing: 'border-box',
+                      textAlign: 'left',
+                      borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
+                      borderTopLeftRadius: '16px',
+                      color: (hasActiveColumnFilter('normal-product') || openFilterColumns.has('normal-product')) ? '#3B82F6' : '#FFFFFF',
+                      width: '280px',
+                      minWidth: '280px',
+                      fontFamily: 'Inter, sans-serif',
+                      fontWeight: 600,
+                      fontSize: '12px',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', position: 'relative' }}>
+                      <span>PRODUCT NAME</span>
                       <img
-                        ref={(el) => {
-                          if (el) filterIconRefs.current[`normal-${idx}`] = el;
-                        }}
+                        ref={(el) => { if (el) filterIconRefs.current['normal-product'] = el; }}
                         src="/assets/Vector (1).png"
                         alt="Filter"
-                        className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter(`normal-${idx}`) || openFilterColumns.has(`normal-${idx}`) ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                        style={{ 
-                          width: '12px', 
-                          height: '12px',
-                          position: 'absolute',
-                          right: '8px',
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          cursor: 'pointer',
-                          filter: hasActiveColumnFilter(`normal-${idx}`) || openFilterColumns.has(`normal-${idx}`) ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const filterKey = `normal-${idx}`;
-                          setOpenFilterColumns((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(filterKey)) {
-                              next.delete(filterKey);
-                            } else {
-                              next.add(filterKey);
-                            }
-                            return next;
-                          });
-                        }}
+                        className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('normal-product') || openFilterColumns.has('normal-product') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                        style={{ width: '12px', height: '12px', cursor: 'pointer', filter: hasActiveColumnFilter('normal-product') || openFilterColumns.has('normal-product') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none' }}
+                        onClick={(e) => { e.stopPropagation(); setOpenFilterColumns((prev) => { const next = new Set(prev); if (next.has('normal-product')) next.delete('normal-product'); else next.add('normal-product'); return next; }); }}
                       />
-                    </th>
-                    );
-                  })}
+                    </div>
+                  </th>
+                  {/* ASIN column */}
+                  <th style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`, color: '#FFFFFF', width: '120px', fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase' }}>
+                    <span>ASIN</span>
+                  </th>
+                  {/* STATUS column */}
+                  <th style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`, color: '#FFFFFF', width: '90px', fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase' }}>
+                    <span>STATUS</span>
+                  </th>
+                  {/* INVENTORY column */}
+                  <th style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`, color: '#FFFFFF', width: '100px', fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase' }}>
+                    <span>INVENTORY</span>
+                  </th>
+                  {/* UNITS TO MAKE column */}
+                  <th style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`, color: '#FFFFFF', width: '120px', fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase' }}>
+                    <span>UNITS TO MAKE</span>
+                  </th>
+                  {/* DOI (DAYS) column */}
+                  <th style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`, color: '#FFFFFF', width: '90px', fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase' }}>
+                    <span>DOI (DAYS)</span>
+                  </th>
+                  {/* SHIPMENT ACTIONS column */}
+                  <th style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderTopRightRadius: '16px', color: '#FFFFFF', width: '180px', fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase' }}>
+                    <span>SHIPMENT ACTIONS</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {currentRows.map((row) => {
                   const index = row._originalIndex;
-                  const isSelected = selectedIndices.has(index);
+                  const effectiveAddedRows = addedRows;
+                  const doiValue = row.doiTotal || row.daysOfInventory || 0;
+                  const isGoodStatus = doiValue >= 30;
                   return (
-                  <tr 
-                    key={`${row.id}-${index}`} 
-                    className="border-t border-gray-200" 
-                    style={{ 
-                      height: '40px', 
-                      maxHeight: '40px',
-                      backgroundColor: isSelected ? (isDarkMode ? 'rgba(59, 130, 246, 0.25)' : 'rgba(59, 130, 246, 0.2)') : undefined,
-                      cursor: 'pointer'
-                    }}
-                    onClick={(e) => handleRowClick(e, index)}
-                  >
-                    <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} className={themeClasses.text}>
-                      {row.brand}
-                    </td>
-                    <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}` }}>
-                      <span
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onProductClick(row);
-                        }}
-                        className="text-blue-500 hover:text-blue-600 hover:underline"
-                        style={{ 
-                          cursor: 'pointer',
-                          fontSize: '0.85rem',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          display: 'inline',
-                          maxWidth: '100%',
-                        }}
-                      >
-                        {row.product}
-                      </span>
-                    </td>
-                    <td style={{ padding: '0.65rem 1rem', fontSize: '0.85rem', height: '40px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} className={themeClasses.textSecondary}>
-                      {row.size}
-                    </td>
-                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}` }}>
-                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', position: 'relative' }}>
-                        <div
-                          ref={(el) => {
-                            if (el) addButtonRefs.current[index] = el;
-                          }}
-                          onMouseEnter={() => {
-                            const currentQty = typeof effectiveQtyValues[index] === 'number' 
-                              ? effectiveQtyValues[index] 
-                              : (effectiveQtyValues[index] === '' || effectiveQtyValues[index] === null || effectiveQtyValues[index] === undefined) 
-                                ? 0 
-                                : parseInt(effectiveQtyValues[index], 10) || 0;
-                            if (currentQty === 0 && !addedRows.has(row.id)) {
-                              setHoveredAddIndex(index);
-                            }
-                          }}
-                          onMouseLeave={() => setHoveredAddIndex(null)}
-                          style={{ position: 'relative', display: 'inline-block' }}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => handleAddClick(row, index)}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: addedRows.has(row.id) ? '0' : '10px',
-                              width: '80px',
-                              height: '24px',
-                              borderRadius: '9999px',
-                              border: 'none',
-                              backgroundColor: addedRows.has(row.id) ? '#10B981' : '#2563EB',
-                              color: '#FFFFFF',
-                              fontSize: '0.875rem',
-                              fontWeight: 500,
-                              fontFamily: 'sans-serif',
-                              cursor: 'pointer',
-                              padding: 0,
-                              transition: 'background-color 0.2s',
-                              position: 'relative',
-                            }}
-                          >
-                            {!addedRows.has(row.id) && (
-                              <span
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  width: '9.33px',
-                                  height: '9.33px',
-                                  color: '#FFFFFF',
-                                  fontSize: '0.875rem',
-                                  fontWeight: 600,
-                                  lineHeight: 1,
-                                  flexShrink: 0,
-                                }}
-                              >
-                                +
-                              </span>
-                            )}
-                            <span style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>{addedRows.has(row.id) ? 'Added' : 'Add'}</span>
-                          </button>
-                          {/* Hover popup for 0 quantity */}
-                          {hoveredAddIndex === index && (() => {
-                            const currentQty = typeof effectiveQtyValues[index] === 'number' 
-                              ? effectiveQtyValues[index] 
-                              : (effectiveQtyValues[index] === '' || effectiveQtyValues[index] === null || effectiveQtyValues[index] === undefined) 
-                                ? 0 
-                                : parseInt(effectiveQtyValues[index], 10) || 0;
-                            return currentQty === 0 && !addedRows.has(row.id);
-                          })() && (
-                            <div
-                              ref={(el) => {
-                                if (el) addPopupRefs.current[index] = el;
-                              }}
-                              style={{
-                                position: 'fixed',
-                                backgroundColor: '#FFFFFF',
-                                borderRadius: '8px',
-                                padding: '8px 12px',
-                                minWidth: '180px',
-                                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                                zIndex: 9999,
-                                border: '1px solid #E5E7EB',
-                                pointerEvents: 'auto',
-                              }}
-                              onMouseEnter={() => setHoveredAddIndex(index)}
-                              onMouseLeave={() => setHoveredAddIndex(null)}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                              }}
-                              onMouseDown={(e) => e.stopPropagation()}
-                              onMouseUp={(e) => e.stopPropagation()}
-                            >
-                              <div style={{ marginBottom: '6px' }}>
-                                <h3 style={{
-                                  fontSize: '12px',
-                                  fontWeight: 600,
-                                  color: '#111827',
-                                  marginBottom: '2px',
-                                  lineHeight: '1.3',
-                                }}>
-                                  0 quantity. Add quantity to include in shipment
-                                </h3>
-                              </div>
-                            </div>
-                          )}
+                  <tr key={`${row.id}-${index}`} style={{ height: '56px', backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF' }}>
+                    {/* PRODUCT NAME cell - with image, name, and brand/size subtitle */}
+                    <td style={{ padding: '0.5rem 1rem', height: '56px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ width: '40px', height: '40px', minWidth: '40px', borderRadius: '6px', overflow: 'hidden', backgroundColor: isDarkMode ? '#374151' : '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {row.imageUrl || row.smallImage || row.image ? (
+                            <img src={row.imageUrl || row.smallImage || row.image} alt={row.product} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling && (e.target.nextSibling.style.display = 'flex'); }} />
+                          ) : null}
+                          <div style={{ display: row.imageUrl || row.smallImage || row.image ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', color: isDarkMode ? '#6B7280' : '#9CA3AF', fontSize: '10px' }}>No img</div>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', overflow: 'hidden' }}>
+                          <span onClick={() => onProductClick(row)} className="text-blue-500 hover:text-blue-600 hover:underline" style={{ cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>{row.product}</span>
+                          <span style={{ fontSize: '0.75rem', color: isDarkMode ? '#9CA3AF' : '#6B7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>{row.brand} • {row.size}</span>
                         </div>
                       </div>
                     </td>
-                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}` }}>
-                      <div
-                        style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                        onMouseEnter={() => setHoveredQtyIndex(index)}
-                        onMouseLeave={() => setHoveredQtyIndex(null)}
-                      >
-                        <input
-                          type="number"
-                          min="0"
-                          step={(() => {
-                            const size = row.size?.toLowerCase() || '';
-                            if (size.includes('8oz')) return 60;
-                            if (size.includes('quart')) return 12;
-                            if (size.includes('gallon')) return 4;
-                            return 1;
-                          })()}
-                          title={row.needsSeasonality ? 'Needs seasonality data for accurate forecast' : ''}
-                          value={(() => {
-                            // Show raw input value while typing, otherwise show rounded value
-                            if (rawQtyInputValues.current[index] !== undefined) {
-                              return rawQtyInputValues.current[index];
-                            }
-                            const qtyValue = effectiveQtyValues[index];
-                            return qtyValue !== undefined && qtyValue !== null && qtyValue !== '' ? String(qtyValue) : '';
-                          })()}
-                          onChange={(e) => {
-                            const inputValue = e.target.value;
-                            // Mark this field as manually edited
-                            manuallyEditedIndices.current.add(index);
-                            
-                            // Store raw input value (no rounding while typing)
-                            if (inputValue === '' || inputValue === '-') {
-                              rawQtyInputValues.current[index] = '';
-                            } else {
-                              // Store raw value for display while typing
-                              rawQtyInputValues.current[index] = inputValue;
-                            }
-                            // Force a minimal re-render to update the input value
-                            setQtyInputUpdateTrigger(prev => prev + 1);
-                          }}
-                          onBlur={(e) => {
-                            const inputValue = e.target.value;
-                            // Round and validate when user finishes typing
-                            if (inputValue === '' || inputValue === '-') {
-                              rawQtyInputValues.current[index] = undefined;
-                              effectiveSetQtyValues(prev => ({
-                                ...prev,
-                                [index]: ''
-                              }));
-                            } else {
-                              const numValue = parseInt(inputValue, 10);
-                              if (!isNaN(numValue) && numValue >= 0) {
-                                const rounded = roundQuantityToCaseSize(numValue, row.size);
-                                rawQtyInputValues.current[index] = undefined; // Clear raw value
-                                effectiveSetQtyValues(prev => ({
-                                  ...prev,
-                                  [index]: rounded
-                                }));
-                              } else {
-                                // Invalid input, clear it
-                                rawQtyInputValues.current[index] = undefined;
-                                effectiveSetQtyValues(prev => ({
-                                  ...prev,
-                                  [index]: ''
-                                }));
-                              }
-                            }
-                          }}
-                          onKeyDown={(e) => {
-                            // Handle ArrowUp and ArrowDown for bulk operations
-                            if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                              e.preventDefault();
-                              
-                              // Check if multiple products are selected
-                              const hasMultipleSelected = selectedIndices.size > 1 && selectedIndices.has(index);
-                              
-                              if (hasMultipleSelected) {
-                                // Bulk increase/decrease operation
-                                const indicesToProcess = Array.from(selectedIndices);
-                                const updates = {};
-                                const isIncrease = e.key === 'ArrowUp';
-                                
-                                indicesToProcess.forEach(originalIdx => {
-                                  const rowToUpdate = currentRows.find(r => r._originalIndex === originalIdx);
-                                  if (rowToUpdate) {
-                                    const currentQty = effectiveQtyValues[originalIdx] ?? 0;
-                                    const numQty =
-                                      typeof currentQty === 'number'
-                                        ? currentQty
-                                        : currentQty === '' ||
-                                          currentQty === null ||
-                                          currentQty === undefined
-                                        ? 0
-                                        : parseInt(currentQty, 10) || 0;
-                                    
-                                    // Stop at 0 for decrease - don't allow going negative
-                                    if (!isIncrease && numQty <= 0) {
-                                      return;
-                                    }
-                                    
-                                    // Determine increment based on size
-                                    let increment = 0;
-                                    const size = rowToUpdate.size?.toLowerCase() || '';
-                                    if (size.includes('8oz')) {
-                                      increment = 60;
-                                    } else if (size.includes('quart')) {
-                                      increment = 12;
-                                    } else if (size.includes('gallon')) {
-                                      increment = 4;
-                                    }
-                                    
-                                    const newQty = isIncrease 
-                                      ? Math.max(0, numQty + increment)
-                                      : Math.max(0, numQty - increment);
-                                    updates[originalIdx] = newQty;
-                                    manuallyEditedIndices.current.add(originalIdx);
-                                  }
-                                });
-                                
-                                effectiveSetQtyValues(prev => ({
-                                  ...prev,
-                                  ...updates,
-                                }));
-                              } else {
-                                // Single product operation
-                                const currentQty = effectiveQtyValues[index] ?? 0;
-                                const numQty =
-                                  typeof currentQty === 'number'
-                                    ? currentQty
-                                    : currentQty === '' ||
-                                      currentQty === null ||
-                                      currentQty === undefined
-                                    ? 0
-                                    : parseInt(currentQty, 10) || 0;
-                                
-                                // Stop at 0 for decrease - don't allow going negative
-                                if (e.key === 'ArrowDown' && numQty <= 0) {
-                                  return;
-                                }
-                                
-                                // Determine increment based on size
-                                let increment = 0;
-                                const size = row.size?.toLowerCase() || '';
-                                if (size.includes('8oz')) {
-                                  increment = 60;
-                                } else if (size.includes('quart')) {
-                                  increment = 12;
-                                } else if (size.includes('gallon')) {
-                                  increment = 4;
-                                }
-                                
-                                const newQty = e.key === 'ArrowUp'
-                                  ? Math.max(0, numQty + increment)
-                                  : Math.max(0, numQty - increment);
-                                
-                                manuallyEditedIndices.current.add(index);
-                                effectiveSetQtyValues(prev => ({
-                                  ...prev,
-                                  [index]: newQty,
-                                }));
-                              }
-                              return;
-                            }
-                            
-                            // Round and validate when user presses Enter
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              const inputValue = e.target.value;
-                              if (inputValue === '' || inputValue === '-') {
-                                rawQtyInputValues.current[index] = undefined;
-                                effectiveSetQtyValues(prev => ({
-                                  ...prev,
-                                  [index]: ''
-                                }));
-                              } else {
-                                const numValue = parseInt(inputValue, 10);
-                                if (!isNaN(numValue) && numValue >= 0) {
-                                  const rounded = roundQuantityToCaseSize(numValue, row.size);
-                                  rawQtyInputValues.current[index] = undefined; // Clear raw value
-                                  effectiveSetQtyValues(prev => ({
-                                    ...prev,
-                                    [index]: rounded
-                                  }));
-                                } else {
-                                  // Invalid input, clear it
-                                  rawQtyInputValues.current[index] = undefined;
-                                  effectiveSetQtyValues(prev => ({
-                                    ...prev,
-                                    [index]: ''
-                                  }));
-                                }
-                              }
-                              e.target.blur(); // Remove focus after Enter
-                            }
-                          }}
-                          placeholder="0"
-                          className={`${themeClasses.cardBg} border rounded-md text-xs ${themeClasses.text}`}
-                          style={{
-                            padding: '0.25rem 0.5rem 0.25rem 1.75rem', // extra left padding for reset icon
-                            width: '90px',
-                            textAlign: 'center',
-                            cursor: 'text',
-                            borderColor: isQtyExceedingLabels(row, index) 
-                              ? '#EF4444' // Red for exceeding labels
-                              : row.needsSeasonality 
-                                ? '#F59E0B' // Orange/amber for needs seasonality
-                                : (isDarkMode ? '#374151' : '#D1D5DB'),
-                            backgroundColor: isQtyExceedingLabels(row, index) 
-                              ? (isDarkMode ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.05)') 
-                              : row.needsSeasonality 
-                                ? (isDarkMode ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.05)') 
-                                : undefined,
-                          }}
-                        />
-                        {/* Warning icon for products needing seasonality data */}
-                        {row.needsSeasonality && (
-                          <div
-                            title="Needs seasonality data for accurate forecast"
-                            style={{
-                              width: '18px',
-                              height: '18px',
-                              borderRadius: '50%',
-                              backgroundColor: '#F59E0B',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: '#FFFFFF',
-                              fontSize: '11px',
-                              fontWeight: 700,
-                              cursor: 'help',
-                              flexShrink: 0,
-                            }}
-                          >
-                            !
-                          </div>
-                        )}
-                        {(() => {
-                          const forecastValue = Math.round(row.weeklyForecast || row.forecast || 0);
-                          // Check both the raw input value (while typing) and the effective value
-                          const rawInputValue = rawQtyInputValues.current[index];
-                          const qtyValue = effectiveQtyValues[index];
-                          
-                          // Determine the current displayed value (raw if typing, otherwise effective)
-                          let currentDisplayValue;
-                          if (rawInputValue !== undefined) {
-                            // User is typing - use raw input value
-                            currentDisplayValue = rawInputValue === '' ? 0 : (parseInt(rawInputValue, 10) || 0);
-                          } else {
-                            // Use effective value
-                            const isValueSet = qtyValue !== undefined && qtyValue !== null && qtyValue !== '';
-                            currentDisplayValue = typeof qtyValue === 'number' 
-                              ? qtyValue 
-                              : isValueSet 
-                                ? parseInt(qtyValue, 10) || 0
-                                : 0;
-                          }
-                          
-                          // Only show reset if value has been manually edited by user and differs from forecast
-                          const isManuallyEdited = manuallyEditedIndices.current.has(index);
-                          const hasValue = rawInputValue !== undefined ? rawInputValue !== '' : (qtyValue !== undefined && qtyValue !== null && qtyValue !== '');
-                          const hasChanged = hasValue && isManuallyEdited && currentDisplayValue !== forecastValue;
-                          
-                          return hasChanged ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                // Clear raw input value
-                                rawQtyInputValues.current[index] = undefined;
-                                effectiveSetQtyValues(prev => ({
-                                  ...prev,
-                                  [index]: forecastValue,
-                                }));
-                                // Remove from manually edited set when reset to forecast
-                                manuallyEditedIndices.current.delete(index);
-                              }}
-                              style={{
-                                position: 'absolute',
-                                left: '6px',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                borderRadius: '999px',
-                                border: 'none',
-                                backgroundColor: 'transparent',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                padding: 0,
-                                margin: 0,
-                              }}
-                              onMouseEnter={() => {}}
-                              onMouseLeave={() => {}}
-                            >
-                              <img
-                                src="/assets/reset.png"
-                                alt="Reset quantity"
-                                style={{
-                                  display: 'block',
-                                  width: '9px',
-                                  height: '9px',
-                                  objectFit: 'contain',
-                                }}
-                              />
-                            </button>
-                          ) : null;
-                        })()}
-                        {/* Label warning icon - positioned absolutely to not affect alignment */}
-                        {isQtyExceedingLabels(row, index) && (effectiveQtyValues[index] ?? 0) > 0 && (
-                          <>
-                            <span
-                              onMouseEnter={(e) => {
-                                e.stopPropagation();
-                                setHoveredLabelWarningIndex(index);
-                              }}
-                              onMouseLeave={(e) => {
-                                e.stopPropagation();
-                                setHoveredLabelWarningIndex(null);
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setHoveredLabelWarningIndex(null);
-                                setClickedQtyIndex(clickedQtyIndex === index ? null : index);
-                              }}
-                              style={{
-                                position: 'absolute',
-                                left: '96px',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                width: '18px',
-                                height: '18px',
-                                borderRadius: '50%',
-                                backgroundColor: '#FEE2E2',
-                                color: '#DC2626',
-                                fontSize: '12px',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                zIndex: 10,
-                              }}
-                            >
-                              !
-                            </span>
-                            {/* Label inventory tooltip on hover */}
-                            {hoveredLabelWarningIndex === index && (() => {
-                              const labelsAvailable = getAvailableLabelsForRow(row, index);
-                              
-                              return (
-                                <div
-                                  style={{
-                                    position: 'absolute',
-                                    top: '100%',
-                                    left: '50%',
-                                    transform: 'translateX(calc(30% - 47px))',
-                                    marginTop: '-63px',
-                                    zIndex: 10000,
-                                    pointerEvents: 'auto',
-                                  }}
-                                  onMouseEnter={() => setHoveredLabelWarningIndex(index)}
-                                  onMouseLeave={() => setHoveredLabelWarningIndex(null)}
-                                >
-                                  <div
-                                    style={{
-                                      backgroundColor: '#FFFFFF',
-                                      borderRadius: '8px',
-                                      padding: '8px',
-                                      width: '134px',
-                                      height: '31px',
-                                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                                      position: 'relative',
-                                      display: 'flex',
-                                      flexDirection: 'row',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      gap: '4px',
-                                    }}
-                                  >
-                                    <div style={{
-                                      fontSize: '13px',
-                                      color: '#6B7280',
-                                      lineHeight: '1.4',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                      whiteSpace: 'nowrap',
-                                    }}>
-                                      <span style={{ color: '#6B7280' }}>Labels Available: </span>
-                                      <span style={{ color: '#111827', fontWeight: 500 }}>{labelsAvailable.toLocaleString()}</span>
-                                    </div>
-                                    {/* Downward arrow */}
-                                    <div
-                                      style={{
-                                        position: 'absolute',
-                                        bottom: '-6px',
-                                        left: '50%',
-                                        transform: 'translateX(-50%)',
-                                        width: 0,
-                                        height: 0,
-                                        borderLeft: '6px solid transparent',
-                                        borderRight: '6px solid transparent',
-                                        borderTop: '6px solid #FFFFFF',
-                                      }}
-                                    />
-                                  </div>
-                                </div>
-                              );
-                            })()}
-                          </>
-                        )}
-                        {/* Popup for "Use Available" */}
-                        {clickedQtyIndex === index && isQtyExceedingLabels(row, index) && (
-                          <div
-                            ref={(el) => {
-                              if (el) popupRefs.current[index] = el;
-                            }}
-                            style={{
-                              position: 'absolute',
-                              bottom: '100%',
-                              left: '50%',
-                              transform: 'translateX(calc(30% - 93px))',
-                              marginBottom: '8px',
-                              zIndex: 9999,
-                              pointerEvents: 'auto',
-                            }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                            }}
-                            onMouseDown={(e) => e.stopPropagation()}
-                            onMouseUp={(e) => e.stopPropagation()}
-                          >
-                            <div style={{
-                              backgroundColor: '#FFFFFF',
-                              borderRadius: '12px',
-                              padding: '8px',
-                              width: '191px',
-                              height: '76px',
-                              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                              border: '1px solid #E5E7EB',
-                              position: 'relative',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '4px',
-                            }}>
-                            <div>
-                              <h3 style={{
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                color: '#111827',
-                                marginBottom: '2px',
-                                lineHeight: '1.3',
-                              }}>
-                                Order exceeds available labels
-                              </h3>
-                              <p style={{
-                                fontSize: '11px',
-                                fontWeight: 400,
-                                color: '#9CA3AF',
-                                lineHeight: '1.4',
-                              }}>
-                                Labels Available: {getAvailableLabelsForRow(row, index).toLocaleString()}
-                              </p>
-                            </div>
-                            <button
-                              style={{
-                                width: '175px',
-                                height: '23px',
-                                backgroundColor: '#3B82F6',
-                                color: '#FFFFFF',
-                                fontSize: '11px',
-                                fontWeight: 600,
-                                borderRadius: '4px',
-                                border: 'none',
-                                cursor: 'pointer',
-                                transition: 'background-color 0.2s',
-                              }}
-                              onMouseEnter={(e) => e.target.style.backgroundColor = '#2563EB'}
-                              onMouseLeave={(e) => e.target.style.backgroundColor = '#3B82F6'}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                const labelsAvailable = getAvailableLabelsForRow(row, index);
-                                
-                                // Round down to nearest case pack increment
-                                let increment = 1;
-                                const size = row.size?.toLowerCase() || '';
-                                if (size.includes('8oz')) increment = 60;
-                                else if (size.includes('quart')) increment = 12;
-                                else if (size.includes('gallon')) increment = 4;
-                                
-                                const maxQty = Math.floor(labelsAvailable / increment) * increment;
-                                
-                                // Mark as manually edited since user clicked "Use Available"
-                                manuallyEditedIndices.current.add(index);
-                                effectiveSetQtyValues(prev => ({
-                                  ...prev,
-                                  [index]: maxQty
-                                }));
-                                
-                                setTimeout(() => setClickedQtyIndex(null), 100);
-                              }}
-                              onMouseDown={(e) => e.stopPropagation()}
-                            >
-                              Use Available
-                            </button>
-                            {/* Downward arrow */}
-                            <div
-                              style={{
-                                position: 'absolute',
-                                bottom: '-6px',
-                                left: '50%',
-                                transform: 'translateX(-50%)',
-                                width: 0,
-                                height: 0,
-                                borderLeft: '6px solid transparent',
-                                borderRight: '6px solid transparent',
-                                borderTop: '6px solid #FFFFFF',
-                              }}
-                            />
-                            </div>
-                          </div>
-                        )}
+                    {/* ASIN cell */}
+                    <td style={{ padding: '0.5rem 1rem', fontSize: '0.8rem', textAlign: 'center', height: '56px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`, color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
+                      {row.asin || row.child_asin || row.childAsin || '—'}
+                    </td>
+                    {/* STATUS cell */}
+                    <td style={{ padding: '0.5rem 1rem', textAlign: 'center', height: '56px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}` }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '4px 12px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 600, backgroundColor: isGoodStatus ? '#D1FAE5' : '#FEF3C7', color: isGoodStatus ? '#059669' : '#D97706' }}>
+                        {isGoodStatus ? 'Good' : 'Low'}
+                      </span>
+                    </td>
+                    {/* INVENTORY cell */}
+                    <td style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', textAlign: 'center', height: '56px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`, fontWeight: 500, color: isDarkMode ? '#F9FAFB' : '#111827' }}>
+                      {(row.fbaAvailable || 0).toLocaleString()}
+                    </td>
+                    {/* UNITS TO MAKE cell */}
+                    <td style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', textAlign: 'center', height: '56px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`, fontWeight: 600, color: '#F97316' }}>
+                      {Math.round(row.weeklyForecast || row.forecast || 0).toLocaleString()}
+                    </td>
+                    {/* DOI (DAYS) cell */}
+                    <td style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', textAlign: 'center', height: '56px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`, fontWeight: 500, color: isDarkMode ? '#F9FAFB' : '#111827' }}>
+                      {doiValue}
+                    </td>
+                    {/* SHIPMENT ACTIONS cell */}
+                    <td style={{ padding: '0.5rem 1rem', textAlign: 'center', height: '56px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                        {/* Minus button */}
+                        <button onClick={(e) => { e.stopPropagation(); const currentQty = effectiveQtyValues[index] ?? 0; const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0; if (numQty <= 0) return; let increment = 1; const size = row.size?.toLowerCase() || ''; if (size.includes('8oz')) increment = 60; else if (size.includes('quart')) increment = 12; else if (size.includes('gallon')) increment = 4; const newQty = Math.max(0, numQty - increment); manuallyEditedIndices.current.add(index); effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty })); }} style={{ width: '24px', height: '24px', borderRadius: '4px', border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`, backgroundColor: 'transparent', color: isDarkMode ? '#9CA3AF' : '#6B7280', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 600 }}>−</button>
+                        {/* Quantity input */}
+                        <input type="number" min="0" value={effectiveQtyValues[index] !== undefined && effectiveQtyValues[index] !== null && effectiveQtyValues[index] !== '' ? effectiveQtyValues[index] : ''} onChange={(e) => { const inputValue = e.target.value; manuallyEditedIndices.current.add(index); if (inputValue === '' || inputValue === '-') { effectiveSetQtyValues(prev => ({ ...prev, [index]: '' })); } else { const numValue = parseInt(inputValue, 10); if (!isNaN(numValue) && numValue >= 0) { effectiveSetQtyValues(prev => ({ ...prev, [index]: numValue })); } } }} onClick={(e) => e.stopPropagation()} style={{ width: '60px', height: '24px', borderRadius: '4px', border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`, backgroundColor: isDarkMode ? '#374151' : '#FFFFFF', color: isDarkMode ? '#F9FAFB' : '#111827', textAlign: 'center', fontSize: '0.8rem', fontWeight: 500, outline: 'none', MozAppearance: 'textfield', WebkitAppearance: 'none' }} />
+                        {/* Plus button */}
+                        <button onClick={(e) => { e.stopPropagation(); const currentQty = effectiveQtyValues[index] ?? 0; const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0; let increment = 1; const size = row.size?.toLowerCase() || ''; if (size.includes('8oz')) increment = 60; else if (size.includes('quart')) increment = 12; else if (size.includes('gallon')) increment = 4; const newQty = numQty + increment; manuallyEditedIndices.current.add(index); effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty })); }} style={{ width: '24px', height: '24px', borderRadius: '4px', border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`, backgroundColor: 'transparent', color: isDarkMode ? '#9CA3AF' : '#6B7280', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 600 }}>+</button>
+                        {/* Add button */}
+                        <button onClick={() => handleAddClick(row, index)} style={{ padding: '4px 12px', borderRadius: '4px', border: 'none', backgroundColor: effectiveAddedRows.has(row.id) ? '#10B981' : '#2563EB', color: '#FFFFFF', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          {effectiveAddedRows.has(row.id) ? '✓' : '+'} Add
+                        </button>
                       </div>
                     </td>
-                    <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}` }} className={themeClasses.text}>
-                      {row.doiTotal || row.daysOfInventory || 0}
-                    </td>
                   </tr>
-                ); })}
+                  ); })}
               </tbody>
             </table>
           </div>
         </div>
 
-        {/* Header Filter Dropdowns for Brand / Product / Size / Add / Qty */}
+        {/* Header Filter Dropdowns */}
         {Array.from(openFilterColumns).map((columnKey) => {
           if (!filterIconRefs.current[columnKey]) return null;
           return (
@@ -2478,69 +1738,20 @@ const NewShipmentTable = ({
                     <option value="lessThan">Less than</option>
                   </select>
                   
-                  <div style={{ position: 'relative', width: '100%' }}>
-                    <input
-                      type="text"
-                      placeholder="Value here..."
-                      value={filterModalValue}
-                      onChange={(e) => setFilterModalValue(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        paddingRight: filterModalValue ? '32px' : '12px',
-                        border: '1px solid #D1D5DB',
-                        borderRadius: '6px',
-                        fontSize: '0.875rem',
-                        color: '#374151',
-                        backgroundColor: '#FFFFFF',
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                    {filterModalValue && (
-                      <button
-                        type="button"
-                        onClick={() => setFilterModalValue('')}
-                        style={{
-                          position: 'absolute',
-                          right: '8px',
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          width: '16px',
-                          height: '16px',
-                          border: '1px solid #D1D5DB',
-                          borderRadius: '4px',
-                          backgroundColor: '#FFFFFF',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          padding: 0,
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = '#9CA3AF';
-                          e.currentTarget.style.backgroundColor = '#F3F4F6';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = '#D1D5DB';
-                          e.currentTarget.style.backgroundColor = '#FFFFFF';
-                        }}
-                      >
-                        <svg
-                          width="10"
-                          height="10"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#6B7280"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <line x1="18" y1="6" x2="6" y2="18" />
-                          <line x1="6" y1="6" x2="18" y2="18" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
+                  <input
+                    type="text"
+                    placeholder="Value here..."
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      color: '#374151',
+                      backgroundColor: '#FFFFFF',
+                      boxSizing: 'border-box',
+                    }}
+                  />
                 </div>
               </div>
 
@@ -2548,10 +1759,7 @@ const NewShipmentTable = ({
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '16px', borderTop: '1px solid #E5E7EB' }}>
                 <button
                   type="button"
-                  onClick={() => {
-                    setFilterModalValue('');
-                    setOpenFilterIndex(null);
-                  }}
+                  onClick={() => setOpenFilterIndex(null)}
                   style={{
                     padding: '8px 16px',
                     border: '1px solid #D1D5DB',
@@ -2674,7 +1882,7 @@ const NewShipmentTable = ({
                 backgroundColor: '#1C2634',
                 boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
                 borderTopLeftRadius: '16px',
-                borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
+                borderRight: '1px solid #FFFFFF',
               }}>
                 <input 
                   type="checkbox" 
@@ -2707,7 +1915,7 @@ const NewShipmentTable = ({
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
                   color: (hasActiveColumnFilter('brand') || openFilterColumns.has('brand')) ? '#3B82F6' : '#FFFFFF',
-                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
+                  borderRight: '1px solid #FFFFFF',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', position: 'relative' }}>
@@ -2752,7 +1960,7 @@ const NewShipmentTable = ({
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
                   color: (hasActiveColumnFilter('product') || openFilterColumns.has('product')) ? '#3B82F6' : '#FFFFFF',
-                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
+                  borderRight: '1px solid #FFFFFF',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', position: 'relative' }}>
@@ -2826,7 +2034,7 @@ const NewShipmentTable = ({
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
-                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
+                  borderRight: '1px solid #FFFFFF',
                   boxSizing: 'border-box',
                   fontFamily: 'Inter, sans-serif',
                   fontWeight: 600,
@@ -2864,7 +2072,7 @@ const NewShipmentTable = ({
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
-                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
+                  borderRight: '1px solid #FFFFFF',
                   boxSizing: 'border-box',
                   backgroundColor: '#1C2634',
                 }}
@@ -2923,7 +2131,7 @@ const NewShipmentTable = ({
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
-                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
+                  borderRight: '1px solid #FFFFFF',
                   boxSizing: 'border-box',
                   backgroundColor: '#1C2634',
                 }}
@@ -2982,7 +2190,7 @@ const NewShipmentTable = ({
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
-                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
+                  borderRight: '1px solid #FFFFFF',
                   boxSizing: 'border-box',
                   fontFamily: 'Inter, sans-serif',
                   fontWeight: 600,
@@ -3021,7 +2229,7 @@ const NewShipmentTable = ({
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
-                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
+                  borderRight: '1px solid #FFFFFF',
                   boxSizing: 'border-box',
                   fontFamily: 'Inter, sans-serif',
                   fontWeight: 600,
@@ -3060,7 +2268,7 @@ const NewShipmentTable = ({
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
-                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
+                  borderRight: '1px solid #FFFFFF',
                   boxSizing: 'border-box',
                   fontFamily: 'Inter, sans-serif',
                   fontWeight: 600,
@@ -3099,7 +2307,7 @@ const NewShipmentTable = ({
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
-                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
+                  borderRight: '1px solid #FFFFFF',
                   boxSizing: 'border-box',
                   fontFamily: 'Inter, sans-serif',
                   fontWeight: 600,
@@ -3138,7 +2346,7 @@ const NewShipmentTable = ({
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
-                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
+                  borderRight: '1px solid #FFFFFF',
                   boxSizing: 'border-box',
                   fontFamily: 'Inter, sans-serif',
                   fontWeight: 600,
@@ -3177,7 +2385,7 @@ const NewShipmentTable = ({
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
-                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
+                  borderRight: '1px solid #FFFFFF',
                   boxSizing: 'border-box',
                   fontFamily: 'Inter, sans-serif',
                   fontWeight: 600,
@@ -3235,7 +2443,7 @@ const NewShipmentTable = ({
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
-                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
+                  borderRight: '1px solid #FFFFFF',
                   boxSizing: 'border-box',
                   fontFamily: 'Inter, sans-serif',
                   fontWeight: 600,
@@ -3290,7 +2498,7 @@ const NewShipmentTable = ({
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
-                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
+                  borderRight: '1px solid #FFFFFF',
                   boxSizing: 'border-box',
                   fontFamily: 'Inter, sans-serif',
                   fontWeight: 600,
@@ -3345,7 +2553,7 @@ const NewShipmentTable = ({
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
-                  borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
+                  borderRight: '1px solid #FFFFFF',
                   boxSizing: 'border-box',
                   fontFamily: 'Inter, sans-serif',
                   fontWeight: 600,
@@ -3405,7 +2613,7 @@ const NewShipmentTable = ({
                 zIndex: 6,
                 backgroundColor: '#1C2634',
                 boxShadow: '-2px 0 4px rgba(0,0,0,0.1)',
-                borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
+                borderRight: '1px solid #FFFFFF',
                 borderTopRightRadius: '16px',
               }}>
                 <span style={{ color: '#FFFFFF', fontSize: '1rem' }}>⋮</span>
@@ -3415,18 +2623,8 @@ const NewShipmentTable = ({
           <tbody>
             {currentRows.map((row) => {
               const index = row._originalIndex;
-              const isSelected = selectedIndices.has(index);
               return (
-              <tr 
-                key={`${row.id}-${index}`} 
-                style={{ 
-                  height: '40px', 
-                  maxHeight: '40px',
-                  backgroundColor: isSelected ? (isDarkMode ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)') : undefined,
-                  cursor: 'pointer'
-                }}
-                onClick={(e) => handleRowClick(e, index)}
-              >
+              <tr key={`${row.id}-${index}`} style={{ height: '40px', maxHeight: '40px' }}>
                 {/* Sticky columns */}
                 <td style={{ 
                   padding: '0.65rem 0.75rem', 
@@ -3441,7 +2639,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
-                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                  borderTop: '1px solid #E5E7EB',
                 }}>
                   <input 
                     type="checkbox" 
@@ -3464,7 +2662,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
-                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                  borderTop: '1px solid #E5E7EB',
                 }} className={themeClasses.text}>
                   {row.brand}
                 </td>
@@ -3482,18 +2680,16 @@ const NewShipmentTable = ({
                   minWidth: '200px',
                   maxWidth: '200px',
                   boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
-                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                  borderTop: '1px solid #E5E7EB',
                 }}>
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onProductClick(row);
-                    }}
-                    className="text-xs text-blue-500 hover:text-blue-600 hover:underline"
-                    style={{ cursor: 'pointer', display: 'inline' }}
+                  <button
+                    type="button"
+                    onClick={() => onProductClick(row)}
+                    className="text-xs text-blue-500 hover:text-blue-600"
+                    style={{ textDecoration: 'underline', cursor: 'pointer', margin: '0 auto', display: 'block' }}
                   >
                     {row.product.length > 18 ? `${row.product.substring(0, 18)}...` : row.product}
-                  </span>
+                  </button>
                 </td>
                 <td style={{ 
                   padding: '0.65rem 1rem', 
@@ -3508,7 +2704,7 @@ const NewShipmentTable = ({
                   maxWidth: '120px',
                   height: '40px',
                   verticalAlign: 'middle',
-                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                  borderTop: '1px solid #E5E7EB',
                   borderRight: 'none',
                 }} className={themeClasses.textSecondary}>
                   {row.size}
@@ -3521,7 +2717,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxSizing: 'border-box',
-                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                  borderTop: '1px solid #E5E7EB',
                   borderLeft: 'none',
                 }}>
                   <div style={{ position: 'relative', display: 'block' }}>
@@ -3671,101 +2867,6 @@ const NewShipmentTable = ({
                           }
                         }}
                         onKeyDown={(e) => {
-                          // Handle ArrowUp and ArrowDown for bulk operations
-                          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                            e.preventDefault();
-                            
-                            // Check if multiple products are selected
-                            const hasMultipleSelected = selectedIndices.size > 1 && selectedIndices.has(index);
-                            
-                            if (hasMultipleSelected) {
-                              // Bulk increase/decrease operation
-                              const indicesToProcess = Array.from(selectedIndices);
-                              const updates = {};
-                              const isIncrease = e.key === 'ArrowUp';
-                              
-                              indicesToProcess.forEach(originalIdx => {
-                                const rowToUpdate = currentRows.find(r => r._originalIndex === originalIdx);
-                                if (rowToUpdate) {
-                                  const currentQty = effectiveQtyValues[originalIdx] ?? 0;
-                                  const numQty =
-                                    typeof currentQty === 'number'
-                                      ? currentQty
-                                      : currentQty === '' ||
-                                        currentQty === null ||
-                                        currentQty === undefined
-                                      ? 0
-                                      : parseInt(currentQty, 10) || 0;
-                                  
-                                  // Stop at 0 for decrease - don't allow going negative
-                                  if (!isIncrease && numQty <= 0) {
-                                    return;
-                                  }
-                                  
-                                  // Determine increment based on size
-                                  let increment = 0;
-                                  const size = rowToUpdate.size?.toLowerCase() || '';
-                                  if (size.includes('8oz')) {
-                                    increment = 60;
-                                  } else if (size.includes('quart')) {
-                                    increment = 12;
-                                  } else if (size.includes('gallon')) {
-                                    increment = 4;
-                                  }
-                                  
-                                  const newQty = isIncrease 
-                                    ? Math.max(0, numQty + increment)
-                                    : Math.max(0, numQty - increment);
-                                  updates[originalIdx] = newQty;
-                                  manuallyEditedIndices.current.add(originalIdx);
-                                }
-                              });
-                              
-                              effectiveSetQtyValues(prev => ({
-                                ...prev,
-                                ...updates,
-                              }));
-                            } else {
-                              // Single product operation
-                              const currentQty = effectiveQtyValues[index] ?? 0;
-                              const numQty =
-                                typeof currentQty === 'number'
-                                  ? currentQty
-                                  : currentQty === '' ||
-                                    currentQty === null ||
-                                    currentQty === undefined
-                                  ? 0
-                                  : parseInt(currentQty, 10) || 0;
-                              
-                              // Stop at 0 for decrease - don't allow going negative
-                              if (e.key === 'ArrowDown' && numQty <= 0) {
-                                return;
-                              }
-                              
-                              // Determine increment based on size
-                              let increment = 0;
-                              const size = row.size?.toLowerCase() || '';
-                              if (size.includes('8oz')) {
-                                increment = 60;
-                              } else if (size.includes('quart')) {
-                                increment = 12;
-                              } else if (size.includes('gallon')) {
-                                increment = 4;
-                              }
-                              
-                              const newQty = e.key === 'ArrowUp'
-                                ? Math.max(0, numQty + increment)
-                                : Math.max(0, numQty - increment);
-                              
-                              manuallyEditedIndices.current.add(index);
-                              effectiveSetQtyValues(prev => ({
-                                ...prev,
-                                [index]: newQty,
-                              }));
-                            }
-                            return;
-                          }
-                          
                           // Round and validate when user presses Enter
                           if (e.key === 'Enter') {
                             e.preventDefault();
@@ -3853,80 +2954,34 @@ const NewShipmentTable = ({
                             onClick={(e) => {
                               e.stopPropagation();
                               e.preventDefault();
+                              const currentQty = effectiveQtyValues[index] ?? 0;
+                              const numQty =
+                                typeof currentQty === 'number'
+                                  ? currentQty
+                                  : currentQty === '' ||
+                                    currentQty === null ||
+                                    currentQty === undefined
+                                  ? 0
+                                  : parseInt(currentQty, 10) || 0;
                               
-                              // Check if multiple products are selected
-                              const hasMultipleSelected = selectedIndices.size > 1 && selectedIndices.has(index);
-                              
-                              if (hasMultipleSelected) {
-                                // Bulk increase operation
-                                const indicesToProcess = Array.from(selectedIndices);
-                                const updates = {};
-                                
-                                indicesToProcess.forEach(idx => {
-                                  const rowToUpdate = filteredRows[idx];
-                                  if (rowToUpdate) {
-                                    const currentQty = effectiveQtyValues[idx] ?? 0;
-                                    const numQty =
-                                      typeof currentQty === 'number'
-                                        ? currentQty
-                                        : currentQty === '' ||
-                                          currentQty === null ||
-                                          currentQty === undefined
-                                        ? 0
-                                        : parseInt(currentQty, 10) || 0;
-                                    
-                                    // Determine increment based on size
-                                    let increment = 0;
-                                    const size = rowToUpdate.size?.toLowerCase() || '';
-                                    if (size.includes('8oz')) {
-                                      increment = 60;
-                                    } else if (size.includes('quart')) {
-                                      increment = 12;
-                                    } else if (size.includes('gallon')) {
-                                      increment = 4;
-                                    }
-                                    
-                                    const newQty = Math.max(0, numQty + increment);
-                                    updates[idx] = newQty;
-                                    manuallyEditedIndices.current.add(idx);
-                                  }
-                                });
-                                
-                                effectiveSetQtyValues(prev => ({
-                                  ...prev,
-                                  ...updates,
-                                }));
-                              } else {
-                                // Single product operation (original behavior)
-                                const currentQty = effectiveQtyValues[index] ?? 0;
-                                const numQty =
-                                  typeof currentQty === 'number'
-                                    ? currentQty
-                                    : currentQty === '' ||
-                                      currentQty === null ||
-                                      currentQty === undefined
-                                    ? 0
-                                    : parseInt(currentQty, 10) || 0;
-                                
-                                // Determine increment based on size
-                                let increment = 0;
-                                const size = row.size?.toLowerCase() || '';
-                                if (size.includes('8oz')) {
-                                  increment = 60;
-                                } else if (size.includes('quart')) {
-                                  increment = 12;
-                                } else if (size.includes('gallon')) {
-                                  increment = 4;
-                                }
-                                
-                                const newQty = Math.max(0, numQty + increment);
-                                // Mark as manually edited since user clicked increment button
-                                manuallyEditedIndices.current.add(index);
-                                effectiveSetQtyValues(prev => ({
-                                  ...prev,
-                                  [index]: newQty,
-                                }));
+                              // Determine increment based on size
+                              let increment = 0;
+                              const size = row.size?.toLowerCase() || '';
+                              if (size.includes('8oz')) {
+                                increment = 60;
+                              } else if (size.includes('quart')) {
+                                increment = 12;
+                              } else if (size.includes('gallon')) {
+                                increment = 4;
                               }
+                              
+                              const newQty = Math.max(0, numQty + increment);
+                              // Mark as manually edited since user clicked increment button
+                              manuallyEditedIndices.current.add(index);
+                              effectiveSetQtyValues(prev => ({
+                                ...prev,
+                                [index]: newQty,
+                              }));
                             }}
                             style={{
                               width: '100%',
@@ -3962,90 +3017,39 @@ const NewShipmentTable = ({
                             onClick={(e) => {
                               e.stopPropagation();
                               e.preventDefault();
+                              const currentQty = effectiveQtyValues[index] ?? 0;
+                              const numQty =
+                                typeof currentQty === 'number'
+                                  ? currentQty
+                                  : currentQty === '' ||
+                                    currentQty === null ||
+                                    currentQty === undefined
+                                  ? 0
+                                  : parseInt(currentQty, 10) || 0;
                               
-                              // Check if multiple products are selected
-                              const hasMultipleSelected = selectedIndices.size > 1 && selectedIndices.has(index);
-                              
-                              if (hasMultipleSelected) {
-                                // Bulk decrease operation
-                                const indicesToProcess = Array.from(selectedIndices);
-                                const updates = {};
-                                
-                                indicesToProcess.forEach(idx => {
-                                  const rowToUpdate = filteredRows[idx];
-                                  if (rowToUpdate) {
-                                    const currentQty = effectiveQtyValues[idx] ?? 0;
-                                    const numQty =
-                                      typeof currentQty === 'number'
-                                        ? currentQty
-                                        : currentQty === '' ||
-                                          currentQty === null ||
-                                          currentQty === undefined
-                                        ? 0
-                                        : parseInt(currentQty, 10) || 0;
-                                    
-                                    // Stop at 0 - don't allow going negative
-                                    if (numQty <= 0) {
-                                      return;
-                                    }
-                                    
-                                    // Determine increment based on size
-                                    let increment = 0;
-                                    const size = rowToUpdate.size?.toLowerCase() || '';
-                                    if (size.includes('8oz')) {
-                                      increment = 60;
-                                    } else if (size.includes('quart')) {
-                                      increment = 12;
-                                    } else if (size.includes('gallon')) {
-                                      increment = 4;
-                                    }
-                                    
-                                    const newQty = Math.max(0, numQty - increment);
-                                    updates[idx] = newQty;
-                                    manuallyEditedIndices.current.add(idx);
-                                  }
-                                });
-                                
-                                effectiveSetQtyValues(prev => ({
-                                  ...prev,
-                                  ...updates,
-                                }));
-                              } else {
-                                // Single product operation (original behavior)
-                                const currentQty = effectiveQtyValues[index] ?? 0;
-                                const numQty =
-                                  typeof currentQty === 'number'
-                                    ? currentQty
-                                    : currentQty === '' ||
-                                      currentQty === null ||
-                                      currentQty === undefined
-                                    ? 0
-                                    : parseInt(currentQty, 10) || 0;
-                                
-                                // Stop at 0 - don't allow going negative
-                                if (numQty <= 0) {
-                                  return;
-                                }
-                                
-                                // Determine increment based on size
-                                let increment = 0;
-                                const size = row.size?.toLowerCase() || '';
-                                if (size.includes('8oz')) {
-                                  increment = 60;
-                                } else if (size.includes('quart')) {
-                                  increment = 12;
-                                } else if (size.includes('gallon')) {
-                                  increment = 4;
-                                }
-                                
-                                const newQty = Math.max(0, numQty - increment);
-                                // Mark as manually edited since user clicked decrement button
-                                manuallyEditedIndices.current.add(index);
-                                effectiveSetQtyValues(prev => ({
-                                  ...prev,
-                                  [index]: newQty,
-                                }));
+                              // Stop at 0 - don't allow going negative
+                              if (numQty <= 0) {
+                                return;
                               }
+                              
+                              // Determine increment based on size
+                              let increment = 0;
+                              const size = row.size?.toLowerCase() || '';
+                              if (size.includes('8oz')) {
+                                increment = 60;
+                              } else if (size.includes('quart')) {
+                                increment = 12;
+                              } else if (size.includes('gallon')) {
+                                increment = 4;
+                              }
+                              
+                              const newQty = Math.max(0, numQty - increment);
+                              // Mark as manually edited since user clicked decrement button
+                              manuallyEditedIndices.current.add(index);
+                              effectiveSetQtyValues(prev => ({
+                                ...prev,
+                                [index]: newQty,
+                              }));
                             }}
                             style={{
                               width: '100%',
@@ -4086,105 +3090,32 @@ const NewShipmentTable = ({
                       // Only show warning if labels needed exceed available
                       if (labelsNeeded > labelsAvailable && labelsNeeded > 0) {
                         return (
-                          <>
-                            <span
-                              onMouseEnter={(e) => {
-                                e.stopPropagation();
-                                setHoveredLabelWarningIndex(index);
-                              }}
-                              onMouseLeave={(e) => {
-                                e.stopPropagation();
-                                setHoveredLabelWarningIndex(null);
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setHoveredLabelWarningIndex(null);
-                                setClickedQtyIndex(clickedQtyIndex === index ? null : index);
-                              }}
-                              style={{
-                                position: 'absolute',
-                                left: '119px',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                width: '18px',
-                                height: '18px',
-                                borderRadius: '50%',
-                                backgroundColor: '#FEE2E2',
-                                color: '#DC2626',
-                                fontSize: '12px',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                zIndex: 10,
-                              }}
-                            >
-                              !
-                            </span>
-                            {/* Label inventory tooltip on hover */}
-                            {hoveredLabelWarningIndex === index && (() => {
-                              return (
-                                <div
-                                  style={{
-                                    position: 'absolute',
-                                    top: '100%',
-                                    left: '50%',
-                                    transform: 'translateX(calc(30% - 47px))',
-                                    marginTop: '-63px',
-                                    zIndex: 10000,
-                                    pointerEvents: 'auto',
-                                  }}
-                                  onMouseEnter={() => setHoveredLabelWarningIndex(index)}
-                                  onMouseLeave={() => setHoveredLabelWarningIndex(null)}
-                                >
-                                  <div
-                                    style={{
-                                      backgroundColor: '#FFFFFF',
-                                      borderRadius: '8px',
-                                      padding: '8px',
-                                      width: '134px',
-                                      height: '31px',
-                                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                                      position: 'relative',
-                                      display: 'flex',
-                                      flexDirection: 'row',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      gap: '4px',
-                                    }}
-                                  >
-                                    <div style={{
-                                      fontSize: '13px',
-                                      color: '#6B7280',
-                                      lineHeight: '1.4',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                      whiteSpace: 'nowrap',
-                                    }}>
-                                      <span style={{ color: '#6B7280' }}>Labels Available: </span>
-                                      <span style={{ color: '#111827', fontWeight: 500 }}>{labelsAvailable.toLocaleString()}</span>
-                                    </div>
-                                    {/* Downward arrow */}
-                                    <div
-                                      style={{
-                                        position: 'absolute',
-                                        bottom: '-6px',
-                                        left: '50%',
-                                        transform: 'translateX(-50%)',
-                                        width: 0,
-                                        height: 0,
-                                        borderLeft: '6px solid transparent',
-                                        borderRight: '6px solid transparent',
-                                        borderTop: '6px solid #FFFFFF',
-                                      }}
-                                    />
-                                  </div>
-                                </div>
-                              );
-                            })()}
-                          </>
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setClickedQtyIndex(clickedQtyIndex === index ? null : index);
+                            }}
+                            style={{
+                              position: 'absolute',
+                              left: '119px',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '18px',
+                              height: '18px',
+                              borderRadius: '50%',
+                              backgroundColor: '#FEE2E2',
+                              color: '#DC2626',
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              zIndex: 10,
+                            }}
+                          >
+                            !
+                          </span>
                         );
                       }
                       return null;
@@ -4200,11 +3131,17 @@ const NewShipmentTable = ({
                         }}
                         style={{
                           position: 'absolute',
-                          bottom: '100%',
+                          top: '100%',
                           left: '50%',
-                          transform: 'translateX(calc(30% - 116px))',
-                          marginBottom: '8px',
+                          transform: 'translateX(-50%)',
+                          marginTop: '8px',
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: '12px',
+                          padding: '14px 16px',
+                          minWidth: '220px',
+                          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
                           zIndex: 9999,
+                          border: '1px solid #E5E7EB',
                           pointerEvents: 'auto',
                         }}
                         onClick={(e) => {
@@ -4214,31 +3151,18 @@ const NewShipmentTable = ({
                         onMouseDown={(e) => e.stopPropagation()}
                         onMouseUp={(e) => e.stopPropagation()}
                       >
-                        <div style={{
-                          backgroundColor: '#FFFFFF',
-                          borderRadius: '12px',
-                          padding: '8px',
-                          width: '191px',
-                          height: '76px',
-                          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                          border: '1px solid #E5E7EB',
-                          position: 'relative',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '4px',
-                        }}>
-                        <div>
+                        <div style={{ marginBottom: '10px' }}>
                           <h3 style={{
-                            fontSize: '12px',
+                            fontSize: '14px',
                             fontWeight: 600,
                             color: '#111827',
-                            marginBottom: '2px',
+                            marginBottom: '4px',
                             lineHeight: '1.3',
                           }}>
                             Order exceeds available labels
                           </h3>
                           <p style={{
-                            fontSize: '11px',
+                            fontSize: '13px',
                             fontWeight: 400,
                             color: '#9CA3AF',
                             lineHeight: '1.4',
@@ -4248,13 +3172,13 @@ const NewShipmentTable = ({
                         </div>
                         <button
                           style={{
-                            width: '175px',
-                            height: '23px',
+                            width: '100%',
+                            height: '32px',
                             backgroundColor: '#3B82F6',
                             color: '#FFFFFF',
-                            fontSize: '11px',
+                            fontSize: '13px',
                             fontWeight: 600,
-                            borderRadius: '4px',
+                            borderRadius: '6px',
                             border: 'none',
                             cursor: 'pointer',
                             transition: 'background-color 0.2s',
@@ -4288,21 +3212,6 @@ const NewShipmentTable = ({
                         >
                           Use Available
                         </button>
-                        {/* Downward arrow */}
-                        <div
-                          style={{
-                            position: 'absolute',
-                            bottom: '-6px',
-                            left: '50%',
-                            transform: 'translateX(-50%)',
-                            width: 0,
-                            height: 0,
-                            borderLeft: '6px solid transparent',
-                            borderRight: '6px solid transparent',
-                            borderTop: '6px solid #FFFFFF',
-                          }}
-                        />
-                        </div>
                       </div>
                     )}
                   </div>
@@ -4315,7 +3224,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxSizing: 'border-box',
-                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                  borderTop: '1px solid #E5E7EB',
                   fontWeight: 600,
                   color: '#A855F7', // Purple - matches FBA Avail. legend
                 }}>
@@ -4329,7 +3238,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxSizing: 'border-box',
-                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                  borderTop: '1px solid #E5E7EB',
                   fontWeight: 600,
                   color: '#22C55E', // Green - matches Total Inv. legend
                 }}>
@@ -4343,7 +3252,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxSizing: 'border-box',
-                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                  borderTop: '1px solid #E5E7EB',
                   fontWeight: 600,
                   color: '#3B82F6', // Blue - matches Forecast legend
                 }}>
@@ -4357,7 +3266,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxSizing: 'border-box',
-                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                  borderTop: '1px solid #E5E7EB',
                 }} className={themeClasses.text}>
                   {row.sales7Day || 0}
                 </td>
@@ -4369,7 +3278,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxSizing: 'border-box',
-                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                  borderTop: '1px solid #E5E7EB',
                 }} className={themeClasses.text}>
                   {row.sales30Day || 0}
                 </td>
@@ -4381,7 +3290,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxSizing: 'border-box',
-                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                  borderTop: '1px solid #E5E7EB',
                 }} className={themeClasses.text}>
                   {Math.round((row.sales30Day || 0) * 4)}
                 </td>
@@ -4393,7 +3302,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxSizing: 'border-box',
-                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                  borderTop: '1px solid #E5E7EB',
                 }} className={themeClasses.text}>
                   {row.formula_name || ''}
                 </td>
@@ -4405,7 +3314,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxSizing: 'border-box',
-                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                  borderTop: '1px solid #E5E7EB',
                 }} className={themeClasses.text}>
                   {row.bottleInventory || row.bottle_inventory || 0}
                 </td>
@@ -4417,7 +3326,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxSizing: 'border-box',
-                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                  borderTop: '1px solid #E5E7EB',
                 }} className={themeClasses.text}>
                   {row.closureInventory || row.closure_inventory || 0}
                 </td>
@@ -4429,7 +3338,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxSizing: 'border-box',
-                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                  borderTop: '1px solid #E5E7EB',
                 }} className={themeClasses.text}>
                   {row.boxInventory || row.box_inventory || 0}
                 </td>
@@ -4441,7 +3350,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxSizing: 'border-box',
-                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                  borderTop: '1px solid #E5E7EB',
                 }} className={themeClasses.text}>
                   {row.labelsAvailable || row.label_inventory || row.labels_available || 0}
                 </td>
@@ -4456,7 +3365,7 @@ const NewShipmentTable = ({
                   height: '40px',
                   verticalAlign: 'middle',
                   boxShadow: '-2px 0 4px rgba(0,0,0,0.1)',
-                  borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                  borderTop: '1px solid #E5E7EB',
                 }}>
                   <button
                     type="button"
@@ -5068,8 +3977,7 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
                 onChange={(e) => setFilterValue(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '6px 10px',
-                  paddingRight: filterValue ? '60px' : '36px',
+                  padding: '6px 36px 6px 10px',
                   border: '1px solid #D1D5DB',
                   borderRadius: '6px',
                   fontSize: '0.875rem',
@@ -5078,50 +3986,6 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
                   boxSizing: 'border-box',
                 }}
               />
-              {filterValue && (
-                <button
-                  type="button"
-                  onClick={() => setFilterValue('')}
-                  style={{
-                    position: 'absolute',
-                    right: '28px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    width: '16px',
-                    height: '16px',
-                    border: '1px solid #D1D5DB',
-                    borderRadius: '4px',
-                    backgroundColor: '#FFFFFF',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: 0,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = '#9CA3AF';
-                    e.currentTarget.style.backgroundColor = '#F3F4F6';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = '#D1D5DB';
-                    e.currentTarget.style.backgroundColor = '#FFFFFF';
-                  }}
-                >
-                  <svg
-                    width="10"
-                    height="10"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#6B7280"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
-              )}
               <div style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <svg width="10" height="6" viewBox="0 0 10 6" fill="none" style={{ cursor: 'pointer' }}>
                   <path d="M1 5L5 1L9 5" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
