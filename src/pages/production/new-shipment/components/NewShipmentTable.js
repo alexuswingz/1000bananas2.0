@@ -2046,6 +2046,11 @@ const NewShipmentTable = ({
                                 e.stopPropagation();
                                 setHoveredLabelWarningIndex(null);
                               }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setHoveredLabelWarningIndex(null);
+                                setClickedQtyIndex(clickedQtyIndex === index ? null : index);
+                              }}
                               style={{
                                 position: 'absolute',
                                 left: '96px',
@@ -2141,17 +2146,11 @@ const NewShipmentTable = ({
                             }}
                             style={{
                               position: 'absolute',
-                              top: '100%',
+                              bottom: '100%',
                               left: '50%',
-                              transform: 'translateX(-50%)',
-                              marginTop: '8px',
-                              backgroundColor: '#FFFFFF',
-                              borderRadius: '12px',
-                              padding: '14px 16px',
-                              minWidth: '220px',
-                              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                              transform: 'translateX(calc(30% - 93px))',
+                              marginBottom: '8px',
                               zIndex: 9999,
-                              border: '1px solid #E5E7EB',
                               pointerEvents: 'auto',
                             }}
                             onClick={(e) => {
@@ -2161,18 +2160,31 @@ const NewShipmentTable = ({
                             onMouseDown={(e) => e.stopPropagation()}
                             onMouseUp={(e) => e.stopPropagation()}
                           >
-                            <div style={{ marginBottom: '10px' }}>
+                            <div style={{
+                              backgroundColor: '#FFFFFF',
+                              borderRadius: '12px',
+                              padding: '8px',
+                              width: '191px',
+                              height: '76px',
+                              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                              border: '1px solid #E5E7EB',
+                              position: 'relative',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '4px',
+                            }}>
+                            <div>
                               <h3 style={{
-                                fontSize: '14px',
+                                fontSize: '12px',
                                 fontWeight: 600,
                                 color: '#111827',
-                                marginBottom: '4px',
+                                marginBottom: '2px',
                                 lineHeight: '1.3',
                               }}>
                                 Order exceeds available labels
                               </h3>
                               <p style={{
-                                fontSize: '13px',
+                                fontSize: '11px',
                                 fontWeight: 400,
                                 color: '#9CA3AF',
                                 lineHeight: '1.4',
@@ -2182,13 +2194,13 @@ const NewShipmentTable = ({
                             </div>
                             <button
                               style={{
-                                width: '100%',
-                                height: '32px',
+                                width: '175px',
+                                height: '23px',
                                 backgroundColor: '#3B82F6',
                                 color: '#FFFFFF',
-                                fontSize: '13px',
+                                fontSize: '11px',
                                 fontWeight: 600,
-                                borderRadius: '6px',
+                                borderRadius: '4px',
                                 border: 'none',
                                 cursor: 'pointer',
                                 transition: 'background-color 0.2s',
@@ -2222,6 +2234,21 @@ const NewShipmentTable = ({
                             >
                               Use Available
                             </button>
+                            {/* Downward arrow */}
+                            <div
+                              style={{
+                                position: 'absolute',
+                                bottom: '-6px',
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                                width: 0,
+                                height: 0,
+                                borderLeft: '6px solid transparent',
+                                borderRight: '6px solid transparent',
+                                borderTop: '6px solid #FFFFFF',
+                              }}
+                            />
+                            </div>
                           </div>
                         )}
                       </div>
@@ -4008,6 +4035,11 @@ const NewShipmentTable = ({
                                 e.stopPropagation();
                                 setHoveredLabelWarningIndex(null);
                               }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setHoveredLabelWarningIndex(null);
+                                setClickedQtyIndex(clickedQtyIndex === index ? null : index);
+                              }}
                               style={{
                                 position: 'absolute',
                                 left: '119px',
@@ -4107,17 +4139,11 @@ const NewShipmentTable = ({
                         }}
                         style={{
                           position: 'absolute',
-                          top: '100%',
+                          bottom: '100%',
                           left: '50%',
-                          transform: 'translateX(-50%)',
-                          marginTop: '8px',
-                          backgroundColor: '#FFFFFF',
-                          borderRadius: '12px',
-                          padding: '14px 16px',
-                          minWidth: '220px',
-                          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                          transform: 'translateX(calc(30% - 116px))',
+                          marginBottom: '8px',
                           zIndex: 9999,
-                          border: '1px solid #E5E7EB',
                           pointerEvents: 'auto',
                         }}
                         onClick={(e) => {
@@ -4127,18 +4153,31 @@ const NewShipmentTable = ({
                         onMouseDown={(e) => e.stopPropagation()}
                         onMouseUp={(e) => e.stopPropagation()}
                       >
-                        <div style={{ marginBottom: '10px' }}>
+                        <div style={{
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: '12px',
+                          padding: '8px',
+                          width: '191px',
+                          height: '76px',
+                          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                          border: '1px solid #E5E7EB',
+                          position: 'relative',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px',
+                        }}>
+                        <div>
                           <h3 style={{
-                            fontSize: '14px',
+                            fontSize: '12px',
                             fontWeight: 600,
                             color: '#111827',
-                            marginBottom: '4px',
+                            marginBottom: '2px',
                             lineHeight: '1.3',
                           }}>
                             Order exceeds available labels
                           </h3>
                           <p style={{
-                            fontSize: '13px',
+                            fontSize: '11px',
                             fontWeight: 400,
                             color: '#9CA3AF',
                             lineHeight: '1.4',
@@ -4148,13 +4187,13 @@ const NewShipmentTable = ({
                         </div>
                         <button
                           style={{
-                            width: '100%',
-                            height: '32px',
+                            width: '175px',
+                            height: '23px',
                             backgroundColor: '#3B82F6',
                             color: '#FFFFFF',
-                            fontSize: '13px',
+                            fontSize: '11px',
                             fontWeight: 600,
-                            borderRadius: '6px',
+                            borderRadius: '4px',
                             border: 'none',
                             cursor: 'pointer',
                             transition: 'background-color 0.2s',
@@ -4188,6 +4227,21 @@ const NewShipmentTable = ({
                         >
                           Use Available
                         </button>
+                        {/* Downward arrow */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            bottom: '-6px',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            width: 0,
+                            height: 0,
+                            borderLeft: '6px solid transparent',
+                            borderRight: '6px solid transparent',
+                            borderTop: '6px solid #FFFFFF',
+                          }}
+                        />
+                        </div>
                       </div>
                     )}
                   </div>
