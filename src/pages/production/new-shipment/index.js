@@ -115,6 +115,7 @@ const NewShipment = () => {
   const [isRecountMode, setIsRecountMode] = useState(false);
   const [varianceExceededRowIds, setVarianceExceededRowIds] = useState([]);
   const [labelCheckRows, setLabelCheckRows] = useState([]);
+  const [labelCheckSelectedRowsCount, setLabelCheckSelectedRowsCount] = useState(0);
   const [formulaCheckData, setFormulaCheckData] = useState({ total: 0, completed: 0, remaining: 0 });
   const [formulaSelectedRows, setFormulaSelectedRows] = useState(new Set());
   const [formulaCheckRefreshKey, setFormulaCheckRefreshKey] = useState(0);
@@ -2211,6 +2212,7 @@ const NewShipment = () => {
                 setVarianceExceededRowIds([]);
               }}
               onRowsDataChange={setLabelCheckRows}
+              onSelectedRowsChange={setLabelCheckSelectedRowsCount}
               refreshKey={labelCheckRefreshKey}
               checkAllIncompleteTrigger={checkAllIncompleteTrigger}
               isAdmin={false} // TODO: Connect to actual user role check (e.g., user?.role === 'admin')
@@ -2789,7 +2791,7 @@ const NewShipment = () => {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                {labelCheckRemainingCount > 0 && (
+                {labelCheckRemainingCount > 0 && labelCheckSelectedRowsCount > 0 && (
                   <button
                     type="button"
                     onClick={handleMarkAllLabelChecksAsDone}

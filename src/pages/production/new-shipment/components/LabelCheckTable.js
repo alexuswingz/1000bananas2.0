@@ -16,6 +16,7 @@ const LabelCheckTable = ({
   refreshKey = 0, // Increment to trigger reload while preserving checked status
   checkAllIncompleteTrigger = 0, // Increment to check all incomplete row checkboxes
   isAdmin = false, // Admin role check for bulk actions
+  onSelectedRowsChange, // Callback to notify parent of selected rows count
 }) => {
   const { isDarkMode } = useTheme();
   const location = useLocation();
@@ -716,6 +717,13 @@ const LabelCheckTable = ({
     }
   }, [rows, completedRows, confirmedRows, completedRowStatus, onRowsDataChange]);
 
+  // Notify parent component when selected rows change
+  useEffect(() => {
+    if (onSelectedRowsChange) {
+      onSelectedRowsChange(selectedRows.size);
+    }
+  }, [selectedRows, onSelectedRowsChange]);
+
   // Close filter dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -1012,7 +1020,7 @@ const LabelCheckTable = ({
                         textAlign: (column.key === 'start' || column.key === 'checkbox') ? 'center' : 'left',
                         fontSize: '11px',
                         fontWeight: 600,
-                        color: isActive ? '#3B82F6' : '#9CA3AF',
+                        color: '#FFFFFF',
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em',
                         width: column.width,
@@ -1083,9 +1091,7 @@ const LabelCheckTable = ({
                 <tr
                   key={row.id}
                   style={{
-                    backgroundColor: originalIndex % 2 === 0
-                      ? (isDarkMode ? '#1F2937' : '#FFFFFF')
-                      : (isDarkMode ? '#1A1F2E' : '#F9FAFB'),
+                    backgroundColor: isDarkMode ? '#1F2937' : '#F9FAFB',
                     borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
                     transition: 'background-color 0.2s',
                     height: '40px',
@@ -1094,9 +1100,7 @@ const LabelCheckTable = ({
                     e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = originalIndex % 2 === 0
-                      ? (isDarkMode ? '#1F2937' : '#FFFFFF')
-                      : (isDarkMode ? '#1A1F2E' : '#F9FAFB');
+                    e.currentTarget.style.backgroundColor = isDarkMode ? '#1F2937' : '#F9FAFB';
                   }}
                 >
                   <td style={{
@@ -1146,9 +1150,9 @@ const LabelCheckTable = ({
                         style={{
                           height: '26px',
                           padding: '0 12px',
-                          borderRadius: '13px',
+                          borderRadius: '6px',
                           border: 'none',
-                          backgroundColor: completedRowStatus[row.id] ? '#F59E0B' : '#10B981',
+                          backgroundColor: '#F59E0B',
                           color: '#FFFFFF',
                           fontSize: '12px',
                           fontWeight: 600,
@@ -1165,8 +1169,7 @@ const LabelCheckTable = ({
                           position: 'relative',
                         }}
                         onMouseEnter={(e) => {
-                          const baseColor = completedRowStatus[row.id] ? '#D97706' : '#059669';
-                          e.currentTarget.style.backgroundColor = baseColor;
+                          e.currentTarget.style.backgroundColor = '#D97706';
                           e.currentTarget.style.transform = 'scale(1.02)';
                           e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
                           // Show edit icon
@@ -1174,8 +1177,7 @@ const LabelCheckTable = ({
                           if (icon) icon.style.opacity = '1';
                         }}
                         onMouseLeave={(e) => {
-                          const baseColor = completedRowStatus[row.id] ? '#F59E0B' : '#10B981';
-                          e.currentTarget.style.backgroundColor = baseColor;
+                          e.currentTarget.style.backgroundColor = '#F59E0B';
                           e.currentTarget.style.transform = 'scale(1)';
                           e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
                           // Hide edit icon
@@ -1221,7 +1223,7 @@ const LabelCheckTable = ({
                         style={{
                           height: '26px',
                           padding: '0 14px',
-                          borderRadius: '13px',
+                          borderRadius: '6px',
                           border: 'none',
                           backgroundColor: '#3B82F6',
                           color: '#FFFFFF',
