@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
+import { toast } from 'sonner';
 import SortFormulasFilterDropdown from './SortFormulasFilterDropdown';
 
 const NewShipmentTable = ({
@@ -195,6 +196,24 @@ const NewShipmentTable = ({
       const value = activeFilters.filterValue.toLowerCase();
       
       result = result.filter(row => {
+        // Special handling for brand filter - search both brand field and product name
+        if (activeFilters.filterField === 'brand') {
+          const brandValue = row.brand || '';
+          const productValue = row.product || '';
+          const searchText = (brandValue + ' ' + productValue).toLowerCase();
+          const filterValue = activeFilters.filterValue.toLowerCase();
+          
+          switch (activeFilters.filterCondition) {
+            case 'equals':
+              return brandValue.toLowerCase() === filterValue;
+            case 'contains':
+              return searchText.includes(filterValue);
+            default:
+              return true;
+          }
+        }
+        
+        // Standard filtering for other fields
         const rowValue = row[field];
         const strValue = String(rowValue || '').toLowerCase();
         const numValue = parseFloat(rowValue) || 0;
@@ -597,6 +616,24 @@ const NewShipmentTable = ({
       const value = activeFilters.filterValue.toLowerCase();
       
       result = result.filter(row => {
+        // Special handling for brand filter - search both brand field and product name
+        if (activeFilters.filterField === 'brand') {
+          const brandValue = row.brand || '';
+          const productValue = row.product || '';
+          const searchText = (brandValue + ' ' + productValue).toLowerCase();
+          const filterValue = activeFilters.filterValue.toLowerCase();
+          
+          switch (activeFilters.filterCondition) {
+            case 'equals':
+              return brandValue.toLowerCase() === filterValue;
+            case 'contains':
+              return searchText.includes(filterValue);
+            default:
+              return true;
+          }
+        }
+        
+        // Standard filtering for other fields
         const rowValue = row[field];
         const strValue = String(rowValue || '').toLowerCase();
         const numValue = parseFloat(rowValue) || 0;
@@ -1491,508 +1528,383 @@ const NewShipmentTable = ({
     headerBg: 'bg-[#2C3544]',
   };
 
+  // Helper function to get DOI color
+  const getDoiColor = (doiValue) => {
+    if (doiValue < 30) return '#EF4444'; // Red
+    if (doiValue < 60) return '#F97316'; // Orange
+    return '#10B981'; // Green
+  };
+
   if (!tableMode) {
-    // Normal view with timeline
+    // Card/List view layout
     return (
       <>
         <div
           className={`${themeClasses.cardBg} ${themeClasses.border} border rounded-xl shadow-sm`}
           style={{ marginTop: '1.25rem', overflow: 'hidden', borderRadius: '16px' }}
         >
-          <div style={{ overflowX: 'auto' }}>
-            <table
+          {/* Header Row */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 140px 220px 140px',
+              padding: '22px 16px 12px 16px',
+              height: '67px',
+              backgroundColor: '#1A2235',
+              alignItems: 'center',
+              gap: '32px',
+              position: 'relative'
+            }}
+          >
+            {/* Border line with 30px margin on both sides */}
+            <div
               style={{
-                width: '100%',
-                borderCollapse: 'separate',
-                borderSpacing: 0,
+                position: 'absolute',
+                bottom: 0,
+                left: '30px',
+                right: '30px',
+                height: '1px',
+                backgroundColor: isDarkMode ? '#374151' : '#E5E7EB'
               }}
-            >
-              <thead className={themeClasses.headerBg}>
-                <tr style={{ height: '40px', maxHeight: '40px', borderRadius: '16px', overflow: 'hidden' }}>
-                  {/* Checkbox column */}
-                  <th style={{ 
-                    padding: '0 1rem', 
-                    height: '40px', 
-                    textAlign: 'center', 
-                    borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
-                    borderTopLeftRadius: '16px',
-                    width: '50px',
-                    minWidth: '50px',
-                  }}>
-                    <input 
-                      type="checkbox" 
-                      ref={selectAllCheckboxRef}
-                      style={{ cursor: 'pointer', width: '16px', height: '16px' }}
-                      checked={allSelected}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          const allIds = new Set(currentRows.map(row => row.id));
-                          setSelectedRows(allIds);
-                        } else {
-                          setSelectedRows(new Set());
-                        }
-                      }}
-                    />
-                  </th>
-                  {/* PRODUCT NAME column */}
-                  <th 
-                    className="group"
+            />
+            <div style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase', color: isDarkMode ? '#FFFFFF' : '#111827', marginLeft: '20px' }}>
+              PRODUCTS
+            </div>
+            <div style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase', color: isDarkMode ? '#FFFFFF' : '#111827', textAlign: 'center', paddingLeft: '16px', marginLeft: '-220px' }}>
+              INVENTORY
+            </div>
+            <div style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase', color: isDarkMode ? '#FFFFFF' : '#111827', textAlign: 'center', paddingLeft: '16px', marginLeft: '-220px' }}>
+              UNITS TO MAKE
+            </div>
+            <div style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase', color: isDarkMode ? '#FFFFFF' : '#111827', textAlign: 'center', paddingLeft: '16px', marginLeft: '-220px' }}>
+              DOI (DAYS)
+            </div>
+          </div>
+
+          {/* Product Rows */}
+          <div>
+            {currentRows.map((row) => {
+              const index = row._originalIndex;
+              const effectiveAddedRows = addedRows;
+              const doiValue = row.doiTotal || row.daysOfInventory || 0;
+              const doiColor = getDoiColor(doiValue);
+              const asin = row.asin || row.child_asin || row.childAsin || '';
+              
+              return (
+                <div
+                  key={`${row.id}-${index}`}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 140px 220px 140px',
+                    height: '66px',
+                    padding: '8px 16px',
+                    backgroundColor: '#1A2235',
+                    alignItems: 'center',
+                    gap: '32px',
+                    boxSizing: 'border-box',
+                    position: 'relative'
+                  }}
+                >
+                  {/* Border line with 30px margin on both sides */}
+                  <div
                     style={{
-                      padding: '0 1rem',
-                      height: '40px',
-                      maxHeight: '40px',
-                      lineHeight: '40px',
-                      boxSizing: 'border-box',
-                      textAlign: 'left',
-                      borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
-                      color: (hasActiveColumnFilter('normal-product') || openFilterColumns.has('normal-product')) ? '#3B82F6' : '#FFFFFF',
-                      width: '280px',
-                      minWidth: '280px',
-                      fontFamily: 'Inter, sans-serif',
-                      fontWeight: 600,
-                      fontSize: '12px',
-                      textTransform: 'uppercase',
+                      position: 'absolute',
+                      bottom: 0,
+                      left: '30px',
+                      right: '30px',
+                      height: '1px',
+                      backgroundColor: isDarkMode ? '#374151' : '#E5E7EB'
                     }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', width: '100%' }}>
-                      <span>PRODUCT NAME</span>
-                      <img
-                        ref={(el) => { if (el) filterIconRefs.current['normal-product'] = el; }}
-                        src="/assets/Vector (1).png"
-                        alt="Filter"
-                        className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('normal-product') || openFilterColumns.has('normal-product') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                        style={{ width: '12px', height: '12px', cursor: 'pointer', filter: hasActiveColumnFilter('normal-product') || openFilterColumns.has('normal-product') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none' }}
-                        onClick={(e) => handleFilterClick('normal-product', e)}
-                      />
-                    </div>
-                  </th>
-                  {/* ASIN column */}
-                  <th 
-                    className="group"
-                    style={{ 
-                      padding: '0 1rem', 
-                      height: '40px', 
-                      textAlign: 'center', 
-                      borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`, 
-                      color: (hasActiveColumnFilter('normal-asin') || openFilterColumns.has('normal-asin')) ? '#3B82F6' : '#FFFFFF', 
-                      width: '120px', 
-                      fontFamily: 'Inter, sans-serif', 
-                      fontWeight: 600, 
-                      fontSize: '12px', 
-                      textTransform: 'uppercase' 
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', width: '100%' }}>
-                      <span>ASIN</span>
-                      <img
-                        ref={(el) => { if (el) filterIconRefs.current['normal-asin'] = el; }}
-                        src="/assets/Vector (1).png"
-                        alt="Filter"
-                        className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('normal-asin') || openFilterColumns.has('normal-asin') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                        style={{ width: '12px', height: '12px', cursor: 'pointer', position: 'absolute', right: '0', filter: hasActiveColumnFilter('normal-asin') || openFilterColumns.has('normal-asin') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none' }}
-                        onClick={(e) => handleFilterClick('normal-asin', e)}
-                      />
-                    </div>
-                  </th>
-                  {/* STATUS column */}
-                  <th 
-                    className="group"
-                    style={{ 
-                      padding: '0 1rem', 
-                      height: '40px', 
-                      textAlign: 'center', 
-                      borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`, 
-                      color: (hasActiveColumnFilter('normal-status') || openFilterColumns.has('normal-status')) ? '#3B82F6' : '#FFFFFF', 
-                      width: '90px', 
-                      fontFamily: 'Inter, sans-serif', 
-                      fontWeight: 600, 
-                      fontSize: '12px', 
-                      textTransform: 'uppercase' 
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', width: '100%' }}>
-                      <span>STATUS</span>
-                      <img
-                        ref={(el) => { if (el) filterIconRefs.current['normal-status'] = el; }}
-                        src="/assets/Vector (1).png"
-                        alt="Filter"
-                        className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('normal-status') || openFilterColumns.has('normal-status') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                        style={{ width: '12px', height: '12px', cursor: 'pointer', position: 'absolute', right: '0', filter: hasActiveColumnFilter('normal-status') || openFilterColumns.has('normal-status') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none' }}
-                        onClick={(e) => handleFilterClick('normal-status', e)}
-                      />
-                    </div>
-                  </th>
-                  {/* INVENTORY column */}
-                  <th 
-                    className="group"
-                    style={{ 
-                      padding: '0 1rem', 
-                      height: '40px', 
-                      textAlign: 'center', 
-                      borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`, 
-                      color: (hasActiveColumnFilter('normal-inventory') || openFilterColumns.has('normal-inventory')) ? '#3B82F6' : '#FFFFFF', 
-                      width: '100px', 
-                      fontFamily: 'Inter, sans-serif', 
-                      fontWeight: 600, 
-                      fontSize: '12px', 
-                      textTransform: 'uppercase' 
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', width: '100%' }}>
-                      <span>INVENTORY</span>
-                      <img
-                        ref={(el) => { if (el) filterIconRefs.current['normal-inventory'] = el; }}
-                        src="/assets/Vector (1).png"
-                        alt="Filter"
-                        className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('normal-inventory') || openFilterColumns.has('normal-inventory') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                        style={{ width: '12px', height: '12px', cursor: 'pointer', position: 'absolute', right: '0', filter: hasActiveColumnFilter('normal-inventory') || openFilterColumns.has('normal-inventory') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none' }}
-                        onClick={(e) => handleFilterClick('normal-inventory', e)}
-                      />
-                    </div>
-                  </th>
-                  {/* UNITS TO MAKE column */}
-                  <th 
-                    className="group"
-                    style={{ 
-                      padding: '0 1rem', 
-                      height: '40px', 
-                      textAlign: 'center', 
-                      borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`, 
-                      color: (hasActiveColumnFilter('normal-unitsToMake') || openFilterColumns.has('normal-unitsToMake')) ? '#3B82F6' : '#FFFFFF', 
-                      width: '120px', 
-                      fontFamily: 'Inter, sans-serif', 
-                      fontWeight: 600, 
-                      fontSize: '12px', 
-                      textTransform: 'uppercase' 
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', width: '100%' }}>
-                      <span>UNITS TO MAKE</span>
-                      <img
-                        ref={(el) => { if (el) filterIconRefs.current['normal-unitsToMake'] = el; }}
-                        src="/assets/Vector (1).png"
-                        alt="Filter"
-                        className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('normal-unitsToMake') || openFilterColumns.has('normal-unitsToMake') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                        style={{ width: '12px', height: '12px', cursor: 'pointer', position: 'absolute', right: '0', filter: hasActiveColumnFilter('normal-unitsToMake') || openFilterColumns.has('normal-unitsToMake') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none' }}
-                        onClick={(e) => handleFilterClick('normal-unitsToMake', e)}
-                      />
-                    </div>
-                  </th>
-                  {/* DOI (DAYS) column */}
-                  <th 
-                    className="group"
-                    style={{ 
-                      padding: '0 1rem', 
-                      height: '40px', 
-                      textAlign: 'center', 
-                      borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`, 
-                      color: (hasActiveColumnFilter('normal-doi') || openFilterColumns.has('normal-doi')) ? '#3B82F6' : '#FFFFFF', 
-                      width: '90px', 
-                      fontFamily: 'Inter, sans-serif', 
-                      fontWeight: 600, 
-                      fontSize: '12px', 
-                      textTransform: 'uppercase' 
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', width: '100%' }}>
-                      <span>DOI (DAYS)</span>
-                      <img
-                        ref={(el) => { if (el) filterIconRefs.current['normal-doi'] = el; }}
-                        src="/assets/Vector (1).png"
-                        alt="Filter"
-                        className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('normal-doi') || openFilterColumns.has('normal-doi') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                        style={{ width: '12px', height: '12px', cursor: 'pointer', position: 'absolute', right: '0', filter: hasActiveColumnFilter('normal-doi') || openFilterColumns.has('normal-doi') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none' }}
-                        onClick={(e) => handleFilterClick('normal-doi', e)}
-                      />
-                    </div>
-                  </th>
-                  {/* SHIPMENT ACTIONS column */}
-                  <th 
-                    className="group"
-                    style={{ 
-                      padding: '0 1rem', 
-                      height: '40px', 
-                      textAlign: 'center', 
-                      borderTopRightRadius: '16px', 
-                      color: (hasActiveColumnFilter('normal-shipmentActions') || openFilterColumns.has('normal-shipmentActions')) ? '#3B82F6' : '#FFFFFF', 
-                      width: '180px', 
-                      fontFamily: 'Inter, sans-serif', 
-                      fontWeight: 600, 
-                      fontSize: '12px', 
-                      textTransform: 'uppercase' 
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', width: '100%' }}>
-                      <span>SHIPMENT ACTIONS</span>
-                      <img
-                        ref={(el) => { if (el) filterIconRefs.current['normal-shipmentActions'] = el; }}
-                        src="/assets/Vector (1).png"
-                        alt="Filter"
-                        className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('normal-shipmentActions') || openFilterColumns.has('normal-shipmentActions') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                        style={{ width: '12px', height: '12px', cursor: 'pointer', position: 'absolute', right: '0', filter: hasActiveColumnFilter('normal-shipmentActions') || openFilterColumns.has('normal-shipmentActions') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none' }}
-                        onClick={(e) => handleFilterClick('normal-shipmentActions', e)}
-                      />
-                    </div>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {currentRows.map((row) => {
-                  const index = row._originalIndex;
-                  const effectiveAddedRows = addedRows;
-                  const doiValue = row.doiTotal || row.daysOfInventory || 0;
-                  const isGoodStatus = doiValue >= 30;
-                  return (
-                  <tr key={`${row.id}-${index}`} style={{ height: '56px', backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF' }}>
-                    {/* Checkbox cell */}
-                    <td style={{ padding: '0.5rem 1rem', textAlign: 'center', height: '56px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}` }}>
-                      <input 
-                        type="checkbox" 
-                        style={{ cursor: 'pointer', width: '16px', height: '16px' }}
-                        checked={effectiveAddedRows.has(row.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            // Automatically add the product when checked
-                            const currentQty = typeof effectiveQtyValues[index] === 'number' 
-                              ? effectiveQtyValues[index] 
-                              : (effectiveQtyValues[index] === '' || effectiveQtyValues[index] === null || effectiveQtyValues[index] === undefined) 
-                                ? 0 
-                                : parseInt(effectiveQtyValues[index], 10) || 0;
-                            
-                            // If quantity is 0, set it to the suggested quantity or 1
-                            if (currentQty === 0) {
-                              const suggestedQty = Math.round(row.weeklyForecast || row.forecast || row.suggestedQty || 0);
-                              const defaultQty = suggestedQty > 0 ? suggestedQty : 1;
-                              effectiveSetQtyValues(prev => ({ ...prev, [index]: defaultQty }));
-                            }
-                            
-                            // Add to addedRows
-                            const newAdded = new Set(effectiveAddedRows);
-                            newAdded.add(row.id);
-                            setAddedRows(newAdded);
-                            if (onAddedRowsChange) onAddedRowsChange(newAdded);
-                          } else {
-                            // Remove from addedRows when unchecked
-                            const newAdded = new Set(effectiveAddedRows);
-                            newAdded.delete(row.id);
-                            setAddedRows(newAdded);
-                            if (onAddedRowsChange) onAddedRowsChange(newAdded);
-                          }
-                        }}
-                      />
-                    </td>
-                    {/* PRODUCT NAME cell - with image, name, and brand/size subtitle */}
-                    <td style={{ padding: '0.5rem 1rem', height: '56px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}` }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{ width: '40px', height: '40px', minWidth: '40px', borderRadius: '6px', overflow: 'hidden', backgroundColor: isDarkMode ? '#374151' : '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {row.imageUrl || row.smallImage || row.image ? (
-                            <img src={row.imageUrl || row.smallImage || row.image} alt={row.product} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling && (e.target.nextSibling.style.display = 'flex'); }} />
-                          ) : null}
-                          <div style={{ display: row.imageUrl || row.smallImage || row.image ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', color: isDarkMode ? '#6B7280' : '#9CA3AF', fontSize: '10px' }}>No img</div>
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', overflow: 'hidden' }}>
-                          <span onClick={() => onProductClick(row)} className="text-blue-500 hover:text-blue-600 hover:underline" style={{ cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>{row.product}</span>
-                          <span style={{ fontSize: '0.75rem', color: isDarkMode ? '#9CA3AF' : '#6B7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>{row.brand} • {row.size}</span>
-                        </div>
+                  />
+                  {/* PRODUCTS Column */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {/* Product Icon */}
+                    <div style={{ width: '36px', height: '36px', minWidth: '36px', borderRadius: '3px', overflow: 'hidden', backgroundColor: isDarkMode ? '#374151' : '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginLeft: '20px' }}>
+                      {row.imageUrl || row.smallImage || row.image ? (
+                        <img 
+                          src={row.imageUrl || row.smallImage || row.image} 
+                          alt={row.product} 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                          onError={(e) => { 
+                            e.target.style.display = 'none'; 
+                            if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'; 
+                          }} 
+                        />
+                      ) : null}
+                      <div style={{ display: row.imageUrl || row.smallImage || row.image ? 'none' : 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', borderRadius: '3px', gap: '7.5px', color: isDarkMode ? '#6B7280' : '#9CA3AF', fontSize: '12px' }}>
+                        No img
                       </div>
-                    </td>
-                    {/* ASIN cell */}
-                    <td style={{ padding: '0.5rem 1rem', fontSize: '0.8rem', textAlign: 'center', height: '56px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`, color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
-                      {row.asin || row.child_asin || row.childAsin || '—'}
-                    </td>
-                    {/* STATUS cell */}
-                    <td style={{ padding: '0.5rem 1rem', textAlign: 'center', height: '56px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}` }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '4px 12px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 600, backgroundColor: isGoodStatus ? '#D1FAE5' : '#FEF3C7', color: isGoodStatus ? '#059669' : '#D97706' }}>
-                        {isGoodStatus ? 'Good' : 'Low'}
+                    </div>
+                    
+                    {/* Product Info */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: 0 }}>
+                      {/* Product Name */}
+                      <span 
+                        style={{ 
+                          fontSize: '14px', 
+                          fontWeight: 500, 
+                          color: isDarkMode ? '#F9FAFB' : '#111827',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {row.product}
                       </span>
-                    </td>
-                    {/* INVENTORY cell */}
-                    <td style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', textAlign: 'center', height: '56px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`, fontWeight: 500, color: isDarkMode ? '#F9FAFB' : '#111827' }}>
-                      {(row.fbaAvailable || 0).toLocaleString()}
-                    </td>
-                    {/* UNITS TO MAKE cell */}
-                    <td style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', textAlign: 'center', height: '56px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`, fontWeight: 600, color: '#F97316' }}>
-                      {Math.round(row.weeklyForecast || row.forecast || 0).toLocaleString()}
-                    </td>
-                    {/* DOI (DAYS) cell */}
-                    <td style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', textAlign: 'center', height: '56px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`, fontWeight: 500, color: isDarkMode ? '#F9FAFB' : '#111827' }}>
-                      {doiValue}
-                    </td>
-                    {/* SHIPMENT ACTIONS cell */}
-                    <td style={{ padding: '0.5rem 1rem', textAlign: 'center', height: '56px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}` }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-                        {/* Quantity stepper container */}
-                        <div style={{ 
+                      
+                      {/* Product ID and Brand/Size on same line */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px', flexWrap: 'wrap' }}>
+                        {/* Product ID with Clipboard Icon */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
+                            {asin || 'N/A'}
+                          </span>
+                          {asin && (
+                            <img 
+                              src="/assets/content_copy.png" 
+                              alt="Copy" 
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  await navigator.clipboard.writeText(asin);
+                                  toast.success('ASIN copied to clipboard', {
+                                    description: asin,
+                                    duration: 2000,
+                                  });
+                                } catch (err) {
+                                  console.error('Failed to copy ASIN:', err);
+                                  toast.error('Failed to copy ASIN', {
+                                    description: 'Please try again',
+                                    duration: 2000,
+                                  });
+                                }
+                              }}
+                              style={{ width: '14px', height: '14px', cursor: 'pointer', flexShrink: 0 }} 
+                            />
+                          )}
+                        </div>
+                        
+                        {/* Brand and Size */}
+                        <span style={{ fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
+                          {row.brand} • {row.size}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* INVENTORY Column */}
+                  <div style={{ textAlign: 'center', fontSize: '14px', fontWeight: 500, color: isDarkMode ? '#F9FAFB' : '#111827', paddingLeft: '16px', marginLeft: '-220px', marginRight: '20px' }}>
+                    {(row.fbaAvailable || 0).toLocaleString()}
+                  </div>
+
+                  {/* UNITS TO MAKE Column */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', paddingLeft: '16px', marginLeft: '-220px', marginRight: '20px' }}>
+                    {/* Quantity stepper container */}
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      width: '110px',
+                      height: '28px',
+                      borderRadius: '6px', 
+                      overflow: 'hidden',
+                      border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
+                      backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF'
+                    }}>
+                      {/* Decrement button */}
+                      <button 
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          const currentQty = effectiveQtyValues[index] ?? 0; 
+                          const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0; 
+                          if (numQty <= 0) return; 
+                          let increment = 1; 
+                          const size = row.size?.toLowerCase() || ''; 
+                          if (size.includes('8oz')) increment = 60; 
+                          else if (size.includes('quart')) increment = 12; 
+                          else if (size.includes('gallon')) increment = 4; 
+                          const newQty = Math.max(0, numQty - increment); 
+                          manuallyEditedIndices.current.add(index); 
+                          effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty })); 
+                        }} 
+                        style={{ 
+                          width: '24px', 
+                          height: '28px', 
+                          borderTopLeftRadius: '6px',
+                          borderBottomLeftRadius: '6px',
+                          borderTopRightRadius: '0',
+                          borderBottomRightRadius: '0',
+                          border: 'none',
+                          borderRight: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                          backgroundColor: isDarkMode ? '#374151' : '#F3F4F6', 
+                          color: isDarkMode ? '#FFFFFF' : '#6B7280', 
+                          cursor: 'pointer', 
                           display: 'flex', 
                           alignItems: 'center', 
-                          width: '120px',
-                          height: '32px',
-                          borderRadius: '8px', 
-                          overflow: 'hidden',
-                          border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
-                          backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF'
-                        }}>
-                          {/* Decrement button */}
-                          <button 
-                            onClick={(e) => { 
-                              e.stopPropagation(); 
-                              const currentQty = effectiveQtyValues[index] ?? 0; 
-                              const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0; 
-                              if (numQty <= 0) return; 
-                              let increment = 1; 
-                              const size = row.size?.toLowerCase() || ''; 
-                              if (size.includes('8oz')) increment = 60; 
-                              else if (size.includes('quart')) increment = 12; 
-                              else if (size.includes('gallon')) increment = 4; 
-                              const newQty = Math.max(0, numQty - increment); 
-                              manuallyEditedIndices.current.add(index); 
-                              effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty })); 
-                            }} 
-                            style={{ 
-                              width: '28px', 
-                              height: '32px', 
-                              borderTopLeftRadius: '8px',
-                              borderBottomLeftRadius: '8px',
-                              borderTopRightRadius: '0',
-                              borderBottomRightRadius: '0',
-                              border: 'none',
-                              borderRight: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
-                              backgroundColor: isDarkMode ? '#374151' : '#F3F4F6', 
-                              color: isDarkMode ? '#D1D5DB' : '#6B7280', 
-                              cursor: 'pointer', 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              justifyContent: 'center', 
-                              fontSize: '16px', 
-                              fontWeight: 400,
-                              fontFamily: 'sans-serif',
-                              padding: 0,
-                              outline: 'none',
-                              flexShrink: 0
-                            }}
-                          >
-                            −
-                          </button>
-                          {/* Quantity input/display */}
-                          <input 
-                            type="number" 
-                            min="0" 
-                            value={effectiveQtyValues[index] !== undefined && effectiveQtyValues[index] !== null && effectiveQtyValues[index] !== '' ? effectiveQtyValues[index] : ''} 
-                            onChange={(e) => { 
-                              const inputValue = e.target.value; 
-                              manuallyEditedIndices.current.add(index); 
-                              if (inputValue === '' || inputValue === '-') { 
-                                effectiveSetQtyValues(prev => ({ ...prev, [index]: '' })); 
-                              } else { 
-                                const numValue = parseInt(inputValue, 10); 
-                                if (!isNaN(numValue) && numValue >= 0) { 
-                                  effectiveSetQtyValues(prev => ({ ...prev, [index]: numValue })); 
-                                } 
-                              } 
-                            }} 
-                            onClick={(e) => e.stopPropagation()} 
-                            style={{ 
-                              width: '64px', 
-                              height: '32px', 
-                              border: 'none',
-                              borderLeft: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
-                              borderRight: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
-                              backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF', 
-                              color: isDarkMode ? '#FFFFFF' : '#111827', 
-                              textAlign: 'center', 
-                              fontSize: '0.875rem', 
-                              fontWeight: 500, 
-                              outline: 'none', 
-                              MozAppearance: 'textfield', 
-                              WebkitAppearance: 'none',
-                              fontFamily: 'sans-serif',
-                              padding: '0 4px',
-                              flex: '1 1 auto'
-                            }}
-                            onWheel={(e) => e.target.blur()}
-                            className="no-spinner" 
-                          />
-                          {/* Increment button */}
-                          <button 
-                            onClick={(e) => { 
-                              e.stopPropagation(); 
-                              const currentQty = effectiveQtyValues[index] ?? 0; 
-                              const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0; 
-                              let increment = 1; 
-                              const size = row.size?.toLowerCase() || ''; 
-                              if (size.includes('8oz')) increment = 60; 
-                              else if (size.includes('quart')) increment = 12; 
-                              else if (size.includes('gallon')) increment = 4; 
-                              const newQty = numQty + increment; 
-                              manuallyEditedIndices.current.add(index); 
-                              effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty })); 
-                            }} 
-                            style={{ 
-                              width: '28px', 
-                              height: '32px', 
-                              borderTopLeftRadius: '0',
-                              borderBottomLeftRadius: '0',
-                              borderTopRightRadius: '8px',
-                              borderBottomRightRadius: '8px',
-                              border: 'none',
-                              borderLeft: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
-                              backgroundColor: isDarkMode ? '#374151' : '#F3F4F6', 
-                              color: isDarkMode ? '#D1D5DB' : '#6B7280', 
-                              cursor: 'pointer', 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              justifyContent: 'center', 
-                              fontSize: '16px', 
-                              fontWeight: 400,
-                              fontFamily: 'sans-serif',
-                              padding: 0,
-                              outline: 'none',
-                              flexShrink: 0
-                            }}
-                          >
-                            +
-                          </button>
-                        </div>
-                        {/* Add button */}
-                        <button 
-                          onClick={() => handleAddClick(row, index)} 
-                          style={{ 
-                            width: '64px',
-                            height: '24px',
-                            borderRadius: '6px', 
-                            border: 'none', 
-                            backgroundColor: effectiveAddedRows.has(row.id) ? '#10B981' : '#2563EB', 
-                            color: '#FFFFFF', 
-                            fontSize: '0.75rem', 
-                            fontWeight: 500, 
-                            cursor: 'pointer', 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'center',
-                            gap: '4px',
-                            padding: 0,
-                            outline: 'none',
-                            fontFamily: 'sans-serif'
-                          }}
-                        >
-                          {effectiveAddedRows.has(row.id) ? (
-                            <>
-                              <span style={{ fontSize: '0.875rem', lineHeight: 1 }}>✓</span>
-                              <span>Added</span>
-                            </>
-                          ) : (
-                            <>
-                              <span style={{ fontSize: '0.875rem', lineHeight: 1 }}>+</span>
-                              <span>Add</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                  ); })}
-              </tbody>
-            </table>
+                          justifyContent: 'center', 
+                          fontSize: '14px', 
+                          fontWeight: 400,
+                          fontFamily: 'sans-serif',
+                          padding: 0,
+                          outline: 'none',
+                          flexShrink: 0
+                        }}
+                      >
+                        −
+                      </button>
+                      {/* Quantity input/display */}
+                      <input 
+                        type="number" 
+                        min="0" 
+                        value={effectiveQtyValues[index] !== undefined && effectiveQtyValues[index] !== null && effectiveQtyValues[index] !== '' ? effectiveQtyValues[index] : ''} 
+                        onChange={(e) => { 
+                          const inputValue = e.target.value; 
+                          manuallyEditedIndices.current.add(index); 
+                          if (inputValue === '' || inputValue === '-') { 
+                            effectiveSetQtyValues(prev => ({ ...prev, [index]: '' })); 
+                          } else { 
+                            const numValue = parseInt(inputValue, 10); 
+                            if (!isNaN(numValue) && numValue >= 0) { 
+                              effectiveSetQtyValues(prev => ({ ...prev, [index]: numValue })); 
+                            } 
+                          } 
+                        }} 
+                        onClick={(e) => e.stopPropagation()} 
+                        style={{ 
+                          height: '28px',
+                          minWidth: '50px',
+                          border: 'none',
+                          borderLeft: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                          borderRight: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                          backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF', 
+                          color: isDarkMode ? '#FFFFFF' : '#111827', 
+                          textAlign: 'center', 
+                          fontSize: '13px', 
+                          fontWeight: 500, 
+                          outline: 'none', 
+                          MozAppearance: 'textfield', 
+                          WebkitAppearance: 'none',
+                          fontFamily: 'sans-serif',
+                          padding: '0 6px',
+                          flex: '1 1 auto',
+                          boxSizing: 'border-box'
+                        }}
+                        onWheel={(e) => e.target.blur()}
+                        className="no-spinner" 
+                      />
+                      {/* Increment button */}
+                      <button 
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          const currentQty = effectiveQtyValues[index] ?? 0; 
+                          const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0; 
+                          let increment = 1; 
+                          const size = row.size?.toLowerCase() || ''; 
+                          if (size.includes('8oz')) increment = 60; 
+                          else if (size.includes('quart')) increment = 12; 
+                          else if (size.includes('gallon')) increment = 4; 
+                          const newQty = numQty + increment; 
+                          manuallyEditedIndices.current.add(index); 
+                          effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty })); 
+                        }} 
+                        style={{ 
+                          width: '24px', 
+                          height: '28px', 
+                          borderTopLeftRadius: '0',
+                          borderBottomLeftRadius: '0',
+                          borderTopRightRadius: '6px',
+                          borderBottomRightRadius: '6px',
+                          border: 'none',
+                          borderLeft: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                          backgroundColor: isDarkMode ? '#374151' : '#F3F4F6', 
+                          color: isDarkMode ? '#FFFFFF' : '#6B7280', 
+                          cursor: 'pointer', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          fontSize: '14px', 
+                          fontWeight: 400,
+                          fontFamily: 'sans-serif',
+                          padding: 0,
+                          outline: 'none',
+                          flexShrink: 0
+                        }}
+                      >
+                        +
+                      </button>
+                    </div>
+                    {/* Add button */}
+                    <button 
+                      onClick={() => handleAddClick(row, index)} 
+                      style={{ 
+                        width: '64px',
+                        height: '24px',
+                        borderRadius: '4px', 
+                        border: 'none', 
+                        backgroundColor: effectiveAddedRows.has(row.id) ? '#10B981' : '#2563EB', 
+                        color: '#FFFFFF', 
+                        fontSize: '12px', 
+                        fontWeight: 500, 
+                        cursor: 'pointer', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        gap: '8px',
+                        padding: '4px 8px',
+                        outline: 'none',
+                        fontFamily: 'sans-serif'
+                      }}
+                    >
+                      {!effectiveAddedRows.has(row.id) && (
+                        <span style={{ fontSize: '14px', lineHeight: 1 }}>+</span>
+                      )}
+                      <span>{effectiveAddedRows.has(row.id) ? 'Added' : 'Add'}</span>
+                    </button>
+                  </div>
+
+                  {/* DOI (DAYS) Column */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingLeft: '16px', marginLeft: '-220px', marginRight: '20px', position: 'relative' }}>
+                    <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+                      <span style={{ fontSize: '18px', fontWeight: 500, color: doiColor, height: '32px', display: 'flex', alignItems: 'center' }}>
+                        {doiValue}
+                      </span>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onProductClick(row);
+                      }}
+                      style={{
+                        width: '86px',
+                        height: '24px',
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        border: 'none',
+                        backgroundColor: '#9333EA',
+                        color: '#FFFFFF',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        fontFamily: 'sans-serif',
+                        position: 'absolute',
+                        right: 0,
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M2.33333 10.5L5.25 7.58333L7.58333 9.91667L11.6667 5.83333M11.6667 5.83333V9.33333M11.6667 5.83333H8.16667" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M1.16667 2.33333H12.8333" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                        <path d="M1.16667 11.6667H12.8333" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                      </svg>
+                      Analyze
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 

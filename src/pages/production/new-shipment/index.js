@@ -839,6 +839,7 @@ const NewShipment = () => {
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [qtyValues, setQtyValues] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedBrand, setSelectedBrand] = useState('');
   const [lastAccount, setLastAccount] = useState(null); // Track account changes
   const [lastForecastRange, setLastForecastRange] = useState(null); // Track forecastRange changes
   
@@ -1752,31 +1753,59 @@ const NewShipment = () => {
 
   const floorInventoryOptions = ['Finished Goods', 'Shiners', 'Unused Formulas'];
 
-  // Filter products based on search term
+  // Get unique brands from products
+  const uniqueBrands = useMemo(() => {
+    const brands = new Set();
+    products.forEach(product => {
+      const brand = product.brand || '';
+      if (brand) {
+        brands.add(brand);
+      } else if (product.product) {
+        // Try to extract brand from product name if brand field is empty
+        const productName = product.product;
+        // Common patterns: "Brand Name Product" or "Product - Brand"
+        const words = productName.split(' ');
+        if (words.length > 0 && words[0].length > 2) {
+          brands.add(words[0]); // Use first word as potential brand
+        }
+      }
+    });
+    return Array.from(brands).sort();
+  }, [products]);
+
+  // Filter products based on search term and brand
   // This is computed directly, not memoized, to ensure immediate updates
   const getFilteredProducts = () => {
     // IMPORTANT: Add _originalIndex to ALL products so qtyValues lookup works after filtering
-    const productsWithIndex = products.map((product, index) => ({
+    let productsWithIndex = products.map((product, index) => ({
       ...product,
       _originalIndex: index, // Store original position in products array for qtyValues lookup
     }));
     
-    // If no search term or empty, return all products with index
+    // Apply brand filter first
+    if (selectedBrand) {
+      productsWithIndex = productsWithIndex.filter(product => {
+        const brandValue = product.brand || '';
+        const productValue = product.product || '';
+        const searchText = (brandValue + ' ' + productValue).toLowerCase();
+        return searchText.includes(selectedBrand.toLowerCase());
+      });
+    }
+    
+    // Then apply search term filter
     if (!searchTerm || searchTerm.trim() === '') {
-      console.log(`🔍 Search empty, returning all ${products.length} products`);
       return productsWithIndex;
     }
     
     const searchLower = searchTerm.toLowerCase().trim();
     
-    // If search is empty after trim, return all products with index
+    // If search is empty after trim, return products with index
     if (searchLower === '') {
       return productsWithIndex;
     }
     
     // Split into words for AND logic
     const searchWords = searchLower.split(/\s+/).filter(w => w.length > 0);
-    console.log(`🔍 Searching for words: [${searchWords.join(', ')}] in ${products.length} products`);
     
     // Filter products but preserve _originalIndex
     const filtered = productsWithIndex.filter(product => {
@@ -1796,7 +1825,6 @@ const NewShipment = () => {
       return searchWords.every(word => searchableText.includes(word));
     });
     
-    console.log(`🔍 Found ${filtered.length} matching products`);
     return filtered;
   };
   
@@ -1991,30 +2019,34 @@ const NewShipment = () => {
                   onSettingsChange={handleDoiSettingsChange}
                 />
 
-                {/* Sort Dropdown */}
+                {/* Brand Filter */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: 400, color: '#94a3b8' }}>Sort</span>
+                  <span style={{ fontSize: '14px', fontWeight: 400, color: isDarkMode ? '#94a3b8' : '#6B7280' }}>Brand</span>
                   <select
-                    value={sortOption}
-                    onChange={(e) => setSortOption(e.target.value)}
+                    value={selectedBrand}
+                    onChange={(e) => setSelectedBrand(e.target.value)}
                     style={{
-                      backgroundColor: '#1e293b',
-                      color: '#fff',
-                      border: '1px solid #334155',
+                      backgroundColor: isDarkMode ? '#1e293b' : '#FFFFFF',
+                      color: isDarkMode ? '#fff' : '#111827',
+                      border: `1px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
                       borderRadius: '6px',
                       padding: '6px 28px 6px 12px',
                       fontSize: '14px',
                       fontWeight: 500,
                       cursor: 'pointer',
                       appearance: 'none',
-                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='${isDarkMode ? '%2394a3b8' : '%236B7280'}' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
                       backgroundRepeat: 'no-repeat',
                       backgroundPosition: 'right 8px center',
+                      minWidth: '150px',
                     }}
                   >
-                    <option value="doi">DOI (Low → High)</option>
-                    <option value="qty">QTY (High → Low)</option>
-                    <option value="name">Name (A → Z)</option>
+                    <option value="">All Brands</option>
+                    {uniqueBrands.map((brand) => (
+                      <option key={brand} value={brand}>
+                        {brand}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
