@@ -1753,25 +1753,12 @@ const NewShipment = () => {
 
   const floorInventoryOptions = ['Finished Goods', 'Shiners', 'Unused Formulas'];
 
-  // Get unique brands from products
+  // Get unique brands from products - only show allowed brands
+  const allowedBrands = ['TPS Nutrients', 'TPS Plant Foods', 'Bloom City'];
   const uniqueBrands = useMemo(() => {
-    const brands = new Set();
-    products.forEach(product => {
-      const brand = product.brand || '';
-      if (brand) {
-        brands.add(brand);
-      } else if (product.product) {
-        // Try to extract brand from product name if brand field is empty
-        const productName = product.product;
-        // Common patterns: "Brand Name Product" or "Product - Brand"
-        const words = productName.split(' ');
-        if (words.length > 0 && words[0].length > 2) {
-          brands.add(words[0]); // Use first word as potential brand
-        }
-      }
-    });
-    return Array.from(brands).sort();
-  }, [products]);
+    // Always return only the three allowed brands, sorted
+    return [...allowedBrands].sort();
+  }, []);
 
   // Filter products based on search term and brand
   // This is computed directly, not memoized, to ensure immediate updates
@@ -2627,7 +2614,7 @@ const NewShipment = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: '104px',
+            gap: '32px',
             zIndex: 1000,
             transition: 'left 300ms cubic-bezier(0.4, 0, 0.2, 1)',
             boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
@@ -2973,7 +2960,7 @@ const NewShipment = () => {
           ) : (
             /* Default Footer (Add Products) */
             <>
-              <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '48px', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
                   <span style={{
                     fontSize: '12px',
@@ -3052,6 +3039,7 @@ const NewShipment = () => {
                     fontWeight: 400,
                     color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
                     textAlign: 'center',
+                    whiteSpace: 'nowrap',
                   }}>
                     TIME (HRS)
                   </span>
@@ -3070,6 +3058,7 @@ const NewShipment = () => {
                     fontWeight: 400,
                     color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
                     textAlign: 'center',
+                    whiteSpace: 'nowrap',
                   }}>
                     WEIGHT (LBS)
                   </span>
@@ -3114,7 +3103,7 @@ const NewShipment = () => {
                     borderRadius: '6px',
                     border: 'none',
                     backgroundColor: 'transparent',
-                    color: isDarkMode ? '#FFFFFF' : '#111827',
+                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
                     fontSize: '14px',
                     fontWeight: 500,
                     cursor: 'pointer',
