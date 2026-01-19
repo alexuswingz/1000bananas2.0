@@ -1500,15 +1500,35 @@ const NewShipmentTable = ({
                       <input 
                         type="checkbox" 
                         style={{ cursor: 'pointer', width: '16px', height: '16px' }}
-                        checked={selectedRows.has(row.id)}
+                        checked={effectiveAddedRows.has(row.id)}
                         onChange={(e) => {
-                          const newSelected = new Set(selectedRows);
                           if (e.target.checked) {
-                            newSelected.add(row.id);
+                            // Automatically add the product when checked
+                            const currentQty = typeof effectiveQtyValues[index] === 'number' 
+                              ? effectiveQtyValues[index] 
+                              : (effectiveQtyValues[index] === '' || effectiveQtyValues[index] === null || effectiveQtyValues[index] === undefined) 
+                                ? 0 
+                                : parseInt(effectiveQtyValues[index], 10) || 0;
+                            
+                            // If quantity is 0, set it to the suggested quantity or 1
+                            if (currentQty === 0) {
+                              const suggestedQty = Math.round(row.weeklyForecast || row.forecast || row.suggestedQty || 0);
+                              const defaultQty = suggestedQty > 0 ? suggestedQty : 1;
+                              effectiveSetQtyValues(prev => ({ ...prev, [index]: defaultQty }));
+                            }
+                            
+                            // Add to addedRows
+                            const newAdded = new Set(effectiveAddedRows);
+                            newAdded.add(row.id);
+                            setAddedRows(newAdded);
+                            if (onAddedRowsChange) onAddedRowsChange(newAdded);
                           } else {
-                            newSelected.delete(row.id);
+                            // Remove from addedRows when unchecked
+                            const newAdded = new Set(effectiveAddedRows);
+                            newAdded.delete(row.id);
+                            setAddedRows(newAdded);
+                            if (onAddedRowsChange) onAddedRowsChange(newAdded);
                           }
-                          setSelectedRows(newSelected);
                         }}
                       />
                     </td>

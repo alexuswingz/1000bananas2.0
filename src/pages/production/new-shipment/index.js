@@ -1092,6 +1092,21 @@ const NewShipment = () => {
     return sum + weight;
   }, 0);
 
+  // Calculate total products count (unique products added)
+  const totalProducts = products.filter((product, index) => {
+    return addedRows && addedRows instanceof Set && addedRows.has(product.id) && (qtyValues[index] || 0) > 0;
+  }).length;
+
+  // Calculate total formulas count (unique formulas from added products)
+  const totalFormulas = new Set(
+    products
+      .filter((product, index) => {
+        return addedRows && addedRows instanceof Set && addedRows.has(product.id) && (qtyValues[index] || 0) > 0;
+      })
+      .map(product => product.formula_name || product.formulaName)
+      .filter(formula => formula && formula.trim() !== '')
+  ).size;
+
   const handleProductClick = (row) => {
     setSelectedRow(row);
     setIsNgoosOpen(true);
@@ -2574,17 +2589,25 @@ const NewShipment = () => {
         <div
           style={{
             position: 'fixed',
-            bottom: 0,
-            left: `${sidebarWidth}px`,
-            right: 0,
-            backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-            borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+            bottom: '16px',
+            left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2)`,
+            transform: 'translateX(-50%)',
+            width: 'fit-content',
+            minWidth: '1014px',
+            height: '65px',
+            backgroundColor: isDarkMode ? 'rgba(31, 41, 55, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+            borderRadius: '32px',
             padding: '16px 24px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            zIndex: 10,
+            gap: '104px',
+            zIndex: 1000,
             transition: 'left 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+            boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
           }}
         >
           {activeAction === 'formula-check' ? (
@@ -2950,7 +2973,23 @@ const NewShipment = () => {
                     fontWeight: 400,
                     color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
                   }}>
-                    TOTAL BOXES
+                    PRODUCTS
+                  </span>
+                  <span style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                  }}>
+                    {totalProducts}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 400,
+                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                  }}>
+                    BOXES
                   </span>
                   <span style={{
                     fontSize: '18px',
@@ -3008,8 +3047,54 @@ const NewShipment = () => {
                     {Math.round(totalWeightLbs).toLocaleString()}
                   </span>
                 </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 400,
+                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                  }}>
+                    FORMULAS
+                  </span>
+                  <span style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                  }}>
+                    {totalFormulas}
+                  </span>
+                </div>
               </div>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddedRows(new Set());
+                    setQtyValues({});
+                  }}
+                  style={{
+                    height: '31px',
+                    padding: '0 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: 'transparent',
+                    color: isDarkMode ? '#FFFFFF' : '#111827',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  Clear
+                </button>
                 <button
                   type="button"
                   onClick={handleExport}

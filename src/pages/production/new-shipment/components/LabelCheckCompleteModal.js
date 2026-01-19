@@ -1,8 +1,10 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '../../../../context/ThemeContext';
 
 const LabelCheckCompleteModal = ({ isOpen, onClose, onGoToShipments, onBeginFormulaCheck, onBeginBookShipment, isFormulaCheckCompleted }) => {
   const navigate = useNavigate();
+  const { isDarkMode } = useTheme();
 
   if (!isOpen) return null;
 
@@ -53,10 +55,10 @@ const LabelCheckCompleteModal = ({ isOpen, onClose, onGoToShipments, onBeginForm
         {/* Modal */}
         <div
           style={{
-            backgroundColor: '#FFFFFF',
+            backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
             borderRadius: '14px',
             width: '400px',
-            border: '1px solid #E5E7EB',
+            border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
             zIndex: 9999,
             position: 'relative',
@@ -82,7 +84,7 @@ const LabelCheckCompleteModal = ({ isOpen, onClose, onGoToShipments, onBeginForm
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#9CA3AF',
+              color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
               width: '24px',
               height: '24px',
             }}
@@ -119,7 +121,7 @@ const LabelCheckCompleteModal = ({ isOpen, onClose, onGoToShipments, onBeginForm
             <h2 style={{
               fontSize: '20px',
               fontWeight: 600,
-              color: '#111827',
+              color: isDarkMode ? '#F9FAFB' : '#111827',
               margin: 0,
               textAlign: 'center',
             }}>
@@ -145,19 +147,19 @@ const LabelCheckCompleteModal = ({ isOpen, onClose, onGoToShipments, onBeginForm
                 height: '31px',
                 padding: '0 14px',
                 borderRadius: '4px',
-                border: '1px solid #D1D5DB',
-                backgroundColor: '#FFFFFF',
-                color: '#374151',
+                border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
+                backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                color: isDarkMode ? '#F9FAFB' : '#374151',
                 fontSize: '14px',
                 fontWeight: 500,
                 cursor: 'pointer',
                 transition: 'all 0.2s',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#F3F4F6';
+                e.currentTarget.style.backgroundColor = isDarkMode ? '#4B5563' : '#F3F4F6';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#FFFFFF';
+                e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#FFFFFF';
               }}
             >
               Go to Shipments

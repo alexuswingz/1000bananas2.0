@@ -1,6 +1,9 @@
 import React from 'react';
+import { useTheme } from '../../../../context/ThemeContext';
 
 const UncheckedFormulaModal = ({ isOpen, remainingCount = 0, onCancel, onConfirm }) => {
+  const { isDarkMode } = useTheme();
+  
   if (!isOpen) return null;
 
   return (
@@ -25,9 +28,9 @@ const UncheckedFormulaModal = ({ isOpen, remainingCount = 0, onCancel, onConfirm
           transform: 'translate(-50%, -50%)',
           width: '366px',
           height: '217px',
-          backgroundColor: '#FFFFFF',
+          backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
           borderRadius: '12px',
-          border: '1px solid #E5E7EB',
+          border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
           zIndex: 9999,
           padding: '24px',
@@ -68,10 +71,10 @@ const UncheckedFormulaModal = ({ isOpen, remainingCount = 0, onCancel, onConfirm
             </div>
           </div>
 
-          <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#111827', margin: 0, marginBottom: '8px' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: 600, color: isDarkMode ? '#F9FAFB' : '#111827', margin: 0, marginBottom: '8px' }}>
             Unchecked Formula
           </h3>
-          <p style={{ fontSize: '14px', color: '#6B7280', margin: 0, lineHeight: 1.5 }}>
+          <p style={{ fontSize: '14px', color: isDarkMode ? '#D1D5DB' : '#6B7280', margin: 0, lineHeight: 1.5 }}>
             {remainingCount} formula{remainingCount === 1 ? '' : 's'} has been left unchecked. Proceed anyway and mark as incomplete?
           </p>
         </div>
@@ -84,19 +87,19 @@ const UncheckedFormulaModal = ({ isOpen, remainingCount = 0, onCancel, onConfirm
               width: '151px',
               height: '31px',
               borderRadius: '4px',
-              border: '1px solid #D1D5DB',
-              backgroundColor: '#FFFFFF',
-              color: '#374151',
+              border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
+              backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+              color: isDarkMode ? '#F9FAFB' : '#374151',
               fontSize: '14px',
               fontWeight: 500,
               cursor: 'pointer',
               transition: 'all 0.2s',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#F9FAFB';
+              e.currentTarget.style.backgroundColor = isDarkMode ? '#4B5563' : '#F9FAFB';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#FFFFFF';
+              e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#FFFFFF';
             }}
           >
             Cancel
