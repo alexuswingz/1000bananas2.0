@@ -808,6 +808,13 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
     }
   }, [openMenuIndex]);
 
+  // Close filters when menu opens
+  useEffect(() => {
+    if (openMenuIndex !== null && openFilterColumns.size > 0) {
+      setOpenFilterColumns(new Set());
+    }
+  }, [openMenuIndex]);
+
   // Close filter dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -869,6 +876,10 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
 
   const handleMenuClick = (e, index) => {
     e.stopPropagation();
+    // Close filters when opening a menu
+    if (openFilterColumns.size > 0) {
+      setOpenFilterColumns(new Set());
+    }
     setOpenMenuIndex(openMenuIndex === index ? null : index);
   };
 
@@ -1181,12 +1192,12 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
   const handleFilterClick = (columnKey, event) => {
     event.stopPropagation();
     setOpenFilterColumns((prev) => {
-      const next = new Set(prev);
-      if (next.has(columnKey)) {
-        next.delete(columnKey);
-      } else {
+      const next = new Set();
+      // Close all other filters and open only the clicked one (if not already open)
+      if (!prev.has(columnKey)) {
         next.add(columnKey);
       }
+      // If it was already open, close it (empty set)
       return next;
     });
   };

@@ -241,8 +241,8 @@ const NewShipmentTable = ({
       // Apply value filters (checkbox selections)
       if (filter.selectedValues && filter.selectedValues.size > 0) {
         result = result.filter(row => {
-          // Special handling for Add column
-          if (columnKey === 'normal-3' || columnKey === 'add') {
+          // Special handling for Add column and Shipment Actions column
+          if (columnKey === 'normal-3' || columnKey === 'add' || columnKey === 'normal-shipmentActions') {
             const isAdded = addedRows.has(row.id);
             const wantsAdded = filter.selectedValues.has('Added');
             const wantsNotAdded = filter.selectedValues.has('Not Added');
@@ -305,6 +305,23 @@ const NewShipmentTable = ({
               break;
             case 'formula':
               rowValue = row.formula_name || '';
+              break;
+            case 'normal-asin':
+              rowValue = row.asin || row.child_asin || row.childAsin || '';
+              break;
+            case 'normal-status': {
+              const doiValue = row.doiTotal || row.daysOfInventory || 0;
+              rowValue = doiValue >= 30 ? 'Good' : 'Low';
+              break;
+            }
+            case 'normal-inventory':
+              rowValue = row.fbaAvailable || 0;
+              break;
+            case 'normal-unitsToMake':
+              rowValue = Math.round(row.weeklyForecast || row.forecast || 0);
+              break;
+            case 'normal-doi':
+              rowValue = row.doiTotal || row.daysOfInventory || 0;
               break;
             default: {
               const field = getFieldForHeaderFilter(columnKey);
@@ -369,6 +386,23 @@ const NewShipmentTable = ({
               break;
             case 'formula':
               rowValue = row.formula_name || '';
+              break;
+            case 'normal-asin':
+              rowValue = row.asin || row.child_asin || row.childAsin || '';
+              break;
+            case 'normal-status': {
+              const doiValue = row.doiTotal || row.daysOfInventory || 0;
+              rowValue = doiValue >= 30 ? 'Good' : 'Low';
+              break;
+            }
+            case 'normal-inventory':
+              rowValue = row.fbaAvailable || 0;
+              break;
+            case 'normal-unitsToMake':
+              rowValue = Math.round(row.weeklyForecast || row.forecast || 0);
+              break;
+            case 'normal-doi':
+              rowValue = row.doiTotal || row.daysOfInventory || 0;
               break;
             default: {
               const field = getFieldForHeaderFilter(columnKey);
@@ -502,6 +536,13 @@ const NewShipmentTable = ({
     });
   };
 
+  // Close column filters when timeline filter opens
+  useEffect(() => {
+    if (openFilterIndex === 'doi-goal' && openFilterColumns.size > 0) {
+      setOpenFilterColumns(new Set());
+    }
+  }, [openFilterIndex]);
+
   // Store current filtered rows (without sorting) in ref for use in sort handler
   useEffect(() => {
     // Compute filtered rows without sorting
@@ -583,8 +624,8 @@ const NewShipmentTable = ({
 
       if (filter.selectedValues && filter.selectedValues.size > 0) {
         result = result.filter(row => {
-          // Special handling for Add column
-          if (key === 'normal-3' || key === 'add') {
+          // Special handling for Add column and Shipment Actions column
+          if (key === 'normal-3' || key === 'add' || key === 'normal-shipmentActions') {
             const isAdded = addedRows.has(row.id);
             const wantsAdded = filter.selectedValues.has('Added');
             const wantsNotAdded = filter.selectedValues.has('Not Added');
@@ -648,6 +689,23 @@ const NewShipmentTable = ({
             case 'formula':
               rowValue = row.formula_name || '';
               break;
+            case 'normal-asin':
+              rowValue = row.asin || row.child_asin || row.childAsin || '';
+              break;
+            case 'normal-status': {
+              const doiValue = row.doiTotal || row.daysOfInventory || 0;
+              rowValue = doiValue >= 30 ? 'Good' : 'Low';
+              break;
+            }
+            case 'normal-inventory':
+              rowValue = row.fbaAvailable || 0;
+              break;
+            case 'normal-unitsToMake':
+              rowValue = Math.round(row.weeklyForecast || row.forecast || 0);
+              break;
+            case 'normal-doi':
+              rowValue = row.doiTotal || row.daysOfInventory || 0;
+              break;
             default: {
               const field = getFieldForHeaderFilter(key);
               rowValue = row[field];
@@ -710,6 +768,23 @@ const NewShipmentTable = ({
               break;
             case 'formula':
               rowValue = row.formula_name || '';
+              break;
+            case 'normal-asin':
+              rowValue = row.asin || row.child_asin || row.childAsin || '';
+              break;
+            case 'normal-status': {
+              const doiValue = row.doiTotal || row.daysOfInventory || 0;
+              rowValue = doiValue >= 30 ? 'Good' : 'Low';
+              break;
+            }
+            case 'normal-inventory':
+              rowValue = row.fbaAvailable || 0;
+              break;
+            case 'normal-unitsToMake':
+              rowValue = Math.round(row.weeklyForecast || row.forecast || 0);
+              break;
+            case 'normal-doi':
+              rowValue = row.doiTotal || row.daysOfInventory || 0;
               break;
             default: {
               const field = getFieldForHeaderFilter(key);
@@ -902,6 +977,7 @@ const NewShipmentTable = ({
       case 'normal-0':
         return 'brand';
       case 'normal-1':
+      case 'normal-product':
         return 'product';
       case 'normal-2':
         return 'size';
@@ -909,6 +985,18 @@ const NewShipmentTable = ({
         return 'add'; // whether product is added (uses boolean/flag)
       case 'normal-4':
         return 'qty'; // quantity field
+      case 'normal-asin':
+        return 'asin';
+      case 'normal-status':
+        return 'status';
+      case 'normal-inventory':
+        return 'fbaAvailable';
+      case 'normal-unitsToMake':
+        return 'weeklyForecast';
+      case 'normal-doi':
+        return 'doiTotal';
+      case 'normal-shipmentActions':
+        return 'add'; // whether product is added (uses boolean/flag)
       default:
         return columnKey;
     }
@@ -916,8 +1004,8 @@ const NewShipmentTable = ({
 
   // Get unique values for a column
   const getColumnValues = (columnKey) => {
-    // Special handling for Add column
-    if (columnKey === 'normal-3' || columnKey === 'add') {
+    // Special handling for Add column and Shipment Actions column
+    if (columnKey === 'normal-3' || columnKey === 'add' || columnKey === 'normal-shipmentActions') {
       return ['Added', 'Not Added'];
     }
     
@@ -971,6 +1059,23 @@ const NewShipmentTable = ({
         case 'formula':
           val = row.formula_name || '';
           break;
+        case 'normal-asin':
+          val = row.asin || row.child_asin || row.childAsin || '';
+          break;
+        case 'normal-status': {
+          const doiValue = row.doiTotal || row.daysOfInventory || 0;
+          val = doiValue >= 30 ? 'Good' : 'Low';
+          break;
+        }
+        case 'normal-inventory':
+          val = row.fbaAvailable || 0;
+          break;
+        case 'normal-unitsToMake':
+          val = Math.round(row.weeklyForecast || row.forecast || 0);
+          break;
+        case 'normal-doi':
+          val = row.doiTotal || row.daysOfInventory || 0;
+          break;
         default: {
           const field = getFieldForHeaderFilter(columnKey);
           val = row[field];
@@ -1008,8 +1113,8 @@ const NewShipmentTable = ({
     // Check for value filters - only active if not all values are selected
     if (!filter.selectedValues || filter.selectedValues.size === 0) return false;
     
-    // Special handling for Add column
-    if (columnKey === 'normal-3' || columnKey === 'add') {
+    // Special handling for Add column and Shipment Actions column
+    if (columnKey === 'normal-3' || columnKey === 'add' || columnKey === 'normal-shipmentActions') {
       // For Add column, both "Added" and "Not Added" selected means no active filter
       return filter.selectedValues.size < 2;
     }
@@ -1449,7 +1554,7 @@ const NewShipmentTable = ({
                       textTransform: 'uppercase',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', position: 'relative' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', width: '100%' }}>
                       <span>PRODUCT NAME</span>
                       <img
                         ref={(el) => { if (el) filterIconRefs.current['normal-product'] = el; }}
@@ -1457,33 +1562,177 @@ const NewShipmentTable = ({
                         alt="Filter"
                         className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('normal-product') || openFilterColumns.has('normal-product') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                         style={{ width: '12px', height: '12px', cursor: 'pointer', filter: hasActiveColumnFilter('normal-product') || openFilterColumns.has('normal-product') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none' }}
-                        onClick={(e) => { e.stopPropagation(); setOpenFilterColumns((prev) => { const next = new Set(prev); if (next.has('normal-product')) next.delete('normal-product'); else next.add('normal-product'); return next; }); }}
+                        onClick={(e) => handleFilterClick('normal-product', e)}
                       />
                     </div>
                   </th>
                   {/* ASIN column */}
-                  <th style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`, color: '#FFFFFF', width: '120px', fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase' }}>
-                    <span>ASIN</span>
+                  <th 
+                    className="group"
+                    style={{ 
+                      padding: '0 1rem', 
+                      height: '40px', 
+                      textAlign: 'center', 
+                      borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`, 
+                      color: (hasActiveColumnFilter('normal-asin') || openFilterColumns.has('normal-asin')) ? '#3B82F6' : '#FFFFFF', 
+                      width: '120px', 
+                      fontFamily: 'Inter, sans-serif', 
+                      fontWeight: 600, 
+                      fontSize: '12px', 
+                      textTransform: 'uppercase' 
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', width: '100%' }}>
+                      <span>ASIN</span>
+                      <img
+                        ref={(el) => { if (el) filterIconRefs.current['normal-asin'] = el; }}
+                        src="/assets/Vector (1).png"
+                        alt="Filter"
+                        className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('normal-asin') || openFilterColumns.has('normal-asin') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                        style={{ width: '12px', height: '12px', cursor: 'pointer', position: 'absolute', right: '0', filter: hasActiveColumnFilter('normal-asin') || openFilterColumns.has('normal-asin') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none' }}
+                        onClick={(e) => handleFilterClick('normal-asin', e)}
+                      />
+                    </div>
                   </th>
                   {/* STATUS column */}
-                  <th style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`, color: '#FFFFFF', width: '90px', fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase' }}>
-                    <span>STATUS</span>
+                  <th 
+                    className="group"
+                    style={{ 
+                      padding: '0 1rem', 
+                      height: '40px', 
+                      textAlign: 'center', 
+                      borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`, 
+                      color: (hasActiveColumnFilter('normal-status') || openFilterColumns.has('normal-status')) ? '#3B82F6' : '#FFFFFF', 
+                      width: '90px', 
+                      fontFamily: 'Inter, sans-serif', 
+                      fontWeight: 600, 
+                      fontSize: '12px', 
+                      textTransform: 'uppercase' 
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', width: '100%' }}>
+                      <span>STATUS</span>
+                      <img
+                        ref={(el) => { if (el) filterIconRefs.current['normal-status'] = el; }}
+                        src="/assets/Vector (1).png"
+                        alt="Filter"
+                        className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('normal-status') || openFilterColumns.has('normal-status') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                        style={{ width: '12px', height: '12px', cursor: 'pointer', position: 'absolute', right: '0', filter: hasActiveColumnFilter('normal-status') || openFilterColumns.has('normal-status') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none' }}
+                        onClick={(e) => handleFilterClick('normal-status', e)}
+                      />
+                    </div>
                   </th>
                   {/* INVENTORY column */}
-                  <th style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`, color: '#FFFFFF', width: '100px', fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase' }}>
-                    <span>INVENTORY</span>
+                  <th 
+                    className="group"
+                    style={{ 
+                      padding: '0 1rem', 
+                      height: '40px', 
+                      textAlign: 'center', 
+                      borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`, 
+                      color: (hasActiveColumnFilter('normal-inventory') || openFilterColumns.has('normal-inventory')) ? '#3B82F6' : '#FFFFFF', 
+                      width: '100px', 
+                      fontFamily: 'Inter, sans-serif', 
+                      fontWeight: 600, 
+                      fontSize: '12px', 
+                      textTransform: 'uppercase' 
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', width: '100%' }}>
+                      <span>INVENTORY</span>
+                      <img
+                        ref={(el) => { if (el) filterIconRefs.current['normal-inventory'] = el; }}
+                        src="/assets/Vector (1).png"
+                        alt="Filter"
+                        className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('normal-inventory') || openFilterColumns.has('normal-inventory') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                        style={{ width: '12px', height: '12px', cursor: 'pointer', position: 'absolute', right: '0', filter: hasActiveColumnFilter('normal-inventory') || openFilterColumns.has('normal-inventory') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none' }}
+                        onClick={(e) => handleFilterClick('normal-inventory', e)}
+                      />
+                    </div>
                   </th>
                   {/* UNITS TO MAKE column */}
-                  <th style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`, color: '#FFFFFF', width: '120px', fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase' }}>
-                    <span>UNITS TO MAKE</span>
+                  <th 
+                    className="group"
+                    style={{ 
+                      padding: '0 1rem', 
+                      height: '40px', 
+                      textAlign: 'center', 
+                      borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`, 
+                      color: (hasActiveColumnFilter('normal-unitsToMake') || openFilterColumns.has('normal-unitsToMake')) ? '#3B82F6' : '#FFFFFF', 
+                      width: '120px', 
+                      fontFamily: 'Inter, sans-serif', 
+                      fontWeight: 600, 
+                      fontSize: '12px', 
+                      textTransform: 'uppercase' 
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', width: '100%' }}>
+                      <span>UNITS TO MAKE</span>
+                      <img
+                        ref={(el) => { if (el) filterIconRefs.current['normal-unitsToMake'] = el; }}
+                        src="/assets/Vector (1).png"
+                        alt="Filter"
+                        className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('normal-unitsToMake') || openFilterColumns.has('normal-unitsToMake') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                        style={{ width: '12px', height: '12px', cursor: 'pointer', position: 'absolute', right: '0', filter: hasActiveColumnFilter('normal-unitsToMake') || openFilterColumns.has('normal-unitsToMake') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none' }}
+                        onClick={(e) => handleFilterClick('normal-unitsToMake', e)}
+                      />
+                    </div>
                   </th>
                   {/* DOI (DAYS) column */}
-                  <th style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`, color: '#FFFFFF', width: '90px', fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase' }}>
-                    <span>DOI (DAYS)</span>
+                  <th 
+                    className="group"
+                    style={{ 
+                      padding: '0 1rem', 
+                      height: '40px', 
+                      textAlign: 'center', 
+                      borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`, 
+                      color: (hasActiveColumnFilter('normal-doi') || openFilterColumns.has('normal-doi')) ? '#3B82F6' : '#FFFFFF', 
+                      width: '90px', 
+                      fontFamily: 'Inter, sans-serif', 
+                      fontWeight: 600, 
+                      fontSize: '12px', 
+                      textTransform: 'uppercase' 
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', width: '100%' }}>
+                      <span>DOI (DAYS)</span>
+                      <img
+                        ref={(el) => { if (el) filterIconRefs.current['normal-doi'] = el; }}
+                        src="/assets/Vector (1).png"
+                        alt="Filter"
+                        className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('normal-doi') || openFilterColumns.has('normal-doi') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                        style={{ width: '12px', height: '12px', cursor: 'pointer', position: 'absolute', right: '0', filter: hasActiveColumnFilter('normal-doi') || openFilterColumns.has('normal-doi') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none' }}
+                        onClick={(e) => handleFilterClick('normal-doi', e)}
+                      />
+                    </div>
                   </th>
                   {/* SHIPMENT ACTIONS column */}
-                  <th style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderTopRightRadius: '16px', color: '#FFFFFF', width: '180px', fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase' }}>
-                    <span>SHIPMENT ACTIONS</span>
+                  <th 
+                    className="group"
+                    style={{ 
+                      padding: '0 1rem', 
+                      height: '40px', 
+                      textAlign: 'center', 
+                      borderTopRightRadius: '16px', 
+                      color: (hasActiveColumnFilter('normal-shipmentActions') || openFilterColumns.has('normal-shipmentActions')) ? '#3B82F6' : '#FFFFFF', 
+                      width: '180px', 
+                      fontFamily: 'Inter, sans-serif', 
+                      fontWeight: 600, 
+                      fontSize: '12px', 
+                      textTransform: 'uppercase' 
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', width: '100%' }}>
+                      <span>SHIPMENT ACTIONS</span>
+                      <img
+                        ref={(el) => { if (el) filterIconRefs.current['normal-shipmentActions'] = el; }}
+                        src="/assets/Vector (1).png"
+                        alt="Filter"
+                        className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('normal-shipmentActions') || openFilterColumns.has('normal-shipmentActions') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                        style={{ width: '12px', height: '12px', cursor: 'pointer', position: 'absolute', right: '0', filter: hasActiveColumnFilter('normal-shipmentActions') || openFilterColumns.has('normal-shipmentActions') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none' }}
+                        onClick={(e) => handleFilterClick('normal-shipmentActions', e)}
+                      />
+                    </div>
                   </th>
                 </tr>
               </thead>
