@@ -250,13 +250,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
       e.stopPropagation();
       e.preventDefault();
       
-      // If status is completed, navigate to that section
-      if (normalizedStatus === 'completed' && onStatusClick && rowId && statusFieldName && row) {
-        onStatusClick(row, statusFieldName);
-        return;
-      }
-      
-      // If has comment, toggle tooltip (no modal)
+      // If has comment, show tooltip first (comments take priority over navigation)
       if (hasComment && commentText && uniqueCommentId) {
         if (hoveredCommentId === uniqueCommentId) {
           // If already showing, close it
@@ -270,6 +264,13 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
           });
           setHoveredCommentId(uniqueCommentId);
         }
+        return; // Don't navigate if there's a comment to show
+      }
+      
+      // If status is completed and no comment, navigate to that section
+      if (normalizedStatus === 'completed' && onStatusClick && rowId && statusFieldName && row) {
+        onStatusClick(row, statusFieldName);
+        return;
       }
     };
 
@@ -297,6 +298,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
 
     return (
       <div 
+        data-status-circle="true"
         ref={(el) => { if (el && uniqueCommentId) iconRefs.current[uniqueCommentId] = el; }}
         style={{ 
           position: 'relative', 
@@ -1752,6 +1754,10 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                   position: 'relative',
                 }}
                 onClick={async (e) => {
+                  // Don't handle click if it's on the status circle (let the circle handle its own clicks)
+                  if (e.target.closest('[data-status-circle]')) {
+                    return;
+                  }
                   e.stopPropagation();
                   e.preventDefault();
                   if (onLabelCheckClick) {
