@@ -159,6 +159,56 @@ const LabelCheckTable = ({
     });
   };
 
+  // Handle select all checkbox in header
+  const handleSelectAll = (checked) => {
+    const filteredRows = getFilteredRows();
+    if (isAdmin) {
+      if (checked) {
+        // Add all filtered row IDs to bulkSelectedRows (preserve existing selections)
+        setBulkSelectedRows(prev => {
+          const newSet = new Set(prev);
+          filteredRows.forEach(row => newSet.add(row.id));
+          return newSet;
+        });
+      } else {
+        // Remove all filtered row IDs from bulkSelectedRows
+        setBulkSelectedRows(prev => {
+          const newSet = new Set(prev);
+          filteredRows.forEach(row => newSet.delete(row.id));
+          return newSet;
+        });
+      }
+    } else {
+      if (checked) {
+        // Add all filtered row IDs to selectedRows (preserve existing selections)
+        setSelectedRows(prev => {
+          const newSet = new Set(prev);
+          filteredRows.forEach(row => newSet.add(row.id));
+          return newSet;
+        });
+      } else {
+        // Remove all filtered row IDs from selectedRows
+        setSelectedRows(prev => {
+          const newSet = new Set(prev);
+          filteredRows.forEach(row => newSet.delete(row.id));
+          return newSet;
+        });
+      }
+    }
+  };
+
+  // Check if all filtered rows are selected
+  const areAllRowsSelected = () => {
+    const filteredRows = getFilteredRows();
+    if (filteredRows.length === 0) return false;
+    
+    if (isAdmin) {
+      return filteredRows.every(row => bulkSelectedRows.has(row.id));
+    } else {
+      return filteredRows.every(row => selectedRows.has(row.id));
+    }
+  };
+
   // Handle bulk complete action
   const handleBulkComplete = async () => {
     if (bulkSelectedRows.size === 0) return;
@@ -1031,51 +1081,73 @@ const LabelCheckTable = ({
                         backgroundColor: isActive ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
                       }}
                     >
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '0.5rem',
-                      }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          {column.label}
-                          {isActive && (
-                            <span style={{ 
-                              display: 'inline-block',
-                              width: '6px', 
-                              height: '6px', 
-                              borderRadius: '50%', 
-                              backgroundColor: '#10B981',
-                            }} />
-                          )}
-                        </span>
-                        {!disableFilters && column.key !== 'start' && column.key !== 'checkbox' && (
-                          <img
-                            ref={(el) => { if (el) filterIconRefs.current[column.key] = el; }}
-                            src="/assets/Vector (1).png"
-                            alt="Filter"
-                            className={`w-3 h-3 transition-opacity cursor-pointer ${
-                              isActive || openFilterColumn === column.key
-                                ? 'opacity-100'
-                                : 'opacity-0 group-hover:opacity-100'
-                            }`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenFilterColumn(openFilterColumn === column.key ? null : column.key);
-                            }}
+                      {column.key === 'checkbox' ? (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                          <input
+                            type="checkbox"
+                            checked={areAllRowsSelected()}
+                            onChange={(e) => handleSelectAll(e.target.checked)}
+                            onClick={(e) => e.stopPropagation()}
                             style={{
-                              width: '12px',
-                              height: '12px',
-                              ...(isActive || openFilterColumn === column.key
-                                ? {
-                                    filter:
-                                      'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
-                                  }
-                                : undefined)
+                              width: '16px',
+                              height: '16px',
+                              cursor: 'pointer',
+                              accentColor: '#3B82F6',
                             }}
+                            title="Select all rows"
                           />
-                        )}
-                      </div>
+                        </div>
+                      ) : (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '0.5rem',
+                        }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            {column.label}
+                            {isActive && (
+                              <span style={{ 
+                                display: 'inline-block',
+                                width: '6px', 
+                                height: '6px', 
+                                borderRadius: '50%', 
+                                backgroundColor: '#10B981',
+                              }} />
+                            )}
+                          </span>
+                          {!disableFilters && column.key !== 'start' && column.key !== 'checkbox' && (
+                            <img
+                              ref={(el) => { if (el) filterIconRefs.current[column.key] = el; }}
+                              src="/assets/Vector (1).png"
+                              alt="Filter"
+                              className={`w-3 h-3 transition-opacity cursor-pointer ${
+                                isActive || openFilterColumn === column.key
+                                  ? 'opacity-100'
+                                  : 'opacity-0 group-hover:opacity-100'
+                              }`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenFilterColumn(openFilterColumn === column.key ? null : column.key);
+                              }}
+                              style={{
+                                width: '12px',
+                                height: '12px',
+                                ...(isActive || openFilterColumn === column.key
+                                  ? {
+                                      filter:
+                                        'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
+                                    }
+                                  : undefined)
+                              }}
+                            />
+                          )}
+                        </div>
+                      )}
                   </th>
                   );
                   });

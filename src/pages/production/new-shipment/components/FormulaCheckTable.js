@@ -459,6 +459,72 @@ const FormulaCheckTable = ({
     });
   };
 
+  // Handle select all checkbox in header
+  const handleSelectAll = (checked) => {
+    const filteredFormulas = getFilteredFormulas();
+    // In recount mode, only consider variance-exceeded formulas
+    const formulasToSelect = isRecountMode
+      ? filteredFormulas.filter(formula => varianceExceededRowIds.includes(formula.id))
+      : filteredFormulas;
+    
+    if (isAdmin) {
+      if (checked) {
+        // Add all filtered formula IDs to bulkSelectedRows (preserve existing selections)
+        setBulkSelectedRows(prev => {
+          const newSet = new Set(prev);
+          formulasToSelect.forEach(formula => newSet.add(formula.id));
+          return newSet;
+        });
+      } else {
+        // Remove all filtered formula IDs from bulkSelectedRows
+        setBulkSelectedRows(prev => {
+          const newSet = new Set(prev);
+          formulasToSelect.forEach(formula => newSet.delete(formula.id));
+          return newSet;
+        });
+      }
+    } else {
+      if (checked) {
+        // Add all filtered formula IDs to selectedRows (preserve existing selections)
+        setSelectedRows(prev => {
+          const newSet = new Set(prev);
+          formulasToSelect.forEach(formula => newSet.add(formula.id));
+          if (onSelectedRowsChange) {
+            onSelectedRowsChange(newSet);
+          }
+          return newSet;
+        });
+      } else {
+        // Remove all filtered formula IDs from selectedRows
+        setSelectedRows(prev => {
+          const newSet = new Set(prev);
+          formulasToSelect.forEach(formula => newSet.delete(formula.id));
+          if (onSelectedRowsChange) {
+            onSelectedRowsChange(newSet);
+          }
+          return newSet;
+        });
+      }
+    }
+  };
+
+  // Check if all filtered rows are selected
+  const areAllRowsSelected = () => {
+    const filteredFormulas = getFilteredFormulas();
+    // In recount mode, only consider variance-exceeded formulas
+    const formulasToCheck = isRecountMode
+      ? filteredFormulas.filter(formula => varianceExceededRowIds.includes(formula.id))
+      : filteredFormulas;
+    
+    if (formulasToCheck.length === 0) return false;
+    
+    if (isAdmin) {
+      return formulasToCheck.every(formula => bulkSelectedRows.has(formula.id));
+    } else {
+      return formulasToCheck.every(formula => selectedRows.has(formula.id));
+    }
+  };
+
   // Handle bulk complete action
   const handleBulkComplete = async () => {
     if (bulkSelectedRows.size === 0) return;
@@ -621,7 +687,27 @@ const FormulaCheckTable = ({
                     backgroundColor: isActive ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
                   }}
                 >
-                  {column.key === 'checkbox' || column.key === 'complete' ? (
+                  {column.key === 'checkbox' ? (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={areAllRowsSelected()}
+                        onChange={(e) => handleSelectAll(e.target.checked)}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          width: '16px',
+                          height: '16px',
+                          cursor: 'pointer',
+                          accentColor: '#3B82F6',
+                        }}
+                        title="Select all rows"
+                      />
+                    </div>
+                  ) : column.key === 'complete' ? (
                     column.label
                   ) : (
                     <div style={{
