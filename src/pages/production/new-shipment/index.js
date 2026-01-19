@@ -1314,44 +1314,33 @@ const NewShipment = () => {
       return newSet;
     });
 
-    // Navigate based on whether label check is completed
+    // If incomplete (no formulas checked), always navigate back to planning page
+    if (isIncomplete) {
+      if (hasComment) {
+        toast.info('Formula Check comment saved. Returning to shipments table.');
+      } else {
+        toast.info('Returning to shipments table.');
+      }
+      
+      // Navigate back to planning page with shipments tab
+      navigate('/dashboard/production/planning', {
+        state: {
+          activeTab: 'shipments',
+          refresh: Date.now(),
+          fromFormulaCheckComplete: true,
+        }
+      });
+      return;
+    }
+
+    // Navigate based on whether label check is completed (only when formula check is complete)
     if (labelCheckCompleted) {
       // Both are completed, show modal (user will click button to navigate)
-      if (isIncomplete) {
-        if (hasComment) {
-          toast.info('Formula Check comment saved. Proceeding to Book Shipment.');
-        } else {
-          toast.info('Proceeding to Book Shipment.');
-        }
-        // For incomplete, still auto-navigate
-        setActiveAction('book-shipment');
-      } else {
-        // Show the completion modal - user will click "Begin Book Shipment" to navigate
-        toast.success('Formula Check completed! Moving to Book Shipment');
-        setIsFormulaCheckCompleteOpen(true);
-      }
+      toast.success('Formula Check completed! Moving to Book Shipment');
+      setIsFormulaCheckCompleteOpen(true);
     } else {
-      // If formula check is completed, show completion modal instead of auto-navigating
-      if (!isIncomplete) {
-        // Show the completion modal instead of automatically navigating
-        setIsFormulaCheckCompleteOpen(true);
-      } else {
-        // If incomplete, navigate back to planning page
-        if (hasComment) {
-          toast.info('Formula Check comment saved. Returning to shipments table.');
-        } else {
-          toast.info('Returning to shipments table.');
-        }
-        
-        // Navigate back to planning page with shipments tab
-        navigate('/dashboard/production/planning', {
-          state: {
-            activeTab: 'shipments',
-            refresh: Date.now(),
-            fromFormulaCheckComplete: true,
-          }
-        });
-      }
+      // Show the completion modal instead of automatically navigating
+      setIsFormulaCheckCompleteOpen(true);
     }
   };
   const completeLabelCheck = async (comment = '', isIncomplete = false) => {
