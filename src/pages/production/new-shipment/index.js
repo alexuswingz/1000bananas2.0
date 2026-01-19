@@ -1424,30 +1424,30 @@ const NewShipment = () => {
         return;
       }
 
-      // Get all formulas for the shipment
-      const formulas = await getShipmentFormulaCheck(shipmentId);
+      // Get selected formula IDs from checkbox selection
+      const selectedFormulaIds = Array.from(formulaSelectedRows);
       
-      if (formulas.length === 0) {
-        toast.info('No formulas to mark as completed');
+      if (selectedFormulaIds.length === 0) {
+        toast.info('Please select at least one formula to mark as completed');
         return;
       }
 
-      // Get all formula IDs
-      const allFormulaIds = formulas.map(formula => formula.id);
-
-      // Mark all formulas as checked
+      // Mark only selected formulas as checked
       await updateShipmentFormulaCheck(shipmentId, {
-        checked_formula_ids: allFormulaIds,
+        checked_formula_ids: selectedFormulaIds,
         uncheck_formula_ids: []
       });
 
-      toast.success(`All ${allFormulaIds.length} formula(s) marked as completed`);
+      toast.success(`${selectedFormulaIds.length} formula(s) marked as completed`);
+      
+      // Clear selection after marking as completed
+      setFormulaSelectedRows(new Set());
       
       // Trigger a refresh by incrementing the refresh key
       setFormulaCheckRefreshKey(prev => prev + 1);
     } catch (error) {
-      console.error('Error marking all formulas as completed:', error);
-      toast.error('Failed to mark all formulas as completed');
+      console.error('Error marking formulas as completed:', error);
+      toast.error('Failed to mark formulas as completed');
     }
   };
 
@@ -2658,7 +2658,7 @@ const NewShipment = () => {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                {formulaCheckData.completed > 0 && (
+                {formulaSelectedRows.size > 0 && (
                   <button
                     type="button"
                     onClick={handleMarkAllAsCompleted}

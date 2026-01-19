@@ -420,22 +420,29 @@ const FormulaCheckTable = ({
       newSet.delete(id);
     }
     
-    // Persist to backend
-    await saveCheckedStatus(id, isNowChecked);
-    
-    // Update local state
+    // Update local state only - do NOT persist to backend
+    // Checkboxes are for selection only, not for marking as done
     setSelectedRows(newSet);
     if (onSelectedRowsChange) onSelectedRowsChange(newSet);
-    
-    // Reload data to get latest state, then check if all formulas are checked
-    if (isNowChecked) {
-      try {
-        await loadFormulaData();
-        // Check if all formulas are now checked and clear comment if so (after reload)
-        await checkAndClearFormulaCheckComment();
-      } catch (error) {
-        console.error('Error reloading formula data:', error);
-      }
+  };
+
+  // Handle individual "Complete" button click - marks item as done
+  const handleCompleteClick = async (id) => {
+    try {
+      // Mark as done in backend
+      await saveCheckedStatus(id, true);
+      
+      // Update selection state to show checkbox as checked
+      const newSet = new Set(selectedRows);
+      newSet.add(id);
+      setSelectedRows(newSet);
+      if (onSelectedRowsChange) onSelectedRowsChange(newSet);
+      
+      // Reload data to get latest state, then check if all formulas are checked
+      await loadFormulaData();
+      await checkAndClearFormulaCheckComment();
+    } catch (error) {
+      console.error('Error completing formula:', error);
     }
   };
 
@@ -758,16 +765,17 @@ const FormulaCheckTable = ({
                   height: '40px',
                 }}>
                   {(() => {
-                    const isCompleted = selectedRows.has(formula.id);
+                    const isCompleted = formula.isChecked; // Use backend completion status, not checkbox selection
                     return (
                       <button
                         type="button"
-                        onClick={() => handleCheckboxChange(formula.id)}
+                        onClick={() => handleCompleteClick(formula.id)}
                         className="done-badge-btn"
                         style={{
-                          height: '26px',
+                          height: '24px',
+                          width: '96px',
                           padding: '0 12px',
-                          borderRadius: '13px',
+                          borderRadius: '6px',
                           border: 'none',
                           backgroundColor: isCompleted ? '#10B981' : '#3B82F6',
                           color: '#FFFFFF',
@@ -779,9 +787,8 @@ const FormulaCheckTable = ({
                           display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '5px',
+                          gap: '10px',
                           whiteSpace: 'nowrap',
-                          minWidth: '60px',
                           boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
                           position: 'relative',
                         }}
