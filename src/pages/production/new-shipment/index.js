@@ -2974,11 +2974,12 @@ const NewShipment = () => {
             /* Default Footer (Add Products) */
             <>
               <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
                   <span style={{
                     fontSize: '12px',
                     fontWeight: 400,
                     color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                    textAlign: 'center',
                   }}>
                     PALETTES
                   </span>
@@ -2986,15 +2987,17 @@ const NewShipment = () => {
                     fontSize: '18px',
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
+                    textAlign: 'center',
                   }}>
                     {totalPalettes.toFixed(2)}
                   </span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
                   <span style={{
                     fontSize: '12px',
                     fontWeight: 400,
                     color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                    textAlign: 'center',
                   }}>
                     PRODUCTS
                   </span>
@@ -3002,15 +3005,17 @@ const NewShipment = () => {
                     fontSize: '18px',
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
+                    textAlign: 'center',
                   }}>
                     {totalProducts}
                   </span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
                   <span style={{
                     fontSize: '12px',
                     fontWeight: 400,
                     color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                    textAlign: 'center',
                   }}>
                     BOXES
                   </span>
@@ -3018,15 +3023,17 @@ const NewShipment = () => {
                     fontSize: '18px',
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
+                    textAlign: 'center',
                   }}>
                     {Math.ceil(totalBoxes).toLocaleString()}
                   </span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
                   <span style={{
                     fontSize: '12px',
                     fontWeight: 400,
                     color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                    textAlign: 'center',
                   }}>
                     UNITS
                   </span>
@@ -3034,15 +3041,17 @@ const NewShipment = () => {
                     fontSize: '18px',
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
+                    textAlign: 'center',
                   }}>
                     {totalUnits.toLocaleString()}
                   </span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
                   <span style={{
                     fontSize: '12px',
                     fontWeight: 400,
                     color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                    textAlign: 'center',
                   }}>
                     TIME (HRS)
                   </span>
@@ -3050,15 +3059,17 @@ const NewShipment = () => {
                     fontSize: '18px',
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
+                    textAlign: 'center',
                   }}>
                     {totalTimeHours.toFixed(1)}
                   </span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
                   <span style={{
                     fontSize: '12px',
                     fontWeight: 400,
                     color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                    textAlign: 'center',
                   }}>
                     WEIGHT (LBS)
                   </span>
@@ -3066,15 +3077,17 @@ const NewShipment = () => {
                     fontSize: '18px',
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
+                    textAlign: 'center',
                   }}>
                     {Math.round(totalWeightLbs).toLocaleString()}
                   </span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
                   <span style={{
                     fontSize: '12px',
                     fontWeight: 400,
                     color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                    textAlign: 'center',
                   }}>
                     FORMULAS
                   </span>
@@ -3082,6 +3095,7 @@ const NewShipment = () => {
                     fontSize: '18px',
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
+                    textAlign: 'center',
                   }}>
                     {totalFormulas}
                   </span>

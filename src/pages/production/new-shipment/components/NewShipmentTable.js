@@ -1864,7 +1864,7 @@ const NewShipmentTable = ({
                   {/* DOI (DAYS) Column */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingLeft: '16px', marginLeft: '-220px', marginRight: '20px', position: 'relative' }}>
                     <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-                      <span style={{ fontSize: '18px', fontWeight: 500, color: doiColor, height: '32px', display: 'flex', alignItems: 'center' }}>
+                      <span style={{ fontSize: '24px', fontWeight: 500, color: doiColor, height: '32px', display: 'flex', alignItems: 'center' }}>
                         {doiValue}
                       </span>
                     </div>

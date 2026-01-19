@@ -15,7 +15,7 @@ const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
     text: isDarkMode ? 'text-dark-text-primary' : 'text-gray-900',
     textSecondary: isDarkMode ? 'text-dark-text-secondary' : 'text-gray-500',
     border: isDarkMode ? 'border-dark-border-primary' : 'border-gray-200',
-    headerBg: 'bg-[#1C2634]',
+    headerBg: 'bg-[#334155]',
     rowHover: isDarkMode ? 'hover:bg-dark-bg-tertiary' : 'hover:bg-gray-50',
   };
 
