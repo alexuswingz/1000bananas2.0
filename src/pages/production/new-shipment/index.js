@@ -4,7 +4,7 @@ import { useSidebar } from '../../../context/SidebarContext';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
-import { createShipment, getShipmentById, updateShipment, addShipmentProducts, getShipmentProducts, getShipmentFormulaCheck, getLabelsAvailability, updateShipmentFormulaCheck, updateShipmentProductLabelCheck } from '../../../services/productionApi';
+import { createShipment, getShipmentById, updateShipment, addShipmentProducts, getShipmentProducts, getShipmentFormulaCheck, getLabelsAvailability, updateShipmentFormulaCheck, updateShipmentProductLabelCheck, getSellables, getShiners, getUnusedFormulas } from '../../../services/productionApi';
 import CatalogAPI from '../../../services/catalogApi';
 import NgoosAPI from '../../../services/ngoosApi';
 import { extractFileId, getDriveImageUrl } from '../../../services/googleDriveApi';
@@ -134,6 +134,11 @@ const NewShipment = () => {
   const floorInventoryButtonRef = useRef(null);
   const [floorInventoryPosition, setFloorInventoryPosition] = useState({ top: 0, left: 0 });
   const [labelsAvailabilityMap, setLabelsAvailabilityMap] = useState({}); // Map of label_location -> available labels
+  const [floorInventoryCounts, setFloorInventoryCounts] = useState({
+    'Finished Goods': 0,
+    'Shiners': 0,
+    'Unused Formulas': 0
+  });
   const [isBookShipmentHovered, setIsBookShipmentHovered] = useState(false);
   const bookShipmentButtonRef = useRef(null);
   const [bookShipmentTooltipPosition, setBookShipmentTooltipPosition] = useState({ top: 0, left: 0 });
@@ -380,6 +385,38 @@ const NewShipment = () => {
       setProducts(sorted);
     }
   }, [sortOption]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch floor inventory counts
+  useEffect(() => {
+    const fetchFloorInventoryCounts = async () => {
+      try {
+        const [sellables, shiners, unusedFormulas] = await Promise.all([
+          getSellables().catch(() => []),
+          getShiners().catch(() => []),
+          getUnusedFormulas().catch(() => [])
+        ]);
+
+        // Count products/items for each category
+        const finishedGoodsCount = sellables.length || 0;
+        
+        // For shiners, count total products across all formula groups
+        const shinersCount = shiners.reduce((total, group) => total + (group.products?.length || 0), 0);
+        
+        // For unused formulas, count total formulas
+        const unusedFormulasCount = unusedFormulas.length || 0;
+
+        setFloorInventoryCounts({
+          'Finished Goods': finishedGoodsCount,
+          'Shiners': shinersCount,
+          'Unused Formulas': unusedFormulasCount
+        });
+      } catch (error) {
+        console.error('Error fetching floor inventory counts:', error);
+      }
+    };
+
+    fetchFloorInventoryCounts();
+  }, []); // Fetch once on mount
 
   // Reset shipment number for new shipments (when no ID in route)
   // Also read account from navigation state if coming from Planning modal
@@ -1708,7 +1745,7 @@ const NewShipment = () => {
     setSelectedFloorInventory(null);
   };
 
-  const floorInventoryOptions = ['Sellables', 'Shiners', 'Unused Formulas'];
+  const floorInventoryOptions = ['Finished Goods', 'Shiners', 'Unused Formulas'];
 
   // Filter products based on search term
   // This is computed directly, not memoized, to ensure immediate updates
@@ -1798,44 +1835,98 @@ const NewShipment = () => {
                 gap: '16px',
               }}
             >
-              {/* Left: Navigation Tabs */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+              {/* Left: Product Catalog Label and Navigation Tabs */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                {/* Product Catalog - Static Label */}
                 <div
-                  onClick={handleAllProductsClick}
                   style={{
-                    color: activeView === 'all-products' ? '#3B82F6' : '#6B7280',
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    borderBottom: activeView === 'all-products' ? '2px solid #3B82F6' : 'none',
-                    paddingBottom: '4px',
-                    transition: 'all 0.2s',
+                    color: isDarkMode ? '#FFFFFF' : '#111827',
+                    fontSize: '16px',
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap'
                   }}
                 >
-                  All Products
+                  Product Catalog
                 </div>
-                <div
-                  ref={floorInventoryButtonRef}
-                  onClick={() => setIsFloorInventoryOpen(!isFloorInventoryOpen)}
-                  style={{
-                    color: activeView === 'floor-inventory' ? '#3B82F6' : '#6B7280',
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
+                
+                {/* Navigation Tabs */}
+                <div 
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
                     gap: '4px',
-                    position: 'relative',
-                    borderBottom: activeView === 'floor-inventory' ? '2px solid #3B82F6' : 'none',
-                    paddingBottom: '4px',
-                    transition: 'all 0.2s',
+                    padding: '2px',
+                    borderRadius: '6px',
+                    border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
+                    backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF'
                   }}
                 >
-                  {selectedFloorInventory || 'Floor Inventory'}
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M3 4.5L6 7.5L9 4.5" stroke={activeView === 'floor-inventory' ? '#3B82F6' : '#6B7280'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
+                  <div
+                    onClick={handleAllProductsClick}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '4px',
+                      backgroundColor: activeView === 'all-products' 
+                        ? (isDarkMode ? '#1E293B' : '#F1F5F9') 
+                        : 'transparent',
+                      border: activeView === 'all-products' 
+                        ? 'none' 
+                        : `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
+                      color: activeView === 'all-products' 
+                        ? (isDarkMode ? '#FFFFFF' : '#3B82F6') 
+                        : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+                      fontSize: '14px',
+                      fontWeight: activeView === 'all-products' ? 600 : 500,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    All ({products.length})
+                  </div>
+                  <div
+                    ref={floorInventoryButtonRef}
+                    onClick={() => setIsFloorInventoryOpen(!isFloorInventoryOpen)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '4px',
+                      backgroundColor: activeView === 'floor-inventory' 
+                        ? (isDarkMode ? '#1E293B' : '#F1F5F9') 
+                        : 'transparent',
+                      border: activeView === 'floor-inventory' 
+                        ? 'none' 
+                        : `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
+                      color: activeView === 'floor-inventory' 
+                        ? (isDarkMode ? '#FFFFFF' : '#3B82F6') 
+                        : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+                      fontSize: '14px',
+                      fontWeight: activeView === 'floor-inventory' ? 600 : 500,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      position: 'relative',
+                      transition: 'all 0.2s',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    Floor Inventory
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path 
+                        d="M3 4.5L6 7.5L9 4.5" 
+                        stroke={activeView === 'floor-inventory' 
+                          ? (isDarkMode ? '#FFFFFF' : '#3B82F6') 
+                          : (isDarkMode ? '#9CA3AF' : '#6B7280')} 
+                        strokeWidth="1.5" 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
                 </div>
+              </div>
                 
                 {isFloorInventoryOpen && createPortal(
                   <div
@@ -1844,10 +1935,12 @@ const NewShipment = () => {
                       position: 'fixed',
                       top: `${floorInventoryPosition.top}px`,
                       left: `${floorInventoryPosition.left}px`,
-                      backgroundColor: '#FFFFFF',
-                      border: '1px solid #E5E7EB',
+                      backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                      border: `1px solid ${isDarkMode ? '#4B5563' : '#E5E7EB'}`,
                       borderRadius: '6px',
-                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                      boxShadow: isDarkMode 
+                        ? '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)' 
+                        : '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
                       zIndex: 10000,
                       minWidth: '160px',
                       overflow: 'hidden',
@@ -1860,14 +1953,16 @@ const NewShipment = () => {
                         style={{
                           padding: '8px 12px',
                           cursor: 'pointer',
-                          color: '#111827',
+                          color: isDarkMode ? '#F9FAFB' : '#111827',
                           fontSize: '14px',
-                          backgroundColor: selectedFloorInventory === option ? '#F3F4F6' : 'transparent',
+                          backgroundColor: selectedFloorInventory === option 
+                            ? (isDarkMode ? '#374151' : '#F3F4F6') 
+                            : 'transparent',
                           transition: 'background-color 0.2s',
                         }}
                         onMouseEnter={(e) => {
                           if (selectedFloorInventory !== option) {
-                            e.currentTarget.style.backgroundColor = '#F9FAFB';
+                            e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F9FAFB';
                           }
                         }}
                         onMouseLeave={(e) => {
@@ -1876,13 +1971,12 @@ const NewShipment = () => {
                           }
                         }}
                       >
-                        {option}
+                        {option} ({floorInventoryCounts[option] || 0})
                       </div>
                     ))}
                   </div>,
                   document.body
                 )}
-              </div>
 
               {/* Right: DOI Settings, Sort, and Search Input */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
@@ -1938,14 +2032,14 @@ const NewShipment = () => {
                 >
                   <path
                     d="M7.33333 12.6667C10.2789 12.6667 12.6667 10.2789 12.6667 7.33333C12.6667 4.38781 10.2789 2 7.33333 2C4.38781 2 2 4.38781 2 7.33333C2 10.2789 4.38781 12.6667 7.33333 12.6667Z"
-                    stroke="#9CA3AF"
+                    stroke={isDarkMode ? '#9CA3AF' : '#9CA3AF'}
                     strokeWidth="1.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />
                   <path
                     d="M14 14L11.1 11.1"
-                    stroke="#9CA3AF"
+                    stroke={isDarkMode ? '#9CA3AF' : '#9CA3AF'}
                     strokeWidth="1.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -1962,9 +2056,9 @@ const NewShipment = () => {
                     padding: '6px 12px 6px 32px',
                     paddingRight: searchTerm ? '32px' : '12px',
                     borderRadius: '6px',
-                    border: '1px solid #D1D5DB',
-                    backgroundColor: '#FFFFFF',
-                    color: '#111827',
+                    border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
+                    backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                    color: isDarkMode ? '#F9FAFB' : '#111827',
                     fontSize: '13px',
                     outline: 'none',
                     boxSizing: 'border-box',
@@ -1973,7 +2067,7 @@ const NewShipment = () => {
                     e.target.style.borderColor = '#3B82F6';
                   }}
                   onBlur={(e) => {
-                    e.target.style.borderColor = '#D1D5DB';
+                    e.target.style.borderColor = isDarkMode ? '#4B5563' : '#D1D5DB';
                   }}
                 />
                 {searchTerm && (
@@ -1987,9 +2081,9 @@ const NewShipment = () => {
                       transform: 'translateY(-50%)',
                       width: '16px',
                       height: '16px',
-                      border: '1px solid #D1D5DB',
+                      border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
                       borderRadius: '4px',
-                      backgroundColor: '#FFFFFF',
+                      backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -1998,12 +2092,12 @@ const NewShipment = () => {
                       zIndex: 2,
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = '#9CA3AF';
-                      e.currentTarget.style.backgroundColor = '#F3F4F6';
+                      e.currentTarget.style.borderColor = isDarkMode ? '#6B7280' : '#9CA3AF';
+                      e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = '#D1D5DB';
-                      e.currentTarget.style.backgroundColor = '#FFFFFF';
+                      e.currentTarget.style.borderColor = isDarkMode ? '#4B5563' : '#D1D5DB';
+                      e.currentTarget.style.backgroundColor = isDarkMode ? '#1F2937' : '#FFFFFF';
                     }}
                   >
                     <svg
@@ -2011,7 +2105,7 @@ const NewShipment = () => {
                       height="10"
                       viewBox="0 0 24 24"
                       fill="none"
-                      stroke="#6B7280"
+                      stroke={isDarkMode ? '#9CA3AF' : '#6B7280'}
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -2047,7 +2141,7 @@ const NewShipment = () => {
         )}
 
         {/* Separate container for Sellables View */}
-        {activeAction === 'add-products' && activeView === 'floor-inventory' && selectedFloorInventory === 'Sellables' && (
+        {activeAction === 'add-products' && activeView === 'floor-inventory' && selectedFloorInventory === 'Finished Goods' && (
           <div style={{ padding: '0 1.5rem' }}>
             <SellablesView />
           </div>

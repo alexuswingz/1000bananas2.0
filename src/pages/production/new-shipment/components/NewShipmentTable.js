@@ -1404,6 +1404,31 @@ const NewShipmentTable = ({
             >
               <thead className={themeClasses.headerBg}>
                 <tr style={{ height: '40px', maxHeight: '40px', borderRadius: '16px', overflow: 'hidden' }}>
+                  {/* Checkbox column */}
+                  <th style={{ 
+                    padding: '0 1rem', 
+                    height: '40px', 
+                    textAlign: 'center', 
+                    borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
+                    borderTopLeftRadius: '16px',
+                    width: '50px',
+                    minWidth: '50px',
+                  }}>
+                    <input 
+                      type="checkbox" 
+                      ref={selectAllCheckboxRef}
+                      style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                      checked={allSelected}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          const allIds = new Set(currentRows.map(row => row.id));
+                          setSelectedRows(allIds);
+                        } else {
+                          setSelectedRows(new Set());
+                        }
+                      }}
+                    />
+                  </th>
                   {/* PRODUCT NAME column */}
                   <th 
                     className="group"
@@ -1415,7 +1440,6 @@ const NewShipmentTable = ({
                       boxSizing: 'border-box',
                       textAlign: 'left',
                       borderRight: `1px solid ${isDarkMode ? '#4B5563' : '#FFFFFF'}`,
-                      borderTopLeftRadius: '16px',
                       color: (hasActiveColumnFilter('normal-product') || openFilterColumns.has('normal-product')) ? '#3B82F6' : '#FFFFFF',
                       width: '280px',
                       minWidth: '280px',
@@ -1471,6 +1495,23 @@ const NewShipmentTable = ({
                   const isGoodStatus = doiValue >= 30;
                   return (
                   <tr key={`${row.id}-${index}`} style={{ height: '56px', backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF' }}>
+                    {/* Checkbox cell */}
+                    <td style={{ padding: '0.5rem 1rem', textAlign: 'center', height: '56px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}` }}>
+                      <input 
+                        type="checkbox" 
+                        style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                        checked={selectedRows.has(row.id)}
+                        onChange={(e) => {
+                          const newSelected = new Set(selectedRows);
+                          if (e.target.checked) {
+                            newSelected.add(row.id);
+                          } else {
+                            newSelected.delete(row.id);
+                          }
+                          setSelectedRows(newSelected);
+                        }}
+                      />
+                    </td>
                     {/* PRODUCT NAME cell - with image, name, and brand/size subtitle */}
                     <td style={{ padding: '0.5rem 1rem', height: '56px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}` }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -1510,16 +1551,172 @@ const NewShipmentTable = ({
                     </td>
                     {/* SHIPMENT ACTIONS cell */}
                     <td style={{ padding: '0.5rem 1rem', textAlign: 'center', height: '56px', verticalAlign: 'middle', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}` }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                        {/* Minus button */}
-                        <button onClick={(e) => { e.stopPropagation(); const currentQty = effectiveQtyValues[index] ?? 0; const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0; if (numQty <= 0) return; let increment = 1; const size = row.size?.toLowerCase() || ''; if (size.includes('8oz')) increment = 60; else if (size.includes('quart')) increment = 12; else if (size.includes('gallon')) increment = 4; const newQty = Math.max(0, numQty - increment); manuallyEditedIndices.current.add(index); effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty })); }} style={{ width: '24px', height: '24px', borderRadius: '4px', border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`, backgroundColor: 'transparent', color: isDarkMode ? '#9CA3AF' : '#6B7280', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 600 }}>−</button>
-                        {/* Quantity input */}
-                        <input type="number" min="0" value={effectiveQtyValues[index] !== undefined && effectiveQtyValues[index] !== null && effectiveQtyValues[index] !== '' ? effectiveQtyValues[index] : ''} onChange={(e) => { const inputValue = e.target.value; manuallyEditedIndices.current.add(index); if (inputValue === '' || inputValue === '-') { effectiveSetQtyValues(prev => ({ ...prev, [index]: '' })); } else { const numValue = parseInt(inputValue, 10); if (!isNaN(numValue) && numValue >= 0) { effectiveSetQtyValues(prev => ({ ...prev, [index]: numValue })); } } }} onClick={(e) => e.stopPropagation()} style={{ width: '60px', height: '24px', borderRadius: '4px', border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`, backgroundColor: isDarkMode ? '#374151' : '#FFFFFF', color: isDarkMode ? '#F9FAFB' : '#111827', textAlign: 'center', fontSize: '0.8rem', fontWeight: 500, outline: 'none', MozAppearance: 'textfield', WebkitAppearance: 'none' }} />
-                        {/* Plus button */}
-                        <button onClick={(e) => { e.stopPropagation(); const currentQty = effectiveQtyValues[index] ?? 0; const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0; let increment = 1; const size = row.size?.toLowerCase() || ''; if (size.includes('8oz')) increment = 60; else if (size.includes('quart')) increment = 12; else if (size.includes('gallon')) increment = 4; const newQty = numQty + increment; manuallyEditedIndices.current.add(index); effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty })); }} style={{ width: '24px', height: '24px', borderRadius: '4px', border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`, backgroundColor: 'transparent', color: isDarkMode ? '#9CA3AF' : '#6B7280', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 600 }}>+</button>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                        {/* Quantity stepper container */}
+                        <div style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          width: '120px',
+                          height: '32px',
+                          borderRadius: '8px', 
+                          overflow: 'hidden',
+                          border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
+                          backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF'
+                        }}>
+                          {/* Decrement button */}
+                          <button 
+                            onClick={(e) => { 
+                              e.stopPropagation(); 
+                              const currentQty = effectiveQtyValues[index] ?? 0; 
+                              const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0; 
+                              if (numQty <= 0) return; 
+                              let increment = 1; 
+                              const size = row.size?.toLowerCase() || ''; 
+                              if (size.includes('8oz')) increment = 60; 
+                              else if (size.includes('quart')) increment = 12; 
+                              else if (size.includes('gallon')) increment = 4; 
+                              const newQty = Math.max(0, numQty - increment); 
+                              manuallyEditedIndices.current.add(index); 
+                              effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty })); 
+                            }} 
+                            style={{ 
+                              width: '28px', 
+                              height: '32px', 
+                              borderTopLeftRadius: '8px',
+                              borderBottomLeftRadius: '8px',
+                              borderTopRightRadius: '0',
+                              borderBottomRightRadius: '0',
+                              border: 'none',
+                              borderRight: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                              backgroundColor: isDarkMode ? '#374151' : '#F3F4F6', 
+                              color: isDarkMode ? '#D1D5DB' : '#6B7280', 
+                              cursor: 'pointer', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center', 
+                              fontSize: '16px', 
+                              fontWeight: 400,
+                              fontFamily: 'sans-serif',
+                              padding: 0,
+                              outline: 'none',
+                              flexShrink: 0
+                            }}
+                          >
+                            −
+                          </button>
+                          {/* Quantity input/display */}
+                          <input 
+                            type="number" 
+                            min="0" 
+                            value={effectiveQtyValues[index] !== undefined && effectiveQtyValues[index] !== null && effectiveQtyValues[index] !== '' ? effectiveQtyValues[index] : ''} 
+                            onChange={(e) => { 
+                              const inputValue = e.target.value; 
+                              manuallyEditedIndices.current.add(index); 
+                              if (inputValue === '' || inputValue === '-') { 
+                                effectiveSetQtyValues(prev => ({ ...prev, [index]: '' })); 
+                              } else { 
+                                const numValue = parseInt(inputValue, 10); 
+                                if (!isNaN(numValue) && numValue >= 0) { 
+                                  effectiveSetQtyValues(prev => ({ ...prev, [index]: numValue })); 
+                                } 
+                              } 
+                            }} 
+                            onClick={(e) => e.stopPropagation()} 
+                            style={{ 
+                              width: '64px', 
+                              height: '32px', 
+                              border: 'none',
+                              borderLeft: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                              borderRight: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                              backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF', 
+                              color: isDarkMode ? '#FFFFFF' : '#111827', 
+                              textAlign: 'center', 
+                              fontSize: '0.875rem', 
+                              fontWeight: 500, 
+                              outline: 'none', 
+                              MozAppearance: 'textfield', 
+                              WebkitAppearance: 'none',
+                              fontFamily: 'sans-serif',
+                              padding: '0 4px',
+                              flex: '1 1 auto'
+                            }}
+                            onWheel={(e) => e.target.blur()}
+                            className="no-spinner" 
+                          />
+                          {/* Increment button */}
+                          <button 
+                            onClick={(e) => { 
+                              e.stopPropagation(); 
+                              const currentQty = effectiveQtyValues[index] ?? 0; 
+                              const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0; 
+                              let increment = 1; 
+                              const size = row.size?.toLowerCase() || ''; 
+                              if (size.includes('8oz')) increment = 60; 
+                              else if (size.includes('quart')) increment = 12; 
+                              else if (size.includes('gallon')) increment = 4; 
+                              const newQty = numQty + increment; 
+                              manuallyEditedIndices.current.add(index); 
+                              effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty })); 
+                            }} 
+                            style={{ 
+                              width: '28px', 
+                              height: '32px', 
+                              borderTopLeftRadius: '0',
+                              borderBottomLeftRadius: '0',
+                              borderTopRightRadius: '8px',
+                              borderBottomRightRadius: '8px',
+                              border: 'none',
+                              borderLeft: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                              backgroundColor: isDarkMode ? '#374151' : '#F3F4F6', 
+                              color: isDarkMode ? '#D1D5DB' : '#6B7280', 
+                              cursor: 'pointer', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center', 
+                              fontSize: '16px', 
+                              fontWeight: 400,
+                              fontFamily: 'sans-serif',
+                              padding: 0,
+                              outline: 'none',
+                              flexShrink: 0
+                            }}
+                          >
+                            +
+                          </button>
+                        </div>
                         {/* Add button */}
-                        <button onClick={() => handleAddClick(row, index)} style={{ padding: '4px 12px', borderRadius: '4px', border: 'none', backgroundColor: effectiveAddedRows.has(row.id) ? '#10B981' : '#2563EB', color: '#FFFFFF', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          {effectiveAddedRows.has(row.id) ? '✓' : '+'} Add
+                        <button 
+                          onClick={() => handleAddClick(row, index)} 
+                          style={{ 
+                            width: '64px',
+                            height: '24px',
+                            borderRadius: '6px', 
+                            border: 'none', 
+                            backgroundColor: effectiveAddedRows.has(row.id) ? '#10B981' : '#2563EB', 
+                            color: '#FFFFFF', 
+                            fontSize: '0.75rem', 
+                            fontWeight: 500, 
+                            cursor: 'pointer', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            gap: '4px',
+                            padding: 0,
+                            outline: 'none',
+                            fontFamily: 'sans-serif'
+                          }}
+                        >
+                          {effectiveAddedRows.has(row.id) ? (
+                            <>
+                              <span style={{ fontSize: '0.875rem', lineHeight: 1 }}>✓</span>
+                              <span>Added</span>
+                            </>
+                          ) : (
+                            <>
+                              <span style={{ fontSize: '0.875rem', lineHeight: 1 }}>+</span>
+                              <span>Add</span>
+                            </>
+                          )}
                         </button>
                       </div>
                     </td>
