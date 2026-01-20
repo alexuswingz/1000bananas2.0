@@ -82,7 +82,6 @@ const NewShipmentTable = ({
   const [nonTableFilters, setNonTableFilters] = useState({});
   const [nonTableSortField, setNonTableSortField] = useState('');
   const [nonTableSortOrder, setNonTableSortOrder] = useState('');
-  const isTransitioningFiltersRef = useRef(false);
   
   // Filter state
   const [activeFilters, setActiveFilters] = useState({
@@ -1446,8 +1445,9 @@ const NewShipmentTable = ({
       }
       
       // Close non-table filter if open and click is outside
-      // BUT: Don't close if clicking on another filter icon (let the icon handler manage the transition)
-      if (nonTableOpenFilterColumn !== null && !isTransitioningFiltersRef.current) {
+      if (nonTableOpenFilterColumn !== null) {
+        // Don't close if clicking on ANY filter icon - let the icon handler manage the transition
+        // Only close if clicking truly outside (not on icons, not in dropdown)
         if (!clickedOnNonTableFilterIcon && !clickedInsideNonTableFilterDropdown) {
           setNonTableOpenFilterColumn(null);
         }
@@ -1456,10 +1456,10 @@ const NewShipmentTable = ({
 
     // Use mousedown with capture phase to catch clicks early
     if (openFilterColumns.size > 0 || openFilterIndex === 'doi-goal' || nonTableOpenFilterColumn !== null) {
-      // Add a small delay to prevent immediate closing when opening
+      // Add a delay to prevent immediate closing when opening or switching
       const timeoutId = setTimeout(() => {
         document.addEventListener('mousedown', handleClickOutside, true);
-      }, 10);
+      }, 100);
       
       return () => {
         clearTimeout(timeoutId);
@@ -1979,11 +1979,7 @@ const NewShipmentTable = ({
                 onMouseDown={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  isTransitioningFiltersRef.current = true;
                   setNonTableOpenFilterColumn(prev => prev === 'product' ? null : 'product');
-                  setTimeout(() => {
-                    isTransitioningFiltersRef.current = false;
-                  }, 50);
                 }}
                 style={{
                   width: '12px',
@@ -2038,11 +2034,7 @@ const NewShipmentTable = ({
                 onMouseDown={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  isTransitioningFiltersRef.current = true;
                   setNonTableOpenFilterColumn(prev => prev === 'fbaAvailable' ? null : 'fbaAvailable');
-                  setTimeout(() => {
-                    isTransitioningFiltersRef.current = false;
-                  }, 50);
                 }}
                 style={{
                   width: '12px',
@@ -2097,11 +2089,7 @@ const NewShipmentTable = ({
                 onMouseDown={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  isTransitioningFiltersRef.current = true;
                   setNonTableOpenFilterColumn(prev => prev === 'unitsToMake' ? null : 'unitsToMake');
-                  setTimeout(() => {
-                    isTransitioningFiltersRef.current = false;
-                  }, 50);
                 }}
                 style={{
                   width: '12px',
@@ -2156,11 +2144,7 @@ const NewShipmentTable = ({
                 onMouseDown={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  isTransitioningFiltersRef.current = true;
                   setNonTableOpenFilterColumn(prev => prev === 'doiDays' ? null : 'doiDays');
-                  setTimeout(() => {
-                    isTransitioningFiltersRef.current = false;
-                  }, 50);
                 }}
                 style={{
                   width: '12px',
@@ -3061,6 +3045,7 @@ const NewShipmentTable = ({
         {/* Non-table mode filter dropdown */}
         {nonTableOpenFilterColumn && nonTableFilterIconRefs.current[nonTableOpenFilterColumn] && (
           <SortFormulasFilterDropdown
+            key={nonTableOpenFilterColumn}
             ref={(el) => {
               nonTableFilterDropdownRef.current = el;
             }}

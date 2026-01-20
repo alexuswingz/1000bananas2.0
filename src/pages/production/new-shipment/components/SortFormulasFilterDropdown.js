@@ -11,6 +11,7 @@ const SortFormulasFilterDropdown = forwardRef(({
   onClose 
 }, ref) => {
   const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [isPositioned, setIsPositioned] = useState(false);
   const [sortOrder, setSortOrder] = useState(''); // Always start with empty, don't show blue state
   const [filterConditionExpanded, setFilterConditionExpanded] = useState(true);
   const [filterValuesExpanded, setFilterValuesExpanded] = useState(true);
@@ -114,6 +115,12 @@ const SortFormulasFilterDropdown = forwardRef(({
       if (top < 16) top = 16;
 
       setPosition({ top, left });
+      // Mark as positioned after calculating
+      requestAnimationFrame(() => {
+        setIsPositioned(true);
+      });
+    } else {
+      setIsPositioned(false);
     }
   }, [filterIconRef]);
 
@@ -190,6 +197,8 @@ const SortFormulasFilterDropdown = forwardRef(({
         border: '1px solid #E5E7EB',
         zIndex: 10000,
         overflow: 'hidden',
+        opacity: isPositioned ? 1 : 0,
+        transition: 'opacity 0.15s ease-in',
       }}
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
