@@ -563,6 +563,7 @@ const NewShipment = () => {
         const railwayDoiTotal = forecast.doi_total || forecast.doi_total_days || 0;
         const railwayDoiFba = forecast.doi_fba || forecast.doi_fba_days || 0;
         const railwayUnitsToMake = forecast.units_to_make || 0;
+        const railwayLabelInventory = forecast.label_inventory || 0;
         
         return {
           id: `${item.id}-${index}`, // Unique key combining DB ID and index
@@ -600,8 +601,9 @@ const NewShipment = () => {
           // Supply chain inventory levels
           bottleInventory: item.bottle_inventory || 0,
           closureInventory: item.closure_inventory || 0,
-          labelsAvailable: item.label_inventory || 0,
-          label_inventory: item.label_inventory || 0, // Also include as label_inventory
+          // Label inventory - USE RAILWAY API as source of truth (falls back to AWS Lambda if Railway has 0)
+          labelsAvailable: railwayLabelInventory || item.label_inventory || 0,
+          label_inventory: railwayLabelInventory || item.label_inventory || 0,
           formulaGallonsAvailable: item.formula_gallons_available || 0,
           formulaGallonsPerUnit: item.gallons_per_unit || 0,
           maxUnitsProducible: item.max_units_producible || 0,
