@@ -75,6 +75,15 @@ const NewShipmentTable = ({
   // Ref to store current filtered rows (without sorting) for use in sort handler
   const currentFilteredRowsRef = useRef([]);
   
+  // Non-table mode filter state
+  const [nonTableOpenFilterColumn, setNonTableOpenFilterColumn] = useState(null);
+  const nonTableFilterIconRefs = useRef({});
+  const nonTableFilterDropdownRef = useRef(null);
+  const [nonTableFilters, setNonTableFilters] = useState({});
+  const [nonTableSortField, setNonTableSortField] = useState('');
+  const [nonTableSortOrder, setNonTableSortOrder] = useState('');
+  const isTransitioningFiltersRef = useRef(false);
+  
   // Filter state
   const [activeFilters, setActiveFilters] = useState({
     popularFilter: '',
@@ -1226,6 +1235,165 @@ const NewShipmentTable = ({
     return !allSelected;
   };
 
+  // Non-table mode filter helpers
+  const getNonTableColumnValues = (columnKey) => {
+    const values = new Set();
+    filteredRowsWithSelection.forEach((row, idx) => {
+      if (columnKey === 'product') {
+        // Include product name, brand, and size for compound filtering
+        if (row.product !== undefined && row.product !== null && row.product !== '') {
+          values.add(row.product);
+        }
+        if (row.brand !== undefined && row.brand !== null && row.brand !== '') {
+          values.add(row.brand);
+        }
+        if (row.size !== undefined && row.size !== null && row.size !== '') {
+          values.add(row.size);
+        }
+      } else if (columnKey === 'unitsToMake') {
+        // Get units to make from qtyValues using original index
+        const index = row._originalIndex !== undefined ? row._originalIndex : idx;
+        const qty = effectiveQtyValues[index];
+        const val = typeof qty === 'number' ? qty : (qty === '' || qty === null || qty === undefined ? 0 : parseInt(qty, 10) || 0);
+        values.add(val);
+      } else if (columnKey === 'doiDays') {
+        // Get DOI value
+        const val = row.doiTotal || row.daysOfInventory || 0;
+        values.add(val);
+      } else {
+        let val;
+        if (columnKey === 'brand') {
+          val = row.brand;
+        } else if (columnKey === 'size') {
+          val = row.size;
+        } else if (columnKey === 'fbaAvailable') {
+          val = row.fbaAvailable || 0;
+        }
+        if (val !== undefined && val !== null && val !== '') {
+          values.add(val);
+        }
+      }
+    });
+    const sortedValues = Array.from(values).sort((a, b) => {
+      if (typeof a === 'number' && typeof b === 'number') return a - b;
+      return String(a).localeCompare(String(b));
+    });
+    return sortedValues;
+  };
+
+  const isNonTableNumericColumn = (columnKey) => columnKey === 'fbaAvailable' || columnKey === 'unitsToMake' || columnKey === 'doiDays';
+
+  const hasNonTableActiveFilter = (columnKey) => {
+    const filter = nonTableFilters[columnKey];
+    if (!filter || filter === null || filter === undefined) return false;
+    
+    // Check for condition filter
+    const hasCondition = filter.conditionType && filter.conditionType !== '';
+    if (hasCondition) return true;
+    
+    // Check for value filters - only active if not all values are selected
+    if (!filter.selectedValues || filter.selectedValues.size === 0) return false;
+    
+    // Get all available values for this column
+    const allAvailableValues = getNonTableColumnValues(columnKey);
+    if (allAvailableValues.length === 0) return false;
+    
+    const allValuesSet = new Set(allAvailableValues.map(v => String(v)));
+    const selectedValuesSet = filter.selectedValues instanceof Set 
+      ? new Set(Array.from(filter.selectedValues).map(v => String(v)))
+      : new Set(Array.from(filter.selectedValues || []).map(v => String(v)));
+    
+    // Check if all available values are selected - if so, it's not an active filter
+    const allSelected = allValuesSet.size > 0 && 
+      selectedValuesSet.size === allValuesSet.size &&
+      Array.from(allValuesSet).every(val => selectedValuesSet.has(val));
+    
+    // Filter is active only if not all values are selected
+    return !allSelected;
+  };
+
+  const applyNonTableConditionFilter = (value, conditionType, conditionValue, numeric) => {
+    if (!conditionType) return true;
+
+    const strValue = String(value ?? '').toLowerCase();
+    const strCond = String(conditionValue ?? '').toLowerCase();
+
+    switch (conditionType) {
+      case 'contains':
+        return strValue.includes(strCond);
+      case 'notContains':
+        return !strValue.includes(strCond);
+      case 'equals':
+        return numeric ? Number(value) === Number(conditionValue) : strValue === strCond;
+      case 'notEquals':
+        return numeric ? Number(value) !== Number(conditionValue) : strValue !== strCond;
+      case 'startsWith':
+        return strValue.startsWith(strCond);
+      case 'endsWith':
+        return strValue.endsWith(strCond);
+      case 'isEmpty':
+        return !value || strValue === '';
+      case 'isNotEmpty':
+        return !!value && strValue !== '';
+      case 'greaterThan':
+        return Number(value) > Number(conditionValue);
+      case 'lessThan':
+        return Number(value) < Number(conditionValue);
+      case 'greaterOrEqual':
+        return Number(value) >= Number(conditionValue);
+      case 'lessOrEqual':
+        return Number(value) <= Number(conditionValue);
+      case 'between':
+        if (!conditionValue || !conditionValue.includes('-')) return true;
+        const [min, max] = conditionValue.split('-').map(v => Number(v.trim()));
+        if (isNaN(min) || isNaN(max)) return true;
+        const numValue = Number(value);
+        return numValue >= min && numValue <= max;
+      case 'notBetween':
+        if (!conditionValue || !conditionValue.includes('-')) return true;
+        const [minNot, maxNot] = conditionValue.split('-').map(v => Number(v.trim()));
+        if (isNaN(minNot) || isNaN(maxNot)) return true;
+        const numValueNot = Number(value);
+        return numValueNot < minNot || numValueNot > maxNot;
+      default:
+        return true;
+    }
+  };
+
+  const handleNonTableApplyFilter = (columnKey, filterData) => {
+    // If filterData is null, remove the filter (Reset was clicked)
+    if (filterData === null) {
+      setNonTableFilters(prev => {
+        const newFilters = { ...prev };
+        delete newFilters[columnKey];
+        return newFilters;
+      });
+      // Also clear sort for this column
+      if (nonTableSortField === columnKey) {
+        setNonTableSortField('');
+        setNonTableSortOrder('');
+      }
+      return;
+    }
+    
+    setNonTableFilters(prev => ({
+      ...prev,
+      [columnKey]: {
+        selectedValues: filterData.selectedValues || new Set(),
+        conditionType: filterData.conditionType || '',
+        conditionValue: filterData.conditionValue || '',
+      },
+    }));
+
+    if (filterData.sortOrder) {
+      setNonTableSortField(columnKey);
+      setNonTableSortOrder(filterData.sortOrder);
+    } else if (nonTableSortField === columnKey) {
+      setNonTableSortField('');
+      setNonTableSortOrder('');
+    }
+  };
+
   // Close filter dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -1251,6 +1419,16 @@ const NewShipmentTable = ({
          filterModalRefs.current['doi-goal'].contains && 
          filterModalRefs.current['doi-goal'].contains(event.target));
       
+      // Check if click is on ANY non-table filter icon
+      const clickedOnNonTableFilterIcon = Object.values(nonTableFilterIconRefs.current).some(ref => 
+        ref && ref.contains && ref.contains(event.target)
+      );
+      
+      // Check if click is inside non-table filter dropdown
+      const clickedInsideNonTableFilterDropdown = 
+        (nonTableFilterDropdownRef.current && nonTableFilterDropdownRef.current.contains && nonTableFilterDropdownRef.current.contains(event.target)) ||
+        event.target.closest('[data-filter-dropdown]');
+      
       // Close column filters if open and click is outside
       if (openFilterColumns.size > 0) {
         if (!clickedOnFilterIcon && !clickedInsideDropdown && 
@@ -1266,19 +1444,156 @@ const NewShipmentTable = ({
           setOpenFilterIndex(null);
         }
       }
+      
+      // Close non-table filter if open and click is outside
+      // BUT: Don't close if clicking on another filter icon (let the icon handler manage the transition)
+      if (nonTableOpenFilterColumn !== null && !isTransitioningFiltersRef.current) {
+        if (!clickedOnNonTableFilterIcon && !clickedInsideNonTableFilterDropdown) {
+          setNonTableOpenFilterColumn(null);
+        }
+      }
     };
 
     // Use mousedown with capture phase to catch clicks early
-    if (openFilterColumns.size > 0 || openFilterIndex === 'doi-goal') {
-      document.addEventListener('mousedown', handleClickOutside, true);
+    if (openFilterColumns.size > 0 || openFilterIndex === 'doi-goal' || nonTableOpenFilterColumn !== null) {
+      // Add a small delay to prevent immediate closing when opening
+      const timeoutId = setTimeout(() => {
+        document.addEventListener('mousedown', handleClickOutside, true);
+      }, 10);
       
       return () => {
+        clearTimeout(timeoutId);
         document.removeEventListener('mousedown', handleClickOutside, true);
       };
     }
-  }, [openFilterColumns, openFilterIndex]);
+  }, [openFilterColumns, openFilterIndex, nonTableOpenFilterColumn]);
 
-  const currentRows = filteredRowsWithSelection;
+  // Apply non-table mode filters
+  const nonTableFilteredRows = useMemo(() => {
+    if (tableMode) return filteredRowsWithSelection; // Don't apply non-table filters in table mode
+    
+    let result = [...filteredRowsWithSelection];
+    
+    // Apply non-table filters
+    Object.keys(nonTableFilters).forEach(columnKey => {
+      const filter = nonTableFilters[columnKey];
+      if (!filter) return;
+
+      const numeric = isNonTableNumericColumn(columnKey);
+
+      // Value filters
+      if (filter.selectedValues && filter.selectedValues.size > 0) {
+        result = result.filter((row, idx) => {
+          // For product column, check product name, brand, and size
+          if (columnKey === 'product') {
+            return filter.selectedValues.has(row.product) || 
+                   filter.selectedValues.has(String(row.product)) ||
+                   filter.selectedValues.has(row.brand) || 
+                   filter.selectedValues.has(String(row.brand)) ||
+                   filter.selectedValues.has(row.size) || 
+                   filter.selectedValues.has(String(row.size));
+          }
+          
+          let value;
+          if (columnKey === 'brand') value = row.brand;
+          else if (columnKey === 'size') value = row.size;
+          else if (columnKey === 'fbaAvailable') value = row.fbaAvailable || 0;
+          else if (columnKey === 'unitsToMake') {
+            const index = row._originalIndex !== undefined ? row._originalIndex : idx;
+            const qty = effectiveQtyValues[index];
+            value = typeof qty === 'number' ? qty : (qty === '' || qty === null || qty === undefined ? 0 : parseInt(qty, 10) || 0);
+          }
+          
+          return (
+            filter.selectedValues.has(value) ||
+            filter.selectedValues.has(String(value))
+          );
+        });
+      }
+
+      // Condition filters
+      if (filter.conditionType) {
+        result = result.filter((row, idx) => {
+          // For product column, search across product name, brand, and size
+          if (columnKey === 'product') {
+            const productMatch = applyNonTableConditionFilter(
+              row.product,
+              filter.conditionType,
+              filter.conditionValue,
+              false
+            );
+            const brandMatch = applyNonTableConditionFilter(
+              row.brand,
+              filter.conditionType,
+              filter.conditionValue,
+              false
+            );
+            const sizeMatch = applyNonTableConditionFilter(
+              row.size,
+              filter.conditionType,
+              filter.conditionValue,
+              false
+            );
+            return productMatch || brandMatch || sizeMatch;
+          }
+          
+          let value;
+          if (columnKey === 'brand') value = row.brand;
+          else if (columnKey === 'size') value = row.size;
+          else if (columnKey === 'fbaAvailable') value = row.fbaAvailable || 0;
+          else if (columnKey === 'unitsToMake') {
+            const index = row._originalIndex !== undefined ? row._originalIndex : idx;
+            const qty = effectiveQtyValues[index];
+            value = typeof qty === 'number' ? qty : (qty === '' || qty === null || qty === undefined ? 0 : parseInt(qty, 10) || 0);
+          }
+          
+          return applyNonTableConditionFilter(
+            value,
+            filter.conditionType,
+            filter.conditionValue,
+            numeric
+          );
+        });
+      }
+    });
+
+    // Apply non-table sorting
+    if (nonTableSortField && nonTableSortOrder) {
+      const numeric = isNonTableNumericColumn(nonTableSortField);
+      result.sort((a, b) => {
+        let aVal, bVal;
+        if (nonTableSortField === 'product') { aVal = a.product; bVal = b.product; }
+        else if (nonTableSortField === 'brand') { aVal = a.brand; bVal = b.brand; }
+        else if (nonTableSortField === 'size') { aVal = a.size; bVal = b.size; }
+        else if (nonTableSortField === 'fbaAvailable') { aVal = a.fbaAvailable || 0; bVal = b.fbaAvailable || 0; }
+        else if (nonTableSortField === 'unitsToMake') {
+          const aIndex = a._originalIndex !== undefined ? a._originalIndex : result.findIndex(r => r.id === a.id);
+          const bIndex = b._originalIndex !== undefined ? b._originalIndex : result.findIndex(r => r.id === b.id);
+          const aQty = effectiveQtyValues[aIndex];
+          const bQty = effectiveQtyValues[bIndex];
+          aVal = typeof aQty === 'number' ? aQty : (aQty === '' || aQty === null || aQty === undefined ? 0 : parseInt(aQty, 10) || 0);
+          bVal = typeof bQty === 'number' ? bQty : (bQty === '' || bQty === null || bQty === undefined ? 0 : parseInt(bQty, 10) || 0);
+        }
+        else if (nonTableSortField === 'doiDays') { aVal = a.doiTotal || a.daysOfInventory || 0; bVal = b.doiTotal || b.daysOfInventory || 0; }
+
+        if (numeric) {
+          const aNum = Number(aVal) || 0;
+          const bNum = Number(bVal) || 0;
+          return nonTableSortOrder === 'asc' ? aNum - bNum : bNum - aNum;
+        }
+
+        const aStr = String(aVal ?? '').toLowerCase();
+        const bStr = String(bVal ?? '').toLowerCase();
+        return nonTableSortOrder === 'asc'
+          ? aStr.localeCompare(bStr)
+          : bStr.localeCompare(aStr);
+      });
+    }
+
+    return result;
+  }, [filteredRowsWithSelection, nonTableFilters, nonTableSortField, nonTableSortOrder, tableMode]);
+
+  const currentRows = tableMode ? filteredRowsWithSelection : nonTableFilteredRows;
 
   // Check if all rows are selected (respect current view/filter)
   const allSelected = useMemo(() => {
@@ -1625,17 +1940,239 @@ const NewShipmentTable = ({
                 backgroundColor: isDarkMode ? '#374151' : '#E5E7EB'
               }}
             />
-            <div style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase', color: isDarkMode ? '#FFFFFF' : '#111827', marginLeft: '20px' }}>
-              PRODUCTS
+            <div 
+              className="group"
+              style={{ 
+                fontFamily: 'Inter, sans-serif', 
+                fontWeight: 600, 
+                fontSize: '12px', 
+                textTransform: 'uppercase', 
+                color: (hasNonTableActiveFilter('product') || nonTableOpenFilterColumn === 'product') ? '#3B82F6' : (isDarkMode ? '#FFFFFF' : '#111827'), 
+                marginLeft: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                position: 'relative'
+              }}
+            >
+              <span>PRODUCTS</span>
+              {hasNonTableActiveFilter('product') && (
+                <span style={{ 
+                  display: 'inline-block',
+                  width: '6px', 
+                  height: '6px', 
+                  borderRadius: '50%', 
+                  backgroundColor: '#10B981',
+                }} />
+              )}
+              <img
+                ref={(el) => {
+                  if (el) nonTableFilterIconRefs.current['product'] = el;
+                }}
+                src="/assets/Vector (1).png"
+                alt="Filter"
+                className={`w-3 h-3 transition-opacity cursor-pointer ${
+                  hasNonTableActiveFilter('product') || nonTableOpenFilterColumn === 'product'
+                    ? 'opacity-100'
+                    : 'opacity-0 group-hover:opacity-100'
+                }`}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  isTransitioningFiltersRef.current = true;
+                  setNonTableOpenFilterColumn(prev => prev === 'product' ? null : 'product');
+                  setTimeout(() => {
+                    isTransitioningFiltersRef.current = false;
+                  }, 50);
+                }}
+                style={{
+                  width: '12px',
+                  height: '12px',
+                  ...(hasNonTableActiveFilter('product') || nonTableOpenFilterColumn === 'product'
+                    ? {
+                        filter:
+                          'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
+                      }
+                    : undefined)
+                }}
+              />
             </div>
-            <div style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase', color: isDarkMode ? '#FFFFFF' : '#111827', textAlign: 'center', paddingLeft: '16px', marginLeft: '-220px' }}>
-              INVENTORY
+            <div 
+              className="group"
+              style={{ 
+                fontFamily: 'Inter, sans-serif', 
+                fontWeight: 600, 
+                fontSize: '12px', 
+                textTransform: 'uppercase', 
+                color: (hasNonTableActiveFilter('fbaAvailable') || nonTableOpenFilterColumn === 'fbaAvailable') ? '#3B82F6' : (isDarkMode ? '#FFFFFF' : '#111827'), 
+                textAlign: 'center', 
+                paddingLeft: '16px', 
+                marginLeft: '-95px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                position: 'relative'
+              }}
+            >
+              <span>INVENTORY</span>
+              {hasNonTableActiveFilter('fbaAvailable') && (
+                <span style={{ 
+                  display: 'inline-block',
+                  width: '6px', 
+                  height: '6px', 
+                  borderRadius: '50%', 
+                  backgroundColor: '#10B981',
+                }} />
+              )}
+              <img
+                ref={(el) => {
+                  if (el) nonTableFilterIconRefs.current['fbaAvailable'] = el;
+                }}
+                src="/assets/Vector (1).png"
+                alt="Filter"
+                className={`w-3 h-3 transition-opacity cursor-pointer ${
+                  hasNonTableActiveFilter('fbaAvailable') || nonTableOpenFilterColumn === 'fbaAvailable'
+                    ? 'opacity-100'
+                    : 'opacity-0 group-hover:opacity-100'
+                }`}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  isTransitioningFiltersRef.current = true;
+                  setNonTableOpenFilterColumn(prev => prev === 'fbaAvailable' ? null : 'fbaAvailable');
+                  setTimeout(() => {
+                    isTransitioningFiltersRef.current = false;
+                  }, 50);
+                }}
+                style={{
+                  width: '12px',
+                  height: '12px',
+                  ...(hasNonTableActiveFilter('fbaAvailable') || nonTableOpenFilterColumn === 'fbaAvailable'
+                    ? {
+                        filter:
+                          'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
+                      }
+                    : undefined)
+                }}
+              />
             </div>
-            <div style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase', color: isDarkMode ? '#FFFFFF' : '#111827', textAlign: 'center', paddingLeft: '16px', marginLeft: '-220px' }}>
-              UNITS TO MAKE
+            <div 
+              className="group"
+              style={{ 
+                fontFamily: 'Inter, sans-serif', 
+                fontWeight: 600, 
+                fontSize: '12px', 
+                textTransform: 'uppercase', 
+                color: (hasNonTableActiveFilter('unitsToMake') || nonTableOpenFilterColumn === 'unitsToMake') ? '#3B82F6' : (isDarkMode ? '#FFFFFF' : '#111827'), 
+                textAlign: 'center', 
+                paddingLeft: '16px', 
+                marginLeft: '-95px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                position: 'relative'
+              }}
+            >
+              <span>UNITS TO MAKE</span>
+              {hasNonTableActiveFilter('unitsToMake') && (
+                <span style={{ 
+                  display: 'inline-block',
+                  width: '6px', 
+                  height: '6px', 
+                  borderRadius: '50%', 
+                  backgroundColor: '#10B981',
+                }} />
+              )}
+              <img
+                ref={(el) => {
+                  if (el) nonTableFilterIconRefs.current['unitsToMake'] = el;
+                }}
+                src="/assets/Vector (1).png"
+                alt="Filter"
+                className={`w-3 h-3 transition-opacity cursor-pointer ${
+                  hasNonTableActiveFilter('unitsToMake') || nonTableOpenFilterColumn === 'unitsToMake'
+                    ? 'opacity-100'
+                    : 'opacity-0 group-hover:opacity-100'
+                }`}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  isTransitioningFiltersRef.current = true;
+                  setNonTableOpenFilterColumn(prev => prev === 'unitsToMake' ? null : 'unitsToMake');
+                  setTimeout(() => {
+                    isTransitioningFiltersRef.current = false;
+                  }, 50);
+                }}
+                style={{
+                  width: '12px',
+                  height: '12px',
+                  ...(hasNonTableActiveFilter('unitsToMake') || nonTableOpenFilterColumn === 'unitsToMake'
+                    ? {
+                        filter:
+                          'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
+                      }
+                    : undefined)
+                }}
+              />
             </div>
-            <div style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase', color: isDarkMode ? '#FFFFFF' : '#111827', textAlign: 'center', paddingLeft: '16px', marginLeft: '-220px' }}>
-              DOI (DAYS)
+            <div 
+              className="group"
+              style={{ 
+                fontFamily: 'Inter, sans-serif', 
+                fontWeight: 600, 
+                fontSize: '12px', 
+                textTransform: 'uppercase', 
+                color: (hasNonTableActiveFilter('doiDays') || nonTableOpenFilterColumn === 'doiDays') ? '#3B82F6' : (isDarkMode ? '#FFFFFF' : '#111827'), 
+                textAlign: 'center', 
+                paddingLeft: '16px', 
+                marginLeft: '-95px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                position: 'relative'
+              }}
+            >
+              <span>DOI (DAYS)</span>
+              {hasNonTableActiveFilter('doiDays') && (
+                <span style={{ 
+                  display: 'inline-block',
+                  width: '6px', 
+                  height: '6px', 
+                  borderRadius: '50%', 
+                  backgroundColor: '#10B981',
+                }} />
+              )}
+              <img
+                ref={(el) => {
+                  if (el) nonTableFilterIconRefs.current['doiDays'] = el;
+                }}
+                src="/assets/Vector (1).png"
+                alt="Filter"
+                className={`w-3 h-3 transition-opacity cursor-pointer ${
+                  hasNonTableActiveFilter('doiDays') || nonTableOpenFilterColumn === 'doiDays'
+                    ? 'opacity-100'
+                    : 'opacity-0 group-hover:opacity-100'
+                }`}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  isTransitioningFiltersRef.current = true;
+                  setNonTableOpenFilterColumn(prev => prev === 'doiDays' ? null : 'doiDays');
+                  setTimeout(() => {
+                    isTransitioningFiltersRef.current = false;
+                  }, 50);
+                }}
+                style={{
+                  width: '12px',
+                  height: '12px',
+                  ...(hasNonTableActiveFilter('doiDays') || nonTableOpenFilterColumn === 'doiDays'
+                    ? {
+                        filter:
+                          'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
+                      }
+                    : undefined)
+                }}
+              />
             </div>
           </div>
 
@@ -2518,6 +3055,22 @@ const NewShipmentTable = ({
             onApply={handleFilterApply}
             onReset={handleFilterReset}
             currentFilters={activeFilters}
+          />
+        )}
+        
+        {/* Non-table mode filter dropdown */}
+        {nonTableOpenFilterColumn && nonTableFilterIconRefs.current[nonTableOpenFilterColumn] && (
+          <SortFormulasFilterDropdown
+            ref={(el) => {
+              nonTableFilterDropdownRef.current = el;
+            }}
+            filterIconRef={nonTableFilterIconRefs.current[nonTableOpenFilterColumn]}
+            columnKey={nonTableOpenFilterColumn}
+            availableValues={getNonTableColumnValues(nonTableOpenFilterColumn)}
+            currentFilter={nonTableFilters[nonTableOpenFilterColumn] || {}}
+            currentSort={nonTableSortField === nonTableOpenFilterColumn ? nonTableSortOrder : ''}
+            onApply={(filterData) => handleNonTableApplyFilter(nonTableOpenFilterColumn, filterData)}
+            onClose={() => setNonTableOpenFilterColumn(null)}
           />
         )}
       </>
