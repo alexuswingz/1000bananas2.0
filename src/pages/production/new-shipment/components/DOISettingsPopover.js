@@ -259,7 +259,7 @@ const DOISettingsPopover = ({
               ? '0 10px 40px rgba(0, 0, 0, 0.5)' 
               : '0 10px 40px rgba(0, 0, 0, 0.15)',
             padding: '20px',
-            minWidth: '300px',
+            minWidth: '340px',
             zIndex: 10000,
           }}
         >
@@ -350,15 +350,17 @@ const DOISettingsPopover = ({
                 value={formValues.amazonDoiGoal}
                 onChange={(e) => handleInputChange('amazonDoiGoal', e.target.value)}
                 style={{
-                  width: '80px',
-                  padding: '8px 12px',
-                  borderRadius: '6px',
+                  width: '107px',
+                  height: '24px',
+                  padding: '4px 6px',
+                  borderRadius: '8px',
                   border: `1px solid ${theme.inputBorder}`,
                   backgroundColor: theme.inputBg,
                   color: theme.inputText,
                   fontSize: '14px',
                   textAlign: 'center',
                   outline: 'none',
+                  boxSizing: 'border-box',
                 }}
                 onFocus={(e) => e.target.style.borderColor = theme.inputBorderFocus}
                 onBlur={(e) => e.target.style.borderColor = theme.inputBorder}
@@ -383,15 +385,17 @@ const DOISettingsPopover = ({
                 value={formValues.inboundLeadTime}
                 onChange={(e) => handleInputChange('inboundLeadTime', e.target.value)}
                 style={{
-                  width: '80px',
-                  padding: '8px 12px',
-                  borderRadius: '6px',
+                  width: '107px',
+                  height: '24px',
+                  padding: '4px 6px',
+                  borderRadius: '8px',
                   border: `1px solid ${theme.inputBorder}`,
                   backgroundColor: theme.inputBg,
                   color: theme.inputText,
                   fontSize: '14px',
                   textAlign: 'center',
                   outline: 'none',
+                  boxSizing: 'border-box',
                 }}
                 onFocus={(e) => e.target.style.borderColor = theme.inputBorderFocus}
                 onBlur={(e) => e.target.style.borderColor = theme.inputBorder}
@@ -416,15 +420,17 @@ const DOISettingsPopover = ({
                 value={formValues.manufactureLeadTime}
                 onChange={(e) => handleInputChange('manufactureLeadTime', e.target.value)}
                 style={{
-                  width: '80px',
-                  padding: '8px 12px',
-                  borderRadius: '6px',
+                  width: '107px',
+                  height: '24px',
+                  padding: '4px 6px',
+                  borderRadius: '8px',
                   border: `1px solid ${theme.inputBorder}`,
                   backgroundColor: theme.inputBg,
                   color: theme.inputText,
                   fontSize: '14px',
                   textAlign: 'center',
                   outline: 'none',
+                  boxSizing: 'border-box',
                 }}
                 onFocus={(e) => e.target.style.borderColor = theme.inputBorderFocus}
                 onBlur={(e) => e.target.style.borderColor = theme.inputBorder}
@@ -464,18 +470,17 @@ const DOISettingsPopover = ({
           {/* Actions */}
           <div style={{ 
             display: 'flex', 
-            gap: '12px', 
+            justifyContent: 'space-between',
             marginTop: '20px',
-            paddingTop: '16px',
-            borderTop: `1px solid ${theme.divider}`,
           }}>
             {/* Save as Default */}
             <button
               onClick={handleSaveAsDefault}
               style={{
-                flex: 1,
-                padding: '10px 16px',
-                borderRadius: '8px',
+                width: '113px',
+                height: '23px',
+                padding: 0,
+                borderRadius: '4px',
                 border: `1px solid ${theme.secondaryBtnBorder}`,
                 backgroundColor: theme.secondaryBtnBg,
                 color: theme.secondaryBtnText,
@@ -483,6 +488,9 @@ const DOISettingsPopover = ({
                 fontWeight: 500,
                 cursor: 'pointer',
                 transition: 'background-color 0.15s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
               onMouseEnter={(e) => e.target.style.backgroundColor = theme.secondaryBtnHover}
               onMouseLeave={(e) => e.target.style.backgroundColor = theme.secondaryBtnBg}
@@ -494,9 +502,10 @@ const DOISettingsPopover = ({
             <button
               onClick={handleApply}
               style={{
-                flex: 1,
-                padding: '10px 16px',
-                borderRadius: '8px',
+                width: '57px',
+                height: '23px',
+                padding: 0,
+                borderRadius: '4px',
                 border: 'none',
                 backgroundColor: theme.primaryBtnBg,
                 color: '#FFFFFF',
@@ -504,6 +513,9 @@ const DOISettingsPopover = ({
                 fontWeight: 500,
                 cursor: 'pointer',
                 transition: 'background-color 0.15s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
               onMouseEnter={(e) => e.target.style.backgroundColor = theme.primaryBtnHover}
               onMouseLeave={(e) => e.target.style.backgroundColor = theme.primaryBtnBg}

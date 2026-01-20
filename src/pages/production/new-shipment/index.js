@@ -157,6 +157,9 @@ const NewShipment = () => {
   const [doiSettingsChangeCount, setDoiSettingsChangeCount] = useState(0);
   const doiSettingsInitialized = useRef(false);
   
+  // Track manually edited quantity indices (from NewShipmentTable)
+  const manuallyEditedIndicesRef = useRef(new Set());
+  
   // Sort option for product table
   const [sortOption, setSortOption] = useState('doi'); // 'doi', 'qty', 'name'
   
@@ -700,16 +703,44 @@ const NewShipment = () => {
       console.log(`✅ Showing ${filteredProducts.length} products after account filter (${shipmentData.account})`);
       console.log(`✅ Products with forecast data: ${Object.keys(forecastMap).length}`);
       
+      // Preserve manually edited quantities when reloading
+      // Build a map of product ID -> manually edited quantity
+      const manuallyEditedQtyMap = {};
+      if (manuallyEditedIndicesRef.current && products.length > 0) {
+        manuallyEditedIndicesRef.current.forEach((index) => {
+          const product = products[index];
+          if (product && qtyValues[index] !== undefined) {
+            manuallyEditedQtyMap[product.id] = qtyValues[index];
+          }
+        });
+      }
+      
       // Initialize qty values with suggested quantities for FILTERED products
       // Use filtered products indices since that's what the table displays
       const initialQtyValues = {};
+      const newManuallyEditedIndices = new Set();
+      
       filteredProducts.forEach((product, index) => {
-        // Auto-populate qty with suggested qty if product needs restocking
-        if (product.suggestedQty > 0) {
+        // First check if this product had a manually edited quantity
+        if (manuallyEditedQtyMap[product.id] !== undefined) {
+          initialQtyValues[index] = manuallyEditedQtyMap[product.id];
+          // Mark this index as manually edited in the new product list
+          newManuallyEditedIndices.add(index);
+        }
+        // Otherwise auto-populate qty with suggested qty if product needs restocking
+        else if (product.suggestedQty > 0) {
           initialQtyValues[index] = product.suggestedQty;
         }
       });
       setQtyValues(initialQtyValues);
+      
+      // Update manually edited indices with new indices after reload
+      // IMPORTANT: Clear and repopulate the existing Set instead of replacing it
+      // This preserves the reference that the child component is using
+      if (manuallyEditedIndicesRef.current) {
+        manuallyEditedIndicesRef.current.clear();
+        newManuallyEditedIndices.forEach(idx => manuallyEditedIndicesRef.current.add(idx));
+      }
       
       // Initialize lastAccount to prevent reset on first account filter useEffect run
       setLastAccount(shipmentData.account);
@@ -939,8 +970,13 @@ const NewShipment = () => {
     
     const newQtyValues = {};
     products.forEach((product, index) => {
-      // Keep existing quantity for already added products
-      if (addedRows.has(product.id)) {
+      // Keep existing quantity for:
+      // 1. Already added products (addedRows)
+      // 2. Manually edited quantities (manuallyEditedIndicesRef)
+      const isManuallyEdited = manuallyEditedIndicesRef.current?.has(index);
+      
+      if (addedRows.has(product.id) || isManuallyEdited) {
+        // Preserve the manually set or added quantity
         if (qtyValues[index] !== undefined) {
           newQtyValues[index] = qtyValues[index];
         }
@@ -2157,6 +2193,7 @@ const NewShipment = () => {
                     onAddedRowsChange={setAddedRows}
                     labelsAvailabilityMap={labelsAvailabilityMap}
                     forecastRange={parseInt(forecastRange) || 120}
+                    manuallyEditedIndicesRef={manuallyEditedIndicesRef}
                   />
                 )}
               </>
@@ -3163,6 +3200,24 @@ const NewShipment = () => {
         selectedRow={selectedRow}
         forecastRange={parseInt(forecastRange) || 150}
         doiSettings={doiSettingsValues}
+        allProducts={filteredProducts}
+        onNavigate={(direction) => {
+          if (!selectedRow || !filteredProducts || filteredProducts.length === 0) return;
+          
+          const currentIndex = filteredProducts.findIndex(p => p.id === selectedRow.id);
+          if (currentIndex === -1) return;
+          
+          let newIndex;
+          if (direction === 'prev') {
+            // Go to previous, wrap to end if at beginning
+            newIndex = currentIndex === 0 ? filteredProducts.length - 1 : currentIndex - 1;
+          } else {
+            // Go to next, wrap to beginning if at end
+            newIndex = currentIndex === filteredProducts.length - 1 ? 0 : currentIndex + 1;
+          }
+          
+          setSelectedRow(filteredProducts[newIndex]);
+        }}
         labelsAvailable={(() => {
           if (!selectedRow?.label_location) return null;
           const labelLoc = selectedRow.label_location;

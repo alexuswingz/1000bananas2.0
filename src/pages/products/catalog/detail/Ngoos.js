@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 import { toast } from 'sonner';
 import NgoosAPI from '../../../../services/ngoosApi';
 import OpenAIService from '../../../../services/openaiService';
 import BananaBrainModal from '../../../../components/BananaBrainModal';
+import DOISettingsPopover from '../../../production/new-shipment/components/DOISettingsPopover';
 import { 
   LineChart, 
   Line, 
@@ -953,12 +954,13 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
       style={{ 
         width: inventoryOnly ? '100%' : '100%', 
         maxWidth: inventoryOnly ? '100%' : 'none', 
-        margin: inventoryOnly ? '0' : '0 auto' 
+        margin: inventoryOnly ? '0' : '0 auto',
+        backgroundColor: '#1A2235'
       }}
     >
       {/* Tab Navigation - Hidden when inventoryOnly is true */}
       {!inventoryOnly && (
-        <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #334155' }}>
+        <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #334155', backgroundColor: '#1A2235' }}>
           <button
             onClick={() => setActiveTab('forecast')}
             style={{
@@ -1012,7 +1014,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
 
       {/* Inventory Tab Content */}
       {activeTab === 'forecast' && (
-        <div>
+        <div style={{ backgroundColor: '#1A2235' }}>
       {/* Header - Hidden when inventoryOnly (shown in parent modal) */}
       {!inventoryOnly && (
         <div className={`px-6 py-4 border-b ${themeClasses.border}`}>
@@ -1041,22 +1043,157 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
       )}
 
       {/* Content - More compact padding when inventoryOnly */}
-      <div className={inventoryOnly ? "" : "px-6 pb-6"} style={{ padding: inventoryOnly ? '0.5rem 0.75rem' : '1.5rem' }}>
+      <div className={inventoryOnly ? "" : "px-6 pb-6"} style={{ 
+        padding: inventoryOnly ? '0.5rem clamp(0.75rem, 2vw, 1.5rem)' : '1.5rem', 
+        backgroundColor: '#1A2235',
+        overflow: 'auto'
+      }}>
+        {/* Tabs and Add Units Button - Only show in inventoryOnly mode */}
+        {inventoryOnly && (
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between', 
+            marginBottom: '1rem', 
+            marginTop: '0.9375rem'
+          }}>
+          <div style={{ 
+            display: 'flex', 
+            gap: '0.25rem',
+            backgroundColor: '#0f172a',
+            borderRadius: '0.5rem',
+            padding: '4px',
+            width: '325px',
+            height: '32px',
+            border: '1px solid #334155',
+            alignItems: 'center',
+            boxSizing: 'border-box'
+          }}>
+            <button
+              style={{
+                padding: '0',
+                fontSize: '1rem',
+                fontWeight: '500',
+                color: '#fff',
+                backgroundColor: '#2563EB',
+                border: 'none',
+                borderRadius: '0.25rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                flex: 1,
+                height: '23px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              Inventory
+            </button>
+            <button
+              style={{
+                padding: '0',
+                fontSize: '1rem',
+                fontWeight: '500',
+                color: '#94a3b8',
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderRadius: '0.25rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                flex: 1,
+                height: '23px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              Sales
+            </button>
+            <button
+              style={{
+                padding: '0',
+                fontSize: '1rem',
+                fontWeight: '500',
+                color: '#94a3b8',
+                backgroundColor: 'transparent',
+                border: 'none',
+                borderRadius: '0.25rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                flex: 1,
+                height: '23px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              Ads
+            </button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            {/* Required DOI Settings Popover */}
+            <DOISettingsPopover 
+              isDarkMode={isDarkMode}
+              onSettingsChange={(settings) => {
+                // This would update the parent component's DOI settings
+                // For now, just log it since we're in inventoryOnly mode
+                console.log('DOI Settings updated:', settings);
+              }}
+              initialSettings={doiSettings}
+            />
+            
+            <button
+              type="button"
+              style={{
+                padding: '4px 12px',
+                borderRadius: '4px',
+                border: 'none',
+                backgroundColor: '#2563EB',
+                color: '#FFFFFF',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                minWidth: '116px',
+                height: '23px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                whiteSpace: 'nowrap',
+                cursor: 'pointer',
+              }}
+            >
+              Add Units ({(overrideUnitsToMake ?? forecastData?.units_to_make ?? 0).toLocaleString()})
+            </button>
+          </div>
+          </div>
+        )}
+        
         {/* Main Grid - Horizontal layout when inventoryOnly */}
         <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: inventoryOnly ? '1fr 1fr 1fr' : '1fr 1fr 1fr', 
-          gap: inventoryOnly ? '0.75rem' : '1.5rem', 
-          marginBottom: inventoryOnly ? '0.75rem' : '2rem' 
+          display: 'flex', 
+          gap: inventoryOnly ? '1rem' : '1.5rem', 
+          marginBottom: inventoryOnly ? '0.75rem' : '2rem',
+          justifyContent: 'space-between',
+          flexWrap: inventoryOnly ? 'nowrap' : 'wrap'
         }}>
           {/* Left: Product Info */}
-          <div className={themeClasses.cardBg} style={{ borderRadius: '0.5rem', padding: inventoryOnly ? '0.75rem' : '1.5rem' }}>
-            <div style={{ display: 'flex', gap: inventoryOnly ? '0.5rem' : '1rem', marginBottom: inventoryOnly ? '0' : '1.5rem' }}>
+          <div className={themeClasses.cardBg} style={{ 
+            borderRadius: '0.5rem', 
+            padding: inventoryOnly ? '1rem 3rem 1rem 1rem' : '1.5rem',
+            minWidth: inventoryOnly ? '300px' : 'auto',
+            flex: inventoryOnly ? '1 1 48%' : '1',
+            maxWidth: inventoryOnly ? '488px' : 'auto',
+            height: inventoryOnly ? '160px' : 'auto',
+            border: '1px solid #334155',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
               <div style={{ 
-                width: inventoryOnly ? '50px' : '80px', 
-                height: inventoryOnly ? '75px' : '120px', 
+                width: inventoryOnly ? '128px' : '80px', 
+                height: inventoryOnly ? '128px' : '120px', 
                 backgroundColor: '#fff', 
-                borderRadius: '0.375rem', 
+                borderRadius: '0.5rem', 
                 display: 'flex', 
                 alignItems: 'center', 
                 justifyContent: 'center', 
@@ -1070,40 +1207,54 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                     style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} 
                   />
                 ) : (
-                  <svg style={{ width: inventoryOnly ? '1.5rem' : '3rem', height: inventoryOnly ? '1.5rem' : '3rem', color: '#9ca3af' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg style={{ width: inventoryOnly ? '2rem' : '3rem', height: inventoryOnly ? '2rem' : '3rem', color: '#9ca3af' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 )}
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <h3 style={{ 
-                  fontSize: inventoryOnly ? '0.8rem' : '1.125rem', 
+                  fontSize: inventoryOnly ? '1.125rem' : '1.125rem', 
                   fontWeight: '600', 
                   color: '#fff', 
-                  marginBottom: inventoryOnly ? '0.2rem' : '0.5rem',
-                  lineHeight: 1.2,
+                  lineHeight: 1.3,
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
-                  whiteSpace: inventoryOnly ? 'nowrap' : 'normal'
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  margin: 0
                 }}>
                   {productDetails?.product?.name || data?.product || 'Product Name'}
                 </h3>
-                <div style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8', marginBottom: '0.15rem' }}>
-                  SIZE: {productDetails?.product?.size || data?.size || data?.variations?.[0] || 'N/A'}
-                </div>
-                <div style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8', marginBottom: '0.15rem' }}>
-                  ASIN: {productDetails?.product?.asin || data?.child_asin || data?.childAsin || 'N/A'}
-                </div>
-                <div style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>
-                  BRAND: {productDetails?.product?.brand || data?.brand || 'N/A'}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  <div style={{ fontSize: inventoryOnly ? '0.875rem' : '0.875rem', color: '#94a3b8' }}>
+                    <span style={{ fontWeight: 500 }}>SIZE:</span> <span style={{ color: '#fff' }}>{productDetails?.product?.size || data?.size || data?.variations?.[0] || 'N/A'}</span>
+                  </div>
+                  <div style={{ fontSize: inventoryOnly ? '0.875rem' : '0.875rem', color: '#94a3b8' }}>
+                    <span style={{ fontWeight: 500 }}>ASIN:</span> <span style={{ color: '#fff' }}>{productDetails?.product?.asin || data?.child_asin || data?.childAsin || 'N/A'}</span>
+                  </div>
+                  <div style={{ fontSize: inventoryOnly ? '0.875rem' : '0.875rem', color: '#94a3b8' }}>
+                    <span style={{ fontWeight: 500 }}>BRAND:</span> <span style={{ color: '#fff' }}>{productDetails?.product?.brand || data?.brand || 'N/A'}</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
           {/* FBA Card */}
-          <div className={themeClasses.cardBg} style={{ borderRadius: '0.5rem', padding: inventoryOnly ? '0.75rem' : '1.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: inventoryOnly ? '0.5rem' : '1rem' }}>
+          <div className={themeClasses.cardBg} style={{ 
+            borderRadius: '0.5rem', 
+            padding: '1rem', 
+            minWidth: inventoryOnly ? '180px' : 'auto',
+            flex: inventoryOnly ? '1 1 22%' : '1',
+            maxWidth: inventoryOnly ? '220px' : 'auto',
+            height: inventoryOnly ? '160px' : 'auto',
+            border: '1px solid #334155',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
               <div style={{ 
                 width: inventoryOnly ? '24px' : '32px', 
                 height: inventoryOnly ? '24px' : '32px', 
@@ -1119,7 +1270,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               </div>
               <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>FBA</span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: inventoryOnly ? '0.25rem' : '0.5rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Total:</span>
                 <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fba.total}</span>
@@ -1140,8 +1291,18 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           </div>
 
           {/* AWD Card */}
-          <div className={themeClasses.cardBg} style={{ borderRadius: '0.5rem', padding: inventoryOnly ? '0.75rem' : '1.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: inventoryOnly ? '0.5rem' : '1rem' }}>
+          <div className={themeClasses.cardBg} style={{ 
+            borderRadius: '0.5rem', 
+            padding: '1rem', 
+            minWidth: inventoryOnly ? '180px' : 'auto',
+            flex: inventoryOnly ? '1 1 22%' : '1',
+            maxWidth: inventoryOnly ? '220px' : 'auto',
+            height: inventoryOnly ? '160px' : 'auto',
+            border: '1px solid #334155',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
               <div style={{ 
                 width: inventoryOnly ? '24px' : '32px', 
                 height: inventoryOnly ? '24px' : '32px', 
@@ -1157,7 +1318,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               </div>
               <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>AWD</span>
             </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: inventoryOnly ? '0.25rem' : '0.5rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Total:</span>
                   <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.awd.total}</span>
@@ -1178,175 +1339,219 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             </div>
         </div>
 
-        {/* Timeline Bar - Compact when inventoryOnly */}
-        <div className={themeClasses.cardBg} style={{ borderRadius: '0.5rem', padding: inventoryOnly ? '0.75rem' : '1.5rem', marginBottom: inventoryOnly ? '0.75rem' : '2rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: inventoryOnly ? '0.5rem' : '1rem' }}>
-            {(() => {
-              // Calculate dynamic timeline dates
-              const today = new Date();
-              const totalDoiDays = doiGoalDays || (doiSettings ? 
-                (doiSettings.amazonDoiGoal + doiSettings.inboundLeadTime + doiSettings.manufactureLeadTime) : 
-                130);
-              const goalDate = new Date(today.getTime() + totalDoiDays * 24 * 60 * 60 * 1000);
-              
-              // Calculate intermediate months between today and goal
-              const monthLabels = [];
-              const monthsSpan = Math.ceil(totalDoiDays / 30);
-              for (let i = 1; i <= Math.min(monthsSpan - 1, 4); i++) {
-                const monthDate = new Date(today.getTime() + (totalDoiDays * i / (monthsSpan)) * 24 * 60 * 60 * 1000);
-                monthLabels.push(monthDate.toLocaleDateString('en-US', { month: 'short' }));
-              }
-              // Pad to 4 months if needed
-              while (monthLabels.length < 4) {
-                const nextMonth = new Date(today.getFullYear(), today.getMonth() + monthLabels.length + 1, 1);
-                monthLabels.push(nextMonth.toLocaleDateString('en-US', { month: 'short' }));
-              }
-              
-              return (
-                <>
-                  <div style={{ fontSize: inventoryOnly ? '0.65rem' : '0.75rem', color: '#94a3b8' }}>
-                    Today<br />{today.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}
-                  </div>
-                  {monthLabels.map((month, idx) => (
-                    <div key={idx} style={{ fontSize: inventoryOnly ? '0.65rem' : '0.75rem', color: '#94a3b8' }}>{month}</div>
-                  ))}
-                  <div style={{ fontSize: inventoryOnly ? '0.65rem' : '0.75rem', color: '#94a3b8', textAlign: 'right' }}>
-                    DOI Goal ({totalDoiDays}d)<br />
-                    {goalDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' })}
-                  </div>
-                </>
-              );
-            })()}
+        {/* Three Metric Cards - FBA Available, Total Inventory, Forecast */}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: inventoryOnly ? 'repeat(auto-fit, minmax(200px, 1fr))' : '1fr 1fr 1fr', 
+          gap: inventoryOnly ? '0.75rem' : '1.5rem', 
+          marginBottom: inventoryOnly ? '0.75rem' : '2rem' 
+        }}>
+          {/* FBA Available Card */}
+          <div style={{ 
+            borderRadius: '0.5rem', 
+            padding: inventoryOnly ? '0.75rem 1rem' : '1rem 1.25rem',
+            backgroundColor: '#0f172a',
+            borderTop: '3px solid #a855f7',
+            position: 'relative',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+          }}>
+            <div style={{ 
+              fontSize: inventoryOnly ? '0.75rem' : '0.85rem', 
+              color: '#a855f7', 
+              marginBottom: inventoryOnly ? '0.25rem' : '0.35rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: '0.35rem'
+            }}>
+              <span>FBA Available</span>
+              <span style={{ 
+                fontSize: inventoryOnly ? '0.65rem' : '0.75rem',
+                color: '#94a3b8',
+                fontWeight: 400
+              }}>
+                ({inventoryData.fba.available || 0} units)
+              </span>
+            </div>
+            <div style={{ 
+              fontSize: inventoryOnly ? '1.75rem' : '2rem', 
+              fontWeight: '700', 
+              color: '#fff',
+              lineHeight: 1,
+              marginBottom: inventoryOnly ? '0.15rem' : '0.25rem'
+            }}>
+              {timeline.fbaAvailable}
+            </div>
+            <div style={{ 
+              fontSize: inventoryOnly ? '0.75rem' : '0.85rem', 
+              color: '#94a3b8',
+              fontWeight: 500
+            }}>
+              days
+            </div>
           </div>
-          
-          <div style={{ display: 'flex', height: inventoryOnly ? '40px' : '60px', borderRadius: '0.375rem', overflow: 'hidden', position: 'relative' }}>
-            {/* FBA Inventory - Purple */}
-            {timeline.fbaInventory > 0 && (
+
+          {/* Total Inventory Card */}
+          <div style={{ 
+            borderRadius: '0.5rem', 
+            padding: inventoryOnly ? '0.75rem 1rem' : '1rem 1.25rem',
+            backgroundColor: '#0f172a',
+            borderTop: '3px solid #22c55e',
+            position: 'relative',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+          }}>
             <div style={{ 
-                width: timelineWidths.fba, 
-              backgroundColor: '#a855f7', 
-              display: 'flex', 
-              flexDirection: inventoryOnly ? 'row' : 'column', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              gap: inventoryOnly ? '0.25rem' : 0,
-              color: '#fff',
-              fontSize: inventoryOnly ? '0.7rem' : '0.875rem',
-                fontWeight: '600',
-                minWidth: '60px'
+              fontSize: inventoryOnly ? '0.75rem' : '0.85rem', 
+              color: '#22c55e', 
+              marginBottom: inventoryOnly ? '0.25rem' : '0.35rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: '0.35rem'
             }}>
-              <div>{timeline.fbaAvailable} Days</div>
-              <div style={{ fontSize: inventoryOnly ? '0.6rem' : '0.75rem', opacity: 0.8 }}>FBA</div>
+              <span>Total Inventory</span>
+              <span style={{ 
+                fontSize: inventoryOnly ? '0.65rem' : '0.75rem',
+                color: '#94a3b8',
+                fontWeight: 400
+              }}>
+                ({(inventoryData.fba.total + inventoryData.awd.total) || 0} units)
+              </span>
             </div>
-            )}
-            {/* Additional Inventory (AWD) - Green */}
-            {timeline.additionalInventory > 0 && (
             <div style={{ 
-                width: timelineWidths.total, 
-              backgroundColor: '#22c55e', 
-              display: 'flex', 
-              flexDirection: inventoryOnly ? 'row' : 'column', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              gap: inventoryOnly ? '0.25rem' : 0,
+              fontSize: inventoryOnly ? '1.75rem' : '2rem', 
+              fontWeight: '700', 
               color: '#fff',
-              fontSize: inventoryOnly ? '0.7rem' : '0.875rem',
-                fontWeight: '600',
-                minWidth: '60px'
+              lineHeight: 1,
+              marginBottom: inventoryOnly ? '0.15rem' : '0.25rem'
             }}>
-              <div>{timeline.totalDays} Days</div>
-              <div style={{ fontSize: inventoryOnly ? '0.6rem' : '0.75rem', opacity: 0.8 }}>Total</div>
+              {timeline.totalDays}
             </div>
-            )}
-            {/* Units to Make - Blue */}
-            {timeline.unitsToMake > 0 && (
             <div style={{ 
-                width: timelineWidths.forecast, 
-              backgroundColor: '#3b82f6', 
-              display: 'flex', 
-              flexDirection: inventoryOnly ? 'row' : 'column', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              gap: inventoryOnly ? '0.25rem' : 0,
-              color: '#fff',
-              fontSize: inventoryOnly ? '0.7rem' : '0.875rem',
-              fontWeight: '600',
-                position: 'relative',
-                minWidth: '80px'
+              fontSize: inventoryOnly ? '0.75rem' : '0.85rem', 
+              color: '#94a3b8',
+              fontWeight: 500
             }}>
-              <div>{timeline.unitsToMake.toLocaleString()} Units</div>
-              <div style={{ fontSize: inventoryOnly ? '0.6rem' : '0.75rem', opacity: 0.8 }}>To Make</div>
-              {timeline.adjustment !== 0 && (
-                <div style={{ 
-                  position: 'absolute', 
-                  right: inventoryOnly ? '-12px' : '-20px', 
-                  top: inventoryOnly ? '-12px' : '-20px',
-                  width: inventoryOnly ? '28px' : '40px',
-                  height: inventoryOnly ? '28px' : '40px',
-                  borderRadius: '50%',
-                  backgroundColor: timeline.adjustment > 0 ? '#f59e0b' : '#ef4444',
-                  border: '2px solid #1e293b',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: inventoryOnly ? '0.65rem' : '0.875rem',
-                  fontWeight: '700'
-                }}>
-                  {timeline.adjustment > 0 ? `+${timeline.adjustment}` : timeline.adjustment}
-                </div>
-              )}
+              days
             </div>
-            )}
+          </div>
+
+          {/* Forecast Card */}
+          <div style={{ 
+            borderRadius: '0.5rem', 
+            padding: inventoryOnly ? '0.75rem 1rem' : '1rem 1.25rem',
+            backgroundColor: '#0f172a',
+            borderTop: '3px solid #3b82f6',
+            position: 'relative',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+          }}>
+            <div style={{ 
+              fontSize: inventoryOnly ? '0.75rem' : '0.85rem', 
+              color: '#3b82f6', 
+              marginBottom: inventoryOnly ? '0.25rem' : '0.35rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: '0.35rem'
+            }}>
+              <span>Forecast</span>
+              <span style={{ 
+                fontSize: inventoryOnly ? '0.65rem' : '0.75rem',
+                color: '#94a3b8',
+                fontWeight: 400
+              }}>
+                ({(overrideUnitsToMake ?? forecastData?.units_to_make ?? 0).toLocaleString()} units)
+              </span>
+            </div>
+            <div style={{ 
+              fontSize: inventoryOnly ? '1.75rem' : '2rem', 
+              fontWeight: '700', 
+              color: '#fff',
+              lineHeight: 1,
+              marginBottom: inventoryOnly ? '0.15rem' : '0.25rem'
+            }}>
+              {(() => {
+                const totalDoiDays = doiGoalDays || (doiSettings ? 
+                  (doiSettings.amazonDoiGoal + doiSettings.inboundLeadTime + doiSettings.manufactureLeadTime) : 
+                  130);
+                return totalDoiDays;
+              })()}
+            </div>
+            <div style={{ 
+              fontSize: inventoryOnly ? '0.75rem' : '0.85rem', 
+              color: '#94a3b8',
+              fontWeight: 500
+            }}>
+              days
+            </div>
           </div>
         </div>
 
         {/* Unit Forecast Chart - Compact when inventoryOnly */}
-        <div className={themeClasses.cardBg} style={{ borderRadius: '0.5rem', padding: inventoryOnly ? '0.75rem' : '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: inventoryOnly ? '0.5rem' : '1rem' }}>
+        <div className={themeClasses.cardBg} style={{ 
+          borderRadius: '0.75rem', 
+          padding: '1rem', 
+          border: '1px solid #334155',
+          width: '100%'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
             <div>
-              <h3 style={{ fontSize: inventoryOnly ? '0.85rem' : '1rem', fontWeight: '600', color: '#fff', marginBottom: '0.15rem' }}>Unit Forecast</h3>
+              <h3 style={{ fontSize: inventoryOnly ? '0.85rem' : '1rem', fontWeight: '600', color: '#fff', marginBottom: '0.25rem' }}>Unit Forecast</h3>
               <p style={{ fontSize: inventoryOnly ? '0.75rem' : '0.875rem', color: '#94a3b8' }}>
                 {productDetails?.product?.size || data?.size || data?.variations?.[0] || '8oz'} Forecast
               </p>
             </div>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
               <button 
                 onClick={handleOpenAdjustmentModal}
                 title="Adjustment Weights"
                 style={{ 
                   padding: '0.5rem', 
                   color: '#94a3b8', 
-                  backgroundColor: 'rgba(59, 130, 246, 0.1)', 
-                  border: '1px solid rgba(59, 130, 246, 0.3)', 
+                  backgroundColor: 'transparent', 
+                  border: 'none', 
                   borderRadius: '0.375rem',
                   cursor: 'pointer',
-                  transition: 'all 0.2s'
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
-                  e.currentTarget.style.color = '#3b82f6';
+                  e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
-                  e.currentTarget.style.color = '#94a3b8';
+                  e.currentTarget.style.backgroundColor = 'transparent';
                 }}
               >
-                <svg style={{ width: '20px', height: '20px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
+                <img 
+                  src="/assets/Vector.png" 
+                  alt="Settings" 
+                  style={{ width: '20px', height: '20px' }}
+                />
               </button>
               <select 
                 value={selectedView}
                 onChange={(e) => setSelectedView(e.target.value)}
                 style={{ 
-                  padding: '0.375rem 0.75rem', 
-                  borderRadius: '0.375rem', 
-                  backgroundColor: '#334155', 
+                  padding: '0 0.625rem', 
+                  paddingRight: '1.75rem',
+                  borderRadius: '0.25rem', 
+                  backgroundColor: '#1A1F2E', 
                   color: '#fff',
-                  border: '1px solid #475569',
+                  border: '1px solid #2D3748',
                   fontSize: '0.875rem',
-                  cursor: 'pointer'
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  appearance: 'none',
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3 5L6 8L9 5' stroke='%23ffffff' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'right 0.5rem center',
+                  backgroundSize: '12px',
+                  width: '91px',
+                  height: '24px',
+                  display: 'flex',
+                  alignItems: 'center'
                 }}
               >
                 <option value="1 Year">1 Year</option>
@@ -1358,7 +1563,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
 
 
           {/* Chart Area - More compact height when inventoryOnly */}
-          <div style={{ height: inventoryOnly ? '240px' : '320px', width: '100%', marginTop: '0.25rem', position: 'relative' }}>
+          <div style={{ height: inventoryOnly ? '180px' : '320px', width: '100%', marginTop: '0.25rem', position: 'relative' }}>
             {/* 
               BACKEND-DRIVEN CHART RENDERING
               Uses pre-calculated percentages from forecastData.chart_rendering
@@ -1500,7 +1705,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart
                   data={chartDisplayData.data}
-                  margin={{ top: 10, right: 10, left: 10, bottom: 30 }}
+                  margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
                   style={{ backgroundColor: 'transparent' }}
                 >
                   <CartesianGrid 
@@ -1606,31 +1811,31 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           {/* Legend at bottom - matching image format: Lines on left, squares on right */}
           <div style={{ 
             display: 'flex', 
-            gap: inventoryOnly ? '1rem' : '2rem', 
-            marginTop: inventoryOnly ? '0.75rem' : '1rem', 
+            gap: inventoryOnly ? '0.35rem' : '0.75rem', 
+            marginTop: inventoryOnly ? '0.35rem' : '0.5rem', 
             justifyContent: 'center', 
             fontSize: inventoryOnly ? '0.65rem' : '0.75rem',
             flexWrap: 'wrap'
           }}>
             {/* Left side - Lines */}
-            <div style={{ display: 'flex', gap: inventoryOnly ? '0.75rem' : '1rem', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <div style={{ width: inventoryOnly ? '24px' : '32px', height: '2px', backgroundColor: '#64748b' }}></div>
+            <div style={{ display: 'flex', gap: inventoryOnly ? '0.35rem' : '0.5rem', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                <div style={{ width: inventoryOnly ? '18px' : '24px', height: '2px', backgroundColor: '#64748b' }}></div>
                 <span style={{ color: '#94a3b8' }}>Units Sold</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <div style={{ width: inventoryOnly ? '24px' : '32px', height: '2px', backgroundColor: '#f97316' }}></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                <div style={{ width: inventoryOnly ? '18px' : '24px', height: '2px', backgroundColor: '#f97316' }}></div>
                 <span style={{ color: '#94a3b8' }}>Smoothed Units Sold</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <div style={{ width: inventoryOnly ? '24px' : '32px', height: '2px', borderTop: '2px dashed #f97316' }}></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                <div style={{ width: inventoryOnly ? '18px' : '24px', height: '2px', borderTop: '2px dashed #f97316' }}></div>
                 <span style={{ color: '#94a3b8' }}>Forecast</span>
               </div>
             </div>
             
             {/* Right side - Squares */}
-            <div style={{ display: 'flex', gap: inventoryOnly ? '0.75rem' : '1rem', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', gap: inventoryOnly ? '0.35rem' : '0.5rem', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                 <div style={{ 
                   width: inventoryOnly ? '10px' : '12px', 
                   height: inventoryOnly ? '10px' : '12px', 
@@ -1639,7 +1844,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 }}></div>
                 <span style={{ color: '#94a3b8' }}>FBA Avail.</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                 <div style={{ 
                   width: inventoryOnly ? '10px' : '12px', 
                   height: inventoryOnly ? '10px' : '12px', 
@@ -1648,7 +1853,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 }}></div>
                 <span style={{ color: '#94a3b8' }}>Total Inv.</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                 <div style={{ 
                   width: inventoryOnly ? '10px' : '12px', 
                   height: inventoryOnly ? '10px' : '12px', 
@@ -1666,7 +1871,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
 
       {/* Sales Tab Content */}
       {activeTab === 'sales' && (
-          <div>
+          <div style={{ backgroundColor: '#1A2235' }}>
             {/* Header with Controls */}
             <div className="px-6 pt-6" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1rem', gap: '1rem' }}>
               {/* Metric Controller */}
@@ -2103,7 +2308,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
 
       {/* Ads Tab Content */}
       {activeTab === 'ads' && (
-          <div>
+          <div style={{ backgroundColor: '#1A2235' }}>
             {/* Header with Controls */}
             <div className="px-6 pt-6" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1rem', gap: '1rem' }}>
               {/* Metric Controller */}
