@@ -1254,7 +1254,12 @@ const NewShipmentTable = ({
         const index = row._originalIndex !== undefined ? row._originalIndex : idx;
         const qty = effectiveQtyValues[index];
         const val = typeof qty === 'number' ? qty : (qty === '' || qty === null || qty === undefined ? 0 : parseInt(qty, 10) || 0);
-        values.add(val);
+        // Map numeric values to "add" or "added" labels
+        if (val === 0) {
+          values.add('add');
+        } else {
+          values.add('added');
+        }
       } else if (columnKey === 'doiDays') {
         // Get DOI value
         const val = row.doiTotal || row.daysOfInventory || 0;
@@ -1280,7 +1285,7 @@ const NewShipmentTable = ({
     return sortedValues;
   };
 
-  const isNonTableNumericColumn = (columnKey) => columnKey === 'fbaAvailable' || columnKey === 'unitsToMake' || columnKey === 'doiDays';
+  const isNonTableNumericColumn = (columnKey) => columnKey === 'fbaAvailable' || columnKey === 'doiDays';
 
   const hasNonTableActiveFilter = (columnKey) => {
     const filter = nonTableFilters[columnKey];
@@ -1474,6 +1479,15 @@ const NewShipmentTable = ({
     
     let result = [...filteredRowsWithSelection];
     
+    // Filter to show only specific brands in non-table mode
+    const allowedBrands = ['Bloom City', 'TPS Nutrients', 'TPS Plant Foods'];
+    result = result.filter(row => {
+      const brand = row.brand || '';
+      return allowedBrands.some(allowedBrand => 
+        brand.toLowerCase().includes(allowedBrand.toLowerCase())
+      );
+    });
+    
     // Apply non-table filters
     Object.keys(nonTableFilters).forEach(columnKey => {
       const filter = nonTableFilters[columnKey];
@@ -1501,8 +1515,11 @@ const NewShipmentTable = ({
           else if (columnKey === 'unitsToMake') {
             const index = row._originalIndex !== undefined ? row._originalIndex : idx;
             const qty = effectiveQtyValues[index];
-            value = typeof qty === 'number' ? qty : (qty === '' || qty === null || qty === undefined ? 0 : parseInt(qty, 10) || 0);
+            const numericValue = typeof qty === 'number' ? qty : (qty === '' || qty === null || qty === undefined ? 0 : parseInt(qty, 10) || 0);
+            // Convert numeric value to label for filtering
+            value = numericValue === 0 ? 'add' : 'added';
           }
+          else if (columnKey === 'doiDays') value = row.doiTotal || row.daysOfInventory || 0;
           
           return (
             filter.selectedValues.has(value) ||
@@ -1544,8 +1561,11 @@ const NewShipmentTable = ({
           else if (columnKey === 'unitsToMake') {
             const index = row._originalIndex !== undefined ? row._originalIndex : idx;
             const qty = effectiveQtyValues[index];
-            value = typeof qty === 'number' ? qty : (qty === '' || qty === null || qty === undefined ? 0 : parseInt(qty, 10) || 0);
+            const numericValue = typeof qty === 'number' ? qty : (qty === '' || qty === null || qty === undefined ? 0 : parseInt(qty, 10) || 0);
+            // Convert numeric value to label for filtering
+            value = numericValue === 0 ? 'add' : 'added';
           }
+          else if (columnKey === 'doiDays') value = row.doiTotal || row.daysOfInventory || 0;
           
           return applyNonTableConditionFilter(
             value,
