@@ -324,6 +324,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
 
     const historical = chartData.historical || [];
     let forecast = chartData.forecast || [];
+    const algorithm = chartData.algorithm || '18m+';
     
     // 🎯 Limit forecast to half of selected period for better detail/zoom
     const maxForecastWeeks = getWeeksForView(selectedView) / 2;
@@ -358,14 +359,38 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
       ? new Date(forecastData.total_runout_date)
       : new Date(currentDate.getTime() + totalDays * 24 * 60 * 60 * 1000);
     
+    // Helper to get the correct "smooth" field based on algorithm
+    // 18m+: units_sold_smoothed | 6-18m: units_sold_potential | 0-6m: max_week_seasonality_index_applied
+    const getSmoothValue = (item) => {
+      if (algorithm === '18m+') {
+        return item.units_sold_smoothed || item.units_smooth || 0;
+      } else if (algorithm === '6-18m') {
+        return item.units_sold_potential || 0;
+      } else { // 0-6m
+        return item.max_week_seasonality_index_applied || 0;
+      }
+    };
+    
+    // Helper to get the correct "units sold" field based on algorithm
+    const getUnitsSoldValue = (item) => {
+      if (algorithm === '0-6m') {
+        return item.adj_units_sold || item.units_sold || 0;
+      }
+      return item.units_sold || 0;
+    };
+    
+    // Helper to get the correct "forecast" field (backend returns 'forecast', not 'adj_forecast')
+    const getForecastValue = (item) => {
+      return item.forecast || item.adj_forecast || 0;
+    };
     
     // Find max value to make bars span full chart height
     let maxValue = 0;
     historical.forEach(item => {
-      maxValue = Math.max(maxValue, item.units_sold || 0, item.units_smooth || 0);
+      maxValue = Math.max(maxValue, getUnitsSoldValue(item), getSmoothValue(item));
     });
     forecast.forEach(item => {
-      maxValue = Math.max(maxValue, item.units_smooth || 0, item.adj_forecast || 0);
+      maxValue = Math.max(maxValue, getForecastValue(item));
     });
     
     // Use max value for full-height bars
@@ -381,12 +406,15 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
       const isInFbaAvailPeriod = itemDate >= currentDate && itemDate < runoutDate;
       const isInTotalPeriod = itemDate >= runoutDate && itemDate < totalRunoutDate;
       
+      const smoothVal = getSmoothValue(item);
+      const unitsSoldVal = getUnitsSoldValue(item);
+      
       combinedData.push({
         date: item.week_end,
         timestamp: itemDate.getTime(),
-        unitsSold: item.units_sold || 0,
-        unitsSmooth: item.units_smooth || 0,
-        forecastBase: item.units_smooth || 0, // Smoothed units sold (forecast base) - shown from start
+        unitsSold: unitsSoldVal,
+        unitsSmooth: smoothVal,
+        forecastBase: smoothVal, // Smoothed units sold (forecast base) - shown from start
         isForecast: false,
         isInDoiPeriod: isInInventoryPeriod,
         // Bars span full height when in their respective periods
@@ -405,14 +433,16 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
       const isInTotalPeriod = itemDate >= runoutDate && itemDate < totalRunoutDate;
       const isInForecastPeriod = itemDate >= totalRunoutDate && itemDate <= doiGoalDate;
       
+      const forecastVal = getForecastValue(item);
+      
       // Only first forecast point gets forecastBase value for smooth transition from historical
       // After that, only forecastAdjusted (dashed) is shown
       combinedData.push({
         date: item.week_end,
         timestamp: itemDate.getTime(),
         // forecastBase (solid) only at first point for smooth transition, then null
-        forecastBase: index === 0 ? (item.units_smooth || item.adj_forecast || 0) : null,
-        forecastAdjusted: item.adj_forecast || 0, // Forecast (dashed) takes over after Today
+        forecastBase: index === 0 ? forecastVal : null,
+        forecastAdjusted: forecastVal, // Forecast (dashed) takes over after Today
         isForecast: true,
         isInDoiPeriod: isInInventoryPeriod,
         // Bars span full height when in their respective periods

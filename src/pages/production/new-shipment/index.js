@@ -458,16 +458,21 @@ const NewShipment = () => {
         getLabelsAvailability(shipmentId) // Pass shipment ID to exclude current shipment
       ]);
       
-      // Map TPS forecast data to planning format
+      // Map TPS forecast data to planning format - USE RAILWAY DATA AS SOURCE OF TRUTH
       const planningData = {
         products: (tpsForecastData.products || []).map(p => ({
           asin: p.asin,
-          brand: 'TPS Plant Foods',
-          product: p.product_name,
-          size: p.inventory?.size || extractSizeFromProductName(p.product_name),
-          doi_total: p.doi_total_days || 0,
-          doi_fba: p.doi_fba_days || 0,
-          inventory: p.inventory?.total_inventory || p.total_inventory || 0,
+          brand: p.brand || 'TPS Plant Foods',
+          product: p.product_name || p.product,
+          size: p.size || extractSizeFromProductName(p.product_name || p.product),
+          // DOI from Railway API
+          doi_total: p.doi_total_days || p.doi_total || 0,
+          doi_fba: p.doi_fba_days || p.doi_fba || 0,
+          // Inventory from Railway API
+          inventory: p.total_inventory || 0,
+          total_inventory: p.total_inventory || 0,
+          fba_available: p.fba_available || 0,
+          // Units to make from Railway API
           units_to_make: p.units_to_make || 0,
           algorithm: p.algorithm,
           needs_seasonality: p.needs_seasonality,
@@ -552,6 +557,13 @@ const NewShipment = () => {
           weeklyForecast = (salesData / 30) * 7; // Convert daily avg to weekly
         }
         
+        // Get inventory values from Railway API (TPS Forecast) - this is the source of truth
+        const railwayTotalInventory = forecast.total_inventory || forecast.inventory || 0;
+        const railwayFbaAvailable = forecast.fba_available || 0;
+        const railwayDoiTotal = forecast.doi_total || forecast.doi_total_days || 0;
+        const railwayDoiFba = forecast.doi_fba || forecast.doi_fba_days || 0;
+        const railwayUnitsToMake = forecast.units_to_make || 0;
+        
         return {
           id: `${item.id}-${index}`, // Unique key combining DB ID and index
           catalogId: item.id,
@@ -562,18 +574,18 @@ const NewShipment = () => {
           childSku: item.child_sku_final || '',
           marketplace: 'Amazon',
           account: 'TPS Nutrients',
-          // Image data - check multiple possible field names and convert Drive URLs
+          // Image data - from AWS Lambda (keep existing)
           mainImage: getImageUrl(item.mainImage || item.product_image_url || item.productImage || item.image || item.productImageUrl || null),
           product_image_url: getImageUrl(item.product_image_url || item.mainImage || item.productImage || item.image || item.productImageUrl || null),
           productImage: getImageUrl(item.productImage || item.mainImage || item.product_image_url || item.image || item.productImageUrl || null),
           image: getImageUrl(item.image || item.mainImage || item.product_image_url || item.productImage || item.productImageUrl || null),
-          // Inventory/DOI data - merge forecast with database
-          fbaAvailable: Math.round((forecast.inventory || 0) * 0.5),
-          totalInventory: forecast.inventory || 0,
+          // Inventory/DOI data - USE RAILWAY API (TPS Forecast) as source of truth
+          fbaAvailable: railwayFbaAvailable,
+          totalInventory: railwayTotalInventory,
           forecast: Math.round(weeklyForecast),
-          daysOfInventory: calculatedDoiTotal,
-          doiFba: calculatedDoiFba,
-          doiTotal: calculatedDoiTotal,
+          daysOfInventory: railwayDoiTotal,
+          doiFba: railwayDoiFba,
+          doiTotal: railwayDoiTotal,
           sales7Day: sales7Day,
           sales30Day: salesData,
           weeklyForecast: weeklyForecast,
@@ -593,8 +605,9 @@ const NewShipment = () => {
           formulaGallonsAvailable: item.formula_gallons_available || 0,
           formulaGallonsPerUnit: item.gallons_per_unit || 0,
           maxUnitsProducible: item.max_units_producible || 0,
-          // TPS Forecast data (from TPS API)
-          unitsToMake: forecast.units_to_make || 0, // Store TPS units_to_make for suggestedQty calculation
+          // TPS Forecast data (from Railway API) - source of truth for units_to_make
+          unitsToMake: railwayUnitsToMake, // Store TPS units_to_make for suggestedQty calculation
+          units_to_make: railwayUnitsToMake, // Also store as units_to_make for compatibility
           tpsAlgorithm: forecast.algorithm || '',
           tpsNeedsSeasonality: forecast.needs_seasonality || false,
           // Packaging calculation fields (for pallets, weight, time)
@@ -1828,6 +1841,7 @@ const NewShipment = () => {
         product.brand || '',
         product.product || '',
         product.size || '',
+        product.asin || '',
         product.childAsin || '',
         product.childSku || '',
         product.formula_name || '',
@@ -2098,7 +2112,7 @@ const NewShipment = () => {
                 </svg>
                 <input
                   type="text"
-                  placeholder="Search..."
+                  placeholder="Search by name, ASIN, size..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   style={{
