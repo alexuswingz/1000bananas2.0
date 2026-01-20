@@ -20,7 +20,7 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck, p
           <div style={{ 
             fontSize: '22px', 
             fontWeight: 'bold', 
-            color: '#000000', 
+            color: isDarkMode ? '#FFFFFF' : '#000000', 
             letterSpacing: '-0.5px',
             fontFamily: 'Arial, sans-serif',
             lineHeight: '1.2'
@@ -45,7 +45,7 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck, p
           <div style={{ 
             fontSize: '22px', 
             fontWeight: 'bold', 
-            color: '#000000', 
+            color: isDarkMode ? '#FFFFFF' : '#000000', 
             letterSpacing: '-0.5px',
             fontFamily: 'Arial, sans-serif',
             lineHeight: '1.2'
@@ -67,9 +67,9 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck, p
       label: 'Production Order',
       icon: (
         <svg width="50" height="50" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="8" y="32" width="34" height="10" fill="#000000" rx="1"/>
-          <rect x="12" y="23" width="26" height="10" fill="#000000" rx="1"/>
-          <rect x="16" y="14" width="18" height="10" fill="#000000" rx="1"/>
+          <rect x="8" y="32" width="34" height="10" fill="currentColor" rx="1"/>
+          <rect x="12" y="23" width="26" height="10" fill="currentColor" rx="1"/>
+          <rect x="16" y="14" width="18" height="10" fill="currentColor" rx="1"/>
         </svg>
       ),
     },
@@ -144,10 +144,10 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck, p
           {/* Export Complete Modal */}
           <div
             style={{
-              backgroundColor: '#FFFFFF',
+              backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
               borderRadius: '12px',
               width: '320px',
-              border: '1px solid #E5E7EB',
+              border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
               boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
               zIndex: 9999,
               position: 'relative',
@@ -172,7 +172,7 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck, p
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#9CA3AF',
+                color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
                 width: '24px',
                 height: '24px',
               }}
@@ -209,7 +209,7 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck, p
               <h2 style={{
                 fontSize: '20px',
                 fontWeight: 600,
-                color: '#111827',
+                color: isDarkMode ? '#F9FAFB' : '#111827',
                 margin: 0,
                 textAlign: 'center',
               }}>
@@ -232,19 +232,19 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck, p
                 style={{
                   padding: '8px 20px',
                   borderRadius: '6px',
-                  border: '1px solid #D1D5DB',
-                  backgroundColor: '#FFFFFF',
-                  color: '#374151',
+                  border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
+                  backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                  color: isDarkMode ? '#F9FAFB' : '#374151',
                   fontSize: '14px',
                   fontWeight: 500,
                   cursor: 'pointer',
                   transition: 'all 0.2s',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#F9FAFB';
+                  e.currentTarget.style.backgroundColor = isDarkMode ? '#4B5563' : '#F9FAFB';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#FFFFFF';
                 }}
               >
                 Close
@@ -302,11 +302,11 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck, p
         {/* Modal */}
         <div
           style={{
-            backgroundColor: '#FFFFFF',
+            backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
             borderRadius: '12px',
             width: '800px',
             height: 'auto',
-            border: '1px solid #E5E7EB',
+            border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
             zIndex: 9999,
             position: 'relative',
@@ -320,7 +320,7 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck, p
           {/* Header */}
           <div style={{ 
             padding: '16px 24px',
-            borderBottom: '1px solid #E5E7EB',
+            borderBottom: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
             borderTopLeftRadius: '12px',
             borderTopRightRadius: '12px',
             display: 'flex', 
@@ -332,7 +332,7 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck, p
             <h2 style={{
               fontSize: '20px',
               fontWeight: 600,
-              color: '#374151',
+              color: isDarkMode ? '#F9FAFB' : '#374151',
               margin: 0,
             }}>
               Export Template
@@ -348,7 +348,7 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck, p
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#374151',
+                color: isDarkMode ? '#9CA3AF' : '#374151',
                 width: '24px',
                 height: '24px',
               }}
@@ -371,7 +371,7 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck, p
               display: 'block',
               fontSize: '14px',
               fontWeight: 500,
-              color: '#374151',
+              color: isDarkMode ? '#F9FAFB' : '#374151',
               marginBottom: '16px',
             }}>
               Select Shipment Type*
@@ -398,11 +398,11 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck, p
                     padding: '32px',
                     border: selectedType === type.id
                       ? '2px solid #3B82F6'
-                      : '1px solid #E5E7EB',
+                      : `1px solid ${isDarkMode ? '#4B5563' : '#E5E7EB'}`,
                     borderRadius: '12px',
                     backgroundColor: selectedType === type.id
-                      ? 'rgba(59, 130, 246, 0.05)'
-                      : '#FFFFFF',
+                      ? (isDarkMode ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.05)')
+                      : (isDarkMode ? '#374151' : '#FFFFFF'),
                     cursor: 'pointer',
                     transition: 'all 0.2s',
                     width: '176px',
@@ -411,12 +411,12 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck, p
                   }}
                   onMouseEnter={(e) => {
                     if (selectedType !== type.id) {
-                      e.currentTarget.style.borderColor = '#D1D5DB';
+                      e.currentTarget.style.borderColor = isDarkMode ? '#6B7280' : '#D1D5DB';
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (selectedType !== type.id) {
-                      e.currentTarget.style.borderColor = '#E5E7EB';
+                      e.currentTarget.style.borderColor = isDarkMode ? '#4B5563' : '#E5E7EB';
                     }
                   }}
                 >
@@ -425,13 +425,14 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck, p
                     alignItems: 'center', 
                     justifyContent: 'center',
                     flex: '1',
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
                   }}>
                     {type.icon}
                   </div>
                   <span style={{
                     fontSize: '14px',
                     fontWeight: 500,
-                    color: '#374151',
+                    color: isDarkMode ? '#F9FAFB' : '#374151',
                     textAlign: 'center',
                   }}>
                     {type.label}
@@ -444,10 +445,10 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck, p
           {/* Footer */}
           <div style={{ 
             padding: '16px 24px',
-            borderRight: '1px solid #E5E7EB',
-            borderBottom: '1px solid #E5E7EB',
-            borderLeft: '1px solid #E5E7EB',
-            borderTop: '1px solid #E5E7EB',
+            borderRight: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+            borderBottom: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+            borderLeft: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+            borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
             borderBottomLeftRadius: '12px',
             borderBottomRightRadius: '12px',
             display: 'flex', 
@@ -458,7 +459,7 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck, p
             width: '100%',
             flexShrink: 0,
             flexGrow: 0,
-            backgroundColor: '#FFFFFF',
+            backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
             boxSizing: 'border-box',
           }}>
             <button

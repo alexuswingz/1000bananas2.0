@@ -1,15 +1,17 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useCompany } from '../context/CompanyContext';
+import { useSidebar } from '../context/SidebarContext';
 
-const Sidebar = () => {
+const Sidebar = (props = {}) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isDarkMode, toggleTheme } = useTheme();
   const { company, getEnabledWorkspaceModules, getEnabledProductModules } = useCompany();
+  const { isMinimized, setIsMinimized } = useSidebar();
   
-  const [isMinimized, setIsMinimized] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [expandedMenus, setExpandedMenus] = useState({
     products: false,
     teamWorkspaces: false,
@@ -19,6 +21,15 @@ const Sidebar = () => {
   const [hoveredMenu, setHoveredMenu] = useState(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0 });
   const hoverTimeoutRef = useRef(null);
+
+  // Handle window resize for mobile detection
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Get enabled workspace modules
   const enabledModules = getEnabledWorkspaceModules ? getEnabledWorkspaceModules() : [];
@@ -117,7 +128,6 @@ const Sidebar = () => {
   };
 
   const toggleSidebar = () => {
-    setIsMinimized(!isMinimized);
     // Close all expanded menus when minimizing
     if (!isMinimized) {
       setExpandedMenus({
@@ -127,10 +137,21 @@ const Sidebar = () => {
         production: false,
       });
     }
+    setIsMinimized(!isMinimized);
   };
 
+  // Hide sidebar on mobile (unless forced to show)
+  if (isMobile && !props?.forceMobile) {
+    return null;
+  }
+
+  // For mobile forced display, use full width and don't allow minimization
+  const isForcedMobile = props?.forceMobile && isMobile;
+  const effectiveMinimized = isForcedMobile ? false : isMinimized;
+  const effectiveWidth = isForcedMobile ? 'w-full' : (effectiveMinimized ? 'w-20' : 'w-64');
+
   return (
-    <div className={`hidden md:flex ${isMinimized ? 'w-20' : 'w-64'} h-screen ${themeClasses.bg} ${themeClasses.border} border-r flex-col transition-all duration-300 relative`}>
+    <div className={`hidden md:flex ${effectiveWidth} h-screen ${themeClasses.bg} ${isForcedMobile ? '' : themeClasses.border + ' border-r'} flex flex-col transition-all duration-300 relative`}>
       {/* Logo Header */}
       <div className={`p-4 ${themeClasses.border} border-b flex items-center ${isMinimized ? 'justify-center' : 'justify-between'}`}>
         {!isMinimized && (

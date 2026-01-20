@@ -11,6 +11,7 @@ const FormulaCheckTable = ({
   selectedRows: externalSelectedRows = null,
   onSelectedRowsChange,
   refreshKey = 0, // Increment to trigger reload while preserving checked status
+  isAdmin = false, // Admin role check for bulk actions
 }) => {
   const { isDarkMode } = useTheme();
   const [selectedRows, setSelectedRows] = useState(new Set());
@@ -24,6 +25,7 @@ const FormulaCheckTable = ({
   const [notesModalOpen, setNotesModalOpen] = useState(false);
   const [selectedFormulaForNotes, setSelectedFormulaForNotes] = useState(null);
   const [dataLoaded, setDataLoaded] = useState(false); // Track if we've loaded from backend
+  const [bulkSelectedRows, setBulkSelectedRows] = useState(new Set()); // Track rows selected for bulk actions
 
   // Load formula data from API - reload when shipmentId OR refreshKey changes
   useEffect(() => {
@@ -217,6 +219,36 @@ const FormulaCheckTable = ({
   const isNumericColumn = (columnKey) =>
     columnKey === 'qty' || columnKey === 'totalVolume';
 
+  // Check if a column has active filters (excludes sort - only checks for Filter by Values and Filter by Conditions)
+  const hasActiveFilter = (columnKey) => {
+    const filter = filters[columnKey];
+    if (!filter) return false;
+    
+    // Check for condition filter
+    const hasCondition = filter.conditionType && filter.conditionType !== '';
+    if (hasCondition) return true;
+    
+    // Check for value filters - only active if not all values are selected
+    if (!filter.selectedValues || filter.selectedValues.size === 0) return false;
+    
+    // Get all available values for this column
+    const allAvailableValues = getColumnValues(columnKey);
+    if (allAvailableValues.length === 0) return false;
+    
+    const allValuesSet = new Set(allAvailableValues.map(v => String(v)));
+    const selectedValuesSet = filter.selectedValues instanceof Set 
+      ? new Set(Array.from(filter.selectedValues).map(v => String(v)))
+      : new Set(Array.from(filter.selectedValues || []).map(v => String(v)));
+    
+    // Check if all available values are selected - if so, it's not an active filter
+    const allSelected = allValuesSet.size > 0 && 
+      selectedValuesSet.size === allValuesSet.size &&
+      Array.from(allValuesSet).every(val => selectedValuesSet.has(val));
+    
+    // Filter is active only if not all values are selected
+    return !allSelected;
+  };
+
   const applyConditionFilter = (value, conditionType, conditionValue, numeric) => {
     if (!conditionType) return true;
 
@@ -388,22 +420,133 @@ const FormulaCheckTable = ({
       newSet.delete(id);
     }
     
-    // Persist to backend
-    await saveCheckedStatus(id, isNowChecked);
-    
-    // Update local state
+    // Update local state only - do NOT persist to backend
+    // Checkboxes are for selection only, not for marking as done
     setSelectedRows(newSet);
     if (onSelectedRowsChange) onSelectedRowsChange(newSet);
-    
-    // Reload data to get latest state, then check if all formulas are checked
-    if (isNowChecked) {
-      try {
-        await loadFormulaData();
-        // Check if all formulas are now checked and clear comment if so (after reload)
-        await checkAndClearFormulaCheckComment();
-      } catch (error) {
-        console.error('Error reloading formula data:', error);
+  };
+
+  // Handle individual "Complete" button click - marks item as done
+  const handleCompleteClick = async (id) => {
+    try {
+      // Mark as done in backend
+      await saveCheckedStatus(id, true);
+      
+      // Update selection state to show checkbox as checked
+      const newSet = new Set(selectedRows);
+      newSet.add(id);
+      setSelectedRows(newSet);
+      if (onSelectedRowsChange) onSelectedRowsChange(newSet);
+      
+      // Reload data to get latest state, then check if all formulas are checked
+      await loadFormulaData();
+      await checkAndClearFormulaCheckComment();
+    } catch (error) {
+      console.error('Error completing formula:', error);
+    }
+  };
+
+  // Handle bulk checkbox change (for bulk actions)
+  const handleBulkCheckboxChange = (id) => {
+    setBulkSelectedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
       }
+      return newSet;
+    });
+  };
+
+  // Handle select all checkbox in header
+  const handleSelectAll = (checked) => {
+    const filteredFormulas = getFilteredFormulas();
+    // In recount mode, only consider variance-exceeded formulas
+    const formulasToSelect = isRecountMode
+      ? filteredFormulas.filter(formula => varianceExceededRowIds.includes(formula.id))
+      : filteredFormulas;
+    
+    if (isAdmin) {
+      if (checked) {
+        // Add all filtered formula IDs to bulkSelectedRows (preserve existing selections)
+        setBulkSelectedRows(prev => {
+          const newSet = new Set(prev);
+          formulasToSelect.forEach(formula => newSet.add(formula.id));
+          return newSet;
+        });
+      } else {
+        // Remove all filtered formula IDs from bulkSelectedRows
+        setBulkSelectedRows(prev => {
+          const newSet = new Set(prev);
+          formulasToSelect.forEach(formula => newSet.delete(formula.id));
+          return newSet;
+        });
+      }
+    } else {
+      if (checked) {
+        // Add all filtered formula IDs to selectedRows (preserve existing selections)
+        setSelectedRows(prev => {
+          const newSet = new Set(prev);
+          formulasToSelect.forEach(formula => newSet.add(formula.id));
+          if (onSelectedRowsChange) {
+            onSelectedRowsChange(newSet);
+          }
+          return newSet;
+        });
+      } else {
+        // Remove all filtered formula IDs from selectedRows
+        setSelectedRows(prev => {
+          const newSet = new Set(prev);
+          formulasToSelect.forEach(formula => newSet.delete(formula.id));
+          if (onSelectedRowsChange) {
+            onSelectedRowsChange(newSet);
+          }
+          return newSet;
+        });
+      }
+    }
+  };
+
+  // Check if all filtered rows are selected
+  const areAllRowsSelected = () => {
+    const filteredFormulas = getFilteredFormulas();
+    // In recount mode, only consider variance-exceeded formulas
+    const formulasToCheck = isRecountMode
+      ? filteredFormulas.filter(formula => varianceExceededRowIds.includes(formula.id))
+      : filteredFormulas;
+    
+    if (formulasToCheck.length === 0) return false;
+    
+    if (isAdmin) {
+      return formulasToCheck.every(formula => bulkSelectedRows.has(formula.id));
+    } else {
+      return formulasToCheck.every(formula => selectedRows.has(formula.id));
+    }
+  };
+
+  // Handle bulk complete action
+  const handleBulkComplete = async () => {
+    if (bulkSelectedRows.size === 0) return;
+    
+    try {
+      setLoading(true);
+      // Complete all selected formulas
+      const promises = Array.from(bulkSelectedRows).map(id => 
+        saveCheckedStatus(id, true)
+      );
+      await Promise.all(promises);
+      
+      // Reload data
+      await loadFormulaData();
+      await checkAndClearFormulaCheckComment();
+      
+      // Clear bulk selection
+      setBulkSelectedRows(new Set());
+    } catch (error) {
+      console.error('Error bulk completing formulas:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -427,7 +570,8 @@ const FormulaCheckTable = ({
 
   const columns = [
     { key: 'checkbox', label: '', width: '50px' },
-    { key: 'formula', label: 'FORMULA', width: '200px' },
+    { key: 'complete', label: '', width: '112px' },
+    { key: 'formula', label: 'FORMULA', width: '150px' },
     { key: 'vessel', label: 'VESSEL', width: '120px' },
     { key: 'qty', label: 'QTY', width: '80px' },
     { key: 'vesselType', label: 'VESSEL TYPE', width: '120px' },
@@ -456,6 +600,54 @@ const FormulaCheckTable = ({
         border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
         overflow: 'hidden',
       }}>
+        {/* Bulk Action Bar (Admin only, shown when items are selected) */}
+        {isAdmin && bulkSelectedRows.size > 0 && (
+          <div style={{
+            backgroundColor: isDarkMode ? '#374151' : '#F3F4F6',
+            borderBottom: isDarkMode ? '1px solid #4B5563' : '1px solid #E5E7EB',
+            padding: '12px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}>
+            <span style={{
+              fontSize: '14px',
+              fontWeight: 500,
+              color: isDarkMode ? '#E5E7EB' : '#374151',
+            }}>
+              {bulkSelectedRows.size} {bulkSelectedRows.size === 1 ? 'formula' : 'formulas'} selected
+            </span>
+            <button
+              type="button"
+              onClick={handleBulkComplete}
+              disabled={loading}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: '#10B981',
+                color: '#FFFFFF',
+                fontSize: '14px',
+                fontWeight: 500,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.6 : 1,
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                if (!loading) {
+                  e.currentTarget.style.backgroundColor = '#059669';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!loading) {
+                  e.currentTarget.style.backgroundColor = '#10B981';
+                }
+              }}
+            >
+              Complete Selected
+            </button>
+          </div>
+        )}
         {/* Table Container */}
         <div style={{ overflowX: 'auto' }}>
         <table style={{
@@ -469,27 +661,53 @@ const FormulaCheckTable = ({
               borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
               height: '40px',
             }}>
-              {columns.map((column) => (
+              {columns.map((column) => {
+                const isActive = hasActiveFilter(column.key);
+                const isDropdownOpen = openFilterColumn === column.key;
+                const shouldShowIcon = isActive || isDropdownOpen;
+                
+                return (
                 <th
                   key={column.key}
                   className="group"
                   style={{
-                    padding: column.key === 'checkbox' ? '0 8px' : '0 16px',
-                    textAlign: column.key === 'checkbox' ? 'center' : 'left',
+                    padding: column.key === 'checkbox' || column.key === 'complete' ? '0 8px' : '0 16px',
+                    textAlign: column.key === 'checkbox' || column.key === 'complete' ? 'center' : 'left',
                     fontSize: '11px',
                     fontWeight: 600,
-                    color: '#9CA3AF',
+                    color: isActive ? '#3B82F6' : '#9CA3AF',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
                     width: column.width,
                     whiteSpace: 'nowrap',
-                    borderRight: column.key === 'checkbox' ? 'none' : '1px solid #FFFFFF',
+                    borderRight: column.key === 'checkbox' || column.key === 'complete' ? 'none' : '1px solid #FFFFFF',
                     height: '40px',
-                    cursor: column.key !== 'checkbox' ? 'pointer' : 'default',
+                    cursor: column.key !== 'checkbox' && column.key !== 'complete' ? 'pointer' : 'default',
                     position: 'relative',
+                    backgroundColor: isActive ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
                   }}
                 >
                   {column.key === 'checkbox' ? (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={areAllRowsSelected()}
+                        onChange={(e) => handleSelectAll(e.target.checked)}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          width: '16px',
+                          height: '16px',
+                          cursor: 'pointer',
+                          accentColor: '#3B82F6',
+                        }}
+                        title="Select all rows"
+                      />
+                    </div>
+                  ) : column.key === 'complete' ? (
                     column.label
                   ) : (
                     <div style={{
@@ -498,20 +716,31 @@ const FormulaCheckTable = ({
                       justifyContent: 'space-between',
                       gap: '8px',
                     }}>
-                      <span>{column.label}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {column.label}
+                        {isActive && (
+                          <span style={{ 
+                            display: 'inline-block',
+                            width: '6px', 
+                            height: '6px', 
+                            borderRadius: '50%', 
+                            backgroundColor: '#10B981',
+                          }} />
+                        )}
+                      </span>
                       {column.key !== 'notes' && (
                         <img
                           ref={(el) => { if (el) filterIconRefs.current[column.key] = el; }}
                           src="/assets/Vector (1).png"
                           alt="Filter"
                           className="transition-opacity"
-                          data-filter-open={openFilterColumn === column.key ? 'true' : 'false'}
+                          data-filter-open={isDropdownOpen ? 'true' : 'false'}
                           style={{
                             width: '12px',
                             height: '12px',
                             cursor: 'pointer',
-                            opacity: openFilterColumn === column.key ? 1 : 0,
-                            filter: openFilterColumn === column.key
+                            opacity: shouldShowIcon ? 1 : 0,
+                            filter: shouldShowIcon
                               ? 'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)'
                               : undefined,
                           }}
@@ -519,11 +748,11 @@ const FormulaCheckTable = ({
                             e.currentTarget.style.opacity = '1';
                           }}
                           onMouseLeave={(e) => {
-                            // Keep visible if dropdown is open for this column
-                            if (openFilterColumn !== column.key) {
-                              e.currentTarget.style.opacity = '0';
-                            } else {
+                            // Keep visible if dropdown is open or filter is active
+                            if (shouldShowIcon) {
                               e.currentTarget.style.opacity = '1';
+                            } else {
+                              e.currentTarget.style.opacity = '0';
                             }
                           }}
                           onClick={(e) => {
@@ -535,7 +764,8 @@ const FormulaCheckTable = ({
                     </div>
                   )}
                 </th>
-              ))}
+                );
+              })}
             </tr>
           </thead>
 
@@ -597,15 +827,115 @@ const FormulaCheckTable = ({
                 }}>
                   <input
                     type="checkbox"
-                    checked={selectedRows.has(formula.id)}
-                    onChange={() => handleCheckboxChange(formula.id)}
+                    checked={isAdmin ? bulkSelectedRows.has(formula.id) : selectedRows.has(formula.id)}
+                    onChange={() => {
+                      if (isAdmin) {
+                        handleBulkCheckboxChange(formula.id);
+                      } else {
+                        handleCheckboxChange(formula.id);
+                      }
+                    }}
+                    onClick={(e) => e.stopPropagation()}
                     style={{
                       width: '16px',
                       height: '16px',
                       cursor: 'pointer',
-                      accentColor: hasNote ? '#F59E0B' : undefined, // turn orange when a comment/note exists
+                      accentColor: hasNote ? '#F59E0B' : '#3B82F6',
                     }}
+                    title={isAdmin ? "Select for bulk action" : "Check to mark as complete"}
                   />
+                </td>
+                <td style={{
+                  padding: '0 8px',
+                  textAlign: 'center',
+                  height: '40px',
+                }}>
+                  {(() => {
+                    const isCompleted = formula.isChecked; // Use backend completion status, not checkbox selection
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => handleCompleteClick(formula.id)}
+                        className="done-badge-btn"
+                        style={{
+                          height: '24px',
+                          width: '96px',
+                          padding: '0 12px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          backgroundColor: isCompleted ? '#10B981' : '#3B82F6',
+                          color: '#FFFFFF',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          letterSpacing: '0.025em',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '10px',
+                          whiteSpace: 'nowrap',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                          position: 'relative',
+                        }}
+                        onMouseEnter={(e) => {
+                          const baseColor = isCompleted ? '#059669' : '#2563EB';
+                          e.currentTarget.style.backgroundColor = baseColor;
+                          e.currentTarget.style.transform = 'scale(1.02)';
+                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+                          // Show edit icon
+                          const icon = e.currentTarget.querySelector('.edit-icon');
+                          if (icon) icon.style.opacity = '1';
+                        }}
+                        onMouseLeave={(e) => {
+                          const baseColor = isCompleted ? '#10B981' : '#3B82F6';
+                          e.currentTarget.style.backgroundColor = baseColor;
+                          e.currentTarget.style.transform = 'scale(1)';
+                          e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
+                          // Hide edit icon
+                          const icon = e.currentTarget.querySelector('.edit-icon');
+                          if (icon) icon.style.opacity = '0';
+                        }}
+                        title={isCompleted ? "Click to edit" : "Click to complete"}
+                      >
+                        {isCompleted ? (
+                          <>
+                            <svg 
+                              width="12" 
+                              height="12" 
+                              viewBox="0 0 24 24" 
+                              fill="none" 
+                              stroke="currentColor" 
+                              strokeWidth="2.5"
+                              style={{ marginRight: '-2px' }}
+                            >
+                              <polyline points="20 6 9 17 4 12" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                            <span>Done</span>
+                            <svg 
+                              className="edit-icon"
+                              width="10" 
+                              height="10" 
+                              viewBox="0 0 24 24" 
+                              fill="none" 
+                              stroke="currentColor" 
+                              strokeWidth="2.5"
+                              style={{ 
+                                opacity: 0, 
+                                transition: 'opacity 0.15s ease',
+                                marginLeft: '2px',
+                              }}
+                            >
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </>
+                        ) : (
+                          <span>Complete</span>
+                        )}
+                      </button>
+                    );
+                  })()}
                 </td>
                 <td style={{
                   padding: '0 16px',

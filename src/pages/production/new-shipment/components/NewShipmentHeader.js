@@ -21,6 +21,7 @@ const NewShipmentHeader = ({
   hideActionsDropdown = false,
   hasUnresolvedCheckIssues = false,
   productsAddedAfterExport = false,
+  canAccessTab,
 }) => {
   // Stepper logic - determine which tabs are accessible
   // Workflow: Add Products → (Label Check & Formula Check in any order) → Book Shipment → Sort Products → Sort Formulas
@@ -937,7 +938,14 @@ const NewShipmentHeader = ({
       }}>
         <button
           type="button"
-          onClick={() => onActionChange && onActionChange('add-products')}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const isAccessible = isTabAccessible('add-products') && (!canAccessTab || canAccessTab('add-products'));
+            if (isAccessible && onActionChange && typeof onActionChange === 'function') {
+              onActionChange('add-products');
+            }
+          }}
           style={{
             display: 'flex',
             alignItems: 'center',

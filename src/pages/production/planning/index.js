@@ -222,7 +222,6 @@ const Planning = () => {
         // Helper function to determine step status
         const getStepStatus = (completed, currentStepStatus, workflowStatus, hasComment) => {
           // If completed, always show as completed (handle both boolean true and string "true")
-          // This check MUST come first to ensure completed status takes priority
           // Also handle PostgreSQL boolean which might come as True/False
           const isCompleted = completed === true || 
                               completed === 'true' || 
@@ -231,12 +230,28 @@ const Planning = () => {
                               completed === '1' ||
                               (typeof completed === 'string' && completed.toLowerCase() === 'true');
           
+          // Check for explicit incompleteness (has comment AND completed is explicitly false)
+          // This check MUST come first - if a user marked it incomplete, respect that
+          const isExplicitlyIncomplete = completed === false || 
+                                         completed === 'false' || 
+                                         completed === 'False' ||
+                                         completed === 0 ||
+                                         completed === '0' ||
+                                         (typeof completed === 'string' && completed.toLowerCase() === 'false');
+          
+          // If has comment and explicitly marked incomplete, it's incomplete regardless of workflow
+          if (hasComment && isExplicitlyIncomplete) {
+            return 'incomplete';
+          }
+          
+          // If explicitly completed in database, return completed
           if (isCompleted) {
             return 'completed';
           }
           
           // If workflow has moved past this step, it's implicitly completed
           // (workflow can't progress without completing previous steps)
+          // BUT only if it wasn't explicitly marked as incomplete
           if (workflowStatus) {
             const workflowSteps = ['add_products', 'label_check', 'formula_check', 'book_shipment', 'sort_products', 'sort_formulas'];
             const currentStepIndex = workflowSteps.indexOf(currentStepStatus);
@@ -245,19 +260,14 @@ const Planning = () => {
             // If workflow has moved past this step, it means it was completed
             // (even if the flag wasn't set correctly in the database)
             if (currentStepIndex >= 0 && workflowStepIndex > currentStepIndex) {
-              // Only return 'completed' if there's no comment (comments indicate incomplete)
-              if (!hasComment) {
-                return 'completed';
-              } else {
-                return 'incomplete'; // Has comment, so it was marked incomplete
-              }
+              return 'completed';
             }
           }
           
           // If workflow is currently on this step, show as in progress
           if (workflowStatus && workflowStatus === currentStepStatus) return 'in progress';
           
-          // If has comment, it's incomplete
+          // If has comment but not explicitly marked (shouldn't happen, but handle it)
           if (hasComment) return 'incomplete';
           
           // Otherwise, it's pending
@@ -268,10 +278,10 @@ const Planning = () => {
         const formulaCheckStatus = getStepStatus(shipment.formula_check_completed, 'formula_check', shipment.status, hasFormulaComment);
         const labelCheckStatus = getStepStatus(shipment.label_check_completed, 'label_check', shipment.status, hasLabelComment);
         
-        // Only show comment icon if step is NOT completed (comments should be cleared when completed)
-        // If status is 'completed', don't show comment even if it exists in DB (it should have been cleared)
-        const showFormulaComment = hasFormulaComment && formulaCheckStatus !== 'completed';
-        const showLabelComment = hasLabelComment && labelCheckStatus !== 'completed';
+        // Show comment icon if there's a comment (even if status is completed, comments can still exist)
+        // Comments are now preserved when completing with a comment, so show them regardless of status
+        const showFormulaComment = hasFormulaComment;
+        const showLabelComment = hasLabelComment;
         
         return {
         id: shipment.id,
@@ -310,10 +320,8 @@ const Planning = () => {
   };
 
   const handleStatusCommentClick = (row, statusFieldName) => {
-    // Don't show modal if status is completed
-    if (row[statusFieldName] === 'completed') {
-      return;
-    }
+    // Allow opening modal for any status (completed statuses will navigate via onStatusClick instead)
+    // This allows viewing/editing comments even if status changed
     setStatusCommentRow(row);
     setStatusCommentField(statusFieldName);
     setIsStatusCommentOpen(true);
@@ -354,13 +362,26 @@ const Planning = () => {
         return;
       }
 
+      // Map field names to their dedicated comment columns
+      const commentFieldMap = {
+        'addProducts': 'add_products_comment',
+        'formulaCheck': 'formula_check_comment',
+        'labelCheck': 'label_check_comment',
+        'bookShipment': 'book_shipment_comment',
+        'sortProducts': 'sort_products_comment',
+        'sortFormulas': 'sort_formulas_comment',
+      };
+
       const updateData = {
         [backendField]: false, // Mark as incomplete since comment was added
       };
       
-      // Add comment to notes if provided
+      // Add comment to dedicated comment column if provided
       if (commentText.trim()) {
-        updateData.notes = commentText.trim();
+        const commentField = commentFieldMap[fieldName];
+        if (commentField) {
+          updateData[commentField] = commentText.trim();
+        }
       }
 
       // Update shipment in backend
@@ -866,6 +887,17 @@ const Planning = () => {
     }
   };
 
+  const handleUpdateShipment = async (shipmentId, updates) => {
+    try {
+      await updateShipment(shipmentId, updates);
+      // Refresh the shipments list after update
+      await fetchShipments();
+    } catch (error) {
+      console.error('Error updating shipment:', error);
+      alert('Failed to update shipment. Please try again.');
+    }
+  };
+
   return (
     <div className={`min-h-screen ${themeClasses.pageBg}`}>
       <PlanningHeader
@@ -894,6 +926,7 @@ const Planning = () => {
         onComplete={handleStatusCommentComplete}
         isDarkMode={isDarkMode}
         statusFieldName={statusCommentField}
+        existingComment={statusCommentRow && statusCommentField ? statusCommentRow[`${statusCommentField}CommentText`] || '' : ''}
       />
 
       {/* Content */}
@@ -913,6 +946,7 @@ const Planning = () => {
                 onStatusCommentClick={handleStatusCommentClick}
                 onStatusClick={handleStatusClick}
                 onDeleteRow={handleDeleteRow}
+                onUpdateShipment={handleUpdateShipment}
               />
             )}
           </>

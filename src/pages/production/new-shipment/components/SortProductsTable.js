@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 import SortProductsFilterDropdown from './SortProductsFilterDropdown';
+import { showInfoToast } from '../../../../utils/notifications';
 
 const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipmentId = null }) => {
   const { isDarkMode } = useTheme();
@@ -10,6 +11,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
   const [lockedProductIds, setLockedProductIds] = useState(() => new Set());
   const [openFilterColumns, setOpenFilterColumns] = useState(() => new Set());
   const filterIconRefs = useRef({});
+  const filterDropdownRefs = useRef({}); // Store refs to dropdown DOM elements
   const tableContainerRef = useRef(null);
   const [filters, setFilters] = useState({});
   // sortConfig is now an array of sort objects: [{column: 'size', order: 'asc'}, {column: 'formula', order: 'asc'}]
@@ -27,6 +29,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [firstBatchQty, setFirstBatchQty] = useState(1);
   const splitsLoadedRef = useRef(null); // Track which shipmentId we've loaded splits for
+  const isUndoingSplitRef = useRef(false); // Flag to prevent reloading splits during undo
 
   // Transform shipment products into table format
   const [products, setProducts] = useState([]);
@@ -42,6 +45,24 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
   const getProductIdentifier = (product) => {
     const baseIdentifier = `${product.brand || ''}::${product.product || ''}::${product.size || ''}`;
     return product.splitTag ? `${baseIdentifier}::${product.splitTag}` : baseIdentifier;
+  };
+
+  // Helper function to get the increment step based on product size
+  // Returns the step value for the number input (e.g., 4 for Gallons, 12 for Quarts, 60 for 8oz, 1 for others)
+  const getIncrementStep = (size) => {
+    if (!size) return 1;
+    const sizeLower = (size || '').toLowerCase();
+    if (sizeLower.includes('gallon') && !sizeLower.includes('5')) {
+      return 4; // Gallons increment by 4
+    }
+    if (sizeLower.includes('quart') || sizeLower.includes('32oz') || sizeLower === '32 oz') {
+      return 12; // Quarts increment by 12
+    }
+    if (sizeLower.includes('8oz') || sizeLower.includes('8 oz')) {
+      return 60; // 8oz increment by 60
+    }
+    // For other sizes, increment by 1
+    return 1;
   };
 
   // Save product order to localStorage
@@ -77,6 +98,12 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
 
   // Update products when shipmentProducts prop changes
   useEffect(() => {
+    // Don't reload if we're in the middle of undoing a split
+    if (isUndoingSplitRef.current) {
+      isUndoingSplitRef.current = false;
+      return;
+    }
+    
     if (shipmentProducts && shipmentProducts.length > 0) {
       const transformedProducts = shipmentProducts.map((product, index) => ({
         id: product.id || product.catalogId || product.catalog_id || `product_${index}`,
@@ -175,13 +202,15 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                   
                   // Create all split products
                   const splitProducts = [];
+                  const totalBatches = 2 + additionalBatches.length;
                   
                   // First batch
                   splitProducts.push({
                     ...templateProduct,
                     id: `${baseIdForSplits}_split_1`,
                     qty: firstBatch.qty,
-                    splitTag: '1/2',
+                    volume: firstBatch.volume !== undefined ? firstBatch.volume : templateProduct.volume,
+                    splitTag: firstBatch.splitTag || `1/${totalBatches}`,
                     originalId: baseIdForSplits,
                   });
                   
@@ -190,18 +219,19 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                     ...templateProduct,
                     id: `${baseIdForSplits}_split_2`,
                     qty: secondBatch.qty,
-                    splitTag: '2/2',
+                    volume: secondBatch.volume !== undefined ? secondBatch.volume : templateProduct.volume,
+                    splitTag: secondBatch.splitTag || `2/${totalBatches}`,
                     originalId: baseIdForSplits,
                   });
                   
                   // Additional batches (for multiple splits)
                   additionalBatches.forEach((batch, idx) => {
-                    const totalBatches = 2 + additionalBatches.length;
                     splitProducts.push({
                       ...templateProduct,
                       id: `${baseIdForSplits}_split_${idx + 3}`,
                       qty: batch.qty,
-                      splitTag: `${idx + 3}/${totalBatches}`,
+                      volume: batch.volume !== undefined ? batch.volume : templateProduct.volume,
+                      splitTag: batch.splitTag || `${idx + 3}/${totalBatches}`,
                       originalId: baseIdForSplits,
                     });
                   });
@@ -469,12 +499,15 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
       if (openFilterColumns.size > 0) {
         // Check if click is on any filter icon
         const clickedOnFilterIcon = Object.values(filterIconRefs.current).some(ref => 
-          ref && ref.contains(event.target)
+          ref && ref.contains && ref.contains(event.target)
         );
         
-        // Check if click is inside any dropdown (they use portals, so we check by class or data attribute)
-        // Since dropdowns are portals, we need to check if the click target is within a dropdown
-        const clickedInsideDropdown = event.target.closest('[data-filter-dropdown]');
+        // Check if click is inside any dropdown (by attribute or ref)
+        const clickedInsideDropdown = 
+          event.target.closest('[data-filter-dropdown]') ||
+          Object.values(filterDropdownRefs.current).some(ref => 
+            ref && ref.contains && ref.contains(event.target)
+          );
         
         if (!clickedOnFilterIcon && !clickedInsideDropdown) {
           setOpenFilterColumns(new Set());
@@ -483,13 +516,11 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     };
 
     if (openFilterColumns.size > 0) {
-      const timeoutId = setTimeout(() => {
-        document.addEventListener('click', handleClickOutside);
-      }, 0);
+      // Use mousedown with capture phase to catch clicks early
+      document.addEventListener('mousedown', handleClickOutside, true);
       
       return () => {
-        clearTimeout(timeoutId);
-        document.removeEventListener('click', handleClickOutside);
+        document.removeEventListener('mousedown', handleClickOutside, true);
       };
     }
   }, [openFilterColumns]);
@@ -512,6 +543,13 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
       return () => {
         document.removeEventListener('mousedown', handleClickOutside);
       };
+    }
+  }, [openMenuIndex]);
+
+  // Close filters when menu opens
+  useEffect(() => {
+    if (openMenuIndex !== null && openFilterColumns.size > 0) {
+      setOpenFilterColumns(new Set());
     }
   }, [openMenuIndex]);
 
@@ -551,7 +589,6 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     { key: 'size', label: 'SIZE', width: '100px' },
     { key: 'qty', label: 'QTY', width: '80px' },
     { key: 'formula', label: 'FORMULA', width: '180px' },
-    { key: 'volume', label: 'VOLUME', width: '100px' },
     { key: 'productType', label: 'TYPE', width: '100px' },
     { key: 'notes', label: 'NOTES', width: '80px' },
     { key: 'menu', label: '', width: '50px' },
@@ -665,24 +702,318 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     if (isMultiDrag) {
       // Multi-drag: move all selected items
       const sortedSelectedIndices = Array.from(selectedIndices).sort((a, b) => a - b);
-      const draggedItems = sortedSelectedIndices.map(idx => filteredList[idx]);
       
-      // Find drop item in original products array
-      const dropOriginalIndex = products.findIndex(p => p.id === dropItem.id);
+      // Step 1: Collect all selected item IDs from the filtered list
+      // This preserves the visual order of selection
+      const selectedItemIds = [];
+      const selectedItemIdsSet = new Set();
+      const selectedItemsFromFiltered = []; // Store the actual items for fallback
       
-      const newProducts = [...products];
-      
-      // Remove all dragged items (in reverse order to maintain indices)
-      const draggedOriginalIndices = draggedItems.map(item => 
-        products.findIndex(p => p.id === item.id)
-      ).sort((a, b) => b - a); // Sort descending to remove from end first
-      
-      draggedOriginalIndices.forEach(originalIdx => {
-        newProducts.splice(originalIdx, 1);
+      sortedSelectedIndices.forEach(idx => {
+        if (idx >= 0 && idx < filteredList.length) {
+          const item = filteredList[idx];
+          if (item) {
+            selectedItemsFromFiltered.push(item); // Always store the item
+            if (item.id) {
+              // Track unique IDs
+              if (!selectedItemIdsSet.has(item.id)) {
+                selectedItemIds.push(item.id);
+                selectedItemIdsSet.add(item.id);
+              } else {
+                // If we've seen this ID before, still add it to handle potential duplicates
+                console.warn('Duplicate ID found in selection:', item.id, 'at index:', idx);
+                selectedItemIds.push(item.id);
+              }
+            } else {
+              console.warn('Selected item has no ID at index:', idx, 'item:', item);
+            }
+          } else {
+            console.warn('Selected item is null/undefined at index:', idx);
+          }
+        } else {
+          console.warn('Selected index out of bounds:', idx, 'filteredList length:', filteredList.length, 'selectedIndices:', Array.from(selectedIndices));
+        }
       });
+      
+      // Ensure we have the same number of items as selected indices
+      if (selectedItemsFromFiltered.length !== selectedIndices.size) {
+        console.error('Mismatch in selected items from filtered list:', {
+          selectedIndicesCount: selectedIndices.size,
+          collectedItemsCount: selectedItemsFromFiltered.length,
+          sortedSelectedIndices: sortedSelectedIndices,
+          filteredListLength: filteredList.length
+        });
+      }
+      
+      // Step 2: Get the actual product objects from the original products array
+      // Use selectedItemsFromFiltered directly to ensure we get ALL items in the correct order
+      const draggedItems = [];
+      const draggedItemIds = new Set();
+      const usedProductRefs = new Set(); // Track actual product object references to avoid duplicates
+      
+      // Match each selected item from filtered list to products array
+      // This ensures we get all items even if there are edge cases with IDs
+      selectedItemsFromFiltered.forEach((filteredItem, idx) => {
+        // First, try to find by ID
+        let matchingProduct = null;
+        
+        if (filteredItem.id) {
+          matchingProduct = products.find(p => 
+            !usedProductRefs.has(p) && 
+            p.id === filteredItem.id
+          );
+        }
+        
+        // If not found by ID, try matching by all properties (for edge cases)
+        if (!matchingProduct) {
+          matchingProduct = products.find(p => 
+            !usedProductRefs.has(p) &&
+            p.brand === filteredItem.brand && 
+            p.product === filteredItem.product && 
+            p.size === filteredItem.size &&
+            p.formula === filteredItem.formula &&
+            (p.splitTag || '') === (filteredItem.splitTag || '') &&
+            p.qty === filteredItem.qty
+          );
+        }
+        
+        // If still not found, try matching by stable identifier (brand + product + size + splitTag)
+        if (!matchingProduct && filteredItem.id) {
+          // Try to find by stable identifier as last resort
+          const stableId = `${filteredItem.brand || ''}::${filteredItem.product || ''}::${filteredItem.size || ''}${filteredItem.splitTag ? `::${filteredItem.splitTag}` : ''}`;
+          matchingProduct = products.find(p => {
+            if (usedProductRefs.has(p)) return false;
+            const pStableId = `${p.brand || ''}::${p.product || ''}::${p.size || ''}${p.splitTag ? `::${p.splitTag}` : ''}`;
+            return pStableId === stableId && p.qty === filteredItem.qty;
+          });
+        }
+        
+        if (matchingProduct) {
+          draggedItems.push(matchingProduct);
+          if (matchingProduct.id) {
+            draggedItemIds.add(matchingProduct.id);
+          }
+          usedProductRefs.add(matchingProduct);
+        } else {
+          console.error('Could not find matching product for filtered item:', {
+            index: idx,
+            filteredItem: {
+              id: filteredItem.id,
+              brand: filteredItem.brand,
+              product: filteredItem.product,
+              size: filteredItem.size,
+              splitTag: filteredItem.splitTag,
+              qty: filteredItem.qty
+            },
+            availableProducts: products.slice(0, 10).map(p => ({
+              id: p.id,
+              brand: p.brand,
+              product: p.product,
+              size: p.size,
+              splitTag: p.splitTag,
+              qty: p.qty
+            }))
+          });
+        }
+      });
+      
+      // Validate we have all items
+      if (draggedItems.length !== selectedIndices.size) {
+        console.error('Mismatch in dragged items count:', {
+          selectedIndicesCount: selectedIndices.size,
+          draggedItemsCount: draggedItems.length,
+          selectedItemsFromFilteredCount: selectedItemsFromFiltered.length,
+          draggedItemIds: Array.from(draggedItemIds),
+          draggedItems: draggedItems.map(d => ({ id: d.id, product: d.product, size: d.size, splitTag: d.splitTag, qty: d.qty }))
+        });
+        
+        // If we're missing items, try one more time with a more aggressive matching
+        if (draggedItems.length < selectedItemsFromFiltered.length) {
+          console.warn('Attempting aggressive recovery of missing items...');
+          const missingCount = selectedItemsFromFiltered.length - draggedItems.length;
+          let recovered = 0;
+          
+          selectedItemsFromFiltered.forEach(filteredItem => {
+            // Check if we already have this item
+            const alreadyHave = draggedItems.some(d => 
+              d === filteredItem || // Same object reference
+              (d.id && filteredItem.id && d.id === filteredItem.id) || // Same ID
+              (d.brand === filteredItem.brand && 
+               d.product === filteredItem.product && 
+               d.size === filteredItem.size &&
+               d.formula === filteredItem.formula &&
+               (d.splitTag || '') === (filteredItem.splitTag || '') &&
+               d.qty === filteredItem.qty) // Same properties
+            );
+            
+            if (!alreadyHave) {
+              // Try to find ANY product that matches, even if already used
+              const anyMatch = products.find(p => 
+                (p.id && filteredItem.id && p.id === filteredItem.id) ||
+                (p.brand === filteredItem.brand && 
+                 p.product === filteredItem.product && 
+                 p.size === filteredItem.size &&
+                 p.formula === filteredItem.formula &&
+                 (p.splitTag || '') === (filteredItem.splitTag || '') &&
+                 p.qty === filteredItem.qty)
+              );
+              
+              if (anyMatch && !draggedItems.some(d => d === anyMatch)) {
+                draggedItems.push(anyMatch);
+                if (anyMatch.id) {
+                  draggedItemIds.add(anyMatch.id);
+                }
+                usedProductRefs.add(anyMatch);
+                recovered++;
+                console.log('Aggressively recovered item:', anyMatch.id || 'no-id', anyMatch.product);
+              }
+            }
+          });
+          
+          if (recovered > 0) {
+            console.log(`Recovered ${recovered} missing item(s)`);
+          }
+        }
+      }
+      
+      // Final validation - if we still don't have all items, abort but log details
+      if (draggedItems.length === 0) {
+        console.error('No items to drag in multi-drag operation - aborting');
+        setDraggedIndex(null);
+        setDragOverIndex(null);
+        setDropPosition(null);
+        return;
+      }
+      
+      // If we're still missing items, log warning but proceed with what we have
+      if (draggedItems.length < selectedIndices.size) {
+        console.warn(`Proceeding with ${draggedItems.length} items out of ${selectedIndices.size} selected`);
+      }
+      
+      // Ensure ALL dragged items have their IDs in draggedItemIds set
+      // This is critical for proper removal
+      draggedItems.forEach(item => {
+        if (item && item.id) {
+          draggedItemIds.add(item.id);
+        } else {
+          console.warn('Dragged item has no ID:', item);
+        }
+      });
+      
+      // Create a set of all dragged item IDs for removal
+      // Also track by object reference as a fallback for items without IDs
+      const draggedItemIdsForRemoval = new Set(draggedItemIds);
+      const draggedItemRefs = new Set(draggedItems);
+      
+      // Check if drop item is one of the selected items BEFORE removing (shouldn't happen, but handle it)
+      if (draggedItemIdsForRemoval.has(dropItem.id)) {
+        // If dropping on a selected item, don't move anything
+        setDraggedIndex(null);
+        setDragOverIndex(null);
+        setDropPosition(null);
+        return;
+      }
+      
+      // Create new products array and remove all dragged items
+      // Remove by ID first, then by object reference as fallback for items without IDs
+      const newProducts = products.filter(p => {
+        // Remove if ID matches
+        if (p.id && draggedItemIdsForRemoval.has(p.id)) {
+          return false;
+        }
+        // Remove if it's the same object reference (fallback for items without IDs)
+        if (draggedItemRefs.has(p)) {
+          return false;
+        }
+        return true;
+      });
+      
+      // Verify we removed the correct number of items
+      const removedCount = products.length - newProducts.length;
+      if (removedCount !== draggedItems.length) {
+        console.error('Mismatch in removed items - some items may be duplicated!', {
+          expected: draggedItems.length,
+          removed: removedCount,
+          draggedItemIds: Array.from(draggedItemIdsForRemoval),
+          draggedItems: draggedItems.map(d => ({ id: d.id, product: d.product, size: d.size, splitTag: d.splitTag, qty: d.qty })),
+          originalProductsCount: products.length,
+          newProductsCount: newProducts.length,
+          productsBeforeRemoval: products.map(p => ({ id: p.id, product: p.product, size: p.size, splitTag: p.splitTag, qty: p.qty })),
+          productsAfterRemoval: newProducts.map(p => ({ id: p.id, product: p.product, size: p.size, splitTag: p.splitTag, qty: p.qty }))
+        });
+        
+        // If we didn't remove all items, try to identify which ones weren't removed
+        const notRemoved = draggedItems.filter(item => {
+          const stillExists = newProducts.some(p => 
+            p === item || // Same object reference (most reliable)
+            (p.id && item.id && p.id === item.id) || // Same ID
+            (p.brand === item.brand && 
+             p.product === item.product && 
+             p.size === item.size &&
+             p.formula === item.formula &&
+             (p.splitTag || '') === (item.splitTag || '') &&
+             p.qty === item.qty) // Same properties
+          );
+          return stillExists;
+        });
+        
+        if (notRemoved.length > 0) {
+          console.error('Items that were NOT removed - forcing removal:', notRemoved.map(item => ({ id: item.id, product: item.product, size: item.size, splitTag: item.splitTag, qty: item.qty })));
+          
+          // Force remove them - check by object reference first, then by ID, then by properties
+          notRemoved.forEach(item => {
+            let removed = false;
+            
+            // Try to remove by object reference first (most reliable)
+            const indexByRef = newProducts.findIndex(p => p === item);
+            if (indexByRef !== -1) {
+              newProducts.splice(indexByRef, 1);
+              removed = true;
+              console.log('Force removed item by reference:', item.id, item.product);
+            } else if (item.id) {
+              // Try to remove by ID
+              const indexById = newProducts.findIndex(p => p.id === item.id);
+              if (indexById !== -1) {
+                newProducts.splice(indexById, 1);
+                removed = true;
+                console.log('Force removed item by ID:', item.id, item.product);
+              } else {
+                // Try to remove by properties as last resort
+                const indexByProps = newProducts.findIndex(p => 
+                  p.brand === item.brand && 
+                  p.product === item.product && 
+                  p.size === item.size &&
+                  p.formula === item.formula &&
+                  (p.splitTag || '') === (item.splitTag || '') &&
+                  p.qty === item.qty
+                );
+                if (indexByProps !== -1) {
+                  newProducts.splice(indexByProps, 1);
+                  removed = true;
+                  console.log('Force removed item by properties:', item.id, item.product);
+                }
+              }
+            }
+            
+            if (!removed) {
+              console.error('Could not remove item even with force removal:', item);
+            }
+          });
+          
+          // Verify removal was successful
+          const finalRemovedCount = products.length - newProducts.length;
+          console.log('Final removed count after force removal:', finalRemovedCount, 'expected:', draggedItems.length);
+        }
+      }
       
       // Find new position after removal
       let newDropIndex = newProducts.findIndex(p => p.id === dropItem.id);
+      
+      // If drop item not found (shouldn't happen, but handle it)
+      if (newDropIndex === -1) {
+        // Insert at the end
+        newDropIndex = newProducts.length;
+      }
       
       // Use drop position to determine insert index
       let insertIndex;
@@ -693,25 +1024,135 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
         insertIndex = newDropIndex + 1;
       }
       
+      // Ensure insertIndex is within bounds
+      insertIndex = Math.max(0, Math.min(insertIndex, newProducts.length));
+      
+      // Final verification: ensure none of the dragged items are already in newProducts
+      // Check by both ID and object reference to catch any duplicates
+      const existingIds = new Set(newProducts.map(p => p && p.id ? p.id : null).filter(Boolean));
+      const existingRefs = new Set(newProducts);
+      
+      const itemsToInsert = draggedItems.filter(item => {
+        // Don't insert if it's already in the array (by reference or ID)
+        if (existingRefs.has(item)) {
+          return false;
+        }
+        if (item.id && existingIds.has(item.id)) {
+          // Double check - maybe the ID exists but it's a different object
+          const existingById = newProducts.find(p => p && p.id === item.id);
+          if (existingById === item) {
+            return false; // Same object, don't insert
+          }
+          // Different object with same ID - log warning but still insert
+          console.warn('Different object with same ID found, will insert anyway:', item.id);
+        }
+        return true;
+      });
+      
+      if (itemsToInsert.length !== draggedItems.length) {
+        const skippedItems = draggedItems.filter(item => {
+          return existingRefs.has(item) || (item.id && existingIds.has(item.id) && newProducts.find(p => p && p.id === item.id) === item);
+        });
+        
+        console.warn('Some dragged items already exist in new array (skipping insertion):', {
+          expected: draggedItems.length,
+          toInsert: itemsToInsert.length,
+          skipped: skippedItems.length,
+          skippedItems: skippedItems.map(item => ({ id: item.id, product: item.product, size: item.size, splitTag: item.splitTag, qty: item.qty }))
+        });
+      }
+      
       // Insert all dragged items at the new position
-      newProducts.splice(insertIndex, 0, ...draggedItems);
+      if (itemsToInsert.length > 0) {
+        newProducts.splice(insertIndex, 0, ...itemsToInsert);
+      } else {
+        console.error('No items to insert after filtering duplicates!');
+      }
       
       // Track which items were moved (by ID) to preserve selection
       const movedItemIds = new Set(draggedItems.map(item => item.id));
       
-      // Clear drag states
+      // Final validation: ensure newProducts doesn't contain duplicates
+      // Use both ID and object reference to detect duplicates
+      const finalProductIds = new Set();
+      const finalProductRefs = new Set();
+      const finalProducts = [];
+      const duplicateIds = [];
+      const duplicateRefs = [];
+      
+      newProducts.forEach((product, idx) => {
+        if (!product) {
+          console.warn('Null/undefined product found at index:', idx);
+          return; // Skip null/undefined products
+        }
+        
+        // Check for duplicate by object reference (most reliable)
+        if (finalProductRefs.has(product)) {
+          duplicateRefs.push({ index: idx, id: product.id, product: product.product });
+          console.warn('Duplicate product by reference found, skipping:', product.id, product.product);
+          return; // Skip this duplicate
+        }
+        
+        // Check for duplicate by ID
+        if (product.id && finalProductIds.has(product.id)) {
+          // Check if it's the same object or a different one
+          const existingProduct = finalProducts.find(p => p.id === product.id);
+          if (existingProduct !== product) {
+            // Different object with same ID - this is a duplicate
+            duplicateIds.push({ index: idx, id: product.id, product: product.product });
+            console.warn('Duplicate product by ID found, skipping:', product.id, product.product);
+            return; // Skip this duplicate
+          }
+        }
+        
+        // Add to final arrays
+        if (product.id) {
+          finalProductIds.add(product.id);
+        }
+        finalProductRefs.add(product);
+        finalProducts.push(product);
+      });
+      
+      if (duplicateIds.length > 0 || duplicateRefs.length > 0) {
+        console.error('Found duplicates in newProducts before state update:', {
+          duplicateIds: duplicateIds,
+          duplicateRefs: duplicateRefs,
+          originalCount: newProducts.length,
+          finalCount: finalProducts.length
+        });
+      }
+      
+      // Verify we have the correct number of products
+      const expectedCount = products.length - draggedItems.length + itemsToInsert.length;
+      if (finalProducts.length !== expectedCount) {
+        console.error('Product count mismatch:', {
+          expected: expectedCount,
+          actual: finalProducts.length,
+          originalCount: products.length,
+          draggedItemsCount: draggedItems.length,
+          itemsToInsertCount: itemsToInsert.length
+        });
+      }
+      
+      // Update state immediately to ensure UI reflects changes
+      // Use a new array reference to force React to re-render
+      setProducts([...finalProducts]);
+      saveProductOrder(finalProducts);
+      
+      // Clear drag states after a short delay for smooth animation
       setDragOverIndex(null);
       setDropPosition(null);
       
       setTimeout(() => {
-        setProducts(newProducts);
-        saveProductOrder(newProducts);
         setDraggedIndex(null);
         
         // Update selection to reflect new positions of moved items
-        // Find the new indices of the moved items in the updated products array
+        // Use filteredProducts to get the correct indices in the displayed list
+        // But first, we need to recalculate filteredProducts with the new state
+        // Since state update is async, we'll use the finalProducts we just set
+        const tempFiltered = getFilteredAndSortedProductsForArray(finalProducts);
         const newSelectedIndices = new Set();
-        newProducts.forEach((product, index) => {
+        tempFiltered.forEach((product, index) => {
           if (movedItemIds.has(product.id)) {
             newSelectedIndices.add(index);
           }
@@ -810,14 +1251,24 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
 
   const handleMenuClick = (e, index) => {
     e.stopPropagation();
+    // Close filters when opening a menu
+    if (openFilterColumns.size > 0) {
+      setOpenFilterColumns(new Set());
+    }
     setOpenMenuIndex(openMenuIndex === index ? null : index);
   };
 
   const handleMenuAction = (action, product) => {
     if (action === 'split') {
       setSelectedProduct(product);
-      setFirstBatchQty(1); // Always set first batch to 1
+      // Initialize first batch with the increment step for this product size
+      const step = getIncrementStep(product.size);
+      setFirstBatchQty(step); // Set to the increment step (e.g., 4 for Gallons, 1 for others)
       setIsSplitModalOpen(true);
+    } else if (action === 'undoSplit') {
+      handleUndoSplit(product);
+    } else if (action === 'undoAllSplits') {
+      handleUndoAllSplits(product);
     }
     setOpenMenuIndex(null);
   };
@@ -825,16 +1276,51 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
   const handleCloseSplitModal = () => {
     setIsSplitModalOpen(false);
     setSelectedProduct(null);
+    // Reset to default step when closing
+    if (selectedProduct) {
+      const step = getIncrementStep(selectedProduct.size);
+      setFirstBatchQty(step);
+    } else {
     setFirstBatchQty(1);
+    }
+  };
+
+  const handleFirstBatchQtyChange = (e) => {
+    const newValue = parseFloat(e.target.value) || 0;
+    if (!selectedProduct) return;
+    
+    const originalQty = selectedProduct.qty || 1;
+    const step = getIncrementStep(selectedProduct.size);
+    
+    // Round to nearest step
+    const roundedValue = Math.round(newValue / step) * step;
+    
+    // Ensure value is within valid range (at least step, at most originalQty - step)
+    // But allow it to be up to originalQty if that's what user wants
+    const minValue = step;
+    const maxValue = originalQty;
+    
+    if (roundedValue < minValue) {
+      setFirstBatchQty(minValue);
+    } else if (roundedValue > maxValue) {
+      setFirstBatchQty(maxValue);
+    } else {
+      setFirstBatchQty(roundedValue);
+    }
   };
 
   const handleConfirmSplit = () => {
     if (!selectedProduct) return;
     
-    // First quantity is always 1 unit, second is the remaining quantity
+    // Use the firstBatchQty from state (editable value)
     const originalQty = selectedProduct.qty || 1;
-    const firstBatchQty = 1;
-    const secondBatchQty = originalQty - firstBatchQty;
+    const firstBatchQtyValue = firstBatchQty;
+    const secondBatchQty = originalQty - firstBatchQtyValue;
+    
+    // Validate that first batch is valid
+    if (firstBatchQtyValue <= 0 || firstBatchQtyValue >= originalQty) {
+      return; // Don't proceed if invalid
+    }
     
     // Find the index of the product to split
     const productIndex = products.findIndex(p => p.id === selectedProduct.id);
@@ -845,26 +1331,73 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     // This ensures consistent IDs when restoring splits
     const baseProductId = selectedProduct.originalId || selectedProduct.id;
     
-    // Create two new products from the split
+    // Find the maximum split number currently in use for this base product
+    // This ensures we don't create duplicate IDs when splitting a split product
+    let maxSplitNum = 0;
+    products.forEach(p => {
+      const pOriginalId = p.originalId || p.id;
+      if (pOriginalId === baseProductId && typeof p.id === 'string') {
+        const match = p.id.match(/_split_(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxSplitNum) maxSplitNum = num;
+        }
+      }
+    });
+    
+    // Generate unique split numbers (if no existing splits, start at 1)
+    const firstSplitNum = maxSplitNum > 0 ? maxSplitNum + 1 : 1;
+    const secondSplitNum = firstSplitNum + 1;
+    
+    // Count how many split products will exist after this split
+    const currentSplitCount = products.filter(p => {
+      const pOriginalId = p.originalId || p.id;
+      return pOriginalId === baseProductId && p.splitTag;
+    }).length;
+    // If the product being split has a splitTag, we're replacing 1 with 2
+    // If not, we're adding 2 new splits
+    const totalSplitsAfter = selectedProduct.splitTag 
+      ? currentSplitCount + 1  
+      : currentSplitCount + 2;
+    
+    // Create two new products from the split with unique IDs
     const firstBatch = {
       ...selectedProduct,
-      id: `${baseProductId}_split_1`,
-      qty: firstBatchQty,
-      splitTag: '1/2',
+      id: `${baseProductId}_split_${firstSplitNum}`,
+      qty: firstBatchQtyValue,
+      splitTag: `${firstSplitNum}/${totalSplitsAfter}`,
       originalId: baseProductId,
     };
     
     const secondBatch = {
       ...selectedProduct,
-      id: `${baseProductId}_split_2`,
+      id: `${baseProductId}_split_${secondSplitNum}`,
       qty: secondBatchQty,
-      splitTag: '2/2',
+      splitTag: `${secondSplitNum}/${totalSplitsAfter}`,
       originalId: baseProductId,
     };
     
     // Replace the original product with the two split products
     const newProducts = [...products];
     newProducts.splice(productIndex, 1, firstBatch, secondBatch);
+    
+    // Update splitTags of ALL split products with the same base ID to reflect new total
+    // This ensures all split tags show the correct denominator
+    newProducts.forEach((p, idx) => {
+      const pOriginalId = p.originalId || p.id;
+      if (pOriginalId === baseProductId && p.splitTag && typeof p.id === 'string') {
+        // Extract the split number from the ID
+        const match = p.id.match(/_split_(\d+)$/);
+        if (match) {
+          const splitNum = parseInt(match[1], 10);
+          newProducts[idx] = {
+            ...p,
+            splitTag: `${splitNum}/${totalSplitsAfter}`,
+          };
+        }
+      }
+    });
+    
     setProducts(newProducts);
     saveProductOrder(newProducts);
     
@@ -883,9 +1416,8 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
           ? fullIdentifier.replace(`::${selectedProduct.splitTag}`, '')
           : fullIdentifier;
         
-        // Get all products with this original ID from the new products array (after split)
-        const newProducts = [...products];
-        newProducts.splice(productIndex, 1, firstBatch, secondBatch);
+        // Get all products with this original ID from the updated products array
+        // Note: We use the newProducts array that was already created and modified above
         const productsWithThisId = newProducts.filter(p => {
           // Match by originalId if it exists, otherwise match by id
           const pOriginalId = p.originalId || p.id;
@@ -906,12 +1438,15 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
           );
           
           // Save all split products for this ID
-          // Sort by splitTag to ensure consistent order
+          // Sort by the numeric split number in the ID for consistent order
           const sortedSplitProducts = [...splitProducts].sort((a, b) => {
-            if (a.splitTag && b.splitTag) {
-              return a.splitTag.localeCompare(b.splitTag);
-            }
-            return 0;
+            // Extract split numbers from IDs (e.g., "123_split_3" -> 3)
+            const getNum = (id) => {
+              if (typeof id !== 'string') return 0;
+              const match = id.match(/_split_(\d+)$/);
+              return match ? parseInt(match[1], 10) : 0;
+            };
+            return getNum(a.id) - getNum(b.id);
           });
           
           // Store as batches - if there are 2, store as firstBatch/secondBatch
@@ -923,13 +1458,19 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
               stableIdentifier: stableIdentifier, // Save stable identifier for matching
               firstBatch: {
                 qty: sortedSplitProducts[0].qty,
+                volume: sortedSplitProducts[0].volume,
+                splitTag: sortedSplitProducts[0].splitTag,
               },
               secondBatch: {
                 qty: sortedSplitProducts[1].qty,
+                volume: sortedSplitProducts[1].volume,
+                splitTag: sortedSplitProducts[1].splitTag,
               },
               // Store additional batches if there are more than 2
               additionalBatches: sortedSplitProducts.slice(2).map(p => ({
                 qty: p.qty,
+                volume: p.volume,
+                splitTag: p.splitTag,
               })),
             });
           } else if (sortedSplitProducts.length === 1) {
@@ -939,9 +1480,12 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
               stableIdentifier: stableIdentifier,
               firstBatch: {
                 qty: sortedSplitProducts[0].qty,
+                volume: sortedSplitProducts[0].volume,
+                splitTag: sortedSplitProducts[0].splitTag,
               },
               secondBatch: {
                 qty: 0,
+                volume: 0,
               },
             });
           }
@@ -957,23 +1501,300 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     handleCloseSplitModal();
   };
 
-  // Second batch quantity is always the remaining (total - 1)
-  const secondBatchQty = selectedProduct ? (selectedProduct.qty || 1) - 1 : 0;
+  // Helper function to check if a product has splits (is a parent with split children)
+  // For split items, check if there are other splits with the same originalId
+  // For non-split items, check if there are any split items with this id as originalId
+  const hasSplits = (product) => {
+    if (!product) return false;
+    const originalId = product.originalId || product.id;
+    // Count how many split products share this originalId
+    const splitCount = products.filter(p => {
+      const pOriginalId = p.originalId || p.id;
+      return pOriginalId === originalId && p.splitTag;
+    }).length;
+    return splitCount > 0;
+  };
+
+  // Helper function to get all split products for a given product
+  const getSplitProducts = (product) => {
+    if (!product) return [];
+    const originalId = product.originalId || product.id;
+    return products.filter(p => {
+      const pOriginalId = p.originalId || p.id;
+      return pOriginalId === originalId && p.splitTag;
+    });
+  };
+
+  // Handler for undoing a single split (from a split item)
+  const handleUndoSplit = (splitProduct) => {
+    if (!splitProduct || !splitProduct.splitTag) return;
+    
+    // Get the stable identifier (brand + product + size) without splitTag - this is the key
+    const fullIdentifier = getProductIdentifier(splitProduct);
+    const stableIdentifier = splitProduct.splitTag 
+      ? fullIdentifier.replace(`::${splitProduct.splitTag}`, '')
+      : fullIdentifier;
+    
+    // Find all split products with the same stable identifier (like formulas use formula name)
+    const allSplitProducts = products.filter(p => {
+      if (!p.splitTag) return false;
+      const pFullIdentifier = getProductIdentifier(p);
+      const pStableIdentifier = p.splitTag 
+        ? pFullIdentifier.replace(`::${p.splitTag}`, '')
+        : pFullIdentifier;
+      return pStableIdentifier === stableIdentifier;
+    });
+    
+    if (allSplitProducts.length === 0) return;
+    
+    // Calculate the combined quantity and volume
+    const combinedQty = allSplitProducts.reduce((sum, p) => sum + (p.qty || 0), 0);
+    const combinedVolume = allSplitProducts.reduce((sum, p) => sum + (p.volume || 0), 0);
+    
+    // Find the first split product to use as template
+    const templateProduct = allSplitProducts[0];
+    const originalId = templateProduct.originalId || templateProduct.id.replace(/_split_\d+$/, '');
+    
+    // Create the merged product (remove splitTag and originalId)
+    const mergedProduct = {
+      ...templateProduct,
+      id: originalId,
+      qty: combinedQty,
+      volume: Math.round(combinedVolume * 100) / 100,
+      splitTag: undefined,
+      originalId: undefined,
+    };
+    
+    // Remove all split products with this stable identifier (simple filter like formulas)
+    const newProducts = products.filter(p => {
+      if (!p.splitTag) return true; // Keep all non-split products
+      const pFullIdentifier = getProductIdentifier(p);
+      const pStableIdentifier = p.splitTag 
+        ? pFullIdentifier.replace(`::${p.splitTag}`, '')
+        : pFullIdentifier;
+      // Remove if it matches our stable identifier
+      return pStableIdentifier !== stableIdentifier;
+    });
+    
+    // Find the position of the first split product to insert the merged product there
+    const firstSplitIndex = products.findIndex(p => {
+      if (!p.splitTag) return false;
+      const pFullIdentifier = getProductIdentifier(p);
+      const pStableIdentifier = p.splitTag 
+        ? pFullIdentifier.replace(`::${p.splitTag}`, '')
+        : pFullIdentifier;
+      return pStableIdentifier === stableIdentifier;
+    });
+    
+    // Insert merged product at the correct position (don't mutate)
+    let finalProducts;
+    if (firstSplitIndex !== -1) {
+      // Count how many non-split products come before the first split
+      let insertIndex = 0;
+      for (let i = 0; i < firstSplitIndex; i++) {
+        if (!products[i].splitTag) {
+          insertIndex++;
+        }
+      }
+      // Create new array with merged product inserted
+      finalProducts = [
+        ...newProducts.slice(0, insertIndex),
+        mergedProduct,
+        ...newProducts.slice(insertIndex)
+      ];
+    } else {
+      finalProducts = [...newProducts, mergedProduct];
+    }
+    
+    // Set flag to prevent useEffect from reloading splits
+    isUndoingSplitRef.current = true;
+    
+    // Remove split from localStorage FIRST, before updating state
+    if (shipmentId) {
+      try {
+        const storedSplits = localStorage.getItem(`sortProductsSplits_${shipmentId}`);
+        if (storedSplits) {
+          const existingSplits = JSON.parse(storedSplits);
+          const filteredSplits = existingSplits.filter(s => s.stableIdentifier !== stableIdentifier);
+          localStorage.setItem(`sortProductsSplits_${shipmentId}`, JSON.stringify(filteredSplits));
+        }
+      } catch (error) {
+        console.error('Error removing split from localStorage:', error);
+      }
+    }
+    
+    // Close menu and clear selection before updating products
+    setOpenMenuIndex(null);
+    setSelectedIndices(new Set());
+    setLastSelectedIndex(null);
+    
+    // Update products state with new array reference
+    setProducts(finalProducts);
+    saveProductOrder(finalProducts);
+    
+    // Clear flag after state update completes
+    setTimeout(() => {
+      isUndoingSplitRef.current = false;
+    }, 200);
+    
+    // Show info toast
+    const productName = `${splitProduct.brand || ''} ${splitProduct.product || ''} ${splitProduct.size || ''}`.trim();
+    showInfoToast(`Split undone for ${productName}`, `Combined ${allSplitProducts.length} split item(s) back into one.`);
+  };
+
+  // Handler for undoing all splits (from a parent item or any split item)
+  // This is the same as handleUndoSplit but called from a parent context
+  const handleUndoAllSplits = (product) => {
+    if (!product) return;
+    
+    // If it's a split item, use the same logic as handleUndoSplit
+    if (product.splitTag) {
+      handleUndoSplit(product);
+      return;
+    }
+    
+    // If it's not a split item, find all splits using the stable identifier
+    const stableIdentifier = getProductIdentifier(product);
+    
+    // Find all split products with this stable identifier
+    const allSplitProducts = products.filter(p => {
+      if (!p.splitTag) return false;
+      const pFullIdentifier = getProductIdentifier(p);
+      const pStableIdentifier = p.splitTag 
+        ? pFullIdentifier.replace(`::${p.splitTag}`, '')
+        : pFullIdentifier;
+      return pStableIdentifier === stableIdentifier;
+    });
+    
+    if (allSplitProducts.length === 0) return;
+    
+    // Calculate the combined quantity and volume
+    const combinedQty = allSplitProducts.reduce((sum, p) => sum + (p.qty || 0), 0);
+    const combinedVolume = allSplitProducts.reduce((sum, p) => sum + (p.volume || 0), 0);
+    
+    // Use the first split product as template
+    const templateProduct = allSplitProducts[0];
+    const originalId = templateProduct.originalId || product.id;
+    
+    // Create the merged product
+    const mergedProduct = {
+      ...templateProduct,
+      id: originalId,
+      qty: combinedQty,
+      volume: Math.round(combinedVolume * 100) / 100,
+      splitTag: undefined,
+      originalId: undefined,
+    };
+    
+    // Remove all split products with this stable identifier (simple filter like formulas)
+    const newProducts = products.filter(p => {
+      if (!p.splitTag) return true; // Keep all non-split products
+      const pFullIdentifier = getProductIdentifier(p);
+      const pStableIdentifier = p.splitTag 
+        ? pFullIdentifier.replace(`::${p.splitTag}`, '')
+        : pFullIdentifier;
+      // Remove if it matches our stable identifier
+      return pStableIdentifier !== stableIdentifier;
+    });
+    
+    // Find the position of the first split product to insert the merged product there
+    const firstSplitIndex = products.findIndex(p => {
+      if (!p.splitTag) return false;
+      const pFullIdentifier = getProductIdentifier(p);
+      const pStableIdentifier = p.splitTag 
+        ? pFullIdentifier.replace(`::${p.splitTag}`, '')
+        : pFullIdentifier;
+      return pStableIdentifier === stableIdentifier;
+    });
+    
+    // Insert merged product at the correct position (don't mutate)
+    let finalProducts;
+    if (firstSplitIndex !== -1) {
+      // Count how many non-split products come before the first split
+      let insertIndex = 0;
+      for (let i = 0; i < firstSplitIndex; i++) {
+        if (!products[i].splitTag) {
+          insertIndex++;
+        }
+      }
+      // Create new array with merged product inserted
+      finalProducts = [
+        ...newProducts.slice(0, insertIndex),
+        mergedProduct,
+        ...newProducts.slice(insertIndex)
+      ];
+    } else {
+      finalProducts = [...newProducts, mergedProduct];
+    }
+    
+    // Set flag to prevent useEffect from reloading splits
+    isUndoingSplitRef.current = true;
+    
+    // Remove split from localStorage FIRST, before updating state
+    if (shipmentId) {
+      try {
+        const storedSplits = localStorage.getItem(`sortProductsSplits_${shipmentId}`);
+        if (storedSplits) {
+          const existingSplits = JSON.parse(storedSplits);
+          const filteredSplits = existingSplits.filter(s => s.stableIdentifier !== stableIdentifier);
+          localStorage.setItem(`sortProductsSplits_${shipmentId}`, JSON.stringify(filteredSplits));
+        }
+      } catch (error) {
+        console.error('Error removing split from localStorage:', error);
+      }
+    }
+    
+    // Close menu and clear selection before updating products
+    setOpenMenuIndex(null);
+    setSelectedIndices(new Set());
+    setLastSelectedIndex(null);
+    
+    // Update products state with new array reference
+    setProducts(finalProducts);
+    saveProductOrder(finalProducts);
+    
+    // Clear flag after state update completes
+    setTimeout(() => {
+      isUndoingSplitRef.current = false;
+    }, 200);
+    
+    // Show info toast
+    const productName = `${product.brand || ''} ${product.product || ''} ${product.size || ''}`.trim();
+    showInfoToast(`All splits undone for ${productName}`, `Combined ${allSplitProducts.length} split item(s) back into one.`);
+  };
+
+  // Second batch quantity is the remaining (total - firstBatchQty)
+  const secondBatchQty = selectedProduct ? Math.max(0, (selectedProduct.qty || 1) - firstBatchQty) : 0;
+  
+  // Get increment step for the selected product
+  const incrementStep = selectedProduct ? getIncrementStep(selectedProduct.size) : 1;
 
   const handleFilterClick = (columnKey, event) => {
     event.stopPropagation();
     setOpenFilterColumns((prev) => {
-      const next = new Set(prev);
-      if (next.has(columnKey)) {
-        next.delete(columnKey);
-      } else {
+      const next = new Set();
+      // Close all other filters and open only the clicked one (if not already open)
+      if (!prev.has(columnKey)) {
         next.add(columnKey);
       }
+      // If it was already open, close it (empty set)
       return next;
     });
   };
 
   const handleApplyFilter = (columnKey, filterData) => {
+    // If filterData is null, remove the filter (Reset was clicked)
+    if (filterData === null) {
+      setFilters(prev => {
+        const newFilters = { ...prev };
+        delete newFilters[columnKey];
+        return newFilters;
+      });
+      // Also clear sort config for this column
+      setSortConfig(prev => prev.filter(sort => sort.column !== columnKey));
+      return;
+    }
+    
     setFilters(prev => ({
       ...prev,
       [columnKey]: filterData,
@@ -1075,11 +1896,29 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     const filter = filters[columnKey];
     if (!filter) return false;
     
-    // Only check for custom filters, not sort
-    const hasValues = filter.selectedValues && filter.selectedValues.size > 0;
+    // Check for condition filter
     const hasCondition = filter.conditionType && filter.conditionType !== '';
+    if (hasCondition) return true;
     
-    return hasValues || hasCondition;
+    // Check for value filters - only active if not all values are selected
+    if (!filter.selectedValues || filter.selectedValues.size === 0) return false;
+    
+    // Get all available values for this column
+    const allAvailableValues = getColumnValues(columnKey);
+    if (allAvailableValues.length === 0) return false;
+    
+    const allValuesSet = new Set(allAvailableValues.map(v => String(v)));
+    const selectedValuesSet = filter.selectedValues instanceof Set 
+      ? new Set(Array.from(filter.selectedValues).map(v => String(v)))
+      : new Set(Array.from(filter.selectedValues || []).map(v => String(v)));
+    
+    // Check if all available values are selected - if so, it's not an active filter
+    const allSelected = allValuesSet.size > 0 && 
+      selectedValuesSet.size === allValuesSet.size &&
+      Array.from(allValuesSet).every(val => selectedValuesSet.has(val));
+    
+    // Filter is active only if not all values are selected
+    return !allSelected;
   };
 
   // Get sort priority for a column (1 = primary, 2 = secondary, etc., or null if not sorted)
@@ -1132,21 +1971,31 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
         return Number(value) >= Number(conditionValue);
       case 'lessOrEqual':
         return Number(value) <= Number(conditionValue);
+      case 'between':
+        if (!conditionValue || !conditionValue.includes('-')) return true;
+        const [min, max] = conditionValue.split('-').map(v => Number(v.trim()));
+        if (isNaN(min) || isNaN(max)) return true;
+        const numValue = Number(value);
+        return numValue >= min && numValue <= max;
+      case 'notBetween':
+        if (!conditionValue || !conditionValue.includes('-')) return true;
+        const [minNot, maxNot] = conditionValue.split('-').map(v => Number(v.trim()));
+        if (isNaN(minNot) || isNaN(maxNot)) return true;
+        const numValueNot = Number(value);
+        return numValueNot < minNot || numValueNot > maxNot;
       default:
         return true;
     }
   };
 
-  // Apply filters to products
-  // Locked items maintain their positions and are not affected by filters
-  // Unlocked items are filtered, filling in the gaps
-  // Note: Sorting is now one-time (applied directly to products array), not continuous
-  const getFilteredAndSortedProducts = () => {
+  // Helper function to calculate filtered products for a given array
+  // This allows us to calculate filtered products for arrays other than the current state
+  const getFilteredAndSortedProductsForArray = (productsArray) => {
     // Separate locked and unlocked products
     const lockedProducts = [];
     const unlockedProducts = [];
     
-    products.forEach((product, index) => {
+    productsArray.forEach((product, index) => {
       if (lockedProductIds.has(product.id)) {
         lockedProducts.push({ product, originalIndex: index });
       } else {
@@ -1159,7 +2008,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     
     Object.keys(filters).forEach(columnKey => {
       const filter = filters[columnKey];
-      const isNumericColumn = columnKey === 'qty' || columnKey === 'volume';
+      const isNumericColumn = columnKey === 'qty';
       
       // Apply value filters (checkbox selections)
       if (filter.selectedValues && filter.selectedValues.size > 0) {
@@ -1188,7 +2037,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     const result = [];
     let unlockedIndex = 0;
     
-    for (let i = 0; i < products.length; i++) {
+    for (let i = 0; i < productsArray.length; i++) {
       const lockedItem = lockedProducts.find(lp => lp.originalIndex === i);
       if (lockedItem) {
         result.push(lockedItem.product);
@@ -1199,6 +2048,14 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     }
 
     return result;
+  };
+
+  // Apply filters to products
+  // Locked items maintain their positions and are not affected by filters
+  // Unlocked items are filtered, filling in the gaps
+  // Note: Sorting is now one-time (applied directly to products array), not continuous
+  const getFilteredAndSortedProducts = () => {
+    return getFilteredAndSortedProductsForArray(products);
   };
 
   const filteredProducts = getFilteredAndSortedProducts();
@@ -1241,6 +2098,8 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
             }}>
               {columns.map((column) => {
                 const isActive = hasActiveFilter(column.key);
+                const isDropdownOpen = openFilterColumns.has(column.key);
+                const isActiveOrOpen = isActive || isDropdownOpen;
                 return (
                 <th
                   key={column.key}
@@ -1250,7 +2109,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                     textAlign: column.key === 'drag' || column.key === 'menu' ? 'center' : 'center',
                     fontSize: '11px',
                     fontWeight: 600,
-                    color: isActive ? '#3B82F6' : '#9CA3AF',
+                    color: isActiveOrOpen ? '#3B82F6' : '#9CA3AF',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
                     width: column.width,
@@ -1258,7 +2117,6 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                     borderRight: column.key === 'drag' || column.key === 'menu' ? 'none' : '1px solid #FFFFFF',
                     height: '40px',
                     position: column.key === 'drag' || column.key === 'menu' ? 'static' : 'relative',
-                    backgroundColor: isActive ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
                   }}
                 >
                   {column.key === 'drag' || column.key === 'menu' ? (
@@ -1275,7 +2133,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         {column.label}
                         {(() => {
-                          if (isActive) {
+                          if (isActiveOrOpen) {
                             return (
                               <span style={{ 
                                 display: 'inline-block',
@@ -1292,7 +2150,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                       <img
                         src="/assets/Vector (1).png"
                         alt="Filter"
-                        className={`w-3 h-3 transition-opacity ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                        className={`w-3 h-3 transition-opacity ${isActiveOrOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                         ref={(el) => {
                           if (el) {
                             filterIconRefs.current[column.key] = el;
@@ -1303,7 +2161,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                           width: '12px', 
                           height: '12px', 
                           cursor: 'pointer',
-                          filter: isActive ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                          filter: isActiveOrOpen ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
                         }}
                       />
                     </div>
@@ -1582,15 +2440,6 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                   color: isDarkMode ? '#E5E7EB' : '#374151',
                   height: '40px',
                 }}>
-                  {product.volume || ''}
-                </td>
-                <td style={{
-                  padding: '0 16px',
-                  fontSize: '14px',
-                  fontWeight: 400,
-                  color: isDarkMode ? '#E5E7EB' : '#374151',
-                  height: '40px',
-                }}>
                   {product.productType}
                 </td>
                 <td style={{
@@ -1674,80 +2523,158 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                         overflow: 'hidden',
                       }}
                     >
-                      <button
-                        type="button"
-                        onClick={() => handleMenuAction('split', product)}
-                        style={{
-                          width: '100%',
-                          padding: '10px 16px',
-                          textAlign: 'left',
-                          background: 'transparent',
-                          border: 'none',
-                          color: isDarkMode ? '#E5E7EB' : '#374151',
-                          fontSize: '14px',
-                          fontWeight: 400,
-                          cursor: 'pointer',
-                          transition: 'background-color 0.2s',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '12px',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                        }}
-                      >
-                        <svg 
-                          width="16" 
-                          height="16" 
-                          viewBox="0 0 16 16" 
-                          fill="none" 
-                          xmlns="http://www.w3.org/2000/svg"
-                          style={{ flexShrink: 0 }}
+                      {/* Show Split Product option - for split products, only on the one with highest qty (parent) */}
+                      {product.qty > 1 && (() => {
+                        // If this is not a split product, show the button
+                        if (!product.splitTag) return true;
+                        
+                        // If this is a split product, only show if it has the highest qty among siblings
+                        const originalId = product.originalId || product.id;
+                        const siblingProducts = products.filter(p => {
+                          const pOriginalId = p.originalId || p.id;
+                          return pOriginalId === originalId && p.splitTag;
+                        });
+                        
+                        if (siblingProducts.length <= 1) return true; // Only one split, show it
+                        
+                        // Find the max qty among siblings
+                        const maxQty = Math.max(...siblingProducts.map(p => p.qty));
+                        
+                        // Only show on the product with the highest qty (parent)
+                        return product.qty === maxQty;
+                      })() && (
+                        <button
+                          type="button"
+                          onClick={() => handleMenuAction('split', product)}
+                          style={{
+                            width: '100%',
+                            padding: '10px 16px',
+                            textAlign: 'left',
+                            background: 'transparent',
+                            border: 'none',
+                            color: isDarkMode ? '#E5E7EB' : '#374151',
+                            fontSize: '14px',
+                            fontWeight: 400,
+                            cursor: 'pointer',
+                            transition: 'background-color 0.2s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
                         >
-                          {/* Vertical line */}
-                          <line 
-                            x1="8" 
-                            y1="10" 
-                            x2="8" 
-                            y2="14" 
-                            stroke="currentColor" 
-                            strokeWidth="1.5" 
-                            strokeLinecap="round"
-                          />
-                          {/* Left branch pointing up and left */}
-                          <line 
-                            x1="8" 
-                            y1="10" 
-                            x2="4.5" 
-                            y2="6.5" 
-                            stroke="currentColor" 
-                            strokeWidth="1.5" 
-                            strokeLinecap="round"
-                          />
-                          <polygon 
-                            points="4.5,6.5 4,6 3.5,6.5" 
-                            fill="currentColor"
-                          />
-                          {/* Right branch pointing up and right */}
-                          <line 
-                            x1="8" 
-                            y1="10" 
-                            x2="11.5" 
-                            y2="6.5" 
-                            stroke="currentColor" 
-                            strokeWidth="1.5" 
-                            strokeLinecap="round"
-                          />
-                          <polygon 
-                            points="11.5,6.5 12,6 12.5,6.5" 
-                            fill="currentColor"
-                          />
-                        </svg>
-                        <span>Split Product</span>
-                      </button>
+                          <svg 
+                            width="16" 
+                            height="16" 
+                            viewBox="0 0 16 16" 
+                            fill="none" 
+                            xmlns="http://www.w3.org/2000/svg"
+                            style={{ flexShrink: 0 }}
+                          >
+                            {/* Vertical line */}
+                            <line 
+                              x1="8" 
+                              y1="10" 
+                              x2="8" 
+                              y2="14" 
+                              stroke="currentColor" 
+                              strokeWidth="1.5" 
+                              strokeLinecap="round"
+                            />
+                            {/* Left branch pointing up and left */}
+                            <line 
+                              x1="8" 
+                              y1="10" 
+                              x2="4.5" 
+                              y2="6.5" 
+                              stroke="currentColor" 
+                              strokeWidth="1.5" 
+                              strokeLinecap="round"
+                            />
+                            <polygon 
+                              points="4.5,6.5 4,6 3.5,6.5" 
+                              fill="currentColor"
+                            />
+                            {/* Right branch pointing up and right */}
+                            <line 
+                              x1="8" 
+                              y1="10" 
+                              x2="11.5" 
+                              y2="6.5" 
+                              stroke="currentColor" 
+                              strokeWidth="1.5" 
+                              strokeLinecap="round"
+                            />
+                            <polygon 
+                              points="11.5,6.5 12,6 12.5,6.5" 
+                              fill="currentColor"
+                            />
+                          </svg>
+                          <span>Split Product</span>
+                        </button>
+                      )}
+                      
+                      {/* Show Undo All Splits option for split items */}
+                      {product.splitTag && (
+                        <button
+                          type="button"
+                          onClick={() => handleMenuAction('undoAllSplits', product)}
+                          style={{
+                            width: '100%',
+                            padding: '10px 16px',
+                            textAlign: 'left',
+                            background: 'transparent',
+                            border: 'none',
+                            color: isDarkMode ? '#E5E7EB' : '#374151',
+                            fontSize: '14px',
+                            fontWeight: 400,
+                            cursor: 'pointer',
+                            transition: 'background-color 0.2s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
+                        >
+                          <svg 
+                            width="16" 
+                            height="16" 
+                            viewBox="0 0 16 16" 
+                            fill="none" 
+                            xmlns="http://www.w3.org/2000/svg"
+                            style={{ flexShrink: 0 }}
+                          >
+                            {/* Arrow pointing left (undo icon) */}
+                            <path 
+                              d="M3 8L1 6L3 4" 
+                              stroke="currentColor" 
+                              strokeWidth="1.5" 
+                              strokeLinecap="round" 
+                              strokeLinejoin="round"
+                            />
+                            <line 
+                              x1="1" 
+                              y1="6" 
+                              x2="15" 
+                              y2="6" 
+                              stroke="currentColor" 
+                              strokeWidth="1.5" 
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                          <span>Undo All Splits</span>
+                        </button>
+                      )}
                     </div>
                   )}
                 </td>
@@ -1792,6 +2719,10 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
         return (
           <SortProductsFilterDropdown
             key={columnKey}
+            ref={(el) => {
+              if (el) filterDropdownRefs.current[columnKey] = el;
+              else delete filterDropdownRefs.current[columnKey];
+            }}
             filterIconRef={filterIconRefs.current[columnKey]}
             columnKey={columnKey}
             availableValues={getColumnValues(columnKey)}
@@ -1927,7 +2858,9 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                     color: '#6B7280',
                     margin: '0 0 12px 0',
                   }}>
-                    The first batch is always 1 unit.
+                    {selectedProduct && incrementStep > 1 
+                      ? `Increments by ${incrementStep} unit${incrementStep > 1 ? 's' : ''} (based on product size).`
+                      : 'Enter the quantity for the first batch.'}
                   </p>
                   <div style={{ display: 'flex', gap: '12px' }}>
                     <div style={{ flex: 1 }}>
@@ -1936,20 +2869,23 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                       </label>
                       <input
                         type="number"
-                        value={1}
-                        readOnly
+                        value={firstBatchQty}
+                        onChange={handleFirstBatchQtyChange}
+                        min={incrementStep}
+                        max={selectedProduct ? (selectedProduct.qty || 1) : 1}
+                        step={incrementStep}
                         style={{
                           width: '100%',
                           height: '40px',
                           padding: '0 12px',
                           borderRadius: '6px',
                           border: '1px solid #D1D5DB',
-                          backgroundColor: '#F9FAFB',
-                          color: '#6B7280',
+                          backgroundColor: '#FFFFFF',
+                          color: '#374151',
                           fontSize: '14px',
                           fontWeight: 400,
                           outline: 'none',
-                          cursor: 'not-allowed',
+                          cursor: 'text',
                           boxSizing: 'border-box',
                         }}
                       />
@@ -2040,25 +2976,25 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                 <button
                   type="button"
                   onClick={handleConfirmSplit}
-                  disabled={!selectedProduct || (selectedProduct?.qty || 1) <= 1}
+                  disabled={!selectedProduct || (selectedProduct?.qty || 1) <= incrementStep || firstBatchQty <= 0 || firstBatchQty >= (selectedProduct?.qty || 1)}
                   style={{
                     padding: '8px 16px',
                     borderRadius: '6px',
                     border: 'none',
-                    backgroundColor: (!selectedProduct || (selectedProduct?.qty || 1) <= 1) ? '#9CA3AF' : '#3B82F6',
+                    backgroundColor: (!selectedProduct || (selectedProduct?.qty || 1) <= incrementStep || firstBatchQty <= 0 || firstBatchQty >= (selectedProduct?.qty || 1)) ? '#9CA3AF' : '#3B82F6',
                     color: '#FFFFFF',
                     fontSize: '14px',
                     fontWeight: 500,
-                    cursor: (!selectedProduct || (selectedProduct?.qty || 1) <= 1) ? 'not-allowed' : 'pointer',
+                    cursor: (!selectedProduct || (selectedProduct?.qty || 1) <= incrementStep || firstBatchQty <= 0 || firstBatchQty >= (selectedProduct?.qty || 1)) ? 'not-allowed' : 'pointer',
                     transition: 'background-color 0.2s',
                   }}
                   onMouseEnter={(e) => {
-                    if (selectedProduct && (selectedProduct?.qty || 1) > 1) {
+                    if (selectedProduct && (selectedProduct?.qty || 1) > incrementStep && firstBatchQty > 0 && firstBatchQty < (selectedProduct?.qty || 1)) {
                       e.currentTarget.style.backgroundColor = '#2563EB';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (selectedProduct && (selectedProduct?.qty || 1) > 1) {
+                    if (selectedProduct && (selectedProduct?.qty || 1) > incrementStep && firstBatchQty > 0 && firstBatchQty < (selectedProduct?.qty || 1)) {
                       e.currentTarget.style.backgroundColor = '#3B82F6';
                     }
                   }}

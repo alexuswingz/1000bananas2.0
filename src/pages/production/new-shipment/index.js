@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTheme } from '../../../context/ThemeContext';
+import { useSidebar } from '../../../context/SidebarContext';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
-import { createShipment, getShipmentById, updateShipment, addShipmentProducts, getShipmentProducts, getShipmentFormulaCheck, getLabelsAvailability } from '../../../services/productionApi';
+import { createShipment, getShipmentById, updateShipment, addShipmentProducts, getShipmentProducts, getShipmentFormulaCheck, getLabelsAvailability, updateShipmentFormulaCheck, updateShipmentProductLabelCheck, getSellables, getShiners, getUnusedFormulas } from '../../../services/productionApi';
 import CatalogAPI from '../../../services/catalogApi';
 import NgoosAPI from '../../../services/ngoosApi';
 import { extractFileId, getDriveImageUrl } from '../../../services/googleDriveApi';
@@ -26,6 +27,28 @@ import UncheckedFormulaModal from './components/UncheckedFormulaModal';
 import FormulaCheckCommentModal from './components/FormulaCheckCommentModal';
 import LabelCheckCommentModal from './components/LabelCheckCommentModal';
 import LabelCheckCompleteModal from './components/LabelCheckCompleteModal';
+<<<<<<< HEAD
+=======
+import FormulaCheckCompleteModal from './components/FormulaCheckCompleteModal';
+import DOISettingsPopover from './components/DOISettingsPopover';
+
+// Utility function to extract size from product name
+const extractSizeFromProductName = (productName) => {
+  if (!productName) return null;
+  const patterns = [
+    /(\d+\s*oz)/i,
+    /(\d+\s*ml)/i,
+    /(Quart)/i,
+    /(Gallon)/i,
+    /(\d+\s*Gallon)/i,
+  ];
+  for (const pattern of patterns) {
+    const match = productName.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
+};
+>>>>>>> e57dfe3d4b4ed86635872787cf968b45dbdf24e1
 
 // Utility function to handle Google Drive image URLs
 const getImageUrl = (url) => {
@@ -60,6 +83,7 @@ const knownCarriers = ['WeShip', 'TopCarrier', 'Worldwide Express'];
 
 const NewShipment = () => {
   const { isDarkMode } = useTheme();
+  const { sidebarWidth } = useSidebar();
   const location = useLocation();
   const navigate = useNavigate();
   const { id } = useParams();
@@ -93,8 +117,12 @@ const NewShipment = () => {
   const [isRecountMode, setIsRecountMode] = useState(false);
   const [varianceExceededRowIds, setVarianceExceededRowIds] = useState([]);
   const [labelCheckRows, setLabelCheckRows] = useState([]);
+  const [labelCheckSelectedRowsCount, setLabelCheckSelectedRowsCount] = useState(0);
   const [formulaCheckData, setFormulaCheckData] = useState({ total: 0, completed: 0, remaining: 0 });
   const [formulaSelectedRows, setFormulaSelectedRows] = useState(new Set());
+  const [formulaCheckRefreshKey, setFormulaCheckRefreshKey] = useState(0);
+  const [labelCheckRefreshKey, setLabelCheckRefreshKey] = useState(0);
+  const [checkAllIncompleteTrigger, setCheckAllIncompleteTrigger] = useState(0);
   const [labelCheckData, setLabelCheckData] = useState({ total: 0, completed: 0, remaining: 0 });
   const [shipmentProducts, setShipmentProducts] = useState([]); // Products loaded from existing shipment
   const [tableMode, setTableMode] = useState(false);
@@ -109,11 +137,52 @@ const NewShipment = () => {
   const floorInventoryButtonRef = useRef(null);
   const [floorInventoryPosition, setFloorInventoryPosition] = useState({ top: 0, left: 0 });
   const [labelsAvailabilityMap, setLabelsAvailabilityMap] = useState({}); // Map of label_location -> available labels
+  const [floorInventoryCounts, setFloorInventoryCounts] = useState({
+    'Finished Goods': 0,
+    'Shiners': 0,
+    'Unused Formulas': 0
+  });
   const [isBookShipmentHovered, setIsBookShipmentHovered] = useState(false);
   const bookShipmentButtonRef = useRef(null);
   const [bookShipmentTooltipPosition, setBookShipmentTooltipPosition] = useState({ top: 0, left: 0 });
   const [exportCompleted, setExportCompleted] = useState(false);
+  
+  // DOI Settings - managed by DOISettingsPopover component
   const [forecastRange, setForecastRange] = useState('150');
+  const [doiSettingsValues, setDoiSettingsValues] = useState({
+    amazonDoiGoal: 130,
+    inboundLeadTime: 30,
+    manufactureLeadTime: 7
+  });
+  
+  // Track DOI settings change counter to trigger reload
+  const [doiSettingsChangeCount, setDoiSettingsChangeCount] = useState(0);
+  const doiSettingsInitialized = useRef(false);
+  
+  // Track manually edited quantity indices (from NewShipmentTable)
+  const manuallyEditedIndicesRef = useRef(new Set());
+  
+  // Sort option for product table
+  const [sortOption, setSortOption] = useState('doi'); // 'doi', 'qty', 'name'
+  
+  // Callback when DOI settings change from the popover
+  const handleDoiSettingsChange = (newSettings, totalDoi) => {
+    const prevSettings = doiSettingsValues;
+    setDoiSettingsValues(newSettings);
+    setForecastRange(String(totalDoi));
+    
+    // Trigger reload if settings actually changed (but not on initial mount)
+    if (doiSettingsInitialized.current && 
+        (prevSettings.amazonDoiGoal !== newSettings.amazonDoiGoal ||
+         prevSettings.inboundLeadTime !== newSettings.inboundLeadTime ||
+         prevSettings.manufactureLeadTime !== newSettings.manufactureLeadTime)) {
+      console.log('DOI settings changed, will reload products with new settings:', newSettings);
+      setDoiSettingsChangeCount(c => c + 1);
+    }
+    doiSettingsInitialized.current = true;
+  };
+  
+  // Legacy state for tooltip (keeping for backward compatibility)
   const [showDOITooltip, setShowDOITooltip] = useState(false);
   const [isTooltipPinned, setIsTooltipPinned] = useState(false);
   const [showDateCalculationInfo, setShowDateCalculationInfo] = useState(false);
@@ -137,39 +206,42 @@ const NewShipment = () => {
   const labelCheckRemainingCount = totalLabelCheckRows - labelCheckCompletedCount;
   const isLabelCheckReadyToComplete = totalLabelCheckRows > 0 && labelCheckRemainingCount === 0;
 
-  // Auto-complete label check when all products are checked
-  useEffect(() => {
-    // Only auto-complete if:
-    // 1. We have products to check
-    // 2. All products are completed
-    // 3. Label check is not already marked as completed
-    // 4. We have a shipmentId
-    // 5. We're currently on the label-check step
-    if (
-      shipmentId &&
-      activeAction === 'label-check' &&
-      isLabelCheckReadyToComplete &&
-      !completedTabs.has('label-check') &&
-      totalLabelCheckRows > 0
-    ) {
-      // Check for variance/incomplete status - if any row is insufficient, mark as incomplete
-      const hasVariance = labelCheckRows.some(row => {
-        // A row is incomplete if it's counted and has insufficient labels
-        return row.isCounted && row.isInsufficient === true;
-      });
-      
-      // Auto-complete the label check step (only once)
-      const autoComplete = async () => {
-        try {
-          await completeLabelCheck('', hasVariance);
-        } catch (error) {
-          console.error('Error auto-completing label check:', error);
-        }
-      };
-      autoComplete();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLabelCheckReadyToComplete, shipmentId, activeAction, completedTabs, totalLabelCheckRows, labelCheckRows]);
+  // REMOVED: Auto-complete label check when all products are checked
+  // This was causing automatic navigation to planning table when the last row was completed,
+  // even if the user didn't click the "Complete" button in the footer.
+  // Users must now manually click the "Complete" button to finish the label check step.
+  // useEffect(() => {
+  //   // Only auto-complete if:
+  //   // 1. We have products to check
+  //   // 2. All products are completed
+  //   // 3. Label check is not already marked as completed
+  //   // 4. We have a shipmentId
+  //   // 5. We're currently on the label-check step
+  //   if (
+  //     shipmentId &&
+  //     activeAction === 'label-check' &&
+  //     isLabelCheckReadyToComplete &&
+  //     !completedTabs.has('label-check') &&
+  //     totalLabelCheckRows > 0
+  //   ) {
+  //     // Check for variance/incomplete status - if any row is insufficient, mark as incomplete
+  //     const hasVariance = labelCheckRows.some(row => {
+  //       // A row is incomplete if it's counted and has insufficient labels
+  //       return row.isCounted && row.isInsufficient === true;
+  //     });
+  //     
+  //     // Auto-complete the label check step (only once)
+  //     const autoComplete = async () => {
+  //       try {
+  //         await completeLabelCheck('', hasVariance);
+  //       } catch (error) {
+  //         console.error('Error auto-completing label check:', error);
+  //       }
+  //     };
+  //     autoComplete();
+  //   }
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [isLabelCheckReadyToComplete, shipmentId, activeAction, completedTabs, totalLabelCheckRows, labelCheckRows]);
 
   // Close tooltip when clicking outside if it's pinned
   useEffect(() => {
@@ -285,6 +357,73 @@ const NewShipment = () => {
     loadProducts();
   }, [id]); // Re-run when ID changes to get fresh labels availability
 
+  // Reload products when DOI settings change (triggered by Apply button in DOISettingsPopover)
+  useEffect(() => {
+    if (doiSettingsChangeCount > 0) {
+      console.log('Reloading products due to DOI settings change...');
+      loadProducts();
+    }
+  }, [doiSettingsChangeCount]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-sort products when sort option changes
+  useEffect(() => {
+    if (products.length > 0) {
+      const sorted = [...products].sort((a, b) => {
+        if (sortOption === 'doi') {
+          const aDOI = a.doiTotal || a.daysOfInventory || 999;
+          const bDOI = b.doiTotal || b.daysOfInventory || 999;
+          if (aDOI !== bDOI) return aDOI - bDOI;
+          return (b.suggestedQty || 0) - (a.suggestedQty || 0);
+        } else if (sortOption === 'qty') {
+          const aQty = a.suggestedQty || 0;
+          const bQty = b.suggestedQty || 0;
+          if (aQty !== bQty) return bQty - aQty;
+          const aDOI = a.doiTotal || a.daysOfInventory || 999;
+          const bDOI = b.doiTotal || b.daysOfInventory || 999;
+          return aDOI - bDOI;
+        } else if (sortOption === 'name') {
+          const aName = (a.name || a.productName || '').toLowerCase();
+          const bName = (b.name || b.productName || '').toLowerCase();
+          return aName.localeCompare(bName);
+        }
+        return 0;
+      });
+      setProducts(sorted);
+    }
+  }, [sortOption]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch floor inventory counts
+  useEffect(() => {
+    const fetchFloorInventoryCounts = async () => {
+      try {
+        const [sellables, shiners, unusedFormulas] = await Promise.all([
+          getSellables().catch(() => []),
+          getShiners().catch(() => []),
+          getUnusedFormulas().catch(() => [])
+        ]);
+
+        // Count products/items for each category
+        const finishedGoodsCount = sellables.length || 0;
+        
+        // For shiners, count total products across all formula groups
+        const shinersCount = shiners.reduce((total, group) => total + (group.products?.length || 0), 0);
+        
+        // For unused formulas, count total formulas
+        const unusedFormulasCount = unusedFormulas.length || 0;
+
+        setFloorInventoryCounts({
+          'Finished Goods': finishedGoodsCount,
+          'Shiners': shinersCount,
+          'Unused Formulas': unusedFormulasCount
+        });
+      } catch (error) {
+        console.error('Error fetching floor inventory counts:', error);
+      }
+    };
+
+    fetchFloorInventoryCounts();
+  }, []); // Fetch once on mount
+
   // Reset shipment number for new shipments (when no ID in route)
   // Also read account from navigation state if coming from Planning modal
   useEffect(() => {
@@ -308,16 +447,37 @@ const NewShipment = () => {
     try {
       setLoadingProducts(true);
       
-      // Load Amazon forecast data, production supply chain data, and labels availability
+      // Load TPS Forecast data (Railway/Lambda API), production supply chain data, and labels availability
       // Use production inventory as PRIMARY source (all products from our database)
       // Merge in forecast data where available
-      const [planningData, productionInventory, labelsAvailability] = await Promise.all([
-        NgoosAPI.getPlanning(1, 5000), // Increase limit for forecast data
+      const [tpsForecastData, productionInventory, labelsAvailability] = await Promise.all([
+        NgoosAPI.getTpsAllForecasts({
+          amazonDoiGoal: doiSettingsValues.amazonDoiGoal,
+          inboundLeadTime: doiSettingsValues.inboundLeadTime,
+          manufactureLeadTime: doiSettingsValues.manufactureLeadTime
+        }), // Use TPS Forecast API with DOI settings
         import('../../../services/productionApi').then(api => api.getProductsInventory()),
         getLabelsAvailability(shipmentId) // Pass shipment ID to exclude current shipment
       ]);
       
-      console.log('Loaded planning data:', planningData.products?.length || 0, 'products with forecast');
+      // Map TPS forecast data to planning format
+      const planningData = {
+        products: (tpsForecastData.products || []).map(p => ({
+          asin: p.asin,
+          brand: 'TPS Plant Foods',
+          product: p.product_name,
+          size: p.inventory?.size || extractSizeFromProductName(p.product_name),
+          doi_total: p.doi_total_days || 0,
+          doi_fba: p.doi_fba_days || 0,
+          inventory: p.inventory?.total_inventory || p.total_inventory || 0,
+          units_to_make: p.units_to_make || 0,
+          algorithm: p.algorithm,
+          needs_seasonality: p.needs_seasonality,
+          status: p.status,
+        }))
+      };
+      
+      console.log('Loaded TPS forecast data:', planningData.products?.length || 0, 'products with forecast (source:', tpsForecastData.source || 'api', ')');
       console.log('Loaded production inventory:', productionInventory.length, 'total products from database');
       console.log('Loaded labels availability:', Object.keys(labelsAvailability.byLocation || {}).length, 'label locations');
       
@@ -356,8 +516,9 @@ const NewShipment = () => {
       // USE PRODUCTION INVENTORY AS PRIMARY SOURCE (all products from our database)
       // This ensures we show ALL products, not just those with forecast data
       const formattedProducts = uniqueProducts.map((item, index) => {
-        // Get forecast data for this product if available
-        const forecast = forecastMap[item.child_asin] || {};
+        // Get forecast data for this product if available - try multiple ASIN fields
+        const asinKey = item.child_asin || item.asin || item.childAsin || '';
+        const forecast = forecastMap[asinKey] || {};
         
         // Get sales data from forecast API if available
         const salesData = forecast.sales_30_day || item.units_sold_30_days || 0;
@@ -434,6 +595,10 @@ const NewShipment = () => {
           formulaGallonsAvailable: item.formula_gallons_available || 0,
           formulaGallonsPerUnit: item.gallons_per_unit || 0,
           maxUnitsProducible: item.max_units_producible || 0,
+          // TPS Forecast data (from TPS API)
+          unitsToMake: forecast.units_to_make || 0, // Store TPS units_to_make for suggestedQty calculation
+          tpsAlgorithm: forecast.algorithm || '',
+          tpsNeedsSeasonality: forecast.needs_seasonality || false,
           // Packaging calculation fields (for pallets, weight, time)
           box_weight_lbs: parseFloat(item.box_weight_lbs) || 0,
           boxes_per_pallet: parseFloat(item.boxes_per_pallet) || 50,
@@ -445,52 +610,83 @@ const NewShipment = () => {
       
       console.log('Loaded products with supply chain:', formattedProducts.length);
       
-      // Calculate suggested qty for each product based on forecast
-      // Formula: unitsNeeded = (targetDOI - currentDOI) * dailySalesRate
-      // Then round up to nearest units_per_case
+      // Use units_to_make from TPS Forecast API as suggested qty
+      // This already accounts for DOI goals, lead times, and seasonality
       const productsWithSuggestedQty = formattedProducts.map(product => {
-        const dailySalesRate = (product.sales30Day || 0) / 30;
-        const currentDOI = product.doiTotal || product.daysOfInventory || 0;
-        const targetDOI = parseInt(forecastRange) || 120;
+        // Get forecast data for this product - use the stored units_to_make from formattedProducts
+        // This ensures we use the same lookup that was done earlier
         const unitsPerCase = product.units_per_case || 60;
+        const needsSeasonality = product.tpsNeedsSeasonality || false;
         
-        let suggestedQty = 0;
+        // If product needs seasonality data, set QTY to 0 and flag it
+        if (needsSeasonality) {
+          return {
+            ...product,
+            suggestedQty: 0,
+            algorithm: product.tpsAlgorithm || '',
+            needsSeasonality: true,
+          };
+        }
         
-        // Only calculate if there are sales and we're below target DOI
-        if (dailySalesRate > 0 && currentDOI < targetDOI) {
-          const daysNeeded = targetDOI - currentDOI;
-          const rawUnitsNeeded = daysNeeded * dailySalesRate;
+        // Use units_to_make directly from product (set in formattedProducts from forecastMap)
+        // This avoids a second lookup that might fail
+        let suggestedQty = product.unitsToMake || 0;
+        
+        // Round to nearest case pack
+        if (suggestedQty > 0) {
+          suggestedQty = Math.ceil(suggestedQty / unitsPerCase) * unitsPerCase;
+        }
+        
+        // Fallback: calculate if TPS forecast not available AND product doesn't need seasonality
+        if (suggestedQty === 0 && !needsSeasonality) {
+          const dailySalesRate = (product.sales30Day || 0) / 30;
+          const currentDOI = product.doiTotal || product.daysOfInventory || 0;
+          const targetDOI = parseInt(forecastRange) || 120;
           
-          // Round up to nearest units_per_case (case pack)
-          suggestedQty = Math.ceil(rawUnitsNeeded / unitsPerCase) * unitsPerCase;
-          
-          // Ensure minimum of 1 case if there's any need
-          if (suggestedQty === 0 && rawUnitsNeeded > 0) {
-            suggestedQty = unitsPerCase;
+          if (dailySalesRate > 0 && currentDOI < targetDOI) {
+            const daysNeeded = targetDOI - currentDOI;
+            const rawUnitsNeeded = daysNeeded * dailySalesRate;
+            suggestedQty = Math.ceil(rawUnitsNeeded / unitsPerCase) * unitsPerCase;
+            if (suggestedQty === 0 && rawUnitsNeeded > 0) {
+              suggestedQty = unitsPerCase;
+            }
           }
         }
         
         return {
           ...product,
           suggestedQty,
+          // Keep original TPS values from formattedProducts
+          algorithm: product.tpsAlgorithm || '',
+          needsSeasonality: needsSeasonality,
         };
       });
       
-      // Sort by DOI ascending (lowest DOI first = most urgent)
-      // Products with sales but low DOI need to be prioritized
+      // Sort products based on selected sort option
       const sortedProducts = productsWithSuggestedQty.sort((a, b) => {
-        // First: items with sales > 0 come first
-        const aHasSales = a.sales30Day > 0 ? 0 : 1;
-        const bHasSales = b.sales30Day > 0 ? 0 : 1;
-        if (aHasSales !== bHasSales) return aHasSales - bHasSales;
-        
-        // Second: sort by DOI ascending (lowest DOI = most urgent)
-        const aDOI = a.doiTotal || a.daysOfInventory || 999;
-        const bDOI = b.doiTotal || b.daysOfInventory || 999;
-        if (aDOI !== bDOI) return aDOI - bDOI;
-        
-        // Third: higher sales first (as tiebreaker)
-        return (b.sales30Day || 0) - (a.sales30Day || 0);
+        if (sortOption === 'doi') {
+          // Sort by DOI ascending (lowest DOI = most urgent)
+          const aDOI = a.doiTotal || a.daysOfInventory || 999;
+          const bDOI = b.doiTotal || b.daysOfInventory || 999;
+          if (aDOI !== bDOI) return aDOI - bDOI;
+          // Secondary: higher qty first
+          return (b.suggestedQty || 0) - (a.suggestedQty || 0);
+        } else if (sortOption === 'qty') {
+          // Sort by QTY descending (highest units to make first)
+          const aQty = a.suggestedQty || 0;
+          const bQty = b.suggestedQty || 0;
+          if (aQty !== bQty) return bQty - aQty;
+          // Secondary: lower DOI first
+          const aDOI = a.doiTotal || a.daysOfInventory || 999;
+          const bDOI = b.doiTotal || b.daysOfInventory || 999;
+          return aDOI - bDOI;
+        } else if (sortOption === 'name') {
+          // Sort by product name alphabetically
+          const aName = (a.name || a.productName || '').toLowerCase();
+          const bName = (b.name || b.productName || '').toLowerCase();
+          return aName.localeCompare(bName);
+        }
+        return 0;
       });
       
       // Store all products (unfiltered) for account switching
@@ -509,16 +705,44 @@ const NewShipment = () => {
       console.log(`✅ Showing ${filteredProducts.length} products after account filter (${shipmentData.account})`);
       console.log(`✅ Products with forecast data: ${Object.keys(forecastMap).length}`);
       
+      // Preserve manually edited quantities when reloading
+      // Build a map of product ID -> manually edited quantity
+      const manuallyEditedQtyMap = {};
+      if (manuallyEditedIndicesRef.current && products.length > 0) {
+        manuallyEditedIndicesRef.current.forEach((index) => {
+          const product = products[index];
+          if (product && qtyValues[index] !== undefined) {
+            manuallyEditedQtyMap[product.id] = qtyValues[index];
+          }
+        });
+      }
+      
       // Initialize qty values with suggested quantities for FILTERED products
       // Use filtered products indices since that's what the table displays
       const initialQtyValues = {};
+      const newManuallyEditedIndices = new Set();
+      
       filteredProducts.forEach((product, index) => {
-        // Auto-populate qty with suggested qty if product needs restocking
-        if (product.suggestedQty > 0) {
+        // First check if this product had a manually edited quantity
+        if (manuallyEditedQtyMap[product.id] !== undefined) {
+          initialQtyValues[index] = manuallyEditedQtyMap[product.id];
+          // Mark this index as manually edited in the new product list
+          newManuallyEditedIndices.add(index);
+        }
+        // Otherwise auto-populate qty with suggested qty if product needs restocking
+        else if (product.suggestedQty > 0) {
           initialQtyValues[index] = product.suggestedQty;
         }
       });
       setQtyValues(initialQtyValues);
+      
+      // Update manually edited indices with new indices after reload
+      // IMPORTANT: Clear and repopulate the existing Set instead of replacing it
+      // This preserves the reference that the child component is using
+      if (manuallyEditedIndicesRef.current) {
+        manuallyEditedIndicesRef.current.clear();
+        newManuallyEditedIndices.forEach(idx => manuallyEditedIndicesRef.current.add(idx));
+      }
       
       // Initialize lastAccount to prevent reset on first account filter useEffect run
       setLastAccount(shipmentData.account);
@@ -648,6 +872,7 @@ const NewShipment = () => {
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [qtyValues, setQtyValues] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedBrand, setSelectedBrand] = useState('');
   const [lastAccount, setLastAccount] = useState(null); // Track account changes
   const [lastForecastRange, setLastForecastRange] = useState(null); // Track forecastRange changes
   
@@ -674,6 +899,7 @@ const NewShipment = () => {
           newQtyValues[index] = product.suggestedQty;
         }
       });
+      
       setQtyValues(newQtyValues);
       setAddedRows(new Set());
       
@@ -737,40 +963,30 @@ const NewShipment = () => {
       return;
     }
     
-    console.log(`ForecastRange changed from ${lastForecastRange} to ${forecastRange}. Recalculating QTY values.`);
+    console.log(`ForecastRange changed from ${lastForecastRange} to ${forecastRange}. Preserving TPS units_to_make values.`);
     setLastForecastRange(forecastRange);
     
-    const targetDOI = parseInt(forecastRange) || 120;
+    // NOTE: ForecastRange changes should NOT recalculate QTY values from scratch.
+    // The TPS API already provides accurate units_to_make based on DOI goals.
+    // We should preserve the product.suggestedQty values (from TPS) for products not manually added.
     
     const newQtyValues = {};
     products.forEach((product, index) => {
-      // Only update qty for products that haven't been manually added yet
-      if (!addedRows.has(product.id)) {
-        const dailySalesRate = (product.sales30Day || 0) / 30;
-        const currentDOI = product.doiTotal || product.daysOfInventory || 0;
-        const unitsPerCase = product.units_per_case || 60;
-        
-        let suggestedQty = 0;
-        
-        if (dailySalesRate > 0 && currentDOI < targetDOI) {
-          const daysNeeded = targetDOI - currentDOI;
-          const rawUnitsNeeded = daysNeeded * dailySalesRate;
-          
-          // Round up to nearest units_per_case (case pack)
-          suggestedQty = Math.ceil(rawUnitsNeeded / unitsPerCase) * unitsPerCase;
-          
-          if (suggestedQty === 0 && rawUnitsNeeded > 0) {
-            suggestedQty = unitsPerCase;
-          }
-        }
-        
-        if (suggestedQty > 0) {
-          newQtyValues[index] = suggestedQty;
-        }
-      } else {
-        // Keep existing quantity for already added products
+      // Keep existing quantity for:
+      // 1. Already added products (addedRows)
+      // 2. Manually edited quantities (manuallyEditedIndicesRef)
+      const isManuallyEdited = manuallyEditedIndicesRef.current?.has(index);
+      
+      if (addedRows.has(product.id) || isManuallyEdited) {
+        // Preserve the manually set or added quantity
         if (qtyValues[index] !== undefined) {
           newQtyValues[index] = qtyValues[index];
+        }
+      } else {
+        // Use the TPS suggestedQty (which is based on units_to_make)
+        // This preserves the accurate TPS forecast values
+        if (product.suggestedQty > 0) {
+          newQtyValues[index] = product.suggestedQty;
         }
       }
     });
@@ -915,6 +1131,21 @@ const NewShipment = () => {
     
     return sum + weight;
   }, 0);
+
+  // Calculate total products count (unique products added)
+  const totalProducts = products.filter((product, index) => {
+    return addedRows && addedRows instanceof Set && addedRows.has(product.id) && (qtyValues[index] || 0) > 0;
+  }).length;
+
+  // Calculate total formulas count (unique formulas from added products)
+  const totalFormulas = new Set(
+    products
+      .filter((product, index) => {
+        return addedRows && addedRows instanceof Set && addedRows.has(product.id) && (qtyValues[index] || 0) > 0;
+      })
+      .map(product => product.formula_name || product.formulaName)
+      .filter(formula => formula && formula.trim() !== '')
+  ).size;
 
   const handleProductClick = (row) => {
     setSelectedRow(row);
@@ -1123,6 +1354,7 @@ const NewShipment = () => {
       return newSet;
     });
 
+<<<<<<< HEAD
     // Navigate based on whether label check is completed
     if (labelCheckCompleted) {
       // Both are completed, go to book shipment
@@ -1146,6 +1378,14 @@ const NewShipment = () => {
         }
       } else {
         toast.success('Formula Check completed! Returning to shipments table.');
+=======
+    // If incomplete (no formulas checked), always navigate back to planning page
+    if (isIncomplete) {
+      if (hasComment) {
+        toast.info('Formula Check comment saved. Returning to shipments table.');
+      } else {
+        toast.info('Returning to shipments table.');
+>>>>>>> e57dfe3d4b4ed86635872787cf968b45dbdf24e1
       }
       
       // Navigate back to planning page with shipments tab
@@ -1156,6 +1396,20 @@ const NewShipment = () => {
           fromFormulaCheckComplete: true,
         }
       });
+<<<<<<< HEAD
+=======
+      return;
+    }
+
+    // Navigate based on whether label check is completed (only when formula check is complete)
+    if (labelCheckCompleted) {
+      // Both are completed, show modal (user will click button to navigate)
+      toast.success('Formula Check completed! Moving to Book Shipment');
+      setIsFormulaCheckCompleteOpen(true);
+    } else {
+      // Show the completion modal instead of automatically navigating
+      setIsFormulaCheckCompleteOpen(true);
+>>>>>>> e57dfe3d4b4ed86635872787cf968b45dbdf24e1
     }
   };
 
@@ -1197,15 +1451,119 @@ const NewShipment = () => {
       return newSet;
     });
 
+<<<<<<< HEAD
     // Navigate back to shipments table after completing label check
     if (isIncomplete) {
       if (hasComment) {
         toast.info('Label Check comment saved. Returning to shipments table.');
+=======
+    // If a comment was added, navigate back to shipments table
+    if (hasComment) {
+      if (!isIncomplete) {
+        toast.success('Label Check completed with comment!');
+>>>>>>> e57dfe3d4b4ed86635872787cf968b45dbdf24e1
       } else {
-        toast.info('Returning to shipments table.');
+        toast.info('Label Check comment saved. Returning to shipments table.');
       }
+<<<<<<< HEAD
     } else {
       toast.success('Label Check completed! Returning to shipments table.');
+=======
+      
+      // Navigate back to planning page with shipments tab
+      navigate('/dashboard/production/planning', {
+        state: {
+          activeTab: 'shipments',
+          refresh: Date.now(),
+          fromLabelCheckComplete: true,
+        }
+      });
+    } else if (!isIncomplete) {
+      // If completed without comment, show completion modal
+      toast.success('Label Check completed!');
+      setIsLabelCheckCompleteOpen(true);
+    } else {
+      // If incomplete without comment, navigate back to planning page
+      toast.info('Returning to shipments table.');
+      
+      // Navigate back to planning page with shipments tab
+      navigate('/dashboard/production/planning', {
+        state: {
+          activeTab: 'shipments',
+          refresh: Date.now(),
+          fromLabelCheckComplete: true,
+        }
+      });
+    }
+  };
+
+  const handleMarkAllAsCompleted = async () => {
+    try {
+      if (!shipmentId) {
+        toast.error('Please book the shipment first');
+        return;
+      }
+
+      // Get selected formula IDs from checkbox selection
+      const selectedFormulaIds = Array.from(formulaSelectedRows);
+      
+      if (selectedFormulaIds.length === 0) {
+        toast.info('Please select at least one formula to mark as completed');
+        return;
+      }
+
+      // Mark only selected formulas as checked
+      await updateShipmentFormulaCheck(shipmentId, {
+        checked_formula_ids: selectedFormulaIds,
+        uncheck_formula_ids: []
+      });
+
+      toast.success(`${selectedFormulaIds.length} formula(s) marked as completed`);
+      
+      // Clear selection after marking as completed
+      setFormulaSelectedRows(new Set());
+      
+      // Trigger a refresh by incrementing the refresh key
+      setFormulaCheckRefreshKey(prev => prev + 1);
+    } catch (error) {
+      console.error('Error marking formulas as completed:', error);
+      toast.error('Failed to mark formulas as completed');
+    }
+  };
+
+  const handleMarkAllLabelChecksAsDone = async () => {
+    try {
+      if (!shipmentId) {
+        toast.error('Please book the shipment first');
+        return;
+      }
+
+      // Get all label check rows that are not yet completed
+      const incompleteRows = labelCheckRows.filter(row => !row.isComplete);
+
+      if (incompleteRows.length === 0) {
+        toast.info('All label checks are already completed');
+        return;
+      }
+
+      // Mark all incomplete rows as confirmed
+      const updatePromises = incompleteRows.map(row =>
+        updateShipmentProductLabelCheck(shipmentId, row.id, 'confirmed')
+      );
+
+      await Promise.all(updatePromises);
+
+      toast.success(`All ${incompleteRows.length} label check(s) marked as done`);
+      
+      // Check all incomplete row checkboxes
+      setCheckAllIncompleteTrigger(prev => prev + 1);
+      
+      // Trigger a refresh by incrementing the refresh key
+      setLabelCheckRefreshKey(prev => prev + 1);
+    } catch (error) {
+      console.error('Error marking all label checks as done:', error);
+      toast.error('Failed to mark all label checks as done');
+>>>>>>> e57dfe3d4b4ed86635872787cf968b45dbdf24e1
     }
     
     // Navigate back to planning page with shipments tab
@@ -1262,9 +1620,9 @@ const NewShipment = () => {
           setIsVarianceExceededOpen(true);
           return;
         }
-        // Label Check: Complete and move to the next appropriate step
-        // - When incomplete, mark status as incomplete (orange) but still advance
-        await completeLabelCheck('', isIncomplete);
+
+        // If all checks are done and no variance, complete directly without showing comment modal
+        await completeLabelCheck('', false);
         return;
       }
 
@@ -1482,29 +1840,51 @@ const NewShipment = () => {
     setSelectedFloorInventory(null);
   };
 
-  const floorInventoryOptions = ['Sellables', 'Shiners', 'Unused Formulas'];
+  const floorInventoryOptions = ['Finished Goods', 'Shiners', 'Unused Formulas'];
 
-  // Filter products based on search term
+  // Get unique brands from products - only show allowed brands
+  const allowedBrands = ['TPS Nutrients', 'TPS Plant Foods', 'Bloom City'];
+  const uniqueBrands = useMemo(() => {
+    // Always return only the three allowed brands, sorted
+    return [...allowedBrands].sort();
+  }, []);
+
+  // Filter products based on search term and brand
   // This is computed directly, not memoized, to ensure immediate updates
   const getFilteredProducts = () => {
-    // If no search term or empty, return all products
+    // IMPORTANT: Add _originalIndex to ALL products so qtyValues lookup works after filtering
+    let productsWithIndex = products.map((product, index) => ({
+      ...product,
+      _originalIndex: index, // Store original position in products array for qtyValues lookup
+    }));
+    
+    // Apply brand filter first
+    if (selectedBrand) {
+      productsWithIndex = productsWithIndex.filter(product => {
+        const brandValue = product.brand || '';
+        const productValue = product.product || '';
+        const searchText = (brandValue + ' ' + productValue).toLowerCase();
+        return searchText.includes(selectedBrand.toLowerCase());
+      });
+    }
+    
+    // Then apply search term filter
     if (!searchTerm || searchTerm.trim() === '') {
-      console.log(`🔍 Search empty, returning all ${products.length} products`);
-      return products;
+      return productsWithIndex;
     }
     
     const searchLower = searchTerm.toLowerCase().trim();
     
-    // If search is empty after trim, return all products
+    // If search is empty after trim, return products with index
     if (searchLower === '') {
-      return products;
+      return productsWithIndex;
     }
     
     // Split into words for AND logic
     const searchWords = searchLower.split(/\s+/).filter(w => w.length > 0);
-    console.log(`🔍 Searching for words: [${searchWords.join(', ')}] in ${products.length} products`);
     
-    const filtered = products.filter(product => {
+    // Filter products but preserve _originalIndex
+    const filtered = productsWithIndex.filter(product => {
       // Create a single searchable string from all relevant fields
       const searchableText = [
         product.brand || '',
@@ -1521,7 +1901,6 @@ const NewShipment = () => {
       return searchWords.every(word => searchableText.includes(word));
     });
     
-    console.log(`🔍 Found ${filtered.length} matching products`);
     return filtered;
   };
   
@@ -1565,44 +1944,98 @@ const NewShipment = () => {
                 gap: '16px',
               }}
             >
-              {/* Left: Navigation Tabs */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+              {/* Left: Product Catalog Label and Navigation Tabs */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                {/* Product Catalog - Static Label */}
                 <div
-                  onClick={handleAllProductsClick}
                   style={{
-                    color: activeView === 'all-products' ? '#3B82F6' : '#6B7280',
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    borderBottom: activeView === 'all-products' ? '2px solid #3B82F6' : 'none',
-                    paddingBottom: '4px',
-                    transition: 'all 0.2s',
+                    color: isDarkMode ? '#FFFFFF' : '#111827',
+                    fontSize: '16px',
+                    fontWeight: 600,
+                    whiteSpace: 'nowrap'
                   }}
                 >
-                  All Products
+                  Product Catalog
                 </div>
-                <div
-                  ref={floorInventoryButtonRef}
-                  onClick={() => setIsFloorInventoryOpen(!isFloorInventoryOpen)}
-                  style={{
-                    color: activeView === 'floor-inventory' ? '#3B82F6' : '#6B7280',
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
+                
+                {/* Navigation Tabs */}
+                <div 
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
                     gap: '4px',
-                    position: 'relative',
-                    borderBottom: activeView === 'floor-inventory' ? '2px solid #3B82F6' : 'none',
-                    paddingBottom: '4px',
-                    transition: 'all 0.2s',
+                    padding: '2px',
+                    borderRadius: '6px',
+                    border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
+                    backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF'
                   }}
                 >
-                  {selectedFloorInventory || 'Floor Inventory'}
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M3 4.5L6 7.5L9 4.5" stroke={activeView === 'floor-inventory' ? '#3B82F6' : '#6B7280'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
+                  <div
+                    onClick={handleAllProductsClick}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '4px',
+                      backgroundColor: activeView === 'all-products' 
+                        ? (isDarkMode ? '#1E293B' : '#F1F5F9') 
+                        : 'transparent',
+                      border: activeView === 'all-products' 
+                        ? 'none' 
+                        : `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
+                      color: activeView === 'all-products' 
+                        ? (isDarkMode ? '#FFFFFF' : '#3B82F6') 
+                        : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+                      fontSize: '14px',
+                      fontWeight: activeView === 'all-products' ? 600 : 500,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    All ({products.length})
+                  </div>
+                  <div
+                    ref={floorInventoryButtonRef}
+                    onClick={() => setIsFloorInventoryOpen(!isFloorInventoryOpen)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '4px',
+                      backgroundColor: activeView === 'floor-inventory' 
+                        ? (isDarkMode ? '#1E293B' : '#F1F5F9') 
+                        : 'transparent',
+                      border: activeView === 'floor-inventory' 
+                        ? 'none' 
+                        : `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
+                      color: activeView === 'floor-inventory' 
+                        ? (isDarkMode ? '#FFFFFF' : '#3B82F6') 
+                        : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+                      fontSize: '14px',
+                      fontWeight: activeView === 'floor-inventory' ? 600 : 500,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      position: 'relative',
+                      transition: 'all 0.2s',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    Floor Inventory
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path 
+                        d="M3 4.5L6 7.5L9 4.5" 
+                        stroke={activeView === 'floor-inventory' 
+                          ? (isDarkMode ? '#FFFFFF' : '#3B82F6') 
+                          : (isDarkMode ? '#9CA3AF' : '#6B7280')} 
+                        strokeWidth="1.5" 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
                 </div>
+              </div>
                 
                 {isFloorInventoryOpen && createPortal(
                   <div
@@ -1611,10 +2044,12 @@ const NewShipment = () => {
                       position: 'fixed',
                       top: `${floorInventoryPosition.top}px`,
                       left: `${floorInventoryPosition.left}px`,
-                      backgroundColor: '#FFFFFF',
-                      border: '1px solid #E5E7EB',
+                      backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                      border: `1px solid ${isDarkMode ? '#4B5563' : '#E5E7EB'}`,
                       borderRadius: '6px',
-                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                      boxShadow: isDarkMode 
+                        ? '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)' 
+                        : '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
                       zIndex: 10000,
                       minWidth: '160px',
                       overflow: 'hidden',
@@ -1627,14 +2062,16 @@ const NewShipment = () => {
                         style={{
                           padding: '8px 12px',
                           cursor: 'pointer',
-                          color: '#111827',
+                          color: isDarkMode ? '#F9FAFB' : '#111827',
                           fontSize: '14px',
-                          backgroundColor: selectedFloorInventory === option ? '#F3F4F6' : 'transparent',
+                          backgroundColor: selectedFloorInventory === option 
+                            ? (isDarkMode ? '#374151' : '#F3F4F6') 
+                            : 'transparent',
                           transition: 'background-color 0.2s',
                         }}
                         onMouseEnter={(e) => {
                           if (selectedFloorInventory !== option) {
-                            e.currentTarget.style.backgroundColor = '#F9FAFB';
+                            e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F9FAFB';
                           }
                         }}
                         onMouseLeave={(e) => {
@@ -1643,284 +2080,50 @@ const NewShipment = () => {
                           }
                         }}
                       >
-                        {option}
+                        {option} ({floorInventoryCounts[option] || 0})
                       </div>
                     ))}
                   </div>,
                   document.body
                 )}
-              </div>
 
-              {/* Right: Forecast Range and Search Input */}
+              {/* Right: DOI Settings, Sort, and Search Input */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-                {/* Forecast Range */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', position: 'relative' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <svg
-                      ref={doiIconRef}
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                      onMouseEnter={() => setShowDOITooltip(true)}
-                      onMouseLeave={() => {
-                        if (!isTooltipPinned) {
-                          setShowDOITooltip(false);
-                        }
-                      }}
-                      onClick={() => {
-                        setIsTooltipPinned(!isTooltipPinned);
-                        setShowDOITooltip(true);
-                      }}
-                      style={{ cursor: 'pointer', flexShrink: 0, display: 'block' }}
-                      role="button"
-                      aria-label="Forecast Range info"
-                    >
-                      <defs>
-                        <linearGradient id="infoGradient" x1="12" y1="0" x2="12" y2="24" gradientUnits="userSpaceOnUse">
-                          <stop stopColor="#3B82F6" />
-                          <stop offset="1" stopColor="#1D4ED8" />
-                        </linearGradient>
-                      </defs>
-                      <circle cx="12" cy="12" r="11" fill="url(#infoGradient)" stroke="#1E3A8A" strokeWidth="1" />
-                      <rect x="11.25" y="10" width="1.5" height="6" rx="0.75" fill="#FFFFFF" />
-                      <rect x="11.25" y="6" width="1.5" height="1.5" rx="0.75" fill="#FFFFFF" />
-                    </svg>
-                    <span style={{ fontSize: '14px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
-                      Forecast Range
-                    </span>
-                  </div>
-                  
-                  {/* Forecast Range Tooltip */}
-                  {showDOITooltip && (
-                    <div
-                      ref={doiTooltipRef}
-                      onMouseEnter={() => setShowDOITooltip(true)}
-                      onMouseLeave={() => {
-                        if (!isTooltipPinned) {
-                          setShowDOITooltip(false);
-                        }
-                      }}
-                      style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: '0',
-                        marginTop: '8px',
-                        backgroundColor: '#FFFFFF',
-                        borderRadius: '6px',
-                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                        padding: '12px',
-                        width: '360px',
-                        zIndex: 10000,
-                        boxSizing: 'border-box',
-                        border: '1px solid #E5E7EB',
-                      }}
-                    >
-                      {/* Arrow pointing up - aligned with icon center */}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '-6px',
-                          left: '8px',
-                          transform: 'translateX(-50%) rotate(45deg)',
-                          width: '12px',
-                          height: '12px',
-                          backgroundColor: '#FFFFFF',
-                          borderLeft: '1px solid #E5E7EB',
-                          borderTop: '1px solid #E5E7EB',
-                        }}
-                      />
-                      
-                      {/* Header with icon and title */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
-                        <svg 
-                          width="20" 
-                          height="20" 
-                          viewBox="0 0 24 24" 
-                          fill="none" 
-                          xmlns="http://www.w3.org/2000/svg"
-                          style={{ flexShrink: 0 }}
-                        >
-                          {/* Calendar */}
-                          <rect x="3" y="4" width="18" height="18" rx="2" stroke="#2563EB" strokeWidth="2" fill="none"/>
-                          <line x1="8" y1="2" x2="8" y2="6" stroke="#2563EB" strokeWidth="2" strokeLinecap="round"/>
-                          <line x1="16" y1="2" x2="16" y2="6" stroke="#2563EB" strokeWidth="2" strokeLinecap="round"/>
-                          <line x1="3" y1="10" x2="21" y2="10" stroke="#2563EB" strokeWidth="2"/>
-                          {/* Clock inside calendar */}
-                          <circle cx="12" cy="15" r="4" stroke="#2563EB" strokeWidth="1.5" fill="none"/>
-                          <line x1="12" y1="15" x2="12" y2="13" stroke="#2563EB" strokeWidth="1.5" strokeLinecap="round"/>
-                          <line x1="12" y1="15" x2="13.5" y2="15" stroke="#2563EB" strokeWidth="1.5" strokeLinecap="round"/>
-                        </svg>
-                        <h3 style={{ 
-                          fontSize: '16px', 
-                          fontWeight: 600, 
-                          color: '#111827', 
-                          margin: 0 
-                        }}>
-                          Forecast Range Guide
-                        </h3>
-                      </div>
-                      
-                      {/* Body text */}
-                      <div style={{ fontSize: '14px', color: '#374151', lineHeight: '1.5', marginBottom: '4px' }}>
-                        <p style={{ margin: 0 }}>
-                          The Forecast Range determines the future period for calculating inventory needs. It sets the target date for your{' '}
-                          <span style={{ color: '#2563EB', fontWeight: 500 }}>DOI Goal</span>
-                          {' '}(Days of Inventory), the number of days your inventory will last based on sales data.
-                        </p>
-                        <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#6B7280' }}>
-                          This range actively manipulates the DOI Goal and products react accordingly to help you maintain optimal inventory levels.
-                        </p>
-                      </div>
-                      
-                      {/* Recommended Range section */}
-                      <div style={{ marginBottom: '4px' }}>
-                        <span style={{ 
-                          fontSize: '14px', 
-                          fontWeight: 600, 
-                          color: '#2563EB'
-                        }}>
-                          Recommended Range:{' '}
-                        </span>
-                        <span style={{ 
-                          fontSize: '14px', 
-                          color: '#2563EB',
-                          lineHeight: '1.5'
-                        }}>
-                          90-180 days for optimal coverage and planning flexibility.
-                        </span>
-                      </div>
-                      
-                      {/* View Date Calculation Info */}
-                      <div 
-                        onClick={() => setShowDateCalculationInfo(!showDateCalculationInfo)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          cursor: 'pointer',
-                          color: '#6B7280',
-                          fontSize: '14px',
-                          paddingTop: '4px',
-                          marginTop: '4px',
-                          borderTop: '1px solid #E5E7EB',
-                        }}
-                      >
-                        <span>View Date Calculation Info</span>
-                        <svg 
-                          width="16" 
-                          height="16" 
-                          viewBox="0 0 24 24" 
-                          fill="none" 
-                          xmlns="http://www.w3.org/2000/svg"
-                          style={{
-                            transform: showDateCalculationInfo ? 'rotate(180deg)' : 'rotate(0deg)',
-                            transition: 'transform 0.2s',
-                          }}
-                        >
-                          <path 
-                            d="M6 9L12 15L18 9" 
-                            stroke="currentColor" 
-                            strokeWidth="2" 
-                            strokeLinecap="round" 
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      </div>
-                      
-                      {/* Expanded Date Calculation Info */}
-                      {showDateCalculationInfo && (
-                        <div style={{ 
-                          marginTop: '12px',
-                        }}>
-                          {/* Formula */}
-                          <div style={{
-                            fontSize: '14px',
-                            color: '#111827',
-                            fontWeight: 400,
-                            marginBottom: '12px',
-                            lineHeight: '1.5'
-                          }}>
-                            DOI Goal Date = Current Date + Forecast Range
-                          </div>
-                          
-                          {/* Pro Tip Box */}
-                          <div style={{
-                            backgroundColor: '#F3E8FF',
-                            borderRadius: '8px',
-                            padding: '12px',
-                            border: '1px solid #E9D5FF'
-                          }}>
-                            {/* Pro Tip Header */}
-                            <div style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              marginBottom: '8px'
-                            }}>
-                              <svg 
-                                width="16" 
-                                height="16" 
-                                viewBox="0 0 24 24" 
-                                fill="none" 
-                                xmlns="http://www.w3.org/2000/svg"
-                                style={{ flexShrink: 0 }}
-                              >
-                                <path 
-                                  d="M9 21c0 .5.4 1 1 1h4c.6 0 1-.5 1-1v-1H9v1zm3-19C8.1 2 5 5.1 5 9c0 2.4 1.2 4.5 3 5.7V17c0 .5.4 1 1 1h6c.6 0 1-.5 1-1v-2.3c1.8-1.3 3-3.4 3-5.7 0-3.9-3.1-7-7-7z" 
-                                  fill="#9333EA"
-                                />
-                              </svg>
-                              <span style={{
-                                fontSize: '14px',
-                                fontWeight: 600,
-                                color: '#9333EA'
-                              }}>
-                                Pro Tip:
-                              </span>
-                            </div>
-                            
-                            {/* Pro Tip Body */}
-                            <div style={{
-                              fontSize: '14px',
-                              color: '#9333EA',
-                              lineHeight: '1.5'
-                            }}>
-                              Set your range to cover <strong>Lead Time</strong> + <strong>Manufacturing Cycle</strong> + <strong>Safety Buffer</strong>. This ensures you never run out of stock before the next shipment arrives.
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  <input
-                    type="text"
-                    value={forecastRange}
-                    onChange={(e) => setForecastRange(e.target.value)}
+                {/* DOI Settings Popover */}
+                <DOISettingsPopover
+                  isDarkMode={isDarkMode}
+                  onSettingsChange={handleDoiSettingsChange}
+                />
+
+                {/* Brand Filter */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '14px', fontWeight: 400, color: isDarkMode ? '#94a3b8' : '#6B7280' }}>Brand</span>
+                  <select
+                    value={selectedBrand}
+                    onChange={(e) => setSelectedBrand(e.target.value)}
                     style={{
-                      width: '80px',
-                      height: '32px',
-                      padding: '6px 12px',
+                      backgroundColor: isDarkMode ? '#1e293b' : '#FFFFFF',
+                      color: isDarkMode ? '#fff' : '#111827',
+                      border: `1px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
                       borderRadius: '6px',
-                      border: '1px solid #D1D5DB',
-                      backgroundColor: '#FFFFFF',
-                      color: '#111827',
+                      padding: '6px 28px 6px 12px',
                       fontSize: '14px',
-                      textAlign: 'center',
-                      outline: 'none',
-                      boxSizing: 'border-box',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      appearance: 'none',
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='${isDarkMode ? '%2394a3b8' : '%236B7280'}' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'right 8px center',
+                      minWidth: '150px',
                     }}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = '#3B82F6';
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = '#D1D5DB';
-                    }}
-                  />
-                  <span style={{ fontSize: '14px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
-                    days
-                  </span>
+                  >
+                    <option value="">All Brands</option>
+                    {uniqueBrands.map((brand) => (
+                      <option key={brand} value={brand}>
+                        {brand}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Search Input */}
@@ -1937,18 +2140,19 @@ const NewShipment = () => {
                     top: '50%',
                     transform: 'translateY(-50%)',
                     pointerEvents: 'none',
+                    zIndex: 1,
                   }}
                 >
                   <path
                     d="M7.33333 12.6667C10.2789 12.6667 12.6667 10.2789 12.6667 7.33333C12.6667 4.38781 10.2789 2 7.33333 2C4.38781 2 2 4.38781 2 7.33333C2 10.2789 4.38781 12.6667 7.33333 12.6667Z"
-                    stroke="#9CA3AF"
+                    stroke={isDarkMode ? '#9CA3AF' : '#9CA3AF'}
                     strokeWidth="1.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />
                   <path
                     d="M14 14L11.1 11.1"
-                    stroke="#9CA3AF"
+                    stroke={isDarkMode ? '#9CA3AF' : '#9CA3AF'}
                     strokeWidth="1.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -1963,10 +2167,11 @@ const NewShipment = () => {
                     width: '100%',
                     height: '32px',
                     padding: '6px 12px 6px 32px',
+                    paddingRight: searchTerm ? '32px' : '12px',
                     borderRadius: '6px',
-                    border: '1px solid #D1D5DB',
-                    backgroundColor: '#FFFFFF',
-                    color: '#111827',
+                    border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
+                    backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                    color: isDarkMode ? '#F9FAFB' : '#111827',
                     fontSize: '13px',
                     outline: 'none',
                     boxSizing: 'border-box',
@@ -1975,9 +2180,54 @@ const NewShipment = () => {
                     e.target.style.borderColor = '#3B82F6';
                   }}
                   onBlur={(e) => {
-                    e.target.style.borderColor = '#D1D5DB';
+                    e.target.style.borderColor = isDarkMode ? '#4B5563' : '#D1D5DB';
                   }}
                 />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    style={{
+                      position: 'absolute',
+                      right: '8px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      width: '16px',
+                      height: '16px',
+                      border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
+                      borderRadius: '4px',
+                      backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: 0,
+                      zIndex: 2,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = isDarkMode ? '#6B7280' : '#9CA3AF';
+                      e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = isDarkMode ? '#4B5563' : '#D1D5DB';
+                      e.currentTarget.style.backgroundColor = isDarkMode ? '#1F2937' : '#FFFFFF';
+                    }}
+                  >
+                    <svg
+                      width="10"
+                      height="10"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke={isDarkMode ? '#9CA3AF' : '#6B7280'}
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                )}
                 </div>
               </div>
             </div>
@@ -1996,6 +2246,7 @@ const NewShipment = () => {
                     onAddedRowsChange={setAddedRows}
                     labelsAvailabilityMap={labelsAvailabilityMap}
                     forecastRange={parseInt(forecastRange) || 120}
+                    manuallyEditedIndicesRef={manuallyEditedIndicesRef}
                   />
                 )}
               </>
@@ -2004,7 +2255,7 @@ const NewShipment = () => {
         )}
 
         {/* Separate container for Sellables View */}
-        {activeAction === 'add-products' && activeView === 'floor-inventory' && selectedFloorInventory === 'Sellables' && (
+        {activeAction === 'add-products' && activeView === 'floor-inventory' && selectedFloorInventory === 'Finished Goods' && (
           <div style={{ padding: '0 1.5rem' }}>
             <SellablesView />
           </div>
@@ -2052,6 +2303,8 @@ const NewShipment = () => {
               onFormulaDataChange={setFormulaCheckData}
               selectedRows={formulaSelectedRows}
               onSelectedRowsChange={setFormulaSelectedRows}
+              refreshKey={formulaCheckRefreshKey}
+              isAdmin={false} // TODO: Connect to actual user role check (e.g., user?.role === 'admin')
             />
           </div>
         )}
@@ -2068,6 +2321,10 @@ const NewShipment = () => {
                 setVarianceExceededRowIds([]);
               }}
               onRowsDataChange={setLabelCheckRows}
+              onSelectedRowsChange={setLabelCheckSelectedRowsCount}
+              refreshKey={labelCheckRefreshKey}
+              checkAllIncompleteTrigger={checkAllIncompleteTrigger}
+              isAdmin={false} // TODO: Connect to actual user role check (e.g., user?.role === 'admin')
             />
           </div>
         )}
@@ -2432,16 +2689,25 @@ const NewShipment = () => {
         <div
           style={{
             position: 'fixed',
-            bottom: 0,
-            left: '256px',
-            right: 0,
-            backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-            borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+            bottom: '16px',
+            left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2)`,
+            transform: 'translateX(-50%)',
+            width: 'fit-content',
+            minWidth: '1014px',
+            height: '65px',
+            backgroundColor: isDarkMode ? 'rgba(31, 41, 55, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+            borderRadius: '32px',
             padding: '16px 24px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            zIndex: 10,
+            gap: '32px',
+            zIndex: 1000,
+            transition: 'left 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+            boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
           }}
         >
           {activeAction === 'formula-check' ? (
@@ -2501,6 +2767,53 @@ const NewShipment = () => {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                {formulaSelectedRows.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleMarkAllAsCompleted}
+                    style={{
+                      height: '31px',
+                      padding: '0 16px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      backgroundColor: '#007AFF',
+                      color: '#FFFFFF',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#0056CC';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#007AFF';
+                    }}
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      style={{ flexShrink: 0 }}
+                    >
+                      <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" fill="none" />
+                      <path
+                        d="M5 8L7 10L11 6"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    Mark All as Completed
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleCompleteClick}
@@ -2587,6 +2900,53 @@ const NewShipment = () => {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                {labelCheckRemainingCount > 0 && labelCheckSelectedRowsCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleMarkAllLabelChecksAsDone}
+                    style={{
+                      height: '31px',
+                      padding: '0 16px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      backgroundColor: '#007AFF',
+                      color: '#FFFFFF',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#0056CC';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#007AFF';
+                    }}
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      style={{ flexShrink: 0 }}
+                    >
+                      <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" fill="none" />
+                      <path
+                        d="M5 8L7 10L11 6"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    Mark All as Done
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleCompleteClick}
@@ -2690,12 +3050,13 @@ const NewShipment = () => {
           ) : (
             /* Default Footer (Add Products) */
             <>
-              <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div style={{ display: 'flex', gap: '48px', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
                   <span style={{
                     fontSize: '12px',
                     fontWeight: 400,
                     color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                    textAlign: 'center',
                   }}>
                     PALETTES
                   </span>
@@ -2703,31 +3064,53 @@ const NewShipment = () => {
                     fontSize: '18px',
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
+                    textAlign: 'center',
                   }}>
                     {totalPalettes.toFixed(2)}
                   </span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
                   <span style={{
                     fontSize: '12px',
                     fontWeight: 400,
                     color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                    textAlign: 'center',
                   }}>
-                    TOTAL BOXES
+                    PRODUCTS
                   </span>
                   <span style={{
                     fontSize: '18px',
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
+                    textAlign: 'center',
                   }}>
-                    {Math.ceil(totalBoxes).toLocaleString()}
+                    {totalProducts}
                   </span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
                   <span style={{
                     fontSize: '12px',
                     fontWeight: 400,
                     color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                    textAlign: 'center',
+                  }}>
+                    BOXES
+                  </span>
+                  <span style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                    textAlign: 'center',
+                  }}>
+                    {Math.ceil(totalBoxes).toLocaleString()}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 400,
+                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                    textAlign: 'center',
                   }}>
                     UNITS
                   </span>
@@ -2735,15 +3118,18 @@ const NewShipment = () => {
                     fontSize: '18px',
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
+                    textAlign: 'center',
                   }}>
                     {totalUnits.toLocaleString()}
                   </span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
                   <span style={{
                     fontSize: '12px',
                     fontWeight: 400,
                     color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                    textAlign: 'center',
+                    whiteSpace: 'nowrap',
                   }}>
                     TIME (HRS)
                   </span>
@@ -2751,15 +3137,18 @@ const NewShipment = () => {
                     fontSize: '18px',
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
+                    textAlign: 'center',
                   }}>
                     {totalTimeHours.toFixed(1)}
                   </span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
                   <span style={{
                     fontSize: '12px',
                     fontWeight: 400,
                     color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                    textAlign: 'center',
+                    whiteSpace: 'nowrap',
                   }}>
                     WEIGHT (LBS)
                   </span>
@@ -2767,12 +3156,61 @@ const NewShipment = () => {
                     fontSize: '18px',
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
+                    textAlign: 'center',
                   }}>
                     {Math.round(totalWeightLbs).toLocaleString()}
                   </span>
                 </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 400,
+                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                    textAlign: 'center',
+                  }}>
+                    FORMULAS
+                  </span>
+                  <span style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                    textAlign: 'center',
+                  }}>
+                    {totalFormulas}
+                  </span>
+                </div>
               </div>
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddedRows(new Set());
+                    setQtyValues({});
+                  }}
+                  style={{
+                    height: '31px',
+                    padding: '0 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: 'transparent',
+                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  Clear
+                </button>
                 <button
                   type="button"
                   onClick={handleExport}
@@ -2814,6 +3252,25 @@ const NewShipment = () => {
         }}
         selectedRow={selectedRow}
         forecastRange={parseInt(forecastRange) || 150}
+        doiSettings={doiSettingsValues}
+        allProducts={filteredProducts}
+        onNavigate={(direction) => {
+          if (!selectedRow || !filteredProducts || filteredProducts.length === 0) return;
+          
+          const currentIndex = filteredProducts.findIndex(p => p.id === selectedRow.id);
+          if (currentIndex === -1) return;
+          
+          let newIndex;
+          if (direction === 'prev') {
+            // Go to previous, wrap to end if at beginning
+            newIndex = currentIndex === 0 ? filteredProducts.length - 1 : currentIndex - 1;
+          } else {
+            // Go to next, wrap to beginning if at end
+            newIndex = currentIndex === filteredProducts.length - 1 ? 0 : currentIndex + 1;
+          }
+          
+          setSelectedRow(filteredProducts[newIndex]);
+        }}
         labelsAvailable={(() => {
           if (!selectedRow?.label_location) return null;
           const labelLoc = selectedRow.label_location;
@@ -3071,6 +3528,7 @@ const NewShipment = () => {
           setIsLabelIncompleteComment(false);
         }}
         isDarkMode={isDarkMode}
+        isIncomplete={isLabelIncompleteComment}
       />
 
       <LabelCheckCompleteModal
@@ -3091,6 +3549,28 @@ const NewShipment = () => {
         isFormulaCheckCompleted={completedTabs.has('formula-check')}
       />
 
+<<<<<<< HEAD
+=======
+      <FormulaCheckCompleteModal
+        isOpen={isFormulaCheckCompleteOpen}
+        onClose={() => setIsFormulaCheckCompleteOpen(false)}
+        onGoToShipments={() => {
+          setIsFormulaCheckCompleteOpen(false);
+        }}
+        onBeginLabelCheck={() => {
+          setIsFormulaCheckCompleteOpen(false);
+          // Navigate to label-check section
+          handleActionChange('label-check');
+        }}
+        onBeginBookShipment={() => {
+          setIsFormulaCheckCompleteOpen(false);
+          // Navigate to book-shipment section
+          handleActionChange('book-shipment');
+        }}
+        isLabelCheckCompleted={completedTabs.has('label-check')}
+      />
+
+>>>>>>> e57dfe3d4b4ed86635872787cf968b45dbdf24e1
       {/* Book Shipment Complete Modal */}
       {isBookShipmentCompleteOpen && (
         <>

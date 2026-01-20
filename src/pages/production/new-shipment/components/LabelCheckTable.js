@@ -14,6 +14,9 @@ const LabelCheckTable = ({
   onRowsDataChange,
   hideHeader = false,
   refreshKey = 0, // Increment to trigger reload while preserving checked status
+  checkAllIncompleteTrigger = 0, // Increment to check all incomplete row checkboxes
+  isAdmin = false, // Admin role check for bulk actions
+  onSelectedRowsChange, // Callback to notify parent of selected rows count
 }) => {
   const { isDarkMode } = useTheme();
   const location = useLocation();
@@ -55,6 +58,7 @@ const LabelCheckTable = ({
   const [confirmedRows, setConfirmedRows] = useState(new Set()); // Rows confirmed without counting
   const [completedRowStatus, setCompletedRowStatus] = useState({}); // id -> insufficient?: true/false
   const [selectedRows, setSelectedRows] = useState(new Set()); // Track selected rows for checkboxes
+  const [bulkSelectedRows, setBulkSelectedRows] = useState(new Set()); // Track rows selected for bulk actions
   const [isVarianceStillExceededOpen, setIsVarianceStillExceededOpen] = useState(false);
   const [labelFormula, setLabelFormula] = useState(null); // Current label formula for weight conversion
   const hideActionsDropdown = Boolean(shipmentId);
@@ -142,6 +146,98 @@ const LabelCheckTable = ({
     }
   };
 
+  // Handle bulk checkbox change (for bulk actions)
+  const handleBulkCheckboxChange = (id) => {
+    setBulkSelectedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  // Handle select all checkbox in header
+  const handleSelectAll = (checked) => {
+    const filteredRows = getFilteredRows();
+    if (isAdmin) {
+      if (checked) {
+        // Add all filtered row IDs to bulkSelectedRows (preserve existing selections)
+        setBulkSelectedRows(prev => {
+          const newSet = new Set(prev);
+          filteredRows.forEach(row => newSet.add(row.id));
+          return newSet;
+        });
+      } else {
+        // Remove all filtered row IDs from bulkSelectedRows
+        setBulkSelectedRows(prev => {
+          const newSet = new Set(prev);
+          filteredRows.forEach(row => newSet.delete(row.id));
+          return newSet;
+        });
+      }
+    } else {
+      if (checked) {
+        // Add all filtered row IDs to selectedRows (preserve existing selections)
+        setSelectedRows(prev => {
+          const newSet = new Set(prev);
+          filteredRows.forEach(row => newSet.add(row.id));
+          return newSet;
+        });
+      } else {
+        // Remove all filtered row IDs from selectedRows
+        setSelectedRows(prev => {
+          const newSet = new Set(prev);
+          filteredRows.forEach(row => newSet.delete(row.id));
+          return newSet;
+        });
+      }
+    }
+  };
+
+  // Check if all filtered rows are selected
+  const areAllRowsSelected = () => {
+    const filteredRows = getFilteredRows();
+    if (filteredRows.length === 0) return false;
+    
+    if (isAdmin) {
+      return filteredRows.every(row => bulkSelectedRows.has(row.id));
+    } else {
+      return filteredRows.every(row => selectedRows.has(row.id));
+    }
+  };
+
+  // Handle bulk complete action
+  const handleBulkComplete = async () => {
+    if (bulkSelectedRows.size === 0) return;
+    
+    try {
+      setLoading(true);
+      // Complete all selected products by marking them as confirmed
+      const promises = Array.from(bulkSelectedRows).map(async (id) => {
+        try {
+          await updateShipmentProductLabelCheck(shipmentId, id, 'confirmed');
+        } catch (error) {
+          console.error(`Error completing product ${id}:`, error);
+        }
+      });
+      await Promise.all(promises);
+      
+      // Reload data
+      await loadLabelData();
+      await checkAndClearLabelCheckComment();
+      
+      // Clear bulk selection
+      setBulkSelectedRows(new Set());
+    } catch (error) {
+      console.error('Error bulk completing label checks:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Check if all label checks are complete and clear comment if so
   const checkAndClearLabelCheckComment = async () => {
     if (!shipmentId) return;
@@ -192,7 +288,25 @@ const LabelCheckTable = ({
   // Initialize rows state with empty array - only use real data from API
   const [rows, setRows] = useState([]);
 
+  // Check all incomplete row checkboxes when trigger changes
+  useEffect(() => {
+    if (checkAllIncompleteTrigger > 0 && rows.length > 0) {
+      setSelectedRows(prev => {
+        const newSet = new Set(prev);
+        // Add all incomplete rows (rows without confirmed or counted status) to selectedRows
+        rows.forEach(row => {
+          const isCompleted = row.label_check_status === 'confirmed' || row.label_check_status === 'counted';
+          if (!isCompleted) {
+            newSet.add(row.id);
+          }
+        });
+        return newSet;
+      });
+    }
+  }, [checkAllIncompleteTrigger, rows]);
+
   const columns = [
+    { key: 'checkbox', label: '', width: '50px' },
     { key: 'start', label: '', width: '100px' },
     { key: 'brand', label: 'BRAND', width: '150px' },
     { key: 'product', label: 'PRODUCT', width: '200px' },
@@ -226,6 +340,36 @@ const LabelCheckTable = ({
   const isNumericColumn = (columnKey) =>
     columnKey === 'quantity' || columnKey === 'lblCurrentInv';
 
+  // Check if a column has active filters (excludes sort - only checks for Filter by Values and Filter by Conditions)
+  const hasActiveFilter = (columnKey) => {
+    const filter = filters[columnKey];
+    if (!filter || filter === null || filter === undefined) return false;
+    
+    // Check for condition filter
+    const hasCondition = filter.conditionType && filter.conditionType !== '';
+    if (hasCondition) return true;
+    
+    // Check for value filters - only active if not all values are selected
+    if (!filter.selectedValues || filter.selectedValues.size === 0) return false;
+    
+    // Get all available values for this column
+    const allAvailableValues = getColumnValues(columnKey);
+    if (allAvailableValues.length === 0) return false;
+    
+    const allValuesSet = new Set(allAvailableValues.map(v => String(v)));
+    const selectedValuesSet = filter.selectedValues instanceof Set 
+      ? new Set(Array.from(filter.selectedValues).map(v => String(v)))
+      : new Set(Array.from(filter.selectedValues || []).map(v => String(v)));
+    
+    // Check if all available values are selected - if so, it's not an active filter
+    const allSelected = allValuesSet.size > 0 && 
+      selectedValuesSet.size === allValuesSet.size &&
+      Array.from(allValuesSet).every(val => selectedValuesSet.has(val));
+    
+    // Filter is active only if not all values are selected
+    return !allSelected;
+  };
+
   const applyConditionFilter = (value, conditionType, conditionValue, numeric) => {
     if (!conditionType) return true;
 
@@ -257,12 +401,39 @@ const LabelCheckTable = ({
         return Number(value) >= Number(conditionValue);
       case 'lessOrEqual':
         return Number(value) <= Number(conditionValue);
+      case 'between':
+        if (!conditionValue || !conditionValue.includes('-')) return true;
+        const [min, max] = conditionValue.split('-').map(v => Number(v.trim()));
+        if (isNaN(min) || isNaN(max)) return true;
+        const numValue = Number(value);
+        return numValue >= min && numValue <= max;
+      case 'notBetween':
+        if (!conditionValue || !conditionValue.includes('-')) return true;
+        const [minNot, maxNot] = conditionValue.split('-').map(v => Number(v.trim()));
+        if (isNaN(minNot) || isNaN(maxNot)) return true;
+        const numValueNot = Number(value);
+        return numValueNot < minNot || numValueNot > maxNot;
       default:
         return true;
     }
   };
 
   const handleApplyFilter = (columnKey, filterData) => {
+    // If filterData is null, remove the filter (Reset was clicked)
+    if (filterData === null) {
+      setFilters(prev => {
+        const newFilters = { ...prev };
+        delete newFilters[columnKey];
+        return newFilters;
+      });
+      // Also clear sort for this column
+      if (sortField === columnKey) {
+        setSortField('');
+        setSortOrder('');
+      }
+      return;
+    }
+    
     setFilters(prev => ({
       ...prev,
       [columnKey]: {
@@ -596,32 +767,39 @@ const LabelCheckTable = ({
     }
   }, [rows, completedRows, confirmedRows, completedRowStatus, onRowsDataChange]);
 
+  // Notify parent component when selected rows change
+  useEffect(() => {
+    if (onSelectedRowsChange) {
+      onSelectedRowsChange(selectedRows.size);
+    }
+  }, [selectedRows, onSelectedRowsChange]);
+
   // Close filter dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (openFilterColumn !== null) {
         const filterIcon = filterIconRefs.current[openFilterColumn];
-        const dropdown = filterDropdownRef.current;
         
-        if (filterIcon && dropdown) {
-          const isClickInsideIcon = filterIcon.contains(event.target);
-          const isClickInsideDropdown = dropdown.contains(event.target);
-          
-          if (!isClickInsideIcon && !isClickInsideDropdown) {
-            setOpenFilterColumn(null);
-          }
+        // Check if click is on the filter icon
+        const clickedOnFilterIcon = filterIcon && filterIcon.contains && filterIcon.contains(event.target);
+        
+        // Check if click is inside the dropdown (by ref or attribute)
+        const clickedInsideDropdown = 
+          (filterDropdownRef.current && filterDropdownRef.current.contains && filterDropdownRef.current.contains(event.target)) ||
+          event.target.closest('[data-filter-dropdown]');
+        
+        if (!clickedOnFilterIcon && !clickedInsideDropdown) {
+          setOpenFilterColumn(null);
         }
       }
     };
 
     if (openFilterColumn !== null) {
-      const timeoutId = setTimeout(() => {
-        document.addEventListener('click', handleClickOutside);
-      }, 0);
+      // Use mousedown with capture phase to catch clicks early
+      document.addEventListener('mousedown', handleClickOutside, true);
       
       return () => {
-        clearTimeout(timeoutId);
-        document.removeEventListener('click', handleClickOutside);
+        document.removeEventListener('mousedown', handleClickOutside, true);
       };
     }
   }, [openFilterColumn]);
@@ -642,6 +820,54 @@ const LabelCheckTable = ({
       width: '100%',
       marginBottom: '16px',
     }}>
+      {/* Bulk Action Bar (Admin only, shown when items are selected) */}
+      {isAdmin && bulkSelectedRows.size > 0 && (
+        <div style={{
+          backgroundColor: isDarkMode ? '#374151' : '#F3F4F6',
+          borderBottom: isDarkMode ? '1px solid #4B5563' : '1px solid #E5E7EB',
+          padding: '12px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          <span style={{
+            fontSize: '14px',
+            fontWeight: 500,
+            color: isDarkMode ? '#E5E7EB' : '#374151',
+          }}>
+            {bulkSelectedRows.size} {bulkSelectedRows.size === 1 ? 'product' : 'products'} selected
+          </span>
+          <button
+            type="button"
+            onClick={handleBulkComplete}
+            disabled={loading}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: 'none',
+              backgroundColor: '#10B981',
+              color: '#FFFFFF',
+              fontSize: '14px',
+              fontWeight: 500,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.6 : 1,
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              if (!loading) {
+                e.currentTarget.style.backgroundColor = '#059669';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!loading) {
+                e.currentTarget.style.backgroundColor = '#10B981';
+              }
+            }}
+          >
+            Complete Selected
+          </button>
+        </div>
+      )}
       {/* Recount Mode Banner */}
       {isRecountMode && (
         <div style={{
@@ -833,58 +1059,98 @@ const LabelCheckTable = ({
               <tr style={{ height: '40px', maxHeight: '40px' }}>
                 {(() => {
                   const filteredRows = getFilteredRows();
-                  return columns.map((column) => (
+                  return columns.map((column) => {
+                    const isActive = hasActiveFilter(column.key);
+                    return (
                     <th
                       key={column.key}
                       className={column.key !== 'start' ? 'group cursor-pointer' : ''}
                       style={{
-                        padding: column.key === 'start' ? '0 8px' : '0 16px',
-                        textAlign: column.key === 'start' ? 'center' : 'left',
+                        padding: (column.key === 'start' || column.key === 'checkbox') ? '0 8px' : '0 16px',
+                        textAlign: (column.key === 'start' || column.key === 'checkbox') ? 'center' : 'left',
                         fontSize: '11px',
                         fontWeight: 600,
-                        color: '#9CA3AF',
+                        color: '#FFFFFF',
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em',
                         width: column.width,
                         whiteSpace: 'nowrap',
-                        borderRight: column.key === 'start' ? 'none' : '1px solid #FFFFFF',
+                        borderRight: (column.key === 'start' || column.key === 'checkbox') ? 'none' : '1px solid #FFFFFF',
                         height: '40px',
-                        position: column.key !== 'start' ? 'relative' : 'static',
+                        position: (column.key !== 'start' && column.key !== 'checkbox') ? 'relative' : 'static',
+                        backgroundColor: isActive ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
                       }}
                     >
-                      {column.label}
-                    {!disableFilters && column.key !== 'start' && (
-                      <img
-                        ref={(el) => { if (el) filterIconRefs.current[column.key] = el; }}
-                        src="/assets/Vector (1).png"
-                        alt="Filter"
-                        className={`w-3 h-3 transition-opacity cursor-pointer ${
-                          openFilterColumn === column.key
-                            ? 'opacity-100'
-                            : 'opacity-0 group-hover:opacity-100'
-                        }`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenFilterColumn(openFilterColumn === column.key ? null : column.key);
-                        }}
-                        style={{
-                          position: 'absolute',
-                          top: '50%',
-                          right: '8px',
-                          transform: 'translateY(-50%)',
-                          width: '12px',
-                          height: '12px',
-                          ...(openFilterColumn === column.key
-                            ? {
-                                filter:
-                                  'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
-                              }
-                            : undefined)
-                        }}
-                      />
-                    )}
+                      {column.key === 'checkbox' ? (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                          <input
+                            type="checkbox"
+                            checked={areAllRowsSelected()}
+                            onChange={(e) => handleSelectAll(e.target.checked)}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              width: '16px',
+                              height: '16px',
+                              cursor: 'pointer',
+                              accentColor: '#3B82F6',
+                            }}
+                            title="Select all rows"
+                          />
+                        </div>
+                      ) : (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '0.5rem',
+                        }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            {column.label}
+                            {isActive && (
+                              <span style={{ 
+                                display: 'inline-block',
+                                width: '6px', 
+                                height: '6px', 
+                                borderRadius: '50%', 
+                                backgroundColor: '#10B981',
+                              }} />
+                            )}
+                          </span>
+                          {!disableFilters && column.key !== 'start' && column.key !== 'checkbox' && (
+                            <img
+                              ref={(el) => { if (el) filterIconRefs.current[column.key] = el; }}
+                              src="/assets/Vector (1).png"
+                              alt="Filter"
+                              className={`w-3 h-3 transition-opacity cursor-pointer ${
+                                isActive || openFilterColumn === column.key
+                                  ? 'opacity-100'
+                                  : 'opacity-0 group-hover:opacity-100'
+                              }`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenFilterColumn(openFilterColumn === column.key ? null : column.key);
+                              }}
+                              style={{
+                                width: '12px',
+                                height: '12px',
+                                ...(isActive || openFilterColumn === column.key
+                                  ? {
+                                      filter:
+                                        'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
+                                    }
+                                  : undefined)
+                              }}
+                            />
+                          )}
+                        </div>
+                      )}
                   </th>
-                  ));
+                  );
+                  });
                 })()}
               </tr>
             </thead>
@@ -897,9 +1163,7 @@ const LabelCheckTable = ({
                 <tr
                   key={row.id}
                   style={{
-                    backgroundColor: originalIndex % 2 === 0
-                      ? (isDarkMode ? '#1F2937' : '#FFFFFF')
-                      : (isDarkMode ? '#1A1F2E' : '#F9FAFB'),
+                    backgroundColor: isDarkMode ? '#1F2937' : '#F9FAFB',
                     borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
                     transition: 'background-color 0.2s',
                     height: '40px',
@@ -908,11 +1172,43 @@ const LabelCheckTable = ({
                     e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = originalIndex % 2 === 0
-                      ? (isDarkMode ? '#1F2937' : '#FFFFFF')
-                      : (isDarkMode ? '#1A1F2E' : '#F9FAFB');
+                    e.currentTarget.style.backgroundColor = isDarkMode ? '#1F2937' : '#F9FAFB';
                   }}
                 >
+                  <td style={{
+                    padding: '0 8px',
+                    textAlign: 'center',
+                    height: '40px',
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={isAdmin ? bulkSelectedRows.has(row.id) : selectedRows.has(row.id)}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        if (isAdmin) {
+                          handleBulkCheckboxChange(row.id);
+                        } else {
+                          setSelectedRows(prev => {
+                            const newSet = new Set(prev);
+                            if (e.target.checked) {
+                              newSet.add(row.id);
+                            } else {
+                              newSet.delete(row.id);
+                            }
+                            return newSet;
+                          });
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        cursor: 'pointer',
+                        accentColor: '#3B82F6',
+                      }}
+                      title={isAdmin ? "Select for bulk action" : undefined}
+                    />
+                  </td>
                   <td style={{
                     padding: '0 8px',
                     textAlign: 'center',
@@ -921,14 +1217,14 @@ const LabelCheckTable = ({
                     {completedRows.has(row.id) ? (
                       <button
                         type="button"
-                        onClick={() => handleEditClick(row, index)}
+                        onClick={() => handleStartClick(row, index)}
                         className="done-badge-btn"
                         style={{
                           height: '26px',
                           padding: '0 12px',
-                          borderRadius: '13px',
+                          borderRadius: '6px',
                           border: 'none',
-                          backgroundColor: completedRowStatus[row.id] ? '#F59E0B' : '#10B981',
+                          backgroundColor: '#F59E0B',
                           color: '#FFFFFF',
                           fontSize: '12px',
                           fontWeight: 600,
@@ -945,8 +1241,7 @@ const LabelCheckTable = ({
                           position: 'relative',
                         }}
                         onMouseEnter={(e) => {
-                          const baseColor = completedRowStatus[row.id] ? '#D97706' : '#059669';
-                          e.currentTarget.style.backgroundColor = baseColor;
+                          e.currentTarget.style.backgroundColor = '#D97706';
                           e.currentTarget.style.transform = 'scale(1.02)';
                           e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
                           // Show edit icon
@@ -954,8 +1249,7 @@ const LabelCheckTable = ({
                           if (icon) icon.style.opacity = '1';
                         }}
                         onMouseLeave={(e) => {
-                          const baseColor = completedRowStatus[row.id] ? '#F59E0B' : '#10B981';
-                          e.currentTarget.style.backgroundColor = baseColor;
+                          e.currentTarget.style.backgroundColor = '#F59E0B';
                           e.currentTarget.style.transform = 'scale(1)';
                           e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
                           // Hide edit icon
@@ -1001,7 +1295,7 @@ const LabelCheckTable = ({
                         style={{
                           height: '26px',
                           padding: '0 14px',
-                          borderRadius: '13px',
+                          borderRadius: '6px',
                           border: 'none',
                           backgroundColor: '#3B82F6',
                           color: '#FFFFFF',
@@ -1646,24 +1940,28 @@ const LabelCheckTable = ({
                     type="button"
                     onClick={async () => {
                       // Re-confirm action: Update confirmation
-                      if (selectedRow && selectedRow.id && shipmentId) {
+                      const rowId = selectedRow?.id;
+                      
+                      // Close modal immediately
+                      handleCloseModal();
+                      
+                      if (rowId && shipmentId) {
                         try {
-                          await updateShipmentProductLabelCheck(shipmentId, selectedRow.id, 'confirmed');
-                          console.log(`Label check re-confirmed for product ${selectedRow.id}`);
+                          await updateShipmentProductLabelCheck(shipmentId, rowId, 'confirmed');
+                          console.log(`Label check re-confirmed for product ${rowId}`);
                         } catch (error) {
                           console.error('Error saving label check confirmation:', error);
                         }
                         
-                        setConfirmedRows(prev => new Set(prev).add(selectedRow.id));
-                        setCompletedRows(prev => new Set(prev).add(selectedRow.id));
-                        setCompletedRowStatus(prev => ({ ...prev, [selectedRow.id]: false }));
+                        setConfirmedRows(prev => new Set(prev).add(rowId));
+                        setCompletedRows(prev => new Set(prev).add(rowId));
+                        setCompletedRowStatus(prev => ({ ...prev, [rowId]: false }));
                         // Reload data from API to ensure consistency
                         await loadLabelData();
                         
                         // Check if all products are now complete and clear comment if so (after reload)
                         await checkAndClearLabelCheckComment();
                       }
-                      handleCloseModal();
                     }}
                     style={{
                       height: '40px',
@@ -1752,26 +2050,30 @@ const LabelCheckTable = ({
                     onClick={async () => {
                       // Confirm action: Mark row as confirmed without counting
                       // This is a checkpoint to verify labels are sufficient
-                      if (selectedRow && selectedRow.id && shipmentId) {
+                      const rowId = selectedRow?.id;
+                      
+                      // Close modal immediately
+                      handleCloseModal();
+                      
+                      if (rowId && shipmentId) {
                         try {
                           // Save to database
-                          await updateShipmentProductLabelCheck(shipmentId, selectedRow.id, 'confirmed');
-                          console.log(`Label check confirmed for product ${selectedRow.id}`);
+                          await updateShipmentProductLabelCheck(shipmentId, rowId, 'confirmed');
+                          console.log(`Label check confirmed for product ${rowId}`);
                         } catch (error) {
                           console.error('Error saving label check confirmation:', error);
                           // Continue with local update even if API fails
                         }
                         
-                        setConfirmedRows(prev => new Set(prev).add(selectedRow.id));
-                        setCompletedRows(prev => new Set(prev).add(selectedRow.id));
-                        setCompletedRowStatus(prev => ({ ...prev, [selectedRow.id]: false })); // Not insufficient
+                        setConfirmedRows(prev => new Set(prev).add(rowId));
+                        setCompletedRows(prev => new Set(prev).add(rowId));
+                        setCompletedRowStatus(prev => ({ ...prev, [rowId]: false })); // Not insufficient
                         // Reload data from API to ensure consistency
                         await loadLabelData();
                         
                         // Check if all products are now complete and clear comment if so (after reload)
                         await checkAndClearLabelCheckComment();
                       }
-                      handleCloseModal();
                     }}
                     style={{
                       height: '40px',
@@ -1843,6 +2145,9 @@ const LabelCheckTable = ({
       {/* Filter Dropdown */}
       {!disableFilters && openFilterColumn && filterIconRefs.current[openFilterColumn] && (
         <SortFormulasFilterDropdown
+          ref={(el) => {
+            filterDropdownRef.current = el;
+          }}
           filterIconRef={filterIconRefs.current[openFilterColumn]}
           columnKey={openFilterColumn}
           availableValues={getColumnValues(openFilterColumn)}
@@ -2095,21 +2400,78 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, is
             ))}
           </select>
           
-          <input
-            type="text"
-            placeholder="Value here..."
-            value={filterValue}
-            onChange={(e) => setFilterValue(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              border: '1px solid #D1D5DB',
-              borderRadius: '6px',
-              fontSize: '0.875rem',
-              color: '#374151',
-              backgroundColor: '#FFFFFF',
-            }}
-          />
+          <div style={{ position: 'relative', width: '100%' }}>
+            <input
+              type="text"
+              placeholder="Value here..."
+              value={filterValue}
+              onChange={(e) => setFilterValue(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                paddingRight: filterValue ? '32px' : '12px',
+                border: '1px solid #D1D5DB',
+                borderRadius: '6px',
+                fontSize: '0.875rem',
+                color: '#374151',
+                backgroundColor: '#FFFFFF',
+                boxSizing: 'border-box',
+              }}
+            />
+            {filterValue && (
+              <button
+                type="button"
+                onClick={() => setFilterValue('')}
+                style={{
+                  position: 'absolute',
+                  right: '8px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '16px',
+                  height: '16px',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '4px',
+                  backgroundColor: '#FFFFFF',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
+                  zIndex: 2,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = '#9CA3AF';
+                  e.currentTarget.style.backgroundColor = '#F3F4F6';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = '#D1D5DB';
+                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                }}
+                onTouchStart={(e) => {
+                  e.currentTarget.style.borderColor = '#9CA3AF';
+                  e.currentTarget.style.backgroundColor = '#F3F4F6';
+                }}
+                onTouchEnd={(e) => {
+                  e.currentTarget.style.borderColor = '#D1D5DB';
+                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                }}
+              >
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#6B7280"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

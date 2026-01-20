@@ -30,6 +30,9 @@ const NgoosModal = ({
   onAddUnits = null,
   currentQty = 0,
   forecastRange = 150, // DOI goal in days from the order page
+  doiSettings = null, // Full DOI settings object: { amazonDoiGoal, inboundLeadTime, manufactureLeadTime }
+  allProducts = [], // All products from Add Products page for navigation
+  onNavigate = null, // Navigation handler (prev/next)
 }) => {
   const { isDarkMode } = useTheme();
   const [forecastData, setForecastData] = useState(null);
@@ -42,7 +45,7 @@ const NgoosModal = ({
     textSecondary: isDarkMode ? 'text-dark-text-secondary' : 'text-gray-500',
   };
 
-  // Fetch forecast data for Add Units button (refetch when forecastRange changes)
+  // Fetch forecast data for Add Units button (refetch when forecastRange or doiSettings changes)
   useEffect(() => {
     const fetchForecastData = async () => {
       if (!isOpen || !selectedRow) return;
@@ -51,8 +54,10 @@ const NgoosModal = ({
       if (!childAsin) return;
 
       try {
-        // Pass the forecastRange (DOI goal) to get updated units_to_make calculation
-        const forecast = await NgoosAPI.getForecast(childAsin, forecastRange);
+        // Pass DOI settings object for accurate units_to_make calculation
+        // Falls back to forecastRange if doiSettings not provided
+        const settings = doiSettings || forecastRange;
+        const forecast = await NgoosAPI.getForecast(childAsin, settings);
         setForecastData(forecast);
       } catch (error) {
         console.error('Error fetching forecast data:', error);
@@ -60,7 +65,7 @@ const NgoosModal = ({
     };
 
     fetchForecastData();
-  }, [isOpen, selectedRow, forecastRange]);
+  }, [isOpen, selectedRow, forecastRange, doiSettings]);
 
   // Fetch catalog data to get image if not available in selectedRow
   useEffect(() => {
@@ -110,6 +115,11 @@ const NgoosModal = ({
 
   const childAsin = selectedRow?.child_asin || selectedRow?.childAsin || selectedRow?.asin;
   const hasAsin = !!childAsin;
+  
+  // Calculate current position in product list for navigation display
+  const currentProductIndex = allProducts.findIndex(p => p.id === selectedRow?.id);
+  const currentPosition = currentProductIndex >= 0 ? currentProductIndex + 1 : 0;
+  const totalProducts = allProducts.length;
   
   // Get units_to_make from selectedRow (passed from table) - this matches what's shown in the row
   // Use nullish coalescing (??) to treat 0 as a valid value (not falsy)
@@ -177,16 +187,16 @@ const NgoosModal = ({
       <div
         className={themeClasses.cardBg}
         style={{
-          width: '64%',
-          maxWidth: '896px',
+          width: '90vw',
+          maxWidth: '1009px',
           height: 'auto',
-          maxHeight: '150vh',
+          maxHeight: '90vh',
           borderRadius: '12px',
           boxShadow: '0 24px 80px rgba(15,23,42,0.75)',
           border: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`,
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden',
+          overflow: 'hidden'
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -198,7 +208,7 @@ const NgoosModal = ({
             alignItems: 'center',
             padding: '0.65rem 1rem',
             borderBottom: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`,
-            backgroundColor: isDarkMode ? '#0f172a' : '#FFFFFF',
+            backgroundColor: isDarkMode ? '#1A2235' : '#FFFFFF',
             flexShrink: 0,
           }}
         >
@@ -256,27 +266,99 @@ const NgoosModal = ({
                   </span>
                   Label Inventory: {realLabelInventory.toLocaleString()}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmModal(true)}
-                  style={{
-                    padding: '0 0.6rem',
-                    borderRadius: '4px',
-                    border: 'none',
-                    backgroundColor: '#2563EB',
-                    color: '#FFFFFF',
-                    fontSize: '0.7rem',
-                    fontWeight: 500,
-                    height: '22px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    whiteSpace: 'nowrap',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Add Units ({forecastUnits.toLocaleString()})
-                </button>
+                {/* Navigation arrows */}
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.5rem',
+                }}>
+                  {totalProducts > 0 && (
+                    <span style={{ 
+                      fontSize: '0.7rem', 
+                      color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                      fontWeight: 500
+                    }}>
+                      {currentPosition} of {totalProducts}
+                    </span>
+                  )}
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '0',
+                    backgroundColor: '#1A1F2E',
+                    padding: '0.25rem',
+                    borderRadius: '6px'
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => onNavigate && onNavigate('prev')}
+                      disabled={!onNavigate || totalProducts === 0}
+                      style={{
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '4px',
+                        border: 'none',
+                        backgroundColor: 'transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: onNavigate && totalProducts > 0 ? 'pointer' : 'not-allowed',
+                        color: '#9CA3AF',
+                        opacity: onNavigate && totalProducts > 0 ? 1 : 0.5,
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (onNavigate && totalProducts > 0) {
+                          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M7.5 9L4.5 6L7.5 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                    <div style={{
+                      width: '1px',
+                      height: '16px',
+                      backgroundColor: '#374151',
+                      margin: '0 0.25rem'
+                    }} />
+                    <button
+                      type="button"
+                      onClick={() => onNavigate && onNavigate('next')}
+                      disabled={!onNavigate || totalProducts === 0}
+                      style={{
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '4px',
+                        border: 'none',
+                        backgroundColor: 'transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: onNavigate && totalProducts > 0 ? 'pointer' : 'not-allowed',
+                        color: '#9CA3AF',
+                        opacity: onNavigate && totalProducts > 0 ? 1 : 0.5,
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (onNavigate && totalProducts > 0) {
+                          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M4.5 9L7.5 6L4.5 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
               </>
             )}
             <button
@@ -285,16 +367,15 @@ const NgoosModal = ({
               style={{
                 width: '26px',
                 height: '26px',
-                borderRadius: '9999px',
                 border: 'none',
-                backgroundColor: isDarkMode ? '#111827' : '#F3F4F6',
+                backgroundColor: 'transparent',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
               }}
             >
-              <span style={{ fontSize: '1rem', lineHeight: 1, color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>×</span>
+              <img src="/assets/Vector (6).png" alt="Close" style={{ width: '12px', height: '12px' }} />
             </button>
           </div>
         </div>
@@ -302,7 +383,7 @@ const NgoosModal = ({
         {/* Main content - Using Ngoos component - No scrolling */}
         <div style={{ 
           flex: 1,
-          backgroundColor: isDarkMode ? '#0f172a' : '#F9FAFB',
+          backgroundColor: isDarkMode ? '#1A2235' : '#F9FAFB',
           overflow: 'auto',
         }}>
           {!hasAsin ? (
@@ -314,7 +395,7 @@ const NgoosModal = ({
               <p className={themeClasses.textSecondary} style={{ fontSize: '0.8rem' }}>This product does not have an ASIN.</p>
             </div>
           ) : (
-            <Ngoos data={ngoosData} inventoryOnly={true} doiGoalDays={forecastRange} />
+            <Ngoos data={ngoosData} inventoryOnly={true} doiGoalDays={forecastRange} doiSettings={doiSettings} overrideUnitsToMake={forecastUnits} />
           )}
         </div>
       </div>

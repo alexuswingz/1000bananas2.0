@@ -112,9 +112,10 @@ const LabelOrderPage = () => {
           dailySalesRate: dailySalesRate,
           suggestedQty: suggestedQty,
           currentDOI: currentDOI,
+          childAsin: label.child_asin || '',
         };
-      })
-      .filter(label => label.suggestedQty > 0);
+      });
+      // Removed filter - show all items so users can see the table structure and placeholders
   }, [calculateSuggestedOrderQty]);
 
   useEffect(() => {
@@ -1180,41 +1181,13 @@ const LabelOrderPage = () => {
   };
 
   return (
-    <div className={`min-h-screen ${themeClasses.pageBg}`} style={{ paddingBottom: '100px' }}>
-      {/* Floating legend (single instance near footer) - hide when viewing an order */}
-      {!isViewMode && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: '88px',
-            right: '24px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '12px',
-            backgroundColor: '#FFFFFF',
-            borderRadius: '8px',
-            padding: '6px 10px',
-            boxShadow: '0 6px 14px rgba(0,0,0,0.12)',
-            border: '1px solid #E5E7EB',
-            pointerEvents: 'none',
-            zIndex: 30,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <div style={{ width: '12px', height: '12px', borderRadius: '2px', backgroundColor: '#22C55E' }} />
-            <span style={{ fontSize: '12px', color: '#111827', fontWeight: 500 }}>Total Inv.</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <div style={{ width: '12px', height: '12px', borderRadius: '2px', backgroundColor: '#2563EB' }} />
-            <span style={{ fontSize: '12px', color: '#111827', fontWeight: 500 }}># to Order</span>
-          </div>
-        </div>
-      )}
+    <div className={`min-h-screen`} style={{ paddingBottom: '100px', backgroundColor: isDarkMode ? '#111827' : '#F9FAFB' }}>
       {/* Header Section */}
       <div style={{ 
         backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
         padding: '16px 24px',
         borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+        marginTop: 0,
       }}>
         {/* Top Row - Back button and Order Info */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -1563,7 +1536,7 @@ const LabelOrderPage = () => {
             </div>
 
       {/* Search bar - above table */}
-      <div className="px-6 py-4 flex items-center justify-end" style={{ marginTop: '0' }}>
+      <div className="px-6 py-4 flex items-center justify-end" style={{ marginTop: '0', paddingTop: '16px', paddingBottom: '16px' }}>
         <div className="flex items-center">
           <div className="relative" style={{ maxWidth: '300px', width: '100%' }}>
           <input
@@ -1596,35 +1569,13 @@ const LabelOrderPage = () => {
       </div>
 
       {/* Table */}
-      <div className={`${themeClasses.cardBg} rounded-xl border ${themeClasses.border} shadow-lg mx-6`} style={{ marginTop: '0', position: 'relative' }}>
-        <div style={{ overflowX: 'auto', overflowY: 'visible' }}>
+      <div style={{ marginTop: '0', position: 'relative', marginLeft: '24px', marginRight: '24px' }}>
+        <div style={{ overflowX: 'auto', overflowY: 'visible', borderRadius: '16px', overflow: 'hidden' }}>
           {/* Table Mode - Show when tableMode is true and in addProducts tab */}
           {tableMode && activeTab === 'addProducts' && (!isViewMode || isEditOrderMode) ? (
-            <table style={{ width: '100%', borderCollapse: 'collapse', borderSpacing: 0, margin: 0, padding: 0, tableLayout: 'fixed' }}>
-              <thead className={themeClasses.headerBg}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', borderSpacing: 0, margin: 0, padding: 0, tableLayout: 'fixed', borderRadius: '16px', overflow: 'hidden' }}>
+              <thead style={{ backgroundColor: '#1A2235' }}>
                 <tr style={{ height: '40px', minHeight: '40px' }}>
-                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ padding: '0 1rem', height: '40px', textAlign: 'center', borderRight: '1px solid #3C4656', width: 50 }}>
-                    <input 
-                      type="checkbox" 
-                      style={{ cursor: 'pointer', width: '16px', height: '16px' }}
-                      checked={orderLines.length > 0 && orderLines.every(l => l.added)}
-                      onChange={(e) => {
-                        setOrderLines(prev => prev.map(line => ({ ...line, added: e.target.checked })));
-                      }}
-                    />
-                  </th>
-                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
-                    height: '40px',
-                    paddingTop: '12px',
-                    paddingRight: '24px',
-                    paddingBottom: '12px',
-                    paddingLeft: '24px',
-                    textAlign: 'left',
-                    borderRight: '1px solid #3C4656',
-                    width: isViewMode ? '55%' : undefined,
-                  }}>
-                    PACKAGING NAME
-                  </th>
                   <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
                     height: '40px',
                     paddingTop: '12px',
@@ -1634,7 +1585,7 @@ const LabelOrderPage = () => {
                     textAlign: 'left',
                     borderRight: '1px solid #3C4656',
                   }}>
-                    SUPPLIER INVENTORY
+                    PRODUCTS
                   </th>
                   <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
                     height: '40px',
@@ -1642,34 +1593,21 @@ const LabelOrderPage = () => {
                     paddingRight: '24px',
                     paddingBottom: '12px',
                     paddingLeft: '24px',
-                    textAlign: 'right',
-                    borderRight: '1px solid #3C4656',
-                    width: isViewMode ? '20%' : undefined,
-                  }}>
-                    CURRENT INVENTORY
-                  </th>
-                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
-                    height: '40px',
-                    paddingTop: '12px',
-                    paddingRight: '24px',
-                    paddingBottom: '12px',
-                    paddingLeft: '24px',
-                    textAlign: 'right',
-                    borderRight: '1px solid #3C4656',
-                    width: isViewMode ? '20%' : undefined,
-                  }}>
-                    UNITS NEEDED
-                  </th>
-                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
-                    height: '40px',
-                    paddingTop: '12px',
-                    paddingRight: '24px',
-                    paddingBottom: '12px',
-                    paddingLeft: '24px',
-                    textAlign: 'right',
+                    textAlign: 'center',
                     borderRight: '1px solid #3C4656',
                   }}>
-                    QTY
+                    INVENTORY
+                  </th>
+                  <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
+                    height: '40px',
+                    paddingTop: '12px',
+                    paddingRight: '24px',
+                    paddingBottom: '12px',
+                    paddingLeft: '24px',
+                    textAlign: 'center',
+                    borderRight: '1px solid #3C4656',
+                  }}>
+                    UNITS TO MAKE
                   </th>
                   <th className="text-xs font-bold text-white uppercase tracking-wider" style={{ 
                     height: '40px',
@@ -1678,153 +1616,288 @@ const LabelOrderPage = () => {
                     paddingBottom: '12px',
                     paddingLeft: '24px',
                     textAlign: 'right',
+                    borderTopRightRadius: '16px',
                   }}>
-                    PALLETS
+                    DOI (DAYS)
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {loadingLabels ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-6 text-center text-sm italic text-gray-400">
+                    <td colSpan={4} className="px-6 py-6 text-center text-sm italic text-gray-400">
                       Loading labels...
                     </td>
                   </tr>
                 ) : filteredLines.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-6 text-center text-sm italic text-gray-400">
+                    <td colSpan={4} className="px-6 py-6 text-center text-sm italic text-gray-400">
                       No items available.
                     </td>
                   </tr>
                 ) : (
-                  filteredLines.map((line) => {
-                    const currentInventory = line.currentInventory || 0;
-                    const unitsNeeded = line.forecastedUnitsNeeded || line.recommendedQty || 0;
-                    const labelName = `${line.brand} - ${line.product} ${line.size}`;
+                  filteredLines.map((line, index) => {
+                    const currentInventory = line.inventory || line.currentInventory || 0;
+                    const currentDOI = line.currentDOI || 0;
+                    const productId = line.childAsin || line.id;
+                    const hasUnitsToMake = line.qty && line.qty > 0;
+                    const brandSize = `${line.brand} • ${line.size}`;
+                    const isLastRow = index === filteredLines.length - 1;
                     
                     return (
                       <tr 
                         key={line.id}
                         style={{
-                          borderTop: '1px solid #e5e7eb',
+                          borderTop: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
                         }}
                       >
-                        <td style={{ padding: '0.65rem 1rem', textAlign: 'center', height: '40px', verticalAlign: 'middle' }}>
-                          <input 
-                            type="checkbox" 
-                            style={{ cursor: 'pointer', width: '16px', height: '16px' }}
-                            checked={line.added || false}
-                            onChange={(e) => {
-                              setOrderLines(prev => prev.map(l => 
-                                l.id === line.id ? { ...l, added: e.target.checked } : l
-                              ));
-                            }}
-                          />
-                        </td>
+                        {/* PRODUCTS Column */}
                         <td style={{ 
-                          height: '40px',
-                          paddingTop: '12px',
-                          paddingRight: '24px',
-                          paddingBottom: '12px',
-                          paddingLeft: '24px',
-                          fontSize: '0.875rem',
+                          padding: '16px 24px',
                           verticalAlign: 'middle',
-                          textAlign: 'left',
-                        }} className={themeClasses.textPrimary}>
-                          {labelName}
+                          ...(isLastRow && { borderBottomLeftRadius: '16px' }),
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            {/* Image Placeholder - Only show in addProducts tab */}
+                            {activeTab === 'addProducts' && (
+                              <div style={{
+                                width: '64px',
+                                height: '64px',
+                                backgroundColor: isDarkMode ? '#1F2937' : '#E5E7EB',
+                                borderRadius: '8px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                                border: isDarkMode ? '2px dashed #4B5563' : '2px dashed #9CA3AF',
+                                position: 'relative',
+                                minWidth: '64px',
+                                minHeight: '64px',
+                              }}>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isDarkMode ? '#6B7280' : '#6B7280'} strokeWidth="1.5" style={{ marginBottom: '4px' }}>
+                                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                  <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                  <path d="M21 15l-5-5L5 21"></path>
+                                </svg>
+                                <span style={{
+                                  fontSize: '8px',
+                                  color: isDarkMode ? '#6B7280' : '#6B7280',
+                                  fontWeight: 600,
+                                  textAlign: 'center',
+                                  lineHeight: '1',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.5px',
+                                }}>
+                                  No img
+                                </span>
+                              </div>
+                            )}
+                            {/* Product Info */}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{
+                                fontSize: '14px',
+                                fontWeight: 600,
+                                color: isDarkMode ? '#F9FAFB' : '#111827',
+                                marginBottom: '4px',
+                              }}>
+                                {line.product}
+                              </div>
+                              <div style={{
+                                fontSize: '12px',
+                                color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                                marginBottom: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                              }}>
+                                {productId}
+                                <button
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(productId);
+                                  }}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    padding: 0,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                  }}
+                                  title="Copy ID"
+                                >
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={isDarkMode ? '#9CA3AF' : '#6B7280'} strokeWidth="2">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                  </svg>
+                                </button>
+                              </div>
+                              <div style={{
+                                fontSize: '12px',
+                                color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                              }}>
+                                {brandSize}
+                              </div>
+                            </div>
+                          </div>
                         </td>
+                        
+                        {/* INVENTORY Column */}
                         <td style={{ 
-                          height: '40px',
-                          paddingTop: '12px',
-                          paddingRight: '24px',
-                          paddingBottom: '12px',
-                          paddingLeft: '24px',
-                          fontSize: '0.875rem',
-                          verticalAlign: 'middle',
-                          textAlign: 'left',
-                        }} className={themeClasses.textPrimary}>
-                          Auto Replenishment
-                        </td>
-                        <td style={{ 
-                          height: '40px',
-                          paddingTop: '12px',
-                          paddingRight: '24px',
-                          paddingBottom: '12px',
-                          paddingLeft: '24px',
-                          fontSize: '0.875rem',
-                          verticalAlign: 'middle',
-                          textAlign: 'right',
-                        }} className={themeClasses.textPrimary}>
-                          {currentInventory.toLocaleString()}
-                        </td>
-                        <td style={{ 
-                          height: '40px',
-                          paddingTop: '12px',
-                          paddingRight: '24px',
-                          paddingBottom: '12px',
-                          paddingLeft: '24px',
-                          fontSize: '0.875rem',
-                          verticalAlign: 'middle',
-                          textAlign: 'right',
-                        }} className={themeClasses.textPrimary}>
-                          {unitsNeeded.toLocaleString()}
-                        </td>
-                        <td style={{ 
-                          height: '40px',
-                          paddingTop: '12px',
-                          paddingRight: '24px',
-                          paddingBottom: '12px',
-                          paddingLeft: '24px',
-                          textAlign: 'right',
+                          padding: '16px 24px',
+                          textAlign: 'center',
                           verticalAlign: 'middle',
                         }}>
-                          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                          <span style={{
+                            fontSize: '14px',
+                            color: isDarkMode ? '#F9FAFB' : '#111827',
+                            fontWeight: 500,
+                          }}>
+                          {currentInventory.toLocaleString()}
+                          </span>
+                        </td>
+                        
+                        {/* UNITS TO MAKE Column */}
+                        <td style={{ 
+                          padding: '16px 24px',
+                          textAlign: 'center',
+                          verticalAlign: 'middle',
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                            {/* Decrement Button */}
+                            <button
+                              onClick={() => {
+                                const currentQty = line.qty || 0;
+                                handleQtyChange(line.id, Math.max(0, currentQty - 1));
+                              }}
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                backgroundColor: isDarkMode ? '#374151' : '#E5E7EB',
+                                border: 'none',
+                                borderRadius: '6px',
+                                color: isDarkMode ? '#F9FAFB' : '#111827',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '16px',
+                                fontWeight: 600,
+                              }}
+                            >
+                              −
+                            </button>
+                            
+                            {/* Input Field */}
                             <input
                               type="number"
                               value={line.qty || ''}
                               onChange={(e) => handleQtyChange(line.id, e.target.value)}
+                              placeholder="0"
                               style={{
-                                width: '120px',
-                                padding: '6px 12px',
+                                width: '100px',
+                                height: '32px',
+                                padding: '0 8px',
                                 fontSize: '14px',
-                                textAlign: 'right',
-                                border: '1px solid #D1D5DB',
+                                textAlign: 'center',
+                                backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                                color: isDarkMode ? '#F9FAFB' : '#111827',
+                                border: isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
                                 borderRadius: '6px',
-                                backgroundColor: '#FFFFFF',
-                                color: '#000000',
                                 cursor: 'text',
                               }}
                             />
+                            
+                            {/* Increment Button */}
+                            <button
+                              onClick={() => {
+                                const currentQty = line.qty || 0;
+                                handleQtyChange(line.id, currentQty + 1);
+                              }}
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                backgroundColor: isDarkMode ? '#374151' : '#E5E7EB',
+                                border: 'none',
+                                borderRadius: '6px',
+                                color: isDarkMode ? '#F9FAFB' : '#111827',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '16px',
+                                fontWeight: 600,
+                              }}
+                            >
+                              +
+                            </button>
+                            
+                            {/* Add/Added Button */}
+                            <button
+                              onClick={() => {
+                                setOrderLines(prev => prev.map(l => 
+                                  l.id === line.id ? { ...l, added: !l.added } : l
+                                ));
+                              }}
+                              style={{
+                                padding: '6px 12px',
+                                fontSize: '12px',
+                                fontWeight: 500,
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                backgroundColor: hasUnitsToMake ? '#10B981' : '#007AFF',
+                                color: '#FFFFFF',
+                                marginLeft: '8px',
+                              }}
+                            >
+                              {hasUnitsToMake ? 'Added' : 'Add'}
+                            </button>
                           </div>
                         </td>
+                        
+                        {/* DOI (DAYS) Column */}
                         <td style={{ 
-                          height: '40px',
-                          paddingTop: '12px',
-                          paddingRight: '24px',
-                          paddingBottom: '12px',
-                          paddingLeft: '24px',
+                          padding: '16px 24px',
                           textAlign: 'right',
                           verticalAlign: 'middle',
+                          ...(isLastRow && { borderBottomRightRadius: '16px' }),
                         }}>
-                          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                            <input
-                              type="number"
-                              step="0.1"
-                              value={line.pallets ? line.pallets.toFixed(1) : ''}
-                              readOnly
-                              style={{
-                                width: '120px',
-                                padding: '6px 12px',
-                                fontSize: '14px',
-                                textAlign: 'right',
-                                border: '1px solid #D1D5DB',
-                                borderRadius: '6px',
-                                backgroundColor: '#F3F4F6',
-                                color: '#6B7280',
-                                cursor: 'default',
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '12px' }}>
+                            <span style={{
+                              fontSize: '14px',
+                              color: '#EF4444',
+                              fontWeight: 500,
+                            }}>
+                              {currentDOI}
+                            </span>
+                            <button
+                              onClick={() => {
+                                // TODO: Implement analyze functionality
+                                console.log('Analyze product:', line.id);
                               }}
-                              title="Auto-calculated from quantity"
-                            />
+                              style={{
+                                padding: '6px 12px',
+                                fontSize: '12px',
+                                fontWeight: 500,
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                backgroundColor: '#8B5CF6',
+                                color: '#FFFFFF',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                              }}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M3 3v18h18"></path>
+                                <path d="M18 7v10"></path>
+                                <path d="M13 7v10"></path>
+                                <path d="M8 7v10"></path>
+                              </svg>
+                              Analyze
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -1834,959 +1907,518 @@ const LabelOrderPage = () => {
               </tbody>
             </table>
           ) : (
-          <table
+          <div
               style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-              borderSpacing: 0,
-              margin: 0,
-              padding: 0,
+              marginTop: '0', 
+              overflow: 'hidden',
+              backgroundColor: '#1A2235',
+              borderRadius: '16px',
             }}
           >
-            <thead className={themeClasses.headerBg}>
-              <tr style={{ height: 'auto', minHeight: '40px', width: '100%', display: 'table-row' }}>
-              {/* Checkbox column when viewing, LABEL STATUS when creating/editing */}
-              {(isViewMode && !isEditOrderMode) ? (
-                <th
-                  className="text-xs font-bold text-white uppercase tracking-wider"
+            {/* Header Row */}
+            <div
                   style={{
-                    paddingTop: '12px',
-                    paddingRight: '24px',
-                    paddingBottom: '12px',
-                    paddingLeft: '24px',
-                    height: '40px',
-                    maxHeight: '40px',
-                    minHeight: '40px',
-                    boxSizing: 'border-box',
-                    textAlign: 'center',
-                    borderRight: '1px solid white',
-                    borderBottom: '1px solid #3C4656',
-                    borderTopLeftRadius: '12px',
-                    width: '72px',
-                    verticalAlign: 'middle',
-                    display: 'table-cell',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedItems.size === orderLines.length && orderLines.length > 0}
-                      onChange={handleSelectAll}
-                      style={{
-                        width: '16px',
-                        height: '16px',
-                        cursor: 'pointer',
-                      }}
-                    />
-                  </div>
-                </th>
-              ) : (
-                <th
-                  className="text-xs font-bold text-white uppercase tracking-wider"
-                  style={{
-                    paddingTop: '12px',
-                    paddingRight: '16px',
-                    paddingBottom: '12px',
-                    paddingLeft: '16px',
-                    height: '40px',
-                    maxHeight: '40px',
-                    boxSizing: 'border-box',
-                    textAlign: 'center',
-                    borderRight: '1px solid white',
-                    borderTopLeftRadius: '12px',
-                    width: '156px',
-                    verticalAlign: 'middle',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-                    <span>LABEL STATUS</span>
-                    <img
-                      src="/assets/Vector (1).png"
-                      alt="Filter"
-                      className="w-3 h-3 transition-opacity cursor-pointer opacity-0 group-hover:opacity-100"
-                  />
-                </div>
-                </th>
-              )}
-              <th
-                className="text-xs font-bold text-white uppercase tracking-wider"
-                style={{
-                  paddingTop: '12px',
-                  paddingRight: '16px',
-                  paddingBottom: '12px',
-                  paddingLeft: '16px',
-                  height: '40px',
-                  maxHeight: '40px',
-                  minHeight: '40px',
-                  boxSizing: 'border-box',
-                  textAlign: 'left',
-                  borderRight: '1px solid white',
-                  width: '142px',
-                  verticalAlign: 'middle',
-                  display: 'table-cell',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '10px' }}>
-                  BRAND
-                </div>
-              </th>
-              <th
-                className="text-xs font-bold text-white uppercase tracking-wider"
-                style={{
-                  paddingTop: '12px',
-                  paddingRight: '16px',
-                  paddingBottom: '12px',
-                  paddingLeft: '16px',
-                  height: '40px',
-                  maxHeight: '40px',
-                  boxSizing: 'border-box',
-                  textAlign: 'center',
-                  borderRight: '1px solid white',
-                  width: '172px',
-                  verticalAlign: 'middle',
-                }}
-              >
-                PRODUCT
-              </th>
-              <th
-                className="text-xs font-bold text-white uppercase tracking-wider"
-                style={{
-                  paddingTop: '12px',
-                  paddingRight: '16px',
-                  paddingBottom: '12px',
-                  paddingLeft: '16px',
-                  height: '40px',
-                  maxHeight: '40px',
-                  boxSizing: 'border-box',
-                  textAlign: 'center',
-                  borderRight: '1px solid white', // extra divider after SIZE header only
-                  width: '74px',
-                  verticalAlign: 'middle',
-                }}
-              >
-                SIZE
-              </th>
-              {/* ADD column - show in addProducts tab when creating new order or editing order */}
-              {(activeTab === 'addProducts' && (!isViewMode || isEditOrderMode)) && (
-              <th
-                className="text-xs font-bold text-white uppercase tracking-wider relative"
-                style={{
-                  padding: '12px 16px',
-                  height: '40px',
-                  maxHeight: '40px',
-                  boxSizing: 'border-box',
-                  textAlign: 'center',
-                  borderRight: 'none',
-                  width: 120,
-                  verticalAlign: 'middle',
-                }}
-              >
-                ADD
-              </th>
-              )}
-              <th
-                className="text-xs font-bold text-white uppercase tracking-wider"
-                style={{
-                  paddingTop: '12px',
-                  paddingRight: '16px',
-                  paddingBottom: '12px',
-                  paddingLeft: '16px',
-                  height: '40px',
-                  maxHeight: '40px',
-                  boxSizing: 'border-box',
-                  textAlign: 'center',
-                  borderRight: (activeTab === 'addProducts' && (!isViewMode || isEditOrderMode)) ? '1px solid white' : '1px solid #3C4656',
-                  borderTopRightRadius: (activeTab === 'addProducts' && (!isViewMode || isEditOrderMode)) ? '0' : ((activeTab === 'submitPO' || activeTab === 'receivePO') && isViewMode) || (isViewMode && activeTab === 'addProducts' && !isEditOrderMode) ? '12px' : '0',
-                  width: '139px',
-                  verticalAlign: 'middle',
-                }}
-              >
-                QTY
-              </th>
-              {/* TIMELINE column - show in addProducts tab when creating new order or editing order */}
-              {(activeTab === 'addProducts' && (!isViewMode || isEditOrderMode)) && (
-              <th
-                className="text-xs font-bold text-white uppercase tracking-wider relative"
-                style={{
-                  paddingTop: '4px',
-                  paddingRight: '16px',
-                  paddingBottom: '8px',
-                  paddingLeft: '16px',
-                  height: '50px',
-                  minHeight: '50px',
-                  boxSizing: 'border-box',
-                  textAlign: 'left',
-                  verticalAlign: 'middle',
-                  borderTopRightRadius: '12px',
-                  borderRight: 'none',
-                  minWidth: 400,
+                display: 'grid',
+                gridTemplateColumns: '1fr 140px 220px 140px',
+                padding: '22px 16px 12px 16px',
+                height: '67px',
+                backgroundColor: '#1A2235',
+                alignItems: 'center',
+                gap: '32px',
                   position: 'relative',
-                  overflow: 'visible',
+                borderTopLeftRadius: '16px',
+                borderTopRightRadius: '16px',
                 }}
               >
-                <div style={{ position: 'relative', width: '100%', height: '100%', paddingLeft: '24px', paddingRight: '24px' }}>
-                  {/* Timeline line - white horizontal line at bottom */}
+              {/* Border line with 30px margin on both sides */}
                   <div 
-                    className="absolute bg-white" 
                     style={{ 
-                      left: '24px', 
-                      right: '24px', 
-                      bottom: '8px',
-                      height: '2px' 
-                    }}
-                  ></div>
-                  
-                  {/* Today label - both lines above the timeline */}
-                  <div className="absolute" style={{ left: '24px', bottom: '8px', transform: 'translate(-50%, 0)' }}>
-                    <div className="flex flex-col items-center" style={{ lineHeight: 1.2 }}>
-                      <span className="text-[10px] text-white font-bold uppercase" style={{ lineHeight: 1.2, marginBottom: '2px' }}>Today</span>
-                      <span className="text-[10px] text-white" style={{ lineHeight: 1.2, marginBottom: '10px' }}>11/11/25</span>
-                      <div className="w-2 h-2 rounded-full bg-white" style={{ transform: 'translateY(1px)' }}></div>
+                  position: 'absolute',
+                  bottom: 0,
+                  left: '30px',
+                  right: '30px',
+                  height: '1px',
+                  backgroundColor: isDarkMode ? '#374151' : '#E5E7EB'
+                }}
+              />
+              <div style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase', color: isDarkMode ? '#FFFFFF' : '#111827', marginLeft: '20px' }}>
+                PRODUCTS
                     </div>
+              <div style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase', color: isDarkMode ? '#FFFFFF' : '#111827', textAlign: 'center', paddingLeft: '16px', marginLeft: '-220px' }}>
+                INVENTORY
                   </div>
-                  
-                  {/* Month labels - above the timeline */}
-                  <div className="absolute" style={{ left: 'calc(24px + 20%)', bottom: '8px', transform: 'translate(-50%, 0)' }}>
-                    <div className="flex flex-col items-center">
-                      <span className="text-[10px] text-white uppercase" style={{ lineHeight: 1.2, marginBottom: '10px' }}>Dec</span>
-                      <div className="w-2 h-2 rounded-full bg-white relative" style={{ border: '1px solid white', backgroundColor: 'transparent', transform: 'translateY(1px)' }}>
-                        <div className="absolute inset-0.5 rounded-full" style={{ backgroundColor: '#2C3544' }}></div>
+              <div style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase', color: isDarkMode ? '#FFFFFF' : '#111827', textAlign: 'center', paddingLeft: '16px', marginLeft: '-220px' }}>
+                UNITS TO MAKE
                       </div>
-                    </div>
-                  </div>
-                  <div className="absolute" style={{ left: 'calc(24px + 40%)', bottom: '8px', transform: 'translate(-50%, 0)' }}>
-                    <div className="flex flex-col items-center">
-                      <span className="text-[10px] text-white uppercase" style={{ lineHeight: 1.2, marginBottom: '10px' }}>Jan</span>
-                      <div className="w-2 h-2 rounded-full bg-white relative" style={{ border: '1px solid white', backgroundColor: 'transparent', transform: 'translateY(1px)' }}>
-                        <div className="absolute inset-0.5 rounded-full" style={{ backgroundColor: '#2C3544' }}></div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="absolute" style={{ left: 'calc(24px + 60%)', bottom: '8px', transform: 'translate(-50%, 0)' }}>
-                    <div className="flex flex-col items-center">
-                      <span className="text-[10px] text-white uppercase" style={{ lineHeight: 1.2, marginBottom: '10px' }}>Feb</span>
-                      <div className="w-2 h-2 rounded-full bg-white relative" style={{ border: '1px solid white', backgroundColor: 'transparent', transform: 'translateY(1px)' }}>
-                        <div className="absolute inset-0.5 rounded-full" style={{ backgroundColor: '#2C3544' }}></div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="absolute" style={{ left: 'calc(24px + 80%)', bottom: '8px', transform: 'translate(-50%, 0)' }}>
-                    <div className="flex flex-col items-center">
-                      <span className="text-[10px] text-white uppercase" style={{ lineHeight: 1.2, marginBottom: '10px' }}>Mar</span>
-                      <div className="w-2 h-2 rounded-full bg-white relative" style={{ border: '1px solid white', backgroundColor: 'transparent', transform: 'translateY(1px)' }}>
-                        <div className="absolute inset-0.5 rounded-full" style={{ backgroundColor: '#2C3544' }}></div>
-                      </div>
+              <div style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '12px', textTransform: 'uppercase', color: isDarkMode ? '#FFFFFF' : '#111827', textAlign: 'center', paddingLeft: '16px', marginLeft: '-220px' }}>
+                DOI (DAYS)
                     </div>
                   </div>
                   
-                  {/* DOI Goal label - both lines above the timeline */}
-                  <div className="absolute" style={{ right: '24px', bottom: '8px', transform: 'translate(50%, 0)' }}>
-                    <div className="flex flex-col items-center" style={{ lineHeight: 1.2 }}>
-                      <div className="flex items-center gap-1" style={{ marginBottom: '2px' }}>
-                        <span className="text-[10px] text-white font-bold uppercase" style={{ lineHeight: 1.2 }}>DOI Goal</span>
-                        <svg width="8" height="8" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M2 3L4 5L6 3" stroke="white" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
+            {/* Product Rows */}
+            <div style={{ backgroundColor: '#1A2235' }}>
+              {loadingLabels ? (
+                <div style={{ padding: '24px', textAlign: 'center', color: isDarkMode ? '#9CA3AF' : '#6B7280', fontStyle: 'italic' }}>
+                  Loading labels...
                       </div>
-                      <span className="text-[10px] text-white" style={{ lineHeight: 1.2, marginBottom: '10px' }}>4/13/25</span>
-                      <div className="w-2 h-2 rounded-full bg-white" style={{ transform: 'translateY(1px)' }}></div>
-                    </div>
-                  </div>
-                  
-                  {/* Filter icon - far right, aligned with timeline */}
-                  <div className="absolute" style={{ right: '16px', bottom: '8px', transform: 'translateY(50%)' }}>
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M6 1L8 3H4L6 1Z" fill="white"/>
-                      <path d="M1 4H11" stroke="white" strokeWidth="1"/>
-                    </svg>
-                  </div>
-                </div>
-              </th>
-              )}
-              
-              {/* Ellipsis column - show when viewing order */}
-              {(isViewMode && !isEditOrderMode) && (
-                <th
-                  className="text-xs font-bold text-white uppercase tracking-wider"
-                  style={{
-                    paddingTop: '12px',
-                    paddingRight: '16px',
-                    paddingBottom: '12px',
-                    paddingLeft: '16px',
-                    height: '40px',
-                    maxHeight: '40px',
-                    minHeight: '40px',
-                    boxSizing: 'border-box',
-                    textAlign: 'center',
-                    borderTopRightRadius: '12px',
-                    width: '60px',
-                    verticalAlign: 'middle',
-                    display: 'table-cell',
-                  }}
-                >
-                </th>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {filteredLines.length === 0 ? (
-              <tr>
-                <td colSpan={
-                  isViewMode 
-                    ? (activeTab === 'addProducts' && isEditOrderMode ? 7 : (isViewMode && !isEditOrderMode ? 7 : 6))
-                    : (activeTab === 'addProducts' ? 7 : 6)
-                } className="px-6 py-6 text-center text-sm italic text-gray-400">
+              ) : filteredLines.length === 0 ? (
+                <div style={{ padding: '24px', textAlign: 'center', color: isDarkMode ? '#9CA3AF' : '#6B7280', fontStyle: 'italic', borderBottomLeftRadius: '16px', borderBottomRightRadius: '16px' }}>
                   No items available.
-                </td>
-              </tr>
+                </div>
             ) : (
               filteredLines.map((line, index) => {
-                const timelineData = (!isViewMode || isEditOrderMode) ? getTimelineData(line) : null;
-                const displayedRows = filteredLines;
+                const isLastRow = index === filteredLines.length - 1;
+                  const currentInventory = line.inventory || line.currentInventory || 0;
+                  const currentDOI = line.currentDOI || 0;
+                  const productId = line.childAsin || line.id;
+                  const hasUnitsToMake = line.qty && line.qty > 0;
+                  const brandSize = `${line.brand} • ${line.size}`;
+                  
+                  // DOI color based on value
+                  const getDoiColor = (doi) => {
+                    if (doi <= 7) return '#EF4444'; // Red
+                    if (doi <= 14) return '#F59E0B'; // Orange
+                    if (doi <= 30) return '#EAB308'; // Yellow
+                    return '#22C55E'; // Green
+                  };
+                  const doiColor = getDoiColor(currentDOI);
                 
                 return (
-                  <tr 
+                    <div
                     key={line.id}
-                    className={`text-sm ${themeClasses.rowHover} transition-colors border-t`}
                     style={{
-                      height: '32px',
-                      maxHeight: '32px',
-                      minHeight: '32px',
-                      lineHeight: '32px',
-                      borderTop: index === 0 ? 'none' : (isDarkMode ? '1px solid rgba(75,85,99,0.3)' : '1px solid #e5e7eb'),
-                    }}
-                  >
-                    {/* Checkbox when viewing, LABEL STATUS when creating/editing */}
-                    {(isViewMode && !isEditOrderMode) ? (
-                      <td style={{ paddingTop: '8px', paddingRight: '24px', paddingBottom: '8px', paddingLeft: '24px', height: '32px', maxHeight: '32px', minHeight: '32px', verticalAlign: 'middle', lineHeight: '1', boxSizing: 'border-box', width: '72px', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
-                        <input
-                          type="checkbox"
-                          checked={selectedItems.has(line.id)}
-                          onChange={(e) => handleCheckboxChange(line.id, e.target.checked)}
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 140px 220px 140px',
+                        height: '66px',
+                        padding: '8px 16px',
+                        backgroundColor: '#1A2235',
+                        alignItems: 'center',
+                        gap: '32px',
+                        boxSizing: 'border-box',
+                        ...(isLastRow && {
+                          borderBottomLeftRadius: '16px',
+                          borderBottomRightRadius: '16px',
+                        }),
+                        position: 'relative'
+                      }}
+                    >
+                      {/* Border line with 30px margin on both sides */}
+                      <div
                           style={{
-                            width: '16px',
-                            height: '16px',
-                            cursor: 'pointer',
-                          }}
-                        />
-                      </td>
-                    ) : (
-                      <td style={{ paddingTop: '8px', paddingRight: '16px', paddingBottom: '8px', paddingLeft: '16px', fontSize: '0.85rem', height: '32px', maxHeight: '32px', minHeight: '32px', verticalAlign: 'middle', lineHeight: '1', boxSizing: 'border-box', width: '156px', textAlign: 'left' }}>
-                        {renderLabelStatus(line)}
-                      </td>
-                    )}
-
-                    {/* BRAND */}
-                    <td style={{ 
-                      paddingTop: '8px',
-                      paddingRight: '16px',
-                      paddingBottom: '8px',
-                      paddingLeft: '16px',
-                      fontSize: '0.85rem', 
-                      height: '32px', 
-                      maxHeight: '32px', 
-                      minHeight: '32px', 
-                      verticalAlign: 'middle', 
-                      lineHeight: '1', 
-                      boxSizing: 'border-box',
-                      width: '142px',
-                      textAlign: 'left',
-                    }} className={themeClasses.textPrimary}>
-                      {line.brand}
-                    </td>
-
-                    {/* PRODUCT - blue clickable link */}
-                    <td style={{ 
-                      paddingTop: '8px',
-                      paddingRight: '16px',
-                      paddingBottom: '8px',
-                      paddingLeft: '16px',
-                      fontSize: '0.85rem', 
-                      height: '32px', 
-                      maxHeight: '32px', 
-                      minHeight: '32px', 
-                      verticalAlign: 'middle', 
-                      lineHeight: '1', 
-                      boxSizing: 'border-box',
-                      width: '172px',
-                      textAlign: 'left',
-                    }}>
-                      <button
-                        type="button"
-                        className="text-blue-600 hover:text-blue-700 hover:underline text-sm"
-                        onClick={() => {
-                          // Navigate to product detail if needed
+                          position: 'absolute',
+                          bottom: 0,
+                          left: '30px',
+                          right: '30px',
+                          height: '1px',
+                          backgroundColor: isDarkMode ? '#374151' : '#E5E7EB'
+                        }}
+                      />
+                      {/* PRODUCTS Column */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        {/* Product Icon - Only show placeholder in addProducts tab */}
+                        {(activeTab === 'addProducts') && (
+                          <div style={{ width: '36px', height: '36px', minWidth: '36px', borderRadius: '3px', overflow: 'hidden', backgroundColor: isDarkMode ? '#374151' : '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginLeft: '20px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', borderRadius: '3px', gap: '7.5px', color: isDarkMode ? '#6B7280' : '#9CA3AF', fontSize: '12px' }}>
+                              No img
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Product Info */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: 0 }}>
+                          {/* Product Name */}
+                          <span 
+                            style={{ 
+                              fontSize: '14px', 
+                              fontWeight: 500, 
+                              color: isDarkMode ? '#F9FAFB' : '#111827',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
                         }}
                       >
                         {line.product}
-                      </button>
-                    </td>
+                          </span>
+                          
+                          {/* Product ID and Brand/Size on same line */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px', flexWrap: 'wrap' }}>
+                            {/* Product ID with Clipboard Icon */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
+                                {productId || 'N/A'}
+                              </span>
+                              {productId && (
+                                <img 
+                                  src="/assets/content_copy.png" 
+                                  alt="Copy" 
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    try {
+                                      await navigator.clipboard.writeText(productId);
+                                    } catch (err) {
+                                      console.error('Failed to copy:', err);
+                                    }
+                                  }}
+                                  style={{ width: '14px', height: '14px', cursor: 'pointer', flexShrink: 0 }} 
+                                />
+                              )}
+                            </div>
+                            
+                            {/* Brand and Size */}
+                            <span style={{ fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
+                              {brandSize}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
 
-                    {/* SIZE */}
-                    <td style={{ 
-                      paddingTop: '8px',
-                      paddingRight: '16px',
-                      paddingBottom: '8px',
-                      paddingLeft: '16px',
-                      fontSize: '0.85rem', 
-                      height: '32px', 
-                      maxHeight: '32px', 
-                      minHeight: '32px', 
-                      verticalAlign: 'middle', 
-                      lineHeight: '1', 
-                      boxSizing: 'border-box',
-                      width: '74px',
-                      textAlign: 'left',
-                    }} className={themeClasses.textSecondary}>
-                      {line.size}
-                    </td>
+                      {/* INVENTORY Column */}
+                      <div style={{ textAlign: 'center', fontSize: '14px', fontWeight: 500, color: isDarkMode ? '#F9FAFB' : '#111827', paddingLeft: '16px', marginLeft: '-220px', marginRight: '20px' }}>
+                        {currentInventory.toLocaleString()}
+                      </div>
 
-                    {/* ADD - only show in addProducts tab when creating new order or in edit order mode (not when viewing) */}
-                    {(activeTab === 'addProducts' && (!isViewMode || isEditOrderMode)) && (
-                    <td style={{ paddingTop: '8px', paddingRight: '16px', paddingBottom: '8px', paddingLeft: '16px', textAlign: 'center', height: '32px', maxHeight: '32px', minHeight: '32px', verticalAlign: 'middle', lineHeight: '1', boxSizing: 'border-box', width: '120px' }}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          // In view mode (not editing), don't allow toggling
-                          if (isViewMode && !isEditOrderMode) return;
-                          handleAddProduct(line.id);
-                        }}
-                        disabled={isViewMode && !isEditOrderMode}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: line.added ? '0' : '10px',
-                          backgroundColor: line.added ? '#22C55E' : '#3B82F6',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '6px',
-                          paddingLeft: '12px',
-                          paddingRight: '12px',
-                          paddingTop: '4px',
-                          paddingBottom: '4px',
-                          fontSize: '14px',
-                          fontWeight: 400,
-                          fontFamily: 'system-ui, -apple-system, sans-serif',
-                          cursor: (isViewMode && !isEditOrderMode) ? 'default' : 'pointer',
-                          transition: 'background-color 0.2s',
-                          boxShadow: line.added ? '0 1px 3px 0 rgba(0, 0, 0, 0.2)' : 'none',
-                          width: '72px',
-                          height: '24px',
-                          maxWidth: '72px',
-                          maxHeight: '24px',
-                          minWidth: '72px',
-                          minHeight: '24px',
-                          boxSizing: 'border-box',
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!(isViewMode && !isEditOrderMode)) {
-                            e.target.style.backgroundColor = line.added ? '#16A34A' : '#2563EB';
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!(isViewMode && !isEditOrderMode)) {
-                            e.target.style.backgroundColor = line.added ? '#22C55E' : '#3B82F6';
-                          }
-                        }}
-                      >
-                        {!line.added && (
-                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M7 1V13M1 7H13" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-                          </svg>
-                        )}
-                        <span>{line.added ? 'Added' : 'Add'}</span>
-                      </button>
-                    </td>
-                    )}
-
-                    {/* QTY */}
-                    <td style={{ 
-                      paddingTop: '8px',
-                      paddingRight: '16px',
-                      paddingBottom: '8px',
-                      paddingLeft: '16px',
-                      textAlign: 'left', 
-                      height: '32px', 
-                      maxHeight: '32px', 
-                      minHeight: '32px', 
-                      verticalAlign: 'middle', 
-                      lineHeight: '1', 
-                      boxSizing: 'border-box',
-                      width: '139px',
-                    }}>
-                      {((activeTab === 'submitPO' || activeTab === 'receivePO') && isViewMode) ? (
-                        editingRowId === line.id ? (
-                          <div
-                      style={{
-                              display: 'inline-flex',
+                      {/* UNITS TO MAKE Column */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', paddingLeft: '16px', marginLeft: '-220px', marginRight: '20px' }}>
+                        {/* Quantity stepper container */}
+                        <div style={{ 
+                          display: 'flex', 
                               alignItems: 'center',
-                              justifyContent: 'center',
-                              backgroundColor: '#F3F4F6',
-                              border: '1px solid #E5E7EB',
-                              borderRadius: '8px',
-                              padding: '4px 12px',
-                              minWidth: '120px',
-                              height: '32px',
-                              boxSizing: 'border-box',
-                              position: 'relative',
-                      }}
-                    >
-                      <input
-                              type="text"
-                              inputMode="numeric"
-                              value={String(line.qty || 0)}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                const newValue = e.target.value.replace(/[^0-9]/g, '');
-                                const numValue = newValue === '' ? 0 : parseInt(newValue) || 0;
-                                // Update without rounding while typing
-                                handleQtyChange(line.id, numValue, false);
-                              }}
+                          width: '110px',
+                          height: '28px',
+                          borderRadius: '6px', 
+                          overflow: 'hidden',
+                          border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
+                          backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF'
+                        }}>
+                          {/* Decrement button */}
+                          <button 
                               onClick={(e) => {
                                 e.stopPropagation();
-                              }}
-                              onFocus={(e) => {
-                                e.stopPropagation();
-                                e.target.select();
-                              }}
-                              onBlur={(e) => {
-                                e.stopPropagation();
-                                const value = parseInt(e.target.value) || 0;
-                                // Round the quantity when leaving the field
-                                handleQtyChange(line.id, value, true);
-                              }}
-                              onKeyDown={(e) => {
-                                e.stopPropagation();
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  e.target.blur(); // Trigger blur to round
-                                }
+                              const currentQty = line.qty || 0; 
+                              const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0; 
+                              if (numQty <= 0) return; 
+                              handleQtyChange(line.id, Math.max(0, numQty - 1)); 
                               }}
                               style={{ 
-                                color: '#000000', 
-                                fontSize: '14px', 
-                                fontWeight: 400,
-                                fontFamily: 'system-ui, -apple-system, sans-serif',
+                              width: '24px', 
+                              height: '28px', 
+                              borderTopLeftRadius: '6px',
+                              borderBottomLeftRadius: '6px',
+                              borderTopRightRadius: '0',
+                              borderBottomRightRadius: '0',
                                 border: 'none',
-                                background: 'transparent',
-                                width: '100%',
-                                textAlign: 'center',
-                                outline: 'none',
-                                padding: 0,
-                                margin: 0,
-                                cursor: 'text',
-                                WebkitAppearance: 'none',
-                                MozAppearance: 'textfield',
-                              }}
-                      />
-                    </div>
-                        ) : (
-                    <div 
-                      style={{
-                              display: 'inline-flex',
+                              borderRight: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                              backgroundColor: isDarkMode ? '#374151' : '#F3F4F6', 
+                              color: isDarkMode ? '#FFFFFF' : '#6B7280', 
+                              cursor: 'pointer', 
+                              display: 'flex', 
                               alignItems: 'center',
                               justifyContent: 'center',
-                              backgroundColor: '#F3F4F6',
-                              border: '1px solid #E5E7EB',
-                              borderRadius: '8px',
-                              padding: '4px 12px',
-                              minWidth: '80px',
-                              height: '28px',
-                              boxSizing: 'border-box',
-                            }}
-                          >
-                            <span style={{ 
-                              color: '#000000', 
                               fontSize: '14px', 
                               fontWeight: 400,
-                              fontFamily: 'system-ui, -apple-system, sans-serif',
-                            }}>
-                              {line.qty ? line.qty.toLocaleString() : '0'}
-                            </span>
-                    </div>
-                        )
-                      ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
-                    <div 
-                      style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            backgroundColor: editingRowId === line.id ? '#FFFBEB' : '#ffffff',
-                            border: editingRowId === line.id ? '2px solid #F59E0B' : '1px solid #E5E7EB',
-                            borderRadius: '8px',
-                            paddingTop: editingRowId === line.id ? '3px' : '4px',
-                            paddingRight: '6px',
-                            paddingBottom: editingRowId === line.id ? '3px' : '4px',
-                            paddingLeft: '6px',
-                            boxShadow: editingRowId === line.id ? '0 0 0 3px rgba(245, 158, 11, 0.1)' : '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                            width: '107px',
-                            height: '24px',
-                            boxSizing: 'border-box',
-                            transition: 'all 0.2s',
-                          }}
-                        >
+                              fontFamily: 'sans-serif',
+                              padding: 0,
+                              outline: 'none',
+                              flexShrink: 0
+                            }}
+                          >
+                            −
+                          </button>
+                          {/* Quantity input/display */}
                           <input
                             type="number"
-                            value={line.qty || 0}
-                            onChange={(e) => handleQtyChange(line.id, e.target.value, false)}
-                            onBlur={(e) => {
-                              const value = parseInt(e.target.value) || 0;
-                              // Round the quantity when leaving the field
-                              handleQtyChange(line.id, value, true);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                e.target.blur(); // Trigger blur to round
-                              }
-                            }}
+                            min="0" 
+                            value={line.qty !== undefined && line.qty !== null && line.qty !== '' ? line.qty : ''} 
+                            onChange={(e) => { 
+                              const inputValue = e.target.value; 
+                              if (inputValue === '' || inputValue === '-') { 
+                                handleQtyChange(line.id, ''); 
+                              } else { 
+                                const numValue = parseInt(inputValue, 10); 
+                                if (!isNaN(numValue) && numValue >= 0) { 
+                                  handleQtyChange(line.id, numValue); 
+                                } 
+                              } 
+                            }} 
+                            onClick={(e) => e.stopPropagation()} 
                             style={{ 
-                              color: '#000000', 
+                              height: '28px',
+                              minWidth: '50px',
+                              border: 'none',
+                              borderLeft: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                              borderRight: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                              backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF', 
+                              color: isDarkMode ? '#FFFFFF' : '#111827', 
+                              textAlign: 'center',
+                              fontSize: '13px', 
+                              fontWeight: 500, 
+                              outline: 'none',
+                              MozAppearance: 'textfield',
+                              WebkitAppearance: 'none',
+                              fontFamily: 'sans-serif',
+                              padding: '0 6px',
+                              flex: '1 1 auto',
+                              boxSizing: 'border-box'
+                            }}
+                            onWheel={(e) => e.target.blur()}
+                            className="no-spinner" 
+                          />
+                          {/* Increment button */}
+                          <button 
+                            onClick={(e) => { 
+                              e.stopPropagation(); 
+                              const currentQty = line.qty || 0; 
+                              const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0; 
+                              handleQtyChange(line.id, numQty + 1); 
+                            }} 
+                      style={{
+                              width: '24px', 
+                              height: '28px', 
+                              borderTopLeftRadius: '0',
+                              borderBottomLeftRadius: '0',
+                              borderTopRightRadius: '6px',
+                              borderBottomRightRadius: '6px',
+                              border: 'none',
+                              borderLeft: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                              backgroundColor: isDarkMode ? '#374151' : '#F3F4F6', 
+                              color: isDarkMode ? '#FFFFFF' : '#6B7280', 
+                              cursor: 'pointer', 
+                              display: 'flex',
+                              alignItems: 'center', 
+                              justifyContent: 'center', 
                               fontSize: '14px', 
                               fontWeight: 400,
-                              fontFamily: 'system-ui, -apple-system, sans-serif',
-                              border: 'none',
-                              background: 'transparent',
-                              width: '100%',
-                              textAlign: 'center',
-                              outline: 'none',
+                              fontFamily: 'sans-serif',
                               padding: 0,
-                              margin: 0,
-                              MozAppearance: 'textfield',
-                              cursor: 'text',
-                            }}
-                            className="[&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            min="0"
-                          />
-                    </div>
-                          {/* Show qty difference in edit order mode */}
-                          {isEditOrderMode && getQtyDifference(line) && (
-                            <span 
-                              style={{ 
-                                color: getQtyDifference(line).startsWith('+') ? '#22C55E' : '#EF4444',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              {getQtyDifference(line)}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </td>
-
-                    {/* Timeline - show in addProducts tab when creating new order or editing order */}
-                    {(activeTab === 'addProducts' && (!isViewMode || isEditOrderMode)) && (
-                    <td style={{ paddingTop: '8px', paddingRight: '16px', paddingBottom: '8px', paddingLeft: '16px', width: '400px', height: '32px', maxHeight: '32px', minHeight: '32px', verticalAlign: 'middle', lineHeight: '1', boxSizing: 'border-box', position: 'relative', backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF' }}>
-                      {timelineData && (
-                    <div 
-                      style={{
-                            position: 'relative',
-                            width: '100%',
-                            height: '32px',
-                            paddingLeft: '24px',
-                            paddingRight: '24px',
-                          }}
-                        >
-                          {/* Progress bar container - spans from Today to DOI Goal */}
-                          <div
-                            style={{
-                              position: 'absolute',
-                              left: '24px',
-                              right: '24px',
-                              bottom: '4px',
-                              height: '14px',
-                              display: 'flex',
-                              borderRadius: '9999px',
-                              overflow: 'hidden',
+                              outline: 'none',
+                              flexShrink: 0
                             }}
                           >
-                            {/* Green segment (Inventory) - rounded left end */}
-                            <div
-                              style={{
-                                width: `${timelineData.inventoryPercent}%`,
-                                backgroundColor: '#22C55E',
-                                height: '100%',
-                                borderRadius: timelineData.orderPercent > 0 ? '9999px 0 0 9999px' : '9999px',
-                              }}
-                            />
-                            {/* Blue segment (# to Order) - rounded right end */}
-                            <div
-                              style={{
-                                width: `${timelineData.orderPercent}%`,
-                                backgroundColor: '#2563EB',
-                                height: '100%',
-                                borderRadius: timelineData.inventoryPercent > 0 ? '0 9999px 9999px 0' : '9999px',
-                              }}
-                            />
+                            +
+                          </button>
                           </div>
-
-                          {/* +5 indicator - above Feb position (only for row 3) */}
-                          {index === 2 && (
-                            <div
-                              style={{
-                                position: 'absolute',
-                                left: 'calc(24px + 60%)',
-                                top: '2px',
-                                transform: 'translateX(-50%)',
-                                fontSize: '10px',
-                                color: '#2563EB',
-                                fontWeight: 600,
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              +5
-                            </div>
-                          )}
-
-                          {/* Month markers with dashed lines - only dashed lines, no circles */}
-                          <div className="absolute" style={{ left: 'calc(24px + 20%)', bottom: '8px', transform: 'translateX(-50%)' }}>
-                            {/* Vertical dashed line above */}
-                            <div
-                              style={{
-                                position: 'absolute',
-                                bottom: '8px',
-                                left: '50%',
-                                transform: 'translateX(-50%)',
-                                width: '1px',
-                                height: '12px',
-                                borderLeft: '1px dashed #9CA3AF',
-                                opacity: 0.6,
-                              }}
-                            />
-                          </div>
-                          <div className="absolute" style={{ left: 'calc(24px + 40%)', bottom: '8px', transform: 'translateX(-50%)' }}>
-                            {/* Vertical dashed line above */}
-                            <div
-                              style={{
-                                position: 'absolute',
-                                bottom: '8px',
-                                left: '50%',
-                                transform: 'translateX(-50%)',
-                                width: '1px',
-                                height: '12px',
-                                borderLeft: '1px dashed #9CA3AF',
-                                opacity: 0.6,
-                              }}
-                            />
-                          </div>
-                          <div className="absolute" style={{ left: 'calc(24px + 60%)', bottom: '8px', transform: 'translateX(-50%)' }}>
-                            {/* Vertical dashed line above */}
-                            <div
-                              style={{
-                                position: 'absolute',
-                                bottom: '8px',
-                                left: '50%',
-                                transform: 'translateX(-50%)',
-                                width: '1px',
-                                height: '12px',
-                                borderLeft: '1px dashed #9CA3AF',
-                                opacity: 0.6,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </td>
-                    )}
-                    
-                    {/* Ellipsis menu - show when viewing order */}
-                    {(isViewMode && !isEditOrderMode) && (
-                      <td style={{ 
-                        paddingTop: '8px', 
-                        paddingRight: '16px', 
-                        paddingBottom: '8px', 
-                        paddingLeft: '16px', 
-                        height: '32px', 
-                        maxHeight: '32px', 
-                        minHeight: '32px', 
-                        verticalAlign: 'middle', 
-                        lineHeight: '1', 
-                        boxSizing: 'border-box', 
-                        width: '60px',
-                        textAlign: 'center',
-                        position: 'relative',
-                      }}>
+                        {/* Add button */}
                         <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleMenu(line.id);
+                          onClick={() => {
+                            setOrderLines(prev => prev.map(l => 
+                              l.id === line.id ? { ...l, added: !l.added } : l
+                            ));
                           }}
                           style={{
-                            background: 'transparent',
+                            width: '64px',
+                            height: '24px',
+                            borderRadius: '4px', 
                             border: 'none',
+                            backgroundColor: line.added ? '#10B981' : '#2563EB', 
+                            color: '#FFFFFF', 
+                            fontSize: '12px', 
+                            fontWeight: 500, 
                             cursor: 'pointer',
-                            padding: '4px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
+                            gap: '8px',
+                            padding: '4px 8px',
+                            outline: 'none',
+                            fontFamily: 'sans-serif'
                           }}
                         >
-                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <circle cx="8" cy="4" r="1.5" fill={isDarkMode ? '#9CA3AF' : '#6B7280'}/>
-                            <circle cx="8" cy="8" r="1.5" fill={isDarkMode ? '#9CA3AF' : '#6B7280'}/>
-                            <circle cx="8" cy="12" r="1.5" fill={isDarkMode ? '#9CA3AF' : '#6B7280'}/>
-                          </svg>
+                          {!line.added && (
+                            <span style={{ fontSize: '14px', lineHeight: 1 }}>+</span>
+                          )}
+                          <span>{line.added ? 'Added' : 'Add'}</span>
                         </button>
-                        
-                        {/* Dropdown menu */}
-                        {openMenuId === line.id && (
-                          <div
-                            ref={(el) => {
-                              if (el) {
-                                const menuRefs = statusMenuRefs.current || {};
-                                menuRefs[line.id] = el;
-                                statusMenuRefs.current = menuRefs;
-                              }
-                            }}
-                            style={{
-                              position: 'absolute',
-                              right: '100%',
-                              top: '50%',
-                              transform: 'translateY(-50%)',
-                              marginRight: '8px',
-                              backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-                              border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
-                              borderRadius: '6px',
-                              boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.06)',
-                              zIndex: 1000,
-                              padding: '2px',
-                            }}
-                          >
+                      </div>
+
+                      {/* DOI (DAYS) Column */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingLeft: '16px', marginLeft: '-220px', marginRight: '20px', position: 'relative' }}>
+                        <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+                          <span style={{ fontSize: '18px', fontWeight: 500, color: doiColor, height: '32px', display: 'flex', alignItems: 'center' }}>
+                            {currentDOI}
+                          </span>
+                        </div>
                             <button
-                              type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                // Handle edit action
-                                setOpenMenuId(null);
+                            // TODO: Implement analyze functionality
+                            console.log('Analyze product:', line.id);
                               }}
                               style={{
-                                width: '100%',
+                            width: '86px',
+                            height: '24px',
                                 padding: '4px 8px',
-                                textAlign: 'left',
-                                background: 'transparent',
+                            borderRadius: '4px',
                                 border: 'none',
-                                color: isDarkMode ? '#F9FAFB' : '#111827',
+                            backgroundColor: '#9333EA',
+                            color: '#FFFFFF',
                                 fontSize: '12px',
+                            fontWeight: 500,
                                 cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyContent: 'flex-start',
-                                gap: '6px',
-                                borderRadius: '4px',
-                              }}
-                              onMouseEnter={(e) => {
-                                e.target.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.target.style.backgroundColor = 'transparent';
-                              }}
-                            >
-                              {/* Pencil/Edit icon */}
-                              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path 
-                                  d="M11.333 2.667a1.333 1.333 0 0 1 1.886 0l.781.781a1.333 1.333 0 0 1 0 1.886l-8.5 8.5a1.333 1.333 0 0 1-.943.39H2.667a1.333 1.333 0 0 1-1.334-1.333v-1.608a1.333 1.333 0 0 1 .39-.943l8.5-8.5zm1.057 2.276l-.781-.781-8.5 8.5v.781h.781l8.5-8.5z" 
-                                  fill={isDarkMode ? '#9CA3AF' : '#6B7280'}
-                                />
+                            justifyContent: 'center',
+                            gap: '8px',
+                            fontFamily: 'sans-serif',
+                            position: 'absolute',
+                            right: 0,
+                            boxSizing: 'border-box'
+                          }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M2.33333 10.5L5.25 7.58333L7.58333 9.91667L11.6667 5.83333M11.6667 5.83333V9.33333M11.6667 5.83333H8.16667" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M1.16667 2.33333H12.8333" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                               </svg>
-                              <span>Edit</span>
+                          Analyze
                             </button>
                           </div>
-                        )}
-                      </td>
-                    )}
-
-                  </tr>
+                    </div>
                 );
               })
             )}
-          </tbody>
-        </table>
+            </div>
+          </div>
         )}
         </div>
                     </div>
 
       {/* Footer - Sticky */}
       <div 
-        className="fixed bottom-0 left-64 right-0 z-50"
         style={{ 
-          backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-          borderTop: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+          position: 'fixed',
+          bottom: '16px',
+          left: `calc(256px + (100vw - 256px) / 2)`,
+          transform: 'translateX(-50%)',
+          width: 'fit-content',
+          minWidth: '1014px',
+          height: '65px',
+          backgroundColor: isDarkMode ? 'rgba(31, 41, 55, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+          borderRadius: '32px',
           padding: '16px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '104px',
+          zIndex: 1000,
+          transition: 'left 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+          boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
         }}
       >
-        <div className="flex items-center justify-between gap-6">
           {/* Summary Table - Show in addProducts, receivePO tabs, and edit mode */}
-          {(activeTab === 'addProducts' || activeTab === 'receivePO' || isEditOrderMode) && (
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+        {(activeTab === 'addProducts' || activeTab === 'receivePO' || isEditOrderMode) ? (
+          <>
+            <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 500, color: isDarkMode ? '#9CA3AF' : '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 400,
+                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                  }}>
                     PRODUCTS
-                  </div>
-                  <div style={{ fontSize: '16px', fontWeight: 700, color: isDarkMode ? '#F9FAFB' : '#1F2937' }}>
+                  </span>
+                  <span style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                  }}>
                     {summary.products}
-                  </div>
+                  </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 500, color: isDarkMode ? '#9CA3AF' : '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 400,
+                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                  }}>
                     TOTAL LABELS
-                  </div>
-                  <div style={{ fontSize: '16px', fontWeight: 700, color: isDarkMode ? '#F9FAFB' : '#1F2937' }}>
+                  </span>
+                  <span style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                  }}>
                     {summary.totalLabels.toLocaleString()}
-                  </div>
+                  </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 500, color: isDarkMode ? '#9CA3AF' : '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 400,
+                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                  }}>
                     EST COST
-                  </div>
-                  <div style={{ fontSize: '16px', fontWeight: 700, color: isDarkMode ? '#F9FAFB' : '#1F2937' }}>
+                  </span>
+                  <span style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                  }}>
                     ${summary.estCost.toFixed(2)}
-                  </div>
+                  </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 500, color: isDarkMode ? '#9CA3AF' : '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 400,
+                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                  }}>
                     5" X 8"
-                  </div>
-                  <div style={{ fontSize: '16px', fontWeight: 700, color: isDarkMode ? '#F9FAFB' : '#1F2937' }}>
+                  </span>
+                  <span style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                  }}>
                     {summary.size5x8.toLocaleString()}
-                  </div>
+                  </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 500, color: isDarkMode ? '#9CA3AF' : '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: 400,
+                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                  }}>
                     5.375" X 4.5"
-                  </div>
-                  <div style={{ fontSize: '16px', fontWeight: 700, color: isDarkMode ? '#F9FAFB' : '#1F2937' }}>
+                  </span>
+                  <span style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                  }}>
                     {summary.size5375x45.toLocaleString()}
+                  </span>
                   </div>
                 </div>
-              </div>
-            </div>
-          )}
-          
           {/* Action Buttons */}
-          <div className="flex items-center gap-3">
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             {/* Edit Order Mode Buttons */}
             {isEditOrderMode ? (
               <>
                 <button
                   type="button"
                   onClick={handleCancelEdit}
-                  className="inline-flex items-center gap-2 text-xs font-semibold transition-colors"
                   style={{
+                      height: '31px',
+                      padding: '0 16px',
+                      borderRadius: '6px',
+                      border: 'none',
                     backgroundColor: 'transparent',
-                    color: '#6B7280',
-                    padding: '8px 12px',
+                      color: isDarkMode ? '#FFFFFF' : '#111827',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.opacity = '0.8';
+                      e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.opacity = '1';
+                      e.currentTarget.style.backgroundColor = 'transparent';
                   }}
                 >
                   Cancel Edit
@@ -2794,10 +2426,20 @@ const LabelOrderPage = () => {
                 <button
                   type="button"
                   onClick={handleSaveChanges}
-                  className="inline-flex items-center gap-2 text-xs font-semibold rounded-lg px-4 py-2 transition-colors"
                   style={{
+                      height: '31px',
+                      padding: '0 16px',
+                      borderRadius: '6px',
+                      border: 'none',
                     backgroundColor: '#007AFF',
                     color: '#FFFFFF',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = '#0056CC';
@@ -2816,22 +2458,28 @@ const LabelOrderPage = () => {
                   <button
                     type="button"
                     onClick={handleEditOrder}
-                    className="inline-flex items-center gap-2 text-xs font-semibold transition-colors"
                     style={{
+                        height: '31px',
+                        padding: '0 16px',
+                        borderRadius: '6px',
+                        border: 'none',
                       backgroundColor: 'transparent',
-                      color: '#6B7280',
-                      padding: '8px 12px',
+                        color: isDarkMode ? '#FFFFFF' : '#111827',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.opacity = '0.8';
+                        e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.opacity = '1';
+                        e.currentTarget.style.backgroundColor = 'transparent';
                     }}
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
                     Edit Order
                   </button>
                 )}
@@ -2841,22 +2489,28 @@ const LabelOrderPage = () => {
                   <button
                     type="button"
                     onClick={handleOpenExportModal}
-                    className="inline-flex items-center gap-2 text-xs font-semibold transition-colors"
                     style={{
+                        height: '31px',
+                        padding: '0 16px',
+                        borderRadius: '6px',
+                        border: 'none',
                       backgroundColor: 'transparent',
-                      color: '#3B82F6',
-                      padding: '8px 12px',
+                        color: isDarkMode ? '#FFFFFF' : '#111827',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.opacity = '0.8';
+                        e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.opacity = '1';
+                        e.currentTarget.style.backgroundColor = 'transparent';
                     }}
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                    </svg>
                     Export
                   </button>
                 )}
@@ -2866,12 +2520,21 @@ const LabelOrderPage = () => {
                   type="button"
                   onClick={isViewMode ? handleReceiveClick : handleCompleteOrder}
                   disabled={isViewMode && activeTab === 'receivePO' && selectedItems.size === 0}
-                  className="inline-flex items-center gap-2 text-xs font-semibold rounded-lg px-4 py-2 transition-colors"
                   style={{
+                      height: '31px',
+                      padding: '0 16px',
+                      borderRadius: '6px',
+                      border: 'none',
                     backgroundColor: '#007AFF',
                     color: '#FFFFFF',
+                      fontSize: '14px',
+                      fontWeight: 500,
                     cursor: (isViewMode && activeTab === 'receivePO' && selectedItems.size === 0) ? 'not-allowed' : 'pointer',
                     opacity: (isViewMode && activeTab === 'receivePO' && selectedItems.size === 0) ? 0.5 : 1,
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                   }}
                   onMouseEnter={(e) => {
                     if (!(isViewMode && activeTab === 'receivePO' && selectedItems.size === 0)) {
@@ -2889,9 +2552,12 @@ const LabelOrderPage = () => {
               </>
             )}
           </div>
+          </>
+        ) : (
+          <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }} />
+        )}
         </div>
         {/* Single floating legend for timelines */}
-      </div>
 
       {/* Export Modal */}
       {showExportModal && (

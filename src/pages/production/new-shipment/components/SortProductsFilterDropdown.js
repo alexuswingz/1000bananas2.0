@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, forwardRef, useRef, useImperativeHandle } from 'react';
 import { createPortal } from 'react-dom';
 
-const SortProductsFilterDropdown = ({ 
+const SortProductsFilterDropdown = forwardRef(({ 
   filterIconRef, 
   columnKey, 
   availableValues = [], 
@@ -9,15 +9,53 @@ const SortProductsFilterDropdown = ({
   currentSort = '',
   onApply,
   onClose 
-}) => {
+}, ref) => {
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [sortOrder, setSortOrder] = useState(''); // Always start with empty, don't show blue state
   const [filterConditionExpanded, setFilterConditionExpanded] = useState(true);
   const [filterValuesExpanded, setFilterValuesExpanded] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedValues, setSelectedValues] = useState(
-    currentFilter.selectedValues ? new Set(currentFilter.selectedValues) : new Set()
-  );
+  const hasInitializedRef = useRef(false);
+  
+  // Initialize with all available values checked (unless there's an existing filter)
+  const [selectedValues, setSelectedValues] = useState(() => {
+    // If there's an existing filter with selectedValues, use those
+    if (currentFilter.selectedValues && currentFilter.selectedValues.size > 0) {
+      return new Set(currentFilter.selectedValues);
+    }
+    // Otherwise, start with all values checked
+    const allValues = availableValues.map(v => String(v));
+    return new Set(allValues);
+  });
+  
+  // Update selectedValues when dropdown opens - respect existing filter or start with all checked
+  useEffect(() => {
+    if (filterIconRef) {
+      // Check if there's an existing filter with selectedValues
+      const existingFilterValues = currentFilter.selectedValues;
+      const hasFilter = existingFilterValues && 
+        (existingFilterValues instanceof Set ? existingFilterValues.size > 0 : 
+         Array.isArray(existingFilterValues) ? existingFilterValues.length > 0 :
+         false);
+      
+      if (hasFilter) {
+        // Use existing filter values - always respect the saved filter
+        const filterValues = existingFilterValues instanceof Set 
+          ? Array.from(existingFilterValues)
+          : existingFilterValues;
+        setSelectedValues(new Set(filterValues));
+      } else if (!hasInitializedRef.current) {
+        // First time opening this dropdown with no filter - start with all checked
+        const allValues = availableValues.map(v => String(v));
+        setSelectedValues(new Set(allValues));
+        hasInitializedRef.current = true;
+      }
+      // If hasInitializedRef is true and no filter, keep current selectedValues (don't reset)
+    } else {
+      // Dropdown closed - reset initialization flag for next open
+      hasInitializedRef.current = false;
+    }
+  }, [filterIconRef, columnKey, currentFilter.selectedValues, availableValues]);
   
   // Condition filter state
   const [conditionType, setConditionType] = useState(currentFilter.conditionType || '');
@@ -26,31 +64,18 @@ const SortProductsFilterDropdown = ({
   // Check if column is numeric
   const isNumericColumn = columnKey === 'qty' || columnKey === 'volume';
   
-  // Available conditions based on column type
-  const textConditions = [
+  // Universal conditions - apply to ALL filters
+  const conditions = [
     { value: '', label: 'None' },
-    { value: 'contains', label: 'Contains' },
-    { value: 'notContains', label: 'Does not contain' },
-    { value: 'equals', label: 'Equals' },
-    { value: 'notEquals', label: 'Does not equal' },
-    { value: 'startsWith', label: 'Starts with' },
-    { value: 'endsWith', label: 'Ends with' },
-    { value: 'isEmpty', label: 'Is empty' },
-    { value: 'isNotEmpty', label: 'Is not empty' },
-  ];
-  
-  const numericConditions = [
-    { value: '', label: 'None' },
-    { value: 'equals', label: 'Equals' },
-    { value: 'notEquals', label: 'Does not equal' },
     { value: 'greaterThan', label: 'Greater than' },
+    { value: 'greaterOrEqual', label: 'Greater than or equal to' },
     { value: 'lessThan', label: 'Less than' },
-    { value: 'greaterOrEqual', label: 'Greater than or equal' },
-    { value: 'lessOrEqual', label: 'Less than or equal' },
-    { value: 'between', label: 'Between' },
+    { value: 'lessOrEqual', label: 'Less than or equal to' },
+    { value: 'equals', label: 'Is equal to' },
+    { value: 'notEquals', label: 'Is not equal to' },
+    { value: 'between', label: 'Is between' },
+    { value: 'notBetween', label: 'Is not between' },
   ];
-  
-  const conditions = isNumericColumn ? numericConditions : textConditions;
 
   // Convert values to strings for filtering
   const stringValues = availableValues.map(v => String(v));
@@ -106,16 +131,14 @@ const SortProductsFilterDropdown = ({
   const handleReset = () => {
     setSortOrder('');
     setSearchTerm('');
-    setSelectedValues(new Set());
+    // Reset to all values checked
+    const allValues = availableValues.map(v => String(v));
+    setSelectedValues(new Set(allValues));
     setConditionType('');
     setConditionValue('');
     if (onApply) {
-      onApply({
-        sortOrder: '',
-        selectedValues: new Set(),
-        conditionType: '',
-        conditionValue: '',
-      });
+      // Pass null to indicate filter should be cleared
+      onApply(null);
     }
   };
 
@@ -132,8 +155,14 @@ const SortProductsFilterDropdown = ({
     onClose?.();
   };
 
+  const dropdownRef = useRef(null);
+
+  // Expose the DOM element via ref
+  useImperativeHandle(ref, () => dropdownRef.current, []);
+
   return createPortal(
     <div
+      ref={dropdownRef}
       data-filter-dropdown={columnKey}
       style={{
         position: 'fixed',
@@ -335,23 +364,275 @@ const SortProductsFilterDropdown = ({
             
             {/* Condition value input - show for most conditions except isEmpty/isNotEmpty */}
             {conditionType && conditionType !== 'isEmpty' && conditionType !== 'isNotEmpty' && (
-              <input
-                type={isNumericColumn ? 'number' : 'text'}
-                value={conditionValue}
-                onChange={(e) => setConditionValue(e.target.value)}
-                placeholder={isNumericColumn ? 'Enter number...' : 'Enter value...'}
-                style={{
-                  width: '100%',
-                  padding: '6px 8px',
-                  border: '1px solid #E5E7EB',
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                }}
-                onFocus={(e) => { e.target.style.borderColor = '#3B82F6'; }}
-                onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
-              />
+              <>
+                {conditionType === 'between' || conditionType === 'notBetween' ? (
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <input
+                        type="number"
+                        value={conditionValue.includes('-') ? conditionValue.split('-')[0] : conditionValue}
+                        onChange={(e) => {
+                          const parts = conditionValue.includes('-') ? conditionValue.split('-') : [conditionValue, ''];
+                          const minValue = e.target.value;
+                          const maxValue = parts[1] || '';
+                          if (minValue && maxValue) {
+                            setConditionValue(`${minValue}-${maxValue}`);
+                          } else if (minValue) {
+                            setConditionValue(minValue);
+                          } else if (maxValue) {
+                            setConditionValue(`-${maxValue}`);
+                          } else {
+                            setConditionValue('');
+                          }
+                        }}
+                        placeholder="Min"
+                        style={{
+                          width: '100%',
+                          padding: '6px 8px',
+                          paddingRight: (conditionValue.includes('-') ? conditionValue.split('-')[0] : conditionValue) ? '26px' : '8px',
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                        }}
+                        onFocus={(e) => { e.target.style.borderColor = '#3B82F6'; }}
+                        onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
+                      />
+                      {(conditionValue.includes('-') ? conditionValue.split('-')[0] : conditionValue) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const parts = conditionValue.includes('-') ? conditionValue.split('-') : [conditionValue, ''];
+                            const maxValue = parts[1] || '';
+                            if (maxValue) {
+                              setConditionValue(`-${maxValue}`);
+                            } else {
+                              setConditionValue('');
+                            }
+                          }}
+                          style={{
+                            position: 'absolute',
+                            right: '6px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            width: '14px',
+                            height: '14px',
+                            border: '1px solid #D1D5DB',
+                            borderRadius: '3px',
+                            backgroundColor: '#FFFFFF',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: 0,
+                            zIndex: 2,
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = '#9CA3AF';
+                            e.currentTarget.style.backgroundColor = '#F3F4F6';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = '#D1D5DB';
+                            e.currentTarget.style.backgroundColor = '#FFFFFF';
+                          }}
+                          onTouchStart={(e) => {
+                            e.currentTarget.style.borderColor = '#9CA3AF';
+                            e.currentTarget.style.backgroundColor = '#F3F4F6';
+                          }}
+                          onTouchEnd={(e) => {
+                            e.currentTarget.style.borderColor = '#D1D5DB';
+                            e.currentTarget.style.backgroundColor = '#FFFFFF';
+                          }}
+                        >
+                          <svg
+                            width="8"
+                            height="8"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="#6B7280"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                    <span style={{ fontSize: '12px', color: '#6B7280' }}>to</span>
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <input
+                        type="number"
+                        value={conditionValue.includes('-') ? conditionValue.split('-')[1] : ''}
+                        onChange={(e) => {
+                          const parts = conditionValue.includes('-') ? conditionValue.split('-') : [conditionValue, ''];
+                          const minValue = parts[0] || '';
+                          const maxValue = e.target.value;
+                          if (minValue && maxValue) {
+                            setConditionValue(`${minValue}-${maxValue}`);
+                          } else if (minValue) {
+                            setConditionValue(minValue);
+                          } else if (maxValue) {
+                            setConditionValue(`-${maxValue}`);
+                          } else {
+                            setConditionValue('');
+                          }
+                        }}
+                        placeholder="Max"
+                        style={{
+                          width: '100%',
+                          padding: '6px 8px',
+                          paddingRight: (conditionValue.includes('-') ? conditionValue.split('-')[1] : '') ? '26px' : '8px',
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                        }}
+                        onFocus={(e) => { e.target.style.borderColor = '#3B82F6'; }}
+                        onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
+                      />
+                      {(conditionValue.includes('-') ? conditionValue.split('-')[1] : '') && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const parts = conditionValue.includes('-') ? conditionValue.split('-') : [conditionValue, ''];
+                            const minValue = parts[0] || '';
+                            if (minValue) {
+                              setConditionValue(minValue);
+                            } else {
+                              setConditionValue('');
+                            }
+                          }}
+                          style={{
+                            position: 'absolute',
+                            right: '6px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            width: '14px',
+                            height: '14px',
+                            border: '1px solid #D1D5DB',
+                            borderRadius: '3px',
+                            backgroundColor: '#FFFFFF',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: 0,
+                            zIndex: 2,
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = '#9CA3AF';
+                            e.currentTarget.style.backgroundColor = '#F3F4F6';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = '#D1D5DB';
+                            e.currentTarget.style.backgroundColor = '#FFFFFF';
+                          }}
+                          onTouchStart={(e) => {
+                            e.currentTarget.style.borderColor = '#9CA3AF';
+                            e.currentTarget.style.backgroundColor = '#F3F4F6';
+                          }}
+                          onTouchEnd={(e) => {
+                            e.currentTarget.style.borderColor = '#D1D5DB';
+                            e.currentTarget.style.backgroundColor = '#FFFFFF';
+                          }}
+                        >
+                          <svg
+                            width="8"
+                            height="8"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="#6B7280"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ position: 'relative', width: '100%' }}>
+                    <input
+                      type={isNumericColumn ? 'number' : 'text'}
+                      value={conditionValue}
+                      onChange={(e) => setConditionValue(e.target.value)}
+                      placeholder={isNumericColumn ? 'Enter number...' : 'Enter value...'}
+                      style={{
+                        width: '100%',
+                        padding: '6px 8px',
+                        paddingRight: conditionValue ? '26px' : '8px',
+                        border: '1px solid #E5E7EB',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                      }}
+                      onFocus={(e) => { e.target.style.borderColor = '#3B82F6'; }}
+                      onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
+                    />
+                    {conditionValue && (
+                      <button
+                        type="button"
+                        onClick={() => setConditionValue('')}
+                        style={{
+                          position: 'absolute',
+                          right: '6px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          width: '14px',
+                          height: '14px',
+                          border: '1px solid #D1D5DB',
+                          borderRadius: '3px',
+                          backgroundColor: '#FFFFFF',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: 0,
+                          zIndex: 2,
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = '#9CA3AF';
+                          e.currentTarget.style.backgroundColor = '#F3F4F6';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = '#D1D5DB';
+                          e.currentTarget.style.backgroundColor = '#FFFFFF';
+                        }}
+                        onTouchStart={(e) => {
+                          e.currentTarget.style.borderColor = '#9CA3AF';
+                          e.currentTarget.style.backgroundColor = '#F3F4F6';
+                        }}
+                        onTouchEnd={(e) => {
+                          e.currentTarget.style.borderColor = '#D1D5DB';
+                          e.currentTarget.style.backgroundColor = '#FFFFFF';
+                        }}
+                      >
+                        <svg
+                          width="8"
+                          height="8"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#6B7280"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -452,6 +733,7 @@ const SortProductsFilterDropdown = ({
                   top: '50%',
                   transform: 'translateY(-50%)',
                   pointerEvents: 'none',
+                  zIndex: 1,
                 }}
               >
                 <path
@@ -477,6 +759,7 @@ const SortProductsFilterDropdown = ({
                 style={{
                   width: '100%',
                   padding: '5px 8px 5px 26px',
+                  paddingRight: searchTerm ? '24px' : '26px',
                   border: '1px solid #E5E7EB',
                   borderRadius: '4px',
                   fontSize: '11px',
@@ -490,6 +773,59 @@ const SortProductsFilterDropdown = ({
                   e.target.style.borderColor = '#E5E7EB';
                 }}
               />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  style={{
+                    position: 'absolute',
+                    right: '20px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: '14px',
+                    height: '14px',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '3px',
+                    backgroundColor: '#FFFFFF',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0,
+                    zIndex: 2,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = '#9CA3AF';
+                    e.currentTarget.style.backgroundColor = '#F3F4F6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = '#D1D5DB';
+                    e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  }}
+                  onTouchStart={(e) => {
+                    e.currentTarget.style.borderColor = '#9CA3AF';
+                    e.currentTarget.style.backgroundColor = '#F3F4F6';
+                  }}
+                  onTouchEnd={(e) => {
+                    e.currentTarget.style.borderColor = '#D1D5DB';
+                    e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  }}
+                >
+                  <svg
+                    width="8"
+                    height="8"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#6B7280"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              )}
               {/* Up/Down arrows */}
               <div
                 style={{
@@ -500,6 +836,8 @@ const SortProductsFilterDropdown = ({
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '1px',
+                  pointerEvents: 'none',
+                  zIndex: 1,
                 }}
               >
                 <svg width="10" height="5" viewBox="0 0 12 6" fill="none">
@@ -622,6 +960,8 @@ const SortProductsFilterDropdown = ({
     </div>,
     document.body
   );
-};
+});
+
+SortProductsFilterDropdown.displayName = 'SortProductsFilterDropdown';
 
 export default SortProductsFilterDropdown;

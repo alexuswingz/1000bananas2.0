@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 
-const ManufacturingHeader = ({ activeTab, onTabChange, onSearch, onSortClick }) => {
+const ManufacturingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, isSortMode = false }) => {
   const { isDarkMode } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -121,51 +121,53 @@ const ManufacturingHeader = ({ activeTab, onTabChange, onSearch, onSortClick }) 
           gap: '0.75rem',
         }}
       >
-        {/* Sort Button */}
-        <button
-          onClick={onSortClick}
-          style={{
-            backgroundColor: '#FCD34D',
-            width: '73px',
-            height: '24px',
-            borderRadius: '4px',
-            display: 'flex',
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            border: 'none',
-            gap: '10px',
-            padding: '0',
-            transition: 'all 0.2s ease',
-            boxSizing: 'border-box',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.opacity = '0.9';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.opacity = '1';
-          }}
-        >
-          <svg
-            style={{ width: '14px', height: '14px', color: '#111827', flexShrink: 0 }}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 20 12"
-            strokeWidth={2.5}
-            strokeLinecap="round"
+        {/* Sort Button - Hidden when in sort mode */}
+        {!isSortMode && (
+          <button
+            onClick={onSortClick}
+            style={{
+              backgroundColor: '#FCD34D',
+              width: '73px',
+              height: '24px',
+              borderRadius: '4px',
+              display: 'flex',
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              border: 'none',
+              gap: '10px',
+              padding: '0',
+              transition: 'all 0.2s ease',
+              boxSizing: 'border-box',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '0.9';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '1';
+            }}
           >
-            {/* Top bar - longest */}
-            <line x1="2" y1="2" x2="14" y2="2" />
-            {/* Middle bar - shorter */}
-            <line x1="2" y1="6" x2="10" y2="6" />
-            {/* Bottom bar - shortest */}
-            <line x1="2" y1="10" x2="7" y2="10" />
-          </svg>
-          <span style={{ fontSize: '13px', fontWeight: '500', color: '#111827', lineHeight: '1', whiteSpace: 'nowrap' }}>
-            Sort
-          </span>
-        </button>
+            <svg
+              style={{ width: '14px', height: '14px', color: '#111827', flexShrink: 0 }}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 20 12"
+              strokeWidth={2.5}
+              strokeLinecap="round"
+            >
+              {/* Top bar - longest */}
+              <line x1="2" y1="2" x2="14" y2="2" />
+              {/* Middle bar - shorter */}
+              <line x1="2" y1="6" x2="10" y2="6" />
+              {/* Bottom bar - shortest */}
+              <line x1="2" y1="10" x2="7" y2="10" />
+            </svg>
+            <span style={{ fontSize: '13px', fontWeight: '500', color: '#111827', lineHeight: '1', whiteSpace: 'nowrap' }}>
+              Sort
+            </span>
+          </button>
+        )}
 
         {/* Search */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -179,7 +181,7 @@ const ManufacturingHeader = ({ activeTab, onTabChange, onSearch, onSortClick }) 
                 width: '100%',
                 height: '32px',
                 paddingLeft: '2.5rem',
-                paddingRight: '8px',
+                paddingRight: searchQuery ? '2.5rem' : '8px',
                 paddingTop: '8px',
                 paddingBottom: '8px',
                 borderRadius: '6px',
@@ -212,6 +214,7 @@ const ManufacturingHeader = ({ activeTab, onTabChange, onSearch, onSortClick }) 
                 width: '1rem',
                 height: '1rem',
                 pointerEvents: 'none',
+                zIndex: 1,
               }}
             >
               <path
@@ -221,6 +224,56 @@ const ManufacturingHeader = ({ activeTab, onTabChange, onSearch, onSortClick }) 
                 d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
               />
             </svg>
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  if (onSearch) {
+                    onSearch('');
+                  }
+                }}
+                style={{
+                  position: 'absolute',
+                  right: '8px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '16px',
+                  height: '16px',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '4px',
+                  backgroundColor: '#FFFFFF',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
+                  zIndex: 2,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = '#9CA3AF';
+                  e.currentTarget.style.backgroundColor = '#F3F4F6';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = '#D1D5DB';
+                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                }}
+              >
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#6B7280"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
           </div>
           {/* Arrow buttons - outside search bar */}
           <div

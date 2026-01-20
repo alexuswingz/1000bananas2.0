@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
+import ShipmentDetailsModal from './ShipmentDetailsModal';
+import { getProductsInventory } from '../../../../services/productionApi';
 
-const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabelCheckClick, onStatusCommentClick, onStatusClick, onDeleteRow }) => {
+const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabelCheckClick, onStatusCommentClick, onStatusClick, onDeleteRow, onUpdateShipment }) => {
   const { isDarkMode } = useTheme();
   const [openFilterColumn, setOpenFilterColumn] = useState(null);
   const filterIconRefs = useRef({});
@@ -17,6 +19,10 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
   const [openActionMenu, setOpenActionMenu] = useState(null); // Track which row's menu is open
   const actionMenuRefs = useRef({});
   const actionMenuDropdownRef = useRef(null);
+  const [showShipmentDetailsModal, setShowShipmentDetailsModal] = useState(false);
+  const [selectedRow, setSelectedRow] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(false);
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -151,40 +157,47 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
     // Base status from row field - normalize to lowercase and trim whitespace
     const baseStatus = (status || 'pending').toLowerCase().trim();
     
-    // CRITICAL: If the status is "completed", ALWAYS use "completed" and skip all workflow logic
-    // This ensures that once a step is marked completed, it stays completed regardless of workflowStatus
     let normalizedStatus = baseStatus;
     const workflowStatus = row?.workflowStatus; // e.g. 'label_check', 'formula_check', 'book_shipment', 'sort_products', 'sort_formulas'
     
-    // If status is "completed", force it to stay "completed" and skip workflow override logic
+    // FIRST: If status is "completed", always keep it as completed (comments don't override completion)
+    // This must be checked FIRST to ensure completed status takes priority
     if (baseStatus === 'completed') {
       normalizedStatus = 'completed';
-    } else {
-      // Only apply workflow logic if status is NOT completed
-      // Derive "in progress" from the shipment's current workflow status
-      // so that when you're actively working a step in New Shipment, Planning shows it as blue.
-      if (normalizedStatus !== 'incomplete' && workflowStatus) {
-        if (
-          (statusFieldName === 'addProducts' && workflowStatus === 'add_products') ||
-          (statusFieldName === 'labelCheck' && workflowStatus === 'label_check') ||
-          (statusFieldName === 'formulaCheck' && workflowStatus === 'formula_check') ||
-          (statusFieldName === 'bookShipment' && workflowStatus === 'book_shipment') ||
-          (statusFieldName === 'sortProducts' && workflowStatus === 'sort_products') ||
-          (statusFieldName === 'sortFormulas' && workflowStatus === 'sort_formulas')
-        ) {
-          normalizedStatus = 'in progress';
-        }
+    }
+    // SECOND: Check if it should be incomplete (only if not already completed)
+    else {
+      let shouldBeIncomplete = false;
+      
+      // Check if has comment (indicates incomplete, but only if not explicitly completed)
+      if (hasComment && commentText) {
+        shouldBeIncomplete = true;
+      }
+      
+      // If it should be incomplete, override any other status
+      if (shouldBeIncomplete) {
+        normalizedStatus = 'incomplete';
       }
     }
     
-    // Don't show comment icon if status is completed (comments should be cleared when completed)
-    const shouldShowComment = hasComment && normalizedStatus !== 'completed';
-    
-    // FINAL SAFEGUARD: If original status was "completed", force normalizedStatus to "completed"
-    // This prevents any edge cases where normalizedStatus might have been changed
-    if (baseStatus === 'completed') {
-      normalizedStatus = 'completed';
+    // THIRD: Apply workflow logic to determine "in progress" (only if not completed and not incomplete)
+    if (normalizedStatus !== 'completed' && normalizedStatus !== 'incomplete' && workflowStatus) {
+      // Derive "in progress" from the shipment's current workflow status
+      // so that when you're actively working a step in New Shipment, Planning shows it as blue.
+      if (
+        (statusFieldName === 'addProducts' && workflowStatus === 'add_products') ||
+        (statusFieldName === 'labelCheck' && workflowStatus === 'label_check') ||
+        (statusFieldName === 'formulaCheck' && workflowStatus === 'formula_check') ||
+        (statusFieldName === 'bookShipment' && workflowStatus === 'book_shipment') ||
+        (statusFieldName === 'sortProducts' && workflowStatus === 'sort_products') ||
+        (statusFieldName === 'sortFormulas' && workflowStatus === 'sort_formulas')
+      ) {
+        normalizedStatus = 'in progress';
+      }
     }
+    
+    // Show comment icon if there's a comment (comments are now preserved even when completed)
+    const shouldShowComment = hasComment && commentText;
     
     let circleColor;
     let borderStyle = 'none';
@@ -222,46 +235,8 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         }
     }
 
-    // Force orange when incomplete (status is 'incomplete' OR has comment OR workflow moved past without completing)
-    // Priority: Completed (green) > In Progress (blue) > Incomplete (orange) > Pending (white)
-    // If status is already 'incomplete', it's already orange from the switch statement
-    // Otherwise, check if it should be incomplete
-    if (normalizedStatus === 'incomplete') {
-      // Already handled in switch statement above
-    } else if (normalizedStatus !== 'completed' && normalizedStatus !== 'in progress') {
-      let isIncomplete = false;
-      
-      // Check if has comment
-      if (hasComment && commentText) {
-        isIncomplete = true;
-      }
-      // OR check if workflow has moved past this step (indicating it was marked incomplete)
-      else if (workflowStatus) {
-        const workflowSteps = ['add_products', 'label_check', 'formula_check', 'book_shipment', 'sort_products', 'sort_formulas'];
-        const currentStepIndex = workflowSteps.findIndex(step => {
-          const stepMap = {
-            'addProducts': 'add_products',
-            'labelCheck': 'label_check',
-            'formulaCheck': 'formula_check',
-            'bookShipment': 'book_shipment',
-            'sortProducts': 'sort_products',
-            'sortFormulas': 'sort_formulas'
-          };
-          return step === stepMap[statusFieldName];
-        });
-        const workflowStepIndex = workflowSteps.indexOf(workflowStatus);
-        
-        // If workflow has moved past this step, it means it was marked incomplete
-        if (currentStepIndex >= 0 && workflowStepIndex > currentStepIndex) {
-          isIncomplete = true;
-        }
-      }
-      
-      if (isIncomplete) {
-        circleColor = '#F59E0B'; // Orange for incomplete
-        borderStyle = 'none';
-      }
-    }
+    // Status priority: Incomplete (orange) > Completed (green) > In Progress (blue) > Pending (white)
+    // The incomplete check is now done at the beginning of the function, so we don't need to check again here
 
     // Create unique identifier for this status field in this row
     const uniqueCommentId = rowId && statusFieldName ? `${rowId}-${statusFieldName}` : null;
@@ -275,14 +250,8 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
       e.stopPropagation();
       e.preventDefault();
       
-      // If status is completed, navigate to that section
-      if (normalizedStatus === 'completed' && onStatusClick && rowId && statusFieldName && row) {
-        onStatusClick(row, statusFieldName);
-        return;
-      }
-      
+      // If has comment, show tooltip first (comments take priority over navigation)
       if (hasComment && commentText && uniqueCommentId) {
-        // If has comment, show tooltip
         if (hoveredCommentId === uniqueCommentId) {
           // If already showing, close it
           setHoveredCommentId(null);
@@ -295,15 +264,41 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
           });
           setHoveredCommentId(uniqueCommentId);
         }
+        return; // Don't navigate if there's a comment to show
       }
-      // Removed: clicking status circle no longer opens comment modal
+      
+      // If status is completed and no comment, navigate to that section
+      if (normalizedStatus === 'completed' && onStatusClick && rowId && statusFieldName && row) {
+        onStatusClick(row, statusFieldName);
+        return;
+      }
     };
 
-    // Determine if circle should be clickable (completed status or has comment)
-    const isClickable = normalizedStatus === 'completed' || (shouldShowComment && commentText);
+    // Determine if circle should be clickable (completed status, incomplete status, or has comment)
+    const isClickable = normalizedStatus === 'completed' || normalizedStatus === 'incomplete' || (shouldShowComment && commentText);
     
+    const handleIconHover = (e) => {
+      // Show tooltip on hover if there's a comment
+      if (hasComment && commentText && uniqueCommentId) {
+        const rect = e.currentTarget.getBoundingClientRect();
+        setTooltipPos({
+          top: rect.bottom + window.scrollY + 12,
+          left: rect.left + rect.width / 2 + window.scrollX,
+        });
+        setHoveredCommentId(uniqueCommentId);
+      }
+    };
+
+    const handleIconLeave = () => {
+      // Hide tooltip when mouse leaves
+      if (hoveredCommentId === uniqueCommentId) {
+        setHoveredCommentId(null);
+      }
+    };
+
     return (
       <div 
+        data-status-circle="true"
         ref={(el) => { if (el && uniqueCommentId) iconRefs.current[uniqueCommentId] = el; }}
         style={{ 
           position: 'relative', 
@@ -311,6 +306,8 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
           cursor: isClickable ? 'pointer' : 'default'
         }}
         onClick={handleIconClick}
+        onMouseEnter={handleIconHover}
+        onMouseLeave={handleIconLeave}
       >
         <div
           style={{
@@ -320,28 +317,49 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
             backgroundColor: circleColor,
             border: borderStyle,
             display: 'inline-block',
+            position: 'relative',
+            padding: '3px',
+            boxSizing: 'border-box',
           }}
-        />
-        {shouldShowComment && (
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#FFFFFF"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+        >
+          {shouldShowComment && (
+            <img
+              src="/assets/Vector (4).png"
+              alt="Comment"
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                pointerEvents: 'none',
+                width: '12px',
+                height: '12px',
+                objectFit: 'contain',
+              }}
+              onError={(e) => {
+                // Fallback if image doesn't load - try URL encoded version
+                e.target.src = '/assets/Vector%20(4).png';
+              }}
+            />
+          )}
+        </div>
+        {/* Red notification dot for unread comments on incomplete status */}
+        {normalizedStatus === 'incomplete' && shouldShowComment && commentText && (
+          <div
             style={{
               position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
+              top: '-2px',
+              right: '-2px',
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: '#EF4444',
+              border: '1.5px solid #FFFFFF',
+              boxSizing: 'border-box',
               pointerEvents: 'none',
+              zIndex: 1,
             }}
-          >
-            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-          </svg>
+          />
         )}
         {isHovered && createPortal(
           <div
@@ -564,10 +582,15 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
     
     const filtersToUse = { ...filters };
     if (filterConfig.filterField && filterConfig.filterCondition && filterConfig.filterValue) {
-      filtersToUse[filterConfig.filterField] = {
+      const filterObj = {
         condition: filterConfig.filterCondition,
         value: filterConfig.filterValue,
       };
+      // Include second value for between conditions
+      if (filterConfig.filterValue2) {
+        filterObj.value2 = filterConfig.filterValue2;
+      }
+      filtersToUse[filterConfig.filterField] = filterObj;
     }
     
     // Update sort config
@@ -594,14 +617,30 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
           const rowValue = String(value || '').toLowerCase();
 
           switch (filter.condition) {
-            case 'equals':
-              return rowValue === filterValue;
-            case 'contains':
-              return rowValue.includes(filterValue);
             case 'greaterThan':
               return rowValue > filterValue;
+            case 'greaterThanOrEqual':
+              return rowValue >= filterValue;
             case 'lessThan':
               return rowValue < filterValue;
+            case 'lessThanOrEqual':
+              return rowValue <= filterValue;
+            case 'isEqual':
+              return rowValue === filterValue;
+            case 'isNotEqual':
+              return rowValue !== filterValue;
+            case 'isBetween':
+              if (filter.value2) {
+                const filterValue2 = filter.value2.toLowerCase();
+                return rowValue >= filterValue && rowValue <= filterValue2;
+              }
+              return true;
+            case 'isNotBetween':
+              if (filter.value2) {
+                const filterValue2 = filter.value2.toLowerCase();
+                return !(rowValue >= filterValue && rowValue <= filterValue2);
+              }
+              return true;
             default:
               return true;
           }
@@ -638,12 +677,17 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
     
     // Update filters
     if (filterConfig.filterField && filterConfig.filterCondition && filterConfig.filterValue) {
+      const filterObj = {
+        condition: filterConfig.filterCondition,
+        value: filterConfig.filterValue,
+      };
+      // Include second value for between conditions
+      if (filterConfig.filterValue2) {
+        filterObj.value2 = filterConfig.filterValue2;
+      }
       setFilters(prev => ({
         ...prev,
-        [filterConfig.filterField]: {
-          condition: filterConfig.filterCondition,
-          value: filterConfig.filterValue,
-        }
+        [filterConfig.filterField]: filterObj
       }));
       // If filters changed but sort wasn't reapplied, clear sorted order
       if (!filterConfig.sortField || !filterConfig.sortOrder) {
@@ -693,14 +737,30 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         const rowValue = String(value || '').toLowerCase();
 
         switch (filter.condition) {
-          case 'equals':
-            return rowValue === filterValue;
-          case 'contains':
-            return rowValue.includes(filterValue);
           case 'greaterThan':
             return rowValue > filterValue;
+          case 'greaterThanOrEqual':
+            return rowValue >= filterValue;
           case 'lessThan':
             return rowValue < filterValue;
+          case 'lessThanOrEqual':
+            return rowValue <= filterValue;
+          case 'isEqual':
+            return rowValue === filterValue;
+          case 'isNotEqual':
+            return rowValue !== filterValue;
+          case 'isBetween':
+            if (filter.value2) {
+              const filterValue2 = filter.value2.toLowerCase();
+              return rowValue >= filterValue && rowValue <= filterValue2;
+            }
+            return true;
+          case 'isNotBetween':
+            if (filter.value2) {
+              const filterValue2 = filter.value2.toLowerCase();
+              return !(rowValue >= filterValue && rowValue <= filterValue2);
+            }
+            return true;
           default:
             return true;
         }
@@ -777,10 +837,333 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
     return filteredRows;
   };
 
+  // Fetch products inventory on mount
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setProductsLoading(true);
+        const productsData = await getProductsInventory();
+        setProducts(productsData || []);
+      } catch (error) {
+        console.error('Error fetching products inventory:', error);
+        setProducts([]);
+      } finally {
+        setProductsLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
   const displayRows = getFilteredAndSortedRows();
+
+  // Calculate card values from rows data
+  const calculateCardValues = () => {
+    // Default DOI goal and lead time (can be made configurable later)
+    const DOI_GOAL = 30; // days
+    const LEAD_TIME = 37; // days (manufacturing + shipping)
+    const FORECAST_DAYS = DOI_GOAL + LEAD_TIME;
+    
+    // Calculate products at risk (products not at "Good" status)
+    // Status is "Good" if DOI >= goal, otherwise it's at risk
+    const productsAtRisk = products.filter(product => {
+      const doi = product.days_of_inventory || 0;
+      // If DOI is 9999 (no sales data), consider it at risk
+      if (doi === 9999 || doi === null || doi === undefined) {
+        return true;
+      }
+      // Status is "Good" if DOI >= goal
+      return doi < DOI_GOAL;
+    }).length;
+
+    // Calculate critical and low risk products
+    // Critical: DOI < 7 days (1 week)
+    // Low: 7 <= DOI < 30 days (between 1 week and goal)
+    const criticalRisk = products.filter(product => {
+      const doi = product.days_of_inventory || 0;
+      return doi > 0 && doi < 7 && doi !== 9999;
+    }).length;
+
+    const lowRisk = products.filter(product => {
+      const doi = product.days_of_inventory || 0;
+      return doi >= 7 && doi < DOI_GOAL && doi !== 9999;
+    }).length;
+
+    // Calculate Total DOI across all products as a whole
+    // Total DOI = Total Inventory / Total Daily Sales Rate
+    const totalDOI = (() => {
+      if (products.length === 0) return 0;
+      
+      // Sum total inventory across all products
+      const totalInventory = products.reduce((sum, p) => {
+        return sum + (p.bottle_inventory || 0);
+      }, 0);
+      
+      // Sum total daily sales velocity across all products
+      const totalDailySalesRate = products.reduce((sum, p) => {
+        // Use daily_sales_velocity if available, otherwise calculate from units_sold_30_days
+        const dailySales = p.daily_sales_velocity || (p.units_sold_30_days ? p.units_sold_30_days / 30.0 : 0);
+        return sum + dailySales;
+      }, 0);
+      
+      // Calculate Total DOI: Total Inventory / Total Daily Sales Rate
+      if (totalDailySalesRate > 0) {
+        return Math.round(totalInventory / totalDailySalesRate);
+      }
+      
+      // If no sales data, return 0
+      return 0;
+    })();
+
+    // Calculate Units to Make - sum of all units to make across all products
+    // Units to Make = (Daily Sales Rate × Forecast Days) - Current Inventory
+    const unitsToMake = Math.round(products.reduce((sum, product) => {
+      const dailySalesRate = product.daily_sales_velocity || 0;
+      const currentInventory = product.bottle_inventory || 0;
+      
+      // Only calculate if we have sales data
+      if (dailySalesRate > 0) {
+        const unitsNeeded = (dailySalesRate * FORECAST_DAYS) - currentInventory;
+        // Only add positive values (negative means we have enough inventory)
+        return sum + Math.max(0, unitsNeeded);
+      }
+      
+      return sum;
+    }, 0));
+    
+    // Calculate Pallets to Make - sum of all pallets needed across all products
+    // For each product: calculate units to make, then convert to pallets
+    const palletsToMake = Math.round(products.reduce((sum, product) => {
+      const dailySalesRate = product.daily_sales_velocity || 0;
+      const currentInventory = product.bottle_inventory || 0;
+      
+      // Only calculate if we have sales data
+      if (dailySalesRate > 0) {
+        const unitsNeeded = (dailySalesRate * FORECAST_DAYS) - currentInventory;
+        
+        // Only calculate pallets if units needed > 0
+        if (unitsNeeded > 0) {
+          // Calculate boxes needed
+          const unitsPerCase = product.finished_units_per_case || product.units_per_case || 60;
+          const boxesNeeded = unitsNeeded / unitsPerCase;
+          
+          // Calculate pallet share using single_box_pallet_share or boxes_per_pallet
+          let palletShare = 0;
+          if (product.single_box_pallet_share && product.single_box_pallet_share > 0) {
+            // Each box takes this fraction of a pallet
+            palletShare = boxesNeeded * product.single_box_pallet_share;
+          } else if (product.boxes_per_pallet && product.boxes_per_pallet > 0) {
+            // boxes_per_pallet is max boxes that fit on one pallet
+            palletShare = boxesNeeded / product.boxes_per_pallet;
+          } else {
+            // Fallback: assume 50 boxes per pallet
+            palletShare = boxesNeeded / 50;
+          }
+          
+          return sum + palletShare;
+        }
+      }
+      
+      return sum;
+    }, 0));
+    
+    return { totalDOI, unitsToMake, palletsToMake, productsAtRisk, criticalRisk, lowRisk };
+  };
+
+  const cardValues = calculateCardValues();
 
   return (
     <>
+      {/* Informational Cards */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: '16px',
+          marginBottom: '24px',
+        }}
+      >
+        {/* Total DOI Card */}
+        <div
+          style={{
+            backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+            borderRadius: '8px',
+            border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+            borderTop: '3px solid #10B981',
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}
+        >
+          <div
+            style={{
+              fontSize: '12px',
+              fontWeight: 500,
+              color: isDarkMode ? '#9CA3AF' : '#6B7280',
+            }}
+          >
+            Total DOI
+          </div>
+          <div
+            style={{
+              fontSize: '24px',
+              fontWeight: 700,
+              color: isDarkMode ? '#F9FAFB' : '#111827',
+            }}
+          >
+            {cardValues.totalDOI.toLocaleString()}
+          </div>
+          <div
+            style={{
+              fontSize: '12px',
+              fontWeight: 400,
+              color: '#10B981',
+            }}
+          >
+            Across all products
+          </div>
+        </div>
+
+        {/* Units to Make Card */}
+        <div
+          style={{
+            backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+            borderRadius: '8px',
+            border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+            borderTop: '3px solid #F59E0B',
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}
+        >
+          <div
+            style={{
+              fontSize: '12px',
+              fontWeight: 500,
+              color: isDarkMode ? '#9CA3AF' : '#6B7280',
+            }}
+          >
+            Units to Make
+          </div>
+          <div
+            style={{
+              fontSize: '24px',
+              fontWeight: 700,
+              color: isDarkMode ? '#F9FAFB' : '#111827',
+            }}
+          >
+            {cardValues.unitsToMake.toLocaleString()}
+          </div>
+          <div
+            style={{
+              fontSize: '12px',
+              fontWeight: 400,
+              color: isDarkMode ? '#9CA3AF' : '#6B7280',
+            }}
+          >
+            Across all products
+          </div>
+        </div>
+
+        {/* Pallets to Make Card */}
+        <div
+          style={{
+            backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+            borderRadius: '8px',
+            border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+            borderTop: '3px solid #06B6D4',
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}
+        >
+          <div
+            style={{
+              fontSize: '12px',
+              fontWeight: 500,
+              color: isDarkMode ? '#9CA3AF' : '#6B7280',
+            }}
+          >
+            Pallets to Make
+          </div>
+          <div
+            style={{
+              fontSize: '24px',
+              fontWeight: 700,
+              color: isDarkMode ? '#F9FAFB' : '#111827',
+            }}
+          >
+            {cardValues.palletsToMake.toLocaleString()}
+          </div>
+          <div
+            style={{
+              fontSize: '12px',
+              fontWeight: 400,
+              color: isDarkMode ? '#9CA3AF' : '#6B7280',
+            }}
+          >
+            With Inventory
+          </div>
+        </div>
+
+        {/* Products at Risk Card */}
+        <div
+          style={{
+            backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+            borderRadius: '8px',
+            border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+            borderTop: '3px solid #EF4444',
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}
+        >
+          <div
+            style={{
+              fontSize: '12px',
+              fontWeight: 500,
+              color: isDarkMode ? '#9CA3AF' : '#6B7280',
+            }}
+          >
+            Products at Risk
+          </div>
+          <div
+            style={{
+              fontSize: '24px',
+              fontWeight: 700,
+              color: isDarkMode ? '#F9FAFB' : '#111827',
+            }}
+          >
+            {cardValues.productsAtRisk.toLocaleString()}
+          </div>
+          <div
+            style={{
+              fontSize: '12px',
+              fontWeight: 400,
+              color: isDarkMode ? '#9CA3AF' : '#6B7280',
+            }}
+          >
+            {cardValues.criticalRisk > 0 || cardValues.lowRisk > 0 ? (
+              <>
+                {cardValues.criticalRisk > 0 && (
+                  <span style={{ color: '#EF4444' }}>{cardValues.criticalRisk} critical</span>
+                )}
+                {cardValues.criticalRisk > 0 && cardValues.lowRisk > 0 && ', '}
+                {cardValues.lowRisk > 0 && (
+                  <span style={{ color: '#F59E0B' }}>{cardValues.lowRisk} low</span>
+                )}
+              </>
+            ) : (
+              <span>No products at risk</span>
+            )}
+          </div>
+        </div>
+      </div>
+
       <div
         className={`${themeClasses.cardBg} ${themeClasses.border} border rounded-xl`}
         style={{ overflowX: 'hidden', position: 'relative' }}
@@ -1371,6 +1754,10 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                   position: 'relative',
                 }}
                 onClick={async (e) => {
+                  // Don't handle click if it's on the status circle (let the circle handle its own clicks)
+                  if (e.target.closest('[data-status-circle]')) {
+                    return;
+                  }
                   e.stopPropagation();
                   e.preventDefault();
                   if (onLabelCheckClick) {
@@ -1525,6 +1912,11 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                       row={row}
                       menuIconRef={actionMenuRefs.current[row.id]}
                       onClose={() => setOpenActionMenu(null)}
+                      onShipmentDetails={() => {
+                        setSelectedRow(row);
+                        setShowShipmentDetailsModal(true);
+                        setOpenActionMenu(null);
+                      }}
                       onDelete={() => {
                         if (onDeleteRow) {
                           onDeleteRow(row);
@@ -1557,6 +1949,17 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         />
       )}
     </div>
+    
+    {/* Shipment Details Modal */}
+    <ShipmentDetailsModal
+      isOpen={showShipmentDetailsModal}
+      onClose={() => {
+        setShowShipmentDetailsModal(false);
+        setSelectedRow(null);
+      }}
+      row={selectedRow}
+      onUpdate={onUpdateShipment}
+    />
     
     {/* Key/Legend - Outside table container */}
     <div
@@ -1674,6 +2077,7 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
   const [filterField, setFilterField] = useState(existingFilter ? existingFilter[0] : '');
   const [filterCondition, setFilterCondition] = useState(existingFilter ? existingFilter[1].condition : '');
   const [filterValue, setFilterValue] = useState(existingFilter ? existingFilter[1].value : '');
+  const [filterValue2, setFilterValue2] = useState(existingFilter ? existingFilter[1].value2 || '' : '');
   
   // State to control if "Filter by condition" section is expanded
   const [isFilterConditionOpen, setIsFilterConditionOpen] = useState(false);
@@ -1730,6 +2134,7 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
     setFilterField('');
     setFilterCondition('');
     setFilterValue('');
+    setFilterValue2('');
     if (columnKey === 'addProducts') {
       setAddProductsFilterValues(defaultAddProductsValues);
     }
@@ -1748,6 +2153,10 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
         filterCondition,
         filterValue,
       };
+      // Include second value for between conditions
+      if (filterCondition === 'isBetween' || filterCondition === 'isNotBetween') {
+        applyData.filterValue2 = filterValue2;
+      }
       if (columnKey === 'addProducts') {
         applyData.addProductsFilterValues = addProductsFilterValues;
       }
@@ -1796,10 +2205,14 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
 
   const filterConditions = [
     { value: '', label: 'Select condition' },
-    { value: 'equals', label: 'Equals' },
-    { value: 'contains', label: 'Contains' },
     { value: 'greaterThan', label: 'Greater than' },
+    { value: 'greaterThanOrEqual', label: 'Greater than or equal to' },
     { value: 'lessThan', label: 'Less than' },
+    { value: 'lessThanOrEqual', label: 'Less than or equal to' },
+    { value: 'isEqual', label: 'Is equal to' },
+    { value: 'isNotEqual', label: 'Is not equal to' },
+    { value: 'isBetween', label: 'Is between' },
+    { value: 'isNotBetween', label: 'Is not between' },
   ];
 
   return (
@@ -2024,7 +2437,13 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
               
               <select
                 value={filterCondition}
-                onChange={(e) => setFilterCondition(e.target.value)}
+                onChange={(e) => {
+                  setFilterCondition(e.target.value);
+                  // Clear second value if condition is not between
+                  if (e.target.value !== 'isBetween' && e.target.value !== 'isNotBetween') {
+                    setFilterValue2('');
+                  }
+                }}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
@@ -2043,21 +2462,134 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
                 ))}
               </select>
               
-              <input
-                type="text"
-                placeholder="Value here..."
-                value={filterValue}
-                onChange={(e) => setFilterValue(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  border: '1px solid #D1D5DB',
-                  borderRadius: '6px',
-                  fontSize: '0.875rem',
-                  color: '#374151',
-                  backgroundColor: '#FFFFFF',
-                }}
-              />
+              <div style={{ position: 'relative', width: '100%' }}>
+                <input
+                  type="text"
+                  placeholder="Value here..."
+                  value={filterValue}
+                  onChange={(e) => setFilterValue(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    paddingRight: filterValue ? '32px' : '12px',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                    color: '#374151',
+                    backgroundColor: '#FFFFFF',
+                    boxSizing: 'border-box',
+                  }}
+                />
+                {filterValue && (
+                  <button
+                    type="button"
+                    onClick={() => setFilterValue('')}
+                    style={{
+                      position: 'absolute',
+                      right: '8px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      width: '16px',
+                      height: '16px',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '4px',
+                      backgroundColor: '#FFFFFF',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: 0,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#9CA3AF';
+                      e.currentTarget.style.backgroundColor = '#F3F4F6';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = '#D1D5DB';
+                      e.currentTarget.style.backgroundColor = '#FFFFFF';
+                    }}
+                  >
+                    <svg
+                      width="10"
+                      height="10"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#6B7280"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+              {(filterCondition === 'isBetween' || filterCondition === 'isNotBetween') && (
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <input
+                    type="text"
+                    placeholder="Second value here..."
+                    value={filterValue2}
+                    onChange={(e) => setFilterValue2(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      paddingRight: filterValue2 ? '32px' : '12px',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '6px',
+                      fontSize: '0.875rem',
+                      color: '#374151',
+                      backgroundColor: '#FFFFFF',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  {filterValue2 && (
+                    <button
+                      type="button"
+                      onClick={() => setFilterValue2('')}
+                      style={{
+                        position: 'absolute',
+                        right: '8px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        width: '16px',
+                        height: '16px',
+                        border: '1px solid #D1D5DB',
+                        borderRadius: '4px',
+                        backgroundColor: '#FFFFFF',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 0,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = '#9CA3AF';
+                        e.currentTarget.style.backgroundColor = '#F3F4F6';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = '#D1D5DB';
+                        e.currentTarget.style.backgroundColor = '#FFFFFF';
+                      }}
+                    >
+                      <svg
+                        width="10"
+                        height="10"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#6B7280"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -2119,14 +2651,14 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
 FilterDropdown.displayName = 'FilterDropdown';
 
 // ActionMenuDropdown Component
-const ActionMenuDropdown = React.forwardRef(({ row, menuIconRef, onClose, onDelete, isDarkMode }, ref) => {
+const ActionMenuDropdown = React.forwardRef(({ row, menuIconRef, onClose, onShipmentDetails, onDelete, isDarkMode }, ref) => {
   const [position, setPosition] = useState({ top: 0, left: 0 });
 
   useEffect(() => {
     if (menuIconRef) {
       const rect = menuIconRef.getBoundingClientRect();
       const dropdownWidth = 150;
-      const dropdownHeight = 50;
+      const dropdownHeight = 100;
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
       
@@ -2176,6 +2708,43 @@ const ActionMenuDropdown = React.forwardRef(({ row, menuIconRef, onClose, onDele
       }}
       onClick={(e) => e.stopPropagation()}
     >
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (onShipmentDetails) {
+            onShipmentDetails();
+          }
+        }}
+        style={{
+          padding: '8px 12px',
+          borderRadius: '4px',
+          border: 'none',
+          backgroundColor: 'transparent',
+          color: isDarkMode ? '#E5E7EB' : '#111827',
+          fontSize: '14px',
+          fontWeight: 500,
+          cursor: 'pointer',
+          textAlign: 'left',
+          width: '100%',
+          transition: 'background-color 0.2s',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'transparent';
+        }}
+      >
+        Shipment Details
+      </button>
+      <div
+        style={{
+          height: '1px',
+          backgroundColor: isDarkMode ? '#374151' : '#E5E7EB',
+          margin: '4px 0',
+        }}
+      />
       <button
         type="button"
         onClick={(e) => {
