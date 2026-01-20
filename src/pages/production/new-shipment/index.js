@@ -472,6 +472,8 @@ const NewShipment = () => {
           inventory: p.total_inventory || 0,
           total_inventory: p.total_inventory || 0,
           fba_available: p.fba_available || 0,
+          // Label inventory from Railway API
+          label_inventory: p.label_inventory || 0,
           // Units to make from Railway API
           units_to_make: p.units_to_make || 0,
           algorithm: p.algorithm,
