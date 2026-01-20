@@ -49,7 +49,7 @@ const Landing = () => {
       <Sidebar />
 
       {/* Main Content Area */}
-      <div className="flex-1" style={{ overflow: 'auto', height: '100vh' }}>
+      <div className="flex-1 md:pt-0 pt-14" style={{ overflow: 'auto', height: '100vh' }}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/products/selection" element={<Selection />} />

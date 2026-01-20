@@ -15,22 +15,89 @@ const UnusedFormulasView = () => {
   const [filterPosition, setFilterPosition] = useState({ top: 0, left: 0 });
   const filterRefs = useRef({});
   const filterModalRef = useRef(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Auto-refresh when localStorage changes (for cross-tab/page updates)
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'unusedFormulas') {
+        setRefreshKey(prev => prev + 1);
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  // Also check for localStorage changes every 2 seconds (for same-page updates)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const currentData = localStorage.getItem('unusedFormulas');
+      const lastChecked = sessionStorage.getItem('lastUnusedFormulasCheck');
+      
+      if (currentData !== lastChecked) {
+        sessionStorage.setItem('lastUnusedFormulasCheck', currentData);
+        setRefreshKey(prev => prev + 1);
+      }
+    }, 2000); // Check every 2 seconds
+    
+    return () => clearInterval(interval);
+  }, []);
 
   // Fetch unused formulas data from API
   useEffect(() => {
     const fetchUnusedFormulas = async () => {
       setLoading(true);
       try {
+        // Get data from API
         const data = await getUnusedFormulas();
         
-        // Transform API data to match the component structure
-        const transformedData = data.map(formula => ({
+        // TEMPORARY: Get data from localStorage for demo
+        const localStorageFormulas = JSON.parse(localStorage.getItem('unusedFormulas') || '[]');
+        
+        console.log('📦 LocalStorage formulas:', localStorageFormulas);
+        console.log('🌐 API formulas:', data);
+        
+        // Merge API data with localStorage data
+        const mergedData = [...data];
+        
+        // Add localStorage formulas that aren't in API data
+        localStorageFormulas.forEach(localFormula => {
+          // Try to find matching formula (case-insensitive and trim whitespace)
+          const localName = (localFormula.formula_name || '').toLowerCase().trim();
+          const existingIndex = mergedData.findIndex(f => 
+            (f.formula_name || '').toLowerCase().trim() === localName
+          );
+          
+          console.log('🔍 Looking for:', localFormula.formula_name, '| Found at index:', existingIndex);
+          
+          if (existingIndex >= 0) {
+            // Merge: add local unused gallons to API data
+            const apiGallons = parseFloat(mergedData[existingIndex].unused_gallons || 0);
+            const localGallons = parseFloat(localFormula.unused_gallons || 0);
+            
+            mergedData[existingIndex].unused_gallons = apiGallons + localGallons;
+            mergedData[existingIndex].total_gallons = parseFloat(mergedData[existingIndex].total_gallons || 0) + localGallons;
+            
+            console.log('✅ Merged:', mergedData[existingIndex].formula_name, 
+                       '| API:', apiGallons, '+ Local:', localGallons, '= Total:', mergedData[existingIndex].unused_gallons);
+          } else {
+            // Add new formula from localStorage
+            mergedData.push(localFormula);
+            console.log('➕ Added new formula from localStorage:', localFormula.formula_name);
+          }
+        });
+        
+        console.log('📊 Final merged data:', mergedData);
+        
+        // Transform data to match the component structure
+        const transformedData = mergedData.map(formula => ({
           id: formula.formula_name,
           formula: formula.formula_name,
           unusedGals: formula.unused_gallons,
           usedGals: formula.allocated_gallons,
           totalGals: formula.total_gallons,
-          products: formula.products.map(p => ({
+          products: (formula.products || []).map(p => ({
             id: `${formula.formula_name}-${p.catalog_id}`,
             catalog_id: p.catalog_id,
             brand: p.brand_name || '',
@@ -60,15 +127,51 @@ const UnusedFormulasView = () => {
         
       } catch (error) {
         console.error('Error fetching unused formulas:', error);
-        toast.error('Failed to load unused formulas data');
-        setFormulas([]);
+        
+        // TEMPORARY: If API fails, use only localStorage data
+        try {
+          const localStorageFormulas = JSON.parse(localStorage.getItem('unusedFormulas') || '[]');
+          
+          const transformedData = localStorageFormulas.map(formula => ({
+            id: formula.formula_name,
+            formula: formula.formula_name,
+            unusedGals: formula.unused_gallons,
+            usedGals: formula.allocated_gallons,
+            totalGals: formula.total_gallons,
+            products: (formula.products || []).map(p => ({
+              id: `${formula.formula_name}-${p.catalog_id}`,
+              catalog_id: p.catalog_id,
+              brand: p.brand_name || '',
+              product: p.product_name || '',
+              size: p.size || '',
+              qty: p.potential_units || 0,
+              gallons_per_unit: p.gallons_per_unit,
+              timeline: {
+                purple: 0,
+                green: 0,
+                blue: 0,
+                variance: 0,
+              },
+            }))
+          }));
+          
+          setFormulas(transformedData);
+          
+          if (transformedData.length > 0) {
+            toast.success('Loaded unused formulas from local storage');
+          }
+        } catch (localError) {
+          console.error('Error loading from localStorage:', localError);
+          toast.error('Failed to load unused formulas data');
+          setFormulas([]);
+        }
       } finally {
         setLoading(false);
       }
     };
     
     fetchUnusedFormulas();
-  }, []);
+  }, [refreshKey]); // Re-fetch when refreshKey changes
 
   // Sample data for unused formulas (fallback)
   const sampleFormulas = [

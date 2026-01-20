@@ -130,7 +130,7 @@ const Sidebar = () => {
   };
 
   return (
-    <div className={`${isMinimized ? 'w-20' : 'w-64'} h-screen ${themeClasses.bg} ${themeClasses.border} border-r flex flex-col transition-all duration-300 relative`}>
+    <div className={`hidden md:flex ${isMinimized ? 'w-20' : 'w-64'} h-screen ${themeClasses.bg} ${themeClasses.border} border-r flex-col transition-all duration-300 relative`}>
       {/* Logo Header */}
       <div className={`p-4 ${themeClasses.border} border-b flex items-center ${isMinimized ? 'justify-center' : 'justify-between'}`}>
         {!isMinimized && (

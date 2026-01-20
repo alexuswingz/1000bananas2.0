@@ -1,11 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 import SortFormulasFilterDropdown from '../../new-shipment/components/SortFormulasFilterDropdown';
 import ProductionNotesModal from './ProductionNotesModal';
 import SplitProductModal from './SplitProductModal';
+import LogUnitsProducedModal from './LogUnitsProducedModal';
 
-const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuery = '', isSortMode = false, onExitSortMode }) => {
+const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuery = '', isSortMode = false, onExitSortMode, onSetIsFromUnmarkShiners, onProductNotes, onMoreDetails }) => {
   const { isDarkMode } = useTheme();
   const [openFilterColumn, setOpenFilterColumn] = useState(null);
   const [sortConfig, setSortConfig] = useState({ column: null, order: '' });
@@ -25,6 +26,25 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
   const [originalTableData, setOriginalTableData] = useState([]);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [recentlyMovedRowId, setRecentlyMovedRowId] = useState(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [selectedShinersProductToMove, setSelectedShinersProductToMove] = useState(null);
+  const [selectedShinersProductToStart, setSelectedShinersProductToStart] = useState(null);
+  const [isFromUnmarkShiners, setIsFromUnmarkShiners] = useState(false);
+  const [showMarkAsShinersModal, setShowMarkAsShinersModal] = useState(false);
+  const [selectedProductForMarkShiners, setSelectedProductForMarkShiners] = useState(null);
+  const [selectedProductForLogUnits, setSelectedProductForLogUnits] = useState(null);
+  const [showMarkAsFinishedGoodsModal, setShowMarkAsFinishedGoodsModal] = useState(false);
+  const [selectedProductForMarkFinishedGoods, setSelectedProductForMarkFinishedGoods] = useState(null);
+
+  // Handle window resize for mobile detection
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Handle click outside action menu
   useEffect(() => {
@@ -289,7 +309,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
   };
 
   const columns = [
-    { key: 'status', label: 'STATUS', minWidth: '50px', flex: '0.7', align: 'center' },
+    { key: 'status', label: 'STATUS', minWidth: '140px', flex: '1.1', align: 'center' },
     { key: 'tpsShipNumber', label: 'TPS SHIP #', minWidth: '60px', flex: '0.8', align: 'center' },
     { key: 'type', label: 'TYPE', minWidth: '40px', flex: '0.5', align: 'center' },
     { key: 'brand', label: 'BRAND', minWidth: '60px', flex: '1.1', align: 'center' },
@@ -330,6 +350,8 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
 
   return (
     <>
+      {/* Desktop View */}
+      {!isMobile && (
       <div
         className={`w-full ${themeClasses.cardBg}`}
         style={{
@@ -491,14 +513,16 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                       ? 'none'
                       : '1px solid #e5e7eb',
                   minHeight: '38px',
-                  opacity: draggedRowIndex === index ? 0.4 : 1,
-                  backgroundColor: justMovedRowId && (justMovedRowId === row.id || justMovedRowId === row.key || justMovedRowId === `row-${index}`)
-                    ? '#BFDBFE' 
-                    : draggedOverRowIndex === index && isSortMode 
-                      ? '#E0F2FE' 
-                      : justMovedRowIndex === index
-                        ? '#BFDBFE'
-                        : 'transparent',
+                  opacity: draggedRowIndex === index ? 0.4 : (row.status === 'moved_s' || row.status === 'moved_fg') ? 0.6 : 1,
+                  backgroundColor: row.status === 'moved_s' || row.status === 'moved_fg'
+                    ? '#F3F4F6'
+                    : justMovedRowId && (justMovedRowId === row.id || justMovedRowId === row.key || justMovedRowId === `row-${index}`)
+                      ? '#BFDBFE' 
+                      : draggedOverRowIndex === index && isSortMode 
+                        ? '#E0F2FE' 
+                        : justMovedRowIndex === index
+                          ? '#BFDBFE'
+                          : 'transparent',
                   border: draggedRowIndex === index 
                     ? '2px dashed #3B82F6' 
                     : draggedOverRowIndex === index && isSortMode 
@@ -536,6 +560,9 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                     paddingRight: '6px',
                     paddingTop: '10px',
                     paddingBottom: '10px',
+                    minWidth: '120px',
+                    width: '100%',
+                    boxSizing: 'border-box',
                   }}
                 >
                   {isSortMode ? (
@@ -559,13 +586,108 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                         <line x1="2" y1="10" x2="10" y2="10" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round"/>
                       </svg>
                     </div>
-                  ) : row.status === 'paused' ? (
+                  ) : row.status === 'done' ? (
                     <button
-                      className="bg-gray-400 text-gray-800 text-xs font-semibold px-3 py-1 rounded hover:bg-gray-500 transition-colors"
+                      className="bg-green-500 text-white text-xs font-semibold px-2.5 py-1 rounded"
                       style={{ 
                         whiteSpace: 'nowrap',
                         borderRadius: '4px',
                         cursor: 'default',
+                        backgroundColor: '#10B981',
+                        padding: '6px 10px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        maxWidth: '100%',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                      disabled
+                    >
+                      Done
+                    </button>
+                  ) : row.status === 'moved_s' ? (
+                    <button
+                      className="text-gray-800 text-xs font-semibold px-2.5 py-1 rounded"
+                      style={{ 
+                        whiteSpace: 'nowrap',
+                        borderRadius: '4px',
+                        cursor: 'default',
+                        backgroundColor: '#FFFFFF',
+                        color: '#374151',
+                        border: '1px solid #E5E7EB',
+                        padding: '6px 10px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        maxWidth: '100%',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                      disabled
+                    >
+                      Moved (Shiners)
+                    </button>
+                  ) : row.status === 'moved_fg' ? (
+                    <button
+                      className="text-gray-800 text-xs font-semibold px-2.5 py-1 rounded"
+                      style={{ 
+                        whiteSpace: 'nowrap',
+                        borderRadius: '4px',
+                        cursor: 'default',
+                        backgroundColor: '#FFFFFF',
+                        color: '#374151',
+                        border: '1px solid #E5E7EB',
+                        padding: '6px 10px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        maxWidth: '100%',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                      disabled
+                      title="Moved (Finished Goods)"
+                    >
+                      Moved (Finished Goods)
+                    </button>
+                  ) : row.isShiners && row.status === 'paused' ? (
+                    <button
+                      onClick={() => {
+                        setSelectedShinersProductToStart(row);
+                      }}
+                      className="text-white text-xs font-semibold px-2.5 py-1 rounded"
+                      style={{ 
+                        whiteSpace: 'nowrap',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        backgroundColor: '#F97316',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        padding: '6px 10px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        maxWidth: '100%',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      Start
+                    </button>
+                  ) : row.status === 'paused' ? (
+                    <button
+                      className="text-gray-800 text-xs font-semibold px-2.5 py-1 rounded"
+                      style={{ 
+                        whiteSpace: 'nowrap',
+                        borderRadius: '4px',
+                        cursor: 'default',
+                        backgroundColor: '#FFFFFF',
+                        color: '#374151',
+                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                        border: '1px solid #E5E7EB',
+                        padding: '6px 10px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        maxWidth: '100%',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
                       }}
                       disabled
                     >
@@ -573,7 +695,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                     </button>
                   ) : row.status === 'in_progress' ? (
                     <div
-                      className="text-blue-600 text-xs font-semibold px-3 py-1 rounded"
+                      className="text-blue-600 text-xs font-semibold px-2.5 py-1 rounded"
                       style={{ 
                         whiteSpace: 'nowrap',
                         borderRadius: '4px',
@@ -583,6 +705,12 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                         alignItems: 'center',
                         justifyContent: 'center',
                         cursor: 'pointer',
+                        padding: '6px 10px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        maxWidth: '100%',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
                       }}
                       onClick={() => {
                         if (onInProgressClick) {
@@ -599,10 +727,16 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                           onStartClick(row);
                         }
                       }}
-                      className="bg-blue-600 text-white text-xs font-semibold px-3 py-1 rounded hover:bg-blue-700 transition-colors"
+                      className="bg-blue-600 text-white text-xs font-semibold px-2.5 py-1 rounded hover:bg-blue-700 transition-colors"
                       style={{ 
                         whiteSpace: 'nowrap',
                         borderRadius: '4px',
+                        padding: '6px 10px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        maxWidth: '100%',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
                       }}
                     >
                       Start
@@ -680,9 +814,29 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
+                    gap: '4px',
                   }}
                 >
-                  {row.product}
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {row.product}
+                  </span>
+                  {row.isSplit && (
+                    <svg 
+                      width="14" 
+                      height="14" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="#007AFF" 
+                      strokeWidth="2.5" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round"
+                      style={{ flexShrink: 0 }}
+                      title="Split Product"
+                    >
+                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                    </svg>
+                  )}
                 </div>
 
                 {/* SIZE */}
@@ -921,6 +1075,243 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
           )}
         </div>
       </div>
+      )}
+
+      {/* Mobile View */}
+      {isMobile && (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+            padding: '0 16px',
+            paddingLeft: '16px',
+            paddingRight: '16px',
+            alignItems: 'center',
+          }}
+        >
+          {filteredData.length === 0 ? (
+            <div
+              className={`px-6 py-6 text-center text-sm ${themeClasses.textSecondary}`}
+            >
+              No data available.
+            </div>
+          ) : (
+            filteredData.map((row, index) => (
+              <div
+                key={row.id || index}
+                data-mobile-card
+                style={{
+                  width: '343px',
+                  minHeight: '196px',
+                  maxWidth: '100%',
+                  padding: '12px',
+                  gap: '12px',
+                  borderRadius: '12px',
+                  border: '1px solid #E5E7EB',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                  backgroundColor: row.status === 'moved_s' || row.status === 'moved_fg'
+                    ? '#F3F4F6'
+                    : isDarkMode ? '#1F2937' : '#FFFFFF',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  position: 'relative',
+                  opacity: (row.status === 'moved_s' || row.status === 'moved_fg') ? 0.6 : 1,
+                }}
+              >
+                {/* Three-dot menu button */}
+                <button
+                  ref={(el) => {
+                    if (el) actionButtonRefs.current[row.id] = el;
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const buttonRect = e.currentTarget.getBoundingClientRect();
+                    const cardElement = e.currentTarget.closest('[data-mobile-card]');
+                    const cardRect = cardElement?.getBoundingClientRect();
+                    
+                    const menuWidth = 264;
+                    const menuHeight = 260; // Updated for 5 menu items in mobile
+                    
+                    let menuTop = buttonRect.bottom + 8;
+                    let menuLeft = cardRect ? cardRect.left + 16 : 16;
+                    
+                    const maxTop = window.innerHeight - menuHeight - 16;
+                    if (menuTop > maxTop) {
+                      menuTop = Math.max(buttonRect.top - menuHeight - 8, 60);
+                    }
+                    
+                    const maxLeft = window.innerWidth - menuWidth - 16;
+                    if (menuLeft > maxLeft) {
+                      menuLeft = maxLeft;
+                    }
+                    
+                    menuTop = Math.max(menuTop, 60);
+                    menuLeft = Math.max(menuLeft, 16);
+                    
+                    const menuRight = window.innerWidth - (menuLeft + menuWidth);
+                    
+                    setActionMenuPosition({ top: menuTop, right: menuRight });
+                    setActionMenuId(row.id);
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: '12px',
+                    right: '12px',
+                    width: '24px',
+                    height: '24px',
+                    padding: '0',
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1,
+                  }}
+                >
+                  <svg width="4" height="16" viewBox="0 0 4 16" fill="none">
+                    <circle cx="2" cy="2" r="2" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
+                    <circle cx="2" cy="8" r="2" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
+                    <circle cx="2" cy="14" r="2" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
+                  </svg>
+                </button>
+
+                {/* Card Content - Image + Details */}
+                <div style={{ display: 'flex', gap: '12px', flex: 1 }}>
+                  {/* Product Image */}
+                  {row.productImage && (
+                    <div style={{ flexShrink: 0 }}>
+                      <img
+                        src={row.productImage}
+                        alt={row.product}
+                        style={{
+                          width: '80px',
+                          height: '80px',
+                          objectFit: 'contain',
+                          borderRadius: '8px',
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Product Info */}
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {/* Product Title with Drag Handle */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <circle cx="4" cy="4" r="1.5" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
+                        <circle cx="12" cy="4" r="1.5" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
+                        <circle cx="4" cy="8" r="1.5" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
+                        <circle cx="12" cy="8" r="1.5" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
+                        <circle cx="4" cy="12" r="1.5" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
+                        <circle cx="12" cy="12" r="1.5" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
+                      </svg>
+                      <span
+                        style={{
+                          fontSize: '14px',
+                          fontWeight: 600,
+                          color: isDarkMode ? '#F9FAFB' : '#111827',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          flex: 1,
+                          paddingRight: '32px',
+                        }}
+                      >
+                        {row.product || 'N/A'}
+                      </span>
+                    </div>
+
+                    {/* Product Details Grid */}
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: '8px',
+                        fontSize: '12px',
+                        flex: 1,
+                      }}
+                    >
+                  <div>
+                    <div style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '2px' }}>Formula</div>
+                    <div style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 500 }}>{row.formula || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <div style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '2px' }}>TPS Ship #</div>
+                    <div style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 500 }}>{row.tpsShipNumber || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <div style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '2px' }}>Size</div>
+                    <div style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 500 }}>{row.size || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <div style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '2px' }}>Qty</div>
+                    <div style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 500 }}>{row.qty || 'N/A'}</div>
+                  </div>
+                </div>
+                  </div>
+                </div>
+
+                {/* Action Button */}
+                <button
+                  onClick={() => {
+                    // Don't allow clicking if status is done, moved_s, or moved_fg
+                    if (row.status === 'done' || row.status === 'moved_s' || row.status === 'moved_fg') {
+                      return;
+                    }
+                    // Check if this is a shiners item that is paused - should show Start Item Marked as Shiners modal
+                    if (row.isShiners && row.status === 'paused') {
+                      setSelectedShinersProductToStart(row);
+                    } else if (row.status === 'in_progress') {
+                      if (onInProgressClick) {
+                        onInProgressClick(row);
+                      }
+                    } else {
+                      if (onStartClick) {
+                        onStartClick(row);
+                      }
+                    }
+                  }}
+                  disabled={row.status === 'done' || row.status === 'moved_s' || row.status === 'moved_fg'}
+                  style={{
+                    width: '100%',
+                    height: '32px',
+                    borderRadius: '6px',
+                    border: (row.status === 'moved_s' || row.status === 'moved_fg' || row.status === 'paused') ? '1px solid #E5E7EB' : 'none',
+                    backgroundColor: row.status === 'moved_s' || row.status === 'moved_fg' ? '#FFFFFF' :
+                                    row.isShiners && row.status === 'paused' ? '#F97316' :
+                                    row.status === 'paused' ? '#FFFFFF' :
+                                    row.status === 'in_progress' ? '#3B82F6' :
+                                    row.status === 'done' ? '#10B981' :
+                                    row.isShiners ? '#F97316' : '#3B82F6',
+                    color: (row.status === 'moved_s' || row.status === 'moved_fg' || row.status === 'paused') ? '#374151' : '#FFFFFF',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: (row.status === 'done' || row.status === 'moved_s' || row.status === 'moved_fg') ? 'default' : 'pointer',
+                    padding: '0',
+                    margin: '0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: row.status === 'paused' ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none',
+                  }}
+                >
+                  {row.status === 'moved_s' ? 'Moved (Shiners)' :
+                   row.status === 'moved_fg' ? 'Moved (FG)' :
+                   row.isShiners && row.status === 'paused' ? 'Start' :
+                   row.status === 'paused' ? 'Paused' :
+                   row.status === 'in_progress' ? 'In Progress' :
+                   row.status === 'done' ? 'Done' :
+                   row.isShiners ? 'Start' : 'Start'}
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
       {/* Action Menu Portal - rendered outside overflow container */}
       {actionMenuId && (() => {
@@ -935,7 +1326,8 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
               top: `${actionMenuPosition.top}px`,
               right: `${actionMenuPosition.right}px`,
               zIndex: 10000,
-              minWidth: '240px',
+              minWidth: '264px',
+              maxWidth: 'calc(100vw - 32px)',
               padding: '6px',
               backgroundColor: '#FFFFFF',
               border: '1px solid #E5E7EB',
@@ -1013,18 +1405,50 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = 'transparent';
               }}
-              onClick={() => {
-                // TODO: Implement mark as floor inventory - shiners functionality
-                console.log('Mark as Floor Inv. (Shiners) clicked for:', selectedRow);
-                setActionMenuId(null);
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                if (selectedRow.isShiners) {
+                  // Unmark as shiners
+                  console.log('Unmark as Shiners clicked for:', selectedRow);
+                  const updatedData = localTableData.map(r => 
+                    r.id === selectedRow.id 
+                      ? { ...r, isShiners: false, status: r.status === 'paused' ? 'pending' : r.status }
+                      : r
+                  );
+                  setLocalTableData(updatedData);
+                  setOriginalTableData(updatedData);
+                  setActionMenuId(null);
+                } else {
+                  // Mark as shiners
+                  console.log('Mark as Floor Inv. (Shiners) MOUSEDOWN for:', selectedRow);
+                  setSelectedProductForMarkShiners(selectedRow);
+                  setShowMarkAsShinersModal(true);
+                  setTimeout(() => {
+                    setActionMenuId(null);
+                  }, 100);
+                }
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
               }}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="6" y="4" width="12" height="16" rx="1" />
-                <path d="M9 4v4M15 4v4" />
-                <line x1="9" y1="12" x2="15" y2="12" />
+                {selectedRow.isShiners ? (
+                  <>
+                    <path d="M20 6L9 17l-5-5" />
+                  </>
+                ) : (
+                  <>
+                    <rect x="6" y="4" width="12" height="16" rx="1" />
+                    <path d="M9 4v4M15 4v4" />
+                    <line x1="9" y1="12" x2="15" y2="12" />
+                  </>
+                )}
               </svg>
-              <span>Mark as Floor Inv. (Shiners)</span>
+              <span>{selectedRow.isShiners ? 'Unmark as Shiners' : 'Mark as Floor Inv. (Shiners)'}</span>
             </button>
             <button
               type="button"
@@ -1050,10 +1474,19 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = 'transparent';
               }}
-              onClick={() => {
-                // TODO: Implement mark as floor inventory - finished goods functionality
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 console.log('Mark as Floor Inv. (Finished Goods) clicked for:', selectedRow);
-                setActionMenuId(null);
+                setSelectedProductForMarkFinishedGoods(selectedRow);
+                setShowMarkAsFinishedGoodsModal(true);
+                setTimeout(() => {
+                  setActionMenuId(null);
+                }, 100);
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
               }}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="#111827" stroke="#111827" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1063,6 +1496,145 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
               </svg>
               <span>Mark as Floor Inv. (Finished Goods)</span>
             </button>
+
+            {/* Desktop-only: Log Units Produced */}
+            {!isMobile && (
+              <button
+                type="button"
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '10px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  fontSize: '14px',
+                  fontWeight: 400,
+                  color: '#111827',
+                  borderRadius: '6px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#F3F4F6';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  
+                  console.log('Log Units Produced MOUSEDOWN for:', selectedRow);
+                  setSelectedProductForLogUnits(selectedRow);
+                  setTimeout(() => {
+                    setActionMenuId(null);
+                  }, 100);
+                }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111827" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                  <polyline points="10 9 9 9 8 9" />
+                </svg>
+                <span>Log Units Produced</span>
+              </button>
+            )}
+            
+            {/* Mobile-only options */}
+            {isMobile && (
+              <>
+                <button
+                  type="button"
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '10px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    fontSize: '14px',
+                    fontWeight: 400,
+                    color: '#111827',
+                    borderRadius: '6px',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#F3F4F6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                  onClick={() => {
+                    console.log('Product Notes clicked for:', selectedRow);
+                    if (onProductNotes) {
+                      onProductNotes(selectedRow);
+                    }
+                    setActionMenuId(null);
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                    <polyline points="10 9 9 9 8 9" />
+                  </svg>
+                  <span>Product Notes</span>
+                </button>
+                
+                <button
+                  type="button"
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '10px 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    fontSize: '14px',
+                    fontWeight: 400,
+                    color: '#111827',
+                    borderRadius: '6px',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#F3F4F6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                  onClick={() => {
+                    console.log('More Details clicked for:', selectedRow);
+                    if (onMoreDetails) {
+                      onMoreDetails(selectedRow);
+                    }
+                    setActionMenuId(null);
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="16" x2="12" y2="12" />
+                    <line x1="12" y1="8" x2="12.01" y2="8" />
+                  </svg>
+                  <span>More Details</span>
+                </button>
+              </>
+            )}
           </div>,
           document.body
         );
@@ -1179,12 +1751,21 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
             console.log('Product index:', productIndex, 'Current data length:', currentData.length);
             
             if (productIndex !== -1) {
+              // Determine if original product was "Done"
+              const originalStatus = product.status || 'pending';
+              const isDoneStatus = originalStatus === 'done';
+              
+              // Create split group ID to link the two products
+              const splitGroupId = isDoneStatus ? Date.now() : null;
+              
               // Create two new rows from the split
               const firstRow = {
                 ...product,
                 id: product.id, // Keep original ID for first batch
-                status: 'paused', // First batch is paused
+                status: isDoneStatus ? 'done' : 'paused', // Keep "Done" if original was done
                 qty: firstBatchQty,
+                isSplit: true, // Mark as split product
+                splitGroupId: splitGroupId, // Link to second batch
               };
               
               // Generate a new ID for the second batch (using timestamp or incrementing)
@@ -1192,8 +1773,10 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
               const secondRow = {
                 ...product,
                 id: maxId + 1, // New ID for second batch
-                status: 'pending', // Second batch is pending (shows Start button)
+                status: isDoneStatus ? 'done' : 'pending', // Keep "Done" if original was done
                 qty: secondBatchQty,
+                isSplit: true, // Mark as split product
+                splitGroupId: splitGroupId, // Link to first batch
               };
               
               console.log('First row:', firstRow);
@@ -1215,6 +1798,36 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
             }
             
             setSelectedProductForSplit(null);
+          }}
+        />
+      )}
+
+      {/* Log Units Produced Modal */}
+      {selectedProductForLogUnits && (
+        <LogUnitsProducedModal
+          isOpen={true}
+          onClose={() => {
+            setSelectedProductForLogUnits(null);
+          }}
+          productData={selectedProductForLogUnits}
+          onConfirm={(unitsProduced) => {
+            console.log('Units produced logged:', unitsProduced);
+            // Update the product with units produced
+            const currentData = localTableData.length > 0 ? localTableData : (data.length > 0 ? data : sampleData);
+            const updatedData = currentData.map(row => 
+              row.id === selectedProductForLogUnits.id 
+                ? { 
+                    ...row, 
+                    unitsProduced, 
+                    remainingQty: (row.qty || 0) - unitsProduced,
+                    status: 'paused' 
+                  }
+                : row
+            );
+            
+            setLocalTableData(updatedData);
+            setOriginalTableData(updatedData);
+            setSelectedProductForLogUnits(null);
           }}
         />
       )}
@@ -1435,6 +2048,670 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
             </div>
           </div>
         </div>
+      )}
+
+      {/* Mark Units as Shiners Modal */}
+      {selectedShinersProductToMove && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            padding: '16px',
+          }}
+          onClick={() => setSelectedShinersProductToMove(null)}
+        >
+          <div
+            style={{
+              width: isMobile ? '343px' : '683px',
+              minHeight: isMobile ? 'auto' : '260px',
+              backgroundColor: '#FFFFFF',
+              borderRadius: '12px',
+              border: '1px solid #E5E7EB',
+              overflow: 'visible',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Content Section */}
+            <div style={{ padding: '28px 24px 20px 24px', display: 'flex', flexDirection: 'column', gap: '14px', alignItems: 'center', textAlign: 'center' }}>
+              {/* Warning Icon */}
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <div
+                  style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '50%',
+                    backgroundColor: '#FEF3C7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Title */}
+              <h2 style={{ fontSize: '20px', fontWeight: '600', color: '#111827', margin: 0, lineHeight: '1.4' }}>
+                Are you sure you want to move?
+              </h2>
+
+              {/* Body Text */}
+              <div style={{ maxWidth: '580px' }}>
+                <p style={{ fontSize: '15px', color: '#6B7280', margin: 0, lineHeight: '1.6' }}>
+                  These units will no longer be included in this shipment and moved to floor inventory. Amazon will treat them as false inbound inventory for this shipment type.
+                </p>
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div
+              style={{
+                padding: '0 24px 24px 24px',
+                display: 'flex',
+                gap: '10px',
+                justifyContent: 'space-between',
+              }}
+            >
+              <button
+                onClick={() => setSelectedShinersProductToMove(null)}
+                style={{
+                  width: isMobile ? '147.5px' : '309.5px',
+                  height: isMobile ? '23px' : '31px',
+                  padding: 0,
+                  borderRadius: '4px',
+                  border: '1px solid #D1D5DB',
+                  backgroundColor: '#FFFFFF',
+                  color: '#374151',
+                  fontSize: '15px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#F9FAFB';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  console.log('Confirm clicked for shiners:', selectedShinersProductToMove);
+                  // Update the row status to moved_s (Moved Shiners)
+                  const updatedData = localTableData.map(r => 
+                    r.id === selectedShinersProductToMove.id 
+                      ? { ...r, isShiners: true, status: 'moved_s' }
+                      : r
+                  );
+                  console.log('Updated data:', updatedData);
+                  setLocalTableData(updatedData);
+                  setOriginalTableData(updatedData); // Also update original data to persist changes
+                  setSelectedShinersProductToMove(null);
+                }}
+                style={{
+                  width: isMobile ? '147.5px' : '309.5px',
+                  height: isMobile ? '23px' : '31px',
+                  padding: 0,
+                  borderRadius: '4px',
+                  border: '1px solid #0066FF',
+                  backgroundColor: '#0066FF',
+                  color: '#FFFFFF',
+                  fontSize: '15px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#0052CC';
+                  e.currentTarget.style.borderColor = '#0052CC';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#0066FF';
+                  e.currentTarget.style.borderColor = '#0066FF';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Start Item Marked as Shiners Modal */}
+      {selectedShinersProductToStart && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            padding: '16px',
+          }}
+          onClick={() => setSelectedShinersProductToStart(null)}
+        >
+          <div
+            style={{
+              width: isMobile ? '343px' : '380px',
+              minHeight: isMobile ? 'auto' : '220px',
+              backgroundColor: '#FFFFFF',
+              borderRadius: '12px',
+              border: '1px solid #E5E7EB',
+              overflow: 'hidden',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Content Section */}
+            <div style={{ padding: '32px 24px 24px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
+              {/* Warning Icon */}
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <div
+                  style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '50%',
+                    backgroundColor: '#FEF3C7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Title */}
+              <h3 style={{ fontSize: '18px', fontWeight: 600, color: '#111827', margin: 0, lineHeight: '1.4' }}>
+                Start Item Marked as Shiners?
+              </h3>
+
+              {/* Body Text */}
+              <p style={{ fontSize: '14px', color: '#6B7280', margin: 0, lineHeight: '1.6' }}>
+                This line item is currently marked as shiners. Starting it will unmark the status.
+              </p>
+            </div>
+
+            {/* Buttons */}
+            <div style={{ padding: '0 24px 24px 24px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <button
+                onClick={() => setSelectedShinersProductToStart(null)}
+                style={{
+                  width: isMobile ? '147.5px' : '159.5px',
+                  height: isMobile ? '23px' : '31px',
+                  padding: 0,
+                  borderRadius: '4px',
+                  border: '1px solid #D1D5DB',
+                  backgroundColor: '#FFFFFF',
+                  color: '#374151',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#F9FAFB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  console.log('Unmark Shiners & Start clicked for:', selectedShinersProductToStart);
+                  // Unmark as shiners and start production
+                  const updatedData = localTableData.map(r => 
+                    r.id === selectedShinersProductToStart.id 
+                      ? { ...r, isShiners: false, status: 'pending' }
+                      : r
+                  );
+                  setLocalTableData(updatedData);
+                  setOriginalTableData(updatedData);
+                  
+                  setIsFromUnmarkShiners(true);
+                  if (onSetIsFromUnmarkShiners) {
+                    onSetIsFromUnmarkShiners(true);
+                  }
+                  if (onStartClick) {
+                    onStartClick(selectedShinersProductToStart);
+                  }
+                  setSelectedShinersProductToStart(null);
+                }}
+                style={{
+                  width: isMobile ? '147.5px' : '159.5px',
+                  height: isMobile ? '23px' : '31px',
+                  padding: 0,
+                  borderRadius: '4px',
+                  border: '1px solid #0066FF',
+                  backgroundColor: '#0066FF',
+                  color: '#FFFFFF',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#0052CC';
+                  e.currentTarget.style.borderColor = '#0052CC';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#0066FF';
+                  e.currentTarget.style.borderColor = '#0066FF';
+                }}
+              >
+                Unmark Shiners & Start
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Mark as Floor Inv. (Shiners) Confirmation Modal */}
+      {console.log('Rendering check - showMarkAsShinersModal:', showMarkAsShinersModal, 'selectedProductForMarkShiners:', selectedProductForMarkShiners)}
+      {(showMarkAsShinersModal && selectedProductForMarkShiners) && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            padding: '16px',
+          }}
+          onClick={() => {
+            setShowMarkAsShinersModal(false);
+            setSelectedProductForMarkShiners(null);
+          }}
+        >
+          <div
+            style={{
+              width: isMobile ? '343px' : '480px',
+              minHeight: isMobile ? 'auto' : '260px',
+              backgroundColor: '#FFFFFF',
+              borderRadius: '12px',
+              border: '1px solid #E5E7EB',
+              overflow: 'hidden',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Icon and Title Section */}
+            <div style={{ padding: '32px 32px 24px 32px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '20px', flex: 1 }}>
+              {/* Warning Icon */}
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '4px' }}>
+                <div
+                  style={{
+                    width: '56px',
+                    height: '56px',
+                    borderRadius: '50%',
+                    backgroundColor: '#FEF3C7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Title */}
+              <h2 style={{ fontSize: '22px', fontWeight: '600', color: '#111827', margin: 0, lineHeight: '1.3' }}>
+                Mark Units as Shiners?
+              </h2>
+
+              {/* Body Text */}
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ fontSize: '16px', color: '#6B7280', margin: 0, lineHeight: '1.6', marginBottom: '12px' }}>
+                  You're marking the following units as shiners:
+                </p>
+                <p style={{ fontSize: '17px', color: '#111827', fontWeight: '600', margin: 0, lineHeight: '1.5' }}>
+                  {selectedProductForMarkShiners?.product} ({selectedProductForMarkShiners?.size}) • {selectedProductForMarkShiners?.qty?.toLocaleString()} Units
+                </p>
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div
+              style={{
+                padding: '0 32px 32px 32px',
+                display: 'flex',
+                gap: '12px',
+                justifyContent: 'center',
+              }}
+            >
+              <button
+                onClick={() => {
+                  console.log('Mark as Shiners (first button) clicked');
+                  // Just mark as shiners without moving
+                  const updatedData = localTableData.map(r => 
+                    r.id === selectedProductForMarkShiners.id 
+                      ? { ...r, isShiners: true, status: 'paused' }
+                      : r
+                  );
+                  setLocalTableData(updatedData);
+                  setOriginalTableData(updatedData); // Also update original data to persist changes
+                  setShowMarkAsShinersModal(false);
+                  setSelectedProductForMarkShiners(null);
+                }}
+                style={{
+                  width: isMobile ? '147.5px' : '200px',
+                  height: isMobile ? '23px' : '40px',
+                  padding: 0,
+                  borderRadius: '6px',
+                  border: '1px solid #2563EB',
+                  backgroundColor: '#FFFFFF',
+                  color: '#2563EB',
+                  fontSize: '15px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#EFF6FF';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                Mark as Shiners
+              </button>
+              <button
+                onClick={() => {
+                  console.log('Mark as Shiners & Move confirmed for:', selectedProductForMarkShiners);
+                  // Set the selected product to show the next modal
+                  setSelectedShinersProductToMove(selectedProductForMarkShiners);
+                  setShowMarkAsShinersModal(false);
+                  setSelectedProductForMarkShiners(null);
+                }}
+                style={{
+                  width: isMobile ? '147.5px' : '200px',
+                  height: isMobile ? '23px' : '40px',
+                  padding: 0,
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: '#2563EB',
+                  color: '#FFFFFF',
+                  fontSize: '15px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#1D4ED8';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#2563EB';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                Mark as Shiners & Move
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Mark as Finished Goods Modal */}
+      {(showMarkAsFinishedGoodsModal && selectedProductForMarkFinishedGoods) && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10001,
+            padding: '16px',
+          }}
+          onClick={() => {
+            setShowMarkAsFinishedGoodsModal(false);
+            setSelectedProductForMarkFinishedGoods(null);
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '12px',
+              width: '90%',
+              maxWidth: '440px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              overflow: 'hidden',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Icon and Title */}
+            <div style={{ padding: '32px 24px 24px', textAlign: 'center' }}>
+              <div
+                style={{
+                  width: '64px',
+                  height: '64px',
+                  borderRadius: '50%',
+                  backgroundColor: '#FEF3C7',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 16px',
+                }}
+              >
+                <svg
+                  width="32"
+                  height="32"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#F59E0B"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 16v-4M12 8h.01" />
+                </svg>
+              </div>
+              <h2
+                style={{
+                  fontSize: '20px',
+                  fontWeight: 600,
+                  color: '#111827',
+                  margin: '0 0 12px 0',
+                }}
+              >
+                Mark Units as Finished Goods & Move?
+              </h2>
+              <p
+                style={{
+                  fontSize: '14px',
+                  color: '#6B7280',
+                  margin: 0,
+                  lineHeight: '1.5',
+                }}
+              >
+                You're marking the following units as finished goods: {selectedProductForMarkFinishedGoods?.product} ({selectedProductForMarkFinishedGoods?.size}) • {selectedProductForMarkFinishedGoods?.qty?.toLocaleString()} Units
+              </p>
+            </div>
+
+            {/* Buttons */}
+            <div
+              style={{
+                padding: '24px',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '12px',
+                borderTop: '1px solid #E5E7EB',
+              }}
+            >
+              <button
+                onClick={() => {
+                  setShowMarkAsFinishedGoodsModal(false);
+                  setSelectedProductForMarkFinishedGoods(null);
+                }}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '6px',
+                  border: '1px solid #D1D5DB',
+                  backgroundColor: '#FFFFFF',
+                  color: '#374151',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#F9FAFB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  console.log('Mark as Finished Goods & Move confirmed for:', selectedProductForMarkFinishedGoods);
+                  
+                  // Check if this is a split product (has splitGroupId)
+                  const isSplitProduct = selectedProductForMarkFinishedGoods?.splitGroupId;
+                  const currentData = localTableData.length > 0 ? localTableData : (data.length > 0 ? data : sampleData);
+                  
+                  let updatedData = [...currentData];
+                  
+                  if (isSplitProduct) {
+                    // Find all products in the split group
+                    const splitGroupId = selectedProductForMarkFinishedGoods.splitGroupId;
+                    const splitProducts = updatedData.filter(r => r.splitGroupId === splitGroupId);
+                    
+                    if (splitProducts.length === 2) {
+                      // Find indices of all split products
+                      const splitIndices = splitProducts.map(product => 
+                        updatedData.findIndex(r => r.id === product.id)
+                      ).sort((a, b) => a - b);
+                      
+                      const firstIndex = splitIndices[0];
+                      const secondIndex = splitIndices[1];
+                      const clickedProductIndex = updatedData.findIndex(r => r.id === selectedProductForMarkFinishedGoods.id);
+                      
+                      // Update all split products
+                      updatedData = updatedData.map((r, index) => {
+                        if (r.splitGroupId === splitGroupId) {
+                          if (index === clickedProductIndex) {
+                            // The clicked product becomes "moved_fg"
+                            return { ...r, status: 'moved_fg', isSplit: false, splitGroupId: null };
+                          } else if (index === firstIndex) {
+                            // First product (by table order) → status: 'paused'
+                            return { ...r, status: 'paused', isSplit: false, splitGroupId: null };
+                          } else if (index === secondIndex) {
+                            // Second product → status: 'pending' (Start)
+                            return { ...r, status: 'pending', isSplit: false, splitGroupId: null };
+                          }
+                        }
+                        return r;
+                      });
+                    }
+                  } else {
+                    // Not a split product - just mark as moved_fg
+                    updatedData = updatedData.map(r =>
+                      r.id === selectedProductForMarkFinishedGoods.id
+                        ? { ...r, status: 'moved_fg' }
+                        : r
+                    );
+                  }
+                  
+                  // Update state
+                  setLocalTableData(updatedData);
+                  setOriginalTableData(updatedData);
+                  
+                  setShowMarkAsFinishedGoodsModal(false);
+                  setSelectedProductForMarkFinishedGoods(null);
+                }}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: '#2563EB',
+                  color: '#FFFFFF',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#1D4ED8';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#2563EB';
+                }}
+              >
+                Mark as Finished Goods & Move
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </>
   );

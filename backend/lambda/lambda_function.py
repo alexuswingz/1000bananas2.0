@@ -5918,6 +5918,90 @@ def add_shiner(event):
         cursor.close()
         conn.close()
 
+def add_unused_formula(event):
+    """POST /production/floor-inventory/unused-formulas - Add unused formula to inventory"""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        body = json.loads(event.get('body', '{}'))
+        
+        formula_name = body.get('formula_name')
+        gallons = body.get('gallons')
+        
+        if not formula_name or not gallons:
+            return cors_response(400, {
+                'success': False,
+                'error': 'formula_name and gallons are required'
+            })
+        
+        # Convert gallons to float
+        try:
+            gallons = float(gallons)
+        except (TypeError, ValueError):
+            return cors_response(400, {
+                'success': False,
+                'error': 'gallons must be a valid number'
+            })
+        
+        # Check if formula_inventory record exists for this formula
+        cursor.execute("""
+            SELECT formula_name, gallons_available 
+            FROM formula_inventory 
+            WHERE formula_name = %s
+        """, (formula_name,))
+        
+        existing = cursor.fetchone()
+        
+        if existing:
+            # Update existing record - add to available gallons
+            cursor.execute("""
+                UPDATE formula_inventory 
+                SET gallons_available = gallons_available + %s,
+                    last_manufactured = CURRENT_TIMESTAMP
+                WHERE formula_name = %s
+                RETURNING formula_name, gallons_available
+            """, (gallons, formula_name))
+            
+            result = cursor.fetchone()
+            message = f'Added {gallons} gallons to existing inventory for {formula_name}'
+        else:
+            # Insert new record
+            cursor.execute("""
+                INSERT INTO formula_inventory (
+                    formula_name, 
+                    gallons_available, 
+                    gallons_in_production,
+                    last_manufactured
+                )
+                VALUES (%s, %s, 0, CURRENT_TIMESTAMP)
+                RETURNING formula_name, gallons_available
+            """, (formula_name, gallons))
+            
+            result = cursor.fetchone()
+            message = f'Created new formula inventory record for {formula_name} with {gallons} gallons'
+        
+        conn.commit()
+        
+        return cors_response(201, {
+            'success': True,
+            'data': {
+                'formula_name': result['formula_name'],
+                'gallons_available': float(result['gallons_available'])
+            },
+            'message': message
+        })
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        return cors_response(500, {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        })
+    finally:
+        cursor.close()
+        conn.close()
+
 def get_products_inventory(event):
     """GET /production/products/inventory - Get inventory levels for all products with supply chain dependencies"""
     conn = get_db_connection()
@@ -6315,6 +6399,9 @@ def lambda_handler(event, context):
         
         elif http_method == 'GET' and path.endswith('/production/floor-inventory/unused-formulas'):
             return get_unused_formulas(event)
+        
+        elif http_method == 'POST' and path.endswith('/production/floor-inventory/unused-formulas'):
+            return add_unused_formula(event)
         
         # Labels availability endpoint (support both URL patterns)
         elif http_method == 'GET' and (path.endswith('/production/labels/availability') or path.endswith('/production/labels-availability')):

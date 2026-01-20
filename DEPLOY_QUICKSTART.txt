@@ -1,0 +1,66 @@
+╔══════════════════════════════════════════════════════════════╗
+║           🍌 1000 BANANAS DEPLOYMENT QUICKSTART 🍌           ║
+╚══════════════════════════════════════════════════════════════╝
+
+Live Site: http://1000bananasv2.s3-website-ap-southeast-2.amazonaws.com/
+
+═══════════════════════════════════════════════════════════════
+
+📋 FIRST TIME SETUP (Do this once):
+
+1. Install AWS CLI:
+   → Download: https://awscli.amazonaws.com/AWSCLIV2.msi
+   → Run installer and restart terminal
+
+2. Configure AWS:
+   → Run: aws configure
+   → Enter your AWS Access Key ID
+   → Enter your AWS Secret Access Key
+   → Region: ap-southeast-2
+   → Format: json
+
+═══════════════════════════════════════════════════════════════
+
+🚀 TO DEPLOY (Every time you want to push updates):
+
+Option A - Easy Mode:
+   .\deploy.ps1
+
+Option B - NPM Command:
+   npm run deploy
+
+Option C - Manual:
+   npm run build
+   aws s3 sync build/ s3://1000bananasv2 --delete
+
+═══════════════════════════════════════════════════════════════
+
+✅ BEFORE DEPLOYING CHECKLIST:
+
+  □ Test locally (npm start)
+  □ No errors in console
+  □ All features working
+  □ Commit to git
+  □ Fixed merge conflicts (like we just did!)
+
+═══════════════════════════════════════════════════════════════
+
+⚠️  TROUBLESHOOTING:
+
+Problem: Changes don't appear
+→ Clear browser cache (Ctrl + Shift + R)
+→ Wait 2-3 minutes for cache
+
+Problem: "AWS CLI not found"
+→ Install AWS CLI and restart terminal
+
+Problem: "Access Denied"
+→ Check AWS credentials (aws configure)
+→ Contact admin for S3 permissions
+
+═══════════════════════════════════════════════════════════════
+
+📖 Full guide: See DEPLOYMENT_GUIDE.md
+
+═══════════════════════════════════════════════════════════════
+

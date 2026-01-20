@@ -33,7 +33,8 @@ const ProductInfoModal = ({ isOpen, onClose, onBeginQC, productData }) => {
         className={themeClasses.modalBg}
         style={{
           borderRadius: '12px',
-          width: '648px',
+          width: '580px',
+          maxWidth: '90vw',
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
           display: 'flex',
           flexDirection: 'column',
@@ -79,90 +80,142 @@ const ProductInfoModal = ({ isOpen, onClose, onBeginQC, productData }) => {
         </div>
 
         {/* Content */}
-        <div style={{ padding: '1.25rem', flex: 1, overflow: 'auto', display: 'flex', alignItems: 'center' }}>
-          {/* Product Information Card */}
+        <div style={{ padding: '1.25rem', flex: 1, overflow: 'auto', display: 'flex', gap: '16px' }}>
+          {/* Product Image Container */}
           <div
             style={{
-              backgroundColor: '#F3F4F6',
+              flexShrink: 0,
+              position: 'relative',
+              backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
               borderRadius: '8px',
-              border: `1px solid ${themeClasses.border}`,
-              padding: '1.25rem',
+              border: '1px solid #E5E7EB',
+              padding: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <img
+              src={productData?.productImage || '/assets/TPS_Cherry Tree_8oz_Wrap (1).png'}
+              alt={productData?.product || 'Product'}
+              style={{
+                width: '100px',
+                height: '180px',
+                objectFit: 'contain',
+              }}
+            />
+            {/* Expand Icon */}
+            <button
+              style={{
+                position: 'absolute',
+                top: '8px',
+                right: '8px',
+                width: '24px',
+                height: '24px',
+                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                border: '1px solid #E5E7EB',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                padding: 0,
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2">
+                <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Product Information Container */}
+          <div
+            style={{
+              flex: 1,
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
-              gap: '1.5rem',
-              width: '100%',
+              gap: '12px 16px',
+              alignContent: 'start',
             }}
           >
             {/* Left Column */}
             <div>
-              <div style={{ marginBottom: '0.75rem' }}>
-                <span className={themeClasses.textSecondary} style={{ fontSize: '12px', display: 'block', marginBottom: '0.25rem' }}>
-                  Brand:
-                </span>
-                <span className={themeClasses.textPrimary} style={{ fontSize: '14px', fontWeight: '600' }}>
-                  {productData?.brand || 'TPS Plant Foods'}
-                </span>
-              </div>
-              <div style={{ marginBottom: '0.75rem' }}>
-                <span className={themeClasses.textSecondary} style={{ fontSize: '12px', display: 'block', marginBottom: '0.25rem' }}>
-                  Product Name:
-                </span>
-                <span className={themeClasses.textPrimary} style={{ fontSize: '14px', fontWeight: '600' }}>
-                  {productData?.product || 'Cherry Tree Fertilizer'}
-                </span>
-              </div>
-              <div style={{ marginBottom: '0.75rem' }}>
-                <span className={themeClasses.textSecondary} style={{ fontSize: '12px', display: 'block', marginBottom: '0.25rem' }}>
-                  Size:
-                </span>
-                <span className={themeClasses.textPrimary} style={{ fontSize: '14px', fontWeight: '600' }}>
-                  {productData?.size || '8oz'}
-                </span>
-              </div>
-              <div>
-                <span className={themeClasses.textSecondary} style={{ fontSize: '12px', display: 'block', marginBottom: '0.25rem' }}>
-                  Label Location:
-                </span>
-                <span className={themeClasses.textPrimary} style={{ fontSize: '14px', fontWeight: '600' }}>
-                  {productData?.labelLocation || 'LBL-PLANT-218'}
-                </span>
-              </div>
+              <span className={themeClasses.textSecondary} style={{ fontSize: '11px', display: 'block', marginBottom: '2px' }}>
+                Brand
+              </span>
+              <span className={themeClasses.textPrimary} style={{ fontSize: '13px', fontWeight: '600', display: 'block' }}>
+                {productData?.brand || 'TPS Plant Foods'}
+              </span>
             </div>
 
             {/* Right Column */}
             <div>
-              <div style={{ marginBottom: '0.75rem' }}>
-                <span className={themeClasses.textSecondary} style={{ fontSize: '12px', display: 'block', marginBottom: '0.25rem' }}>
-                  Formula:
-                </span>
-                <span className={themeClasses.textPrimary} style={{ fontSize: '14px', fontWeight: '600' }}>
-                  {productData?.formula || 'F.Ultra Grow'}
-                </span>
-              </div>
-              <div style={{ marginBottom: '0.75rem' }}>
-                <span className={themeClasses.textSecondary} style={{ fontSize: '12px', display: 'block', marginBottom: '0.25rem' }}>
-                  QTY:
-                </span>
-                <span className={themeClasses.textPrimary} style={{ fontSize: '14px', fontWeight: '600' }}>
-                  {productData?.qty?.toLocaleString() || '72,000'}
-                </span>
-              </div>
-              <div style={{ marginBottom: '0.75rem' }}>
-                <span className={themeClasses.textSecondary} style={{ fontSize: '12px', display: 'block', marginBottom: '0.25rem' }}>
-                  Case #:
-                </span>
-                <span className={themeClasses.textPrimary} style={{ fontSize: '14px', fontWeight: '600' }}>
-                  {productData?.caseNumber || '488'}
-                </span>
-              </div>
-              <div>
-                <span className={themeClasses.textSecondary} style={{ fontSize: '12px', display: 'block', marginBottom: '0.25rem' }}>
-                  TPS Ship #:
-                </span>
-                <span className={themeClasses.textPrimary} style={{ fontSize: '14px', fontWeight: '600' }}>
-                  {productData?.tpsShipNumber || '10-01-2025'}
-                </span>
-              </div>
+              <span className={themeClasses.textSecondary} style={{ fontSize: '11px', display: 'block', marginBottom: '2px' }}>
+                Formula
+              </span>
+              <span className={themeClasses.textPrimary} style={{ fontSize: '13px', fontWeight: '600', display: 'block' }}>
+                {productData?.formula || 'F.Ultra Grow'}
+              </span>
+            </div>
+
+            {/* Product Name */}
+            <div>
+              <span className={themeClasses.textSecondary} style={{ fontSize: '11px', display: 'block', marginBottom: '2px' }}>
+                Product Name
+              </span>
+              <span className={themeClasses.textPrimary} style={{ fontSize: '13px', fontWeight: '600', display: 'block' }}>
+                {productData?.product || 'Cherry Tree Fertilizer'}
+              </span>
+            </div>
+
+            {/* QTY */}
+            <div>
+              <span className={themeClasses.textSecondary} style={{ fontSize: '11px', display: 'block', marginBottom: '2px' }}>
+                QTY
+              </span>
+              <span className={themeClasses.textPrimary} style={{ fontSize: '13px', fontWeight: '600', display: 'block' }}>
+                {productData?.qty?.toLocaleString() || '72,000'}
+              </span>
+            </div>
+
+            {/* Size */}
+            <div>
+              <span className={themeClasses.textSecondary} style={{ fontSize: '11px', display: 'block', marginBottom: '2px' }}>
+                Size
+              </span>
+              <span className={themeClasses.textPrimary} style={{ fontSize: '13px', fontWeight: '600', display: 'block' }}>
+                {productData?.size || '8oz'}
+              </span>
+            </div>
+
+            {/* Case # */}
+            <div>
+              <span className={themeClasses.textSecondary} style={{ fontSize: '11px', display: 'block', marginBottom: '2px' }}>
+                Case #
+              </span>
+              <span className={themeClasses.textPrimary} style={{ fontSize: '13px', fontWeight: '600', display: 'block' }}>
+                {productData?.caseNumber || '488'}
+              </span>
+            </div>
+
+            {/* Label Location */}
+            <div>
+              <span className={themeClasses.textSecondary} style={{ fontSize: '11px', display: 'block', marginBottom: '2px' }}>
+                Label Location
+              </span>
+              <span className={themeClasses.textPrimary} style={{ fontSize: '13px', fontWeight: '600', display: 'block' }}>
+                {productData?.labelLocation || 'LBL-PLANT-218'}
+              </span>
+            </div>
+
+            {/* TPS Ship # */}
+            <div>
+              <span className={themeClasses.textSecondary} style={{ fontSize: '11px', display: 'block', marginBottom: '2px' }}>
+                TPS Ship #
+              </span>
+              <span className={themeClasses.textPrimary} style={{ fontSize: '13px', fontWeight: '600', display: 'block' }}>
+                {productData?.tpsShipNumber || '10-01-2025'}
+              </span>
             </div>
           </div>
         </div>

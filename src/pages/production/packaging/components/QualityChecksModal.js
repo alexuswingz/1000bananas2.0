@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 
 const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction }) => {
@@ -102,11 +102,11 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
   };
 
   const allSteps = [
-    { id: 'formula', label: 'Formula', confirmationText: 'Confirm Correct Formula' },
+    { id: 'formula', label: 'Formula Verifications', confirmationText: 'Confirm Correct Formula' },
     { id: 'fillLevel', label: 'Fill Level', confirmationText: 'Confirm Fill Level' },
-    { id: 'seal', label: 'Seal', confirmationText: 'Confirm Seal' },
-    { id: 'product', label: 'Product', confirmationText: 'Confirm Product' },
-    { id: 'upcScan', label: 'UPC Scan', confirmationText: 'Confirm UPC Scan' },
+    { id: 'seal', label: 'Proper Seal', confirmationText: 'Confirm Seal' },
+    { id: 'product', label: 'Finished Product', confirmationText: 'Confirm Product' },
+    { id: 'upcScan', label: 'UPC', confirmationText: 'Confirm UPC Scan' },
     { id: 'boxSticker', label: 'Box Sticker', confirmationText: 'Confirm Box Sticker' },
   ];
 
@@ -221,9 +221,65 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
         />
 
         {/* Content */}
-        <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', flex: 1, overflow: 'auto' }}>
-          {/* Step Indicator */}
-          <div style={{ marginBottom: '2rem' }}>
+        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', flex: 1, overflow: 'auto' }}>
+          {/* Step Header with Dropdown */}
+          <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            {/* Step Counter */}
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+              <span style={{ fontSize: '12px', fontWeight: '600', color: '#3B82F6', letterSpacing: '0.05em' }}>
+                STEP {currentStepIndex + 1} OF {allSteps.length}:
+              </span>
+            </div>
+            
+            {/* Step Dropdown */}
+            <div style={{ position: 'relative', minWidth: '240px' }}>
+              <select
+                value={currentStepIndex}
+                onChange={(e) => {
+                  setCurrentStepIndex(Number(e.target.value));
+                  setUploadedFile(null);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '8px 32px 8px 12px',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  color: '#374151',
+                  backgroundColor: '#FFFFFF',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '6px',
+                  appearance: 'none',
+                  cursor: 'pointer',
+                  outline: 'none',
+                }}
+              >
+                {allSteps.map((step, index) => (
+                  <option key={step.id} value={index}>
+                    {index + 1}. {step.label}
+                  </option>
+                ))}
+              </select>
+              {/* Dropdown Arrow */}
+              <svg
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  pointerEvents: 'none',
+                  width: '12px',
+                  height: '12px',
+                }}
+                viewBox="0 0 12 12"
+                fill="none"
+              >
+                <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+          </div>
+
+          {/* Old step indicator removed - replaced with dropdown above */}
+          <div style={{ display: 'none' }}>
             <div style={{ width: '600px', height: '47px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}>
               {/* Continuous background line - spans full width, centered on icon circles */}
               <div
@@ -326,32 +382,29 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
           </div>
 
           {/* Step Confirmation */}
-          <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <p className={themeClasses.textPrimary} style={{ fontSize: '14px', fontWeight: '500', margin: 0 }}>
+          <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <p style={{ fontSize: '14px', fontWeight: '400', margin: 0, color: '#374151' }}>
               {currentStep.id === 'formula' && productData?.formula 
                 ? (
                   <>
-                    Confirm Correct Formula:{' '}
-                    <span style={{ color: '#3B82F6', fontWeight: '600' }}>
-                      {productData.formula}
-                    </span>
+                    Confirm Correct Formula: <span style={{ color: '#3B82F6', fontWeight: '600' }}>{productData.formula}</span>
                   </>
                 )
                 : currentStep.confirmationText
               }
             </p>
             <svg
-              width="14"
-              height="14"
-              viewBox="0 0 14 14"
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
               fill="none"
               style={{ flexShrink: 0 }}
             >
-              <circle cx="7" cy="7" r="6.5" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
+              <circle cx="8" cy="8" r="7" fill="#6B7280" />
               <path
-                d="M7 4V7M7 10H7.01"
+                d="M8 4.5V8.5M8 11.5H8.01"
                 stroke="white"
-                strokeWidth="1.2"
+                strokeWidth="1.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
@@ -365,31 +418,30 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
             onDragOver={handleDragOver}
             style={{
               position: 'relative',
-              borderRadius: '8px',
+              borderRadius: '12px',
               width: '100%',
-              maxWidth: '600px',
-              height: '296px',
+              height: '240px',
               cursor: 'pointer',
-              backgroundImage: `url('/assets/Asset Upload Area.png')`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
+              border: '2px dashed #D1D5DB',
+              backgroundColor: '#F9FAFB',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '16px',
+              gap: '12px',
               transition: 'all 0.2s ease',
-              marginBottom: '1rem',
+              marginBottom: '24px',
             }}
             onMouseEnter={() => {
               if (uploadAreaRef.current) {
-                uploadAreaRef.current.style.opacity = '0.9';
+                uploadAreaRef.current.style.borderColor = '#9CA3AF';
+                uploadAreaRef.current.style.backgroundColor = '#F3F4F6';
               }
             }}
             onMouseLeave={() => {
               if (uploadAreaRef.current) {
-                uploadAreaRef.current.style.opacity = '1';
+                uploadAreaRef.current.style.borderColor = '#D1D5DB';
+                uploadAreaRef.current.style.backgroundColor = '#F9FAFB';
               }
             }}
             onClick={() => document.getElementById('file-upload').click()}
@@ -401,6 +453,46 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
               onChange={handleFileChange}
               style={{ display: 'none' }}
             />
+            
+            {/* Camera Icon */}
+            <svg
+              width="64"
+              height="64"
+              viewBox="0 0 64 64"
+              fill="none"
+              style={{ opacity: 0.4 }}
+            >
+              <rect width="64" height="64" rx="8" fill="#9CA3AF" />
+              <path
+                d="M26 22L28 18H36L38 22H46C47.1046 22 48 22.8954 48 24V42C48 43.1046 47.1046 44 46 44H18C16.8954 44 16 43.1046 16 42V24C16 22.8954 16.8954 22 18 22H26Z"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+              />
+              <circle
+                cx="32"
+                cy="33"
+                r="6"
+                stroke="white"
+                strokeWidth="2"
+                fill="none"
+              />
+            </svg>
+
+            {/* Upload Text */}
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ fontSize: '14px', color: '#374151', margin: '0 0 4px 0' }}>
+                Drag and drop photo or{' '}
+                <span style={{ color: '#3B82F6', fontWeight: '500', cursor: 'pointer' }}>
+                  Click to upload
+                </span>
+              </p>
+              <p style={{ fontSize: '12px', color: '#9CA3AF', margin: 0 }}>
+                Max size: 3MB (JPG, PNG)
+              </p>
+            </div>
           </div>
         </div>
 

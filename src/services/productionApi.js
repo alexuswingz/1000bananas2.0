@@ -659,6 +659,38 @@ export const getUnusedFormulas = async () => {
   }
 };
 
+/**
+ * Add unused formula to inventory
+ * @param {string} formulaName - Name of the formula
+ * @param {number} gallons - Amount of unused formula in gallons
+ * @returns {Promise<Object>} Result of the operation
+ */
+export const addUnusedFormula = async (formulaName, gallons) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/production/floor-inventory/unused-formulas`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        formula_name: formulaName,
+        gallons: gallons,
+      }),
+    });
+    
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to add unused formula');
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error adding unused formula:', error);
+    throw error;
+  }
+};
+
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
