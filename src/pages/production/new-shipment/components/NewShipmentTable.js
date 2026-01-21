@@ -83,6 +83,10 @@ const NewShipmentTable = ({
   const [nonTableSortField, setNonTableSortField] = useState('');
   const [nonTableSortOrder, setNonTableSortOrder] = useState('');
   
+  // Multi-select state for non-table mode bulk operations
+  const [nonTableSelectedIndices, setNonTableSelectedIndices] = useState(() => new Set());
+  const [nonTableLastSelectedIndex, setNonTableLastSelectedIndex] = useState(null);
+  
   // Filter state
   const [activeFilters, setActiveFilters] = useState({
     popularFilter: '',
@@ -1615,6 +1619,58 @@ const NewShipmentTable = ({
 
   const currentRows = tableMode ? filteredRowsWithSelection : nonTableFilteredRows;
 
+  // Keyboard support for bulk increase/decrease (non-table mode)
+  useEffect(() => {
+    if (tableMode || nonTableSelectedIndices.size === 0) {
+      return; // Only handle in non-table mode with selections
+    }
+
+    const handleKeyDown = (e) => {
+      // Don't handle if user is typing in an input
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault(); // Prevent page scrolling
+        
+        const isIncrease = e.key === 'ArrowUp';
+        
+        effectiveSetQtyValues(prev => {
+          const newValues = { ...prev };
+          nonTableSelectedIndices.forEach(selectedIndex => {
+            const selectedRow = currentRows.find(r => r._originalIndex === selectedIndex);
+            if (selectedRow) {
+              const currentQty = newValues[selectedIndex] ?? 0;
+              const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
+              
+              let increment = 1;
+              const size = selectedRow.size?.toLowerCase() || '';
+              if (size.includes('8oz')) increment = 60;
+              else if (size.includes('quart')) increment = 12;
+              else if (size.includes('gallon')) increment = 4;
+              
+              if (isIncrease) {
+                newValues[selectedIndex] = numQty + increment;
+              } else {
+                if (numQty > 0) {
+                  newValues[selectedIndex] = Math.max(0, numQty - increment);
+                }
+              }
+              manuallyEditedIndices.current.add(selectedIndex);
+            }
+          });
+          return newValues;
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [tableMode, nonTableSelectedIndices, currentRows, effectiveSetQtyValues]);
+
   // Check if all rows are selected (respect current view/filter)
   const allSelected = useMemo(() => {
     return currentRows.length > 0 && selectedRows.size === currentRows.length;
@@ -1884,30 +1940,99 @@ const NewShipmentTable = ({
     }
   };
 
-  // Handle Add button click
+  // Handle row click for multi-select (non-table mode)
+  const handleNonTableRowClick = (e, index) => {
+    // Don't handle selection if clicking on interactive elements
+    if (e.target.closest('button') || e.target.closest('input')) {
+      return;
+    }
+
+    const isShiftClick = e.shiftKey;
+    const isCmdClick = e.metaKey || e.ctrlKey;
+
+    if (isShiftClick && nonTableLastSelectedIndex !== null) {
+      // Shift + Click: Select range between lastSelectedIndex and current index
+      const start = Math.min(nonTableLastSelectedIndex, index);
+      const end = Math.max(nonTableLastSelectedIndex, index);
+      const newSelected = new Set(nonTableSelectedIndices);
+      
+      for (let i = start; i <= end; i++) {
+        newSelected.add(i);
+      }
+      
+      setNonTableSelectedIndices(newSelected);
+      setNonTableLastSelectedIndex(index);
+    } else if (isCmdClick) {
+      // Cmd/Ctrl + Click: Toggle selection of this item
+      const newSelected = new Set(nonTableSelectedIndices);
+      if (newSelected.has(index)) {
+        newSelected.delete(index);
+      } else {
+        newSelected.add(index);
+      }
+      setNonTableSelectedIndices(newSelected);
+      setNonTableLastSelectedIndex(index);
+    } else {
+      // Regular click: Select only this item
+      setNonTableSelectedIndices(new Set([index]));
+      setNonTableLastSelectedIndex(index);
+    }
+  };
+
+  // Handle Add button click (with bulk support)
   const handleAddClick = (row, index) => {
     const newAdded = new Set(addedRows);
     
-    if (newAdded.has(row.id)) {
-      // Remove from added - keep the qty value (don't clear it)
-      newAdded.delete(row.id);
+    // In non-table mode, if multiple products are selected, perform bulk add/remove
+    if (!tableMode && nonTableSelectedIndices.size > 1 && nonTableSelectedIndices.has(index)) {
+      // Determine if we're adding or removing based on the clicked row's state
+      const isRemoving = newAdded.has(row.id);
+      
+      // Apply the action to all selected rows
+      nonTableSelectedIndices.forEach(selectedIndex => {
+        const selectedRow = currentRows.find(r => r._originalIndex === selectedIndex);
+        if (selectedRow) {
+          if (isRemoving) {
+            // Remove from added - keep the qty value
+            newAdded.delete(selectedRow.id);
+          } else {
+            // Check if quantity is greater than 0 before adding
+            const currentQty = typeof effectiveQtyValues[selectedIndex] === 'number' 
+              ? effectiveQtyValues[selectedIndex] 
+              : (effectiveQtyValues[selectedIndex] === '' || effectiveQtyValues[selectedIndex] === null || effectiveQtyValues[selectedIndex] === undefined) 
+                ? 0 
+                : parseInt(effectiveQtyValues[selectedIndex], 10) || 0;
+            
+            if (currentQty > 0) {
+              newAdded.add(selectedRow.id);
+            }
+          }
+        }
+      });
     } else {
-      // Check if quantity is 0 before adding
-      const currentQty = typeof effectiveQtyValues[index] === 'number' 
-        ? effectiveQtyValues[index] 
-        : (effectiveQtyValues[index] === '' || effectiveQtyValues[index] === null || effectiveQtyValues[index] === undefined) 
-          ? 0 
-          : parseInt(effectiveQtyValues[index], 10) || 0;
-      
-      if (currentQty === 0) {
-        // Don't add if quantity is 0 - the hover popup will show
-        return;
+      // Single product add/remove
+      if (newAdded.has(row.id)) {
+        // Remove from added - keep the qty value (don't clear it)
+        newAdded.delete(row.id);
+      } else {
+        // Check if quantity is 0 before adding
+        const currentQty = typeof effectiveQtyValues[index] === 'number' 
+          ? effectiveQtyValues[index] 
+          : (effectiveQtyValues[index] === '' || effectiveQtyValues[index] === null || effectiveQtyValues[index] === undefined) 
+            ? 0 
+            : parseInt(effectiveQtyValues[index], 10) || 0;
+        
+        if (currentQty === 0) {
+          // Don't add if quantity is 0 - the hover popup will show
+          return;
+        }
+        
+        // Add - just mark as added, don't change qty value
+        // User should have already entered qty before clicking Add
+        newAdded.add(row.id);
       }
-      
-      // Add - just mark as added, don't change qty value
-      // User should have already entered qty before clicking Add
-      newAdded.add(row.id);
     }
+    
     // This will update local state and notify parent
     setAddedRows(newAdded);
     if (onAddedRowsChange) onAddedRowsChange(newAdded);
@@ -2189,19 +2314,24 @@ const NewShipmentTable = ({
               const doiColor = getDoiColor(doiValue);
               const asin = row.asin || row.child_asin || row.childAsin || '';
               
+              const isSelected = nonTableSelectedIndices.has(index);
+              
               return (
                 <div
                   key={`${row.id}-${index}`}
+                  onClick={(e) => handleNonTableRowClick(e, index)}
                   style={{
                     display: 'grid',
                     gridTemplateColumns: '1fr 140px 220px 140px',
                     height: '66px',
                     padding: '8px 16px',
-                    backgroundColor: '#1A2235',
+                    backgroundColor: isSelected ? (isDarkMode ? '#1E3A5F' : '#DBEAFE') : '#1A2235',
                     alignItems: 'center',
                     gap: '32px',
                     boxSizing: 'border-box',
-                    position: 'relative'
+                    position: 'relative',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.15s ease'
                   }}
                 >
                   {/* Border line with 30px margin on both sides */}
@@ -2504,17 +2634,44 @@ const NewShipmentTable = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          const currentQty = effectiveQtyValues[index] ?? 0;
-                          const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
-                          if (numQty <= 0) return;
-                          let increment = 1;
-                          const size = row.size?.toLowerCase() || '';
-                          if (size.includes('8oz')) increment = 60;
-                          else if (size.includes('quart')) increment = 12;
-                          else if (size.includes('gallon')) increment = 4;
-                          const newQty = Math.max(0, numQty - increment);
-                          manuallyEditedIndices.current.add(index);
-                          effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty }));
+                          
+                          // Bulk decrease if multiple products are selected
+                          if (nonTableSelectedIndices.size > 1 && nonTableSelectedIndices.has(index)) {
+                            effectiveSetQtyValues(prev => {
+                              const newValues = { ...prev };
+                              nonTableSelectedIndices.forEach(selectedIndex => {
+                                const selectedRow = currentRows.find(r => r._originalIndex === selectedIndex);
+                                if (selectedRow) {
+                                  const currentQty = newValues[selectedIndex] ?? 0;
+                                  const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
+                                  if (numQty <= 0) return;
+                                  
+                                  let increment = 1;
+                                  const size = selectedRow.size?.toLowerCase() || '';
+                                  if (size.includes('8oz')) increment = 60;
+                                  else if (size.includes('quart')) increment = 12;
+                                  else if (size.includes('gallon')) increment = 4;
+                                  
+                                  newValues[selectedIndex] = Math.max(0, numQty - increment);
+                                  manuallyEditedIndices.current.add(selectedIndex);
+                                }
+                              });
+                              return newValues;
+                            });
+                          } else {
+                            // Single product decrease
+                            const currentQty = effectiveQtyValues[index] ?? 0;
+                            const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
+                            if (numQty <= 0) return;
+                            let increment = 1;
+                            const size = row.size?.toLowerCase() || '';
+                            if (size.includes('8oz')) increment = 60;
+                            else if (size.includes('quart')) increment = 12;
+                            else if (size.includes('gallon')) increment = 4;
+                            const newQty = Math.max(0, numQty - increment);
+                            manuallyEditedIndices.current.add(index);
+                            effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty }));
+                          }
                         }}
                         style={{
                           position: 'absolute',
@@ -2551,16 +2708,42 @@ const NewShipmentTable = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          const currentQty = effectiveQtyValues[index] ?? 0;
-                          const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
-                          let increment = 1;
-                          const size = row.size?.toLowerCase() || '';
-                          if (size.includes('8oz')) increment = 60;
-                          else if (size.includes('quart')) increment = 12;
-                          else if (size.includes('gallon')) increment = 4;
-                          const newQty = numQty + increment;
-                          manuallyEditedIndices.current.add(index);
-                          effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty }));
+                          
+                          // Bulk increase if multiple products are selected
+                          if (nonTableSelectedIndices.size > 1 && nonTableSelectedIndices.has(index)) {
+                            effectiveSetQtyValues(prev => {
+                              const newValues = { ...prev };
+                              nonTableSelectedIndices.forEach(selectedIndex => {
+                                const selectedRow = currentRows.find(r => r._originalIndex === selectedIndex);
+                                if (selectedRow) {
+                                  const currentQty = newValues[selectedIndex] ?? 0;
+                                  const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
+                                  
+                                  let increment = 1;
+                                  const size = selectedRow.size?.toLowerCase() || '';
+                                  if (size.includes('8oz')) increment = 60;
+                                  else if (size.includes('quart')) increment = 12;
+                                  else if (size.includes('gallon')) increment = 4;
+                                  
+                                  newValues[selectedIndex] = numQty + increment;
+                                  manuallyEditedIndices.current.add(selectedIndex);
+                                }
+                              });
+                              return newValues;
+                            });
+                          } else {
+                            // Single product increase
+                            const currentQty = effectiveQtyValues[index] ?? 0;
+                            const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
+                            let increment = 1;
+                            const size = row.size?.toLowerCase() || '';
+                            if (size.includes('8oz')) increment = 60;
+                            else if (size.includes('quart')) increment = 12;
+                            else if (size.includes('gallon')) increment = 4;
+                            const newQty = numQty + increment;
+                            manuallyEditedIndices.current.add(index);
+                            effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty }));
+                          }
                         }}
                         style={{
                           position: 'absolute',
