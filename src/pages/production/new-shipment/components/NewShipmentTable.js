@@ -2395,7 +2395,25 @@ const NewShipmentTable = ({
                               onClick={async (e) => {
                                 e.stopPropagation();
                                 try {
-                                  await navigator.clipboard.writeText(asin);
+                                  // Try modern clipboard API first
+                                  if (navigator.clipboard && navigator.clipboard.writeText) {
+                                    await navigator.clipboard.writeText(asin);
+                                  } else {
+                                    // Fallback for non-secure contexts or older browsers
+                                    const textArea = document.createElement('textarea');
+                                    textArea.value = asin;
+                                    textArea.style.position = 'fixed';
+                                    textArea.style.left = '-999999px';
+                                    textArea.style.top = '-999999px';
+                                    document.body.appendChild(textArea);
+                                    textArea.focus();
+                                    textArea.select();
+                                    try {
+                                      document.execCommand('copy');
+                                    } finally {
+                                      document.body.removeChild(textArea);
+                                    }
+                                  }
                                   toast.success('ASIN copied to clipboard', {
                                     description: asin,
                                     duration: 2000,
