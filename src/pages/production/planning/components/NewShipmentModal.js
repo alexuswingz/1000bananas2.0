@@ -120,9 +120,9 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
           width: '600px',
           maxWidth: '90vw',
           borderRadius: '12px',
-          border: '1px solid #E5E7EB',
+          border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
           boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
-          backgroundColor: '#FFFFFF',
+          backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -130,17 +130,19 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
         <div
           style={{
             padding: '20px 24px',
-            borderBottom: '1px solid #E5E7EB',
+            borderBottom: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+            backgroundColor: isDarkMode ? '#111827' : '#F8F9FA',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            borderRadius: '12px 12px 0 0',
           }}
         >
           <h2
             style={{ 
               fontSize: '16px', 
               fontWeight: 600, 
-              color: '#111827',
+              color: isDarkMode ? '#FFFFFF' : '#111827',
               margin: 0,
             }}
           >
@@ -169,7 +171,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
             >
               <path
                 d="M6 6L18 18M18 6L6 18"
-                stroke="#9CA3AF"
+                stroke={isDarkMode ? '#9CA3AF' : '#ADB5BD'}
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -185,6 +187,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
             display: 'flex',
             flexDirection: 'column',
             gap: '20px',
+            backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
           }}
         >
           {/* Shipment Name */}
@@ -195,7 +198,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                 fontWeight: 500, 
                 display: 'block', 
                 marginBottom: '8px', 
-                color: '#374151' 
+                color: isDarkMode ? '#E5E7EB' : '#374151' 
               }}
             >
               Shipment Name<span style={{ color: '#EF4444' }}>*</span>
@@ -209,11 +212,11 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
               style={{
                 width: '100%',
                 padding: '10px 12px',
-                border: '1px solid #D1D5DB',
+                border: `1px solid ${isDarkMode ? '#374151' : '#D1D5DB'}`,
                 borderRadius: '6px',
                 fontSize: '14px',
-                color: '#6B7280',
-                backgroundColor: '#F9FAFB',
+                color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                backgroundColor: isDarkMode ? '#374151' : '#F9FAFB',
                 outline: 'none',
                 cursor: 'not-allowed',
               }}
@@ -228,7 +231,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                 fontWeight: 500, 
                 display: 'block', 
                 marginBottom: '8px', 
-                color: '#374151' 
+                color: isDarkMode ? '#E5E7EB' : '#374151' 
               }}
             >
               Shipment Type<span style={{ color: '#EF4444' }}>*</span>
@@ -243,12 +246,12 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '10px 12px',
-                  border: '1px solid #D1D5DB',
+                  border: `1px solid ${isDarkMode ? '#374151' : '#D1D5DB'}`,
                   borderRadius: '6px',
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
                   cursor: 'pointer',
                   fontSize: '14px',
-                  color: newShipment.shipmentType ? '#111827' : '#9CA3AF',
+                  color: newShipment.shipmentType ? (isDarkMode ? '#FFFFFF' : '#111827') : (isDarkMode ? '#9CA3AF' : '#9CA3AF'),
                   outline: 'none',
                 }}
               >
@@ -258,7 +261,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                   style={{ 
                     width: '16px', 
                     height: '16px', 
-                    color: '#9CA3AF',
+                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
                     flexShrink: 0,
                   }}
                   viewBox="0 0 24 24"
@@ -283,8 +286,8 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                     left: 0,
                     right: 0,
                     marginTop: '4px',
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid #D1D5DB',
+                    backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                    border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
                     borderRadius: '6px',
                     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
                     overflow: 'hidden',
@@ -304,13 +307,17 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                         textAlign: 'left',
                         padding: '10px 12px',
                         fontSize: '14px',
-                        color: '#111827',
-                        backgroundColor: newShipment.shipmentType === option ? '#F3F4F6' : '#FFFFFF',
+                        color: isDarkMode ? '#FFFFFF' : '#111827',
+                        backgroundColor: newShipment.shipmentType === option 
+                          ? (isDarkMode ? '#4B5563' : '#F3F4F6') 
+                          : (isDarkMode ? '#374151' : '#FFFFFF'),
                         border: 'none',
                         cursor: 'pointer',
                       }}
-                      onMouseEnter={(e) => e.target.style.backgroundColor = '#F3F4F6'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = newShipment.shipmentType === option ? '#F3F4F6' : '#FFFFFF'}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = isDarkMode ? '#4B5563' : '#F3F4F6'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = newShipment.shipmentType === option 
+                        ? (isDarkMode ? '#4B5563' : '#F3F4F6') 
+                        : (isDarkMode ? '#374151' : '#FFFFFF')}
                     >
                       {option}
                     </button>
@@ -328,7 +335,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                 fontWeight: 500, 
                 display: 'block', 
                 marginBottom: '8px', 
-                color: '#374151' 
+                color: isDarkMode ? '#E5E7EB' : '#374151' 
               }}
             >
               Marketplace<span style={{ color: '#EF4444' }}>*</span>
@@ -343,12 +350,12 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '10px 12px',
-                  border: '1px solid #D1D5DB',
+                  border: `1px solid ${isDarkMode ? '#374151' : '#D1D5DB'}`,
                   borderRadius: '6px',
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
                   cursor: 'pointer',
                   fontSize: '14px',
-                  color: newShipment.marketplace ? '#111827' : '#9CA3AF',
+                  color: newShipment.marketplace ? (isDarkMode ? '#FFFFFF' : '#111827') : (isDarkMode ? '#9CA3AF' : '#9CA3AF'),
                   outline: 'none',
                 }}
               >
@@ -358,7 +365,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                   style={{ 
                     width: '16px', 
                     height: '16px', 
-                    color: '#9CA3AF',
+                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
                     flexShrink: 0,
                   }}
                   viewBox="0 0 24 24"
@@ -383,8 +390,8 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                     left: 0,
                     right: 0,
                     marginTop: '4px',
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid #D1D5DB',
+                    backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                    border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
                     borderRadius: '6px',
                     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
                     overflow: 'hidden',
@@ -404,13 +411,17 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                         textAlign: 'left',
                         padding: '10px 12px',
                         fontSize: '14px',
-                        color: '#111827',
-                        backgroundColor: newShipment.marketplace === option ? '#F3F4F6' : '#FFFFFF',
+                        color: isDarkMode ? '#FFFFFF' : '#111827',
+                        backgroundColor: newShipment.marketplace === option 
+                          ? (isDarkMode ? '#4B5563' : '#F3F4F6') 
+                          : (isDarkMode ? '#374151' : '#FFFFFF'),
                         border: 'none',
                         cursor: 'pointer',
                       }}
-                      onMouseEnter={(e) => e.target.style.backgroundColor = '#F3F4F6'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = newShipment.marketplace === option ? '#F3F4F6' : '#FFFFFF'}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = isDarkMode ? '#4B5563' : '#F3F4F6'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = newShipment.marketplace === option 
+                        ? (isDarkMode ? '#4B5563' : '#F3F4F6') 
+                        : (isDarkMode ? '#374151' : '#FFFFFF')}
                     >
                       {option}
                     </button>
@@ -428,7 +439,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                 fontWeight: 500, 
                 display: 'block', 
                 marginBottom: '8px', 
-                color: '#374151' 
+                color: isDarkMode ? '#E5E7EB' : '#374151' 
               }}
             >
               Account<span style={{ color: '#EF4444' }}>*</span>
@@ -443,12 +454,12 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '10px 12px',
-                  border: '1px solid #D1D5DB',
+                  border: `1px solid ${isDarkMode ? '#374151' : '#D1D5DB'}`,
                   borderRadius: '6px',
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
                   cursor: 'pointer',
                   fontSize: '14px',
-                  color: newShipment.account ? '#111827' : '#9CA3AF',
+                  color: newShipment.account ? (isDarkMode ? '#FFFFFF' : '#111827') : (isDarkMode ? '#9CA3AF' : '#9CA3AF'),
                   outline: 'none',
                 }}
               >
@@ -458,7 +469,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                   style={{ 
                     width: '16px', 
                     height: '16px', 
-                    color: '#9CA3AF',
+                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
                     flexShrink: 0,
                   }}
                   viewBox="0 0 24 24"
@@ -483,8 +494,8 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                     left: 0,
                     right: 0,
                     marginTop: '4px',
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid #D1D5DB',
+                    backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                    border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
                     borderRadius: '6px',
                     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
                     overflow: 'hidden',
@@ -506,20 +517,22 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                         textAlign: 'left',
                         padding: '12px 14px',
                         fontSize: '14px',
-                        color: '#111827',
-                        backgroundColor: newShipment.account === option.name ? '#EBF5FF' : '#FFFFFF',
+                        color: isDarkMode ? '#FFFFFF' : '#111827',
+                        backgroundColor: newShipment.account === option.name 
+                          ? (isDarkMode ? '#1E40AF' : '#EBF5FF') 
+                          : (isDarkMode ? '#374151' : '#FFFFFF'),
                         border: 'none',
-                        borderBottom: '1px solid #F3F4F6',
+                        borderBottom: `1px solid ${isDarkMode ? '#4B5563' : '#F3F4F6'}`,
                         cursor: 'pointer',
                       }}
                       onMouseEnter={(e) => {
                         if (newShipment.account !== option.name) {
-                          e.currentTarget.style.backgroundColor = '#F9FAFB';
+                          e.currentTarget.style.backgroundColor = isDarkMode ? '#4B5563' : '#F9FAFB';
                         }
                       }}
                       onMouseLeave={(e) => {
                         if (newShipment.account !== option.name) {
-                          e.currentTarget.style.backgroundColor = '#FFFFFF';
+                          e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#FFFFFF';
                         }
                       }}
                     >
@@ -544,8 +557,8 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                               fontSize: '11px',
                               padding: '2px 6px',
                               borderRadius: '4px',
-                              backgroundColor: '#F3F4F6',
-                              color: '#6B7280',
+                              backgroundColor: isDarkMode ? '#4B5563' : '#F3F4F6',
+                              color: isDarkMode ? '#D1D5DB' : '#6B7280',
                             }}
                           >
                             {brand}
@@ -564,7 +577,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
         <div
           style={{
             padding: '16px 24px',
-            borderTop: '1px solid #E5E7EB',
+            borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
             display: 'flex',
             justifyContent: 'flex-end',
             gap: '12px',
@@ -576,11 +589,11 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
             style={{
               padding: '10px 20px',
               borderRadius: '6px',
-              border: '1px solid #D1D5DB',
-              backgroundColor: '#FFFFFF',
+              border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
+              backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
               fontSize: '14px',
               fontWeight: 500,
-              color: '#374151',
+              color: isDarkMode ? '#E5E7EB' : '#374151',
               cursor: 'pointer',
             }}
           >
@@ -605,7 +618,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                 !newShipment.shipmentType ||
                 !newShipment.marketplace ||
                 !newShipment.account
-                  ? '#9CA3AF'
+                  ? (isDarkMode ? '#4B5563' : '#9CA3AF')
                   : '#3B82F6',
               color: '#FFFFFF',
               cursor:
