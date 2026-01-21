@@ -2626,7 +2626,12 @@ const NewShipmentTable = ({
                               effectiveSetQtyValues(prev => ({ ...prev, [index]: numValue })); 
                             } 
                           } 
-                        }} 
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.target.blur(); // Remove focus after Enter
+                          }
+                        }}
                         onClick={(e) => e.stopPropagation()} 
                         style={{ 
                           width: '100%',
@@ -2912,20 +2917,12 @@ const NewShipmentTable = ({
                             e.preventDefault();
                             const labelsAvailable = getAvailableLabelsForRow(row, index);
                             
-                            // Round down to nearest case pack increment
-                            let increment = 1;
-                            const size = row.size?.toLowerCase() || '';
-                            if (size.includes('8oz')) increment = 60;
-                            else if (size.includes('quart')) increment = 12;
-                            else if (size.includes('gallon')) increment = 4;
-                            
-                            const maxQty = Math.floor(labelsAvailable / increment) * increment;
-                            
+                            // Use exact available quantity (no rounding)
                             // Mark as manually edited since user clicked "Use Available"
                             manuallyEditedIndices.current.add(index);
                             effectiveSetQtyValues(prev => ({
                               ...prev,
-                              [index]: maxQty
+                              [index]: labelsAvailable
                             }));
                             
                             setTimeout(() => setClickedQtyIndex(null), 100);
