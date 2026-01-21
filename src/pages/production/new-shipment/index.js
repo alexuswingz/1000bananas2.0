@@ -992,9 +992,44 @@ const NewShipment = () => {
       const isManuallyEdited = manuallyEditedIndicesRef.current?.has(index);
       
       if (addedRows.has(product.id) || isManuallyEdited) {
-        // Preserve the manually set or added quantity
-        if (qtyValues[index] !== undefined) {
-          newQtyValues[index] = qtyValues[index];
+        // For added or manually edited products, handle label limits intelligently
+        const currentQty = qtyValues[index] !== undefined ? qtyValues[index] : 0;
+        const newSuggestedQty = product.suggestedQty || 0;
+        
+        // Check if product has label limit
+        const labelLoc = product.label_location;
+        let availableLabels = null;
+        if (labelLoc && labelsAvailabilityMap[labelLoc]) {
+          // Get base available labels for this location
+          const baseAvailable = labelsAvailabilityMap[labelLoc]?.labels_available || 0;
+          
+          // Subtract labels used by OTHER products with same label_location in current shipment
+          const usedByOthers = products.reduce((sum, otherProduct, otherIdx) => {
+            if (otherIdx !== index && otherProduct.label_location === labelLoc) {
+              const otherQty = qtyValues[otherIdx] || 0;
+              return sum + (typeof otherQty === 'number' ? otherQty : parseInt(otherQty, 10) || 0);
+            }
+            return sum;
+          }, 0);
+          
+          availableLabels = Math.max(0, baseAvailable - usedByOthers);
+        }
+        
+        // Determine if DOI is increasing or decreasing
+        const isIncreasing = newSuggestedQty > currentQty;
+        
+        if (isIncreasing && availableLabels !== null) {
+          // DOI increased - cap at available labels to respect label limit
+          newQtyValues[index] = Math.min(newSuggestedQty, availableLabels);
+        } else if (!isIncreasing && newSuggestedQty < currentQty) {
+          // DOI decreased - update to the new lower value
+          newQtyValues[index] = newSuggestedQty;
+        } else if (isIncreasing && availableLabels === null) {
+          // DOI increased but no label limit - use new suggested quantity
+          newQtyValues[index] = newSuggestedQty;
+        } else {
+          // No change in DOI or other case - preserve current quantity
+          newQtyValues[index] = currentQty;
         }
       } else {
         // Use the TPS suggestedQty (which is based on units_to_make)
