@@ -2061,7 +2061,8 @@ const NewShipmentTable = ({
   };
 
   // Handle row click for multi-select (non-table mode)
-  const handleNonTableRowClick = (e, index) => {
+  // arrayIndex is the position in currentRows (0, 1, 2...), originalIndex is row._originalIndex for qty operations
+  const handleNonTableRowClick = (e, arrayIndex, originalIndex) => {
     // Don't handle selection if clicking on interactive elements
     if (e.target.closest('button') || e.target.closest('input')) {
       return;
@@ -2071,31 +2072,35 @@ const NewShipmentTable = ({
     const isCmdClick = e.metaKey || e.ctrlKey;
 
     if (isShiftClick && nonTableLastSelectedIndex !== null) {
-      // Shift + Click: Select range between lastSelectedIndex and current index
-      const start = Math.min(nonTableLastSelectedIndex, index);
-      const end = Math.max(nonTableLastSelectedIndex, index);
+      // Shift + Click: Select range between lastSelectedIndex and current arrayIndex
+      const start = Math.min(nonTableLastSelectedIndex, arrayIndex);
+      const end = Math.max(nonTableLastSelectedIndex, arrayIndex);
       const newSelected = new Set(nonTableSelectedIndices);
       
+      // Add all rows in the range by their array positions
       for (let i = start; i <= end; i++) {
-        newSelected.add(i);
+        if (i < currentRows.length) {
+          const rowAtPosition = currentRows[i];
+          newSelected.add(rowAtPosition._originalIndex);
+        }
       }
       
       setNonTableSelectedIndices(newSelected);
-      setNonTableLastSelectedIndex(index);
+      setNonTableLastSelectedIndex(arrayIndex);
     } else if (isCmdClick) {
       // Cmd/Ctrl + Click: Toggle selection of this item
       const newSelected = new Set(nonTableSelectedIndices);
-      if (newSelected.has(index)) {
-        newSelected.delete(index);
+      if (newSelected.has(originalIndex)) {
+        newSelected.delete(originalIndex);
       } else {
-        newSelected.add(index);
+        newSelected.add(originalIndex);
       }
       setNonTableSelectedIndices(newSelected);
-      setNonTableLastSelectedIndex(index);
+      setNonTableLastSelectedIndex(arrayIndex);
     } else {
       // Regular click: Select only this item
-      setNonTableSelectedIndices(new Set([index]));
-      setNonTableLastSelectedIndex(index);
+      setNonTableSelectedIndices(new Set([originalIndex]));
+      setNonTableLastSelectedIndex(arrayIndex);
     }
   };
 
@@ -2427,7 +2432,7 @@ const NewShipmentTable = ({
 
           {/* Product Rows */}
           <div>
-            {currentRows.map((row) => {
+            {currentRows.map((row, arrayIndex) => {
               const index = row._originalIndex;
               const effectiveAddedRows = addedRows;
               const doiValue = row.doiTotal || row.daysOfInventory || 0;
@@ -2439,7 +2444,7 @@ const NewShipmentTable = ({
               return (
                 <div
                   key={`${row.id}-${index}`}
-                  onClick={(e) => handleNonTableRowClick(e, index)}
+                  onClick={(e) => handleNonTableRowClick(e, arrayIndex, index)}
                   style={{
                     display: 'grid',
                     gridTemplateColumns: '1fr 140px 220px 140px',
