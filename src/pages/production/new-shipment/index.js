@@ -163,6 +163,12 @@ const NewShipment = () => {
   // Sort option for product table
   const [sortOption, setSortOption] = useState('doi'); // 'doi', 'qty', 'name'
   
+  // Track products with custom DOI settings (different from general)
+  const [customDoiSettings, setCustomDoiSettings] = useState({});
+  
+  // Track if DOI settings should open in modal
+  const [openDoiSettings, setOpenDoiSettings] = useState(false);
+  
   // Callback when DOI settings change from the popover
   const handleDoiSettingsChange = (newSettings, totalDoi) => {
     const prevSettings = doiSettingsValues;
@@ -1196,8 +1202,9 @@ const NewShipment = () => {
       .filter(formula => formula && formula.trim() !== '')
   ).size;
 
-  const handleProductClick = (row) => {
+  const handleProductClick = (row, shouldOpenDoiSettings = false) => {
     setSelectedRow(row);
+    setOpenDoiSettings(shouldOpenDoiSettings);
     setIsNgoosOpen(true);
   };
 
@@ -2228,6 +2235,7 @@ const NewShipment = () => {
                     labelsAvailabilityMap={labelsAvailabilityMap}
                     forecastRange={parseInt(forecastRange) || 120}
                     manuallyEditedIndicesRef={manuallyEditedIndicesRef}
+                    customDoiSettings={customDoiSettings}
                   />
                 )}
               </>
@@ -3230,11 +3238,13 @@ const NewShipment = () => {
         onClose={() => {
           setIsNgoosOpen(false);
           setSelectedRow(null);
+          setOpenDoiSettings(false);
         }}
         selectedRow={selectedRow}
         forecastRange={parseInt(forecastRange) || 150}
         doiSettings={doiSettingsValues}
         allProducts={filteredProducts}
+        openDoiSettings={openDoiSettings}
         onNavigate={(direction) => {
           if (!selectedRow || !filteredProducts || filteredProducts.length === 0) return;
           

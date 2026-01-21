@@ -25,9 +25,10 @@ const STORAGE_KEY = 'doi_default_settings';
 const DOISettingsPopover = ({ 
   onSettingsChange, 
   isDarkMode = true,
-  initialSettings = null 
+  initialSettings = null,
+  initialOpen = false 
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(initialOpen);
   const popoverRef = useRef(null);
   const buttonRef = useRef(null);
   

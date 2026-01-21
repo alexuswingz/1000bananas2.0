@@ -3,6 +3,17 @@ import { useTheme } from '../../../../context/ThemeContext';
 
 const ProductInfoModal = ({ isOpen, onClose, onBeginQC, productData }) => {
   const { isDarkMode } = useTheme();
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  React.useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 640);
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   if (!isOpen) return null;
 
@@ -26,6 +37,7 @@ const ProductInfoModal = ({ isOpen, onClose, onBeginQC, productData }) => {
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 1000,
+        padding: isMobile ? '12px' : '0',
       }}
       onClick={onClose}
     >
@@ -33,11 +45,13 @@ const ProductInfoModal = ({ isOpen, onClose, onBeginQC, productData }) => {
         className={themeClasses.modalBg}
         style={{
           borderRadius: '12px',
-          width: '580px',
-          maxWidth: '90vw',
+          width: isMobile ? '100%' : '580px',
+          maxWidth: isMobile ? '640px' : '90vw',
+          maxHeight: '90vh',
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
           display: 'flex',
           flexDirection: 'column',
+          overflow: 'hidden',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -59,7 +73,7 @@ const ProductInfoModal = ({ isOpen, onClose, onBeginQC, productData }) => {
             flexShrink: 0,
           }}
         >
-          <h2 className="text-white text-lg font-semibold">Product Info</h2>
+          <h2 className="text-white text-lg font-semibold">Product Information</h2>
           <button
             onClick={onClose}
             className="text-white hover:text-gray-300 transition-colors"
@@ -80,53 +94,65 @@ const ProductInfoModal = ({ isOpen, onClose, onBeginQC, productData }) => {
         </div>
 
         {/* Content */}
-        <div style={{ padding: '1.25rem', flex: 1, overflow: 'auto', display: 'flex', gap: '16px' }}>
-          {/* Product Image Container */}
-          <div
-            style={{
-              flexShrink: 0,
-              position: 'relative',
-              backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-              borderRadius: '8px',
-              border: '1px solid #E5E7EB',
-              padding: '12px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <img
-              src={productData?.productImage || '/assets/TPS_Cherry Tree_8oz_Wrap (1).png'}
-              alt={productData?.product || 'Product'}
+        <div
+          style={{
+            padding: isMobile ? '1rem' : '1.25rem',
+            flex: 1,
+            overflow: 'auto',
+            display: 'flex',
+            gap: '16px',
+            flexDirection: isMobile ? 'column' : 'row',
+          }}
+        >
+          {/* Product Image Container - First on desktop, second on mobile */}
+          {!isMobile && (
+            <div
               style={{
-                width: '100px',
-                height: '180px',
-                objectFit: 'contain',
-              }}
-            />
-            {/* Expand Icon */}
-            <button
-              style={{
-                position: 'absolute',
-                top: '8px',
-                right: '8px',
-                width: '24px',
-                height: '24px',
-                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                flexShrink: 0,
+                position: 'relative',
+                backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                borderRadius: '8px',
                 border: '1px solid #E5E7EB',
-                borderRadius: '4px',
+                padding: '12px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                cursor: 'pointer',
-                padding: 0,
+                width: '160px',
               }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2">
-                <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-              </svg>
-            </button>
-          </div>
+              <img
+                src={productData?.productImage || '/assets/TPS_Cherry Tree_8oz_Wrap (1).png'}
+                alt={productData?.product || 'Product'}
+                style={{
+                  width: '100px',
+                  height: '180px',
+                  objectFit: 'contain',
+                }}
+              />
+              {/* Expand Icon */}
+              <button
+                style={{
+                  position: 'absolute',
+                  top: '8px',
+                  right: '8px',
+                  width: '24px',
+                  height: '24px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  padding: 0,
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2">
+                  <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                </svg>
+              </button>
+            </div>
+          )}
 
           {/* Product Information Container */}
           <div
@@ -136,6 +162,9 @@ const ProductInfoModal = ({ isOpen, onClose, onBeginQC, productData }) => {
               gridTemplateColumns: '1fr 1fr',
               gap: '12px 16px',
               alignContent: 'start',
+              padding: isMobile ? '12px' : '0',
+              backgroundColor: isMobile ? (isDarkMode ? '#111827' : '#F3F4F6') : 'transparent',
+              borderRadius: isMobile ? '8px' : '0',
             }}
           >
             {/* Left Column */}
@@ -218,6 +247,57 @@ const ProductInfoModal = ({ isOpen, onClose, onBeginQC, productData }) => {
               </span>
             </div>
           </div>
+
+          {/* Product Image Container - Second on mobile */}
+          {isMobile && (
+            <div
+              style={{
+                flexShrink: 0,
+                position: 'relative',
+                backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                borderRadius: '8px',
+                border: '1px solid #E5E7EB',
+                padding: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '100%',
+                minHeight: '260px',
+              }}
+            >
+              <img
+                src={productData?.productImage || '/assets/TPS_Cherry Tree_8oz_Wrap (1).png'}
+                alt={productData?.product || 'Product'}
+                style={{
+                  width: '160px',
+                  height: '260px',
+                  objectFit: 'contain',
+                }}
+              />
+              {/* Expand Icon */}
+              <button
+                style={{
+                  position: 'absolute',
+                  top: '8px',
+                  right: '8px',
+                  width: '24px',
+                  height: '24px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  padding: 0,
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2">
+                  <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Footer */}

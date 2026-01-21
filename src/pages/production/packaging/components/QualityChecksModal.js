@@ -4,16 +4,43 @@ import { useTheme } from '../../../../context/ThemeContext';
 const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction }) => {
   const { isDarkMode } = useTheme();
   const [uploadedFile, setUploadedFile] = useState(null);
+  const [uploadedFileUrl, setUploadedFileUrl] = useState(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
+  const [qualityCheckImages, setQualityCheckImages] = useState([]);
   const uploadAreaRef = useRef(null);
+
+  // Detect mobile view
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 640);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Reset step when modal opens
   useEffect(() => {
     if (isOpen) {
       setCurrentStepIndex(0);
       setUploadedFile(null);
+      setQualityCheckImages([]);
+      if (uploadedFileUrl) {
+        URL.revokeObjectURL(uploadedFileUrl);
+        setUploadedFileUrl(null);
+      }
     }
   }, [isOpen]);
+
+  // Cleanup object URL when component unmounts
+  useEffect(() => {
+    return () => {
+      if (uploadedFileUrl) {
+        URL.revokeObjectURL(uploadedFileUrl);
+      }
+    };
+  }, [uploadedFileUrl]);
 
   if (!isOpen) return null;
 
@@ -102,12 +129,48 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
   };
 
   const allSteps = [
-    { id: 'formula', label: 'Formula Verifications', confirmationText: 'Confirm Correct Formula' },
-    { id: 'fillLevel', label: 'Fill Level', confirmationText: 'Confirm Fill Level' },
-    { id: 'seal', label: 'Proper Seal', confirmationText: 'Confirm Seal' },
-    { id: 'product', label: 'Finished Product', confirmationText: 'Confirm Product' },
-    { id: 'upcScan', label: 'UPC', confirmationText: 'Confirm UPC Scan' },
-    { id: 'boxSticker', label: 'Box Sticker', confirmationText: 'Confirm Box Sticker' },
+    { 
+      id: 'formula', 
+      label: 'Formula Verifications', 
+      confirmationText: 'Confirm Correct Formula',
+      description: 'Verify the correct fertilizer formula was used for this product and batch.',
+      icon: '/assets/basura.png'
+    },
+    { 
+      id: 'fillLevel', 
+      label: 'Fill Level', 
+      confirmationText: 'Confirm Fill Level',
+      description: 'Ensure each container is filled to the approved level by shining a light behind the bottle for clarity.',
+      icon: '/assets/level.png'
+    },
+    { 
+      id: 'seal', 
+      label: 'Proper Seal', 
+      confirmationText: 'Confirm Proper Seal',
+      description: 'Confirm all containers are properly sealed with no leaks, burns, or defects.',
+      icon: '/assets/seal.png'
+    },
+    { 
+      id: 'product', 
+      label: 'Finished Product', 
+      confirmationText: 'Confirm Finished Product',
+      description: 'Verify the product is fully finished, including proper labeling and cap tightness.',
+      icon: '/assets/TPS_Cherry Tree_8oz_Wrap (1).png'
+    },
+    { 
+      id: 'upcScan', 
+      label: 'UPC', 
+      confirmationText: 'Confirm UPC',
+      description: 'Confirm the correct UPC label is applied and scannable.',
+      icon: '/assets/scan.png'
+    },
+    { 
+      id: 'boxSticker', 
+      label: 'Box Sticker', 
+      confirmationText: 'Confirm Box Sticker',
+      description: 'Verify the correct box sticker is applied and legible on all cases.',
+      icon: '/assets/box.png'
+    },
   ];
 
   const steps = allSteps.map((step, index) => ({
@@ -120,11 +183,26 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
   const isLastStep = currentStepIndex === allSteps.length - 1;
 
   const handleContinue = () => {
+    // Store the uploaded image for current step
+    if (uploadedFileUrl) {
+      const newImages = [...qualityCheckImages];
+      newImages[currentStepIndex] = uploadedFileUrl;
+      setQualityCheckImages(newImages);
+    }
+    
+    // Cleanup uploaded file URL
+    if (uploadedFileUrl) {
+      URL.revokeObjectURL(uploadedFileUrl);
+      setUploadedFileUrl(null);
+    }
+    
     if (isLastStep) {
-      // Close QC modal and open Production Started modal
+      // Close QC modal and open Production Started modal with images
+      setUploadedFile(null);
       onClose();
       if (onStartProduction) {
-        onStartProduction();
+        // Pass quality check images to production started modal
+        onStartProduction(qualityCheckImages);
       }
     } else {
       setCurrentStepIndex((prev) => prev + 1);
@@ -135,7 +213,12 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      // Cleanup previous URL if exists
+      if (uploadedFileUrl) {
+        URL.revokeObjectURL(uploadedFileUrl);
+      }
       setUploadedFile(file);
+      setUploadedFileUrl(URL.createObjectURL(file));
     }
   };
 
@@ -151,6 +234,333 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
     e.preventDefault();
   };
 
+  // Mobile Layout
+  if (isMobile) {
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: '#F3F4F6',
+          zIndex: 1000,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'auto',
+        }}
+      >
+        {/* Mobile Header */}
+        <div
+          style={{
+            backgroundColor: '#F9FAFB',
+            padding: '12px 16px',
+            borderBottom: '1px solid #E5E7EB',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexShrink: 0,
+          }}
+        >
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth={2}>
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', margin: 0 }}>
+            Quality Check
+          </h2>
+          <div style={{ position: 'relative', minWidth: '120px' }}>
+            <select
+              value={currentStepIndex}
+              onChange={(e) => {
+                setCurrentStepIndex(Number(e.target.value));
+                setUploadedFile(null);
+              }}
+              style={{
+                width: '100%',
+                padding: '6px 24px 6px 8px',
+                fontSize: '12px',
+                fontWeight: '500',
+                color: '#374151',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #D1D5DB',
+                borderRadius: '6px',
+                appearance: 'none',
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+            >
+              {allSteps.map((step, index) => {
+                const prefix = `${index + 1}. `;
+                const maxLabelLength = 10;
+                const truncatedLabel = step.label.length > maxLabelLength 
+                  ? step.label.substring(0, maxLabelLength) + '...' 
+                  : step.label;
+                return (
+                  <option key={step.id} value={index}>
+                    {prefix}{truncatedLabel}
+                  </option>
+                );
+              })}
+            </select>
+            <svg
+              style={{
+                position: 'absolute',
+                right: '8px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                pointerEvents: 'none',
+                width: '12px',
+                height: '12px',
+              }}
+              viewBox="0 0 12 12"
+              fill="none"
+            >
+              <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+        </div>
+
+        {/* Mobile Content */}
+        <div style={{ flex: 1, padding: '16px', display: 'flex', flexDirection: 'column' }}>
+          {/* Step Indicator */}
+          <div style={{ marginBottom: '12px' }}>
+            <span style={{ fontSize: '12px', fontWeight: '600', color: '#3B82F6', letterSpacing: '0.05em' }}>
+              STEP {currentStepIndex + 1} OF {allSteps.length}:
+            </span>
+          </div>
+
+          {/* Instruction with Formula */}
+          <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <p style={{ fontSize: '14px', fontWeight: '400', margin: 0, color: '#374151' }}>
+              {currentStep.id === 'formula' && productData?.formula 
+                ? (
+                  <>
+                    Confirm Correct Formula: <span style={{ color: '#3B82F6', fontWeight: '600' }}>{productData.formula}</span>
+                  </>
+                )
+                : currentStep.confirmationText
+              }
+            </p>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              style={{ flexShrink: 0 }}
+            >
+              <circle cx="8" cy="8" r="7" fill="#9CA3AF" />
+              <path
+                d="M8 4.5V8.5M8 11.5H8.01"
+                stroke="white"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+
+          {/* Progress Bar */}
+          <div
+            style={{
+              width: '100%',
+              height: '4px',
+              backgroundColor: '#E5E7EB',
+              borderRadius: '2px',
+              marginBottom: '24px',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                width: `${((currentStepIndex + 1) / allSteps.length) * 100}%`,
+                height: '100%',
+                backgroundColor: '#3B82F6',
+                transition: 'width 0.3s ease',
+              }}
+            />
+          </div>
+
+          {/* White Card */}
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '12px',
+              border: '2px dashed #D1D5DB',
+              padding: '32px 16px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flex: 1,
+              minHeight: '400px',
+              gap: '16px',
+            }}
+          >
+            {/* Show uploaded image preview or step icon */}
+            {uploadedFile && uploadedFileUrl ? (
+              <div style={{ width: '100%', maxWidth: '280px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+                <img
+                  src={uploadedFileUrl}
+                  alt="Uploaded"
+                  style={{
+                    width: '100%',
+                    maxHeight: '300px',
+                    objectFit: 'contain',
+                    borderRadius: '8px',
+                    border: '1px solid #E5E7EB',
+                  }}
+                />
+                <p style={{ fontSize: '14px', color: '#22C55E', fontWeight: '500', margin: 0 }}>
+                  ✓ Image uploaded successfully
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Step Icon */}
+                <img
+                  src={currentStep.icon}
+                  alt={currentStep.label}
+                  style={{
+                    width: '120px',
+                    height: '120px',
+                    objectFit: 'contain',
+                  }}
+                />
+
+                {/* Title */}
+                <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#111827', margin: 0, textAlign: 'center' }}>
+                  {currentStep.confirmationText}
+                </h3>
+
+                {/* Description */}
+                <p style={{ fontSize: '14px', color: '#6B7280', margin: 0, textAlign: 'center', maxWidth: '280px' }}>
+                  {currentStep.description}
+                </p>
+
+                {/* Take Image Button */}
+                <button
+                  onClick={() => document.getElementById('mobile-camera-upload').click()}
+                  style={{
+                    width: '100%',
+                    maxWidth: '280px',
+                    padding: '12px 24px',
+                    backgroundColor: '#3B82F6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    transition: 'background-color 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#2563EB';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#3B82F6';
+                  }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                  </svg>
+                  Take Image
+                </button>
+
+                {/* Upload from Gallery Link */}
+                <button
+                  onClick={() => document.getElementById('mobile-gallery-upload').click()}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#3B82F6',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                    padding: '4px',
+                  }}
+                >
+                  or Upload from Gallery
+                </button>
+              </>
+            )}
+
+            {/* Camera input - opens camera directly on mobile */}
+            <input
+              id="mobile-camera-upload"
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleFileChange}
+              style={{ display: 'none' }}
+            />
+
+            {/* Gallery input - opens file picker/gallery */}
+            <input
+              id="mobile-gallery-upload"
+              type="file"
+              accept="image/jpeg,image/png"
+              onChange={handleFileChange}
+              style={{ display: 'none' }}
+            />
+
+            {/* Use Image Button - shown after image is uploaded */}
+            {uploadedFile && (
+              <button
+                onClick={handleContinue}
+                style={{
+                  width: '100%',
+                  maxWidth: '280px',
+                  padding: '12px 24px',
+                  backgroundColor: '#22C55E',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  transition: 'background-color 0.2s ease',
+                  marginTop: '8px',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#16A34A';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#22C55E';
+                }}
+              >
+                {isLastStep ? 'Start Production' : 'Use Image'}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop Layout
   return (
     <div
       style={{

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../context/ThemeContext';
 import { toast } from 'sonner';
 import MobileHeader from '../../components/MobileHeader';
+import Sidebar from '../../components/Sidebar';
 import PackagingHeader from './packaging/components/PackagingHeader';
 import PackagingTable from './packaging/components/PackagingTable';
 import PackagingArchiveTable from './packaging/components/PackagingArchiveTable';
@@ -34,6 +35,8 @@ const Packaging = () => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isSortMode, setIsSortMode] = useState(false);
   const [isFromUnmarkShiners, setIsFromUnmarkShiners] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   // Sample data - initialize with packaging products
   const [products, setProducts] = useState([
@@ -99,6 +102,15 @@ const Packaging = () => {
     textSecondary: isDarkMode ? 'text-dark-text-secondary' : 'text-gray-600',
   };
 
+  // Handle window resize for mobile detection
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const subTabs = [
     { id: 'all', label: 'All', count: 88 },
     { id: 'bottling', label: 'Bottling', count: 12 },
@@ -142,10 +154,16 @@ const Packaging = () => {
     }
   };
 
-  const handleStartProduction = () => {
+  const [qualityCheckImages, setQualityCheckImages] = useState([]);
+
+  const handleStartProduction = (images) => {
     // Close all other modals
     setShowQualityChecksModal(false);
     setShowProductInfoModal(false);
+    // Store quality check images
+    if (images) {
+      setQualityCheckImages(images);
+    }
     // Open Production Started modal
     setShowProductionStartedModal(true);
   };
@@ -468,7 +486,7 @@ const Packaging = () => {
     <div className={`min-h-screen ${themeClasses.pageBg}`}>
       {/* Mobile Header - Only visible on mobile */}
       <div className="md:hidden">
-        <MobileHeader />
+        <MobileHeader onMenuClick={() => setIsSidebarOpen(true)} />
       </div>
       
       {/* Packaging Header - Has both desktop and mobile layouts inside */}
@@ -766,6 +784,7 @@ const Packaging = () => {
         onMarkDone={handleMarkDone}
         onLogUnitsClick={handleLogUnitsClick}
         onImageClick={handleImageClick}
+        qualityCheckImages={qualityCheckImages}
       />
 
       {/* Log Units Produced Modal */}
@@ -812,6 +831,99 @@ const Packaging = () => {
         onClose={() => setShowClosingReportHistory(false)}
         onViewReport={handleViewReportFromHistory}
       />
+
+      {/* Mobile Sidebar Overlay */}
+      {isMobile && isSidebarOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            onClick={() => setIsSidebarOpen(false)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 9998,
+            }}
+          />
+          {/* Sidebar Drawer */}
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              bottom: 0,
+              width: '280px',
+              backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+              zIndex: 9999,
+              boxShadow: '2px 0 8px rgba(0, 0, 0, 0.15)',
+              transform: isSidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
+              transition: 'transform 0.3s ease',
+              overflowY: 'auto',
+            }}
+          >
+            {/* Close Button */}
+            <div
+              style={{
+                padding: '12px 16px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderBottom: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    backgroundColor: '#9333EA',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <span style={{ color: '#FCD34D', fontSize: '20px', fontWeight: 'bold' }}>🍌</span>
+                </div>
+                <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#FCD34D' }}>
+                  1000 Bananas
+                </span>
+              </div>
+              <button
+                onClick={() => setIsSidebarOpen(false)}
+                style={{
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={isDarkMode ? '#FFFFFF' : '#374151'}
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+            {/* Sidebar Content */}
+            <Sidebar forceMobile={true} />
+          </div>
+        </>
+      )}
     </div>
   );
 };

@@ -208,30 +208,32 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
     switch (normalizedStatus) {
       case 'pending':
         if (isAddProducts) {
-          circleColor = '#93C5FD'; // Light blue for addProducts pending
+          circleColor = '#3B82F6'; // Blue filled for addProducts pending (in progress)
           borderStyle = 'none';
         } else {
-          circleColor = '#FFFFFF'; // White/transparent
-          borderStyle = '1px solid #D1D5DB'; // Light gray outline
+          circleColor = 'transparent'; // Transparent for pending
+          borderStyle = '1px solid #FFFFFF'; // White outline
         }
         break;
       case 'in progress':
-        circleColor = '#3B82F6'; // Blue for in progress
+        circleColor = '#3B82F6'; // Blue filled for in progress
+        borderStyle = 'none';
         break;
       case 'completed':
-        circleColor = '#10B981'; // Green for completed (all statuses)
+        circleColor = '#10B981'; // Green filled for completed
+        borderStyle = 'none';
         break;
       case 'incomplete':
-        circleColor = '#F59E0B'; // Orange for incomplete
+        circleColor = '#F59E0B'; // Orange filled for incomplete
         borderStyle = 'none';
         break;
       default:
         if (isAddProducts) {
-          circleColor = '#93C5FD'; // Light blue for addProducts default
+          circleColor = '#3B82F6'; // Blue filled for addProducts default
           borderStyle = 'none';
         } else {
-          circleColor = '#FFFFFF'; // Default to white (Pending)
-          borderStyle = '1px solid #D1D5DB'; // Light gray outline
+          circleColor = 'transparent'; // Default to transparent (Pending)
+          borderStyle = '1px solid #FFFFFF'; // White outline
         }
     }
 
@@ -313,12 +315,11 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
           style={{
             width: '20px',
             height: '20px',
-            borderRadius: '20px',
+            borderRadius: '50%',
             backgroundColor: circleColor,
             border: borderStyle,
             display: 'inline-block',
             position: 'relative',
-            padding: '3px',
             boxSizing: 'border-box',
           }}
         >
@@ -798,7 +799,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         return (b.id || 0) - (a.id || 0);
       });
       
-      // Combine: sorted rows first, then new rows
+      // Combine: sorted rows first, then new rows (newest first)
       filteredRows = [...orderedRows, ...remainingRows];
     } else if (sortConfig.field && sortConfig.order) {
       // If sort config exists but no stored order, apply sorting (shouldn't happen normally, but fallback)
@@ -855,7 +856,39 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
     fetchProducts();
   }, []);
 
+  // Clear sorted order when new shipments are added and ensure they're visible
+  const prevRowsRef = useRef(rows);
+  const tableContainerRef = useRef(null);
+  useEffect(() => {
+    const prevRowIds = new Set(prevRowsRef.current.map(r => r.id));
+    
+    // Check if there are new rows (rows in current but not in previous)
+    const hasNewRows = rows.some(row => !prevRowIds.has(row.id));
+    
+    if (hasNewRows) {
+      // Clear sorted order and sort config when new shipments are added so they appear with default sort (newest first)
+      setSortedRowOrder(null);
+      setSortConfig({ field: '', order: '' });
+      
+      // Scroll to top to show new shipment
+      if (tableContainerRef.current) {
+        tableContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+    
+    prevRowsRef.current = rows;
+  }, [rows]);
+
   const displayRows = getFilteredAndSortedRows();
+  
+  // Debug: Log row count and new shipments
+  useEffect(() => {
+    console.log('Total rows:', rows.length, 'Display rows:', displayRows.length);
+    if (rows.length > 0) {
+      console.log('First row:', rows[0]);
+      console.log('First display row:', displayRows[0]);
+    }
+  }, [rows, displayRows]);
 
   // Calculate card values from rows data
   const calculateCardValues = () => {
@@ -1165,21 +1198,31 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
       </div>
 
       <div
-        className={`${themeClasses.cardBg} ${themeClasses.border} border rounded-xl`}
-        style={{ overflowX: 'hidden', position: 'relative' }}
+        ref={tableContainerRef}
+        className="border rounded-xl"
+        style={{ 
+          overflowX: 'hidden',
+          overflowY: 'visible',
+          position: 'relative',
+          backgroundColor: '#111827',
+          borderColor: '#111827',
+          borderWidth: '1px',
+          borderStyle: 'solid',
+          minHeight: 'auto',
+        }}
       >
         {/* Table with 100% width to fit container */}
-        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed' }}>
-        <thead className={themeClasses.headerBg}>
-          <tr>
+        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'auto', display: 'table' }}>
+        <thead style={{ backgroundColor: '#111827' }}>
+          <tr style={{ borderBottom: '1px solid #374151', height: 'auto' }}>
             <th
-              className="text-left text-xs font-bold text-white uppercase tracking-wider group cursor-pointer"
+              className="text-center text-xs font-bold text-white uppercase tracking-wider group cursor-pointer"
               style={{
-                padding: '0.75rem 1rem',
-                width: '15%',
-                height: '40px',
-                backgroundColor: '#1C2634',
-                borderRight: `1px solid ${columnBorderColor}`,
+                padding: '1rem 1rem',
+                width: '11%',
+                height: 'auto',
+                backgroundColor: '#111827',
+                borderRight: 'none',
                 boxSizing: 'border-box',
               }}
             >
@@ -1187,11 +1230,11 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'space-between',
+                  justifyContent: 'center',
                   gap: '0.5rem',
                 }}
               >
-                <span style={{ color: (isFilterActive('status') || openFilterColumn === 'status') ? '#007AFF' : '#FFFFFF' }}>
+                <span style={{ color: (isFilterActive('status') || openFilterColumn === 'status') ? '#007AFF' : '#9CA3AF' }}>
                   STATUS
                 </span>
                 <img
@@ -1216,13 +1259,13 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
               </div>
             </th>
             <th
-              className="text-left text-xs font-bold text-white uppercase tracking-wider group cursor-pointer"
+              className="text-center text-xs font-bold text-white uppercase tracking-wider group cursor-pointer"
               style={{
-                padding: '0.75rem 1rem',
-                width: '15%',
-                height: '40px',
-                backgroundColor: '#1C2634',
-                borderRight: `1px solid ${columnBorderColor}`,
+                padding: '1rem 1rem',
+                width: '13%',
+                height: 'auto',
+                backgroundColor: '#111827',
+                borderRight: 'none',
                 boxSizing: 'border-box',
               }}
             >
@@ -1230,11 +1273,11 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'space-between',
+                  justifyContent: 'center',
                   gap: '0.5rem',
                 }}
               >
-                <span style={{ color: (isFilterActive('shipment') || openFilterColumn === 'shipment') ? '#007AFF' : '#FFFFFF' }}>
+                <span style={{ color: (isFilterActive('shipment') || openFilterColumn === 'shipment') ? '#007AFF' : '#9CA3AF' }}>
                   SHIPMENT
                 </span>
                 <img
@@ -1259,13 +1302,13 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
               </div>
             </th>
             <th
-              className="text-left text-xs font-bold text-white uppercase tracking-wider group cursor-pointer"
+              className="text-center text-xs font-bold text-white uppercase tracking-wider group cursor-pointer"
               style={{
-                padding: '0.75rem 1rem',
-                width: '12%',
-                height: '40px',
-                backgroundColor: '#1C2634',
-                borderRight: `1px solid ${columnBorderColor}`,
+                padding: '1rem 1rem',
+                width: '8%',
+                height: 'auto',
+                backgroundColor: '#111827',
+                borderRight: 'none',
                 boxSizing: 'border-box',
               }}
             >
@@ -1273,41 +1316,40 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'space-between',
+                  justifyContent: 'center',
                   gap: '0.5rem',
                 }}
               >
-                <span style={{ color: (isFilterActive('marketplace') || openFilterColumn === 'marketplace') ? '#007AFF' : '#FFFFFF' }}>
-                  MARKETPLACE
+                <span style={{ color: (isFilterActive('marketplace') || openFilterColumn === 'marketplace') ? '#007AFF' : '#9CA3AF' }}>
+                  TYPE
                 </span>
-                <img
+                <svg
                   ref={(el) => { if (el) filterIconRefs.current['marketplace'] = el; }}
-                  src="/assets/Vector (1).png"
-                  alt="Filter"
-                  className={`w-3 h-3 transition-opacity cursor-pointer ${
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={(isFilterActive('marketplace') || openFilterColumn === 'marketplace') ? '#007AFF' : '#9CA3AF'}
+                  strokeWidth="2"
+                  className={`transition-opacity cursor-pointer ${
                     (isFilterActive('marketplace') || openFilterColumn === 'marketplace')
                       ? 'opacity-100'
                       : 'opacity-0 group-hover:opacity-100'
                   }`}
                   onClick={(e) => handleFilterClick('marketplace', e)}
-                  style={
-                    (isFilterActive('marketplace') || openFilterColumn === 'marketplace')
-                      ? {
-                          filter:
-                            'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
-                        }
-                      : undefined
-                  }
-                />
+                  style={{ cursor: 'pointer' }}
+                >
+                  <path d="M5 15l7-7 7 7" />
+                </svg>
               </div>
             </th>
             <th
-              className="text-left text-xs font-bold text-white uppercase tracking-wider group cursor-pointer"
+              className="text-center text-xs font-bold text-white uppercase tracking-wider group cursor-pointer"
               style={{
-                padding: '0.75rem 1rem',
-                width: '12%',
-                height: '40px',
-                borderRight: `1px solid ${columnBorderColor}`,
+                padding: '1rem 1rem',
+                width: '14%',
+                height: 'auto',
+                borderRight: 'none',
                 boxSizing: 'border-box',
               }}
             >
@@ -1315,11 +1357,11 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'space-between',
+                  justifyContent: 'center',
                   gap: '0.5rem',
                 }}
               >
-                <span style={{ color: (isFilterActive('account') || openFilterColumn === 'account') ? '#007AFF' : '#FFFFFF' }}>
+                <span style={{ color: (isFilterActive('account') || openFilterColumn === 'account') ? '#007AFF' : '#9CA3AF' }}>
                   ACCOUNT
                 </span>
                 <img
@@ -1352,19 +1394,19 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                 }
               }}
               style={{
-                padding: '0.5rem 1rem',
-                width: '12%',
-                height: '40px',
-                backgroundColor: '#1C2634',
-                borderRight: `1px solid #FFFFFF`,
+                padding: '1rem 0.75rem',
+                width: '9%',
+                height: 'auto',
+                backgroundColor: '#111827',
+                borderRight: 'none',
                 boxSizing: 'border-box',
                 position: 'relative',
-                color: (isFilterActive('addProducts') || openFilterColumn === 'addProducts') ? '#007AFF' : '#FFFFFF',
+                color: (isFilterActive('addProducts') || openFilterColumn === 'addProducts') ? '#007AFF' : '#9CA3AF',
               }}
             >
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.1', gap: '1px' }}>
-                <span style={{ fontSize: '9px', fontWeight: 600, color: (isFilterActive('addProducts') || openFilterColumn === 'addProducts') ? '#007AFF' : '#FFFFFF' }}>ADD</span>
-                <span style={{ fontSize: '9px', fontWeight: 600, color: (isFilterActive('addProducts') || openFilterColumn === 'addProducts') ? '#007AFF' : '#FFFFFF' }}>PRODUCTS</span>
+                <span style={{ fontSize: '9px', fontWeight: 600, color: (isFilterActive('addProducts') || openFilterColumn === 'addProducts') ? '#007AFF' : '#9CA3AF' }}>ADD</span>
+                <span style={{ fontSize: '9px', fontWeight: 600, color: (isFilterActive('addProducts') || openFilterColumn === 'addProducts') ? '#007AFF' : '#9CA3AF' }}>PRODUCTS</span>
               </div>
               <img
                 ref={(el) => { if (el) filterIconRefs.current['addProducts'] = el; }}
@@ -1393,18 +1435,18 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
             <th
               className="text-center text-white uppercase tracking-wider group cursor-pointer"
               style={{
-                padding: '0.5rem 1rem',
-                width: '12%',
-                height: '40px',
-                backgroundColor: '#1C2634',
-                borderRight: `1px solid #FFFFFF`,
+                padding: '1rem 0.75rem',
+                width: '9%',
+                height: 'auto',
+                backgroundColor: '#111827',
+                borderRight: 'none',
                 boxSizing: 'border-box',
                 position: 'relative',
               }}
             >
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.1', gap: '1px' }}>
-                <span style={{ fontSize: '9px', fontWeight: 600 }}>LABEL</span>
-                <span style={{ fontSize: '9px', fontWeight: 600 }}>CHECK</span>
+                <span style={{ fontSize: '9px', fontWeight: 600, color: '#9CA3AF' }}>LABEL</span>
+                <span style={{ fontSize: '9px', fontWeight: 600, color: '#9CA3AF' }}>CHECK</span>
               </div>
                 <img
                 ref={(el) => { if (el) filterIconRefs.current['labelCheck'] = el; }}
@@ -1433,18 +1475,18 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
             <th
               className="text-center text-white uppercase tracking-wider group cursor-pointer"
               style={{
-                padding: '0.5rem 1rem',
-                width: '12%',
-                height: '40px',
-                backgroundColor: '#1C2634',
-                borderRight: `1px solid #FFFFFF`,
+                padding: '1rem 0.75rem',
+                width: '9%',
+                height: 'auto',
+                backgroundColor: '#111827',
+                borderRight: 'none',
                 boxSizing: 'border-box',
                 position: 'relative',
               }}
             >
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.1', gap: '1px' }}>
-                <span style={{ fontSize: '9px', fontWeight: 600 }}>FORMULA</span>
-                <span style={{ fontSize: '9px', fontWeight: 600 }}>CHECK</span>
+                <span style={{ fontSize: '9px', fontWeight: 600, color: '#9CA3AF' }}>FORMULA</span>
+                <span style={{ fontSize: '9px', fontWeight: 600, color: '#9CA3AF' }}>CHECK</span>
               </div>
                 <img
                 ref={(el) => { if (el) filterIconRefs.current['formulaCheck'] = el; }}
@@ -1473,18 +1515,18 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
             <th
               className="text-center text-white uppercase tracking-wider group cursor-pointer"
               style={{
-                padding: '0.5rem 1rem',
-                width: '12%',
-                height: '40px',
-                backgroundColor: '#1C2634',
-                borderRight: `1px solid #FFFFFF`,
+                padding: '1rem 0.75rem',
+                width: '9%',
+                height: 'auto',
+                backgroundColor: '#111827',
+                borderRight: 'none',
                 boxSizing: 'border-box',
                 position: 'relative',
               }}
             >
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.1', gap: '1px' }}>
-                <span style={{ fontSize: '9px', fontWeight: 600 }}>BOOK</span>
-                <span style={{ fontSize: '9px', fontWeight: 600 }}>SHIPMENT</span>
+                <span style={{ fontSize: '9px', fontWeight: 600, color: '#9CA3AF' }}>BOOK</span>
+                <span style={{ fontSize: '9px', fontWeight: 600, color: '#9CA3AF' }}>SHIPMENT</span>
               </div>
                 <img
                 ref={(el) => { if (el) filterIconRefs.current['bookShipment'] = el; }}
@@ -1513,18 +1555,18 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
             <th
               className="text-center text-white uppercase tracking-wider group cursor-pointer"
               style={{
-                padding: '0.5rem 1rem',
-                width: '12%',
-                height: '40px',
-                backgroundColor: '#1C2634',
-                borderRight: `1px solid #FFFFFF`,
+                padding: '1rem 0.75rem',
+                width: '9%',
+                height: 'auto',
+                backgroundColor: '#111827',
+                borderRight: 'none',
                 boxSizing: 'border-box',
                 position: 'relative',
               }}
             >
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.1', gap: '1px' }}>
-                <span style={{ fontSize: '9px', fontWeight: 600 }}>SORT</span>
-                <span style={{ fontSize: '9px', fontWeight: 600 }}>PRODUCTS</span>
+                <span style={{ fontSize: '9px', fontWeight: 600, color: '#9CA3AF' }}>SORT</span>
+                <span style={{ fontSize: '9px', fontWeight: 600, color: '#9CA3AF' }}>PRODUCTS</span>
               </div>
                 <img
                 ref={(el) => { if (el) filterIconRefs.current['sortProducts'] = el; }}
@@ -1553,17 +1595,17 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
             <th
               className="text-center text-white uppercase tracking-wider group cursor-pointer"
               style={{
-                padding: '0.5rem 1rem',
-                width: '12%',
-                height: '40px',
-                backgroundColor: '#1C2634',
+                padding: '1rem 0.75rem',
+                width: '9%',
+                height: 'auto',
+                backgroundColor: '#111827',
                 boxSizing: 'border-box',
                 position: 'relative',
               }}
             >
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.1', gap: '1px' }}>
-                <span style={{ fontSize: '9px', fontWeight: 600 }}>SORT</span>
-                <span style={{ fontSize: '9px', fontWeight: 600 }}>FORMULAS</span>
+                <span style={{ fontSize: '9px', fontWeight: 600, color: '#9CA3AF' }}>SORT</span>
+                <span style={{ fontSize: '9px', fontWeight: 600, color: '#9CA3AF' }}>FORMULAS</span>
               </div>
                 <img
                 ref={(el) => { if (el) filterIconRefs.current['sortFormulas'] = el; }}
@@ -1589,49 +1631,42 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                 }}
                 />
             </th>
-            <th
-              className="text-center text-white uppercase tracking-wider"
-              style={{
-                padding: '0.5rem 1rem',
-                width: '40px',
-                height: '40px',
-                backgroundColor: '#1C2634',
-                boxSizing: 'border-box',
-              }}
-            >
-            </th>
           </tr>
         </thead>
         <tbody
-          className="divide-y"
-          style={{ borderColor: isDarkMode ? 'rgba(75, 85, 99, 0.3)' : '#f3f4f6' }}
+          style={{ borderColor: '#374151', display: 'table-row-group' }}
         >
-          {displayRows.map((row) => (
-            <tr
-              key={row.id}
-              onClick={(e) => {
-                // Don't navigate if clicking on label check cell
-                if (e.target.closest('td') && e.target.closest('td').getAttribute('data-label-check-cell')) {
-                  return;
-                }
-                if (onRowClick) onRowClick(row);
-              }}
-              style={{
-                backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
-                height: '40px',
-                cursor: 'pointer',
-              }}
-              className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            >
-              <td
-                style={{
-                  padding: '0.75rem 1rem',
-                  verticalAlign: 'middle',
-                  backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
-                  borderTop: '1px solid #E5E7EB',
-                  height: '40px',
+          {displayRows.map((row, index) => (
+            <React.Fragment key={row.id || row.shipment || `row-${index}`}>
+              <tr
+                onClick={(e) => {
+                  // Don't navigate if clicking on label check cell
+                  if (e.target.closest('td') && e.target.closest('td').getAttribute('data-label-check-cell')) {
+                    return;
+                  }
+                  if (onRowClick) onRowClick(row);
                 }}
+                style={{
+                  backgroundColor: '#111827',
+                  height: 'auto',
+                  minHeight: '40px',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  display: 'table-row',
+                }}
+                className="hover:bg-gray-800 transition-colors"
               >
+                <td
+                  style={{
+                    padding: '0.75rem 1.25rem',
+                    verticalAlign: 'middle',
+                    backgroundColor: '#111827',
+                    borderTop: 'none',
+                    height: 'auto',
+                    minHeight: '40px',
+                    display: 'table-cell',
+                  }}
+                >
                 <div
                   style={{
                     display: 'inline-flex',
@@ -1639,13 +1674,20 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                     gap: '8px',
                     padding: '4px 12px',
                     borderRadius: '4px',
-                    border: '1px solid #E5E7EB',
-                    backgroundColor: '#FFFFFF',
+                    border: 'none',
+                    backgroundColor: '#374151',
                     minWidth: '137px',
                     width: '100%',
                     maxWidth: '171.5px',
                     height: '24px',
                     boxSizing: 'border-box',
+                    cursor: 'pointer',
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onStatusClick) {
+                      onStatusClick(row, 'status');
+                    }
                   }}
                 >
                   {renderStatusIcon(row.status)}
@@ -1653,16 +1695,16 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                     style={{ 
                       fontSize: '0.875rem', 
                       fontWeight: 500, 
-                      color: '#151515',
+                      color: '#FFFFFF',
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    {row.status || 'Packaging'}
+                    {row.status || 'Planning'}
                   </span>
                   <svg
                     style={{ width: '0.85rem', height: '0.85rem', marginLeft: 'auto' }}
                     fill="none"
-                    stroke="#9CA3AF"
+                    stroke="#FFFFFF"
                     viewBox="0 0 24 24"
                   >
                     <path
@@ -1676,54 +1718,74 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
               </td>
               <td
                 style={{
-                  padding: '0.75rem 1rem',
+                  padding: '0.75rem 1.25rem',
                   verticalAlign: 'middle',
-                  backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
-                  borderTop: '1px solid #E5E7EB',
-                  height: '40px',
+                  textAlign: 'center',
+                  backgroundColor: '#111827',
+                  borderTop: 'none',
+                  height: 'auto',
+                  minHeight: '40px',
+                  display: 'table-cell',
                 }}
               >
                 <span
-                  className={themeClasses.text}
-                  style={{ fontSize: '0.875rem', fontWeight: 500, color: isDarkMode ? '#FFFFFF' : '#151515' }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onRowClick) onRowClick(row);
+                  }}
+                  style={{ 
+                    fontSize: '0.875rem', 
+                    fontWeight: 500, 
+                    color: '#3B82F6',
+                    textDecoration: 'underline',
+                    cursor: 'pointer',
+                  }}
                 >
-                  {row.shipment || '2025.11.18 AWD'}
+                  {row.shipment || '2025.11.18'}
                 </span>
               </td>
               <td
                 style={{
-                  padding: '0.75rem 1rem',
+                  padding: '0.75rem 1.25rem',
                   verticalAlign: 'middle',
-                  backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
-                  borderTop: '1px solid #E5E7EB',
-                  height: '40px',
+                  textAlign: 'center',
+                  backgroundColor: '#111827',
+                  borderTop: 'none',
+                  height: 'auto',
+                  minHeight: '40px',
+                  display: 'table-cell',
                 }}
               >
-                <span className={themeClasses.textSecondary} style={{ fontSize: '0.875rem', color: isDarkMode ? '#FFFFFF' : '#151515' }}>
-                  {row.marketplace || 'Amazon'}
+                <span style={{ fontSize: '0.875rem', color: '#FFFFFF' }}>
+                  {row.marketplace || 'AWD'}
                 </span>
               </td>
               <td
                 style={{
-                  padding: '0.75rem 1rem',
+                  padding: '0.75rem 1.25rem',
                   verticalAlign: 'middle',
-                  backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
-                  borderTop: '1px solid #E5E7EB',
-                  height: '40px',
+                  textAlign: 'center',
+                  backgroundColor: '#111827',
+                  borderTop: 'none',
+                  height: 'auto',
+                  minHeight: '40px',
+                  display: 'table-cell',
                 }}
               >
-                <span className={themeClasses.textSecondary} style={{ fontSize: '0.875rem', color: isDarkMode ? '#FFFFFF' : '#151515' }}>
+                <span style={{ fontSize: '0.875rem', color: '#FFFFFF' }}>
                   {row.account || 'TPS Nutrients'}
                 </span>
               </td>
               <td
                 style={{
-                  padding: '0.75rem 1rem',
+                  padding: '1rem 1.25rem',
                   verticalAlign: 'middle',
                   textAlign: 'center',
-                  backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
-                  borderTop: '1px solid #E5E7EB',
-                  height: '40px',
+                  backgroundColor: '#111827',
+                  borderTop: 'none',
+                  height: 'auto',
+                  minHeight: '40px',
+                  display: 'table-cell',
                 }}
               >
                 {renderStatusCircle(
@@ -1743,12 +1805,12 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
               <td
                 data-label-check-cell="true"
                 style={{
-                  padding: '0.75rem 1rem',
+                  padding: '1rem 1.25rem',
                   verticalAlign: 'middle',
                   textAlign: 'center',
-                  backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
-                  borderTop: '1px solid #E5E7EB',
-                  height: '40px',
+                  backgroundColor: '#111827',
+                  borderTop: 'none',
+                  height: 'auto',
                   cursor: onLabelCheckClick ? 'pointer' : 'default',
                   overflow: 'visible',
                   position: 'relative',
@@ -1781,12 +1843,14 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
               </td>
               <td
                 style={{
-                  padding: '0.75rem 1rem',
+                  padding: '1rem 1.25rem',
                   verticalAlign: 'middle',
                   textAlign: 'center',
-                  backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
-                  borderTop: '1px solid #E5E7EB',
-                  height: '40px',
+                  backgroundColor: '#111827',
+                  borderTop: 'none',
+                  height: 'auto',
+                  minHeight: '40px',
+                  display: 'table-cell',
                 }}
               >
                 {renderStatusCircle(
@@ -1805,12 +1869,14 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
               </td>
               <td
                 style={{
-                  padding: '0.75rem 1rem',
+                  padding: '1rem 1.25rem',
                   verticalAlign: 'middle',
                   textAlign: 'center',
-                  backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
-                  borderTop: '1px solid #E5E7EB',
-                  height: '40px',
+                  backgroundColor: '#111827',
+                  borderTop: 'none',
+                  height: 'auto',
+                  minHeight: '40px',
+                  display: 'table-cell',
                 }}
               >
                 {renderStatusCircle(
@@ -1829,12 +1895,14 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
               </td>
               <td
                 style={{
-                  padding: '0.75rem 1rem',
+                  padding: '1rem 1.25rem',
                   verticalAlign: 'middle',
                   textAlign: 'center',
-                  backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
-                  borderTop: '1px solid #E5E7EB',
-                  height: '40px',
+                  backgroundColor: '#111827',
+                  borderTop: 'none',
+                  height: 'auto',
+                  minHeight: '40px',
+                  display: 'table-cell',
                 }}
               >
                 {renderStatusCircle(
@@ -1853,12 +1921,14 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
               </td>
               <td
                 style={{
-                  padding: '0.75rem 1rem',
+                  padding: '1rem 1.25rem',
                   verticalAlign: 'middle',
                   textAlign: 'center',
-                  backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
-                  borderTop: '1px solid #E5E7EB',
-                  height: '40px',
+                  backgroundColor: '#111827',
+                  borderTop: 'none',
+                  height: 'auto',
+                  minHeight: '40px',
+                  display: 'table-cell',
                 }}
               >
                 {renderStatusCircle(
@@ -1875,60 +1945,20 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                   row
                 )}
               </td>
-              <td
-                style={{
-                  padding: '0.75rem 1rem',
-                  verticalAlign: 'middle',
-                  backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
-                  borderTop: '1px solid #E5E7EB',
-                  height: '40px',
-                  position: 'relative',
-                }}
-              >
-                <div style={{ position: 'relative', display: 'inline-block' }}>
-                  <svg
-                    ref={(el) => { if (el) actionMenuRefs.current[row.id] = el; }}
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke={isDarkMode ? '#9CA3AF' : '#6B7280'}
-                    strokeWidth="2"
-                    style={{ cursor: 'pointer' }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setOpenActionMenu(openActionMenu === row.id ? null : row.id);
-                    }}
-                  >
-                    <circle cx="12" cy="12" r="1" />
-                    <circle cx="12" cy="5" r="1" />
-                    <circle cx="12" cy="19" r="1" />
-                  </svg>
-                  
-                  {/* Action Menu Dropdown */}
-                  {openActionMenu === row.id && (
-                    <ActionMenuDropdown
-                      ref={actionMenuDropdownRef}
-                      row={row}
-                      menuIconRef={actionMenuRefs.current[row.id]}
-                      onClose={() => setOpenActionMenu(null)}
-                      onShipmentDetails={() => {
-                        setSelectedRow(row);
-                        setShowShipmentDetailsModal(true);
-                        setOpenActionMenu(null);
-                      }}
-                      onDelete={() => {
-                        if (onDeleteRow) {
-                          onDeleteRow(row);
-                        }
-                        setOpenActionMenu(null);
-                      }}
-                      isDarkMode={isDarkMode}
-                    />
-                  )}
-                </div>
-              </td>
             </tr>
+              <tr style={{ height: '1px', backgroundColor: '#111827' }}>
+                <td colSpan={10} style={{ padding: 0, backgroundColor: '#111827' }}>
+                  <div
+                    style={{
+                      marginLeft: '1.25rem',
+                      marginRight: '1.25rem',
+                      height: '1px',
+                      backgroundColor: '#374151',
+                    }}
+                  />
+                </td>
+              </tr>
+            </React.Fragment>
           ))}
         </tbody>
       </table>

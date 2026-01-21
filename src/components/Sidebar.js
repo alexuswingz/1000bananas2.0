@@ -149,11 +149,13 @@ const Sidebar = (props = {}) => {
   const isForcedMobile = props?.forceMobile && isMobile;
   const effectiveMinimized = isForcedMobile ? false : isMinimized;
   const effectiveWidth = isForcedMobile ? 'w-full' : (effectiveMinimized ? 'w-20' : 'w-64');
+  const displayClasses = isForcedMobile ? 'flex' : 'hidden md:flex';
 
   return (
-    <div className={`hidden md:flex ${effectiveWidth} h-screen ${themeClasses.bg} ${isForcedMobile ? '' : themeClasses.border + ' border-r'} flex flex-col transition-all duration-300 relative`}>
-      {/* Logo Header */}
-      <div className={`p-4 ${themeClasses.border} border-b flex items-center ${isMinimized ? 'justify-center' : 'justify-between'}`}>
+    <div className={`${displayClasses} ${effectiveWidth} h-screen ${themeClasses.bg} ${isForcedMobile ? '' : themeClasses.border + ' border-r'} flex-col transition-all duration-300 relative`}>
+      {/* Logo Header - Hide on forced mobile since parent provides header */}
+      {!isForcedMobile && (
+        <div className={`p-4 ${themeClasses.border} border-b flex items-center ${isMinimized ? 'justify-center' : 'justify-between'}`}>
         {!isMinimized && (
           <div className="flex items-center gap-3">
             {/* Logo without border - image already has it */}
@@ -191,9 +193,10 @@ const Sidebar = (props = {}) => {
           </button>
         )}
       </div>
+      )}
 
       {/* Minimize Button when collapsed */}
-      {isMinimized && (
+      {!isForcedMobile && isMinimized && (
         <div className="px-4 py-2">
           <button 
             onClick={toggleSidebar}

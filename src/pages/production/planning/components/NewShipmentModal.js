@@ -23,8 +23,10 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
   // Dropdown states
   const [marketplaceOpen, setMarketplaceOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [shipmentTypeOpen, setShipmentTypeOpen] = useState(false);
   const marketplaceRef = useRef(null);
   const accountRef = useRef(null);
+  const shipmentTypeRef = useRef(null);
   const hasInitializedRef = useRef(false);
   
   // Auto-populate shipment name with current timestamp and set marketplace to Amazon when modal opens
@@ -75,16 +77,19 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
       if (accountRef.current && !accountRef.current.contains(event.target)) {
         setAccountOpen(false);
       }
+      if (shipmentTypeRef.current && !shipmentTypeRef.current.contains(event.target)) {
+        setShipmentTypeOpen(false);
+      }
     };
 
-    if (marketplaceOpen || accountOpen) {
+    if (marketplaceOpen || accountOpen || shipmentTypeOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [marketplaceOpen, accountOpen]);
+  }, [marketplaceOpen, accountOpen, shipmentTypeOpen]);
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -213,6 +218,106 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                 cursor: 'not-allowed',
               }}
             />
+          </div>
+
+          {/* Shipment Type */}
+          <div>
+            <label
+              style={{ 
+                fontSize: '13px', 
+                fontWeight: 500, 
+                display: 'block', 
+                marginBottom: '8px', 
+                color: '#374151' 
+              }}
+            >
+              Shipment Type<span style={{ color: '#EF4444' }}>*</span>
+            </label>
+            <div ref={shipmentTypeRef} style={{ position: 'relative' }}>
+              <button
+                type="button"
+                onClick={() => setShipmentTypeOpen(!shipmentTypeOpen)}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 12px',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: '6px',
+                  backgroundColor: '#FFFFFF',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  color: newShipment.shipmentType ? '#111827' : '#9CA3AF',
+                  outline: 'none',
+                }}
+              >
+                <span>{newShipment.shipmentType || 'Select Shipment Type'}</span>
+                <svg
+                  className={`transition-transform ${shipmentTypeOpen ? 'rotate-180' : ''}`}
+                  style={{ 
+                    width: '16px', 
+                    height: '16px', 
+                    color: '#9CA3AF',
+                    flexShrink: 0,
+                  }}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M19 9L12 16L5 9"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              
+              {shipmentTypeOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    marginTop: '4px',
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '6px',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                    overflow: 'hidden',
+                    zIndex: 100,
+                  }}
+                >
+                  {['FBA', 'AWD', 'Hazmat'].map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => {
+                        setNewShipment((prev) => ({ ...prev, shipmentType: option }));
+                        setShipmentTypeOpen(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '10px 12px',
+                        fontSize: '14px',
+                        color: '#111827',
+                        backgroundColor: newShipment.shipmentType === option ? '#F3F4F6' : '#FFFFFF',
+                        border: 'none',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#F3F4F6'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = newShipment.shipmentType === option ? '#F3F4F6' : '#FFFFFF'}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Marketplace */}
@@ -485,6 +590,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
             type="button"
             disabled={
               !newShipment.shipmentName ||
+              !newShipment.shipmentType ||
               !newShipment.marketplace ||
               !newShipment.account
             }
@@ -496,6 +602,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
               fontWeight: 500,
               backgroundColor:
                 !newShipment.shipmentName ||
+                !newShipment.shipmentType ||
                 !newShipment.marketplace ||
                 !newShipment.account
                   ? '#9CA3AF'
@@ -503,6 +610,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
               color: '#FFFFFF',
               cursor:
                 !newShipment.shipmentName ||
+                !newShipment.shipmentType ||
                 !newShipment.marketplace ||
                 !newShipment.account
                   ? 'not-allowed'
@@ -511,6 +619,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
             onClick={() => {
               if (
                 !newShipment.shipmentName ||
+                !newShipment.shipmentType ||
                 !newShipment.marketplace ||
                 !newShipment.account
               ) {

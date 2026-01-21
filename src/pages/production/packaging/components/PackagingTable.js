@@ -1083,11 +1083,11 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
           style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '12px',
+            gap: '16px',
             padding: '0 16px',
             paddingLeft: '16px',
             paddingRight: '16px',
-            alignItems: 'center',
+            alignItems: 'stretch',
           }}
         >
           {filteredData.length === 0 ? (
@@ -1102,11 +1102,10 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                 key={row.id || index}
                 data-mobile-card
                 style={{
-                  width: '343px',
-                  minHeight: '196px',
-                  maxWidth: '100%',
-                  padding: '12px',
-                  gap: '12px',
+                  width: '100%',
+                  minHeight: 'auto',
+                  padding: '16px',
+                  gap: '16px',
                   borderRadius: '12px',
                   border: '1px solid #E5E7EB',
                   boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
@@ -1158,8 +1157,8 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   }}
                   style={{
                     position: 'absolute',
-                    top: '12px',
-                    right: '12px',
+                    top: '16px',
+                    right: '16px',
                     width: '24px',
                     height: '24px',
                     padding: '0',
@@ -1172,86 +1171,174 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                     zIndex: 1,
                   }}
                 >
-                  <svg width="4" height="16" viewBox="0 0 4 16" fill="none">
-                    <circle cx="2" cy="2" r="2" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
-                    <circle cx="2" cy="8" r="2" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
-                    <circle cx="2" cy="14" r="2" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                    <circle cx="10" cy="4" r="1.5" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
+                    <circle cx="10" cy="10" r="1.5" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
+                    <circle cx="10" cy="16" r="1.5" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
                   </svg>
                 </button>
 
                 {/* Card Content - Image + Details */}
-                <div style={{ display: 'flex', gap: '12px', flex: 1 }}>
-                  {/* Product Image */}
+                <div style={{ display: 'flex', gap: '12px', flex: 1, alignItems: 'flex-start' }}>
+                  {/* Product Image Container */}
                   {row.productImage && (
-                    <div style={{ flexShrink: 0 }}>
+                    <div 
+                      style={{ 
+                        flexShrink: 0,
+                        position: 'relative',
+                        width: '120px',
+                        height: '160px',
+                        borderRadius: '8px',
+                        backgroundColor: '#FFFFFF',
+                        border: '1px solid #E5E7EB',
+                        padding: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        overflow: 'hidden',
+                      }}
+                    >
                       <img
                         src={row.productImage}
                         alt={row.product}
                         style={{
-                          width: '80px',
-                          height: '80px',
+                          width: '100%',
+                          height: '100%',
                           objectFit: 'contain',
-                          borderRadius: '8px',
+                        }}
+                        onError={(e) => {
+                          e.target.style.display = 'none';
                         }}
                       />
+                      {/* Chain/Link Icon - Show when product is split */}
+                      {row.isSplit && (
+                        <svg 
+                          width="14" 
+                          height="14" 
+                          viewBox="0 0 24 24" 
+                          fill="none" 
+                          stroke="#007AFF" 
+                          strokeWidth="2.5" 
+                          strokeLinecap="round" 
+                          strokeLinejoin="round"
+                          style={{
+                            position: 'absolute',
+                            top: '8px',
+                            left: '8px',
+                            zIndex: 2,
+                            flexShrink: 0,
+                          }}
+                          title="Split Product"
+                        >
+                          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                        </svg>
+                      )}
+                      {/* Expand Icon */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onMoreDetails) {
+                            onMoreDetails(row);
+                          }
+                        }}
+                        style={{
+                          position: 'absolute',
+                          top: '8px',
+                          right: '8px',
+                          width: '24px',
+                          height: '24px',
+                          backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          padding: 0,
+                          zIndex: 2,
+                        }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2">
+                          <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                        </svg>
+                      </button>
                     </div>
                   )}
 
                   {/* Product Info */}
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {/* Product Title with Drag Handle */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <circle cx="4" cy="4" r="1.5" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
-                        <circle cx="12" cy="4" r="1.5" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
-                        <circle cx="4" cy="8" r="1.5" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
-                        <circle cx="12" cy="8" r="1.5" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
-                        <circle cx="4" cy="12" r="1.5" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
-                        <circle cx="12" cy="12" r="1.5" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
-                      </svg>
-                      <span
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px', minWidth: 0, padding: 0, margin: 0 }}>
+                    {/* Title and Subtitle */}
+                    <div style={{ display: 'block', position: 'relative', paddingRight: '32px', paddingLeft: 0, paddingTop: 0, paddingBottom: 0, margin: 0, width: '100%' }}>
+                      <h3
                         style={{
-                          fontSize: '14px',
-                          fontWeight: 600,
+                          fontSize: '16px',
+                          fontWeight: 700,
                           color: isDarkMode ? '#F9FAFB' : '#111827',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          flex: 1,
-                          paddingRight: '32px',
+                          margin: 0,
+                          padding: 0,
+                          marginBottom: '4px',
+                          lineHeight: '1.3',
+                          textAlign: 'left',
+                          fontFamily: 'system-ui, -apple-system, sans-serif',
+                          width: '100%',
+                          wordBreak: 'break-word',
                         }}
                       >
                         {row.product || 'N/A'}
-                      </span>
+                      </h3>
+                      <p
+                        style={{
+                          fontSize: '14px',
+                          fontWeight: 400,
+                          color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                          margin: 0,
+                          padding: 0,
+                          textAlign: 'left',
+                          fontFamily: 'system-ui, -apple-system, sans-serif',
+                          width: '100%',
+                        }}
+                      >
+                        {row.brand || 'N/A'} • {row.size || 'N/A'}
+                      </p>
                     </div>
 
-                    {/* Product Details Grid */}
+                    {/* Product Details List */}
                     <div
                       style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr 1fr',
-                        gap: '8px',
-                        fontSize: '12px',
-                        flex: 1,
+                        display: 'block',
+                        fontSize: '14px',
+                        fontFamily: 'system-ui, -apple-system, sans-serif',
+                        width: '100%',
+                        padding: 0,
+                        margin: 0,
                       }}
                     >
-                  <div>
-                    <div style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '2px' }}>Formula</div>
-                    <div style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 500 }}>{row.formula || 'N/A'}</div>
-                  </div>
-                  <div>
-                    <div style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '2px' }}>TPS Ship #</div>
-                    <div style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 500 }}>{row.tpsShipNumber || 'N/A'}</div>
-                  </div>
-                  <div>
-                    <div style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '2px' }}>Size</div>
-                    <div style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 500 }}>{row.size || 'N/A'}</div>
-                  </div>
-                  <div>
-                    <div style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '2px' }}>Qty</div>
-                    <div style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 500 }}>{row.qty || 'N/A'}</div>
-                  </div>
-                </div>
+                      <div style={{ textAlign: 'left', lineHeight: '1.5', width: '100%', display: 'block', marginBottom: '12px', padding: 0, marginLeft: 0, marginRight: 0, marginTop: 0 }}>
+                        <span style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: 400, display: 'inline' }}>Formula: </span>
+                        <span style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 700, display: 'inline' }}>{row.formula || 'N/A'}</span>
+                      </div>
+                      <div style={{ textAlign: 'left', lineHeight: '1.5', width: '100%', display: 'block', marginBottom: '12px', padding: 0, marginLeft: 0, marginRight: 0 }}>
+                        <span style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: 400, display: 'inline' }}>TPS Ship #: </span>
+                        <span style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 700, display: 'inline' }}>{row.tpsShipNumber || 'N/A'}</span>
+                      </div>
+                      {row.labelLocation && (
+                        <div style={{ textAlign: 'left', lineHeight: '1.5', width: '100%', display: 'block', marginBottom: '12px', padding: 0, marginLeft: 0, marginRight: 0 }}>
+                          <span style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: 400, display: 'inline' }}>Label Location: </span>
+                          <span style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 700, display: 'inline' }}>{row.labelLocation}</span>
+                        </div>
+                      )}
+                      <div style={{ textAlign: 'left', lineHeight: '1.5', width: '100%', display: 'block', marginBottom: '12px', padding: 0, marginLeft: 0, marginRight: 0 }}>
+                        <span style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: 400, display: 'inline' }}>QTY: </span>
+                        <span style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 700, display: 'inline' }}>{row.qty ? row.qty.toLocaleString() : 'N/A'}</span>
+                      </div>
+                      {row.caseNumber && (
+                        <div style={{ textAlign: 'left', lineHeight: '1.5', width: '100%', display: 'block', marginBottom: '0', padding: 0, marginLeft: 0, marginRight: 0 }}>
+                          <span style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: 400, display: 'inline' }}>Case #: </span>
+                          <span style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 700, display: 'inline' }}>{row.caseNumber}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -1278,25 +1365,33 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   disabled={row.status === 'done' || row.status === 'moved_s' || row.status === 'moved_fg'}
                   style={{
                     width: '100%',
-                    height: '32px',
-                    borderRadius: '6px',
-                    border: (row.status === 'moved_s' || row.status === 'moved_fg' || row.status === 'paused') ? '1px solid #E5E7EB' : 'none',
-                    backgroundColor: row.status === 'moved_s' || row.status === 'moved_fg' ? '#FFFFFF' :
+                    height: '40px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    backgroundColor: row.status === 'moved_s' || row.status === 'moved_fg' ? '#F3F4F6' :
                                     row.isShiners && row.status === 'paused' ? '#F97316' :
-                                    row.status === 'paused' ? '#FFFFFF' :
+                                    row.status === 'paused' ? '#F3F4F6' :
                                     row.status === 'in_progress' ? '#3B82F6' :
                                     row.status === 'done' ? '#10B981' :
                                     row.isShiners ? '#F97316' : '#3B82F6',
-                    color: (row.status === 'moved_s' || row.status === 'moved_fg' || row.status === 'paused') ? '#374151' : '#FFFFFF',
+                    color: (row.status === 'moved_s' || row.status === 'moved_fg' || row.status === 'paused') ? '#6B7280' : '#FFFFFF',
                     fontSize: '14px',
-                    fontWeight: 500,
+                    fontWeight: 600,
                     cursor: (row.status === 'done' || row.status === 'moved_s' || row.status === 'moved_fg') ? 'default' : 'pointer',
                     padding: '0',
                     margin: '0',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    boxShadow: row.status === 'paused' ? '0 1px 2px 0 rgba(0, 0, 0, 0.05)' : 'none',
+                    transition: 'all 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (row.status !== 'done' && row.status !== 'moved_s' && row.status !== 'moved_fg') {
+                      e.currentTarget.style.opacity = '0.9';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = '1';
                   }}
                 >
                   {row.status === 'moved_s' ? 'Moved (Shiners)' :
@@ -2068,50 +2163,55 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
           <div
             style={{
               width: isMobile ? '343px' : '683px',
-              minHeight: isMobile ? 'auto' : '260px',
+              minHeight: isMobile ? '212px' : '260px',
               backgroundColor: '#FFFFFF',
               borderRadius: '12px',
               border: '1px solid #E5E7EB',
+              borderWidth: '1px',
               overflow: 'visible',
               boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'space-between',
+              padding: isMobile ? '16px' : '28px 24px 24px 24px',
             }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Content Section */}
-            <div style={{ padding: '28px 24px 20px 24px', display: 'flex', flexDirection: 'column', gap: '14px', alignItems: 'center', textAlign: 'center' }}>
+            <div style={{ padding: 0, display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '14px', alignItems: 'center', textAlign: 'center', flexShrink: 1, minHeight: 0 }}>
               {/* Warning Icon */}
-              <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
                 <div
                   style={{
-                    width: '48px',
-                    height: '48px',
+                    width: isMobile ? '32px' : '48px',
+                    height: isMobile ? '32px' : '48px',
                     borderRadius: '50%',
-                    backgroundColor: '#FEF3C7',
+                    backgroundColor: '#F97316',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    flexShrink: 0,
                   }}
                 >
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                    <line x1="12" y1="9" x2="12" y2="13" />
-                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                  <svg width={isMobile ? '16' : '24'} height={isMobile ? '16' : '24'} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
                   </svg>
                 </div>
               </div>
 
               {/* Title */}
-              <h2 style={{ fontSize: '20px', fontWeight: '600', color: '#111827', margin: 0, lineHeight: '1.4' }}>
-                Are you sure you want to move?
+              <h2 style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: '700', color: '#111827', margin: 0, lineHeight: '1.3', flexShrink: 0 }}>
+                Are you sure?
               </h2>
 
               {/* Body Text */}
-              <div style={{ maxWidth: '580px' }}>
-                <p style={{ fontSize: '15px', color: '#6B7280', margin: 0, lineHeight: '1.6' }}>
-                  These units will no longer be included in this shipment and moved to floor inventory. Amazon will treat them as false inbound inventory for this shipment type.
+              <div style={{ maxWidth: isMobile ? '100%' : '580px', textAlign: 'center', width: '100%', flexShrink: 1, minHeight: 0 }}>
+                <p style={{ fontSize: isMobile ? '13px' : '15px', color: '#111827', margin: 0, lineHeight: '1.4', marginBottom: isMobile ? '6px' : '8px', textAlign: 'center' }}>
+                  These units will no longer be included in this shipment and moved to floor inventory.
+                </p>
+                <p style={{ fontSize: isMobile ? '13px' : '15px', color: '#111827', margin: 0, lineHeight: '1.4', textAlign: 'center' }}>
+                  Amazon will treat them as false inbound inventory for this shipment type.
                 </p>
               </div>
             </div>
@@ -2119,23 +2219,25 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
             {/* Buttons */}
             <div
               style={{
-                padding: '0 24px 24px 24px',
+                padding: 0,
+                marginTop: isMobile ? '12px' : '16px',
                 display: 'flex',
-                gap: '10px',
-                justifyContent: 'space-between',
+                gap: isMobile ? '8px' : '12px',
+                justifyContent: 'center',
+                flexShrink: 0,
               }}
             >
               <button
                 onClick={() => setSelectedShinersProductToMove(null)}
                 style={{
                   width: isMobile ? '147.5px' : '309.5px',
-                  height: isMobile ? '23px' : '31px',
-                  padding: 0,
-                  borderRadius: '4px',
+                  height: isMobile ? '23px' : '40px',
+                  padding: isMobile ? '4px 12px' : '0',
+                  borderRadius: isMobile ? '4px' : '8px',
                   border: '1px solid #D1D5DB',
                   backgroundColor: '#FFFFFF',
-                  color: '#374151',
-                  fontSize: '15px',
+                  color: '#111827',
+                  fontSize: isMobile ? '14px' : '15px',
                   fontWeight: '600',
                   cursor: 'pointer',
                   display: 'flex',
@@ -2170,13 +2272,13 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                 }}
                 style={{
                   width: isMobile ? '147.5px' : '309.5px',
-                  height: isMobile ? '23px' : '31px',
-                  padding: 0,
-                  borderRadius: '4px',
-                  border: '1px solid #0066FF',
-                  backgroundColor: '#0066FF',
+                  height: isMobile ? '23px' : '40px',
+                  padding: isMobile ? '4px 12px' : '0',
+                  borderRadius: isMobile ? '4px' : '8px',
+                  border: 'none',
+                  backgroundColor: '#2563EB',
                   color: '#FFFFFF',
-                  fontSize: '15px',
+                  fontSize: isMobile ? '14px' : '15px',
                   fontWeight: '600',
                   cursor: 'pointer',
                   display: 'flex',
@@ -2185,13 +2287,11 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   transition: 'all 0.2s ease',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#0052CC';
-                  e.currentTarget.style.borderColor = '#0052CC';
+                  e.currentTarget.style.backgroundColor = '#1D4ED8';
                   e.currentTarget.style.transform = 'translateY(-1px)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#0066FF';
-                  e.currentTarget.style.borderColor = '#0066FF';
+                  e.currentTarget.style.backgroundColor = '#2563EB';
                   e.currentTarget.style.transform = 'translateY(0)';
                 }}
               >
@@ -2372,51 +2472,51 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
           <div
             style={{
               width: isMobile ? '343px' : '480px',
-              minHeight: isMobile ? 'auto' : '260px',
+              minHeight: isMobile ? '159px' : '260px',
               backgroundColor: '#FFFFFF',
               borderRadius: '12px',
               border: '1px solid #E5E7EB',
-              overflow: 'hidden',
+              borderWidth: '1px',
+              overflow: 'visible',
               boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
               display: 'flex',
               flexDirection: 'column',
+              padding: isMobile ? '16px' : '32px',
             }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Icon and Title Section */}
-            <div style={{ padding: '32px 32px 24px 32px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '20px', flex: 1 }}>
+            <div style={{ padding: 0, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '20px', flexShrink: 0 }}>
               {/* Warning Icon */}
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '4px' }}>
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
                 <div
                   style={{
-                    width: '56px',
-                    height: '56px',
+                    width: isMobile ? '40px' : '56px',
+                    height: isMobile ? '40px' : '56px',
                     borderRadius: '50%',
-                    backgroundColor: '#FEF3C7',
+                    backgroundColor: '#F97316',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    flexShrink: 0,
                   }}
                 >
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                    <line x1="12" y1="9" x2="12" y2="13" />
-                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                  <svg width={isMobile ? '20' : '28'} height={isMobile ? '20' : '28'} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
                   </svg>
                 </div>
               </div>
 
               {/* Title */}
-              <h2 style={{ fontSize: '22px', fontWeight: '600', color: '#111827', margin: 0, lineHeight: '1.3' }}>
-                Mark Units as Shiners?
+              <h2 style={{ fontSize: isMobile ? '16px' : '22px', fontWeight: '700', color: '#111827', margin: 0, lineHeight: '1.3', textAlign: 'center' }}>
+                Mark and Move to Shiner Inventory?
               </h2>
 
               {/* Body Text */}
-              <div style={{ textAlign: 'center' }}>
-                <p style={{ fontSize: '16px', color: '#6B7280', margin: 0, lineHeight: '1.6', marginBottom: '12px' }}>
-                  You're marking the following units as shiners:
-                </p>
-                <p style={{ fontSize: '17px', color: '#111827', fontWeight: '600', margin: 0, lineHeight: '1.5' }}>
+              <div style={{ textAlign: 'left', paddingLeft: 0 }}>
+                <p style={{ fontSize: isMobile ? '14px' : '16px', color: '#111827', fontWeight: '400', margin: 0, lineHeight: '1.4', textAlign: 'left' }}>
                   {selectedProductForMarkShiners?.product} ({selectedProductForMarkShiners?.size}) • {selectedProductForMarkShiners?.qty?.toLocaleString()} Units
                 </p>
               </div>
@@ -2425,10 +2525,12 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
             {/* Buttons */}
             <div
               style={{
-                padding: '0 32px 32px 32px',
+                padding: 0,
+                marginTop: isMobile ? '16px' : '16px',
                 display: 'flex',
                 gap: '12px',
                 justifyContent: 'center',
+                flexShrink: 0,
               }}
             >
               <button
@@ -2447,13 +2549,13 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                 }}
                 style={{
                   width: isMobile ? '147.5px' : '200px',
-                  height: isMobile ? '23px' : '40px',
+                  height: isMobile ? '40px' : '40px',
                   padding: 0,
-                  borderRadius: '6px',
+                  borderRadius: '8px',
                   border: '1px solid #2563EB',
                   backgroundColor: '#FFFFFF',
                   color: '#2563EB',
-                  fontSize: '15px',
+                  fontSize: isMobile ? '14px' : '15px',
                   fontWeight: '600',
                   cursor: 'pointer',
                   display: 'flex',
@@ -2470,7 +2572,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   e.currentTarget.style.transform = 'translateY(0)';
                 }}
               >
-                Mark as Shiners
+                Confirm
               </button>
               <button
                 onClick={() => {
@@ -2482,13 +2584,13 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                 }}
                 style={{
                   width: isMobile ? '147.5px' : '200px',
-                  height: isMobile ? '23px' : '40px',
+                  height: isMobile ? '40px' : '40px',
                   padding: 0,
-                  borderRadius: '6px',
+                  borderRadius: '8px',
                   border: 'none',
                   backgroundColor: '#2563EB',
                   color: '#FFFFFF',
-                  fontSize: '15px',
+                  fontSize: isMobile ? '14px' : '15px',
                   fontWeight: '600',
                   cursor: 'pointer',
                   display: 'flex',
@@ -2505,7 +2607,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   e.currentTarget.style.transform = 'translateY(0)';
                 }}
               >
-                Mark as Shiners & Move
+                Confirm & Move
               </button>
             </div>
           </div>
@@ -2537,16 +2639,22 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
           <div
             style={{
               backgroundColor: '#FFFFFF',
-              borderRadius: '12px',
-              width: '90%',
-              maxWidth: '440px',
+              borderRadius: isMobile ? '12px' : '12px',
+              width: isMobile ? '343px' : '90%',
+              maxWidth: isMobile ? '343px' : '440px',
+              height: isMobile ? '186px' : 'auto',
+              padding: isMobile ? '16px' : '0',
+              border: isMobile ? '1px solid #E5E7EB' : 'none',
               boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
               overflow: 'hidden',
+              display: isMobile ? 'flex' : 'block',
+              flexDirection: isMobile ? 'column' : 'row',
+              gap: isMobile ? '24px' : '0',
             }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Icon and Title */}
-            <div style={{ padding: '32px 24px 24px', textAlign: 'center' }}>
+            <div style={{ padding: isMobile ? '0' : '32px 24px 24px', textAlign: 'center' }}>
               <div
                 style={{
                   width: '64px',
@@ -2598,11 +2706,11 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
             {/* Buttons */}
             <div
               style={{
-                padding: '24px',
+                padding: isMobile ? '0' : '24px',
                 display: 'flex',
                 justifyContent: 'flex-end',
                 gap: '12px',
-                borderTop: '1px solid #E5E7EB',
+                borderTop: isMobile ? 'none' : '1px solid #E5E7EB',
               }}
             >
               <button

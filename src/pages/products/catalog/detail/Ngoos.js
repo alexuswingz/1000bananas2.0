@@ -20,7 +20,7 @@ import {
   Brush
 } from 'recharts';
 
-const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = null, overrideUnitsToMake = null, onAddUnits = null, labelsAvailable = null }) => {
+const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = null, overrideUnitsToMake = null, onAddUnits = null, labelsAvailable = null, openDoiSettings = false }) => {
   const { isDarkMode } = useTheme();
   const [selectedView, setSelectedView] = useState('2 Years');
   const [loading, setLoading] = useState(true);
@@ -1181,6 +1181,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 console.log('DOI Settings updated:', settings);
               }}
               initialSettings={doiSettings}
+              initialOpen={openDoiSettings}
             />
             
             <button

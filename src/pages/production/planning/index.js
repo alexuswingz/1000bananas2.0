@@ -19,6 +19,7 @@ const Planning = () => {
   const [showNewShipmentModal, setShowNewShipmentModal] = useState(false);
   const [newShipment, setNewShipment] = useState({
     shipmentName: '',
+    shipmentType: '',
     marketplace: 'Amazon',
     account: '',
   });
@@ -588,7 +589,7 @@ const Planning = () => {
       const shipmentData = {
         shipment_number: newShipment.shipmentName || `SHIP-${Date.now()}`,
         shipment_date: new Date().toISOString().split('T')[0],
-        shipment_type: 'AWD',
+        shipment_type: newShipment.shipmentType || 'AWD',
         account: newShipment.account || 'TPS Nutrients',
         marketplace: newShipment.marketplace || 'Amazon',
         location: '',
@@ -599,6 +600,7 @@ const Planning = () => {
       setShowNewShipmentModal(false);
       setNewShipment({
         shipmentName: '',
+        shipmentType: '',
         marketplace: 'Amazon',
         account: '',
       });
