@@ -170,15 +170,9 @@ const FormulaCheckTable = ({
       
       setFormulas(formattedFormulas);
       
-      // Always initialize selectedRows from backend data (formulas that are checked)
-      // This ensures checked formulas remain checked when reopening the table
-      const checkedIds = new Set(
-        formattedFormulas.filter(f => f.isChecked).map(f => f.id)
-      );
-      setSelectedRows(checkedIds);
-      if (onSelectedRowsChange) {
-        onSelectedRowsChange(checkedIds);
-      }
+      // DO NOT initialize selectedRows from isChecked status
+      // Checkboxes are for manual selection only, independent of completion status
+      // Keep existing selectedRows state (don't reset it on reload)
       
       // Initialize notes from backend data
       const loadedNotes = {};
@@ -352,13 +346,14 @@ const FormulaCheckTable = ({
   // Report formula data changes to parent
   useEffect(() => {
     if (onFormulaDataChange) {
+      const completedCount = formulas.filter(f => f.isChecked).length;
       onFormulaDataChange({
         total: formulas.length,
-        completed: selectedRows.size,
-        remaining: formulas.length - selectedRows.size,
+        completed: completedCount,
+        remaining: formulas.length - completedCount,
       });
     }
-  }, [formulas.length, selectedRows.size, onFormulaDataChange]);
+  }, [formulas, onFormulaDataChange]);
 
   // Close filter dropdown when clicking outside
   useEffect(() => {
@@ -432,11 +427,8 @@ const FormulaCheckTable = ({
       // Mark as done in backend
       await saveCheckedStatus(id, true);
       
-      // Update selection state to show checkbox as checked
-      const newSet = new Set(selectedRows);
-      newSet.add(id);
-      setSelectedRows(newSet);
-      if (onSelectedRowsChange) onSelectedRowsChange(newSet);
+      // DO NOT automatically check the checkbox - checkbox is for selection only
+      // The "Complete" button marks the formula as done, which is separate from selection
       
       // Reload data to get latest state, then check if all formulas are checked
       await loadFormulaData();

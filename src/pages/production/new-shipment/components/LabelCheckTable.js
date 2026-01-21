@@ -1224,7 +1224,7 @@ const LabelCheckTable = ({
                           padding: '0 12px',
                           borderRadius: '6px',
                           border: 'none',
-                          backgroundColor: '#F59E0B',
+                          backgroundColor: '#10B981',
                           color: '#FFFFFF',
                           fontSize: '12px',
                           fontWeight: 600,
@@ -1241,7 +1241,7 @@ const LabelCheckTable = ({
                           position: 'relative',
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#D97706';
+                          e.currentTarget.style.backgroundColor = '#059669';
                           e.currentTarget.style.transform = 'scale(1.02)';
                           e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
                           // Show edit icon
@@ -1249,7 +1249,7 @@ const LabelCheckTable = ({
                           if (icon) icon.style.opacity = '1';
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = '#F59E0B';
+                          e.currentTarget.style.backgroundColor = '#10B981';
                           e.currentTarget.style.transform = 'scale(1)';
                           e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
                           // Hide edit icon

@@ -121,14 +121,25 @@ const NgoosModal = ({
   const currentPosition = currentProductIndex >= 0 ? currentProductIndex + 1 : 0;
   const totalProducts = allProducts.length;
   
-  // Get units_to_make from selectedRow (passed from table) - this matches what's shown in the row
-  // Use nullish coalescing (??) to treat 0 as a valid value (not falsy)
-  // This ensures consistency between the table QTY and the modal's "Add Units" button
-  // Only fall back to forecastData if selectedRow values are undefined/null
+  // Get units_to_make from selectedRow (passed from table) to ensure consistency
+  // This matches exactly what's shown in the table's QTY/Units to Make column
+  // Fallback to freshly fetched forecastData only if selectedRow doesn't have it
   const forecastUnits = selectedRow?.units_to_make ?? selectedRow?.suggestedQty ?? forecastData?.units_to_make ?? 0;
   
-  // Get real label inventory from database (passed via selectedRow.label_inventory or labelsAvailable prop)
-  const realLabelInventory = labelsAvailable ?? selectedRow?.label_inventory ?? selectedRow?.labelsAvailable ?? 0;
+  // Get ACTUAL available label inventory (accounting for labels already used in current shipment)
+  // labelsAvailable prop is already calculated by parent to subtract used labels
+  const realLabelInventory = labelsAvailable !== null && labelsAvailable !== undefined 
+    ? labelsAvailable 
+    : selectedRow?.label_inventory ?? selectedRow?.labelsAvailable ?? 0;
+  
+  // Debug: Log the values to verify
+  console.log('N-GOOS Modal Values:', {
+    forecastUnits,
+    realLabelInventory,
+    forecastData: forecastData?.units_to_make,
+    selectedRowUnits: selectedRow?.units_to_make,
+    product: selectedRow?.product
+  });
   
   // Get image from selectedRow or catalog, and convert Drive URLs
   const convertedImage = getImageUrl(
@@ -395,7 +406,20 @@ const NgoosModal = ({
               <p className={themeClasses.textSecondary} style={{ fontSize: '0.8rem' }}>This product does not have an ASIN.</p>
             </div>
           ) : (
-            <Ngoos data={ngoosData} inventoryOnly={true} doiGoalDays={forecastRange} doiSettings={doiSettings} overrideUnitsToMake={forecastUnits} />
+            <Ngoos 
+              data={ngoosData} 
+              inventoryOnly={true} 
+              doiGoalDays={forecastRange} 
+              doiSettings={doiSettings} 
+              overrideUnitsToMake={forecastUnits}
+              labelsAvailable={realLabelInventory}
+              onAddUnits={(units) => {
+                if (onAddUnits) {
+                  onAddUnits(selectedRow, units);
+                  onClose();
+                }
+              }}
+            />
           )}
         </div>
       </div>

@@ -48,20 +48,9 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
   };
 
   // Helper function to get the increment step based on product size
-  // Returns the step value for the number input (e.g., 4 for Gallons, 12 for Quarts, 60 for 8oz, 1 for others)
+  // Returns the step value for the number input (always 1 - no case pack rounding)
   const getIncrementStep = (size) => {
-    if (!size) return 1;
-    const sizeLower = (size || '').toLowerCase();
-    if (sizeLower.includes('gallon') && !sizeLower.includes('5')) {
-      return 4; // Gallons increment by 4
-    }
-    if (sizeLower.includes('quart') || sizeLower.includes('32oz') || sizeLower === '32 oz') {
-      return 12; // Quarts increment by 12
-    }
-    if (sizeLower.includes('8oz') || sizeLower.includes('8 oz')) {
-      return 60; // 8oz increment by 60
-    }
-    // For other sizes, increment by 1
+    // Always return 1 for all sizes
     return 1;
   };
 

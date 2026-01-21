@@ -82,6 +82,10 @@ const NewShipmentTable = ({
   const [nonTableFilters, setNonTableFilters] = useState({});
   const [nonTableSortField, setNonTableSortField] = useState('');
   const [nonTableSortOrder, setNonTableSortOrder] = useState('');
+  // Store the sorted order (array of row IDs) to preserve positions after sorting (one-time sort)
+  const [nonTableSortedRowOrder, setNonTableSortedRowOrder] = useState(null);
+  // Ref to store current filtered rows (without sorting) for use in sort handler
+  const currentNonTableFilteredRowsRef = useRef([]);
   
   // Multi-select state for non-table mode bulk operations
   const [nonTableSelectedIndices, setNonTableSelectedIndices] = useState(() => new Set());
@@ -126,29 +130,6 @@ const NewShipmentTable = ({
     return numQty > available;
   };
 
-  // Helper function to round quantity based on case size
-  const roundQuantityToCaseSize = (value, size) => {
-    if (value === '' || value === null || value === undefined) return '';
-    
-    const numValue = parseInt(value, 10);
-    if (isNaN(numValue) || numValue < 0) return '';
-    
-    // Determine increment based on size
-    let increment = 1;
-    const sizeLower = (size || '').toLowerCase();
-    if (sizeLower.includes('8oz')) {
-      increment = 60;
-    } else if (sizeLower.includes('quart')) {
-      increment = 12;
-    } else if (sizeLower.includes('gallon')) {
-      increment = 4;
-    }
-    
-    // Round to nearest increment
-    const rounded = Math.round(numValue / increment) * increment;
-    return rounded > 0 ? rounded : increment;
-  };
-
   // Use local state if props not provided (for backward compatibility)
   const [internalQtyValues, setInternalQtyValues] = useState(() => {
     if (qtyValues) return null; // Use props if provided
@@ -178,7 +159,7 @@ const NewShipmentTable = ({
   useEffect(() => {
     console.log('Storing original forecast values for', rows.length, 'rows');
     rows.forEach((row, index) => {
-      const forecastValue = Math.round(row.weeklyForecast || row.forecast || 0);
+      const forecastValue = row.weeklyForecast || row.forecast || 0; // NO ROUNDING - use exact value
       const productId = row.id || row.asin || row.child_asin || row.childAsin;
       // Use _originalIndex if available, otherwise use array index
       const storageIndex = row._originalIndex !== undefined ? row._originalIndex : index;
@@ -375,7 +356,7 @@ const NewShipmentTable = ({
               rowValue = row.doiTotal || row.daysOfInventory || 0;
               break;
             case 'forecast':
-              rowValue = Math.round(row.weeklyForecast || row.forecast || 0);
+              rowValue = row.weeklyForecast || row.forecast || 0;
               break;
             case 'sales7Day':
               rowValue = row.sales7Day || 0;
@@ -401,7 +382,7 @@ const NewShipmentTable = ({
               rowValue = row.fbaAvailable || 0;
               break;
             case 'normal-unitsToMake':
-              rowValue = Math.round(row.weeklyForecast || row.forecast || 0);
+              rowValue = row.weeklyForecast || row.forecast || 0;
               break;
             case 'normal-doi':
               rowValue = row.doiTotal || row.daysOfInventory || 0;
@@ -456,7 +437,7 @@ const NewShipmentTable = ({
               rowValue = row.doiTotal || row.daysOfInventory || 0;
               break;
             case 'forecast':
-              rowValue = Math.round(row.weeklyForecast || row.forecast || 0);
+              rowValue = row.weeklyForecast || row.forecast || 0;
               break;
             case 'sales7Day':
               rowValue = row.sales7Day || 0;
@@ -482,7 +463,7 @@ const NewShipmentTable = ({
               rowValue = row.fbaAvailable || 0;
               break;
             case 'normal-unitsToMake':
-              rowValue = Math.round(row.weeklyForecast || row.forecast || 0);
+              rowValue = row.weeklyForecast || row.forecast || 0;
               break;
             case 'normal-doi':
               rowValue = row.doiTotal || row.daysOfInventory || 0;
@@ -776,7 +757,7 @@ const NewShipmentTable = ({
               rowValue = row.doiTotal || row.daysOfInventory || 0;
               break;
             case 'forecast':
-              rowValue = Math.round(row.weeklyForecast || row.forecast || 0);
+              rowValue = row.weeklyForecast || row.forecast || 0;
               break;
             case 'sales7Day':
               rowValue = row.sales7Day || 0;
@@ -802,7 +783,7 @@ const NewShipmentTable = ({
               rowValue = row.fbaAvailable || 0;
               break;
             case 'normal-unitsToMake':
-              rowValue = Math.round(row.weeklyForecast || row.forecast || 0);
+              rowValue = row.weeklyForecast || row.forecast || 0;
               break;
             case 'normal-doi':
               rowValue = row.doiTotal || row.daysOfInventory || 0;
@@ -856,7 +837,7 @@ const NewShipmentTable = ({
               rowValue = row.doiTotal || row.daysOfInventory || 0;
               break;
             case 'forecast':
-              rowValue = Math.round(row.weeklyForecast || row.forecast || 0);
+              rowValue = row.weeklyForecast || row.forecast || 0;
               break;
             case 'sales7Day':
               rowValue = row.sales7Day || 0;
@@ -882,7 +863,7 @@ const NewShipmentTable = ({
               rowValue = row.fbaAvailable || 0;
               break;
             case 'normal-unitsToMake':
-              rowValue = Math.round(row.weeklyForecast || row.forecast || 0);
+              rowValue = row.weeklyForecast || row.forecast || 0;
               break;
             case 'normal-doi':
               rowValue = row.doiTotal || row.daysOfInventory || 0;
@@ -933,6 +914,110 @@ const NewShipmentTable = ({
     
     currentFilteredRowsRef.current = result;
   }, [rows, activeFilters, columnFilters, forecastRange]);
+
+  // Store current non-table filtered rows (without sorting) in ref for use in sort handler
+  useEffect(() => {
+    if (tableMode) return; // Only for non-table mode
+    
+    // Compute filtered rows without sorting
+    let result = [...filteredRowsWithSelection];
+    
+    // Filter to show only specific brands in non-table mode
+    const allowedBrands = ['Bloom City', 'TPS Nutrients', 'TPS Plant Foods', 'NatureStop', 'GreenThumbs'];
+    result = result.filter(row => {
+      const brand = row.brand || '';
+      return allowedBrands.some(allowedBrand => 
+        brand.toLowerCase().includes(allowedBrand.toLowerCase())
+      );
+    });
+    
+    // Apply non-table filters (but not sorting)
+    Object.keys(nonTableFilters).forEach(columnKey => {
+      const filter = nonTableFilters[columnKey];
+      if (!filter) return;
+
+      const numeric = isNonTableNumericColumn(columnKey);
+
+      // Value filters
+      if (filter.selectedValues && filter.selectedValues.size > 0) {
+        result = result.filter((row, idx) => {
+          if (columnKey === 'product') {
+            return filter.selectedValues.has(row.product) || 
+                   filter.selectedValues.has(String(row.product)) ||
+                   filter.selectedValues.has(row.brand) || 
+                   filter.selectedValues.has(String(row.brand)) ||
+                   filter.selectedValues.has(row.size) || 
+                   filter.selectedValues.has(String(row.size));
+          }
+          
+          let value;
+          if (columnKey === 'brand') value = row.brand;
+          else if (columnKey === 'size') value = row.size;
+          else if (columnKey === 'fbaAvailable') value = row.fbaAvailable || 0;
+          else if (columnKey === 'unitsToMake') {
+            const index = row._originalIndex !== undefined ? row._originalIndex : idx;
+            const qty = effectiveQtyValues[index];
+            const numericValue = typeof qty === 'number' ? qty : (qty === '' || qty === null || qty === undefined ? 0 : parseInt(qty, 10) || 0);
+            value = numericValue === 0 ? 'add' : 'added';
+          }
+          else if (columnKey === 'doiDays') value = row.doiTotal || row.daysOfInventory || 0;
+          
+          return (
+            filter.selectedValues.has(value) ||
+            filter.selectedValues.has(String(value))
+          );
+        });
+      }
+
+      // Condition filters
+      if (filter.conditionType) {
+        result = result.filter((row, idx) => {
+          if (columnKey === 'product') {
+            const productMatch = applyNonTableConditionFilter(
+              row.product,
+              filter.conditionType,
+              filter.conditionValue,
+              false
+            );
+            const brandMatch = applyNonTableConditionFilter(
+              row.brand,
+              filter.conditionType,
+              filter.conditionValue,
+              false
+            );
+            const sizeMatch = applyNonTableConditionFilter(
+              row.size,
+              filter.conditionType,
+              filter.conditionValue,
+              false
+            );
+            return productMatch || brandMatch || sizeMatch;
+          }
+          
+          let value;
+          if (columnKey === 'brand') value = row.brand;
+          else if (columnKey === 'size') value = row.size;
+          else if (columnKey === 'fbaAvailable') value = row.fbaAvailable || 0;
+          else if (columnKey === 'unitsToMake') {
+            const index = row._originalIndex !== undefined ? row._originalIndex : idx;
+            const qty = effectiveQtyValues[index];
+            const numericValue = typeof qty === 'number' ? qty : (qty === '' || qty === null || qty === undefined ? 0 : parseInt(qty, 10) || 0);
+            value = numericValue === 0 ? 'add' : 'added';
+          }
+          else if (columnKey === 'doiDays') value = row.doiTotal || row.daysOfInventory || 0;
+          
+          return applyNonTableConditionFilter(
+            value,
+            filter.conditionType,
+            filter.conditionValue,
+            numeric
+          );
+        });
+      }
+    });
+    
+    currentNonTableFilteredRowsRef.current = result;
+  }, [filteredRowsWithSelection, nonTableFilters, tableMode, effectiveQtyValues]);
 
   const handleApplyColumnFilter = (columnKey, filterData) => {
     // If filterData is null, remove the filter (Reset was clicked)
@@ -1011,8 +1096,8 @@ const NewShipmentTable = ({
             bVal = b.doiTotal || b.daysOfInventory || 0;
             break;
           case 'forecast':
-            aVal = Math.round(a.weeklyForecast || a.forecast || 0);
-            bVal = Math.round(b.weeklyForecast || b.forecast || 0);
+            aVal = a.weeklyForecast || a.forecast || 0;
+            bVal = b.weeklyForecast || b.forecast || 0;
             break;
           case 'sales7Day':
             aVal = a.sales7Day || 0;
@@ -1146,7 +1231,7 @@ const NewShipmentTable = ({
           val = row.doiTotal || row.daysOfInventory || 0;
           break;
         case 'forecast':
-          val = Math.round(row.weeklyForecast || row.forecast || 0);
+          val = row.weeklyForecast || row.forecast || 0;
           break;
         case 'sales7Day':
           val = row.sales7Day || 0;
@@ -1172,7 +1257,7 @@ const NewShipmentTable = ({
           val = row.fbaAvailable || 0;
           break;
         case 'normal-unitsToMake':
-          val = Math.round(row.weeklyForecast || row.forecast || 0);
+          val = row.weeklyForecast || row.forecast || 0;
           break;
         case 'normal-doi':
           val = row.doiTotal || row.daysOfInventory || 0;
@@ -1380,6 +1465,7 @@ const NewShipmentTable = ({
       if (nonTableSortField === columnKey) {
         setNonTableSortField('');
         setNonTableSortOrder('');
+        setNonTableSortedRowOrder(null);
       }
       return;
     }
@@ -1393,12 +1479,55 @@ const NewShipmentTable = ({
       },
     }));
 
+    // If sortOrder is provided, apply one-time sort directly (snapshot the order)
     if (filterData.sortOrder) {
       setNonTableSortField(columnKey);
       setNonTableSortOrder(filterData.sortOrder);
+      
+      // Use setTimeout to ensure filters are applied and ref is updated
+      setTimeout(() => {
+        const rowsToSort = [...currentNonTableFilteredRowsRef.current];
+        const numeric = isNonTableNumericColumn(columnKey);
+        
+        // Sort the rows
+        rowsToSort.sort((a, b) => {
+          let aVal, bVal;
+          if (columnKey === 'product') { aVal = a.product; bVal = b.product; }
+          else if (columnKey === 'brand') { aVal = a.brand; bVal = b.brand; }
+          else if (columnKey === 'size') { aVal = a.size; bVal = b.size; }
+          else if (columnKey === 'fbaAvailable') { aVal = a.fbaAvailable || 0; bVal = b.fbaAvailable || 0; }
+          else if (columnKey === 'unitsToMake') {
+            const aIndex = a._originalIndex !== undefined ? a._originalIndex : rowsToSort.findIndex(r => r.id === a.id);
+            const bIndex = b._originalIndex !== undefined ? b._originalIndex : rowsToSort.findIndex(r => r.id === b.id);
+            const aQty = effectiveQtyValues[aIndex];
+            const bQty = effectiveQtyValues[bIndex];
+            aVal = typeof aQty === 'number' ? aQty : (aQty === '' || aQty === null || aQty === undefined ? 0 : parseInt(aQty, 10) || 0);
+            bVal = typeof bQty === 'number' ? bQty : (bQty === '' || bQty === null || bQty === undefined ? 0 : parseInt(bQty, 10) || 0);
+          }
+          else if (columnKey === 'doiDays') { aVal = a.doiTotal || a.daysOfInventory || 0; bVal = b.doiTotal || b.daysOfInventory || 0; }
+
+          if (numeric) {
+            const aNum = Number(aVal) || 0;
+            const bNum = Number(bVal) || 0;
+            return filterData.sortOrder === 'asc' ? aNum - bNum : bNum - aNum;
+          }
+
+          const aStr = String(aVal ?? '').toLowerCase();
+          const bStr = String(bVal ?? '').toLowerCase();
+          return filterData.sortOrder === 'asc'
+            ? aStr.localeCompare(bStr)
+            : bStr.localeCompare(aStr);
+        });
+        
+        // Store the sorted order (array of row IDs)
+        const sortedIds = rowsToSort.map(row => row.id);
+        setNonTableSortedRowOrder(sortedIds);
+      }, 0);
     } else if (nonTableSortField === columnKey) {
+      // If sortOrder is empty/cleared, remove sort and clear stored order
       setNonTableSortField('');
       setNonTableSortOrder('');
+      setNonTableSortedRowOrder(null);
     }
   };
 
@@ -1484,7 +1613,7 @@ const NewShipmentTable = ({
     let result = [...filteredRowsWithSelection];
     
     // Filter to show only specific brands in non-table mode
-    const allowedBrands = ['Bloom City', 'TPS Nutrients', 'TPS Plant Foods'];
+    const allowedBrands = ['Bloom City', 'TPS Nutrients', 'TPS Plant Foods', 'NatureStop', 'GreenThumbs'];
     result = result.filter(row => {
       const brand = row.brand || '';
       return allowedBrands.some(allowedBrand => 
@@ -1581,41 +1710,35 @@ const NewShipmentTable = ({
       }
     });
 
-    // Apply non-table sorting
-    if (nonTableSortField && nonTableSortOrder) {
-      const numeric = isNonTableNumericColumn(nonTableSortField);
-      result.sort((a, b) => {
-        let aVal, bVal;
-        if (nonTableSortField === 'product') { aVal = a.product; bVal = b.product; }
-        else if (nonTableSortField === 'brand') { aVal = a.brand; bVal = b.brand; }
-        else if (nonTableSortField === 'size') { aVal = a.size; bVal = b.size; }
-        else if (nonTableSortField === 'fbaAvailable') { aVal = a.fbaAvailable || 0; bVal = b.fbaAvailable || 0; }
-        else if (nonTableSortField === 'unitsToMake') {
-          const aIndex = a._originalIndex !== undefined ? a._originalIndex : result.findIndex(r => r.id === a.id);
-          const bIndex = b._originalIndex !== undefined ? b._originalIndex : result.findIndex(r => r.id === b.id);
-          const aQty = effectiveQtyValues[aIndex];
-          const bQty = effectiveQtyValues[bIndex];
-          aVal = typeof aQty === 'number' ? aQty : (aQty === '' || aQty === null || aQty === undefined ? 0 : parseInt(aQty, 10) || 0);
-          bVal = typeof bQty === 'number' ? bQty : (bQty === '' || bQty === null || bQty === undefined ? 0 : parseInt(bQty, 10) || 0);
+    // Apply non-table sorting - use stored order if available (one-time sort)
+    if (nonTableSortedRowOrder && nonTableSortedRowOrder.length > 0) {
+      // Create a map of row ID to row for quick lookup
+      const rowMap = new Map(result.map(row => [row.id, row]));
+      
+      // Reorder result based on stored order
+      const orderedResult = [];
+      const processedIds = new Set();
+      
+      // First, add rows in the stored order
+      nonTableSortedRowOrder.forEach(id => {
+        if (rowMap.has(id)) {
+          orderedResult.push(rowMap.get(id));
+          processedIds.add(id);
         }
-        else if (nonTableSortField === 'doiDays') { aVal = a.doiTotal || a.daysOfInventory || 0; bVal = b.doiTotal || b.daysOfInventory || 0; }
-
-        if (numeric) {
-          const aNum = Number(aVal) || 0;
-          const bNum = Number(bVal) || 0;
-          return nonTableSortOrder === 'asc' ? aNum - bNum : bNum - aNum;
-        }
-
-        const aStr = String(aVal ?? '').toLowerCase();
-        const bStr = String(bVal ?? '').toLowerCase();
-        return nonTableSortOrder === 'asc'
-          ? aStr.localeCompare(bStr)
-          : bStr.localeCompare(aStr);
       });
+      
+      // Then, add any new rows that weren't in the original sort (e.g., newly added rows)
+      result.forEach(row => {
+        if (!processedIds.has(row.id)) {
+          orderedResult.push(row);
+        }
+      });
+      
+      result = orderedResult;
     }
 
     return result;
-  }, [filteredRowsWithSelection, nonTableFilters, nonTableSortField, nonTableSortOrder, tableMode]);
+  }, [filteredRowsWithSelection, nonTableFilters, nonTableSortedRowOrder, tableMode]);
 
   const currentRows = tableMode ? filteredRowsWithSelection : nonTableFilteredRows;
 
@@ -1644,11 +1767,8 @@ const NewShipmentTable = ({
               const currentQty = newValues[selectedIndex] ?? 0;
               const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
               
-              let increment = 1;
-              const size = selectedRow.size?.toLowerCase() || '';
-              if (size.includes('8oz')) increment = 60;
-              else if (size.includes('quart')) increment = 12;
-              else if (size.includes('gallon')) increment = 4;
+              // Use increment of 1 for all sizes
+              const increment = 1;
               
               if (isIncrease) {
                 newValues[selectedIndex] = numQty + increment;
@@ -2669,11 +2789,8 @@ const NewShipmentTable = ({
                                   const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
                                   if (numQty <= 0) return;
                                   
-                                  let increment = 1;
-                                  const size = selectedRow.size?.toLowerCase() || '';
-                                  if (size.includes('8oz')) increment = 60;
-                                  else if (size.includes('quart')) increment = 12;
-                                  else if (size.includes('gallon')) increment = 4;
+                                  // Use increment of 1 for all sizes
+                                  const increment = 1;
                                   
                                   newValues[selectedIndex] = Math.max(0, numQty - increment);
                                   manuallyEditedIndices.current.add(selectedIndex);
@@ -2686,11 +2803,8 @@ const NewShipmentTable = ({
                             const currentQty = effectiveQtyValues[index] ?? 0;
                             const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
                             if (numQty <= 0) return;
-                            let increment = 1;
-                            const size = row.size?.toLowerCase() || '';
-                            if (size.includes('8oz')) increment = 60;
-                            else if (size.includes('quart')) increment = 12;
-                            else if (size.includes('gallon')) increment = 4;
+                            // Use increment of 1 for all sizes
+                            const increment = 1;
                             const newQty = Math.max(0, numQty - increment);
                             manuallyEditedIndices.current.add(index);
                             effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty }));
@@ -2742,11 +2856,8 @@ const NewShipmentTable = ({
                                   const currentQty = newValues[selectedIndex] ?? 0;
                                   const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
                                   
-                                  let increment = 1;
-                                  const size = selectedRow.size?.toLowerCase() || '';
-                                  if (size.includes('8oz')) increment = 60;
-                                  else if (size.includes('quart')) increment = 12;
-                                  else if (size.includes('gallon')) increment = 4;
+                                  // Use increment of 1 for all sizes
+                                  const increment = 1;
                                   
                                   newValues[selectedIndex] = numQty + increment;
                                   manuallyEditedIndices.current.add(selectedIndex);
@@ -2758,11 +2869,8 @@ const NewShipmentTable = ({
                             // Single product increase
                             const currentQty = effectiveQtyValues[index] ?? 0;
                             const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
-                            let increment = 1;
-                            const size = row.size?.toLowerCase() || '';
-                            if (size.includes('8oz')) increment = 60;
-                            else if (size.includes('quart')) increment = 12;
-                            else if (size.includes('gallon')) increment = 4;
+                            // Use increment of 1 for all sizes
+                            const increment = 1;
                             const newQty = numQty + increment;
                             manuallyEditedIndices.current.add(index);
                             effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty }));
@@ -4218,7 +4326,7 @@ const NewShipmentTable = ({
                       }}
                     >
                       {(() => {
-                        const forecastValue = Math.round(row.weeklyForecast || row.forecast || 0);
+                        const forecastValue = row.weeklyForecast || row.forecast || 0;
                         const qtyValue = effectiveQtyValues[index];
                         // Only show reset if value has been manually edited by user and differs from forecast
                         const isValueSet = qtyValue !== undefined && qtyValue !== null && qtyValue !== '';
@@ -4318,11 +4426,11 @@ const NewShipmentTable = ({
                           } else {
                             const numValue = parseInt(inputValue, 10);
                             if (!isNaN(numValue) && numValue >= 0) {
-                              const rounded = roundQuantityToCaseSize(numValue, row.size);
+                              // No rounding - use value as-is
                               rawQtyInputValues.current[index] = undefined; // Clear raw value
                               effectiveSetQtyValues(prev => ({
                                 ...prev,
-                                [index]: rounded
+                                [index]: numValue
                               }));
                             } else {
                               // Invalid input, clear it
@@ -4353,11 +4461,11 @@ const NewShipmentTable = ({
                             } else {
                               const numValue = parseInt(inputValue, 10);
                               if (!isNaN(numValue) && numValue >= 0) {
-                                const rounded = roundQuantityToCaseSize(numValue, row.size);
+                                // No rounding - use value as-is
                                 rawQtyInputValues.current[index] = undefined; // Clear raw value
                                 effectiveSetQtyValues(prev => ({
                                   ...prev,
-                                  [index]: rounded
+                                  [index]: numValue
                                 }));
                               } else {
                                 // Invalid input, clear it
@@ -4437,16 +4545,8 @@ const NewShipmentTable = ({
                                   ? 0
                                   : parseInt(currentQty, 10) || 0;
                               
-                              // Determine increment based on size
-                              let increment = 0;
-                              const size = row.size?.toLowerCase() || '';
-                              if (size.includes('8oz')) {
-                                increment = 60;
-                              } else if (size.includes('quart')) {
-                                increment = 12;
-                              } else if (size.includes('gallon')) {
-                                increment = 4;
-                              }
+                              // Use increment of 1 for all sizes
+                              const increment = 1;
                               
                               const newQty = Math.max(0, numQty + increment);
                               // Mark as manually edited since user clicked increment button
@@ -4505,16 +4605,8 @@ const NewShipmentTable = ({
                                 return;
                               }
                               
-                              // Determine increment based on size
-                              let increment = 0;
-                              const size = row.size?.toLowerCase() || '';
-                              if (size.includes('8oz')) {
-                                increment = 60;
-                              } else if (size.includes('quart')) {
-                                increment = 12;
-                              } else if (size.includes('gallon')) {
-                                increment = 4;
-                              }
+                              // Use increment of 1 for all sizes
+                              const increment = 1;
                               
                               const newQty = Math.max(0, numQty - increment);
                               // Mark as manually edited since user clicked decrement button
@@ -4663,7 +4755,7 @@ const NewShipmentTable = ({
                   fontWeight: 600,
                   color: '#3B82F6', // Blue - matches Forecast legend
                 }}>
-                  {Math.round(row.weeklyForecast || row.forecast || 0)}
+                  {row.weeklyForecast || row.forecast || 0}
                 </td>
                 <td style={{ 
                   padding: '12px 16px', 

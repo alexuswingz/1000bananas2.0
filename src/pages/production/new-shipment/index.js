@@ -68,7 +68,7 @@ const getImageUrl = (url) => {
 // Each account can only sell specific brands
 const ACCOUNT_BRAND_MAPPING = {
   'TPS Nutrients': ['TPS Nutrients', 'Bloom City', 'TPS Plant Foods'],
-  'Total Pest Spray': ['NatureStop', 'GreenThumbs'],
+  'Total Pest Supply': ['NatureStop', 'GreenThumbs'],
 };
 
 // Get allowed brands for an account
@@ -461,25 +461,25 @@ const NewShipment = () => {
       // Map TPS forecast data to planning format - USE RAILWAY DATA AS SOURCE OF TRUTH
       const planningData = {
         products: (tpsForecastData.products || []).map(p => ({
-          asin: p.asin,
-          brand: p.brand || 'TPS Plant Foods',
-          product: p.product_name || p.product,
-          size: p.size || extractSizeFromProductName(p.product_name || p.product),
-          // DOI from Railway API
-          doi_total: p.doi_total_days || p.doi_total || 0,
-          doi_fba: p.doi_fba_days || p.doi_fba || 0,
-          // Inventory from Railway API
-          inventory: p.total_inventory || 0,
-          total_inventory: p.total_inventory || 0,
-          fba_available: p.fba_available || 0,
-          // Label inventory from Railway API
-          label_inventory: p.label_inventory || 0,
-          // Units to make from Railway API
-          units_to_make: p.units_to_make || 0,
-          algorithm: p.algorithm,
-          needs_seasonality: p.needs_seasonality,
-          status: p.status,
-        }))
+            asin: p.asin,
+            brand: p.brand || 'TPS Plant Foods',
+            product: p.product_name || p.product,
+            size: p.size || extractSizeFromProductName(p.product_name || p.product),
+            // DOI from Railway API
+            doi_total: p.doi_total_days || p.doi_total || 0,
+            doi_fba: p.doi_fba_days || p.doi_fba || 0,
+            // Inventory from Railway API
+            inventory: p.total_inventory || 0,
+            total_inventory: p.total_inventory || 0,
+            fba_available: p.fba_available || 0,
+            // Label inventory from Railway API
+            label_inventory: p.label_inventory || 0,
+            // Units to make from Railway API - USE EXACT VALUE FROM API
+            units_to_make: p.units_to_make || 0,
+            algorithm: p.algorithm,
+            needs_seasonality: p.needs_seasonality,
+            status: p.status,
+          }))
       };
       
       console.log('Loaded TPS forecast data:', planningData.products?.length || 0, 'products with forecast (source:', tpsForecastData.source || 'api', ')');
@@ -627,7 +627,7 @@ const NewShipment = () => {
       
       // Use units_to_make from TPS Forecast API as suggested qty
       // This already accounts for DOI goals, lead times, and seasonality
-      const productsWithSuggestedQty = formattedProducts.map(product => {
+      const productsWithSuggestedQty = formattedProducts.map((product, index) => {
         // Get forecast data for this product - use the stored units_to_make from formattedProducts
         // This ensures we use the same lookup that was done earlier
         const unitsPerCase = product.units_per_case || 60;
@@ -647,11 +647,6 @@ const NewShipment = () => {
         // This avoids a second lookup that might fail
         let suggestedQty = product.unitsToMake || 0;
         
-        // Round to nearest case pack
-        if (suggestedQty > 0) {
-          suggestedQty = Math.ceil(suggestedQty / unitsPerCase) * unitsPerCase;
-        }
-        
         // Fallback: calculate if TPS forecast not available AND product doesn't need seasonality
         if (suggestedQty === 0 && !needsSeasonality) {
           const dailySalesRate = (product.sales30Day || 0) / 30;
@@ -661,10 +656,7 @@ const NewShipment = () => {
           if (dailySalesRate > 0 && currentDOI < targetDOI) {
             const daysNeeded = targetDOI - currentDOI;
             const rawUnitsNeeded = daysNeeded * dailySalesRate;
-            suggestedQty = Math.ceil(rawUnitsNeeded / unitsPerCase) * unitsPerCase;
-            if (suggestedQty === 0 && rawUnitsNeeded > 0) {
-              suggestedQty = unitsPerCase;
-            }
+            suggestedQty = Math.ceil(rawUnitsNeeded); // Just round up to whole number, no case pack rounding
           }
         }
         
@@ -941,13 +933,20 @@ const NewShipment = () => {
         // Match by catalogId first (primary key used when saving), fall back to id (ASIN)
         const matchKey = product.catalogId || product.id;
         if (shipmentQtyMap[matchKey] !== undefined) {
+          // Product is in the shipment - use saved quantity
           newQtyValues[index] = shipmentQtyMap[matchKey];
+        } else {
+          // Product is NOT in the shipment - initialize with suggestedQty (units_to_make)
+          // This ensures "Units to Make" is visible for products not yet added
+          if (product.suggestedQty > 0) {
+            newQtyValues[index] = product.suggestedQty;
+          }
         }
       });
       
       if (Object.keys(newQtyValues).length > 0) {
         setQtyValues(newQtyValues);
-        // Also mark these products as added
+        // Also mark these products as added (only those from the shipment)
         const addedIds = new Set();
         products.forEach((product) => {
           const matchKey = product.catalogId || product.id;
@@ -1520,15 +1519,6 @@ const NewShipment = () => {
       console.error('Error marking all label checks as done:', error);
       toast.error('Failed to mark all label checks as done');
     }
-    
-    // Navigate back to planning page with shipments tab
-    navigate('/dashboard/production/planning', {
-      state: {
-        activeTab: 'shipments',
-        refresh: Date.now(),
-        fromLabelCheckComplete: true,
-      }
-    });
   };
 
   const handleCompleteClick = async () => {
@@ -3261,21 +3251,24 @@ const NewShipment = () => {
             }, 0);
             
             const maxAvailable = Math.max(0, baseAvailable - usedInCurrentShipment);
-            const finalUnits = Math.min(unitsToAdd, maxAvailable);
             
-            if (finalUnits < unitsToAdd) {
-              toast.warning(`Only ${finalUnits.toLocaleString()} labels available. Capped from ${unitsToAdd.toLocaleString()}.`);
+            // Add the forecast units WITHOUT capping - let user see and adjust
+            // Just show a warning if it exceeds available labels
+            if (unitsToAdd > maxAvailable) {
+              toast.warning(`⚠️ Adding ${unitsToAdd.toLocaleString()} units but only ${maxAvailable.toLocaleString()} labels available!`, {
+                duration: 5000
+              });
             }
             
             setQtyValues(prev => ({
               ...prev,
-              [productIndex]: finalUnits
+              [productIndex]: unitsToAdd
             }));
             
             // Also add the row to addedRows so button shows "Added"
             setAddedRows(prev => new Set([...prev, row.id]));
             
-            toast.success(`Added ${finalUnits.toLocaleString()} units of ${row.product}`);
+            toast.success(`Added ${unitsToAdd.toLocaleString()} units of ${row.product}`);
           }
         }}
       />

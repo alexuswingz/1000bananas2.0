@@ -10,7 +10,7 @@ const ACCOUNT_OPTIONS = [
     description: 'Plant nutrients and fertilizers',
   },
   {
-    name: 'Total Pest Spray',
+    name: 'Total Pest Supply',
     brands: ['NatureStop', "Ms. Pixie's", "Burke's", 'Mint+'],
     description: 'Pest control products',
   },

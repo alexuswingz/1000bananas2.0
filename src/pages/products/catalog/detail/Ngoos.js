@@ -20,7 +20,7 @@ import {
   Brush
 } from 'recharts';
 
-const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = null, overrideUnitsToMake = null }) => {
+const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = null, overrideUnitsToMake = null, onAddUnits = null, labelsAvailable = null }) => {
   const { isDarkMode } = useTheme();
   const [selectedView, setSelectedView] = useState('2 Years');
   const [loading, setLoading] = useState(true);
@@ -1063,7 +1063,15 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                     Label Inventory: {inventoryData.fba.total + inventoryData.awd.total}
                   </span>
                 </div>
-                <button className="px-4 py-1.5 rounded-md bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 transition-colors">
+                <button 
+                  onClick={() => {
+                    if (onAddUnits) {
+                      const unitsToAdd = overrideUnitsToMake ?? forecastData?.units_to_make ?? 0;
+                      onAddUnits(unitsToAdd);
+                    }
+                  }}
+                  className="px-4 py-1.5 rounded-md bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 transition-colors"
+                >
                   Add Units ({forecastData?.units_to_make || 0})
                 </button>
               </div>
@@ -1100,12 +1108,13 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             boxSizing: 'border-box'
           }}>
             <button
+              onClick={() => setActiveTab('forecast')}
               style={{
                 padding: '0',
                 fontSize: '1rem',
                 fontWeight: '500',
-                color: '#fff',
-                backgroundColor: '#2563EB',
+                color: activeTab === 'forecast' ? '#fff' : '#94a3b8',
+                backgroundColor: activeTab === 'forecast' ? '#2563EB' : 'transparent',
                 border: 'none',
                 borderRadius: '0.25rem',
                 cursor: 'pointer',
@@ -1120,12 +1129,13 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               Inventory
             </button>
             <button
+              onClick={() => setActiveTab('sales')}
               style={{
                 padding: '0',
                 fontSize: '1rem',
                 fontWeight: '500',
-                color: '#94a3b8',
-                backgroundColor: 'transparent',
+                color: activeTab === 'sales' ? '#fff' : '#94a3b8',
+                backgroundColor: activeTab === 'sales' ? '#2563EB' : 'transparent',
                 border: 'none',
                 borderRadius: '0.25rem',
                 cursor: 'pointer',
@@ -1140,12 +1150,13 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               Sales
             </button>
             <button
+              onClick={() => setActiveTab('ads')}
               style={{
                 padding: '0',
                 fontSize: '1rem',
                 fontWeight: '500',
-                color: '#94a3b8',
-                backgroundColor: 'transparent',
+                color: activeTab === 'ads' ? '#fff' : '#94a3b8',
+                backgroundColor: activeTab === 'ads' ? '#2563EB' : 'transparent',
                 border: 'none',
                 borderRadius: '0.25rem',
                 cursor: 'pointer',
@@ -1174,6 +1185,18 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             
             <button
               type="button"
+              onClick={() => {
+                if (onAddUnits) {
+                  const unitsToAdd = overrideUnitsToMake ?? forecastData?.units_to_make ?? 0;
+                  console.log('Add Units clicked:', {
+                    unitsToAdd,
+                    overrideUnitsToMake,
+                    forecastUnitsToMake: forecastData?.units_to_make,
+                    labelsAvailable
+                  });
+                  onAddUnits(unitsToAdd);
+                }
+              }}
               style={{
                 padding: '4px 12px',
                 borderRadius: '4px',

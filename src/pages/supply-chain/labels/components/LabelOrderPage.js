@@ -447,7 +447,7 @@ const LabelOrderPage = () => {
       inventoryData = Array.from({ length: 15 }, (_, i) => ({
         id: i + 1,
         status: i === 9 || i === 14 ? 'Needs Proofing' : 'Up to Date',
-        brand: 'Total Pest Spray',
+        brand: 'Total Pest Supply',
         product: 'Cherry Tree Fertilizer',
         size: 'Gallon',
         labelLink: 'https://drive.google.com/file/d/1a2b3c4d5e6f7g8h9i0j/view',
