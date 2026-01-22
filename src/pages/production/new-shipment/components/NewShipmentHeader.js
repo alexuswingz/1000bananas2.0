@@ -933,8 +933,17 @@ const NewShipmentHeader = ({
         display: 'flex', 
         gap: '0px',
         marginTop: '16px',
-        borderTop: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+        position: 'relative',
       }}>
+        {/* Line on top of tabs - 62px wider */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: '-31px',
+          right: '-31px',
+          height: '1px',
+          backgroundColor: isDarkMode ? '#374151' : '#E5E7EB',
+        }} />
         <button
           type="button"
           onClick={(e) => {
