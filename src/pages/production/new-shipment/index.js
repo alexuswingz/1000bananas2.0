@@ -882,9 +882,17 @@ const NewShipment = () => {
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [qtyValues, setQtyValues] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedBrand, setSelectedBrand] = useState('');
+  const [selectedBrands, setSelectedBrands] = useState(null); // Brand filter from products dropdown (Set of brands or null)
   const [lastAccount, setLastAccount] = useState(null); // Track account changes
   const [lastForecastRange, setLastForecastRange] = useState(null); // Track forecastRange changes
+  
+  // Clear brand filter when account changes
+  useEffect(() => {
+    if (lastAccount !== null && lastAccount !== shipmentData.account) {
+      setSelectedBrands(null);
+    }
+    setLastAccount(shipmentData.account);
+  }, [shipmentData.account, lastAccount]);
   
   // Re-filter products when account changes (but NOT on initial load)
   useEffect(() => {
@@ -1830,14 +1838,34 @@ const NewShipment = () => {
       };
     });
     
-    // Apply brand filter first
-    if (selectedBrand) {
-      productsWithIndex = productsWithIndex.filter(product => {
-        const brandValue = product.brand || '';
-        const productValue = product.product || '';
-        const searchText = (brandValue + ' ' + productValue).toLowerCase();
-        return searchText.includes(selectedBrand.toLowerCase());
-      });
+    // Apply brand filter from products dropdown
+    // Only apply if selectedBrands is not null and has brands selected
+    // If all brands are selected, selectedBrands will be null (no filter)
+    if (selectedBrands && selectedBrands instanceof Set && selectedBrands.size > 0) {
+      // Get account-specific brands to check if all are selected
+      const ACCOUNT_BRAND_MAPPING = {
+        'TPS Nutrients': ['TPS Nutrients', 'Bloom City', 'TPS Plant Foods'],
+        'Total Pest Supply': ['NatureStop', "Ms. Pixie's", "Burke's", 'Mint +'],
+      };
+      const accountBrands = shipmentData.account && ACCOUNT_BRAND_MAPPING[shipmentData.account] 
+        ? ACCOUNT_BRAND_MAPPING[shipmentData.account]
+        : ACCOUNT_BRAND_MAPPING['TPS Nutrients'];
+      
+      // Check if all brands for this account are selected
+      const allBrandsSelected = selectedBrands.size === accountBrands.length &&
+        accountBrands.every(brand => selectedBrands.has(brand));
+      
+      // Only apply filter if not all brands are selected
+      if (!allBrandsSelected) {
+        productsWithIndex = productsWithIndex.filter(product => {
+          const brandValue = product.brand || '';
+          // Check if product's brand matches any selected brand
+          return Array.from(selectedBrands).some(selectedBrand => 
+            brandValue.toLowerCase().includes(selectedBrand.toLowerCase()) ||
+            selectedBrand.toLowerCase().includes(brandValue.toLowerCase())
+          );
+        });
+      }
     }
     
     // Then apply search term filter
@@ -2068,36 +2096,6 @@ const NewShipment = () => {
                   onSettingsChange={handleDoiSettingsChange}
                 />
 
-                {/* Brand Filter */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: 400, color: isDarkMode ? '#94a3b8' : '#6B7280' }}>Brand</span>
-                  <select
-                    value={selectedBrand}
-                    onChange={(e) => setSelectedBrand(e.target.value)}
-                    style={{
-                      backgroundColor: isDarkMode ? '#1e293b' : '#FFFFFF',
-                      color: isDarkMode ? '#fff' : '#111827',
-                      border: `1px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
-                      borderRadius: '6px',
-                      padding: '6px 28px 6px 12px',
-                      fontSize: '14px',
-                      fontWeight: 500,
-                      cursor: 'pointer',
-                      appearance: 'none',
-                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='${isDarkMode ? '%2394a3b8' : '%236B7280'}' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
-                      backgroundRepeat: 'no-repeat',
-                      backgroundPosition: 'right 8px center',
-                      minWidth: '150px',
-                    }}
-                  >
-                    <option value="">All Brands</option>
-                    {uniqueBrands.map((brand) => (
-                      <option key={brand} value={brand}>
-                        {brand}
-                      </option>
-                    ))}
-                  </select>
-                </div>
 
                 {/* Search Input */}
                 <div style={{ position: 'relative', width: '336px', height: '32px' }}>
@@ -2220,6 +2218,8 @@ const NewShipment = () => {
                     labelsAvailabilityMap={labelsAvailabilityMap}
                     forecastRange={parseInt(forecastRange) || 120}
                     manuallyEditedIndicesRef={manuallyEditedIndicesRef}
+                    onBrandFilterChange={setSelectedBrands}
+                    account={shipmentData.account}
                   />
                 )}
               </>

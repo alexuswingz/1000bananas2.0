@@ -4,7 +4,6 @@ import { toast } from 'sonner';
 import NgoosAPI from '../../../../services/ngoosApi';
 import OpenAIService from '../../../../services/openaiService';
 import BananaBrainModal from '../../../../components/BananaBrainModal';
-import DOISettingsPopover from '../../../production/new-shipment/components/DOISettingsPopover';
 import { 
   LineChart, 
   Line, 
@@ -41,11 +40,20 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   const [showAIModal, setShowAIModal] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
+  const [showForecastSettingsTooltip, setShowForecastSettingsTooltip] = useState(false);
+  const [showForecastSettingsModal, setShowForecastSettingsModal] = useState(false);
+  const [hoveredWarning, setHoveredWarning] = useState(false);
   const [salesVelocityWeight, setSalesVelocityWeight] = useState(25);
   const [svVelocityWeight, setSvVelocityWeight] = useState(15);
   const [tempSalesVelocityWeight, setTempSalesVelocityWeight] = useState(25);
   const [tempSvVelocityWeight, setTempSvVelocityWeight] = useState(15);
+  const [forecastModel, setForecastModel] = useState('Growing'); // New, Growing, Established
+  const [marketAdjustment, setMarketAdjustment] = useState(5.0);
+  const [tempForecastModel, setTempForecastModel] = useState('Growing');
+  const [tempMarketAdjustment, setTempMarketAdjustment] = useState(5.0);
+  const [tempDoiSettings, setTempDoiSettings] = useState(() => {
+    return doiSettings || { amazonDoiGoal: 130, inboundLeadTime: 30, manufactureLeadTime: 7 };
+  });
   const [currentProductAsin, setCurrentProductAsin] = useState(null);
   const [visibleSalesMetrics, setVisibleSalesMetrics] = useState(['units_sold', 'sales']);
   const [visibleAdsMetrics, setVisibleAdsMetrics] = useState(['total_sales', 'tacos']);
@@ -205,6 +213,13 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
 
       fetchNgoosData();
     }, [data?.child_asin, data?.childAsin, selectedView, metricsDays, salesVelocityWeight, svVelocityWeight, inventoryOnly, doiGoalDays, doiSettings]);
+
+  // Sync tempDoiSettings when doiSettings prop changes
+  useEffect(() => {
+    if (doiSettings) {
+      setTempDoiSettings(doiSettings);
+    }
+  }, [doiSettings]);
 
   // Extract inventory data from API response or use fallback
   const inventoryData = productDetails?.inventory || {
@@ -709,25 +724,70 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     return response;
   };
 
-  const handleOpenAdjustmentModal = () => {
+
+  const handleOpenForecastSettingsModal = () => {
     setTempSalesVelocityWeight(salesVelocityWeight);
     setTempSvVelocityWeight(svVelocityWeight);
-    setShowAdjustmentModal(true);
+    setTempForecastModel(forecastModel);
+    setTempMarketAdjustment(marketAdjustment);
+    setTempDoiSettings(doiSettings || { amazonDoiGoal: 130, inboundLeadTime: 30, manufactureLeadTime: 7 });
+    setShowForecastSettingsModal(true);
+    setShowForecastSettingsTooltip(false);
   };
 
-  const handleApplyAdjustments = () => {
+  const calculateTotalDOI = (settings) => {
+    return (parseInt(settings.amazonDoiGoal) || 0) + 
+           (parseInt(settings.inboundLeadTime) || 0) + 
+           (parseInt(settings.manufactureLeadTime) || 0);
+  };
+
+  const handleApplyForecastSettings = () => {
     setSalesVelocityWeight(tempSalesVelocityWeight);
     setSvVelocityWeight(tempSvVelocityWeight);
-    setShowAdjustmentModal(false);
-    toast.success('Forecast adjusted', {
-      description: `Sales Velocity: ${tempSalesVelocityWeight}%, Search Volume: ${tempSvVelocityWeight}%`
+    setForecastModel(tempForecastModel);
+    setMarketAdjustment(tempMarketAdjustment);
+    // Apply DOI settings via callback
+    if (onDoiSettingsChange) {
+      onDoiSettingsChange(tempDoiSettings);
+    }
+    setShowForecastSettingsModal(false);
+    toast.success('Forecast settings applied', {
+      description: `Model: ${tempForecastModel}, Market: ${tempMarketAdjustment}%, Sales Velocity: ${tempSalesVelocityWeight}%`
     });
   };
 
-  const handleCancelAdjustments = () => {
+  const handleCancelForecastSettings = () => {
     setTempSalesVelocityWeight(salesVelocityWeight);
     setTempSvVelocityWeight(svVelocityWeight);
-    setShowAdjustmentModal(false);
+    setTempForecastModel(forecastModel);
+    setTempMarketAdjustment(marketAdjustment);
+    setTempDoiSettings(doiSettings || { amazonDoiGoal: 130, inboundLeadTime: 30, manufactureLeadTime: 7 });
+    setShowForecastSettingsModal(false);
+  };
+
+  const handleSaveForecastSettingsAsDefault = () => {
+    setSalesVelocityWeight(tempSalesVelocityWeight);
+    setSvVelocityWeight(tempSvVelocityWeight);
+    setForecastModel(tempForecastModel);
+    setMarketAdjustment(tempMarketAdjustment);
+    // Save DOI settings to localStorage
+    try {
+      localStorage.setItem('doi_default_settings', JSON.stringify(tempDoiSettings));
+      localStorage.setItem('forecast_default_settings', JSON.stringify({
+        salesVelocityWeight: tempSalesVelocityWeight,
+        svVelocityWeight: tempSvVelocityWeight,
+        forecastModel: tempForecastModel,
+        marketAdjustment: tempMarketAdjustment
+      }));
+    } catch (e) {
+      console.error('Error saving forecast settings:', e);
+    }
+    // Apply DOI settings via callback
+    if (onDoiSettingsChange) {
+      onDoiSettingsChange(tempDoiSettings);
+    }
+    setShowForecastSettingsModal(false);
+    toast.success('Forecast settings saved as default');
   };
 
   const toggleSalesMetric = (metricId) => {
@@ -1172,54 +1232,127 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             </button>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            {/* Required DOI Settings Popover */}
-            <DOISettingsPopover 
-              isDarkMode={isDarkMode}
-              onSettingsChange={(settings) => {
-                // Call parent callback to save product-specific DOI settings
-                if (onDoiSettingsChange) {
-                  onDoiSettingsChange(settings);
-                }
-                console.log('DOI Settings updated:', settings);
-              }}
-              initialSettings={doiSettings}
-              openByDefault={openDoiSettings}
-            />
             
-            <button
-              type="button"
-              onClick={() => {
-                if (onAddUnits) {
-                  const unitsToAdd = overrideUnitsToMake ?? forecastData?.units_to_make ?? 0;
-                  console.log('Add Units clicked:', {
-                    unitsToAdd,
-                    overrideUnitsToMake,
-                    forecastUnitsToMake: forecastData?.units_to_make,
-                    labelsAvailable
-                  });
-                  onAddUnits(unitsToAdd);
-                }
-              }}
-              style={{
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', position: 'relative' }}>
+              {/* Units Display Field */}
+              <div style={{
+                position: 'relative',
                 padding: '4px 12px',
                 borderRadius: '4px',
-                border: 'none',
-                backgroundColor: '#2563EB',
-                color: '#FFFFFF',
+                border: `1px solid ${isDarkMode ? '#374151' : '#D1D5DB'}`,
+                backgroundColor: isDarkMode ? '#1F2937' : '#F3F4F6',
+                color: isDarkMode ? '#9CA3AF' : '#6B7280',
                 fontSize: '0.875rem',
                 fontWeight: 500,
-                minWidth: '116px',
                 height: '23px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '8px',
-                whiteSpace: 'nowrap',
-                cursor: 'pointer',
-              }}
-            >
-              Add Units ({(overrideUnitsToMake ?? forecastData?.units_to_make ?? 0).toLocaleString()})
-            </button>
+                minWidth: '80px',
+                boxSizing: 'border-box',
+              }}>
+                {(overrideUnitsToMake ?? forecastData?.units_to_make ?? 0).toLocaleString()}
+                
+                {/* Label warning icon - shown when units exceed labels available */}
+                {(() => {
+                  const unitsNeeded = overrideUnitsToMake ?? forecastData?.units_to_make ?? 0;
+                  const availableLabels = labelsAvailable ?? 0;
+                  // Only show warning if units needed exceed available labels
+                  if (unitsNeeded > availableLabels && unitsNeeded > 0 && availableLabels !== null) {
+                    return (
+                      <>
+                        <span
+                          onMouseEnter={() => setHoveredWarning(true)}
+                          onMouseLeave={() => setHoveredWarning(false)}
+                          style={{
+                            position: 'absolute',
+                            left: '-22px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '18px',
+                            height: '18px',
+                            borderRadius: '50%',
+                            backgroundColor: '#FEE2E2',
+                            color: '#DC2626',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            zIndex: 10,
+                          }}
+                        >
+                          !
+                        </span>
+                        {/* Custom tooltip for warning icon */}
+                        {hoveredWarning && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              left: '-22px',
+                              top: '50%',
+                              transform: 'translate(calc(-100% - 8px + 80px), calc(-50% - 25px))',
+                              backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                              color: isDarkMode ? '#E5E7EB' : '#111827',
+                              padding: '6px 10px',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              fontWeight: 500,
+                              whiteSpace: 'nowrap',
+                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                              border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                              zIndex: 11,
+                              pointerEvents: 'none',
+                            }}
+                          >
+                            Labels Available: {availableLabels.toLocaleString()}
+                          </div>
+                        )}
+                      </>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
+              
+              {/* Add Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (onAddUnits) {
+                    const unitsToAdd = overrideUnitsToMake ?? forecastData?.units_to_make ?? 0;
+                    console.log('Add Units clicked:', {
+                      unitsToAdd,
+                      overrideUnitsToMake,
+                      forecastUnitsToMake: forecastData?.units_to_make,
+                      labelsAvailable
+                    });
+                    onAddUnits(unitsToAdd);
+                  }
+                }}
+                style={{
+                  padding: '4px 12px',
+                  borderRadius: '4px',
+                  border: 'none',
+                  backgroundColor: '#2563EB',
+                  color: '#FFFFFF',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  height: '23px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  whiteSpace: 'nowrap',
+                  cursor: 'pointer',
+                  boxSizing: 'border-box',
+                }}
+              >
+                <span style={{ fontSize: '1rem', lineHeight: 1 }}>+</span>
+                <span>Add</span>
+              </button>
+            </div>
           </div>
           </div>
         )}
@@ -1558,34 +1691,82 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               </p>
             </div>
             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-              <button 
-                onClick={handleOpenAdjustmentModal}
-                title="Adjustment Weights"
+              <div 
                 style={{ 
-                  padding: '0.5rem', 
-                  color: '#94a3b8', 
-                  backgroundColor: 'transparent', 
-                  border: 'none', 
-                  borderRadius: '0.375rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
+                  position: 'relative',
+                  display: 'inline-block'
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
+                onMouseEnter={() => setShowForecastSettingsTooltip(true)}
+                onMouseLeave={() => setShowForecastSettingsTooltip(false)}
               >
-                <img 
-                  src="/assets/Vector.png" 
-                  alt="Settings" 
-                  style={{ width: '20px', height: '20px' }}
-                />
-              </button>
+                <button 
+                  title="Forecast Settings"
+                  style={{ 
+                    padding: '0.5rem', 
+                    color: '#94a3b8', 
+                    backgroundColor: showForecastSettingsTooltip ? 'rgba(59, 130, 246, 0.1)' : 'transparent', 
+                    border: 'none', 
+                    borderRadius: '0.375rem',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <img 
+                    src="/assets/Vector.png" 
+                    alt="Settings" 
+                    style={{ width: '20px', height: '20px' }}
+                  />
+                </button>
+                {showForecastSettingsTooltip && (
+                  <>
+                    {/* Invisible bridge to keep tooltip visible when moving mouse down */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        width: '120px',
+                        height: '8px',
+                        pointerEvents: 'auto',
+                      }}
+                    />
+                    <div
+                      onClick={handleOpenForecastSettingsModal}
+                      style={{
+                        position: 'absolute',
+                        top: 'calc(100% + 8px)',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        backgroundColor: '#1A1F2E',
+                        color: '#E5E7EB',
+                        padding: '6px 10px',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        fontWeight: 500,
+                        whiteSpace: 'nowrap',
+                        zIndex: 1000,
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3)',
+                        transition: 'background-color 0.2s',
+                        pointerEvents: 'auto',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#2563EB';
+                        setShowForecastSettingsTooltip(true);
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#1A1F2E';
+                      }}
+                    >
+                      Forecast Settings
+                    </div>
+                  </>
+                )}
+              </div>
               <select 
                 value={selectedView}
                 onChange={(e) => setSelectedView(e.target.value)}
@@ -2808,8 +2989,8 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         isLoading={isAnalyzing}
       />
 
-      {/* Adjustment Weights Modal */}
-      {showAdjustmentModal && (
+      {/* Forecast Settings Modal */}
+      {showForecastSettingsModal && (
         <div
           style={{
             position: 'fixed',
@@ -2825,202 +3006,570 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             zIndex: 1000,
             animation: 'fadeIn 0.2s ease-out'
           }}
-          onClick={handleCancelAdjustments}
+          onClick={handleCancelForecastSettings}
         >
           <div
             style={{
               backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
-              borderRadius: '1rem',
-              padding: '2rem',
-              width: 'min(90vw, 450px)',
+              borderRadius: '0.75rem',
+              width: 'min(90vw, 400px)',
+              maxHeight: '90vh',
+              display: 'flex',
+              flexDirection: 'column',
               boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)',
               border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
-              animation: 'slideUp 0.3s ease-out'
+              animation: 'slideUp 0.3s ease-out',
+              overflow: 'hidden'
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <div style={{
-                width: '2.5rem',
-                height: '2.5rem',
-                backgroundColor: 'rgba(59, 130, 246, 0.15)',
-                borderRadius: '0.75rem',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginRight: '1rem'
-              }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="3"></circle>
-                  <path d="M12 1v6m0 6v6m-9-9h6m6 0h6"></path>
-                </svg>
-              </div>
+            {/* Header */}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between',
+              width: '100%',
+              height: '44px',
+              padding: '12px 16px',
+              borderBottom: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
+              flexShrink: 0,
+              gap: '8px'
+            }}>
               <h3 style={{
-                fontSize: '1.25rem',
+                fontSize: '1.125rem',
                 fontWeight: '700',
                 color: isDarkMode ? '#fff' : '#1f2937',
                 margin: 0
               }}>
-                Adjustment Weights
+                Forecast Settings
               </h3>
+              <button
+                onClick={handleCancelForecastSettings}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 16 16" fill="none">
+                  <path 
+                    d="M12 4L4 12M4 4L12 12" 
+                    stroke="currentColor" 
+                    strokeWidth="1.5" 
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
             </div>
 
-            {/* Sales Velocity Slider */}
-            <div style={{ marginBottom: '2rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                <label style={{
+            {/* Content Area */}
+            <div style={{
+              width: '100%',
+              padding: '16px',
+              overflowY: 'auto',
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}>
+
+            {/* DOI Settings Section */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.75rem' }}>
+                <h4 style={{
                   fontSize: '0.875rem',
                   fontWeight: '600',
-                  color: isDarkMode ? '#e2e8f0' : '#374151'
+                  color: isDarkMode ? '#F9FAFB' : '#111827',
+                  margin: 0
                 }}>
-                  Sales Velocity
-                </label>
-                <div style={{
-                  backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
-                  padding: '0.375rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
-                  minWidth: '60px',
-                  textAlign: 'center',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  color: isDarkMode ? '#fff' : '#1f2937'
-                }}>
-                  {tempSalesVelocityWeight}%
+                  DOI Settings
+                </h4>
+                <div
+                  style={{
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '50%',
+                    backgroundColor: isDarkMode ? '#374151' : '#E5E7EB',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'help',
+                  }}
+                  title="Days of Inventory settings determine how far ahead to plan production"
+                >
+                  <span style={{ 
+                    fontSize: '11px', 
+                    fontWeight: 600, 
+                    color: isDarkMode ? '#9CA3AF' : '#6B7280'
+                  }}>
+                    i
+                  </span>
                 </div>
               </div>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={tempSalesVelocityWeight}
-                onChange={(e) => setTempSalesVelocityWeight(Number(e.target.value))}
-                style={{
-                  width: '100%',
-                  height: '6px',
-                  borderRadius: '3px',
-                  background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${tempSalesVelocityWeight}%, ${isDarkMode ? '#334155' : '#cbd5e1'} ${tempSalesVelocityWeight}%, ${isDarkMode ? '#334155' : '#cbd5e1'} 100%)`,
-                  outline: 'none',
-                  cursor: 'pointer',
-                  WebkitAppearance: 'none',
-                  appearance: 'none'
-                }}
-              />
+              
+              <div style={{ 
+                backgroundColor: isDarkMode ? '#1F2937' : '#F9FAFB',
+                borderRadius: '0.5rem',
+                padding: '1rem',
+                border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {/* Amazon DOI Goal */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <label style={{ fontSize: '14px', color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 400 }}>
+                    Amazon DOI Goal
+                  </label>
+                  <input
+                    type="text"
+                    value={tempDoiSettings.amazonDoiGoal}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9]/g, '');
+                      setTempDoiSettings(prev => ({ ...prev, amazonDoiGoal: value }));
+                    }}
+                    style={{
+                      width: '107px',
+                      height: '24px',
+                      padding: '4px 6px',
+                      borderRadius: '8px',
+                      border: `1px solid ${isDarkMode ? '#374151' : '#D1D5DB'}`,
+                      backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
+                      color: isDarkMode ? '#F9FAFB' : '#111827',
+                      fontSize: '14px',
+                      textAlign: 'center',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#3B82F6'}
+                    onBlur={(e) => e.target.style.borderColor = isDarkMode ? '#374151' : '#D1D5DB'}
+                  />
+                </div>
+
+                {/* Inbound Lead Time */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <label style={{ fontSize: '14px', color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 400 }}>
+                    Inbound Lead Time
+                  </label>
+                  <input
+                    type="text"
+                    value={tempDoiSettings.inboundLeadTime}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9]/g, '');
+                      setTempDoiSettings(prev => ({ ...prev, inboundLeadTime: value }));
+                    }}
+                    style={{
+                      width: '107px',
+                      height: '24px',
+                      padding: '4px 6px',
+                      borderRadius: '8px',
+                      border: `1px solid ${isDarkMode ? '#374151' : '#D1D5DB'}`,
+                      backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
+                      color: isDarkMode ? '#F9FAFB' : '#111827',
+                      fontSize: '14px',
+                      textAlign: 'center',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#3B82F6'}
+                    onBlur={(e) => e.target.style.borderColor = isDarkMode ? '#374151' : '#D1D5DB'}
+                  />
+                </div>
+
+                {/* Manufacture Lead Time */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <label style={{ fontSize: '14px', color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 400 }}>
+                    Manufacture Lead Time
+                  </label>
+                  <input
+                    type="text"
+                    value={tempDoiSettings.manufactureLeadTime}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9]/g, '');
+                      setTempDoiSettings(prev => ({ ...prev, manufactureLeadTime: value }));
+                    }}
+                    style={{
+                      width: '107px',
+                      height: '24px',
+                      padding: '4px 6px',
+                      borderRadius: '8px',
+                      border: `1px solid ${isDarkMode ? '#374151' : '#D1D5DB'}`,
+                      backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
+                      color: isDarkMode ? '#F9FAFB' : '#111827',
+                      fontSize: '14px',
+                      textAlign: 'center',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = '#3B82F6'}
+                    onBlur={(e) => e.target.style.borderColor = isDarkMode ? '#374151' : '#D1D5DB'}
+                  />
+                </div>
+
+                {/* Divider */}
+                <div style={{ height: '1px', backgroundColor: isDarkMode ? '#374151' : '#E5E7EB', margin: '4px 0' }} />
+
+                {/* Total Required DOI */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '14px', color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: 400 }}>
+                    Total Required DOI
+                  </span>
+                  <div style={{
+                    width: '107px',
+                    height: '24px',
+                    padding: '4px 6px',
+                    borderRadius: '8px',
+                    border: `1px solid ${isDarkMode ? '#374151' : '#D1D5DB'}`,
+                    backgroundColor: isDarkMode ? '#0F172A' : '#F3F4F6',
+                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                    fontSize: '14px',
+                    textAlign: 'center',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxSizing: 'border-box',
+                  }}>
+                    {calculateTotalDOI(tempDoiSettings)}
+                  </div>
+                </div>
+              </div>
+              </div>
+            </div>
+
+            {/* Forecast Adjustments Section */}
+            <div>
               <style>
                 {`
-                  input[type="range"]::-webkit-slider-thumb {
+                  input[type="number"]::-webkit-inner-spin-button,
+                  input[type="number"]::-webkit-outer-spin-button {
                     -webkit-appearance: none;
-                    appearance: none;
-                    width: 18px;
-                    height: 18px;
-                    border-radius: 50%;
-                    background: #3b82f6;
-                    cursor: pointer;
-                    border: 3px solid #ffffff;
-                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                    margin: 0;
                   }
-                  input[type="range"]::-moz-range-thumb {
-                    width: 18px;
-                    height: 18px;
-                    border-radius: 50%;
-                    background: #3b82f6;
-                    cursor: pointer;
-                    border: 3px solid #ffffff;
-                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                  input[type="number"] {
+                    -moz-appearance: textfield;
                   }
                 `}
               </style>
-            </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.75rem' }}>
+                <h4 style={{
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: isDarkMode ? '#F9FAFB' : '#111827',
+                  margin: 0
+                }}>
+                  Forecast Adjustments
+                </h4>
+              </div>
+              
+              <div style={{ 
+                backgroundColor: isDarkMode ? '#1F2937' : '#F9FAFB',
+                borderRadius: '0.5rem',
+                padding: '1rem',
+                border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {/* Forecast Model */}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.75rem' }}>
+                    <label style={{ fontSize: '14px', color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 400 }}>
+                      Forecast Model
+                    </label>
+                    <div
+                      style={{
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        backgroundColor: isDarkMode ? '#374151' : '#E5E7EB',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'help',
+                      }}
+                      title="Select the product lifecycle stage"
+                    >
+                      <span style={{ 
+                        fontSize: '11px', 
+                        fontWeight: 600, 
+                        color: isDarkMode ? '#9CA3AF' : '#6B7280'
+                      }}>
+                        i
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Slider Container */}
+                  <div style={{ position: 'relative', width: '100%' }}>
+                    {/* Labels */}
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      marginBottom: '10px',
+                      position: 'relative',
+                      zIndex: 2,
+                      width: '100%',
+                      height: '20px'
+                    }}>
+                      {['New', 'Growing', 'Established'].map((model, index) => {
+                        // Calculate position for labels: 0%, 50%, 100%
+                        const labelPosition = index === 0 ? '0%' : index === 1 ? '50%' : '100%';
+                        const transformX = index === 0 ? '0' : index === 1 ? '-50%' : '-100%';
+                        
+                        return (
+                          <span
+                            key={model}
+                            style={{
+                              fontSize: '14px',
+                              fontWeight: 400,
+                              color: tempForecastModel === model ? '#3B82F6' : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+                              cursor: 'pointer',
+                              transition: 'color 0.2s',
+                              position: 'absolute',
+                              left: labelPosition,
+                              transform: `translateX(${transformX})`,
+                              whiteSpace: 'nowrap',
+                            }}
+                            onClick={() => setTempForecastModel(model)}
+                          >
+                            {model}
+                          </span>
+                        );
+                      })}
+                    </div>
+                    
+                    {/* Slider Track */}
+                    <div 
+                      style={{ 
+                        position: 'relative', 
+                        width: '100%', 
+                        height: '6px',
+                        cursor: 'pointer',
+                        touchAction: 'none',
+                        marginTop: '4px',
+                      }}
+                      onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const clickX = e.clientX - rect.left;
+                        const percentage = Math.max(0, Math.min(100, (clickX / rect.width) * 100));
+                        
+                        // Determine which option based on click position
+                        if (percentage < 25) {
+                          setTempForecastModel('New');
+                        } else if (percentage < 75) {
+                          setTempForecastModel('Growing');
+                        } else {
+                          setTempForecastModel('Established');
+                        }
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: '100%',
+                          height: '6px',
+                          backgroundColor: isDarkMode ? '#374151' : '#D1D5DB',
+                          borderRadius: '3px',
+                          position: 'relative',
+                        }}
+                      >
+                        {/* Slider Handle - positioned at 0%, 50%, or 100% */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            left: tempForecastModel === 'New' ? '0%' : tempForecastModel === 'Growing' ? '50%' : '100%',
+                            top: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            width: '20px',
+                            height: '20px',
+                            borderRadius: '50%',
+                            backgroundColor: '#FFFFFF',
+                            border: '2px solid #3B82F6',
+                            cursor: 'pointer',
+                            transition: 'left 0.2s ease',
+                            zIndex: 3,
+                            pointerEvents: 'none',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
-            {/* Search Volume Velocity Slider */}
-            <div style={{ marginBottom: '2rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                <label style={{
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  color: isDarkMode ? '#e2e8f0' : '#374151'
-                }}>
-                  Search Volume Velocity
-                </label>
-                <div style={{
-                  backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
-                  padding: '0.375rem 0.75rem',
-                  borderRadius: '0.5rem',
-                  border: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
-                  minWidth: '60px',
-                  textAlign: 'center',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  color: isDarkMode ? '#fff' : '#1f2937'
-                }}>
-                  {tempSvVelocityWeight}%
+                {/* Market Adjustment */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <label style={{ fontSize: '14px', color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 400 }}>
+                      Market Adjustment
+                    </label>
+                    <div
+                      style={{
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        backgroundColor: isDarkMode ? '#374151' : '#E5E7EB',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'help',
+                      }}
+                      title="Adjust forecast based on market conditions"
+                    >
+                      <span style={{ 
+                        fontSize: '11px', 
+                        fontWeight: 600, 
+                        color: isDarkMode ? '#9CA3AF' : '#6B7280'
+                      }}>
+                        i
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={tempMarketAdjustment}
+                      onChange={(e) => setTempMarketAdjustment(parseFloat(e.target.value) || 0)}
+                      style={{
+                        width: '88px',
+                        height: '24px',
+                        padding: '4px 6px',
+                        borderRadius: '4px',
+                        border: `1px solid ${isDarkMode ? '#374151' : '#D1D5DB'}`,
+                        backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
+                        color: isDarkMode ? '#F9FAFB' : '#111827',
+                        fontSize: '14px',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                        textAlign: 'center',
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = '#3B82F6'}
+                      onBlur={(e) => e.target.style.borderColor = isDarkMode ? '#374151' : '#D1D5DB'}
+                    />
+                    <span style={{ fontSize: '14px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>%</span>
+                  </div>
+                </div>
+
+                {/* Sales Velocity Adjustment */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <label style={{ fontSize: '14px', color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 400 }}>
+                      Sales Velocity Adjustment
+                    </label>
+                    <div
+                      style={{
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        backgroundColor: isDarkMode ? '#374151' : '#E5E7EB',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'help',
+                      }}
+                      title="Adjust forecast based on sales velocity trends"
+                    >
+                      <span style={{ 
+                        fontSize: '11px', 
+                        fontWeight: 600, 
+                        color: isDarkMode ? '#9CA3AF' : '#6B7280'
+                      }}>
+                        i
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={tempSalesVelocityWeight}
+                      onChange={(e) => setTempSalesVelocityWeight(parseFloat(e.target.value) || 0)}
+                      style={{
+                        width: '88px',
+                        height: '24px',
+                        padding: '4px 6px',
+                        borderRadius: '4px',
+                        border: `1px solid ${isDarkMode ? '#374151' : '#D1D5DB'}`,
+                        backgroundColor: isDarkMode ? '#111827' : '#FFFFFF',
+                        color: isDarkMode ? '#F9FAFB' : '#111827',
+                        fontSize: '14px',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                        textAlign: 'center',
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = '#3B82F6'}
+                      onBlur={(e) => e.target.style.borderColor = isDarkMode ? '#374151' : '#D1D5DB'}
+                    />
+                    <span style={{ fontSize: '14px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>%</span>
+                  </div>
                 </div>
               </div>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={tempSvVelocityWeight}
-                onChange={(e) => setTempSvVelocityWeight(Number(e.target.value))}
-                style={{
-                  width: '100%',
-                  height: '6px',
-                  borderRadius: '3px',
-                  background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${tempSvVelocityWeight}%, ${isDarkMode ? '#334155' : '#cbd5e1'} ${tempSvVelocityWeight}%, ${isDarkMode ? '#334155' : '#cbd5e1'} 100%)`,
-                  outline: 'none',
-                  cursor: 'pointer',
-                  WebkitAppearance: 'none',
-                  appearance: 'none'
-                }}
-              />
+              </div>
             </div>
 
-            {/* Buttons */}
-            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+            </div>
+
+            {/* Footer */}
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              width: '100%',
+              height: '47px',
+              padding: '12px 16px',
+              borderTop: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
+              flexShrink: 0
+            }}>
               <button
-                onClick={handleCancelAdjustments}
+                onClick={handleSaveForecastSettingsAsDefault}
                 style={{
-                  padding: '0.625rem 1.25rem',
-                  backgroundColor: isDarkMode ? '#334155' : '#e2e8f0',
-                  color: isDarkMode ? '#e2e8f0' : '#475569',
-                  border: 'none',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
+                  minWidth: '113px',
+                  width: 'auto',
+                  height: '23px',
+                  padding: '4px 12px',
+                  borderRadius: '4px',
+                  border: '1px solid #3B82F6',
+                  backgroundColor: 'transparent',
+                  color: '#FFFFFF',
+                  fontSize: '13px',
+                  fontWeight: 500,
                   cursor: 'pointer',
-                  transition: 'all 0.2s'
+                  transition: 'all 0.15s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxSizing: 'border-box',
+                  whiteSpace: 'nowrap',
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = isDarkMode ? '#475569' : '#cbd5e1';
+                  e.target.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = isDarkMode ? '#334155' : '#e2e8f0';
+                  e.target.style.backgroundColor = 'transparent';
                 }}
               >
-                Cancel
+                Save as Default
               </button>
               <button
-                onClick={handleApplyAdjustments}
+                onClick={handleApplyForecastSettings}
                 style={{
-                  padding: '0.625rem 1.25rem',
-                  backgroundColor: '#3b82f6',
-                  color: '#fff',
+                  width: '57px',
+                  height: '23px',
+                  padding: '4px 12px',
+                  borderRadius: '4px',
                   border: 'none',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
+                  backgroundColor: '#3B82F6',
+                  color: '#FFFFFF',
+                  fontSize: '14px',
+                  fontWeight: 500,
                   cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
+                  transition: 'background-color 0.15s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxSizing: 'border-box',
                 }}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = '#2563eb';
-                  e.target.style.transform = 'translateY(-1px)';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = '#3b82f6';
-                  e.target.style.transform = 'translateY(0)';
-                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#2563EB'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#3B82F6'}
               >
                 Apply
               </button>

@@ -8,40 +8,88 @@ import React, {
 } from 'react';
 import { createPortal } from 'react-dom';
 
-const SortFormulasFilterDropdown = forwardRef(({ 
+const ProductsFilterDropdown = forwardRef(({ 
   filterIconRef, 
-  columnKey, 
+  columnKey = 'product',
   availableValues = [], 
   currentFilter = {},
   currentSort = '',
   onApply,
-  onClose 
+  onClose,
+  account = null, // Account name to determine which brands to show
 }, ref) => {
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [isPositioned, setIsPositioned] = useState(false);
-  const [sortOrder, setSortOrder] = useState(''); // Always start with empty, don't show blue state
+  const [sortOrder, setSortOrder] = useState('');
   const [filterConditionExpanded, setFilterConditionExpanded] = useState(false);
-  const [filterValuesExpanded, setFilterValuesExpanded] = useState(false);
+  const [filterValuesExpanded, setFilterValuesExpanded] = useState(true); // Start open by default
+  const [brandFilterExpanded, setBrandFilterExpanded] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [brandSearchTerm, setBrandSearchTerm] = useState('');
   const hasInitializedRef = useRef(false);
   
   // Initialize with all available values checked (unless there's an existing filter)
   const [selectedValues, setSelectedValues] = useState(() => {
-    // If there's an existing filter with selectedValues, use those
     if (currentFilter.selectedValues && currentFilter.selectedValues.size > 0) {
       return new Set(currentFilter.selectedValues);
     }
-    // Otherwise, start with all values checked
-    const allValues = (columnKey === 'normal-3' || columnKey === 'add')
-      ? ['Added', 'Not Added']
-      : availableValues.map(v => String(v));
+    const allValues = availableValues.map(v => String(v));
     return new Set(allValues);
   });
   
-  // Update selectedValues when dropdown opens - respect existing filter or start with all checked
+  // Brand filter state (only for product column) - Brands based on account
+  const [selectedBrands, setSelectedBrands] = useState(() => {
+    if (columnKey === 'product') {
+      // Account to Brand mapping
+      const ACCOUNT_BRAND_MAPPING = {
+        'TPS Nutrients': ['TPS Nutrients', 'Bloom City', 'TPS Plant Foods'],
+        'Total Pest Supply': ['NatureStop', "Ms. Pixie's", "Burke's", 'Mint +'],
+      };
+      
+      const allowedBrands = account && ACCOUNT_BRAND_MAPPING[account] 
+        ? ACCOUNT_BRAND_MAPPING[account]
+        : ACCOUNT_BRAND_MAPPING['TPS Nutrients'];
+      
+      if (currentFilter.selectedBrands && currentFilter.selectedBrands.size > 0) {
+        // Filter to only include allowed brands for this account
+        const filteredBrands = Array.from(currentFilter.selectedBrands).filter(b => allowedBrands.includes(b));
+        // If all allowed brands are in the filter, treat it as no filter (all brands selected)
+        const allBrandsSelected = filteredBrands.length === allowedBrands.length &&
+          allowedBrands.every(brand => filteredBrands.includes(brand));
+        // If all brands are selected, return all brands (no filter)
+        // Otherwise return the filtered brands
+        return allBrandsSelected ? new Set(allowedBrands) : new Set(filteredBrands);
+      }
+      return new Set(allowedBrands);
+    }
+    return new Set();
+  });
+  
+  // Extract unique brands (only for product column) - Show brands based on account
+  const availableBrands = useMemo(() => {
+    if (columnKey !== 'product') return [];
+    
+    // Account to Brand mapping
+    const ACCOUNT_BRAND_MAPPING = {
+      'TPS Nutrients': ['TPS Nutrients', 'Bloom City', 'TPS Plant Foods'],
+      'Total Pest Supply': ['NatureStop', "Ms. Pixie's", "Burke's", 'Mint +'],
+    };
+    
+    // Get brands for the account, or default to TPS Nutrients brands
+    const allowedBrands = account && ACCOUNT_BRAND_MAPPING[account] 
+      ? ACCOUNT_BRAND_MAPPING[account]
+      : ACCOUNT_BRAND_MAPPING['TPS Nutrients'];
+    
+    return allowedBrands.sort();
+  }, [columnKey, account]);
+  
+  const filteredBrands = availableBrands.filter(brand =>
+    brand.toLowerCase().includes(brandSearchTerm.toLowerCase())
+  );
+  
+  // Update selectedValues when dropdown opens
   useEffect(() => {
     if (filterIconRef) {
-      // Check if there's an existing filter with selectedValues
       const existingFilterValues = currentFilter.selectedValues;
       const hasFilter = existingFilterValues && 
         (existingFilterValues instanceof Set ? existingFilterValues.size > 0 : 
@@ -49,106 +97,55 @@ const SortFormulasFilterDropdown = forwardRef(({
          false);
       
       if (hasFilter) {
-        // Use existing filter values - always respect the saved filter
         const filterValues = existingFilterValues instanceof Set 
           ? Array.from(existingFilterValues)
           : existingFilterValues;
         setSelectedValues(new Set(filterValues));
       } else if (!hasInitializedRef.current) {
-        // First time opening this dropdown with no filter - start with all checked
-        const allValues = (columnKey === 'normal-3' || columnKey === 'add')
-          ? ['Added', 'Not Added']
-          : availableValues.map(v => String(v));
+        const allValues = availableValues.map(v => String(v));
         setSelectedValues(new Set(allValues));
         hasInitializedRef.current = true;
       }
-      // If hasInitializedRef is true and no filter, keep current selectedValues (don't reset)
     } else {
-      // Dropdown closed - reset initialization flag for next open
       hasInitializedRef.current = false;
     }
-  }, [filterIconRef, columnKey, currentFilter.selectedValues, availableValues]);
+  }, [filterIconRef, currentFilter.selectedValues, availableValues]);
+  
+  // Update selectedBrands when dropdown opens (only for product column)
+  useEffect(() => {
+    if (filterIconRef && columnKey === 'product') {
+      // Account to Brand mapping
+      const ACCOUNT_BRAND_MAPPING = {
+        'TPS Nutrients': ['TPS Nutrients', 'Bloom City', 'TPS Plant Foods'],
+        'Total Pest Supply': ['NatureStop', "Ms. Pixie's", "Burke's", 'Mint +'],
+      };
+      
+      const allowedBrands = account && ACCOUNT_BRAND_MAPPING[account] 
+        ? ACCOUNT_BRAND_MAPPING[account]
+        : ACCOUNT_BRAND_MAPPING['TPS Nutrients'];
+      
+      const existingBrands = currentFilter.selectedBrands;
+      if (existingBrands && existingBrands instanceof Set && existingBrands.size > 0) {
+        // Filter to only include allowed brands for this account
+        const filteredBrands = Array.from(existingBrands).filter(b => allowedBrands.includes(b));
+        // If all allowed brands are in the filter, treat it as no filter (all brands selected)
+        const allBrandsSelected = filteredBrands.length === allowedBrands.length &&
+          allowedBrands.every(brand => filteredBrands.includes(brand));
+        // If all brands are selected, set to all brands (no filter)
+        // Otherwise use the filtered brands
+        setSelectedBrands(new Set(allBrandsSelected ? allowedBrands : (filteredBrands.length > 0 ? filteredBrands : allowedBrands)));
+      } else if (!hasInitializedRef.current) {
+        setSelectedBrands(new Set(availableBrands));
+      }
+    }
+  }, [filterIconRef, columnKey, currentFilter.selectedBrands, availableBrands, account]);
   
   // Condition filter state
   const [conditionType, setConditionType] = useState(currentFilter.conditionType || '');
   const [conditionValue, setConditionValue] = useState(currentFilter.conditionValue || '');
   
-  // Brand filter state (only for product column)
-  const [brandFilterExpanded, setBrandFilterExpanded] = useState(false);
-  const [brandSearchTerm, setBrandSearchTerm] = useState('');
-  const [selectedBrands, setSelectedBrands] = useState(() => {
-    if (columnKey === 'product' && currentFilter.selectedBrands && currentFilter.selectedBrands.size > 0) {
-      return new Set(currentFilter.selectedBrands);
-    }
-    // For product column, get unique brands from availableValues
-    if (columnKey === 'product') {
-      const allowedBrands = ['TPS Nutrients', 'TPS Plant Foods', 'Bloom City', 'NatureStop', 'GreenThumbs'];
-      return new Set(allowedBrands);
-    }
-    return new Set();
-  });
-  
-  // Extract unique brands from availableValues (for product column)
-  const availableBrands = useMemo(() => {
-    if (columnKey !== 'product') return [];
-    const allowedBrands = ['TPS Nutrients', 'TPS Plant Foods', 'Bloom City', 'NatureStop', 'GreenThumbs'];
-    // Also check availableValues for any brands
-    const brandsFromValues = availableValues
-      .map(v => String(v))
-      .filter(v => allowedBrands.some(b => v.includes(b) || b.includes(v)))
-      .map(v => {
-        // Try to extract brand name
-        for (const brand of allowedBrands) {
-          if (v.includes(brand)) return brand;
-        }
-        return null;
-      })
-      .filter(Boolean);
-    
-    const allBrands = [...new Set([...allowedBrands, ...brandsFromValues])];
-    return allBrands.sort();
-  }, [columnKey, availableValues]);
-  
-  const filteredBrands = availableBrands.filter(brand =>
-    brand.toLowerCase().includes(brandSearchTerm.toLowerCase())
-  );
-  
-  // Update selectedBrands when dropdown opens
-  useEffect(() => {
-    if (filterIconRef && columnKey === 'product') {
-      const existingBrands = currentFilter.selectedBrands;
-      if (existingBrands && existingBrands instanceof Set && existingBrands.size > 0) {
-        setSelectedBrands(new Set(existingBrands));
-      } else if (!hasInitializedRef.current) {
-        // Start with all brands selected
-        setSelectedBrands(new Set(availableBrands));
-      }
-    }
-  }, [filterIconRef, columnKey, currentFilter.selectedBrands, availableBrands]);
-  
-  // Check if column is numeric
-  const isNumericColumn = columnKey === 'qty' || columnKey === 'volume' || 
-                          columnKey === 'bottles' || columnKey === 'closures' || 
-                          columnKey === 'boxes' || columnKey === 'labels' ||
-                          columnKey === 'quantity' || columnKey === 'lblCurrentInv';
-  
-  // Universal conditions - apply to ALL filters
-  const conditions = [
-    { value: 'greaterThan', label: 'Greater than' },
-    { value: 'greaterOrEqual', label: 'Greater than or equal to' },
-    { value: 'lessThan', label: 'Less than' },
-    { value: 'lessOrEqual', label: 'Less than or equal to' },
-    { value: 'equals', label: 'Is equal to' },
-    { value: 'notEquals', label: 'Is not equal to' },
-    { value: 'between', label: 'Is between' },
-    { value: 'notBetween', label: 'Is not between' },
-  ];
-
   // Convert values to strings for filtering
-  // Special handling for Add column
-  const stringValues = (columnKey === 'normal-3' || columnKey === 'add')
-    ? ['Added', 'Not Added']
-    : availableValues.map(v => String(v));
+  const stringValues = availableValues.map(v => String(v));
   
   const filteredValues = stringValues.filter(value =>
     value.toLowerCase().includes(searchTerm.toLowerCase())
@@ -175,7 +172,6 @@ const SortFormulasFilterDropdown = forwardRef(({
       if (top < 16) top = 16;
 
       setPosition({ top, left });
-      // Mark as positioned after calculating
       requestAnimationFrame(() => {
         setIsPositioned(true);
       });
@@ -204,35 +200,14 @@ const SortFormulasFilterDropdown = forwardRef(({
     });
   };
 
-  const handleReset = () => {
-    setSortOrder('');
-    setSearchTerm('');
-    // Reset to all values checked
-    const allValues = (columnKey === 'normal-3' || columnKey === 'add')
-      ? ['Added', 'Not Added']
-      : availableValues.map(v => String(v));
-    setSelectedValues(new Set(allValues));
-    setConditionType('');
-    setConditionValue('');
-    // Reset brand filter for product column
-    if (columnKey === 'product') {
-      setSelectedBrands(new Set(availableBrands));
-      setBrandSearchTerm('');
-    }
-    if (onApply) {
-      // Pass null to indicate filter should be cleared
-      onApply(null);
-    }
-  };
-  
   const handleSelectAllBrands = () => {
     setSelectedBrands(new Set(filteredBrands));
   };
-  
+
   const handleClearAllBrands = () => {
     setSelectedBrands(new Set());
   };
-  
+
   const handleToggleBrand = (brand) => {
     setSelectedBrands(prev => {
       const newSet = new Set(prev);
@@ -245,6 +220,24 @@ const SortFormulasFilterDropdown = forwardRef(({
     });
   };
 
+  const handleReset = () => {
+    setSortOrder('');
+    setSearchTerm('');
+    setBrandSearchTerm('');
+    const allValues = availableValues.map(v => String(v));
+    setSelectedValues(new Set(allValues));
+    if (columnKey === 'product') {
+      setSelectedBrands(new Set(availableBrands));
+    }
+    setConditionType('');
+    setConditionValue('');
+    if (onApply) {
+      onApply(null);
+    }
+    // Close dropdown after reset
+    onClose?.();
+  };
+
   const handleApply = () => {
     if (onApply) {
       const filterData = {
@@ -253,9 +246,13 @@ const SortFormulasFilterDropdown = forwardRef(({
         conditionType,
         conditionValue,
       };
-      // Add brand filter for product column
+      // Add brand filter only for product column
       if (columnKey === 'product') {
-        filterData.selectedBrands = selectedBrands;
+        // Only apply brand filter if not all brands are selected (active filter)
+        // If all brands are selected, it's the same as no filter, so pass null
+        const allBrandsSelected = selectedBrands.size === availableBrands.length &&
+          availableBrands.every(brand => selectedBrands.has(brand));
+        filterData.selectedBrands = allBrandsSelected ? null : selectedBrands;
       }
       onApply(filterData);
     }
@@ -263,14 +260,22 @@ const SortFormulasFilterDropdown = forwardRef(({
   };
 
   const dropdownRef = useRef(null);
-
-  // Expose the DOM element via ref
   useImperativeHandle(ref, () => dropdownRef.current, []);
-  
-  // Ensure component always returns valid JSX
-  if (!columnKey) {
-    return null;
-  }
+
+  // Check if column is numeric
+  const isNumericColumn = columnKey === 'fbaAvailable' || columnKey === 'unitsToMake' || columnKey === 'doiDays';
+
+  // Universal conditions
+  const conditions = [
+    { value: 'greaterThan', label: 'Greater than' },
+    { value: 'greaterOrEqual', label: 'Greater than or equal to' },
+    { value: 'lessThan', label: 'Less than' },
+    { value: 'lessOrEqual', label: 'Less than or equal to' },
+    { value: 'equals', label: 'Is equal to' },
+    { value: 'notEquals', label: 'Is not equal to' },
+    { value: 'between', label: 'Is between' },
+    { value: 'notBetween', label: 'Is not between' },
+  ];
 
   return createPortal(
     <div
@@ -301,15 +306,18 @@ const SortFormulasFilterDropdown = forwardRef(({
             e.stopPropagation();
             const newOrder = 'asc';
             if (onApply) {
-              onApply({
+              const sortData = {
                 sortOrder: newOrder,
                 selectedValues,
                 conditionType,
                 conditionValue,
                 __fromSortClick: true,
-              });
+              };
+              if (columnKey === 'product') {
+                sortData.selectedBrands = selectedBrands;
+              }
+              onApply(sortData);
             }
-            // Reset sortOrder state and close dropdown
             setSortOrder('');
             onClose?.();
           }}
@@ -361,15 +369,18 @@ const SortFormulasFilterDropdown = forwardRef(({
             e.stopPropagation();
             const newOrder = 'desc';
             if (onApply) {
-              onApply({
+              const sortData = {
                 sortOrder: newOrder,
                 selectedValues,
                 conditionType,
                 conditionValue,
                 __fromSortClick: true,
-              });
+              };
+              if (columnKey === 'product') {
+                sortData.selectedBrands = selectedBrands;
+              }
+              onApply(sortData);
             }
-            // Reset sortOrder state and close dropdown
             setSortOrder('');
             onClose?.();
           }}
@@ -452,7 +463,6 @@ const SortFormulasFilterDropdown = forwardRef(({
         </div>
         {filterConditionExpanded && (
           <div style={{ padding: '0 12px 8px 12px' }}>
-            {/* Condition type selector */}
             <select
               value={conditionType}
               onChange={(e) => setConditionType(e.target.value)}
@@ -476,7 +486,6 @@ const SortFormulasFilterDropdown = forwardRef(({
               ))}
             </select>
             
-            {/* Condition value input - show for most conditions except isEmpty/isNotEmpty */}
             {conditionType && conditionType !== 'isEmpty' && conditionType !== 'isNotEmpty' && (
               <>
                 {conditionType === 'between' || conditionType === 'notBetween' ? (
@@ -547,14 +556,6 @@ const SortFormulasFilterDropdown = forwardRef(({
                             e.currentTarget.style.backgroundColor = '#F3F4F6';
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = '#D1D5DB';
-                            e.currentTarget.style.backgroundColor = '#FFFFFF';
-                          }}
-                          onTouchStart={(e) => {
-                            e.currentTarget.style.borderColor = '#9CA3AF';
-                            e.currentTarget.style.backgroundColor = '#F3F4F6';
-                          }}
-                          onTouchEnd={(e) => {
                             e.currentTarget.style.borderColor = '#D1D5DB';
                             e.currentTarget.style.backgroundColor = '#FFFFFF';
                           }}
@@ -642,14 +643,6 @@ const SortFormulasFilterDropdown = forwardRef(({
                             e.currentTarget.style.backgroundColor = '#F3F4F6';
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = '#D1D5DB';
-                            e.currentTarget.style.backgroundColor = '#FFFFFF';
-                          }}
-                          onTouchStart={(e) => {
-                            e.currentTarget.style.borderColor = '#9CA3AF';
-                            e.currentTarget.style.backgroundColor = '#F3F4F6';
-                          }}
-                          onTouchEnd={(e) => {
                             e.currentTarget.style.borderColor = '#D1D5DB';
                             e.currentTarget.style.backgroundColor = '#FFFFFF';
                           }}
@@ -745,233 +738,229 @@ const SortFormulasFilterDropdown = forwardRef(({
 
       {/* Brand Filter (only for product column) */}
       {columnKey === 'product' && (
-        <div style={{ borderBottom: '1px solid #E5E7EB' }}>
-          <div
-            onClick={() => {
-              setBrandFilterExpanded(!brandFilterExpanded);
-              // Close values filter when opening brand filter
-              if (!brandFilterExpanded) {
-                setFilterValuesExpanded(false);
-              }
-            }}
+      <div style={{ borderBottom: '1px solid #E5E7EB' }}>
+        <div
+          onClick={() => {
+            setBrandFilterExpanded(!brandFilterExpanded);
+            if (!brandFilterExpanded) {
+              setFilterValuesExpanded(false);
+            }
+          }}
+          style={{
+            padding: '8px 12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            cursor: 'pointer',
+            userSelect: 'none',
+          }}
+        >
+          <span style={{ fontSize: '12px', color: (selectedBrands.size > 0 && selectedBrands.size < availableBrands.length) ? '#3B82F6' : '#6B7280', fontWeight: (selectedBrands.size > 0 && selectedBrands.size < availableBrands.length) ? 500 : 400 }}>
+            Filter by brand: {(selectedBrands.size > 0 && selectedBrands.size < availableBrands.length) && <span style={{ color: '#10B981' }}>●</span>}
+          </span>
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 12 12"
+            fill="none"
             style={{
-              padding: '8px 12px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              cursor: 'pointer',
-              userSelect: 'none',
+              transform: brandFilterExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s',
             }}
           >
-            <span style={{ fontSize: '12px', color: (selectedBrands.size > 0 && selectedBrands.size < availableBrands.length) ? '#3B82F6' : '#6B7280', fontWeight: (selectedBrands.size > 0 && selectedBrands.size < availableBrands.length) ? 500 : 400 }}>
-              Filter by brand: {(selectedBrands.size > 0 && selectedBrands.size < availableBrands.length) && <span style={{ color: '#10B981' }}>●</span>}
-            </span>
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 12 12"
-              fill="none"
+            <path
+              d="M3 4.5L6 7.5L9 4.5"
+              stroke="#6B7280"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
+        
+        {brandFilterExpanded && (
+          <div style={{ padding: '0 12px 8px 12px' }}>
+            <div
               style={{
-                transform: brandFilterExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                transition: 'transform 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '8px',
               }}
             >
-              <path
-                d="M3 4.5L6 7.5L9 4.5"
-                stroke="#6B7280"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
-          
-          {brandFilterExpanded && (
-            <div style={{ padding: '0 12px 8px 12px' }}>
-              {/* Select all / Clear all */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: '8px',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <button
-                    onClick={handleSelectAllBrands}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: '#3B82F6',
-                      fontSize: '11px',
-                      cursor: 'pointer',
-                      padding: 0,
-                      fontWeight: 400,
-                    }}
-                  >
-                    Select all
-                  </button>
-                  <button
-                    onClick={handleClearAllBrands}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: '#3B82F6',
-                      fontSize: '11px',
-                      cursor: 'pointer',
-                      padding: 0,
-                      fontWeight: 400,
-                    }}
-                  >
-                    Clear all
-                  </button>
-                </div>
-                <span style={{ fontSize: '11px', color: '#9CA3AF' }}>
-                  {filteredBrands.length} results
-                </span>
-              </div>
-              
-              {/* Brand search box */}
-              <div style={{ position: 'relative', marginBottom: '8px' }}>
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 16 16"
-                  fill="none"
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  onClick={handleSelectAllBrands}
                   style={{
-                    position: 'absolute',
-                    left: '8px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    pointerEvents: 'none',
-                    zIndex: 1,
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#3B82F6',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    padding: 0,
+                    fontWeight: 400,
                   }}
                 >
-                  <path
-                    d="M7.33333 12.6667C10.2789 12.6667 12.6667 10.2789 12.6667 7.33333C12.6667 4.38781 10.2789 2 7.33333 2C4.38781 2 2 4.38781 2 7.33333C2 10.2789 4.38781 12.6667 7.33333 12.6667Z"
-                    stroke="#9CA3AF"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M14 14L11.1 11.1"
-                    stroke="#9CA3AF"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                <input
-                  type="text"
-                  value={brandSearchTerm}
-                  onChange={(e) => setBrandSearchTerm(e.target.value)}
-                  placeholder="Search brands..."
+                  Select all
+                </button>
+                <button
+                  onClick={handleClearAllBrands}
                   style={{
-                    width: '100%',
-                    padding: '5px 8px 5px 26px',
-                    paddingRight: brandSearchTerm ? '26px' : '8px',
-                    border: '1px solid #E5E7EB',
-                    borderRadius: '4px',
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#3B82F6',
                     fontSize: '11px',
-                    outline: 'none',
-                    boxSizing: 'border-box',
+                    cursor: 'pointer',
+                    padding: 0,
+                    fontWeight: 400,
                   }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#3B82F6';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#E5E7EB';
-                  }}
-                />
-                {brandSearchTerm && (
-                  <button
-                    type="button"
-                    onClick={() => setBrandSearchTerm('')}
-                    style={{
-                      position: 'absolute',
-                      right: '6px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      width: '14px',
-                      height: '14px',
-                      border: '1px solid #D1D5DB',
-                      borderRadius: '3px',
-                      backgroundColor: '#FFFFFF',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: 0,
-                      zIndex: 2,
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = '#9CA3AF';
-                      e.currentTarget.style.backgroundColor = '#F3F4F6';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = '#D1D5DB';
-                      e.currentTarget.style.backgroundColor = '#FFFFFF';
-                    }}
-                  >
-                    <svg
-                      width="8"
-                      height="8"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#6B7280"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                  </button>
-                )}
+                >
+                  Clear all
+                </button>
               </div>
-              
-              {/* Brands list */}
-              <div
+              <span style={{ fontSize: '11px', color: '#9CA3AF' }}>
+                {filteredBrands.length} results
+              </span>
+            </div>
+            
+            <div style={{ position: 'relative', marginBottom: '8px' }}>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 16 16"
+                fill="none"
                 style={{
-                  maxHeight: '120px',
-                  overflowY: 'auto',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '6px',
+                  position: 'absolute',
+                  left: '8px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  pointerEvents: 'none',
+                  zIndex: 1,
                 }}
               >
-                {filteredBrands.map((brand) => (
-                  <label
-                    key={brand}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      cursor: 'pointer',
-                      padding: '2px 0',
-                    }}
+                <path
+                  d="M7.33333 12.6667C10.2789 12.6667 12.6667 10.2789 12.6667 7.33333C12.6667 4.38781 10.2789 2 7.33333 2C4.38781 2 2 4.38781 2 7.33333C2 10.2789 4.38781 12.6667 7.33333 12.6667Z"
+                  stroke="#9CA3AF"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M14 14L11.1 11.1"
+                  stroke="#9CA3AF"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <input
+                type="text"
+                value={brandSearchTerm}
+                onChange={(e) => setBrandSearchTerm(e.target.value)}
+                placeholder="Search brands..."
+                style={{
+                  width: '100%',
+                  padding: '5px 8px 5px 26px',
+                  paddingRight: brandSearchTerm ? '26px' : '8px',
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#3B82F6';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = '#E5E7EB';
+                }}
+              />
+              {brandSearchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setBrandSearchTerm('')}
+                  style={{
+                    position: 'absolute',
+                    right: '6px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: '14px',
+                    height: '14px',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '3px',
+                    backgroundColor: '#FFFFFF',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0,
+                    zIndex: 2,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = '#9CA3AF';
+                    e.currentTarget.style.backgroundColor = '#F3F4F6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = '#D1D5DB';
+                    e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  }}
+                >
+                  <svg
+                    width="8"
+                    height="8"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#6B7280"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                   >
-                    <input
-                      type="checkbox"
-                      checked={selectedBrands.has(brand)}
-                      onChange={() => handleToggleBrand(brand)}
-                      style={{
-                        width: '14px',
-                        height: '14px',
-                        cursor: 'pointer',
-                        accentColor: '#3B82F6',
-                        flexShrink: 0,
-                      }}
-                    />
-                    <span style={{ fontSize: '12px', color: '#374151', lineHeight: '1.2' }}>{brand}</span>
-                  </label>
-                ))}
-              </div>
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              )}
             </div>
-          )}
-        </div>
+            
+            <div
+              style={{
+                maxHeight: '120px',
+                overflowY: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px',
+              }}
+            >
+              {filteredBrands.map((brand) => (
+                <label
+                  key={brand}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer',
+                    padding: '2px 0',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedBrands.has(brand)}
+                    onChange={() => handleToggleBrand(brand)}
+                    style={{
+                      width: '14px',
+                      height: '14px',
+                      cursor: 'pointer',
+                      accentColor: '#3B82F6',
+                      flexShrink: 0,
+                    }}
+                  />
+                  <span style={{ fontSize: '12px', color: '#374151', lineHeight: '1.2' }}>{brand}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
       )}
 
       {/* Filter by values */}
@@ -1017,16 +1006,15 @@ const SortFormulasFilterDropdown = forwardRef(({
         </div>
 
         {filterValuesExpanded && (
-          <div style={{ padding: '0 12px 8px 12px' }}>
-            {/* Select all / Clear all */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '8px',
-              }}
-            >
+        <div style={{ padding: '0 12px 8px 12px' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '8px',
+            }}
+          >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <button
                   onClick={handleSelectAll}
@@ -1062,7 +1050,6 @@ const SortFormulasFilterDropdown = forwardRef(({
               </span>
             </div>
 
-            {/* Search box */}
             <div style={{ position: 'relative', marginBottom: '8px' }}>
               <svg
                 width="12"
@@ -1162,7 +1149,6 @@ const SortFormulasFilterDropdown = forwardRef(({
               )}
             </div>
 
-            {/* Values list */}
             <div
               style={{
                 maxHeight: '140px',
@@ -1275,6 +1261,6 @@ const SortFormulasFilterDropdown = forwardRef(({
   );
 });
 
-SortFormulasFilterDropdown.displayName = 'SortFormulasFilterDropdown';
+ProductsFilterDropdown.displayName = 'ProductsFilterDropdown';
 
-export default SortFormulasFilterDropdown;
+export default ProductsFilterDropdown;

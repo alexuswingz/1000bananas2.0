@@ -249,36 +249,6 @@ const NgoosModal = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             {hasAsin && (
               <>
-                <div
-                  style={{
-                    padding: '3px 10px',
-                    borderRadius: '4px',
-                    backgroundColor: realLabelInventory < 100 ? 'rgba(220, 38, 38, 0.1)' : 'rgba(34, 197, 94, 0.1)',
-                    border: `1px solid ${realLabelInventory < 100 ? 'rgba(220, 38, 38, 0.3)' : 'rgba(34, 197, 94, 0.3)'}`,
-                    color: realLabelInventory < 100 ? '#DC2626' : '#22C55E',
-                    fontSize: '0.7rem',
-                    fontWeight: 600,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                  }}
-                >
-                  <span style={{ 
-                    width: '14px', 
-                    height: '14px', 
-                    borderRadius: '9999px', 
-                    backgroundColor: realLabelInventory < 100 ? '#DC2626' : '#22C55E',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#fff',
-                    fontSize: '9px',
-                    fontWeight: 700
-                  }}>
-                    {realLabelInventory < 100 ? '!' : '✓'}
-                  </span>
-                  Label Inventory: {realLabelInventory.toLocaleString()}
-                </div>
                 {/* Navigation arrows */}
                 <div style={{ 
                   display: 'flex', 

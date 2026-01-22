@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 import { toast } from 'sonner';
 import SortFormulasFilterDropdown from './SortFormulasFilterDropdown';
+import ProductsFilterDropdown from './ProductsFilterDropdown';
 
 const NewShipmentTable = ({
   rows,
@@ -15,7 +16,14 @@ const NewShipmentTable = ({
   labelsAvailabilityMap = {},
   forecastRange = 120,
   manuallyEditedIndicesRef = null, // Ref to expose manually edited indices to parent
+  onBrandFilterChange = null, // Callback to pass brand filter to parent
+  account = null, // Account name to determine which brands to show
 }) => {
+  // Account to Brand mapping (for checking if all brands are selected)
+  const ACCOUNT_BRAND_MAPPING = {
+    'TPS Nutrients': ['TPS Nutrients', 'Bloom City', 'TPS Plant Foods'],
+    'Total Pest Supply': ['NatureStop', "Ms. Pixie's", "Burke's", 'Mint +'],
+  };
   const { isDarkMode } = useTheme();
   const [selectedRows, setSelectedRows] = useState(new Set());
   const [addedRows, setAddedRows] = useState(new Set());
@@ -81,6 +89,41 @@ const NewShipmentTable = ({
   const nonTableFilterIconRefs = useRef({});
   const nonTableFilterDropdownRef = useRef(null);
   const [nonTableFilters, setNonTableFilters] = useState({});
+  
+  // Clean up any invalid brand filters when account changes or on mount
+  // If a brand filter has all brands selected, treat it as no filter
+  // Also clear filter if it has fewer brands than expected for the account
+  useEffect(() => {
+    if (!tableMode && account && nonTableFilters.product && nonTableFilters.product.selectedBrands) {
+      const filter = nonTableFilters.product;
+      if (filter.selectedBrands instanceof Set && filter.selectedBrands.size > 0) {
+        const accountBrands = ACCOUNT_BRAND_MAPPING[account] || ACCOUNT_BRAND_MAPPING['TPS Nutrients'];
+        
+        // Check if all brands for this account are selected
+        const allBrandsSelected = filter.selectedBrands.size === accountBrands.length &&
+          accountBrands.every(brand => filter.selectedBrands.has(brand));
+        
+        // If all brands are selected, clear the brand filter (treat as no filter)
+        // Also clear if filter has fewer brands than expected (likely a stale filter)
+        if (allBrandsSelected || filter.selectedBrands.size < accountBrands.length) {
+          setNonTableFilters(prev => {
+            const newFilters = { ...prev };
+            if (newFilters.product) {
+              newFilters.product = {
+                ...newFilters.product,
+                selectedBrands: null,
+              };
+            }
+            return newFilters;
+          });
+          // Clear brand filter in parent
+          if (onBrandFilterChange) {
+            onBrandFilterChange(null);
+          }
+        }
+      }
+    }
+  }, [tableMode, account]); // Run when account changes
   const [nonTableSortField, setNonTableSortField] = useState('');
   const [nonTableSortOrder, setNonTableSortOrder] = useState('');
   // Store the sorted order (array of row IDs) to preserve positions after sorting (one-time sort)
@@ -1381,6 +1424,14 @@ const NewShipmentTable = ({
     const filter = nonTableFilters[columnKey];
     if (!filter || filter === null || filter === undefined) return false;
     
+    // Check for brand filter (for product column)
+    if (columnKey === 'product' && filter.selectedBrands && filter.selectedBrands instanceof Set && filter.selectedBrands.size > 0) {
+      // Get account-specific brands (this would need account prop, but for now use a general check)
+      // If selectedBrands is not null and has items, it's an active filter
+      // The check for "all brands selected" is handled in the apply logic
+      return true; // Brand filter is active
+    }
+    
     // Check for condition filter
     const hasCondition = filter.conditionType && filter.conditionType !== '';
     if (hasCondition) return true;
@@ -1468,7 +1519,28 @@ const NewShipmentTable = ({
         setNonTableSortOrder('');
         setNonTableSortedRowOrder(null);
       }
+      // Clear brand filter in parent if product filter is cleared
+      if (columnKey === 'product' && onBrandFilterChange) {
+        onBrandFilterChange(null);
+      }
       return;
+    }
+    
+    // For product column, check if all brands are selected - if so, treat as no brand filter
+    let brandFilterToApply = filterData.selectedBrands || null;
+    if (columnKey === 'product' && filterData.selectedBrands && filterData.selectedBrands instanceof Set) {
+      const accountBrands = account && ACCOUNT_BRAND_MAPPING[account] 
+        ? ACCOUNT_BRAND_MAPPING[account]
+        : ACCOUNT_BRAND_MAPPING['TPS Nutrients'];
+      
+      // Check if all brands for this account are selected
+      const allBrandsSelected = filterData.selectedBrands.size === accountBrands.length &&
+        accountBrands.every(brand => filterData.selectedBrands.has(brand));
+      
+      // If all brands are selected, treat as no filter
+      if (allBrandsSelected) {
+        brandFilterToApply = null;
+      }
     }
     
     setNonTableFilters(prev => ({
@@ -1477,8 +1549,14 @@ const NewShipmentTable = ({
         selectedValues: filterData.selectedValues || new Set(),
         conditionType: filterData.conditionType || '',
         conditionValue: filterData.conditionValue || '',
+        selectedBrands: brandFilterToApply, // Include brand filter (or null if all brands selected)
       },
     }));
+    
+    // Pass brand filter to parent component for pre-filtering products
+    if (columnKey === 'product' && onBrandFilterChange) {
+      onBrandFilterChange(brandFilterToApply);
+    }
 
     // If sortOrder is provided, apply one-time sort directly (snapshot the order)
     if (filterData.sortOrder) {
@@ -1613,21 +1691,37 @@ const NewShipmentTable = ({
     
     let result = [...filteredRowsWithSelection];
     
-    // Filter to show only specific brands in non-table mode
-    const allowedBrands = ['Bloom City', 'TPS Nutrients', 'TPS Plant Foods', 'NatureStop', 'GreenThumbs'];
-    result = result.filter(row => {
-      const brand = row.brand || '';
-      return allowedBrands.some(allowedBrand => 
-        brand.toLowerCase().includes(allowedBrand.toLowerCase())
-      );
-    });
-    
     // Apply non-table filters
     Object.keys(nonTableFilters).forEach(columnKey => {
       const filter = nonTableFilters[columnKey];
       if (!filter) return;
 
       const numeric = isNonTableNumericColumn(columnKey);
+
+      // Brand filter (for product column) - applied first before other filters
+      // Only apply if selectedBrands is not null and has brands selected
+      // If all brands are selected, selectedBrands will be null (no filter)
+      if (columnKey === 'product' && filter.selectedBrands && filter.selectedBrands instanceof Set && filter.selectedBrands.size > 0) {
+        // Get account-specific brands to check if all are selected
+        const accountBrands = account && ACCOUNT_BRAND_MAPPING[account] 
+          ? ACCOUNT_BRAND_MAPPING[account]
+          : ACCOUNT_BRAND_MAPPING['TPS Nutrients'];
+        
+        // Check if all brands for this account are selected
+        const allBrandsSelected = filter.selectedBrands.size === accountBrands.length &&
+          accountBrands.every(brand => filter.selectedBrands.has(brand));
+        
+        // Only apply filter if not all brands are selected
+        if (!allBrandsSelected) {
+          result = result.filter(row => {
+            const brandValue = row.brand || '';
+            return Array.from(filter.selectedBrands).some(selectedBrand => 
+              brandValue.toLowerCase().includes(selectedBrand.toLowerCase()) ||
+              selectedBrand.toLowerCase().includes(brandValue.toLowerCase())
+            );
+          });
+        }
+      }
 
       // Value filters
       if (filter.selectedValues && filter.selectedValues.size > 0) {
@@ -3407,19 +3501,39 @@ const NewShipmentTable = ({
         
         {/* Non-table mode filter dropdown */}
         {nonTableOpenFilterColumn && nonTableFilterIconRefs.current[nonTableOpenFilterColumn] && (
-          <SortFormulasFilterDropdown
-            key={nonTableOpenFilterColumn}
-            ref={(el) => {
-              nonTableFilterDropdownRef.current = el;
-            }}
-            filterIconRef={nonTableFilterIconRefs.current[nonTableOpenFilterColumn]}
-            columnKey={nonTableOpenFilterColumn}
-            availableValues={getNonTableColumnValues(nonTableOpenFilterColumn)}
-            currentFilter={nonTableFilters[nonTableOpenFilterColumn] || {}}
-            currentSort={nonTableSortField === nonTableOpenFilterColumn ? nonTableSortOrder : ''}
-            onApply={(filterData) => handleNonTableApplyFilter(nonTableOpenFilterColumn, filterData)}
-            onClose={() => setNonTableOpenFilterColumn(null)}
-          />
+          (nonTableOpenFilterColumn === 'product' || 
+           nonTableOpenFilterColumn === 'fbaAvailable' || 
+           nonTableOpenFilterColumn === 'unitsToMake' || 
+           nonTableOpenFilterColumn === 'doiDays') ? (
+            <ProductsFilterDropdown
+              key={nonTableOpenFilterColumn}
+              ref={(el) => {
+                nonTableFilterDropdownRef.current = el;
+              }}
+              filterIconRef={nonTableFilterIconRefs.current[nonTableOpenFilterColumn]}
+              columnKey={nonTableOpenFilterColumn}
+              availableValues={getNonTableColumnValues(nonTableOpenFilterColumn)}
+              currentFilter={nonTableFilters[nonTableOpenFilterColumn] || {}}
+              currentSort={nonTableSortField === nonTableOpenFilterColumn ? nonTableSortOrder : ''}
+              onApply={(filterData) => handleNonTableApplyFilter(nonTableOpenFilterColumn, filterData)}
+              onClose={() => setNonTableOpenFilterColumn(null)}
+              account={account}
+            />
+          ) : (
+            <SortFormulasFilterDropdown
+              key={nonTableOpenFilterColumn}
+              ref={(el) => {
+                nonTableFilterDropdownRef.current = el;
+              }}
+              filterIconRef={nonTableFilterIconRefs.current[nonTableOpenFilterColumn]}
+              columnKey={nonTableOpenFilterColumn}
+              availableValues={getNonTableColumnValues(nonTableOpenFilterColumn)}
+              currentFilter={nonTableFilters[nonTableOpenFilterColumn] || {}}
+              currentSort={nonTableSortField === nonTableOpenFilterColumn ? nonTableSortOrder : ''}
+              onApply={(filterData) => handleNonTableApplyFilter(nonTableOpenFilterColumn, filterData)}
+              onClose={() => setNonTableOpenFilterColumn(null)}
+            />
+          )
         )}
       </>
     );
