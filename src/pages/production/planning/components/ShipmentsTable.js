@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
+import { getShipmentProducts } from '../../../../services/productionApi';
 
 const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
   const { isDarkMode } = useTheme();
@@ -9,6 +10,9 @@ const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
   const [filters, setFilters] = useState({});
   const [sortConfig, setSortConfig] = useState({ field: '', order: '' });
   const [sortedRowOrder, setSortedRowOrder] = useState(null); // Store sorted row IDs for one-time sort
+  const [expandedShipmentId, setExpandedShipmentId] = useState(null);
+  const [shipmentProducts, setShipmentProducts] = useState({});
+  const [loadingProducts, setLoadingProducts] = useState(false);
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -254,6 +258,42 @@ const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
 
   const displayRows = getFilteredAndSortedRows();
 
+  // Handle shipment row click to expand/collapse and fetch products
+  const handleShipmentClick = async (shipmentId, e) => {
+    // Don't expand if clicking on action button or filter icon
+    if (e.target.closest('button[type="button"]') || e.target.closest('img[alt="Filter"]')) {
+      return;
+    }
+
+    if (expandedShipmentId === shipmentId) {
+      // Collapse
+      setExpandedShipmentId(null);
+    } else {
+      // Expand and fetch products
+      setExpandedShipmentId(shipmentId);
+      
+      // Only fetch if we don't have products cached
+      if (!shipmentProducts[shipmentId]) {
+        setLoadingProducts(true);
+        try {
+          const products = await getShipmentProducts(shipmentId);
+          setShipmentProducts(prev => ({
+            ...prev,
+            [shipmentId]: products
+          }));
+        } catch (error) {
+          console.error('Error fetching products:', error);
+          setShipmentProducts(prev => ({
+            ...prev,
+            [shipmentId]: []
+          }));
+        } finally {
+          setLoadingProducts(false);
+        }
+      }
+    }
+  };
+
   const columns = [
     { key: 'status', label: 'Status', width: 160, align: 'left' },
     { key: 'marketplace', label: 'Marketplace', width: 140, align: 'left' },
@@ -350,10 +390,15 @@ const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
             const hasComment = row.formulaCheckComment || row.labelCheckComment;
             const statusColor = hasComment ? '#F59E0B' : (row.statusColor || '#10B981');
 
+            const isExpanded = expandedShipmentId === row.id;
+            const products = shipmentProducts[row.id] || [];
+
             return (
+            <React.Fragment key={row.id}>
             <tr
-              key={row.id}
               className={`${themeClasses.rowHover} transition-colors duration-150`}
+              onClick={(e) => handleShipmentClick(row.id, e)}
+              style={{ cursor: 'pointer' }}
             >
               {/* Status with badge and chevron */}
               <td style={{ padding: '0.75rem 1rem', verticalAlign: 'middle', borderTop: '1px solid #E5E7EB' }}>
@@ -415,7 +460,12 @@ const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
                   </span>
                   {/* Chevron */}
                   <svg
-                    style={{ width: '0.85rem', height: '0.85rem' }}
+                    style={{ 
+                      width: '0.85rem', 
+                      height: '0.85rem',
+                      transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.2s'
+                    }}
                     fill="none"
                     stroke={isDarkMode ? '#9CA3AF' : '#9CA3AF'}
                     viewBox="0 0 24 24"
@@ -489,6 +539,160 @@ const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
                 </button>
               </td>
             </tr>
+            
+            {/* Non-table mode products display */}
+            {isExpanded && (
+              <tr>
+                <td colSpan={columns.length} style={{ padding: 0, borderTop: 'none' }}>
+                  <div
+                    style={{
+                      backgroundColor: isDarkMode ? '#0F172A' : '#F9FAFB',
+                      padding: '24px',
+                      borderTop: `1px solid ${isDarkMode ? '#1E293B' : '#E5E7EB'}`,
+                    }}
+                  >
+                    {loadingProducts ? (
+                      <div style={{ textAlign: 'center', padding: '2rem', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
+                        Loading products...
+                      </div>
+                    ) : products.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '2rem', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
+                        No products found for this shipment
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {/* Products Header */}
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 140px 220px 140px',
+                            padding: '12px 16px',
+                            borderBottom: `1px solid ${isDarkMode ? '#1E293B' : '#E5E7EB'}`,
+                            marginBottom: '8px',
+                          }}
+                        >
+                          <div style={{ fontSize: '12px', fontWeight: 600, color: isDarkMode ? '#9CA3AF' : '#6B7280', textTransform: 'uppercase', marginLeft: '20px' }}>
+                            Products
+                          </div>
+                          <div style={{ fontSize: '12px', fontWeight: 600, color: isDarkMode ? '#9CA3AF' : '#6B7280', textTransform: 'uppercase', textAlign: 'center', paddingLeft: '16px', marginLeft: '-220px', marginRight: '20px' }}>
+                            Inventory
+                          </div>
+                          <div style={{ fontSize: '12px', fontWeight: 600, color: isDarkMode ? '#9CA3AF' : '#6B7280', textTransform: 'uppercase', textAlign: 'center', paddingLeft: '16px', marginLeft: '-220px', marginRight: '20px' }}>
+                            Quantity
+                          </div>
+                          <div style={{ fontSize: '12px', fontWeight: 600, color: isDarkMode ? '#9CA3AF' : '#6B7280', textTransform: 'uppercase', textAlign: 'center', paddingLeft: '16px', marginLeft: '-220px', marginRight: '20px' }}>
+                            Status
+                          </div>
+                        </div>
+
+                        {/* Products List */}
+                        {products.map((product, index) => {
+                          const asin = product.asin || product.child_asin || product.childAsin || '';
+                          return (
+                            <div
+                              key={product.id || index}
+                              style={{
+                                display: 'grid',
+                                gridTemplateColumns: '1fr 140px 220px 140px',
+                                height: '66px',
+                                padding: '8px 16px',
+                                backgroundColor: isDarkMode ? '#1A2235' : '#FFFFFF',
+                                alignItems: 'center',
+                                gap: '32px',
+                                boxSizing: 'border-box',
+                                position: 'relative',
+                                borderBottom: `1px solid ${isDarkMode ? '#1E293B' : '#E5E7EB'}`,
+                              }}
+                            >
+                              {/* Border line with 30px margin on both sides */}
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  bottom: 0,
+                                  left: '30px',
+                                  right: '30px',
+                                  height: '1px',
+                                  backgroundColor: isDarkMode ? '#374151' : '#E5E7EB'
+                                }}
+                              />
+                              
+                              {/* PRODUCTS Column */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                {/* Product Icon */}
+                                <div style={{ width: '36px', height: '36px', minWidth: '36px', borderRadius: '3px', overflow: 'hidden', backgroundColor: isDarkMode ? '#374151' : '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginLeft: '20px' }}>
+                                  {product.imageUrl || product.smallImage || product.image ? (
+                                    <img 
+                                      src={product.imageUrl || product.smallImage || product.image} 
+                                      alt={product.product || product.name} 
+                                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                      onError={(e) => { 
+                                        e.target.style.display = 'none'; 
+                                        if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'; 
+                                      }} 
+                                    />
+                                  ) : null}
+                                  <div style={{ display: product.imageUrl || product.smallImage || product.image ? 'none' : 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', borderRadius: '3px', gap: '7.5px', color: isDarkMode ? '#6B7280' : '#9CA3AF', fontSize: '12px' }}>
+                                    No img
+                                  </div>
+                                </div>
+                                
+                                {/* Product Info */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: 0 }}>
+                                  {/* Product Name */}
+                                  <span 
+                                    style={{ 
+                                      fontSize: '14px', 
+                                      fontWeight: 500, 
+                                      color: isDarkMode ? '#F9FAFB' : '#111827',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap'
+                                    }}
+                                  >
+                                    {product.product || product.name || 'N/A'}
+                                  </span>
+                                  
+                                  {/* Product ID and Brand/Size on same line */}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px', flexWrap: 'wrap' }}>
+                                    {/* Product ID */}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      <span style={{ fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
+                                        {asin || 'N/A'}
+                                      </span>
+                                    </div>
+                                    
+                                    {/* Brand and Size */}
+                                    <span style={{ fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
+                                      {product.brand || 'N/A'} • {product.size || 'N/A'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* INVENTORY Column */}
+                              <div style={{ textAlign: 'center', fontSize: '14px', fontWeight: 500, color: isDarkMode ? '#F9FAFB' : '#111827', paddingLeft: '16px', marginLeft: '-220px', marginRight: '20px' }}>
+                                {(product.fbaAvailable || product.inventory || 0).toLocaleString()}
+                              </div>
+
+                              {/* QUANTITY Column */}
+                              <div style={{ textAlign: 'center', fontSize: '14px', fontWeight: 500, color: isDarkMode ? '#F9FAFB' : '#111827', paddingLeft: '16px', marginLeft: '-220px', marginRight: '20px' }}>
+                                {product.quantity || product.qty || 0}
+                              </div>
+
+                              {/* STATUS Column */}
+                              <div style={{ textAlign: 'center', fontSize: '14px', fontWeight: 500, color: isDarkMode ? '#F9FAFB' : '#111827', paddingLeft: '16px', marginLeft: '-220px', marginRight: '20px' }}>
+                                {product.status || 'N/A'}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            )}
+            </React.Fragment>
             );
           })}
         </tbody>

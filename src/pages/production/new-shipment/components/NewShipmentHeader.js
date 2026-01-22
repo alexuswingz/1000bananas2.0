@@ -151,7 +151,7 @@ const NewShipmentHeader = ({
   return (
     <div style={{ 
       backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-      padding: '16px 24px',
+      padding: '16px 24px 0 24px',
       borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
     }}>
       {/* Top Row - Back button and Order Info */}
@@ -934,7 +934,6 @@ const NewShipmentHeader = ({
         gap: '0px',
         marginTop: '16px',
         borderTop: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
-        borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
       }}>
         <button
           type="button"

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 import { toast } from 'sonner';
@@ -1943,8 +1943,8 @@ const NewShipmentTable = ({
     }
   }, [someSelected]);
 
-  // Position popup when it appears
-  useEffect(() => {
+  // Function to position the popup - instant updates, no lag
+  const positionPopup = useCallback(() => {
     if (clickedQtyIndex !== null) {
       // Try to use warning icon ref first (for non-table mode), fallback to qtyContainer
       const warningIcon = warningIconRefs.current[clickedQtyIndex];
@@ -1954,12 +1954,13 @@ const NewShipmentTable = ({
       const targetElement = warningIcon || qtyContainer;
       
       if (targetElement && popup) {
+        // Get current position of the icon relative to viewport
         const rect = targetElement.getBoundingClientRect();
-        const popupHeight = popup.offsetHeight || 200;
         // Position below the warning icon or container, moved 110px higher total
         const top = rect.bottom - 106;
         const left = rect.left + rect.width / 2;
         
+        // Update immediately - direct DOM manipulation for zero lag
         popup.style.position = 'fixed';
         popup.style.top = `${top}px`;
         popup.style.left = `${left}px`;
@@ -1967,6 +1968,66 @@ const NewShipmentTable = ({
       }
     }
   }, [clickedQtyIndex]);
+
+  // Position popup when it appears
+  useEffect(() => {
+    positionPopup();
+  }, [positionPopup]);
+
+  // Update popup position on scroll and resize - continuous RAF loop for zero lag
+  useEffect(() => {
+    if (clickedQtyIndex !== null) {
+      let rafId = null;
+      let isActive = true;
+      
+      // Continuous update loop using requestAnimationFrame
+      const updateLoop = () => {
+        if (isActive && clickedQtyIndex !== null) {
+          positionPopup();
+          rafId = requestAnimationFrame(updateLoop);
+        }
+      };
+      
+      // Start the continuous update loop
+      rafId = requestAnimationFrame(updateLoop);
+      
+      // Also update immediately on scroll/resize events for instant response
+      const handleScroll = () => {
+        if (isActive) {
+          positionPopup();
+        }
+      };
+      
+      const handleResize = () => {
+        if (isActive) {
+          positionPopup();
+        }
+      };
+      
+      // Add event listeners to window and all scrollable parents
+      // Use capture phase to catch all scroll events (including nested scrollable elements)
+      window.addEventListener('scroll', handleScroll, { capture: true, passive: true });
+      window.addEventListener('resize', handleResize);
+      
+      // Also listen to scroll on any scrollable parent containers
+      const scrollableParents = document.querySelectorAll('[data-table-container], .scrollable, [style*="overflow"]');
+      scrollableParents.forEach(parent => {
+        parent.addEventListener('scroll', handleScroll, { capture: true, passive: true });
+      });
+      
+      return () => {
+        isActive = false;
+        if (rafId) {
+          cancelAnimationFrame(rafId);
+        }
+        window.removeEventListener('scroll', handleScroll, { capture: true, passive: true });
+        window.removeEventListener('resize', handleResize);
+        scrollableParents.forEach(parent => {
+          parent.removeEventListener('scroll', handleScroll, { capture: true, passive: true });
+        });
+      };
+    }
+  }, [clickedQtyIndex, positionPopup]);
 
   // Position Add button popup when it appears
   useEffect(() => {
@@ -3112,6 +3173,7 @@ const NewShipmentTable = ({
                           flexDirection: 'column',
                           gap: '6px',
                           boxSizing: 'border-box',
+                          // No transition - instant updates for fast scrolling
                         }}
                         onClick={(e) => {
                           e.stopPropagation();

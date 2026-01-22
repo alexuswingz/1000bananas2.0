@@ -2013,7 +2013,7 @@ const NewShipment = () => {
                     whiteSpace: 'nowrap'
                   }}
                 >
-                  Product Catalog
+                  My Products
                 </div>
                 
                 {/* Navigation Tabs */}
@@ -2022,23 +2022,23 @@ const NewShipment = () => {
                     display: 'flex', 
                     alignItems: 'center', 
                     gap: '4px',
-                    padding: '2px',
-                    borderRadius: '6px',
+                    padding: '4px',
+                    borderRadius: '8px',
                     border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
-                    backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF'
+                    backgroundColor: isDarkMode ? '#0B111E' : '#FFFFFF'
                   }}
                 >
                   <div
                     onClick={handleAllProductsClick}
                     style={{
-                      padding: '6px 12px',
-                      borderRadius: '4px',
+                      padding: '4px 8px',
+                      height: '23px',
+                      minHeight: '23px',
+                      borderRadius: activeView === 'all-products' ? '4px' : '4px 0 0 4px',
                       backgroundColor: activeView === 'all-products' 
-                        ? (isDarkMode ? '#1E293B' : '#F1F5F9') 
+                        ? (isDarkMode ? '#2E3541' : '#F1F5F9') 
                         : 'transparent',
-                      border: activeView === 'all-products' 
-                        ? 'none' 
-                        : `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
+                      border: 'none',
                       color: activeView === 'all-products' 
                         ? (isDarkMode ? '#FFFFFF' : '#3B82F6') 
                         : (isDarkMode ? '#9CA3AF' : '#6B7280'),
@@ -2048,7 +2048,8 @@ const NewShipment = () => {
                       transition: 'all 0.2s',
                       display: 'flex',
                       alignItems: 'center',
-                      whiteSpace: 'nowrap'
+                      whiteSpace: 'nowrap',
+                      boxSizing: 'border-box'
                     }}
                   >
                     All ({products.length})
@@ -2057,35 +2058,30 @@ const NewShipment = () => {
                     ref={floorInventoryButtonRef}
                     onClick={() => setIsFloorInventoryOpen(!isFloorInventoryOpen)}
                     style={{
-                      padding: '6px 12px',
-                      borderRadius: '4px',
-                      backgroundColor: activeView === 'floor-inventory' 
-                        ? (isDarkMode ? '#1E293B' : '#F1F5F9') 
-                        : 'transparent',
-                      border: activeView === 'floor-inventory' 
-                        ? 'none' 
-                        : `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
-                      color: activeView === 'floor-inventory' 
-                        ? (isDarkMode ? '#FFFFFF' : '#3B82F6') 
-                        : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+                      padding: '4px 8px',
+                      height: '23px',
+                      minHeight: '23px',
+                      borderRadius: '0 4px 4px 0',
+                      backgroundColor: isDarkMode ? '#0B111E' : '#FFFFFF',
+                      border: 'none',
+                      color: isDarkMode ? '#AEB1B6' : '#6B7280',
                       fontSize: '14px',
-                      fontWeight: activeView === 'floor-inventory' ? 600 : 500,
+                      fontWeight: 500,
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '6px',
+                      gap: '10px',
                       position: 'relative',
                       transition: 'all 0.2s',
-                      whiteSpace: 'nowrap'
+                      whiteSpace: 'nowrap',
+                      boxSizing: 'border-box'
                     }}
                   >
                     Floor Inventory
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path 
                         d="M3 4.5L6 7.5L9 4.5" 
-                        stroke={activeView === 'floor-inventory' 
-                          ? (isDarkMode ? '#FFFFFF' : '#3B82F6') 
-                          : (isDarkMode ? '#9CA3AF' : '#6B7280')} 
+                        stroke={isDarkMode ? '#AEB1B6' : '#6B7280'} 
                         strokeWidth="1.5" 
                         strokeLinecap="round" 
                         strokeLinejoin="round"
