@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
 const NewShipmentHeader = ({
@@ -23,6 +23,7 @@ const NewShipmentHeader = ({
   productsAddedAfterExport = false,
   canAccessTab,
 }) => {
+  const location = useLocation();
   // Stepper logic - determine which tabs are accessible
   // Workflow: Add Products → (Label Check & Formula Check in any order) → Book Shipment → Sort Products → Sort Formulas
   const tabOrder = ['add-products', 'label-check', 'formula-check', 'book-shipment', 'sort-products', 'sort-formulas'];
@@ -160,7 +161,19 @@ const NewShipmentHeader = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
           <button
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={() => {
+              // If coming from planning, navigate back with refresh flag
+              if (location.state?.fromPlanning) {
+                navigate('/dashboard/production/planning', {
+                  state: {
+                    activeTab: 'shipments',
+                    refresh: true,
+                  }
+                });
+              } else {
+                navigate(-1);
+              }
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',

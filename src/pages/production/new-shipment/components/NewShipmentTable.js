@@ -2294,7 +2294,7 @@ const NewShipmentTable = ({
       setNonTableSelectedIndices(newSelected);
       setNonTableLastSelectedIndex(arrayIndex);
     } else {
-      // Regular click: Select only this item
+      // Regular click: Select only this item (modal opens on double-click)
       setNonTableSelectedIndices(new Set([originalIndex]));
       setNonTableLastSelectedIndex(arrayIndex);
     }
@@ -2643,7 +2643,29 @@ const NewShipmentTable = ({
               return (
                 <div
                   key={`${row.id}-${index}`}
-                  onClick={(e) => handleNonTableRowClick(e, arrayIndex, index)}
+                  onClick={(e) => {
+                    // Only handle selection if not clicking on interactive elements
+                    if (
+                      !e.target.closest('input') &&
+                      !e.target.closest('button') &&
+                      !e.target.closest('img[alt="Copy"]')
+                    ) {
+                      handleNonTableRowClick(e, arrayIndex, index);
+                    }
+                  }}
+                  onDoubleClick={(e) => {
+                    // Open N-GOOS modal on double-click
+                    if (
+                      !e.target.closest('input') &&
+                      !e.target.closest('button') &&
+                      !e.target.closest('img[alt="Copy"]') &&
+                      onProductClick &&
+                      arrayIndex < currentRows.length
+                    ) {
+                      const clickedRow = currentRows[arrayIndex];
+                      onProductClick(clickedRow, false);
+                    }
+                  }}
                   onMouseEnter={() => setHoveredRowIndex(index)}
                   onMouseLeave={() => setHoveredRowIndex(null)}
                   style={{

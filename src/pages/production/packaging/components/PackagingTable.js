@@ -1673,6 +1673,9 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   }}
                   onClick={() => {
                     console.log('Product Notes clicked for:', selectedRow);
+                    // Open the production notes modal
+                    setSelectedProductForNotes(selectedRow);
+                    // Also call parent callback if provided
                     if (onProductNotes) {
                       onProductNotes(selectedRow);
                     }

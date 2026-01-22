@@ -218,13 +218,27 @@ export const createShipment = async (shipmentData) => {
       body: JSON.stringify(shipmentData),
     });
     
-    const data = await response.json();
-    
-    if (!data.success) {
-      throw new Error(data.error || 'Failed to create shipment');
+    // Check if response is ok before parsing
+    if (!response.ok) {
+      let errorMessage = 'Failed to create shipment';
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorData.message || errorMessage;
+      } catch (e) {
+        errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+      }
+      throw new Error(errorMessage);
     }
     
-    return data.data;
+    const data = await response.json();
+    
+    // Handle both { success: true, data: {...} } and direct response formats
+    if (data.success === false) {
+      throw new Error(data.error || data.message || 'Failed to create shipment');
+    }
+    
+    // Return data.data if it exists (wrapped response), otherwise return data directly
+    return data.data || data;
   } catch (error) {
     console.error('Error creating shipment:', error);
     throw error;

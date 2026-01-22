@@ -78,6 +78,34 @@ const getAllowedBrandsForAccount = (account) => {
 
 const knownCarriers = ['WeShip', 'TopCarrier', 'Worldwide Express'];
 
+// Load hazmat classification data
+let hazmatClassificationMap = null;
+const loadHazmatClassification = async () => {
+  if (hazmatClassificationMap) return hazmatClassificationMap;
+  
+  try {
+    const response = await fetch('/test13.json');
+    const data = await response.json();
+    // Create a map: product name (lowercase) -> hazmat status ("Yes" or "No")
+    hazmatClassificationMap = {};
+    data.forEach(item => {
+      const productName = (item.Product || '').toLowerCase().trim();
+      if (productName) {
+        // Use the first occurrence of each product name, or update if we find "Yes"
+        if (!hazmatClassificationMap[productName] || item.Hazmat === 'Yes') {
+          hazmatClassificationMap[productName] = item.Hazmat || 'No';
+        }
+      }
+    });
+    console.log(`✅ Loaded hazmat classification for ${Object.keys(hazmatClassificationMap).length} products`);
+    return hazmatClassificationMap;
+  } catch (error) {
+    console.error('Error loading hazmat classification:', error);
+    return {};
+  }
+};
+
+
 const NewShipment = () => {
   const { isDarkMode } = useTheme();
   const { sidebarWidth } = useSidebar();
@@ -704,9 +732,30 @@ const NewShipment = () => {
       
       // Filter by account's allowed brands
       const allowedBrands = getAllowedBrandsForAccount(shipmentData.account);
-      const filteredProducts = allowedBrands.length > 0 
+      let filteredProducts = allowedBrands.length > 0 
         ? sortedProducts.filter(p => allowedBrands.includes(p.brand))
         : sortedProducts;
+      
+      // Apply shipment type filters based on hazmat classification
+      const shipmentType = shipmentData.shipmentType || shipmentData.shipment_type || '';
+      
+      if (shipmentType === 'Hazmat') {
+        // For Hazmat: only show products where Hazmat = "Yes"
+        filteredProducts = filteredProducts.filter(p => {
+          const productName = (p.product || p.product_name || '').toLowerCase().trim();
+          const hazmatStatus = hazmatMap[productName] || 'No';
+          return hazmatStatus === 'Yes';
+        });
+        console.log(`✅ Filtered to ${filteredProducts.length} hazmat products for Hazmat shipment`);
+      } else if (shipmentType === 'FBA' || shipmentType === 'AWD') {
+        // For FBA/AWD: only show products where Hazmat = "No"
+        filteredProducts = filteredProducts.filter(p => {
+          const productName = (p.product || p.product_name || '').toLowerCase().trim();
+          const hazmatStatus = hazmatMap[productName] || 'No';
+          return hazmatStatus === 'No';
+        });
+        console.log(`✅ Filtered to ${filteredProducts.length} non-hazmat products for ${shipmentType} shipment`);
+      }
       
       setProducts(filteredProducts);
       setDataAsOfDate(new Date()); // Mark data as fresh
@@ -778,6 +827,84 @@ const NewShipment = () => {
     }
   }, [location.state]);
 
+  // Track if we've attempted to create shipment from planning (prevent duplicate attempts)
+  const shipmentCreationAttemptedRef = useRef(false);
+
+  // Create shipment immediately when coming from planning (even without products)
+  useEffect(() => {
+    const createShipmentFromPlanning = async () => {
+      // Only create if:
+      // 1. Coming from planning
+      // 2. No shipmentId exists yet
+      // 3. We have shipmentData from navigation
+      // 4. We haven't already attempted to create it
+      if (location.state?.fromPlanning && !shipmentId && location.state?.shipmentData && !shipmentCreationAttemptedRef.current) {
+        const navShipmentData = location.state.shipmentData;
+        
+        // Validate required fields
+        if (!navShipmentData.shipmentName || !navShipmentData.shipmentType || !navShipmentData.account) {
+          console.warn('Missing required fields for shipment creation:', navShipmentData);
+          return;
+        }
+        
+        shipmentCreationAttemptedRef.current = true;
+        
+        try {
+          setLoading(true);
+          const shipmentPayload = {
+            shipment_number: navShipmentData.shipmentName,
+            shipment_date: new Date().toISOString().split('T')[0],
+            shipment_type: navShipmentData.shipmentType,
+            marketplace: navShipmentData.marketplace || 'Amazon',
+            account: navShipmentData.account,
+            location: navShipmentData.location || '',
+            created_by: 'current_user', // TODO: Get from auth context
+          };
+          
+          console.log('Creating shipment from planning:', shipmentPayload);
+          const newShipment = await createShipment(shipmentPayload);
+          
+          // Handle different response formats
+          const shipmentId = newShipment?.id || newShipment?.shipment_id || newShipment?.data?.id;
+          const shipmentNumber = newShipment?.shipment_number || newShipment?.shipmentNumber || navShipmentData.shipmentName;
+          
+          if (shipmentId) {
+            setShipmentId(shipmentId);
+            setShipmentData(prev => ({
+              ...prev,
+              shipmentNumber: shipmentNumber,
+              shipmentDate: newShipment.shipment_date || newShipment.shipmentDate || new Date().toISOString().split('T')[0],
+              shipmentType: newShipment.shipment_type || newShipment.shipmentType || navShipmentData.shipmentType,
+              account: newShipment.account || navShipmentData.account,
+              marketplace: newShipment.marketplace || navShipmentData.marketplace || 'Amazon',
+            }));
+            console.log('Shipment created successfully:', shipmentId);
+          } else {
+            console.error('Invalid response from createShipment API:', newShipment);
+            throw new Error('Invalid response from createShipment API - missing shipment ID');
+          }
+        } catch (error) {
+          console.error('Error creating shipment from planning:', error);
+          // Only show error toast if it's not a network error or if we have a meaningful error message
+          const errorMessage = error?.message || error?.error || 'Failed to create shipment';
+          // Check if error message contains useful information
+          if (errorMessage && !errorMessage.includes('NetworkError') && !errorMessage.includes('Failed to fetch')) {
+            toast.error(errorMessage);
+          } else {
+            // For network errors, show a more user-friendly message
+            toast.error('Unable to create shipment. Please check your connection and try again.');
+          }
+          // Reset the ref so user can try again if needed
+          shipmentCreationAttemptedRef.current = false;
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    createShipmentFromPlanning();
+  }, [location.state?.fromPlanning, location.state?.shipmentData, shipmentId]);
+
   // Load existing shipment when shipmentId is set
   useEffect(() => {
     // Reset per-shipment selections when switching shipments
@@ -785,7 +912,7 @@ const NewShipment = () => {
 
     if (shipmentId) {
       loadShipment();
-    } else if (location.state?.shipmentData) {
+    } else if (location.state?.shipmentData && !location.state?.fromPlanning) {
       setShipmentData(location.state.shipmentData);
     }
   }, [shipmentId]);
@@ -879,6 +1006,14 @@ const NewShipment = () => {
   // Load products from API
   const [allProducts, setAllProducts] = useState([]); // Unfiltered products (all brands)
   const [products, setProducts] = useState([]); // Filtered by account's allowed brands
+  const [hazmatMap, setHazmatMap] = useState({}); // Hazmat classification map
+
+  // Load hazmat classification on mount
+  useEffect(() => {
+    loadHazmatClassification().then(map => {
+      setHazmatMap(map);
+    });
+  }, []);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [qtyValues, setQtyValues] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
@@ -894,19 +1029,40 @@ const NewShipment = () => {
     setLastAccount(shipmentData.account);
   }, [shipmentData.account, lastAccount]);
   
-  // Re-filter products when account changes (but NOT on initial load)
+  // Re-filter products when account or shipment type changes (but NOT on initial load)
   useEffect(() => {
     // Skip if no products loaded yet or if this is initial load (lastAccount not set)
     if (allProducts.length === 0 || lastAccount === null) {
       return;
     }
     
-    // Only re-filter if account actually changed
+    // Only re-filter if account or shipment type actually changed
     if (lastAccount !== shipmentData.account) {
       const allowedBrands = getAllowedBrandsForAccount(shipmentData.account);
-      const filteredProducts = allowedBrands.length > 0 
+      let filteredProducts = allowedBrands.length > 0 
         ? allProducts.filter(p => allowedBrands.includes(p.brand))
         : allProducts;
+      
+      // Apply shipment type filters
+      const shipmentType = shipmentData.shipmentType || shipmentData.shipment_type || '';
+      
+      if (shipmentType === 'Hazmat') {
+        // For Hazmat: only show products where Hazmat = "Yes"
+        filteredProducts = filteredProducts.filter(p => {
+          const productName = (p.product || p.product_name || '').toLowerCase().trim();
+          const hazmatStatus = hazmatMap[productName] || 'No';
+          return hazmatStatus === 'Yes';
+        });
+        console.log(`✅ Filtered to ${filteredProducts.length} hazmat products for Hazmat shipment`);
+      } else if (shipmentType === 'FBA' || shipmentType === 'AWD') {
+        // For FBA/AWD: only show products where Hazmat = "No"
+        filteredProducts = filteredProducts.filter(p => {
+          const productName = (p.product || p.product_name || '').toLowerCase().trim();
+          const hazmatStatus = hazmatMap[productName] || 'No';
+          return hazmatStatus === 'No';
+        });
+        console.log(`✅ Filtered to ${filteredProducts.length} non-hazmat products for ${shipmentType} shipment`);
+      }
       
       setProducts(filteredProducts);
       
@@ -927,7 +1083,7 @@ const NewShipment = () => {
       console.log(`Account changed from "${lastAccount}" to "${shipmentData.account}".`);
       console.log(`Showing ${filteredProducts.length} of ${allProducts.length} products`);
     }
-  }, [shipmentData.account, allProducts, lastAccount]);
+  }, [shipmentData.account, shipmentData.shipmentType, shipmentData.shipment_type, allProducts, lastAccount, hazmatMap]);
 
   // Map shipment products to qtyValues once products are loaded
   useEffect(() => {

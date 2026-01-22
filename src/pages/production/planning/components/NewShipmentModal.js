@@ -206,8 +206,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
             <input
               type="text"
               value={newShipment.shipmentName || ''}
-              readOnly
-              disabled
+              onChange={(e) => setNewShipment((prev) => ({ ...prev, shipmentName: e.target.value }))}
               placeholder="Auto-generated timestamp..."
               style={{
                 width: '100%',
@@ -215,10 +214,10 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                 border: `1px solid ${isDarkMode ? '#374151' : '#D1D5DB'}`,
                 borderRadius: '6px',
                 fontSize: '14px',
-                color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                backgroundColor: isDarkMode ? '#374151' : '#F9FAFB',
+                color: '#111827',
+                backgroundColor: '#FFFFFF',
                 outline: 'none',
-                cursor: 'not-allowed',
+                cursor: 'text',
               }}
             />
           </div>

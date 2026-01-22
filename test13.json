@@ -1,0 +1,3562 @@
+[
+  {
+    "Product": "pH Down",
+    "Hazmat": "Yes"
+  },
+  {
+    "Product": "pH Down",
+    "Hazmat": "Yes"
+  },
+  {
+    "Product": "pH Down",
+    "Hazmat": "Yes"
+  },
+  {
+    "Product": "pH Down - TPS",
+    "Hazmat": "Yes"
+  },
+  {
+    "Product": "pH Down - TPS",
+    "Hazmat": "Yes"
+  },
+  {
+    "Product": "pH Down - TPS",
+    "Hazmat": "Yes"
+  },
+  {
+    "Product": "pH Kit",
+    "Hazmat": "Yes"
+  },
+  {
+    "Product": "pH Kit",
+    "Hazmat": "Yes"
+  },
+  {
+    "Product": "pH Kit",
+    "Hazmat": "Yes"
+  },
+  {
+    "Product": "pH Kit",
+    "Hazmat": "Yes"
+  },
+  {
+    "Product": "pH Kit",
+    "Hazmat": "Yes"
+  },
+  {
+    "Product": "pH Up",
+    "Hazmat": "Yes"
+  },
+  {
+    "Product": "pH Up",
+    "Hazmat": "Yes"
+  },
+  {
+    "Product": "pH Up",
+    "Hazmat": "Yes"
+  },
+  {
+    "Product": "pH Up - TPS",
+    "Hazmat": "Yes"
+  },
+  {
+    "Product": "pH Up - TPS",
+    "Hazmat": "Yes"
+  },
+  {
+    "Product": "pH Up - TPS",
+    "Hazmat": "Yes"
+  },
+  {
+    "Product": "10-10-10 Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "10-10-10 Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "10-10-10 Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "10-10-10 Fertilizer For Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "10-10-10 Fertilizer For Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "10-10-10 Fertilizer For Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "10-10-10 Fertilizer For Trees",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "10-10-10 Fertilizer For Trees",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "10-10-10 Fertilizer For Trees",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "10-10-10 Fertilizer For Vegetables",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "10-10-10 Fertilizer For Vegetables",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "10-10-10 Fertilizer For Vegetables",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "4-4-4 Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "4-4-4 Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "4-4-4 Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "5-10-10 Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "5-10-10 Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "5-10-10 Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "5-10-5 Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "5-10-5 Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "5-10-5 Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "5-5-5 Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "5-5-5 fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "5-5-5 fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "7-7-7 Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "7-7-7 Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "7-7-7 Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "8-8-8 fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "8-8-8 fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "8-8-8 fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Acid Loving Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Acid Loving Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Acidic Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Acidic Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Acidic Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "African Violet Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "African Violet Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "African Violet Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Air Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Air Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Air Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Air Plant Fertilizer Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "All Purpose Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "All Purpose Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "All Purpose Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "All Purpose Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "All Purpose Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "All Purpose NPK Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "All Purpose NPK Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "All Purpose NPK Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Alocasia Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Alocasia Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Aloe Vera Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Aloe Vera Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Aloe Vera Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Amaryllis Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Amaryllis Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ammonium Nitrate Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ammonium Nitrate Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ammonium Nitrate Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ant Killer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ant Killer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ant Killer Indoor",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ant Killer Indoor",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ant Repellent Indoor",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ant Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "anthurium fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "anthurium fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Anthurium Fertilizer Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Apple Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Apple Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Apple Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Aquarium Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Aquarium Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Aquatic Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Aquatic Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Arborvitae Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Arborvitae Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Arborvitae Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Aspen Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Aspen Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Aspen Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Avocado Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Avocado Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Avocado Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Azalea Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Azalea Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Azalea Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Baby & Toddler Mosquito Repellent",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Baby & Toddler Mosquito Repellent",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bamboo Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bamboo Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Banana Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Banana Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Banana Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Base AB",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Base AB",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Basil Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Basil Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bed Bug Killer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bed Bug Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bed Bug Spray For Mattress",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bed Bug Spray Travel Size",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Begonia fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Begonia fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bermuda Grass Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bermuda Grass Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bermuda Grass Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Berry Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Berry Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Berry Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Berry Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Berry Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Billions",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Billions",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Billions",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Billions",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Billions",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Billions",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Birch Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Birch Tree fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Birch Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bird of Paradise Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bird of Paradise Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bird of Paradise Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bird Repellent Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Blackberry Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Blackberry Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Blackberry Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bloom Boost",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bloom Boost",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bloom Boost",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bloom Boost",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bloom Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bloom Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bloom Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Blueberry Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Blueberry Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Blueberry Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bonsai Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bonsai Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bonsai Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bonsai Fertilizer Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Boston Fern Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Boston Fern Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bougainvillea Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bougainvillea Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Boxwood Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Boxwood Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Boxwood Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Brazilian Wood Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Brazilian Wood Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Brazilian Wood Plant Food Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bromeliad Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bromeliad Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bromeliad Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Buffalo Grass Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Buffalo Grass Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Buffalo Grass Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bug Repellent",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bug Repellent",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bug Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bug Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bulb Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bulb Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bush Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bush Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Bush Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Butterfly Bush fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Butterfly Bush fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Cactus Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Cactus Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Cactus Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Calcium for Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Calcium for Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Calcium for Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Calcium Nitrate Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Calcium Nitrate Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Calcium Nitrate Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "CAL-MAG",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "CAL-MAG",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "CAL-MAG",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "CAL-MAG",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Cal-Mag Complete",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Cal-Mag Complete",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Cal-Mag Complete",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Cal-Mag Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Cal-Mag Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Cal-Mag Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Cal-Mag OAC",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Cal-Mag OAC",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Cal-Mag OAC",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Camellia Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Camellia Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Canopy Boost",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Canopy Boost",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Canopy Boost",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Canopy Boost",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Canopy Boost",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Canopy Boost",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Canopy Boost",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Carnivorous Plant Fertilizer Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Carnivorous Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Carnivorous Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "carpet beetle killer indoor",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Centipede Repellent Indoor",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Chelated Iron For Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Chelated Iron For Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Chelated Iron For Trees",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Chelated Iron For Trees",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Cherry Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Cherry Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Cherry Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Chigger Repellent For Humans",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Chipmunk Repellent Outdoor",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Christmas Cactus Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Christmas Cactus Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Christmas Cactus Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Cinnamon Oil For Pest Control",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Citrus + Fruit Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Citrus + Fruit Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Citrus + Fruit Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Citrus + Fruit Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Citrus + Fruit Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Citrus Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Citrus Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Citrus Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Citrus Tree Fertilizer Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "CleanKelp Seaweed Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "CleanKelp Seaweed Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "CleanKelp Seaweed Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Clematis Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Clematis Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Clover Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Clover Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Clover Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Compost Starter",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Compost Starter",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Compost Starter",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Compost Tea",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Compost Tea",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Compost Tea",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Compost Tea for Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Compost Tea for Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Corn Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Corn Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Corn Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Crepe Myrtle Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Crepe Myrtle Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Crepe Myrtle Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Cricket Repellent Indoor",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "curry leaf plant fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "curry leaf plant fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Cut Flower Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Cut Flower Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Daffodil Bulb Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Daffodil Bulb Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Dahlia Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Dahlia Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Deet Free Mosquito Repellent",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Deet Free Mosquito Repellent",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "desert rose fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "desert rose fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Desert Rose Fertilizer Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Dogwood Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Dogwood Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Dogwood Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Dracaena Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Dracaena Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Dracaena Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Dracaena Fertilizer Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Dragon Fruit Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Dragon Fruit Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Eco-Friendly Bug Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Eco-Friendly Bug Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Elephant Ear Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Elephant Ear Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Epsom Salt",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Epsom Salt",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Evergreen Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Evergreen Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Evergreen Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fall Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fall Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fall Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fern Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fern Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fern Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ferrous Sulfate For Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ferrous Sulfate For Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ferrous Sulfate For Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ficus Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ficus Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ficus Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fiddle Leaf Fig Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fiddle Leaf Fig Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fiddle Leaf Fig Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fig Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fig Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fig Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "fire ant killer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fish Emulsion Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fish Emulsion Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fish Emulsion Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fish Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fish Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fish Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fish Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fish Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fish Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fish Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fish Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fish Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fish Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fish Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fish Tank Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fish Tank Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Flea Killer For Indoor",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Flea Repellent For Humans",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Flea Repellent For Humans",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Flea Spray For Dogs",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Flea Spray For Home",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Flea Spray For Home",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Flower Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Flower Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Flower Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Flowering Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Flowering Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fly Repellent Outdoor",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Foliar Fertilizer Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Foliar Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Foliar Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Foliar Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Frog Repellent",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fruit Fly Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fruit Fly Trap For Indoors",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fruit Fly Trap For Indoors",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fruit Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fruit Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fruit Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Fungus Gnat Killer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Garden Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Garden Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Garden Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Gardenia Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Gardenia Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Gardenia Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Garlic Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Garlic Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Geranium Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Geranium Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Granular Bonsai Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Granular Bonsai Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Granular Fig Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Granular Fig Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Granular Houseplant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Granular Houseplant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Granular Indoor Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Granular Indoor Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Granular Lemon Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Granular Lemon Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Granular Monstera Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Granular Monstera Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Grape Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Grape Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Grape Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Guava Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Guava Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Guava Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Hanging Basket Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Hanging Basket Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Herb & Leafy Greens Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Herb & Leafy Greens Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Herb & Leafy Greens Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Hibiscus Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Hibiscus Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Hibiscus Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "High Nitrogen Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "High Nitrogen Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "High Nitrogen Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "High Nitrogen Fertilizer for Corn",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "High Nitrogen Fertilizer for Corn",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "High Nitrogen Fertilizer for Corn",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "High Nitrogen Fertilizer for Lawns",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "High Nitrogen Fertilizer for Lawns",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "High Nitrogen Fertilizer for Lawns",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "High Nitrogen Fertilizer for Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "High Nitrogen Fertilizer for Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "High Nitrogen Fertilizer for Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "High Nitrogen Fertilizer for Vegetables",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "High Nitrogen Fertilizer for Vegetables",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "High Nitrogen Fertilizer for Vegetables",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Holly Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Holly Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Holly Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Honeysuckle Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Honeysuckle Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "House Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "House Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "House Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "hoya fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "hoya fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Hoya Fertilizer Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Humic Acid for Lawns",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Humic Acid for Lawns",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Humic Acid for Lawns",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Humic Acid for Lawns",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Humic Acid for Lawns",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Humic Acid for Lawns",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Hydrangea Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Hydrangea Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Hydrangea Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Hydroponic Nutrients",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Hydroponic Nutrients",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Hydroponic Nutrients",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Indoor Bug Repellent",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Indoor Earwig Repellent",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Indoor Plant Fertilizer Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Indoor Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Indoor Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Indoor Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Insect And Pest Control",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Insect Repellent",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Insect Repellent (Travel)",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Instant plant food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Instant plant food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Iris Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Iris Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ivy Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ivy Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ixora Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ixora Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Jade Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Jade Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Jade Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Jade Fertilizer Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Japanese Maple Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Japanese Maple Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Japanese Maple Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Jasmine Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Jasmine Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Jasmine Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Juniper Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Juniper Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Juniper Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Kelp Meal Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Kelp Meal Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Kentucky Bluegrass Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Kentucky Bluegrass Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Kids Bug Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Kids Bug Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Kratky Hydroponics Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Kratky Hydroponics Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Lavender Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Lavender Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Lawn Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Lawn Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Lawn Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Lawn Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Lawn Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Lawn Starter",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Lawn Starter",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Lemon Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Lemon Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Lemon Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Lemon Tree Fertilizer Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Lilac Bush Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Lilac Bush Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Lime Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Lime Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Lime Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Liquid Iron Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Liquid Iron Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Liquid Iron Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Liquid Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Liquid Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Liquid Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Lizard Repellent For Outdoors",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Lotus Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Lotus Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Lucky Bamboo Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Lucky Bamboo Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Magnesium for Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Magnesium for Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Magnesium for Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Magnolia Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Magnolia Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Magnolia Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mango Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mango Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mango Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Maple Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Maple Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Maple Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mealybug Killer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Melon Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Melon Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Melon Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mice Repellent",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mice Repellent Indoor",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mint Insect And Pest Control",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Money Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Money Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Money Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Money Tree Fertilizer Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Monstera Fertilizer Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Monstera Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Monstera Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Monstera Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mosquito Repel",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mosquito Repel",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mosquito Repellent For Dogs",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mosquito Repellent For Dogs",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mosquito Repellent For Kids",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mosquito Repellent For Kids",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mosquito Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mosquito Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mosquito Spray For Yard",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Moth Repellent",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mouse Repellent",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mum Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mum Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Muriate Of Potash",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Muriate Of Potash",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mycorrhizal Fungi",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mycorrhizal Fungi",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mycorrhizal Fungi for Citrus Trees",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mycorrhizal Fungi for Citrus Trees",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mycorrhizal Fungi for Gardens",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mycorrhizal Fungi for Gardens",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mycorrhizal Fungi for Houseplants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mycorrhizal Fungi for Houseplants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mycorrhizal Fungi for Palm Trees",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mycorrhizal Fungi for Palm Trees",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mycorrhizal Fungi for Trees",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Mycorrhizal Fungi for Trees",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Nitrogen Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Nitrogen Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Nitrogen Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Nitrogen for Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Nitrogen for Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Nitrogen for Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "No See Ums Repellent",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "No See Ums Repellent",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "N-Primer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "N-Primer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "N-Primer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "N-Primer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Oak Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Oak Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Oak Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Olive Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Olive Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Olive Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Olive Tree Fertilizer Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Onion Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Onion Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Orange Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Orange Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Orange Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Orchard Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Orchard Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Orchard Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Orchid Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Orchid Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Orchid Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Orchid Food Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Palm Fertilizer Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Palm Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Palm Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Palm Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Peace Lilly Fertilizer Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "peace lily fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "peace lily fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Peach Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Peach Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Peach Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pear Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pear Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pear Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pecan Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pecan Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pecan Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Peony Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Peony Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pepper Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pepper Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Peppermint Oil Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Peppermint Oil Spray For Bugs",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Peppermint Oil Spray For Rodents",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Perennial Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Perennial Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pest Control",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pet Safe Lawn Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pet Safe Lawn Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pet Safe Lawn Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pet Safe Mosquito Repellent",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pet Safe Mosquito Repellent",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Petunia Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Petunia Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Philodendron Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Philodendron Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Philodendron Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Phosphorus and Potassium Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Phosphorus and Potassium Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Phosphorus Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Phosphorus Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Phosphorus Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pine Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pine Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pine Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pineapple Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pineapple Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pitcher Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pitcher Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Plant Food Outdoor",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Plant Food Outdoor",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Plant Food Outdoor",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Plant Protection",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Plumeria Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Plumeria Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Plumeria Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pond Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pond Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pond Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Potash Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Potash Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Potassium Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Potassium Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Potassium Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Potassium Nitrate Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Potassium Nitrate Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Potassium Sulfate Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Potassium Sulfate Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Potato Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Potato Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pothos Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pothos Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pothos Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pothos Fertilizer Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Proper-Pour Spout",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Proper-Pour Spout",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Proper-Pour Spout",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Proper-Pour Spout",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Proper-Pour Spout",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Proper-Pour Spout",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pumpkin Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pumpkin Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Pumpkin Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Racoon Repellent",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Raised Bed Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Raised Bed Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Raised Bed Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Raspberry fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Raspberry fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Rat Repellent",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Rhododendron Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Rhododendron Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Rhododendron Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Roach Repellent",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Rodent Repellent",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Rodent Repellent",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Rodent Repellent Outdoor",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Root Boost",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Root Boost",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Root Boost",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Root Boost",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Root Boost",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Root Booster for Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Root Booster for Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Root Stimulator for Trees",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Root Stimulator for Trees",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Root Supplement Fiddle Leaf Figs",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Root Supplement Fiddle Leaf Figs",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Root Supplement Houseplants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Root Supplement Houseplants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Root Supplement Monsteras",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Root Supplement Monsteras",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Root Supplement Orchids",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Root Supplement Orchids",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Root Supplement Succulents",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Root Supplement Succulents",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Rose and Flower",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Rose and Flower",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Rose Bush Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Rose Bush Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Rose Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Rose Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Rose Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Sago Palm Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Sago Palm Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Scorpion Repellent",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Seaweed Extract for Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Seaweed Extract for Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Seaweed Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Seaweed Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Seaweed Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Seedling Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Seedling Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Shrub Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Shrub Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Shrub Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Signal Flower Boost",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Signal Flower Boost",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Signal Flower Boost",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Signal Flower Boost",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Silica Boost For Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Silica Boost For Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Silica Boost For Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Silica Boost For Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Silica Boost For Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Silica for Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Silica for Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Silica for Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Silica Gold",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Silica Gold",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Silica Gold",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Silverfish Killer Indoor",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Silverfish Repellent",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Skunk Repellent For Yard",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Slow Release Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Slow Release Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Snake Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Snake Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Snake Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Snake Plant Fertilizer Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Snake Repellent for Yard",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Soil Acidifier",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Soil Acidifier",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Soil Acidifier",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Soil Microbes for Gardening",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Soil Microbes for Gardening",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Spider Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Spider Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Spider Plant Fertilizer Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Spider Repellent",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Spider Repellent Indoor",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Spider Repellent Indoor Pet Safe",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Spider Repellent Outdoor",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Spider Repellent Patio",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Spider Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Spruce Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Spruce Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Spruce Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Squirrel Repellent",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "St Augustine Grass Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "St Augustine Grass Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "St Augustine Grass Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Star Jasmine Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Star Jasmine Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Starter Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Starter Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Starter Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Strawberry Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Strawberry Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Strawberry Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Succulent Fertilizer Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Succulent Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Succulent Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Succulent Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Sulfate Of Potash",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Sulfate Of Potash",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Sulfur for Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Sulfur for Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Sulfur for Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Sunflower Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Sunflower Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "SuperMicrobe Root Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "SuperMicrobe Root Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "SuperMicrobe Root Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "SuperMicrobe Root Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "SuperMicrobe Root Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "SuperMicrobe Root Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "SuperMicrobe Root Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "SuperMicrobe Root Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "SuperMicrobe Root Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Sweet Corn Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Sweet Corn Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Sweet Corn Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Thuja Green Giant",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Thuja Green Giant",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Thuja Green Giant",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Tick Repellent For Humans",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Tick Repellent For Humans",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Tomato & Veggie Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Tomato & Veggie Plant Food",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Tomato Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Tomato Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Tomato Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "TPS One",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "TPS One",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "TPS One",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "TPS One",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Transplant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Transplant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Travel Bug Spray",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Tree & Shrub",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Tree & Shrub",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Tree & Shrub",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Tree And Shrub Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Tree And Shrub Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Tree And Shrub Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Trichoderma for Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Trichoderma for Plants",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Tropical Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Tropical Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Tropical Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Tulip Bulb Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Tulip Bulb Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ultra Bloom",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ultra Bloom",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ultra Grow",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ultra Grow",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ultra Grow",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ultra Grow",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ultra Kit",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ultra Kit",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ultra Kit",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Ultra Kit",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Urea Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Urea Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Urea Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Vegan Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Vegan Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Vegetable Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Vegetable Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Vegetable Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Veggie Cure",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Veggie Cure",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Vehicle Rodent Protection",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Water Garden Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Water Garden Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Water Lily Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Water Lily Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Water Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Water Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Water Soluble Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Water Soluble Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Watermelon fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Watermelon fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Willow Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Willow Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Willow Tree Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Winter Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Winter Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Winter Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Wisteria Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Wisteria Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Wisteria Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Worm Casting Concentrate",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Worm Casting Concentrate",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Worm Casting Concentrate",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Worm Tea Concentrate",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Worm Tea Concentrate",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Worm Tea Concentrate",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Yard Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Yard Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Yard Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Zoysia Grass Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Zoysia Grass Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "Zoysia Grass Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "ZZ Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "ZZ Plant Fertilizer",
+    "Hazmat": "No"
+  },
+  {
+    "Product": "ZZ Plant Fertilizer",
+    "Hazmat": "No"
+  }
+]
