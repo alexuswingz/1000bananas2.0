@@ -68,7 +68,7 @@ const getImageUrl = (url) => {
 // Each account can only sell specific brands
 const ACCOUNT_BRAND_MAPPING = {
   'TPS Nutrients': ['TPS Nutrients', 'Bloom City', 'TPS Plant Foods'],
-  'Total Pest Supply': ['NatureStop', 'GreenThumbs'],
+  'Total Pest Supply': ['NatureStop', "Ms. Pixie's", "Burke's", 'Mint +'],
 };
 
 // Get allowed brands for an account
@@ -1838,6 +1838,19 @@ const NewShipment = () => {
       };
     });
     
+    // Log all unique brands in the data for debugging
+    const allBrandsInData = [...new Set(productsWithIndex.map(p => p.brand).filter(Boolean))];
+    console.log('All unique brands in product data:', allBrandsInData);
+    if (shipmentData.account === 'Total Pest Supply') {
+      const totalPestBrands = allBrandsInData.filter(b => 
+        b.toLowerCase().includes('naturestop') ||
+        b.toLowerCase().includes("pixie") ||
+        b.toLowerCase().includes("burke") ||
+        b.toLowerCase().includes("mint")
+      );
+      console.log('Total Pest Supply related brands found:', totalPestBrands);
+    }
+    
     // Apply brand filter from products dropdown
     // Only apply if selectedBrands is not null and has brands selected
     // If all brands are selected, selectedBrands will be null (no filter)
@@ -1855,15 +1868,59 @@ const NewShipment = () => {
       const allBrandsSelected = selectedBrands.size === accountBrands.length &&
         accountBrands.every(brand => selectedBrands.has(brand));
       
+      console.log('Brand filter applied:', {
+        selectedBrands: Array.from(selectedBrands),
+        accountBrands,
+        allBrandsSelected,
+        productsBeforeFilter: productsWithIndex.length,
+        account: shipmentData.account
+      });
+      
       // Only apply filter if not all brands are selected
       if (!allBrandsSelected) {
+        const beforeCount = productsWithIndex.length;
+        // Get unique brands in the data before filtering
+        const brandsInData = [...new Set(productsWithIndex.map(p => p.brand).filter(Boolean))];
+        console.log('Brands in data before filter:', brandsInData);
+        console.log('Selected brands for filter:', Array.from(selectedBrands));
+        
         productsWithIndex = productsWithIndex.filter(product => {
-          const brandValue = product.brand || '';
+          const brandValue = (product.brand || '').trim();
           // Check if product's brand matches any selected brand
-          return Array.from(selectedBrands).some(selectedBrand => 
-            brandValue.toLowerCase().includes(selectedBrand.toLowerCase()) ||
-            selectedBrand.toLowerCase().includes(brandValue.toLowerCase())
-          );
+          const matches = Array.from(selectedBrands).some(selectedBrand => {
+            const selectedBrandLower = selectedBrand.toLowerCase().trim();
+            const brandValueLower = brandValue.toLowerCase();
+            
+            // Normalize both strings (remove spaces around +, handle variations)
+            const normalizeBrand = (str) => str.replace(/\s*\+\s*/g, '+').replace(/\s+/g, ' ').trim();
+            const normalizedSelected = normalizeBrand(selectedBrandLower);
+            const normalizedValue = normalizeBrand(brandValueLower);
+            
+            // Exact match or contains match (handles variations like "Mint +" vs "Mint+")
+            const isMatch = normalizedValue === normalizedSelected ||
+                   normalizedValue.includes(normalizedSelected) ||
+                   normalizedSelected.includes(normalizedValue) ||
+                   brandValueLower === selectedBrandLower ||
+                   brandValueLower.includes(selectedBrandLower) ||
+                   selectedBrandLower.includes(brandValueLower);
+            if (isMatch) {
+              console.log(`Brand match: "${brandValue}" matches "${selectedBrand}"`);
+            }
+            return isMatch;
+          });
+          if (!matches && brandValue) {
+            console.log(`Brand no match: "${brandValue}" does not match any of:`, Array.from(selectedBrands));
+          }
+          return matches;
+        });
+        
+        const brandsAfterFilter = [...new Set(productsWithIndex.map(p => p.brand).filter(Boolean))];
+        console.log('Brand filter result:', {
+          productsAfterFilter: productsWithIndex.length,
+          filteredOut: beforeCount - productsWithIndex.length,
+          selectedBrands: Array.from(selectedBrands),
+          brandsInDataBefore: brandsInData,
+          brandsInDataAfter: brandsAfterFilter
         });
       }
     }

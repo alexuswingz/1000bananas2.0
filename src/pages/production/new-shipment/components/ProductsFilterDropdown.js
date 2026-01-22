@@ -66,6 +66,7 @@ const ProductsFilterDropdown = forwardRef(({
   });
   
   // Extract unique brands (only for product column) - Show brands based on account
+  // Only show brands that actually exist in the data
   const availableBrands = useMemo(() => {
     if (columnKey !== 'product') return [];
     
@@ -80,12 +81,51 @@ const ProductsFilterDropdown = forwardRef(({
       ? ACCOUNT_BRAND_MAPPING[account]
       : ACCOUNT_BRAND_MAPPING['TPS Nutrients'];
     
-    return allowedBrands.sort();
-  }, [columnKey, account]);
+    // Extract actual brands from availableValues (product data)
+    // availableValues contains product names, brands, and sizes
+    const brandsInData = new Set();
+    availableValues.forEach(value => {
+      const valueStr = String(value);
+      // Check if this value matches any allowed brand (with normalization)
+      allowedBrands.forEach(brand => {
+        const normalizeBrand = (str) => str.replace(/\s*\+\s*/g, '+').replace(/\s+/g, ' ').trim().toLowerCase();
+        const normalizedBrand = normalizeBrand(brand);
+        const normalizedValue = normalizeBrand(valueStr);
+        
+        if (normalizedValue === normalizedBrand || 
+            normalizedValue.includes(normalizedBrand) || 
+            normalizedBrand.includes(normalizedValue)) {
+          brandsInData.add(brand); // Use the canonical brand name from mapping
+        }
+      });
+    });
+    
+    // Only return brands that exist in the data, sorted
+    const brandsWithProducts = Array.from(brandsInData).sort();
+    console.log('Available brands with products:', brandsWithProducts, 'from allowed brands:', allowedBrands);
+    return brandsWithProducts;
+  }, [columnKey, account, availableValues]);
   
   const filteredBrands = availableBrands.filter(brand =>
     brand.toLowerCase().includes(brandSearchTerm.toLowerCase())
   );
+  
+  // Calculate product counts per brand
+  const brandCounts = useMemo(() => {
+    const counts = {};
+    availableBrands.forEach(brand => {
+      const normalizeBrand = (str) => str.replace(/\s*\+\s*/g, '+').replace(/\s+/g, ' ').trim().toLowerCase();
+      const normalizedBrand = normalizeBrand(brand);
+      counts[brand] = availableValues.filter(value => {
+        const valueStr = String(value);
+        const normalizedValue = normalizeBrand(valueStr);
+        return normalizedValue === normalizedBrand || 
+               normalizedValue.includes(normalizedBrand) || 
+               normalizedBrand.includes(normalizedValue);
+      }).length;
+    });
+    return counts;
+  }, [availableBrands, availableValues]);
   
   // Update selectedValues when dropdown opens
   useEffect(() => {
@@ -954,7 +994,14 @@ const ProductsFilterDropdown = forwardRef(({
                       flexShrink: 0,
                     }}
                   />
-                  <span style={{ fontSize: '12px', color: '#374151', lineHeight: '1.2' }}>{brand}</span>
+                  <span style={{ fontSize: '12px', color: '#374151', lineHeight: '1.2', flex: 1 }}>
+                    {brand}
+                    {brandCounts[brand] !== undefined && (
+                      <span style={{ color: '#9CA3AF', marginLeft: '6px', fontSize: '11px' }}>
+                        ({brandCounts[brand]})
+                      </span>
+                    )}
+                  </span>
                 </label>
               ))}
             </div>

@@ -200,26 +200,48 @@ const NewShipmentTable = ({
 
   // Store original forecast values when rows change (for reset functionality)
   // Store by product ID to survive filtering/sorting, and also by index for quick lookup
+  // Use a ref to track the previous rows signature to avoid unnecessary re-processing
+  const previousRowsSignatureRef = useRef('');
+  
+  // Create a stable signature for rows to detect actual changes
+  const rowsSignature = useMemo(() => {
+    if (!rows || rows.length === 0) return '';
+    return rows.map(r => {
+      const id = r.id || r.asin || r.child_asin || r.childAsin;
+      return id ? String(id) : '';
+    }).filter(Boolean).sort().join('|');
+  }, [rows]);
+  
   useEffect(() => {
+    // Skip if signature hasn't changed
+    if (previousRowsSignatureRef.current === rowsSignature) {
+      return;
+    }
+    
+    previousRowsSignatureRef.current = rowsSignature;
+    
     console.log('Storing original forecast values for', rows.length, 'rows');
-    rows.forEach((row, index) => {
-      const forecastValue = row.weeklyForecast || row.forecast || 0; // NO ROUNDING - use exact value
-      const productId = row.id || row.asin || row.child_asin || row.childAsin;
-      // Use _originalIndex if available, otherwise use array index
-      const storageIndex = row._originalIndex !== undefined ? row._originalIndex : index;
-      
-      // Store by product ID (only if not already set to preserve the original)
-      if (productId && originalForecastValues.current[productId] === undefined) {
-        console.log(`Row ${index} (${row.product}): forecast=${forecastValue}, weeklyForecast=${row.weeklyForecast}, forecast=${row.forecast}, productId=${productId}, storageIndex=${storageIndex}`);
-        originalForecastValues.current[productId] = forecastValue;
-      }
-      
-      // Also store by index for current session
-      originalForecastValuesByIndex.current[storageIndex] = forecastValue;
-    });
+    if (rows && rows.length > 0) {
+      rows.forEach((row, index) => {
+        const forecastValue = row.weeklyForecast || row.forecast || 0; // NO ROUNDING - use exact value
+        const productId = row.id || row.asin || row.child_asin || row.childAsin;
+        // Use _originalIndex if available, otherwise use array index
+        const storageIndex = row._originalIndex !== undefined ? row._originalIndex : index;
+        
+        // Store by product ID (only if not already set to preserve the original)
+        if (productId && originalForecastValues.current[productId] === undefined) {
+          console.log(`Row ${index} (${row.product}): forecast=${forecastValue}, weeklyForecast=${row.weeklyForecast}, forecast=${row.forecast}, productId=${productId}, storageIndex=${storageIndex}`);
+          originalForecastValues.current[productId] = forecastValue;
+        }
+        
+        // Also store by index for current session
+        originalForecastValuesByIndex.current[storageIndex] = forecastValue;
+      });
+    }
     console.log('All original forecasts by ID:', originalForecastValues.current);
     console.log('All original forecasts by index:', originalForecastValuesByIndex.current);
-  }, [rows]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowsSignature]); // Only use stable signature to avoid dependency array size issues
 
   // Apply filters to rows - preserve original index for qtyValues mapping
   const filteredRows = useMemo(() => {
@@ -964,16 +986,9 @@ const NewShipmentTable = ({
     if (tableMode) return; // Only for non-table mode
     
     // Compute filtered rows without sorting
+    // Note: filteredRowsWithSelection is already filtered by account in the parent component
+    // So we don't need to filter by account again here - just apply user filters
     let result = [...filteredRowsWithSelection];
-    
-    // Filter to show only specific brands in non-table mode
-    const allowedBrands = ['Bloom City', 'TPS Nutrients', 'TPS Plant Foods', 'NatureStop', 'GreenThumbs'];
-    result = result.filter(row => {
-      const brand = row.brand || '';
-      return allowedBrands.some(allowedBrand => 
-        brand.toLowerCase().includes(allowedBrand.toLowerCase())
-      );
-    });
     
     // Apply non-table filters (but not sorting)
     Object.keys(nonTableFilters).forEach(columnKey => {
@@ -1061,7 +1076,7 @@ const NewShipmentTable = ({
     });
     
     currentNonTableFilteredRowsRef.current = result;
-  }, [filteredRowsWithSelection, nonTableFilters, tableMode, effectiveQtyValues]);
+  }, [filteredRowsWithSelection, nonTableFilters, tableMode, effectiveQtyValues, account]);
 
   const handleApplyColumnFilter = (columnKey, filterData) => {
     // If filterData is null, remove the filter (Reset was clicked)
@@ -1555,6 +1570,18 @@ const NewShipmentTable = ({
     
     // Pass brand filter to parent component for pre-filtering products
     if (columnKey === 'product' && onBrandFilterChange) {
+      console.log('Passing brand filter to parent:', {
+        brandFilterToApply: brandFilterToApply ? Array.from(brandFilterToApply) : null,
+        account,
+        filterDataSelectedBrands: filterData.selectedBrands ? Array.from(filterData.selectedBrands) : null,
+        allBrandsSelected: columnKey === 'product' && filterData.selectedBrands ? (() => {
+          const accountBrands = account && ACCOUNT_BRAND_MAPPING[account] 
+            ? ACCOUNT_BRAND_MAPPING[account]
+            : ACCOUNT_BRAND_MAPPING['TPS Nutrients'];
+          return filterData.selectedBrands.size === accountBrands.length &&
+            accountBrands.every(brand => filterData.selectedBrands.has(brand));
+        })() : false
+      });
       onBrandFilterChange(brandFilterToApply);
     }
 
@@ -1714,11 +1741,24 @@ const NewShipmentTable = ({
         // Only apply filter if not all brands are selected
         if (!allBrandsSelected) {
           result = result.filter(row => {
-            const brandValue = row.brand || '';
-            return Array.from(filter.selectedBrands).some(selectedBrand => 
-              brandValue.toLowerCase().includes(selectedBrand.toLowerCase()) ||
-              selectedBrand.toLowerCase().includes(brandValue.toLowerCase())
-            );
+            const brandValue = (row.brand || '').trim();
+            return Array.from(filter.selectedBrands).some(selectedBrand => {
+              const selectedBrandLower = selectedBrand.toLowerCase().trim();
+              const brandValueLower = brandValue.toLowerCase();
+              
+              // Normalize both strings (remove spaces around +, handle variations)
+              const normalizeBrand = (str) => str.replace(/\s*\+\s*/g, '+').replace(/\s+/g, ' ').trim();
+              const normalizedSelected = normalizeBrand(selectedBrandLower);
+              const normalizedValue = normalizeBrand(brandValueLower);
+              
+              // Exact match or contains match (handles variations like "Mint +" vs "Mint+")
+              return normalizedValue === normalizedSelected ||
+                     normalizedValue.includes(normalizedSelected) ||
+                     normalizedSelected.includes(normalizedValue) ||
+                     brandValueLower === selectedBrandLower ||
+                     brandValueLower.includes(selectedBrandLower) ||
+                     selectedBrandLower.includes(brandValueLower);
+            });
           });
         }
       }
@@ -1833,7 +1873,7 @@ const NewShipmentTable = ({
     }
 
     return result;
-  }, [filteredRowsWithSelection, nonTableFilters, nonTableSortedRowOrder, tableMode]);
+  }, [filteredRowsWithSelection, nonTableFilters, nonTableSortedRowOrder, tableMode, account]);
 
   const currentRows = tableMode ? filteredRowsWithSelection : nonTableFilteredRows;
 
@@ -1884,7 +1924,7 @@ const NewShipmentTable = ({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [tableMode, nonTableSelectedIndices, currentRows, effectiveSetQtyValues]);
+  }, [tableMode, nonTableSelectedIndices, currentRows.length, effectiveSetQtyValues]);
 
   // Check if all rows are selected (respect current view/filter)
   const allSelected = useMemo(() => {
