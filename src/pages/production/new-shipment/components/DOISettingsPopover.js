@@ -26,9 +26,9 @@ const DOISettingsPopover = ({
   onSettingsChange, 
   isDarkMode = true,
   initialSettings = null,
-  initialOpen = false 
+  openByDefault = false 
 }) => {
-  const [isOpen, setIsOpen] = useState(initialOpen);
+  const [isOpen, setIsOpen] = useState(openByDefault);
   const popoverRef = useRef(null);
   const buttonRef = useRef(null);
   

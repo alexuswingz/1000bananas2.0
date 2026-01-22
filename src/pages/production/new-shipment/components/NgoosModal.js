@@ -33,7 +33,8 @@ const NgoosModal = ({
   doiSettings = null, // Full DOI settings object: { amazonDoiGoal, inboundLeadTime, manufactureLeadTime }
   allProducts = [], // All products from Add Products page for navigation
   onNavigate = null, // Navigation handler (prev/next)
-  openDoiSettings = false, // Whether to open DOI settings popover initially
+  openDoiSettings = false, // Whether to open DOI settings popover by default
+  onDoiSettingsChange = null, // Callback when DOI settings change for this product
 }) => {
   const { isDarkMode } = useTheme();
   const [forecastData, setForecastData] = useState(null);
@@ -415,6 +416,7 @@ const NgoosModal = ({
               overrideUnitsToMake={forecastUnits}
               labelsAvailable={realLabelInventory}
               openDoiSettings={openDoiSettings}
+              onDoiSettingsChange={onDoiSettingsChange}
               onAddUnits={(units) => {
                 if (onAddUnits) {
                   onAddUnits(selectedRow, units);

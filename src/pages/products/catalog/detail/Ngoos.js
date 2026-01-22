@@ -20,7 +20,7 @@ import {
   Brush
 } from 'recharts';
 
-const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = null, overrideUnitsToMake = null, onAddUnits = null, labelsAvailable = null, openDoiSettings = false }) => {
+const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = null, overrideUnitsToMake = null, onAddUnits = null, labelsAvailable = null, openDoiSettings = false, onDoiSettingsChange = null }) => {
   const { isDarkMode } = useTheme();
   const [selectedView, setSelectedView] = useState('2 Years');
   const [loading, setLoading] = useState(true);
@@ -1176,12 +1176,14 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             <DOISettingsPopover 
               isDarkMode={isDarkMode}
               onSettingsChange={(settings) => {
-                // This would update the parent component's DOI settings
-                // For now, just log it since we're in inventoryOnly mode
+                // Call parent callback to save product-specific DOI settings
+                if (onDoiSettingsChange) {
+                  onDoiSettingsChange(settings);
+                }
                 console.log('DOI Settings updated:', settings);
               }}
               initialSettings={doiSettings}
-              initialOpen={openDoiSettings}
+              openByDefault={openDoiSettings}
             />
             
             <button

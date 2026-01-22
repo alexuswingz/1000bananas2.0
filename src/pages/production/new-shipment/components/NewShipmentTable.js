@@ -15,7 +15,6 @@ const NewShipmentTable = ({
   labelsAvailabilityMap = {},
   forecastRange = 120,
   manuallyEditedIndicesRef = null, // Ref to expose manually edited indices to parent
-  customDoiSettings = {}, // Object mapping product IDs to custom DOI settings
 }) => {
   const { isDarkMode } = useTheme();
   const [selectedRows, setSelectedRows] = useState(new Set());
@@ -2442,21 +2441,14 @@ const NewShipmentTable = ({
               const asin = row.asin || row.child_asin || row.childAsin || '';
               
               const isSelected = nonTableSelectedIndices.has(index);
-              const hasCustomDoiSettings = customDoiSettings[row.id] !== undefined;
+              
+              // Check if product has custom DOI settings (different from general settings)
+              const hasCustomDoiSettings = row.customDoiSettings || row.hasCustomDoi || false;
               
               return (
                 <div
                   key={`${row.id}-${index}`}
-                  onClick={(e) => {
-                    // Only handle selection if not clicking on interactive elements
-                    if (
-                      !e.target.closest('input') &&
-                      !e.target.closest('button') &&
-                      !e.target.closest('img[alt="Copy"]')
-                    ) {
-                      handleNonTableRowClick(e, arrayIndex, index);
-                    }
-                  }}
+                  onClick={(e) => handleNonTableRowClick(e, arrayIndex, index)}
                   onMouseEnter={() => setHoveredRowIndex(index)}
                   onMouseLeave={() => setHoveredRowIndex(null)}
                   style={{
@@ -2464,17 +2456,13 @@ const NewShipmentTable = ({
                     gridTemplateColumns: '1fr 140px 220px 140px',
                     height: '66px',
                     padding: '8px 16px',
-                    backgroundColor: isSelected 
-                      ? (isDarkMode ? '#1E3A5F' : '#DBEAFE') 
-                      : hoveredRowIndex === index 
-                        ? '#1F2937' 
-                        : '#1A2235',
+                    backgroundColor: isSelected ? (isDarkMode ? '#1E3A5F' : '#DBEAFE') : '#1A2235',
                     alignItems: 'center',
                     gap: '32px',
                     boxSizing: 'border-box',
                     position: 'relative',
-                    transition: 'background-color 0.15s ease',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    transition: 'background-color 0.15s ease'
                   }}
                 >
                   {/* Border line with 30px margin on both sides */}
@@ -3072,50 +3060,32 @@ const NewShipmentTable = ({
                       <span style={{ fontSize: '24px', fontWeight: 500, color: doiColor, height: '32px', display: 'flex', alignItems: 'center' }}>
                         {doiValue}
                       </span>
-                      {/* Pencil Icon - appears on hover or always if custom DOI settings */}
-                      {(hoveredRowIndex === index || hasCustomDoiSettings) && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            // Call onProductClick with second parameter to indicate DOI settings should open
-                            onProductClick(row, true);
-                          }}
-                          style={{
-                            width: '20px',
-                            height: '20px',
-                            padding: '0',
-                            border: 'none',
-                            backgroundColor: 'transparent',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: hasCustomDoiSettings ? '#3B82F6' : '#9CA3AF',
-                            transition: 'color 0.15s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.color = '#3B82F6';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.color = hasCustomDoiSettings ? '#3B82F6' : '#9CA3AF';
-                          }}
-                          title="Edit DOI Settings"
-                        >
-                          <svg 
-                            width="16" 
-                            height="16" 
-                            viewBox="0 0 24 24" 
-                            fill="none" 
-                            stroke="currentColor" 
-                            strokeWidth="2" 
-                            strokeLinecap="round" 
-                            strokeLinejoin="round"
-                          >
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                          </svg>
-                        </button>
-                      )}
+                      {/* Pencil Icon for DOI Settings */}
+                      <svg
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onProductClick(row, true);
+                        }}
+                        style={{
+                          width: '16px',
+                          height: '16px',
+                          cursor: 'pointer',
+                          opacity: hasCustomDoiSettings ? 1 : (hoveredRowIndex === index ? 1 : 0),
+                          transition: 'opacity 0.15s ease',
+                          flexShrink: 0
+                        }}
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M11.334 2.00004C11.5091 1.82494 11.7169 1.68605 11.9457 1.59129C12.1745 1.49653 12.4197 1.44775 12.6673 1.44775C12.9149 1.44775 13.1601 1.49653 13.3889 1.59129C13.6177 1.68605 13.8256 1.82494 14.0007 2.00004C14.1758 2.17513 14.3147 2.383 14.4094 2.61178C14.5042 2.84055 14.553 3.08575 14.553 3.33337C14.553 3.58099 14.5042 3.82619 14.4094 4.05497C14.3147 4.28374 14.1758 4.49161 14.0007 4.66671L5.00065 13.6667L1.33398 14.6667L2.33398 11L11.334 2.00004Z"
+                          stroke={hasCustomDoiSettings ? '#3B82F6' : '#9CA3AF'}
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
                     </div>
                     <button
                       onClick={(e) => {

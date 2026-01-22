@@ -89,6 +89,9 @@ const NewShipment = () => {
   const [loading, setLoading] = useState(false);
   const [isNgoosOpen, setIsNgoosOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
+  const [openDoiSettings, setOpenDoiSettings] = useState(false);
+  // Store product-specific DOI settings (keyed by ASIN)
+  const [productDoiSettings, setProductDoiSettings] = useState({});
   const [isShipmentDetailsOpen, setIsShipmentDetailsOpen] = useState(false);
   const [isExportTemplateOpen, setIsExportTemplateOpen] = useState(false);
   const [isSortProductsCompleteOpen, setIsSortProductsCompleteOpen] = useState(false);
@@ -162,12 +165,6 @@ const NewShipment = () => {
   
   // Sort option for product table
   const [sortOption, setSortOption] = useState('doi'); // 'doi', 'qty', 'name'
-  
-  // Track products with custom DOI settings (different from general)
-  const [customDoiSettings, setCustomDoiSettings] = useState({});
-  
-  // Track if DOI settings should open in modal
-  const [openDoiSettings, setOpenDoiSettings] = useState(false);
   
   // Callback when DOI settings change from the popover
   const handleDoiSettingsChange = (newSettings, totalDoi) => {
@@ -998,44 +995,9 @@ const NewShipment = () => {
       const isManuallyEdited = manuallyEditedIndicesRef.current?.has(index);
       
       if (addedRows.has(product.id) || isManuallyEdited) {
-        // For added or manually edited products, handle label limits intelligently
-        const currentQty = qtyValues[index] !== undefined ? qtyValues[index] : 0;
-        const newSuggestedQty = product.suggestedQty || 0;
-        
-        // Check if product has label limit
-        const labelLoc = product.label_location;
-        let availableLabels = null;
-        if (labelLoc && labelsAvailabilityMap[labelLoc]) {
-          // Get base available labels for this location
-          const baseAvailable = labelsAvailabilityMap[labelLoc]?.labels_available || 0;
-          
-          // Subtract labels used by OTHER products with same label_location in current shipment
-          const usedByOthers = products.reduce((sum, otherProduct, otherIdx) => {
-            if (otherIdx !== index && otherProduct.label_location === labelLoc) {
-              const otherQty = qtyValues[otherIdx] || 0;
-              return sum + (typeof otherQty === 'number' ? otherQty : parseInt(otherQty, 10) || 0);
-            }
-            return sum;
-          }, 0);
-          
-          availableLabels = Math.max(0, baseAvailable - usedByOthers);
-        }
-        
-        // Determine if DOI is increasing or decreasing
-        const isIncreasing = newSuggestedQty > currentQty;
-        
-        if (isIncreasing && availableLabels !== null) {
-          // DOI increased - cap at available labels to respect label limit
-          newQtyValues[index] = Math.min(newSuggestedQty, availableLabels);
-        } else if (!isIncreasing && newSuggestedQty < currentQty) {
-          // DOI decreased - update to the new lower value
-          newQtyValues[index] = newSuggestedQty;
-        } else if (isIncreasing && availableLabels === null) {
-          // DOI increased but no label limit - use new suggested quantity
-          newQtyValues[index] = newSuggestedQty;
-        } else {
-          // No change in DOI or other case - preserve current quantity
-          newQtyValues[index] = currentQty;
+        // Preserve the manually set or added quantity
+        if (qtyValues[index] !== undefined) {
+          newQtyValues[index] = qtyValues[index];
         }
       } else {
         // Use the TPS suggestedQty (which is based on units_to_make)
@@ -1206,6 +1168,23 @@ const NewShipment = () => {
     setSelectedRow(row);
     setOpenDoiSettings(shouldOpenDoiSettings);
     setIsNgoosOpen(true);
+  };
+
+  // Handle product-specific DOI settings changes
+  const handleProductDoiSettingsChange = (row, newSettings) => {
+    const asin = row?.child_asin || row?.childAsin || row?.asin;
+    if (!asin) return;
+
+    // Save product-specific DOI settings
+    setProductDoiSettings(prev => ({
+      ...prev,
+      [asin]: newSettings
+    }));
+
+    // TODO: When backend is ready, save to database via API
+    // await ProductionAPI.saveProductDoiSettings(asin, newSettings);
+    
+    console.log(`Saved custom DOI settings for ${asin}:`, newSettings);
   };
 
   const handleActionChange = (action) => {
@@ -1840,10 +1819,16 @@ const NewShipment = () => {
   // This is computed directly, not memoized, to ensure immediate updates
   const getFilteredProducts = () => {
     // IMPORTANT: Add _originalIndex to ALL products so qtyValues lookup works after filtering
-    let productsWithIndex = products.map((product, index) => ({
-      ...product,
-      _originalIndex: index, // Store original position in products array for qtyValues lookup
-    }));
+    let productsWithIndex = products.map((product, index) => {
+      const asin = product.child_asin || product.childAsin || product.asin;
+      const hasCustomDoiSettings = asin && productDoiSettings[asin] ? true : false;
+      
+      return {
+        ...product,
+        _originalIndex: index, // Store original position in products array for qtyValues lookup
+        hasCustomDoiSettings, // Flag to indicate if product has custom DOI settings
+      };
+    });
     
     // Apply brand filter first
     if (selectedBrand) {
@@ -2235,7 +2220,6 @@ const NewShipment = () => {
                     labelsAvailabilityMap={labelsAvailabilityMap}
                     forecastRange={parseInt(forecastRange) || 120}
                     manuallyEditedIndicesRef={manuallyEditedIndicesRef}
-                    customDoiSettings={customDoiSettings}
                   />
                 )}
               </>
@@ -3242,9 +3226,14 @@ const NewShipment = () => {
         }}
         selectedRow={selectedRow}
         forecastRange={parseInt(forecastRange) || 150}
-        doiSettings={doiSettingsValues}
-        allProducts={filteredProducts}
+        doiSettings={(() => {
+          // Use product-specific DOI settings if available, otherwise use general settings
+          const asin = selectedRow?.child_asin || selectedRow?.childAsin || selectedRow?.asin;
+          return asin && productDoiSettings[asin] ? productDoiSettings[asin] : doiSettingsValues;
+        })()}
         openDoiSettings={openDoiSettings}
+        onDoiSettingsChange={(newSettings) => handleProductDoiSettingsChange(selectedRow, newSettings)}
+        allProducts={filteredProducts}
         onNavigate={(direction) => {
           if (!selectedRow || !filteredProducts || filteredProducts.length === 0) return;
           
@@ -3533,13 +3522,12 @@ const NewShipment = () => {
         }}
         onBeginFormulaCheck={() => {
           setIsLabelCheckCompleteOpen(false);
-          // Navigate to formula-check
-          handleActionChange('formula-check');
-        }}
-        onBeginBookShipment={() => {
-          setIsLabelCheckCompleteOpen(false);
-          // Navigate to book-shipment section
-          handleActionChange('book-shipment');
+          // Navigate to formula-check if not completed, otherwise to book-shipment
+          if (completedTabs.has('formula-check')) {
+            setActiveAction('book-shipment');
+          } else {
+            handleActionChange('formula-check');
+          }
         }}
         isFormulaCheckCompleted={completedTabs.has('formula-check')}
       />
@@ -3574,7 +3562,7 @@ const NewShipment = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.6)' : 'rgba(0, 0, 0, 0.35)',
+              backgroundColor: 'rgba(0, 0, 0, 0.35)',
               zIndex: 9998,
               display: 'flex',
               alignItems: 'center',
@@ -3585,10 +3573,10 @@ const NewShipment = () => {
             {/* Modal */}
             <div
               style={{
-                backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                backgroundColor: '#FFFFFF',
                 borderRadius: '14px',
                 width: '400px',
-                border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                border: '1px solid #E5E7EB',
                 boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
                 zIndex: 9999,
                 position: 'relative',
@@ -3614,7 +3602,7 @@ const NewShipment = () => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                  color: '#9CA3AF',
                   width: '24px',
                   height: '24px',
                 }}
@@ -3651,7 +3639,7 @@ const NewShipment = () => {
                 <h2 style={{
                   fontSize: '20px',
                   fontWeight: 600,
-                  color: isDarkMode ? '#F9FAFB' : '#111827',
+                  color: '#111827',
                   margin: 0,
                   textAlign: 'center',
                 }}>
@@ -3682,19 +3670,19 @@ const NewShipment = () => {
                     height: '31px',
                     padding: '0 14px',
                     borderRadius: '4px',
-                    border: isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
-                    backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
-                    color: isDarkMode ? '#E5E7EB' : '#374151',
+                    border: '1px solid #D1D5DB',
+                    backgroundColor: '#FFFFFF',
+                    color: '#374151',
                     fontSize: '14px',
                     fontWeight: 500,
                     cursor: 'pointer',
                     transition: 'all 0.2s',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = isDarkMode ? '#4B5563' : '#F3F4F6';
+                    e.currentTarget.style.backgroundColor = '#F3F4F6';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#FFFFFF';
+                    e.currentTarget.style.backgroundColor = '#FFFFFF';
                   }}
                 >
                   Go to Shipments
