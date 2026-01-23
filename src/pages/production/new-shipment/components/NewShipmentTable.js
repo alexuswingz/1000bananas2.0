@@ -134,6 +134,7 @@ const NewShipmentTable = ({
   
   // Multi-select state for non-table mode bulk operations
   const [nonTableSelectedIndices, setNonTableSelectedIndices] = useState(() => new Set());
+  const lastClickTimeRef = useRef({});
   const [nonTableLastSelectedIndex, setNonTableLastSelectedIndex] = useState(null);
   
   // Filter state
@@ -2321,6 +2322,7 @@ const NewShipmentTable = ({
 
     const isShiftClick = e.shiftKey;
     const isCmdClick = e.metaKey || e.ctrlKey;
+    const isAlreadySelected = nonTableSelectedIndices.has(originalIndex);
 
     // Prevent text selection on Shift+Click
     if (isShiftClick) {
@@ -2329,6 +2331,15 @@ const NewShipmentTable = ({
       if (window.getSelection) {
         window.getSelection().removeAllRanges();
       }
+    }
+
+    // If clicking on an already selected row (and no modifier keys), deselect it
+    if (!isShiftClick && !isCmdClick && isAlreadySelected) {
+      const newSelected = new Set(nonTableSelectedIndices);
+      newSelected.delete(originalIndex);
+      setNonTableSelectedIndices(newSelected);
+      setNonTableLastSelectedIndex(null);
+      return;
     }
 
     if (isShiftClick && nonTableLastSelectedIndex !== null) {
@@ -2725,15 +2736,45 @@ const NewShipmentTable = ({
                       !e.target.closest('button') &&
                       !e.target.closest('img[alt="Copy"]')
                     ) {
+                      // Track click time for slow double click detection
+                      const currentTime = Date.now();
+                      lastClickTimeRef.current[index] = currentTime;
+                      
                       handleNonTableRowClick(e, arrayIndex, index);
                     }
                   }}
                   onDoubleClick={(e) => {
-                    // Open N-GOOS modal on double-click
+                    // Check if clicking on interactive elements
                     if (
-                      !e.target.closest('input') &&
-                      !e.target.closest('button') &&
-                      !e.target.closest('img[alt="Copy"]') &&
+                      e.target.closest('input') ||
+                      e.target.closest('button') ||
+                      e.target.closest('img[alt="Copy"]')
+                    ) {
+                      return;
+                    }
+
+                    const currentTime = Date.now();
+                    const lastClickTime = lastClickTimeRef.current[index] || 0;
+                    const timeBetweenClicks = currentTime - lastClickTime;
+                    
+                    // Update last click time
+                    lastClickTimeRef.current[index] = currentTime;
+                    
+                    // Slow double click: time between clicks > 500ms
+                    if (timeBetweenClicks > 500 && timeBetweenClicks < 2000) {
+                      // Remove highlight by deselecting the row
+                      const newSelected = new Set(nonTableSelectedIndices);
+                      if (newSelected.has(index)) {
+                        newSelected.delete(index);
+                        setNonTableSelectedIndices(newSelected);
+                      }
+                      e.preventDefault();
+                      e.stopPropagation();
+                      return;
+                    }
+                    
+                    // Fast double click: Open N-GOOS modal
+                    if (
                       onProductClick &&
                       arrayIndex < currentRows.length
                     ) {
@@ -3358,7 +3399,9 @@ const NewShipmentTable = ({
                         {doiValue}
                       </span>
                       {/* Pencil Icon for DOI Settings */}
-                      <svg
+                      <img
+                        src="/assets/pencil.png"
+                        alt="Edit DOI Settings"
                         onClick={(e) => {
                           e.stopPropagation();
                           onProductClick(row, false, true);
@@ -3368,21 +3411,13 @@ const NewShipmentTable = ({
                           height: '16px',
                           cursor: 'pointer',
                           opacity: hasCustomDoiSettings ? 1 : (hoveredRowIndex === index ? 1 : 0),
-                          transition: 'opacity 0.15s ease',
-                          flexShrink: 0
+                          transition: 'opacity 0.15s ease, filter 0.15s ease',
+                          flexShrink: 0,
+                          filter: hasCustomDoiSettings 
+                            ? 'brightness(0) saturate(100%) invert(47%) sepia(98%) saturate(2476%) hue-rotate(209deg) brightness(100%) contrast(101%)' // Blue #3B82F6
+                            : 'brightness(0) saturate(100%) invert(64%) sepia(6%) saturate(456%) hue-rotate(169deg) brightness(94%) contrast(88%)', // Gray #9CA3AF
                         }}
-                        viewBox="0 0 16 16"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          d="M11.334 2.00004C11.5091 1.82494 11.7169 1.68605 11.9457 1.59129C12.1745 1.49653 12.4197 1.44775 12.6673 1.44775C12.9149 1.44775 13.1601 1.49653 13.3889 1.59129C13.6177 1.68605 13.8256 1.82494 14.0007 2.00004C14.1758 2.17513 14.3147 2.383 14.4094 2.61178C14.5042 2.84055 14.553 3.08575 14.553 3.33337C14.553 3.58099 14.5042 3.82619 14.4094 4.05497C14.3147 4.28374 14.1758 4.49161 14.0007 4.66671L5.00065 13.6667L1.33398 14.6667L2.33398 11L11.334 2.00004Z"
-                          stroke={hasCustomDoiSettings ? '#3B82F6' : '#9CA3AF'}
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
+                      />
                     </div>
                     <button
                       onClick={(e) => {

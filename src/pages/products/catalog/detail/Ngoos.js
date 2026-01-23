@@ -1845,11 +1845,11 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                           backgroundColor: '#0F172A',
                           borderRadius: '8px',
                           padding: '12px',
-                          minWidth: '260px',
-                          maxWidth: '300px',
+                          minWidth: '210px',
+                          maxWidth: '250px',
                           boxShadow: '0 10px 25px rgba(0, 0, 0, 0.5)',
                           zIndex: 1000,
-                          border: 'none',
+                          border: '1px solid #1F2937',
                         }}
                       >
                         {/* Text */}
@@ -1861,7 +1861,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                           lineHeight: '1.4',
                           textAlign: 'center',
                         }}>
-                          This value differs from the global settings for all products.
+                          This product has custom<br />forecast settings
                         </p>
                         
                         {/* Reset Button */}
@@ -1886,9 +1886,9 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                             }
                           }}
                           style={{
-                            width: '192px',
+                            width: 'auto',
                             height: '24px',
-                            padding: '0',
+                            padding: '0 12px',
                             borderRadius: '4px',
                             border: 'none',
                             backgroundColor: '#007BFF',
@@ -1916,14 +1916,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                             }}
                           />
                           <span>
-                            Reset to Global DOI ({(() => {
-                              try {
-                                const globalDoiSettings = JSON.parse(localStorage.getItem('doi_default_settings') || '{}');
-                                return calculateTotalDOI(globalDoiSettings) || 157;
-                              } catch {
-                                return 157;
-                              }
-                            })()})
+                            Reset
                           </span>
                           </button>
                         </div>
