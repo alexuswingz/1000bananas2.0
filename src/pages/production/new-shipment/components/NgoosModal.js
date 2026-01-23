@@ -34,6 +34,7 @@ const NgoosModal = ({
   allProducts = [], // All products from Add Products page for navigation
   onNavigate = null, // Navigation handler (prev/next)
   openDoiSettings = false, // Whether to open DOI settings popover by default
+  openForecastSettings = false, // Whether to open forecast settings modal by default
   onDoiSettingsChange = null, // Callback when DOI settings change for this product
 }) => {
   const { isDarkMode } = useTheme();
@@ -386,6 +387,7 @@ const NgoosModal = ({
               overrideUnitsToMake={forecastUnits}
               labelsAvailable={realLabelInventory}
               openDoiSettings={openDoiSettings}
+              openForecastSettings={openForecastSettings}
               onDoiSettingsChange={onDoiSettingsChange}
               onAddUnits={(units) => {
                 if (onAddUnits) {

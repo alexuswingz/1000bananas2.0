@@ -19,7 +19,7 @@ import {
   Brush
 } from 'recharts';
 
-const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = null, overrideUnitsToMake = null, onAddUnits = null, labelsAvailable = null, openDoiSettings = false, onDoiSettingsChange = null }) => {
+const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = null, overrideUnitsToMake = null, onAddUnits = null, labelsAvailable = null, openDoiSettings = false, openForecastSettings = false, onDoiSettingsChange = null }) => {
   const { isDarkMode } = useTheme();
   const [selectedView, setSelectedView] = useState('2 Years');
   const [loading, setLoading] = useState(true);
@@ -42,7 +42,11 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showForecastSettingsTooltip, setShowForecastSettingsTooltip] = useState(false);
   const [showForecastSettingsModal, setShowForecastSettingsModal] = useState(false);
+  const [showTemporaryConfirmModal, setShowTemporaryConfirmModal] = useState(false);
+  const [dontRemindAgain, setDontRemindAgain] = useState(false);
   const [hoveredWarning, setHoveredWarning] = useState(false);
+  const [settingsApplied, setSettingsApplied] = useState(false);
+  const [showIndicatorTooltip, setShowIndicatorTooltip] = useState(false);
   const [salesVelocityWeight, setSalesVelocityWeight] = useState(25);
   const [svVelocityWeight, setSvVelocityWeight] = useState(15);
   const [tempSalesVelocityWeight, setTempSalesVelocityWeight] = useState(25);
@@ -220,6 +224,13 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
       setTempDoiSettings(doiSettings);
     }
   }, [doiSettings]);
+
+  // Open forecast settings modal when openForecastSettings prop is true
+  useEffect(() => {
+    if (openForecastSettings) {
+      setShowForecastSettingsModal(true);
+    }
+  }, [openForecastSettings]);
 
   // Extract inventory data from API response or use fallback
   const inventoryData = productDetails?.inventory || {
@@ -733,6 +744,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     setTempDoiSettings(doiSettings || { amazonDoiGoal: 130, inboundLeadTime: 30, manufactureLeadTime: 7 });
     setShowForecastSettingsModal(true);
     setShowForecastSettingsTooltip(false);
+    setSettingsApplied(false);
   };
 
   const calculateTotalDOI = (settings) => {
@@ -742,6 +754,20 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   };
 
   const handleApplyForecastSettings = () => {
+    // Check if user has previously checked "Don't remind me again"
+    const dontRemind = localStorage.getItem('forecast_settings_dont_remind') === 'true';
+    
+    if (dontRemind) {
+      // Apply directly without showing confirmation
+      applyForecastSettingsTemporarily();
+    } else {
+      // Close forecast settings modal and show confirmation modal
+      setShowForecastSettingsModal(false);
+      setShowTemporaryConfirmModal(true);
+    }
+  };
+
+  const applyForecastSettingsTemporarily = () => {
     setSalesVelocityWeight(tempSalesVelocityWeight);
     setSvVelocityWeight(tempSvVelocityWeight);
     setForecastModel(tempForecastModel);
@@ -751,9 +777,27 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
       onDoiSettingsChange(tempDoiSettings);
     }
     setShowForecastSettingsModal(false);
+    setShowTemporaryConfirmModal(false);
+    setSettingsApplied(true);
     toast.success('Forecast settings applied', {
       description: `Model: ${tempForecastModel}, Market: ${tempMarketAdjustment}%, Sales Velocity: ${tempSalesVelocityWeight}%`
     });
+  };
+
+  const handleConfirmTemporaryApply = () => {
+    // Save "Don't remind me again" preference if checked
+    if (dontRemindAgain) {
+      localStorage.setItem('forecast_settings_dont_remind', 'true');
+    }
+    applyForecastSettingsTemporarily();
+    setDontRemindAgain(false); // Reset checkbox state
+  };
+
+  const handleGoBackFromConfirm = () => {
+    setShowTemporaryConfirmModal(false);
+    setDontRemindAgain(false); // Reset checkbox state
+    // Reopen the forecast settings modal
+    setShowForecastSettingsModal(true);
   };
 
   const handleCancelForecastSettings = () => {
@@ -1696,7 +1740,12 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                   position: 'relative',
                   display: 'inline-block'
                 }}
-                onMouseEnter={() => setShowForecastSettingsTooltip(true)}
+                onMouseEnter={() => {
+                  // Don't show forecast settings tooltip if indicator tooltip is showing
+                  if (!showIndicatorTooltip) {
+                    setShowForecastSettingsTooltip(true);
+                  }
+                }}
                 onMouseLeave={() => setShowForecastSettingsTooltip(false)}
               >
                 <button 
@@ -1720,6 +1769,183 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                     style={{ width: '20px', height: '20px' }}
                   />
                 </button>
+                {settingsApplied && (
+                  <div
+                    data-indicator-icon
+                    style={{
+                      position: 'absolute',
+                      top: '-7px',
+                      right: '-4px',
+                      width: '16px',
+                      height: '16px',
+                      zIndex: 10,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.stopPropagation();
+                      setShowIndicatorTooltip(true);
+                      setShowForecastSettingsTooltip(false);
+                    }}
+                    onMouseLeave={(e) => {
+                      e.stopPropagation();
+                      setShowIndicatorTooltip(false);
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '50%',
+                        backgroundColor: '#3B82F6',
+                        border: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <svg
+                        width="8"
+                        height="10"
+                        viewBox="0 0 8 10"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <rect
+                          x="3.5"
+                          y="1"
+                          width="1"
+                          height="5"
+                          fill="white"
+                          rx="0.5"
+                        />
+                        <circle
+                          cx="4"
+                          cy="8"
+                          r="1"
+                          fill="white"
+                        />
+                      </svg>
+                    </div>
+                    {showIndicatorTooltip && (
+                      <div
+                        onMouseEnter={(e) => {
+                          e.stopPropagation();
+                          setShowIndicatorTooltip(true);
+                          setShowForecastSettingsTooltip(false);
+                        }}
+                        onMouseLeave={(e) => {
+                          e.stopPropagation();
+                          setShowIndicatorTooltip(false);
+                        }}
+                        style={{
+                          position: 'absolute',
+                          bottom: 'calc(100% + 8px)',
+                          right: '50%',
+                          transform: 'translateX(50%)',
+                          backgroundColor: '#0F172A',
+                          borderRadius: '8px',
+                          padding: '12px',
+                          minWidth: '260px',
+                          maxWidth: '300px',
+                          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.5)',
+                          zIndex: 1000,
+                          border: 'none',
+                        }}
+                      >
+                        {/* Text */}
+                        <p style={{
+                          fontSize: '0.875rem',
+                          color: '#F8F8F8',
+                          margin: 0,
+                          marginBottom: '10px',
+                          lineHeight: '1.4',
+                          textAlign: 'center',
+                        }}>
+                          This value differs from the global settings for all products.
+                        </p>
+                        
+                        {/* Reset Button */}
+                        <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+                          <button
+                          onClick={() => {
+                            // Get global DOI settings from localStorage
+                            try {
+                              const globalDoiSettings = JSON.parse(localStorage.getItem('doi_default_settings') || '{}');
+                              if (Object.keys(globalDoiSettings).length > 0) {
+                                // Reset to global settings
+                                setTempDoiSettings(globalDoiSettings);
+                                if (onDoiSettingsChange) {
+                                  onDoiSettingsChange(globalDoiSettings);
+                                }
+                                setSettingsApplied(false);
+                                setShowIndicatorTooltip(false);
+                                toast.success('Reset to global DOI settings');
+                              }
+                            } catch (e) {
+                              console.error('Error loading global DOI settings:', e);
+                            }
+                          }}
+                          style={{
+                            width: '192px',
+                            height: '24px',
+                            padding: '0',
+                            borderRadius: '4px',
+                            border: 'none',
+                            backgroundColor: '#007BFF',
+                            color: '#FFFFFF',
+                            fontSize: '0.875rem',
+                            fontWeight: '500',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '5px',
+                            transition: 'background-color 0.2s',
+                            boxSizing: 'border-box',
+                          }}
+                          onMouseEnter={(e) => e.target.style.backgroundColor = '#0056B3'}
+                          onMouseLeave={(e) => e.target.style.backgroundColor = '#007BFF'}
+                        >
+                          <img 
+                            src="/assets/Icon=Reset.png" 
+                            alt="Reset" 
+                            style={{ 
+                              width: '16px', 
+                              height: '16px',
+                              filter: 'brightness(0) invert(1)'
+                            }}
+                          />
+                          <span>
+                            Reset to Global DOI ({(() => {
+                              try {
+                                const globalDoiSettings = JSON.parse(localStorage.getItem('doi_default_settings') || '{}');
+                                return calculateTotalDOI(globalDoiSettings) || 157;
+                              } catch {
+                                return 157;
+                              }
+                            })()})
+                          </span>
+                          </button>
+                        </div>
+                        
+                        {/* Caret - centered at bottom */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            bottom: '-6px',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            width: 0,
+                            height: 0,
+                            borderLeft: '6px solid transparent',
+                            borderRight: '6px solid transparent',
+                            borderTop: '6px solid #0F172A',
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
                 {showForecastSettingsTooltip && (
                   <>
                     {/* Invisible bridge to keep tooltip visible when moving mouse down */}
@@ -3049,11 +3275,21 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
-                  padding: '4px',
+                  padding: '6px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                  borderRadius: '4px',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+                  e.currentTarget.style.color = isDarkMode ? '#fff' : '#1f2937';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = isDarkMode ? '#9CA3AF' : '#6B7280';
                 }}
               >
                 <svg width="20" height="20" viewBox="0 0 16 16" fill="none">
@@ -3572,6 +3808,260 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 onMouseLeave={(e) => e.target.style.backgroundColor = '#3B82F6'}
               >
                 Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Temporary Apply Confirmation Modal */}
+      {showTemporaryConfirmModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.6)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1001,
+          }}
+          onClick={handleGoBackFromConfirm}
+        >
+          <div
+            style={{
+              backgroundColor: '#1A2235',
+              borderRadius: '12px',
+              padding: '24px',
+              width: '418px',
+              height: 'auto',
+              minHeight: '257px',
+              boxShadow: '0 24px 80px rgba(15,23,42,0.75)',
+              border: '1px solid #1F2937',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '24px',
+              position: 'relative',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* X Button */}
+            <button
+              onClick={handleGoBackFromConfirm}
+              style={{
+                position: 'absolute',
+                top: '12px',
+                right: '12px',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#9CA3AF',
+                borderRadius: '4px',
+                transition: 'all 0.2s',
+                zIndex: 10,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                e.currentTarget.style.color = '#FFFFFF';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.color = '#9CA3AF';
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 16 16" fill="none">
+                <path 
+                  d="M12 4L4 12M4 4L12 12" 
+                  stroke="currentColor" 
+                  strokeWidth="1.5" 
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+
+            {/* Warning Icon */}
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'center',
+            }}>
+              <div
+                style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: '50%',
+                  backgroundColor: '#F97316',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.5rem',
+                  fontWeight: 'bold',
+                  color: '#FFFFFF',
+                }}
+              >
+                !
+              </div>
+            </div>
+
+            {/* Title */}
+            <h3 style={{
+              fontSize: '1.25rem',
+              fontWeight: '700',
+              color: '#FFFFFF',
+              textAlign: 'center',
+              margin: 0,
+              marginTop: '-12px',
+            }}>
+              Apply Forecast Settings Temporarily?
+            </h3>
+
+            {/* Body Text */}
+            <div style={{ marginTop: '-12px' }}>
+              <p style={{
+                fontSize: '0.875rem',
+                color: '#E2E8F0',
+                textAlign: 'center',
+                margin: 0,
+                marginBottom: '0.5rem',
+                lineHeight: '1.5',
+              }}>
+                You're making a temporary change for this product only.
+              </p>
+              <p style={{
+                fontSize: '0.875rem',
+                color: '#E2E8F0',
+                textAlign: 'center',
+                margin: 0,
+                lineHeight: '1.5',
+              }}>
+                To keep these settings, use Save as Default.
+              </p>
+            </div>
+
+            {/* Checkbox */}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              justifyContent: 'center',
+            }}>
+              <div
+                onClick={() => setDontRemindAgain(!dontRemindAgain)}
+                style={{
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '3px',
+                  border: '1.5px solid #E2E8F0',
+                  backgroundColor: 'transparent',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 1px 2px rgba(226, 232, 240, 0.3)',
+                  transition: 'all 0.2s ease',
+                  flexShrink: 0,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = '#F3F4F6';
+                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(226, 232, 240, 0.4)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = '#E2E8F0';
+                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(226, 232, 240, 0.3)';
+                }}
+              >
+                {dontRemindAgain && (
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 10 10"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M8 2.5L4 6.5L2 4.5"
+                      stroke="#E2E8F0"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
+              </div>
+              <label
+                onClick={() => setDontRemindAgain(!dontRemindAgain)}
+                style={{
+                  fontSize: '0.875rem',
+                  color: '#C7C7CC',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                Don't remind me again
+              </label>
+            </div>
+
+            {/* Buttons */}
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'row',
+              gap: '16px',
+              width: '100%',
+            }}>
+              <button
+                onClick={handleGoBackFromConfirm}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: '#FFFFFF',
+                  color: '#1F2937',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                  width: '177px',
+                  height: '31px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxSizing: 'border-box',
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#F3F4F6'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#FFFFFF'}
+              >
+                Go back
+              </button>
+              <button
+                onClick={handleConfirmTemporaryApply}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: '#3B82F6',
+                  color: '#FFFFFF',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                  width: '177px',
+                  height: '31px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxSizing: 'border-box',
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#2563EB'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#3B82F6'}
+              >
+                Confirm
               </button>
             </div>
           </div>

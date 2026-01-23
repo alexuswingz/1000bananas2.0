@@ -118,6 +118,7 @@ const NewShipment = () => {
   const [isNgoosOpen, setIsNgoosOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
   const [openDoiSettings, setOpenDoiSettings] = useState(false);
+  const [openForecastSettings, setOpenForecastSettings] = useState(false);
   // Store product-specific DOI settings (keyed by ASIN)
   const [productDoiSettings, setProductDoiSettings] = useState({});
   const [isShipmentDetailsOpen, setIsShipmentDetailsOpen] = useState(false);
@@ -1328,9 +1329,10 @@ const NewShipment = () => {
       .filter(formula => formula && formula.trim() !== '')
   ).size;
 
-  const handleProductClick = (row, shouldOpenDoiSettings = false) => {
+  const handleProductClick = (row, shouldOpenDoiSettings = false, shouldOpenForecastSettings = false) => {
     setSelectedRow(row);
     setOpenDoiSettings(shouldOpenDoiSettings);
+    setOpenForecastSettings(shouldOpenForecastSettings);
     setIsNgoosOpen(true);
   };
 
@@ -3432,6 +3434,7 @@ const NewShipment = () => {
           setIsNgoosOpen(false);
           setSelectedRow(null);
           setOpenDoiSettings(false);
+          setOpenForecastSettings(false);
         }}
         selectedRow={selectedRow}
         forecastRange={parseInt(forecastRange) || 150}
@@ -3441,6 +3444,7 @@ const NewShipment = () => {
           return asin && productDoiSettings[asin] ? productDoiSettings[asin] : doiSettingsValues;
         })()}
         openDoiSettings={openDoiSettings}
+        openForecastSettings={openForecastSettings}
         onDoiSettingsChange={(newSettings) => handleProductDoiSettingsChange(selectedRow, newSettings)}
         allProducts={filteredProducts}
         onNavigate={(direction) => {

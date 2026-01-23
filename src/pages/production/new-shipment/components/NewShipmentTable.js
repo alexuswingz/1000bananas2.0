@@ -3361,7 +3361,7 @@ const NewShipmentTable = ({
                       <svg
                         onClick={(e) => {
                           e.stopPropagation();
-                          onProductClick(row, true);
+                          onProductClick(row, false, true);
                         }}
                         style={{
                           width: '16px',
