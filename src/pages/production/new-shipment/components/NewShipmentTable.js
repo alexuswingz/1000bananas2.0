@@ -89,6 +89,7 @@ const NewShipmentTable = ({
   const nonTableFilterIconRefs = useRef({});
   const nonTableFilterDropdownRef = useRef(null);
   const [nonTableFilters, setNonTableFilters] = useState({});
+  const nonTableContainerRef = useRef(null);
   
   // Clean up any invalid brand filters when account changes or on mount
   // If a brand filter has all brands selected, treat it as no filter
@@ -1926,6 +1927,43 @@ const NewShipmentTable = ({
     };
   }, [tableMode, nonTableSelectedIndices, currentRows.length, effectiveSetQtyValues]);
 
+  // Handle clicks outside the product list to deselect products (non-table mode)
+  useEffect(() => {
+    if (tableMode || nonTableSelectedIndices.size === 0) {
+      return; // Only handle in non-table mode with selections
+    }
+
+    const handleClickOutside = (e) => {
+      // Check if click is on a filter icon (don't deselect when opening filters)
+      const clickedOnNonTableFilterIcon = Object.values(nonTableFilterIconRefs.current).some(
+        ref => ref && ref.contains && ref.contains(e.target)
+      );
+      
+      // Check if click is inside the filter dropdown
+      const clickedInsideNonTableFilterDropdown = 
+        (nonTableFilterDropdownRef.current && nonTableFilterDropdownRef.current.contains && nonTableFilterDropdownRef.current.contains(e.target)) ||
+        e.target.closest('[data-filter-dropdown]');
+      
+      // Check if click is outside the product list container
+      if (
+        nonTableContainerRef.current &&
+        !nonTableContainerRef.current.contains(e.target) &&
+        !clickedOnNonTableFilterIcon &&
+        !clickedInsideNonTableFilterDropdown &&
+        // Don't deselect if clicking on modals or other overlays
+        !e.target.closest('[data-modal]')
+      ) {
+        setNonTableSelectedIndices(new Set());
+        setNonTableLastSelectedIndex(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [tableMode, nonTableSelectedIndices.size]);
+
   // Check if all rows are selected (respect current view/filter)
   const allSelected = useMemo(() => {
     return currentRows.length > 0 && selectedRows.size === currentRows.length;
@@ -2256,6 +2294,23 @@ const NewShipmentTable = ({
     }
   };
 
+  // Handle row mousedown to prevent text selection on Shift+Click
+  const handleNonTableRowMouseDown = (e, arrayIndex, originalIndex) => {
+    // Don't prevent if clicking on interactive elements
+    if (e.target.closest('button') || e.target.closest('input')) {
+      return;
+    }
+
+    // Prevent text selection on Shift+Click
+    if (e.shiftKey) {
+      e.preventDefault();
+      // Also prevent text selection via CSS
+      if (window.getSelection) {
+        window.getSelection().removeAllRanges();
+      }
+    }
+  };
+
   // Handle row click for multi-select (non-table mode)
   // arrayIndex is the position in currentRows (0, 1, 2...), originalIndex is row._originalIndex for qty operations
   const handleNonTableRowClick = (e, arrayIndex, originalIndex) => {
@@ -2266,6 +2321,15 @@ const NewShipmentTable = ({
 
     const isShiftClick = e.shiftKey;
     const isCmdClick = e.metaKey || e.ctrlKey;
+
+    // Prevent text selection on Shift+Click
+    if (isShiftClick) {
+      e.preventDefault();
+      // Clear any existing text selection
+      if (window.getSelection) {
+        window.getSelection().removeAllRanges();
+      }
+    }
 
     if (isShiftClick && nonTableLastSelectedIndex !== null) {
       // Shift + Click: Select range between lastSelectedIndex and current arrayIndex
@@ -2379,6 +2443,7 @@ const NewShipmentTable = ({
     return (
       <>
         <div
+          ref={nonTableContainerRef}
           className={`${themeClasses.cardBg} ${themeClasses.border} border rounded-xl shadow-sm`}
           style={{ marginTop: '1.25rem', overflow: 'hidden', borderRadius: '16px' }}
         >
@@ -2643,6 +2708,16 @@ const NewShipmentTable = ({
               return (
                 <div
                   key={`${row.id}-${index}`}
+                  onMouseDown={(e) => {
+                    // Only handle mousedown if not clicking on interactive elements
+                    if (
+                      !e.target.closest('input') &&
+                      !e.target.closest('button') &&
+                      !e.target.closest('img[alt="Copy"]')
+                    ) {
+                      handleNonTableRowMouseDown(e, arrayIndex, index);
+                    }
+                  }}
                   onClick={(e) => {
                     // Only handle selection if not clicking on interactive elements
                     if (
@@ -2676,6 +2751,10 @@ const NewShipmentTable = ({
                     backgroundColor: isSelected ? (isDarkMode ? '#1E3A5F' : '#DBEAFE') : '#1A2235',
                     alignItems: 'center',
                     gap: '32px',
+                    userSelect: 'none', // Prevent text selection
+                    WebkitUserSelect: 'none', // Safari
+                    MozUserSelect: 'none', // Firefox
+                    msUserSelect: 'none', // IE/Edge
                     boxSizing: 'border-box',
                     position: 'relative',
                     cursor: 'pointer',

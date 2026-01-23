@@ -948,12 +948,12 @@ const NewShipmentHeader = ({
         marginTop: '16px',
         position: 'relative',
       }}>
-        {/* Line on top of tabs - 62px wider */}
+        {/* Line on top of tabs - 46px wider */}
         <div style={{
           position: 'absolute',
           top: 0,
-          left: '-31px',
-          right: '-31px',
+          left: '-23px',
+          right: '-23px',
           height: '1px',
           backgroundColor: isDarkMode ? '#374151' : '#E5E7EB',
         }} />
