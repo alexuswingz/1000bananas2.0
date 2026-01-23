@@ -11,6 +11,7 @@ import ProductForm from './products/ProductForm';
 import Development from './products/Development';
 import Catalog from './products/Catalog';
 import ProductDetail from './products/catalog/ProductDetail';
+import VineTracker from './products/vine-tracker';
 import Dashboard from './team/Dashboard';
 import Formula from './team/Formula';
 import Design from './team/Design';
@@ -59,6 +60,7 @@ const Landing = () => {
           <Route path="/products/development" element={<Development />} />
           <Route path="/products/catalog" element={<Catalog />} />
           <Route path="/products/catalog/detail" element={<ProductDetail />} />
+          <Route path="/products/vine-tracker" element={<VineTracker />} />
           <Route path="/team/dashboard" element={<Dashboard />} />
           <Route path="/team/formula" element={<Formula />} />
           <Route path="/team/design" element={<Design />} />

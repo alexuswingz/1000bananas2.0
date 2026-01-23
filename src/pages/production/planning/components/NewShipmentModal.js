@@ -213,11 +213,11 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                 padding: '10px 12px',
                 border: `1px solid ${isDarkMode ? '#374151' : '#D1D5DB'}`,
                 borderRadius: '6px',
-                fontSize: '14px',
-                color: '#111827',
-                backgroundColor: '#FFFFFF',
-                outline: 'none',
+                backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
                 cursor: 'text',
+                fontSize: '14px',
+                color: newShipment.shipmentName ? (isDarkMode ? '#FFFFFF' : '#111827') : (isDarkMode ? '#9CA3AF' : '#9CA3AF'),
+                outline: 'none',
               }}
             />
           </div>
