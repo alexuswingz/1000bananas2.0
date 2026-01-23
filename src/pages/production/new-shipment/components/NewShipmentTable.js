@@ -3428,7 +3428,7 @@ const NewShipmentTable = ({
                         width: '86px',
                         height: '24px',
                         padding: '4px 8px',
-                        borderRadius: '4px',
+                        borderRadius: '6px',
                         border: 'none',
                         backgroundColor: '#9333EA',
                         color: '#FFFFFF',
@@ -3438,17 +3438,15 @@ const NewShipmentTable = ({
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '8px',
+                        gap: '10px',
                         fontFamily: 'sans-serif',
                         position: 'absolute',
                         right: 0,
                         boxSizing: 'border-box'
                       }}
                     >
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <svg width="18" height="18" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginTop: '-4px' }}>
                         <path d="M2.33333 10.5L5.25 7.58333L7.58333 9.91667L11.6667 5.83333M11.6667 5.83333V9.33333M11.6667 5.83333H8.16667" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M1.16667 2.33333H12.8333" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                        <path d="M1.16667 11.6667H12.8333" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                       </svg>
                       Analyze
                     </button>
