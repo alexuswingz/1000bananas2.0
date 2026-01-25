@@ -2789,7 +2789,20 @@ const NewShipmentTable = ({
                     gridTemplateColumns: '1fr 140px 220px 140px',
                     height: '66px',
                     padding: '8px 16px',
-                    backgroundColor: isSelected ? (isDarkMode ? '#1E3A5F' : '#DBEAFE') : '#1A2235',
+                    backgroundColor: (() => {
+                      const isHovered = hoveredRowIndex === index;
+                      if (isSelected) {
+                        if (isDarkMode) {
+                          return isHovered ? '#234A6F' : '#1E3A5F';
+                        } else {
+                          return isHovered ? '#E3EFFE' : '#DBEAFE';
+                        }
+                      } else {
+                        // Base: #1A2235 (rgb(26, 34, 53)), Hover: #84FF00 (rgb(132, 255, 0))
+                        // 3% blend: 97% base + 3% hover = rgb(29, 41, 51) = #1D2933
+                        return isHovered ? '#1D2933' : '#1A2235';
+                      }
+                    })(),
                     alignItems: 'center',
                     gap: '32px',
                     userSelect: 'none', // Prevent text selection
@@ -2799,7 +2812,7 @@ const NewShipmentTable = ({
                     boxSizing: 'border-box',
                     position: 'relative',
                     cursor: 'pointer',
-                    transition: 'background-color 0.15s ease'
+                    transition: 'background-color 0.05s ease'
                   }}
                 >
                   {/* Border line with 30px margin on both sides */}
