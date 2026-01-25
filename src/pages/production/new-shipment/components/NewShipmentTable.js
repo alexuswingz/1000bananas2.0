@@ -1435,7 +1435,7 @@ const NewShipmentTable = ({
     return sortedValues;
   };
 
-  const isNonTableNumericColumn = (columnKey) => columnKey === 'fbaAvailable' || columnKey === 'doiDays';
+  const isNonTableNumericColumn = (columnKey) => columnKey === 'fbaAvailable' || columnKey === 'doiDays' || columnKey === 'unitsToMake';
 
   const hasNonTableActiveFilter = (columnKey) => {
     const filter = nonTableFilters[columnKey];
@@ -1598,6 +1598,9 @@ const NewShipmentTable = ({
         const rowsToSort = [...currentNonTableFilteredRowsRef.current];
         const numeric = isNonTableNumericColumn(columnKey);
         
+        // Get reference to original rows array for finding original indices
+        const originalRows = filteredRowsWithSelection;
+        
         // Sort the rows
         rowsToSort.sort((a, b) => {
           let aVal, bVal;
@@ -1606,12 +1609,24 @@ const NewShipmentTable = ({
           else if (columnKey === 'size') { aVal = a.size; bVal = b.size; }
           else if (columnKey === 'fbaAvailable') { aVal = a.fbaAvailable || 0; bVal = b.fbaAvailable || 0; }
           else if (columnKey === 'unitsToMake') {
-            const aIndex = a._originalIndex !== undefined ? a._originalIndex : rowsToSort.findIndex(r => r.id === a.id);
-            const bIndex = b._originalIndex !== undefined ? b._originalIndex : rowsToSort.findIndex(r => r.id === b.id);
+            // Use _originalIndex if available, otherwise find in original rows array
+            const aIndex = a._originalIndex !== undefined ? a._originalIndex : originalRows.findIndex(r => r.id === a.id);
+            const bIndex = b._originalIndex !== undefined ? b._originalIndex : originalRows.findIndex(r => r.id === b.id);
             const aQty = effectiveQtyValues[aIndex];
             const bQty = effectiveQtyValues[bIndex];
-            aVal = typeof aQty === 'number' ? aQty : (aQty === '' || aQty === null || aQty === undefined ? 0 : parseInt(aQty, 10) || 0);
-            bVal = typeof bQty === 'number' ? bQty : (bQty === '' || bQty === null || bQty === undefined ? 0 : parseInt(bQty, 10) || 0);
+            
+            // Helper function to convert value to number, handling commas and strings
+            const parseNumericValue = (val) => {
+              if (typeof val === 'number') return val;
+              if (val === '' || val === null || val === undefined) return 0;
+              // Remove commas and parse as number
+              const cleaned = String(val).replace(/,/g, '');
+              const parsed = Number(cleaned);
+              return isNaN(parsed) ? 0 : parsed;
+            };
+            
+            aVal = parseNumericValue(aQty);
+            bVal = parseNumericValue(bQty);
           }
           else if (columnKey === 'doiDays') { aVal = a.doiTotal || a.daysOfInventory || 0; bVal = b.doiTotal || b.daysOfInventory || 0; }
 
