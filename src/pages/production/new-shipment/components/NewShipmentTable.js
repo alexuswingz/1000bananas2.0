@@ -2783,17 +2783,29 @@ const NewShipmentTable = ({
                     }
                   }}
                   onMouseEnter={(e) => {
+                    setHoveredRowIndex(index);
                     if (isSelected) {
                       e.currentTarget.style.backgroundColor = isDarkMode ? '#234A6F' : '#E3EFFE';
                     } else {
                       e.currentTarget.style.backgroundColor = '#1D2933';
                     }
+                    // Show pencil icon instantly
+                    const pencilIcon = e.currentTarget.querySelector('img[alt="Edit DOI Settings"]');
+                    if (pencilIcon && !hasCustomDoiSettings) {
+                      pencilIcon.style.opacity = '1';
+                    }
                   }}
                   onMouseLeave={(e) => {
+                    setHoveredRowIndex(null);
                     if (isSelected) {
                       e.currentTarget.style.backgroundColor = isDarkMode ? '#1E3A5F' : '#DBEAFE';
                     } else {
                       e.currentTarget.style.backgroundColor = '#1A2235';
+                    }
+                    // Hide pencil icon instantly
+                    const pencilIcon = e.currentTarget.querySelector('img[alt="Edit DOI Settings"]');
+                    if (pencilIcon && !hasCustomDoiSettings) {
+                      pencilIcon.style.opacity = '0';
                     }
                   }}
                   style={{
@@ -3427,9 +3439,9 @@ const NewShipmentTable = ({
                           width: '16px',
                           height: '16px',
                           cursor: 'pointer',
-                          opacity: hasCustomDoiSettings ? 1 : (hoveredRowIndex === index ? 1 : 0),
-                          transition: 'opacity 0.15s ease, filter 0.15s ease',
+                          opacity: hasCustomDoiSettings ? 1 : 0,
                           flexShrink: 0,
+                          willChange: 'opacity',
                           filter: hasCustomDoiSettings 
                             ? 'brightness(0) saturate(100%) invert(47%) sepia(98%) saturate(2476%) hue-rotate(209deg) brightness(100%) contrast(101%)' // Blue #3B82F6
                             : 'brightness(0) saturate(100%) invert(64%) sepia(6%) saturate(456%) hue-rotate(169deg) brightness(94%) contrast(88%)', // Gray #9CA3AF
