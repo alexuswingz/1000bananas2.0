@@ -29,6 +29,9 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
   const shipmentTypeRef = useRef(null);
   const hasInitializedRef = useRef(false);
   
+  // Focus states for active blue border
+  const [focusedField, setFocusedField] = useState(null);
+  
   // Auto-populate shipment name with current timestamp and set marketplace to Amazon when modal opens
   useEffect(() => {
     if (isOpen && !hasInitializedRef.current) {
@@ -207,17 +210,20 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
               type="text"
               value={newShipment.shipmentName || ''}
               onChange={(e) => setNewShipment((prev) => ({ ...prev, shipmentName: e.target.value }))}
+              onFocus={() => setFocusedField('shipmentName')}
+              onBlur={() => setFocusedField(null)}
               placeholder="Auto-generated timestamp..."
               style={{
                 width: '100%',
                 padding: '10px 12px',
-                border: `1px solid ${isDarkMode ? '#374151' : '#D1D5DB'}`,
+                border: `1px solid ${focusedField === 'shipmentName' ? '#3B82F6' : (isDarkMode ? '#374151' : '#D1D5DB')}`,
                 borderRadius: '6px',
                 backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
                 cursor: 'text',
                 fontSize: '14px',
                 color: newShipment.shipmentName ? (isDarkMode ? '#FFFFFF' : '#111827') : (isDarkMode ? '#9CA3AF' : '#9CA3AF'),
                 outline: 'none',
+                transition: 'border-color 0.2s ease',
               }}
             />
           </div>
@@ -238,20 +244,34 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
             <div ref={shipmentTypeRef} style={{ position: 'relative' }}>
               <button
                 type="button"
-                onClick={() => setShipmentTypeOpen(!shipmentTypeOpen)}
+                onClick={() => {
+                  const newState = !shipmentTypeOpen;
+                  setShipmentTypeOpen(newState);
+                  setFocusedField(newState ? 'shipmentType' : null);
+                }}
+                onFocus={() => setFocusedField('shipmentType')}
+                onBlur={() => {
+                  // Delay blur to allow dropdown click to register
+                  setTimeout(() => {
+                    if (!shipmentTypeOpen) {
+                      setFocusedField(null);
+                    }
+                  }, 200);
+                }}
                 style={{
                   width: '100%',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '10px 12px',
-                  border: `1px solid ${isDarkMode ? '#374151' : '#D1D5DB'}`,
+                  border: `1px solid ${(focusedField === 'shipmentType' || shipmentTypeOpen) ? '#3B82F6' : (isDarkMode ? '#374151' : '#D1D5DB')}`,
                   borderRadius: '6px',
                   backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
                   cursor: 'pointer',
                   fontSize: '14px',
                   color: newShipment.shipmentType ? (isDarkMode ? '#FFFFFF' : '#111827') : (isDarkMode ? '#9CA3AF' : '#9CA3AF'),
                   outline: 'none',
+                  transition: 'border-color 0.2s ease',
                 }}
               >
                 <span>{newShipment.shipmentType || 'Select Shipment Type'}</span>
@@ -300,6 +320,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                       onClick={() => {
                         setNewShipment((prev) => ({ ...prev, shipmentType: option }));
                         setShipmentTypeOpen(false);
+                        setFocusedField(null);
                       }}
                       style={{
                         width: '100%',
@@ -342,20 +363,34 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
             <div ref={marketplaceRef} style={{ position: 'relative' }}>
               <button
                 type="button"
-                onClick={() => setMarketplaceOpen(!marketplaceOpen)}
+                onClick={() => {
+                  const newState = !marketplaceOpen;
+                  setMarketplaceOpen(newState);
+                  setFocusedField(newState ? 'marketplace' : null);
+                }}
+                onFocus={() => setFocusedField('marketplace')}
+                onBlur={() => {
+                  // Delay blur to allow dropdown click to register
+                  setTimeout(() => {
+                    if (!marketplaceOpen) {
+                      setFocusedField(null);
+                    }
+                  }, 200);
+                }}
                 style={{
                   width: '100%',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '10px 12px',
-                  border: `1px solid ${isDarkMode ? '#374151' : '#D1D5DB'}`,
+                  border: `1px solid ${(focusedField === 'marketplace' || marketplaceOpen) ? '#3B82F6' : (isDarkMode ? '#374151' : '#D1D5DB')}`,
                   borderRadius: '6px',
                   backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
                   cursor: 'pointer',
                   fontSize: '14px',
                   color: newShipment.marketplace ? (isDarkMode ? '#FFFFFF' : '#111827') : (isDarkMode ? '#9CA3AF' : '#9CA3AF'),
                   outline: 'none',
+                  transition: 'border-color 0.2s ease',
                 }}
               >
                 <span>{newShipment.marketplace || 'Select Marketplace'}</span>
@@ -404,6 +439,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                       onClick={() => {
                         setNewShipment((prev) => ({ ...prev, marketplace: option }));
                         setMarketplaceOpen(false);
+                        setFocusedField(null);
                       }}
                       style={{
                         width: '100%',
@@ -446,20 +482,34 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
             <div ref={accountRef} style={{ position: 'relative' }}>
               <button
                 type="button"
-                onClick={() => setAccountOpen(!accountOpen)}
+                onClick={() => {
+                  const newState = !accountOpen;
+                  setAccountOpen(newState);
+                  setFocusedField(newState ? 'account' : null);
+                }}
+                onFocus={() => setFocusedField('account')}
+                onBlur={() => {
+                  // Delay blur to allow dropdown click to register
+                  setTimeout(() => {
+                    if (!accountOpen) {
+                      setFocusedField(null);
+                    }
+                  }, 200);
+                }}
                 style={{
                   width: '100%',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '10px 12px',
-                  border: `1px solid ${isDarkMode ? '#374151' : '#D1D5DB'}`,
+                  border: `1px solid ${(focusedField === 'account' || accountOpen) ? '#3B82F6' : (isDarkMode ? '#374151' : '#D1D5DB')}`,
                   borderRadius: '6px',
                   backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
                   cursor: 'pointer',
                   fontSize: '14px',
                   color: newShipment.account ? (isDarkMode ? '#FFFFFF' : '#111827') : (isDarkMode ? '#9CA3AF' : '#9CA3AF'),
                   outline: 'none',
+                  transition: 'border-color 0.2s ease',
                 }}
               >
                 <span>{newShipment.account || 'Select Account'}</span>
@@ -510,6 +560,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                       onClick={() => {
                         setNewShipment((prev) => ({ ...prev, account: option.name }));
                         setAccountOpen(false);
+                        setFocusedField(null);
                       }}
                       style={{
                         width: '100%',
