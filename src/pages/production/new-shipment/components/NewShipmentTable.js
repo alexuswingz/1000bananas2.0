@@ -2782,25 +2782,30 @@ const NewShipmentTable = ({
                       onProductClick(clickedRow, false);
                     }
                   }}
-                  onMouseEnter={() => setHoveredRowIndex(index)}
-                  onMouseLeave={() => setHoveredRowIndex(null)}
+                  onMouseEnter={(e) => {
+                    if (isSelected) {
+                      e.currentTarget.style.backgroundColor = isDarkMode ? '#234A6F' : '#E3EFFE';
+                    } else {
+                      e.currentTarget.style.backgroundColor = '#1D2933';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (isSelected) {
+                      e.currentTarget.style.backgroundColor = isDarkMode ? '#1E3A5F' : '#DBEAFE';
+                    } else {
+                      e.currentTarget.style.backgroundColor = '#1A2235';
+                    }
+                  }}
                   style={{
                     display: 'grid',
                     gridTemplateColumns: '1fr 140px 220px 140px',
                     height: '66px',
                     padding: '8px 16px',
                     backgroundColor: (() => {
-                      const isHovered = hoveredRowIndex === index;
                       if (isSelected) {
-                        if (isDarkMode) {
-                          return isHovered ? '#234A6F' : '#1E3A5F';
-                        } else {
-                          return isHovered ? '#E3EFFE' : '#DBEAFE';
-                        }
+                        return isDarkMode ? '#1E3A5F' : '#DBEAFE';
                       } else {
-                        // Base: #1A2235 (rgb(26, 34, 53)), Hover: #84FF00 (rgb(132, 255, 0))
-                        // 3% blend: 97% base + 3% hover = rgb(29, 41, 51) = #1D2933
-                        return isHovered ? '#1D2933' : '#1A2235';
+                        return '#1A2235';
                       }
                     })(),
                     alignItems: 'center',
@@ -2811,8 +2816,7 @@ const NewShipmentTable = ({
                     msUserSelect: 'none', // IE/Edge
                     boxSizing: 'border-box',
                     position: 'relative',
-                    cursor: 'pointer',
-                    transition: 'background-color 0.05s ease'
+                    cursor: 'pointer'
                   }}
                 >
                   {/* Border line with 30px margin on both sides */}
