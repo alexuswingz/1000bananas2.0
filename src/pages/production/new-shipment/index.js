@@ -121,6 +121,8 @@ const NewShipment = () => {
   const [openForecastSettings, setOpenForecastSettings] = useState(false);
   // Store product-specific DOI settings (keyed by ASIN)
   const [productDoiSettings, setProductDoiSettings] = useState({});
+  // Store product-specific forecast settings (keyed by ASIN)
+  const [productForecastSettings, setProductForecastSettings] = useState({});
   const [isShipmentDetailsOpen, setIsShipmentDetailsOpen] = useState(false);
   const [isExportTemplateOpen, setIsExportTemplateOpen] = useState(false);
   const [isSortProductsCompleteOpen, setIsSortProductsCompleteOpen] = useState(false);
@@ -1353,6 +1355,23 @@ const NewShipment = () => {
     console.log(`Saved custom DOI settings for ${asin}:`, newSettings);
   };
 
+  // Handle product-specific forecast settings changes
+  const handleProductForecastSettingsChange = (row, newSettings) => {
+    const asin = row?.child_asin || row?.childAsin || row?.asin;
+    if (!asin) return;
+
+    // Save product-specific forecast settings
+    setProductForecastSettings(prev => ({
+      ...prev,
+      [asin]: newSettings
+    }));
+
+    // TODO: When backend is ready, save to database via API
+    // await ProductionAPI.saveProductForecastSettings(asin, newSettings);
+    
+    console.log(`Saved custom forecast settings for ${asin}:`, newSettings);
+  };
+
   const handleActionChange = (action) => {
     setActiveAction(action);
     // Track which tab (label-check or formula-check) was accessed first
@@ -1988,11 +2007,13 @@ const NewShipment = () => {
     let productsWithIndex = products.map((product, index) => {
       const asin = product.child_asin || product.childAsin || product.asin;
       const hasCustomDoiSettings = asin && productDoiSettings[asin] ? true : false;
+      const hasCustomForecastSettings = asin && productForecastSettings[asin] ? true : false;
       
       return {
         ...product,
         _originalIndex: index, // Store original position in products array for qtyValues lookup
         hasCustomDoiSettings, // Flag to indicate if product has custom DOI settings
+        hasCustomForecastSettings, // Flag to indicate if product has custom forecast settings
       };
     });
     
@@ -3446,6 +3467,7 @@ const NewShipment = () => {
         openDoiSettings={openDoiSettings}
         openForecastSettings={openForecastSettings}
         onDoiSettingsChange={(newSettings) => handleProductDoiSettingsChange(selectedRow, newSettings)}
+        onForecastSettingsChange={(newSettings) => handleProductForecastSettingsChange(selectedRow, newSettings)}
         allProducts={filteredProducts}
         onNavigate={(direction) => {
           if (!selectedRow || !filteredProducts || filteredProducts.length === 0) return;

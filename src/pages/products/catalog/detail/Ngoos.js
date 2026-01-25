@@ -19,7 +19,7 @@ import {
   Brush
 } from 'recharts';
 
-const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = null, overrideUnitsToMake = null, onAddUnits = null, labelsAvailable = null, openDoiSettings = false, openForecastSettings = false, onDoiSettingsChange = null }) => {
+const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = null, overrideUnitsToMake = null, onAddUnits = null, labelsAvailable = null, openDoiSettings = false, openForecastSettings = false, onDoiSettingsChange = null, onForecastSettingsChange = null }) => {
   const { isDarkMode } = useTheme();
   const [selectedView, setSelectedView] = useState('2 Years');
   const [loading, setLoading] = useState(true);
@@ -776,6 +776,15 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     if (onDoiSettingsChange) {
       onDoiSettingsChange(tempDoiSettings);
     }
+    // Notify parent that forecast settings have been applied
+    if (onForecastSettingsChange) {
+      onForecastSettingsChange({
+        salesVelocityWeight: tempSalesVelocityWeight,
+        svVelocityWeight: tempSvVelocityWeight,
+        forecastModel: tempForecastModel,
+        marketAdjustment: tempMarketAdjustment
+      });
+    }
     setShowForecastSettingsModal(false);
     setShowTemporaryConfirmModal(false);
     setSettingsApplied(true);
@@ -829,6 +838,15 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     // Apply DOI settings via callback
     if (onDoiSettingsChange) {
       onDoiSettingsChange(tempDoiSettings);
+    }
+    // Notify parent that forecast settings have been applied
+    if (onForecastSettingsChange) {
+      onForecastSettingsChange({
+        salesVelocityWeight: tempSalesVelocityWeight,
+        svVelocityWeight: tempSvVelocityWeight,
+        forecastModel: tempForecastModel,
+        marketAdjustment: tempMarketAdjustment
+      });
     }
     setShowForecastSettingsModal(false);
     toast.success('Forecast settings saved as default');

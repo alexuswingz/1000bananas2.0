@@ -2715,6 +2715,8 @@ const NewShipmentTable = ({
               
               // Check if product has custom DOI settings (different from general settings)
               const hasCustomDoiSettings = row.customDoiSettings || row.hasCustomDoi || false;
+              // Check if product has custom forecast settings
+              const hasCustomForecastSettings = row.hasCustomForecastSettings || false;
               
               return (
                 <div
@@ -2783,29 +2785,41 @@ const NewShipmentTable = ({
                     }
                   }}
                   onMouseEnter={(e) => {
-                    setHoveredRowIndex(index);
-                    if (isSelected) {
-                      e.currentTarget.style.backgroundColor = isDarkMode ? '#234A6F' : '#E3EFFE';
-                    } else {
-                      e.currentTarget.style.backgroundColor = '#1D2933';
-                    }
-                    // Show pencil icon instantly
-                    const pencilIcon = e.currentTarget.querySelector('img[alt="Edit DOI Settings"]');
-                    if (pencilIcon && !hasCustomDoiSettings) {
-                      pencilIcon.style.opacity = '1';
+                    // Check if pencil is active first
+                    const pencilIcon = e.currentTarget.querySelector('img[alt="Edit Settings"]');
+                    const isPencilActive = pencilIcon && pencilIcon.getAttribute('data-pencil-active') === 'true';
+                    
+                    // Don't apply hover effects if pencil is active
+                    if (!isPencilActive) {
+                      setHoveredRowIndex(index);
+                      if (isSelected) {
+                        e.currentTarget.style.backgroundColor = isDarkMode ? '#234A6F' : '#E3EFFE';
+                      } else {
+                        e.currentTarget.style.backgroundColor = '#1D2933';
+                      }
+                      // Show pencil icon instantly only if not in active state
+                      if (pencilIcon) {
+                        pencilIcon.style.opacity = '1';
+                      }
                     }
                   }}
                   onMouseLeave={(e) => {
-                    setHoveredRowIndex(null);
-                    if (isSelected) {
-                      e.currentTarget.style.backgroundColor = isDarkMode ? '#1E3A5F' : '#DBEAFE';
-                    } else {
-                      e.currentTarget.style.backgroundColor = '#1A2235';
-                    }
-                    // Hide pencil icon instantly
-                    const pencilIcon = e.currentTarget.querySelector('img[alt="Edit DOI Settings"]');
-                    if (pencilIcon && !hasCustomDoiSettings) {
-                      pencilIcon.style.opacity = '0';
+                    // Check if pencil is active first
+                    const pencilIcon = e.currentTarget.querySelector('img[alt="Edit Settings"]');
+                    const isPencilActive = pencilIcon && pencilIcon.getAttribute('data-pencil-active') === 'true';
+                    
+                    // Don't apply hover effects if pencil is active
+                    if (!isPencilActive) {
+                      setHoveredRowIndex(null);
+                      if (isSelected) {
+                        e.currentTarget.style.backgroundColor = isDarkMode ? '#1E3A5F' : '#DBEAFE';
+                      } else {
+                        e.currentTarget.style.backgroundColor = '#1A2235';
+                      }
+                      // Hide pencil icon instantly only if not in active state
+                      if (pencilIcon) {
+                        pencilIcon.style.opacity = '0';
+                      }
                     }
                   }}
                   style={{
@@ -3427,22 +3441,24 @@ const NewShipmentTable = ({
                       <span style={{ fontSize: '24px', fontWeight: 500, color: doiColor, height: '32px', display: 'flex', alignItems: 'center' }}>
                         {doiValue}
                       </span>
-                      {/* Pencil Icon for DOI Settings */}
+                      {/* Pencil Icon - Shows when DOI or Forecast Settings are customized */}
                       <img
                         src="/assets/pencil.png"
-                        alt="Edit DOI Settings"
+                        alt="Edit Settings"
+                        data-pencil-active={(hasCustomDoiSettings || hasCustomForecastSettings) ? 'true' : 'false'}
                         onClick={(e) => {
                           e.stopPropagation();
+                          // Always open forecast settings modal
                           onProductClick(row, false, true);
                         }}
                         style={{
                           width: '16px',
                           height: '16px',
                           cursor: 'pointer',
-                          opacity: hasCustomDoiSettings ? 1 : 0,
+                          opacity: (hasCustomDoiSettings || hasCustomForecastSettings) ? 1 : 0,
                           flexShrink: 0,
                           willChange: 'opacity',
-                          filter: hasCustomDoiSettings 
+                          filter: (hasCustomDoiSettings || hasCustomForecastSettings)
                             ? 'brightness(0) saturate(100%) invert(47%) sepia(98%) saturate(2476%) hue-rotate(209deg) brightness(100%) contrast(101%)' // Blue #3B82F6
                             : 'brightness(0) saturate(100%) invert(64%) sepia(6%) saturate(456%) hue-rotate(169deg) brightness(94%) contrast(88%)', // Gray #9CA3AF
                         }}

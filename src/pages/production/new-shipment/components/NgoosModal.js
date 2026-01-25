@@ -36,6 +36,7 @@ const NgoosModal = ({
   openDoiSettings = false, // Whether to open DOI settings popover by default
   openForecastSettings = false, // Whether to open forecast settings modal by default
   onDoiSettingsChange = null, // Callback when DOI settings change for this product
+  onForecastSettingsChange = null, // Callback when forecast settings change for this product
 }) => {
   const { isDarkMode } = useTheme();
   const [forecastData, setForecastData] = useState(null);
@@ -389,6 +390,7 @@ const NgoosModal = ({
               openDoiSettings={openDoiSettings}
               openForecastSettings={openForecastSettings}
               onDoiSettingsChange={onDoiSettingsChange}
+              onForecastSettingsChange={onForecastSettingsChange}
               onAddUnits={(units) => {
                 if (onAddUnits) {
                   onAddUnits(selectedRow, units);
