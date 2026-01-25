@@ -1482,8 +1482,51 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                   <div style={{ fontSize: inventoryOnly ? '0.875rem' : '0.875rem', color: '#94a3b8' }}>
                     <span style={{ fontWeight: 500 }}>SIZE:</span> <span style={{ color: '#fff' }}>{productDetails?.product?.size || data?.size || data?.variations?.[0] || 'N/A'}</span>
                   </div>
-                  <div style={{ fontSize: inventoryOnly ? '0.875rem' : '0.875rem', color: '#94a3b8' }}>
-                    <span style={{ fontWeight: 500 }}>ASIN:</span> <span style={{ color: '#fff' }}>{productDetails?.product?.asin || data?.child_asin || data?.childAsin || 'N/A'}</span>
+                  <div style={{ fontSize: inventoryOnly ? '0.875rem' : '0.875rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontWeight: 500 }}>ASIN:</span> 
+                    <span style={{ color: '#fff' }}>{productDetails?.product?.asin || data?.child_asin || data?.childAsin || 'N/A'}</span>
+                    {(productDetails?.product?.asin || data?.child_asin || data?.childAsin) && (
+                      <img 
+                        src="/assets/copyy.png" 
+                        alt="Copy" 
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const asinToCopy = productDetails?.product?.asin || data?.child_asin || data?.childAsin;
+                          try {
+                            // Try modern clipboard API first
+                            if (navigator.clipboard && navigator.clipboard.writeText) {
+                              await navigator.clipboard.writeText(asinToCopy);
+                            } else {
+                              // Fallback for non-secure contexts or older browsers
+                              const textArea = document.createElement('textarea');
+                              textArea.value = asinToCopy;
+                              textArea.style.position = 'fixed';
+                              textArea.style.left = '-999999px';
+                              textArea.style.top = '-999999px';
+                              document.body.appendChild(textArea);
+                              textArea.focus();
+                              textArea.select();
+                              try {
+                                document.execCommand('copy');
+                              } finally {
+                                document.body.removeChild(textArea);
+                              }
+                            }
+                            toast.success('ASIN copied to clipboard', {
+                              description: asinToCopy,
+                              duration: 2000,
+                            });
+                          } catch (err) {
+                            console.error('Failed to copy ASIN:', err);
+                            toast.error('Failed to copy ASIN', {
+                              description: 'Please try again',
+                              duration: 2000,
+                            });
+                          }
+                        }}
+                        style={{ width: '14px', height: '14px', cursor: 'pointer', flexShrink: 0 }} 
+                      />
+                    )}
                   </div>
                   <div style={{ fontSize: inventoryOnly ? '0.875rem' : '0.875rem', color: '#94a3b8' }}>
                     <span style={{ fontWeight: 500 }}>BRAND:</span> <span style={{ color: '#fff' }}>{productDetails?.product?.brand || data?.brand || 'N/A'}</span>

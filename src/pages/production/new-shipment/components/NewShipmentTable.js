@@ -2927,7 +2927,7 @@ const NewShipmentTable = ({
                           </span>
                           {asin && (
                             <img 
-                              src="/assets/content_copy.png" 
+                              src="/assets/copyy.png" 
                               alt="Copy" 
                               onClick={async (e) => {
                                 e.stopPropagation();
