@@ -1571,6 +1571,7 @@ const NewShipmentTable = ({
     }));
     
     // Pass brand filter to parent component for pre-filtering products
+    // This filters the products list, but dropdown checkboxes remain visible
     if (columnKey === 'product' && onBrandFilterChange) {
       console.log('Passing brand filter to parent:', {
         brandFilterToApply: brandFilterToApply ? Array.from(brandFilterToApply) : null,
@@ -1727,9 +1728,7 @@ const NewShipmentTable = ({
 
       const numeric = isNonTableNumericColumn(columnKey);
 
-      // Brand filter (for product column) - applied first before other filters
-      // Only apply if selectedBrands is not null and has brands selected
-      // If all brands are selected, selectedBrands will be null (no filter)
+      // Brand filter/sort (for product column)
       if (columnKey === 'product' && filter.selectedBrands && filter.selectedBrands instanceof Set && filter.selectedBrands.size > 0) {
         // Get account-specific brands to check if all are selected
         const accountBrands = account && ACCOUNT_BRAND_MAPPING[account] 
@@ -1740,29 +1739,41 @@ const NewShipmentTable = ({
         const allBrandsSelected = filter.selectedBrands.size === accountBrands.length &&
           accountBrands.every(brand => filter.selectedBrands.has(brand));
         
-        // Only apply filter if not all brands are selected
+        // Helper function to check if a brand matches any selected brand
+        const isBrandChecked = (brandValue) => {
+          return Array.from(filter.selectedBrands).some(selectedBrand => {
+            const selectedBrandLower = selectedBrand.toLowerCase().trim();
+            const brandValueLower = brandValue.toLowerCase();
+            
+            // Normalize both strings (remove spaces around +, handle variations)
+            const normalizeBrand = (str) => str.replace(/\s*\+\s*/g, '+').replace(/\s+/g, ' ').trim();
+            const normalizedSelected = normalizeBrand(selectedBrandLower);
+            const normalizedValue = normalizeBrand(brandValueLower);
+            
+            // Exact match or contains match (handles variations like "Mint +" vs "Mint+")
+            return normalizedValue === normalizedSelected ||
+                   normalizedValue.includes(normalizedSelected) ||
+                   normalizedSelected.includes(normalizedValue) ||
+                   brandValueLower === selectedBrandLower ||
+                   brandValueLower.includes(selectedBrandLower) ||
+                   selectedBrandLower.includes(brandValueLower);
+          });
+        };
+        
+        // In non-table mode: Filter to show ONLY products from checked brands
+        // If all brands are selected, show all products (no filtering needed)
+        // If not all brands are selected, filter to show only products from checked brands
+        // The brand checkboxes in the dropdown remain visible even when unchecked (handled by dropdown component)
         if (!allBrandsSelected) {
           result = result.filter(row => {
             const brandValue = (row.brand || '').trim();
-            return Array.from(filter.selectedBrands).some(selectedBrand => {
-              const selectedBrandLower = selectedBrand.toLowerCase().trim();
-              const brandValueLower = brandValue.toLowerCase();
-              
-              // Normalize both strings (remove spaces around +, handle variations)
-              const normalizeBrand = (str) => str.replace(/\s*\+\s*/g, '+').replace(/\s+/g, ' ').trim();
-              const normalizedSelected = normalizeBrand(selectedBrandLower);
-              const normalizedValue = normalizeBrand(brandValueLower);
-              
-              // Exact match or contains match (handles variations like "Mint +" vs "Mint+")
-              return normalizedValue === normalizedSelected ||
-                     normalizedValue.includes(normalizedSelected) ||
-                     normalizedSelected.includes(normalizedValue) ||
-                     brandValueLower === selectedBrandLower ||
-                     brandValueLower.includes(selectedBrandLower) ||
-                     selectedBrandLower.includes(brandValueLower);
-            });
+            // If no brand value, don't show the product
+            if (!brandValue) return false;
+            // Show only products from checked brands
+            return isBrandChecked(brandValue);
           });
         }
+        // If allBrandsSelected is true, don't filter - show all products
       }
 
       // Value filters

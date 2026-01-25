@@ -66,7 +66,8 @@ const ProductsFilterDropdown = forwardRef(({
   });
   
   // Extract unique brands (only for product column) - Show brands based on account
-  // Only show brands that actually exist in the data
+  // Always show all allowed brands for the account, even if they don't have products in the current view
+  // This ensures brands remain visible in the dropdown even when unchecked
   const availableBrands = useMemo(() => {
     if (columnKey !== 'product') return [];
     
@@ -81,30 +82,12 @@ const ProductsFilterDropdown = forwardRef(({
       ? ACCOUNT_BRAND_MAPPING[account]
       : ACCOUNT_BRAND_MAPPING['TPS Nutrients'];
     
-    // Extract actual brands from availableValues (product data)
-    // availableValues contains product names, brands, and sizes
-    const brandsInData = new Set();
-    availableValues.forEach(value => {
-      const valueStr = String(value);
-      // Check if this value matches any allowed brand (with normalization)
-      allowedBrands.forEach(brand => {
-        const normalizeBrand = (str) => str.replace(/\s*\+\s*/g, '+').replace(/\s+/g, ' ').trim().toLowerCase();
-        const normalizedBrand = normalizeBrand(brand);
-        const normalizedValue = normalizeBrand(valueStr);
-        
-        if (normalizedValue === normalizedBrand || 
-            normalizedValue.includes(normalizedBrand) || 
-            normalizedBrand.includes(normalizedValue)) {
-          brandsInData.add(brand); // Use the canonical brand name from mapping
-        }
-      });
-    });
-    
-    // Only return brands that exist in the data, sorted
-    const brandsWithProducts = Array.from(brandsInData).sort();
-    console.log('Available brands with products:', brandsWithProducts, 'from allowed brands:', allowedBrands);
-    return brandsWithProducts;
-  }, [columnKey, account, availableValues]);
+    // Always return all allowed brands for the account, sorted
+    // This ensures brands remain visible in the dropdown even when unchecked
+    const sortedBrands = [...allowedBrands].sort();
+    console.log('Available brands for account:', sortedBrands, 'account:', account);
+    return sortedBrands;
+  }, [columnKey, account]);
   
   const filteredBrands = availableBrands.filter(brand =>
     brand.toLowerCase().includes(brandSearchTerm.toLowerCase())

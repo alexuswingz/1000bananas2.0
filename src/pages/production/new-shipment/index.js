@@ -2031,9 +2031,10 @@ const NewShipment = () => {
     }
     
     // Apply brand filter from products dropdown
-    // Only apply if selectedBrands is not null and has brands selected
-    // If all brands are selected, selectedBrands will be null (no filter)
-    if (selectedBrands && selectedBrands instanceof Set && selectedBrands.size > 0) {
+    // In non-table mode, skip brand filtering here - let the table component handle it
+    // This ensures brands remain visible in the filter dropdown even when unchecked
+    // In table mode, apply brand filtering at the parent level
+    if (tableMode && selectedBrands && selectedBrands instanceof Set && selectedBrands.size > 0) {
       // Get account-specific brands to check if all are selected
       const ACCOUNT_BRAND_MAPPING = {
         'TPS Nutrients': ['TPS Nutrients', 'Bloom City', 'TPS Plant Foods'],
