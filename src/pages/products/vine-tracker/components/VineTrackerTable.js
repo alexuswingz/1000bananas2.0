@@ -1,7 +1,286 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
+import NgoosAPI from '../../../../services/ngoosApi';
+import { toast } from 'sonner';
 
-const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow }) => {
+// Calendar Dropdown Component
+const CalendarDropdown = ({ value, onChange, onClose, inputRef }) => {
+  const { isDarkMode } = useTheme();
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const calendarRef = useRef(null);
+
+  // Parse date value (MM/DD/YYYY format)
+  const parseDate = (dateString) => {
+    if (!dateString) return null;
+    const parts = dateString.split('/');
+    if (parts.length === 3) {
+      const month = parseInt(parts[0]) - 1;
+      const day = parseInt(parts[1]);
+      const year = parseInt(parts[2]);
+      if (!isNaN(month) && !isNaN(day) && !isNaN(year)) {
+        return new Date(year, month, day);
+      }
+    }
+    return null;
+  };
+
+  const selectedDate = parseDate(value);
+
+  // Format date to MM/DD/YYYY
+  const formatDate = (date) => {
+    if (!date) return '';
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${month}/${day}/${year}`;
+  };
+
+  // Get days in month
+  const getDaysInMonth = (date) => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  };
+
+  // Get first day of month (0 = Sunday, 1 = Monday, etc.)
+  const getFirstDayOfMonth = (date) => {
+    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+  };
+
+  // Navigate months
+  const navigateMonth = (direction) => {
+    setCurrentMonth(prev => {
+      const newDate = new Date(prev);
+      newDate.setMonth(prev.getMonth() + direction);
+      return newDate;
+    });
+  };
+
+  // Handle date selection
+  const handleDateSelect = (day) => {
+    const newDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+    onChange(formatDate(newDate));
+  };
+
+  // Check if date is selected
+  const isSelected = (day) => {
+    if (!selectedDate) return false;
+    return (
+      selectedDate.getDate() === day &&
+      selectedDate.getMonth() === currentMonth.getMonth() &&
+      selectedDate.getFullYear() === currentMonth.getFullYear()
+    );
+  };
+
+  // Check if date is today
+  const isToday = (day) => {
+    const today = new Date();
+    return (
+      today.getDate() === day &&
+      today.getMonth() === currentMonth.getMonth() &&
+      today.getFullYear() === currentMonth.getFullYear()
+    );
+  };
+
+  // Close on outside click
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        calendarRef.current &&
+        !calendarRef.current.contains(event.target) &&
+        inputRef &&
+        !inputRef.contains(event.target)
+      ) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [onClose, inputRef]);
+
+  const daysInMonth = getDaysInMonth(currentMonth);
+  const firstDay = getFirstDayOfMonth(currentMonth);
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  // Generate calendar days
+  const calendarDays = [];
+  // Add empty cells for days before the first day of the month
+  for (let i = 0; i < firstDay; i++) {
+    calendarDays.push(null);
+  }
+  // Add days of the month
+  for (let day = 1; day <= daysInMonth; day++) {
+    calendarDays.push(day);
+  }
+
+  const inputRect = inputRef?.getBoundingClientRect();
+
+  return (
+    <div
+      ref={calendarRef}
+      data-date-picker-calendar
+      style={{
+        position: 'fixed',
+        top: (inputRect?.bottom || 0) + 4 + 'px',
+        left: (inputRect?.left || 0) + 'px',
+        width: '280px',
+        backgroundColor: '#111827',
+        border: '1px solid #374151',
+        borderRadius: '8px',
+        padding: '16px',
+        zIndex: 10000,
+        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3)',
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* Month Navigation */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <button
+          type="button"
+          onClick={() => navigateMonth(-1)}
+          style={{
+            width: '32px',
+            height: '32px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '4px',
+            border: '1px solid #374151',
+            backgroundColor: '#374151',
+            color: '#FFFFFF',
+            cursor: 'pointer',
+            outline: 'none',
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4B5563'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#374151'}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </button>
+        <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#FFFFFF' }}>
+          {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+        </div>
+        <button
+          type="button"
+          onClick={() => navigateMonth(1)}
+          style={{
+            width: '32px',
+            height: '32px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '4px',
+            border: '1px solid #374151',
+            backgroundColor: '#374151',
+            color: '#FFFFFF',
+            cursor: 'pointer',
+            outline: 'none',
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4B5563'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#374151'}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M9 18l6-6-6-6" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Day Names Header */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '8px' }}>
+        {dayNames.map(day => (
+          <div
+            key={day}
+            style={{
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              color: '#9CA3AF',
+              textAlign: 'center',
+              padding: '4px',
+            }}
+          >
+            {day}
+          </div>
+        ))}
+      </div>
+
+      {/* Calendar Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
+        {calendarDays.map((day, index) => {
+          if (day === null) {
+            return <div key={`empty-${index}`} style={{ height: '32px' }} />;
+          }
+
+          const selected = isSelected(day);
+          const today = isToday(day);
+
+          return (
+            <button
+              key={day}
+              type="button"
+              onClick={() => handleDateSelect(day)}
+              style={{
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '4px',
+                border: selected ? '1px solid #3B82F6' : '1px solid transparent',
+                backgroundColor: selected ? '#3B82F6' : today ? '#1F2937' : 'transparent',
+                color: selected ? '#FFFFFF' : today ? '#3B82F6' : '#FFFFFF',
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+                outline: 'none',
+                fontWeight: today ? 600 : 400,
+              }}
+              onMouseEnter={(e) => {
+                if (!selected) {
+                  e.currentTarget.style.backgroundColor = '#1F2937';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!selected) {
+                  e.currentTarget.style.backgroundColor = today ? '#1F2937' : 'transparent';
+                }
+              }}
+            >
+              {day}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Today Button */}
+      <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'center' }}>
+        <button
+          type="button"
+          onClick={() => {
+            const today = new Date();
+            onChange(formatDate(today));
+          }}
+          style={{
+            padding: '6px 12px',
+            borderRadius: '4px',
+            border: '1px solid #374151',
+            backgroundColor: '#374151',
+            color: '#FFFFFF',
+            fontSize: '0.75rem',
+            cursor: 'pointer',
+            outline: 'none',
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4B5563'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#374151'}
+        >
+          Today
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onRowClick }) => {
   const { isDarkMode } = useTheme();
   const [openFilterColumn, setOpenFilterColumn] = useState(null);
   const filterIconRefs = useRef({});
@@ -13,7 +292,19 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow }) => {
   const [showProductDropdown, setShowProductDropdown] = useState(false);
   const [openProductDropdownId, setOpenProductDropdownId] = useState(null);
   const [productDropdownSearchValue, setProductDropdownSearchValue] = useState('');
+  const [planningProducts, setPlanningProducts] = useState([]);
+  const [loadingPlanningProducts, setLoadingPlanningProducts] = useState(false);
   const productInputRefs = useRef({});
+  const [openDatePickerId, setOpenDatePickerId] = useState(null);
+  const dateInputRefs = useRef({});
+  const [showVineDetailsModal, setShowVineDetailsModal] = useState(false);
+  const [selectedVineRow, setSelectedVineRow] = useState(null);
+  const [claimDate, setClaimDate] = useState('');
+  const [claimUnits, setClaimUnits] = useState('0');
+  const [claimHistory, setClaimHistory] = useState([]);
+  const [showClaimDatePicker, setShowClaimDatePicker] = useState(false);
+  const [showAddClaimModal, setShowAddClaimModal] = useState(false);
+  const claimDateInputRef = useRef(null);
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -23,6 +314,8 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow }) => {
     headerBg: 'bg-[#334155]',
     rowHover: isDarkMode ? 'hover:bg-dark-bg-tertiary' : 'hover:bg-gray-50',
   };
+  
+  const rowBackgroundColor = isDarkMode ? '#1F2937' : '#F9FAFB';
 
   const columnBorderColor = isDarkMode ? 'rgba(55, 65, 81, 0.9)' : '#E5E7EB';
 
@@ -31,6 +324,27 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow }) => {
     const hasSorting = sortConfig.field === key && sortConfig.order !== '';
     return hasFilter || hasSorting;
   };
+
+  // Fetch planning products when dropdown opens
+  useEffect(() => {
+    const fetchPlanningProducts = async () => {
+      if (openProductDropdownId && planningProducts.length === 0 && !loadingPlanningProducts) {
+        setLoadingPlanningProducts(true);
+        try {
+          const data = await NgoosAPI.getTpsPlanning();
+          if (data.success && data.products) {
+            setPlanningProducts(data.products);
+          }
+        } catch (error) {
+          console.error('Error fetching planning products:', error);
+        } finally {
+          setLoadingPlanningProducts(false);
+        }
+      }
+    };
+
+    fetchPlanningProducts();
+  }, [openProductDropdownId, planningProducts.length, loadingPlanningProducts]);
 
   // Close filter dropdown when clicking outside
   useEffect(() => {
@@ -75,9 +389,24 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow }) => {
           }
         }
       }
+      
+      // Close date picker when clicking outside
+      if (openDatePickerId !== null) {
+        const dateInputElement = dateInputRefs.current[openDatePickerId];
+        const datePickerElement = document.querySelector('[data-date-picker-calendar]');
+        
+        if (dateInputElement) {
+          const isClickInsideInput = dateInputElement.contains(event.target);
+          const isClickInsidePicker = datePickerElement && datePickerElement.contains(event.target);
+          
+          if (!isClickInsideInput && !isClickInsidePicker) {
+            setOpenDatePickerId(null);
+          }
+        }
+      }
     };
 
-    if (openFilterColumn !== null || showProductDropdown || openProductDropdownId !== null) {
+    if (openFilterColumn !== null || showProductDropdown || openProductDropdownId !== null || openDatePickerId !== null) {
       const timeoutId = setTimeout(() => {
         document.addEventListener('click', handleClickOutside);
       }, 0);
@@ -87,7 +416,7 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow }) => {
         document.removeEventListener('click', handleClickOutside);
       };
     }
-  }, [openFilterColumn, showProductDropdown, openProductDropdownId]);
+  }, [openFilterColumn, showProductDropdown, openProductDropdownId, openDatePickerId]);
 
   // Handle filter icon click
   const handleFilterClick = (columnKey, e) => {
@@ -340,6 +669,23 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow }) => {
                     minHeight: '40px',
                     position: 'relative',
                     display: 'table-row',
+                    cursor: !row.isNew && row.productName && onRowClick ? 'pointer' : 'default',
+                  }}
+                  onClick={(e) => {
+                    // Only trigger row click if clicking on the row itself, not on interactive elements
+                    const target = e.target;
+                    const isInteractiveElement = 
+                      target.tagName === 'INPUT' ||
+                      target.tagName === 'BUTTON' ||
+                      target.tagName === 'SELECT' ||
+                      target.closest('input') ||
+                      target.closest('button') ||
+                      target.closest('[data-date-picker]') || 
+                      target.closest('[data-dropdown]');
+                    
+                    if (!isInteractiveElement && onRowClick && !row.isNew && row.productName) {
+                      onRowClick(row);
+                    }
                   }}
                 >
                   {/* STATUS */}
@@ -360,14 +706,18 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow }) => {
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '8px',
-                          padding: '4px 12px',
+                          width: '167px',
+                          height: '24px',
+                          minWidth: '132px',
+                          paddingTop: '4px',
+                          paddingRight: '12px',
+                          paddingBottom: '4px',
+                          paddingLeft: '12px',
                           borderRadius: '4px',
-                          border: 'none',
+                          borderWidth: '1px',
+                          borderStyle: 'solid',
+                          borderColor: '#374151',
                           backgroundColor: '#374151',
-                          minWidth: '137px',
-                          width: '100%',
-                          maxWidth: '171.5px',
-                          height: '32px',
                           boxSizing: 'border-box',
                           cursor: 'pointer',
                         }}
@@ -413,14 +763,18 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow }) => {
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '8px',
-                          padding: '4px 12px',
-                          borderRadius: '4px',
-                          border: 'none',
-                          backgroundColor: '#374151',
-                          minWidth: '137px',
-                          width: '100%',
-                          maxWidth: '171.5px',
+                          width: '167px',
                           height: '24px',
+                          minWidth: '132px',
+                          paddingTop: '4px',
+                          paddingRight: '12px',
+                          paddingBottom: '4px',
+                          paddingLeft: '12px',
+                          borderRadius: '4px',
+                          borderWidth: '1px',
+                          borderStyle: 'solid',
+                          borderColor: '#374151',
+                          backgroundColor: '#374151',
                           boxSizing: 'border-box',
                           cursor: 'pointer',
                         }}
@@ -520,33 +874,66 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow }) => {
                       {/* Product Info */}
                       {isNewRow ? (
                         // Input field with dropdown for new rows
-                        <div style={{ position: 'relative', flex: 1, minWidth: 0, cursor: 'pointer' }}>
-                          <div style={{ position: 'relative', width: '100%', maxWidth: '800px' }}>
-                            <input
+                        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '4px', cursor: 'pointer', width: '100%', minWidth: 0 }}>
+                          <div style={{ position: 'relative', width: '100%' }}>
+                            <div
                               ref={(el) => { if (el) productInputRefs.current[row.id] = el; }}
-                              type="text"
-                              value={row.productName || ''}
-                              placeholder="Select Product"
-                              readOnly
-                              onFocus={() => setOpenProductDropdownId(row.id)}
                               onClick={() => setOpenProductDropdownId(row.id)}
+                              onFocus={() => setOpenProductDropdownId(row.id)}
+                              tabIndex={0}
+                              title={row.productName || 'Select Product'}
                               style={{
                                 width: '100%',
-                                padding: '6px 32px 6px 12px',
+                                minWidth: '561px',
+                                height: '28px',
+                                paddingTop: '6px',
+                                paddingRight: '32px',
+                                paddingBottom: '6px',
+                                paddingLeft: '12px',
                                 borderRadius: '4px',
-                                border: '1px solid #374151',
                                 borderWidth: '1px',
+                                borderStyle: 'solid',
+                                borderColor: '#374151',
                                 backgroundColor: '#374151',
                                 color: row.productName ? '#FFFFFF' : '#9CA3AF',
                                 fontSize: '0.875rem',
                                 outline: 'none',
                                 boxSizing: 'border-box',
                                 whiteSpace: 'nowrap',
-                                overflow: 'visible',
-                                textOverflow: 'clip',
+                                overflow: 'hidden',
                                 cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                lineHeight: '1.4',
+                                gap: 0,
                               }}
-                            />
+                            >
+                              {row.productName ? (
+                                <>
+                                  <span style={{ 
+                                    overflow: 'hidden', 
+                                    textOverflow: 'ellipsis', 
+                                    whiteSpace: 'nowrap',
+                                    flex: '0 1 auto',
+                                    minWidth: 0,
+                                    maxWidth: '100%',
+                                  }}>
+                                    {row.productName}
+                                  </span>
+                                  {(row.size || row.asin) && (
+                                    <span style={{ 
+                                      flexShrink: 0,
+                                      whiteSpace: 'nowrap',
+                                      marginLeft: '4px',
+                                    }}>
+                                      {' • ' + [row.size, row.asin].filter(Boolean).join(' • ')}
+                                    </span>
+                                  )}
+                                </>
+                              ) : (
+                                'Select Product'
+                              )}
+                            </div>
                             <svg
                               style={{
                                 position: 'absolute',
@@ -578,9 +965,9 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow }) => {
                                 position: 'fixed',
                                 top: (productInputRefs.current[row.id]?.getBoundingClientRect()?.bottom || 0) + 4 + 'px',
                                 left: (productInputRefs.current[row.id]?.getBoundingClientRect()?.left || 0) + 'px',
-                                width: (productInputRefs.current[row.id]?.getBoundingClientRect()?.width || 800) + 'px',
+                                width: (productInputRefs.current[row.id]?.getBoundingClientRect()?.width || 561) + 'px',
                                 height: '392px',
-                                backgroundColor: '#111827',
+                                backgroundColor: rowBackgroundColor,
                                 border: '1px solid #374151',
                                 borderRadius: '4px',
                                 borderWidth: '1px',
@@ -650,93 +1037,161 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow }) => {
                               
                               {/* Product Options */}
                               <div style={{ 
-                                backgroundColor: '#111827',
+                                backgroundColor: rowBackgroundColor,
                                 flex: 1,
                                 overflowY: 'auto',
                                 minHeight: 0,
                                 position: 'relative',
                                 display: 'block',
                               }}>
-                                {[1, 2, 3, 4, 5, 6].map((i) => (
-                                  <div
-                                    key={i}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const selectedProduct = {
-                                        productName: 'Hydrangea Fertilizer for Acid Loving Plants, Liquid Plant Food 8 oz (250mL)',
-                                        brand: 'TPS Nutrients',
-                                        size: '8oz',
-                                        asin: 'B0C73TDZCQ',
-                                      };
-                                      if (onUpdateRow) {
-                                        onUpdateRow({ ...row, ...selectedProduct });
-                                      }
-                                      setOpenProductDropdownId(null);
-                                      setProductDropdownSearchValue('');
-                                    }}
-                                    style={{
-                                      padding: '14px 12px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '12px',
-                                      cursor: 'pointer',
-                                      borderBottom: i < 6 ? '1px solid #1F2937' : 'none',
-                                      backgroundColor: 'transparent',
-                                      transition: 'background-color 0.15s ease',
-                                    }}
-                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1F2937'}
-                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                                  >
-                                    <div style={{ 
-                                      width: '48px', 
-                                      height: '48px', 
-                                      borderRadius: '6px', 
-                                      backgroundColor: '#374151', 
-                                      flexShrink: 0,
-                                      overflow: 'hidden',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                    }}>
-                                      <div style={{ 
-                                        width: '100%', 
-                                        height: '100%', 
-                                        backgroundColor: '#FFFFFF',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                      }}>
-                                        <div style={{ 
-                                          width: '40px', 
-                                          height: '40px', 
-                                          backgroundColor: '#E5E7EB',
-                                          borderRadius: '4px',
-                                        }} />
-                                      </div>
-                                    </div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                      <div style={{ 
-                                        fontSize: '0.875rem', 
-                                        fontWeight: 500,
-                                        color: '#FFFFFF', 
-                                        marginBottom: '4px', 
-                                        overflow: 'hidden', 
-                                        textOverflow: 'ellipsis', 
-                                        whiteSpace: 'nowrap',
-                                        lineHeight: '1.4',
-                                      }}>
-                                        Hydrangea Fertilizer for Acid Loving Plants, Liquid Plant Food 8 oz (250mL)
-                                      </div>
-                                      <div style={{ 
-                                        fontSize: '0.75rem', 
-                                        color: '#9CA3AF',
-                                        lineHeight: '1.4',
-                                      }}>
-                                        TPS Nutrients • 8oz • B0C73TDZCQ
-                                      </div>
-                                    </div>
+                                {loadingPlanningProducts ? (
+                                  <div style={{ 
+                                    padding: '2rem', 
+                                    textAlign: 'center', 
+                                    color: '#9CA3AF',
+                                    fontSize: '0.875rem',
+                                  }}>
+                                    Loading products...
                                   </div>
-                                ))}
+                                ) : (
+                                  (() => {
+                                    // Get all ASINs from existing vine rows (excluding new rows and current row)
+                                    const existingAsins = new Set(
+                                      rows
+                                        .filter(r => !r.isNew && r.id !== row.id && r.asin)
+                                        .map(r => r.asin.toLowerCase().trim())
+                                    );
+
+                                    // Filter products based on search
+                                    const filteredProducts = planningProducts.filter(product => {
+                                      if (!productDropdownSearchValue) return true;
+                                      const searchLower = productDropdownSearchValue.toLowerCase();
+                                      return (
+                                        (product.product_name || '').toLowerCase().includes(searchLower) ||
+                                        (product.brand || '').toLowerCase().includes(searchLower) ||
+                                        (product.asin || '').toLowerCase().includes(searchLower) ||
+                                        (product.size || '').toLowerCase().includes(searchLower)
+                                      );
+                                    });
+
+                                    if (filteredProducts.length === 0) {
+                                      return (
+                                        <div style={{ 
+                                          padding: '2rem', 
+                                          textAlign: 'center', 
+                                          color: '#9CA3AF',
+                                          fontSize: '0.875rem',
+                                        }}>
+                                          {productDropdownSearchValue ? 'No products found' : 'No products available'}
+                                        </div>
+                                      );
+                                    }
+
+                                    return filteredProducts.map((product, index) => {
+                                      const productAsin = (product.asin || '').toLowerCase().trim();
+                                      const isDisabled = productAsin && existingAsins.has(productAsin);
+
+                                      return (
+                                      <div
+                                        key={product.asin || index}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (isDisabled) return; // Don't allow selection if disabled
+                                          const selectedProduct = {
+                                            productName: product.product_name || '',
+                                            brand: product.brand || '',
+                                            size: product.size || '',
+                                            asin: product.asin || '',
+                                          };
+                                          if (onUpdateRow) {
+                                            onUpdateRow({ ...row, ...selectedProduct });
+                                          }
+                                          setOpenProductDropdownId(null);
+                                          setProductDropdownSearchValue('');
+                                        }}
+                                        style={{
+                                          padding: '14px 12px',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '12px',
+                                          cursor: isDisabled ? 'not-allowed' : 'pointer',
+                                          borderBottom: index < filteredProducts.length - 1 ? '1px solid #1F2937' : 'none',
+                                          backgroundColor: 'transparent',
+                                          transition: 'background-color 0.15s ease',
+                                          opacity: isDisabled ? 0.5 : 1,
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          if (!isDisabled) {
+                                            e.currentTarget.style.backgroundColor = '#1F2937';
+                                          }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          e.currentTarget.style.backgroundColor = 'transparent';
+                                        }}
+                                      >
+                                        <div style={{ 
+                                          width: '48px', 
+                                          height: '48px', 
+                                          borderRadius: '6px', 
+                                          backgroundColor: '#374151', 
+                                          flexShrink: 0,
+                                          overflow: 'hidden',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                        }}>
+                                          <div style={{ 
+                                            width: '100%', 
+                                            height: '100%', 
+                                            backgroundColor: '#FFFFFF',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                          }}>
+                                            <div style={{ 
+                                              width: '40px', 
+                                              height: '40px', 
+                                              backgroundColor: '#E5E7EB',
+                                              borderRadius: '4px',
+                                            }} />
+                                          </div>
+                                        </div>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                          <div style={{ 
+                                            fontSize: '0.875rem', 
+                                            fontWeight: 500,
+                                            color: isDisabled ? '#6B7280' : '#FFFFFF', 
+                                            marginBottom: '4px', 
+                                            overflow: 'hidden', 
+                                            textOverflow: 'ellipsis', 
+                                            whiteSpace: 'nowrap',
+                                            lineHeight: '1.4',
+                                          }}>
+                                            {product.product_name || 'N/A'}
+                                            {isDisabled && (
+                                              <span style={{ 
+                                                marginLeft: '8px', 
+                                                fontSize: '0.75rem', 
+                                                color: '#9CA3AF',
+                                                fontStyle: 'italic',
+                                              }}>
+                                                (Already has vine)
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div style={{ 
+                                            fontSize: '0.75rem', 
+                                            color: isDisabled ? '#6B7280' : '#9CA3AF',
+                                            lineHeight: '1.4',
+                                          }}>
+                                            {[product.brand, product.size, product.asin].filter(Boolean).join(' • ') || 'N/A'}
+                                          </div>
+                                        </div>
+                                      </div>
+                                      );
+                                    });
+                                  })()
+                                )}
                               </div>
                             </div>
                           )}
@@ -777,36 +1232,113 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow }) => {
                     style={{
                       padding: '0.75rem 1.25rem',
                       verticalAlign: 'middle',
-                      textAlign: 'center',
+                      textAlign: 'left',
                       backgroundColor: '#111827',
                       borderTop: 'none',
                       height: 'auto',
                       minHeight: '40px',
                       display: 'table-cell',
+                      position: 'relative',
+                    }}
+                    onClick={(e) => {
+                      // Don't trigger row expansion when clicking on date picker
+                      if (e.target.closest('[data-date-picker]')) {
+                        e.stopPropagation();
+                      }
                     }}
                   >
                     {isNewRow ? (
-                      <input
-                        type="text"
-                        value={row.launchDate || ''}
-                        placeholder="MM/DD/YYYY"
-                        onChange={(e) => {
-                          if (onUpdateRow) {
-                            onUpdateRow({ ...row, launchDate: e.target.value });
-                          }
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '6px 12px',
-                          borderRadius: '4px',
-                          border: '1px solid #374151',
-                          backgroundColor: '#374151',
-                          color: '#FFFFFF',
-                          fontSize: '0.875rem',
-                          outline: 'none',
-                          boxSizing: 'border-box',
-                        }}
-                      />
+                      <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center' }}>
+                        <div style={{ position: 'relative', display: 'inline-block' }} data-date-picker>
+                          <div style={{ position: 'relative', width: '129px' }}>
+                            {/* Calendar Icon inside input */}
+                            <div
+                              style={{
+                                position: 'absolute',
+                                left: '12px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                pointerEvents: 'none',
+                                zIndex: 1,
+                              }}
+                            >
+                              <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="#9CA3AF"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="16" y1="2" x2="16" y2="6"></line>
+                                <line x1="8" y1="2" x2="8" y2="6"></line>
+                                <line x1="3" y1="10" x2="21" y2="10"></line>
+                              </svg>
+                            </div>
+                            <input
+                              ref={(el) => { if (el) dateInputRefs.current[row.id] = el; }}
+                              type="text"
+                              value={row.launchDate || ''}
+                              placeholder="MM/DD/YYYY"
+                              onChange={(e) => {
+                                if (onUpdateRow && row.productName) {
+                                  onUpdateRow({ ...row, launchDate: e.target.value });
+                                }
+                              }}
+                              onFocus={() => {
+                                if (row.productName) {
+                                  setOpenDatePickerId(row.id);
+                                }
+                              }}
+                              onClick={() => {
+                                if (row.productName) {
+                                  setOpenDatePickerId(row.id);
+                                }
+                              }}
+                              disabled={!row.productName}
+                              style={{
+                                width: '129px',
+                                height: '28px',
+                                paddingTop: '6px',
+                                paddingRight: '12px',
+                                paddingBottom: '6px',
+                                paddingLeft: '36px',
+                                borderRadius: '4px',
+                                borderWidth: '1px',
+                                borderStyle: 'solid',
+                                borderColor: '#374151',
+                                backgroundColor: '#374151',
+                                color: row.productName ? '#FFFFFF' : '#6B7280',
+                                fontSize: '0.875rem',
+                                outline: 'none',
+                                boxSizing: 'border-box',
+                                cursor: row.productName ? 'text' : 'not-allowed',
+                              }}
+                            />
+                          </div>
+                          
+                          {/* Calendar Dropdown */}
+                          {openDatePickerId === row.id && dateInputRefs.current[row.id] && row.productName && (
+                            <CalendarDropdown
+                              value={row.launchDate || ''}
+                              onChange={(date) => {
+                                if (onUpdateRow) {
+                                  onUpdateRow({ ...row, launchDate: date });
+                                }
+                                setOpenDatePickerId(null);
+                              }}
+                              onClose={() => setOpenDatePickerId(null)}
+                              inputRef={dateInputRefs.current[row.id]}
+                            />
+                          )}
+                        </div>
+                      </div>
                     ) : (
                       <span style={{ fontSize: '0.875rem', color: '#FFFFFF' }}>
                         {row.launchDate || 'N/A'}
@@ -828,26 +1360,32 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow }) => {
                     }}
                   >
                     {isNewRow ? (
-                      <input
-                        type="number"
-                        value={row.claimed || 0}
-                        onChange={(e) => {
-                          if (onUpdateRow) {
-                            onUpdateRow({ ...row, claimed: parseInt(e.target.value) || 0 });
-                          }
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '6px 12px',
-                          borderRadius: '4px',
-                          border: '1px solid #374151',
-                          backgroundColor: '#374151',
-                          color: '#FFFFFF',
-                          fontSize: '0.875rem',
-                          outline: 'none',
-                          boxSizing: 'border-box',
-                        }}
-                      />
+                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                        <input
+                          type="number"
+                          value={row.claimed || 0}
+                          onChange={(e) => {
+                            if (onUpdateRow) {
+                              onUpdateRow({ ...row, claimed: parseInt(e.target.value) || 0 });
+                            }
+                          }}
+                          style={{
+                            width: '72px',
+                            height: '27px',
+                            padding: '6px',
+                            borderRadius: '4px',
+                            borderWidth: '1px',
+                            borderStyle: 'solid',
+                            borderColor: '#374151',
+                            backgroundColor: '#374151',
+                            color: '#FFFFFF',
+                            fontSize: '0.875rem',
+                            outline: 'none',
+                            boxSizing: 'border-box',
+                            textAlign: 'center',
+                          }}
+                        />
+                      </div>
                     ) : (
                       <span style={{ fontSize: '0.875rem', color: '#FFFFFF' }}>
                         {row.claimed || 0}
@@ -869,26 +1407,32 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow }) => {
                     }}
                   >
                     {isNewRow ? (
-                      <input
-                        type="number"
-                        value={row.enrolled || 0}
-                        onChange={(e) => {
-                          if (onUpdateRow) {
-                            onUpdateRow({ ...row, enrolled: parseInt(e.target.value) || 0 });
-                          }
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '6px 12px',
-                          borderRadius: '4px',
-                          border: '1px solid #374151',
-                          backgroundColor: '#374151',
-                          color: '#FFFFFF',
-                          fontSize: '0.875rem',
-                          outline: 'none',
-                          boxSizing: 'border-box',
-                        }}
-                      />
+                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                        <input
+                          type="number"
+                          value={row.enrolled || 0}
+                          onChange={(e) => {
+                            if (onUpdateRow) {
+                              onUpdateRow({ ...row, enrolled: parseInt(e.target.value) || 0 });
+                            }
+                          }}
+                          style={{
+                            width: '72px',
+                            height: '27px',
+                            padding: '6px',
+                            borderRadius: '4px',
+                            borderWidth: '1px',
+                            borderStyle: 'solid',
+                            borderColor: '#374151',
+                            backgroundColor: '#374151',
+                            color: '#FFFFFF',
+                            fontSize: '0.875rem',
+                            outline: 'none',
+                            boxSizing: 'border-box',
+                            textAlign: 'center',
+                          }}
+                        />
+                      </div>
                     ) : (
                       <span style={{ fontSize: '0.875rem', color: '#FFFFFF' }}>
                         {row.enrolled || 0}
@@ -917,10 +1461,142 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow }) => {
                             // Remove isNew flag and save the row
                             const savedRow = { ...row, isNew: false };
                             onUpdateRow(savedRow);
+                            
+                            // Show toast notification
+                            const productDetails = [row.size, row.asin].filter(Boolean).join(' • ');
+                            
+                            const toastId = toast.success('', {
+                              description: (
+                                <div style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '24px',
+                                  minWidth: '400px',
+                                  width: 'fit-content',
+                                  maxWidth: '95vw',
+                                  height: '36px',
+                                  paddingTop: '8px',
+                                  paddingRight: '12px',
+                                  paddingBottom: '8px',
+                                  paddingLeft: '12px',
+                                  borderRadius: '12px',
+                                  backgroundColor: '#F0FDF4',
+                                  color: '#34C759',
+                                  margin: '0 auto',
+                                  overflow: 'visible',
+                                }}>
+                                  {/* Check Icon */}
+                                  <svg
+                                    width="20"
+                                    height="20"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="#34C759"
+                                    strokeWidth="3"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    style={{ flexShrink: 0 }}
+                                  >
+                                    <path d="M20 6L9 17l-5-5" />
+                                  </svg>
+                                  {/* Product Name and Details */}
+                                  <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    flexShrink: 0,
+                                    overflow: 'visible',
+                                  }}>
+                                    <span style={{
+                                      fontSize: '0.875rem',
+                                      fontWeight: 500,
+                                      color: '#34C759',
+                                      whiteSpace: 'nowrap',
+                                      flexShrink: 0,
+                                    }}>
+                                      Vine created for{' '}
+                                    </span>
+                                    {row.productName && (
+                                      <span style={{
+                                        fontSize: '0.875rem',
+                                        fontWeight: 500,
+                                        color: '#34C759',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'visible',
+                                        flexShrink: 0,
+                                      }}>
+                                        {row.productName}
+                                      </span>
+                                    )}
+                                    {productDetails && (
+                                      <span style={{
+                                        fontSize: '0.875rem',
+                                        fontWeight: 500,
+                                        color: '#34C759',
+                                        whiteSpace: 'nowrap',
+                                        flexShrink: 0,
+                                      }}>
+                                        {' • ' + productDetails}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {/* Close Button (X) */}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toast.dismiss(toastId);
+                                    }}
+                                    style={{
+                                      background: 'transparent',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      padding: '4px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      flexShrink: 0,
+                                      color: '#34C759',
+                                    }}
+                                  >
+                                    <svg
+                                      width="16"
+                                      height="16"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    >
+                                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                                    </svg>
+                                  </button>
+                                </div>
+                              ),
+                              duration: 4000,
+                              icon: null,
+                              closeButton: false,
+                              style: {
+                                background: 'transparent',
+                                padding: 0,
+                                border: 'none',
+                                boxShadow: 'none',
+                                display: 'flex',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                              },
+                              className: 'vine-created-toast',
+                            });
                           }
                         }}
                         style={{
-                          padding: '6px 12px',
+                          width: '63px',
+                          height: '23px',
+                          paddingTop: '4px',
+                          paddingRight: '12px',
+                          paddingBottom: '4px',
+                          paddingLeft: '12px',
                           borderRadius: '4px',
                           border: 'none',
                           backgroundColor: '#3B82F6',
@@ -929,6 +1605,9 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow }) => {
                           fontWeight: 500,
                           cursor: 'pointer',
                           boxSizing: 'border-box',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
                         }}
                         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2563EB'}
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#3B82F6'}
@@ -942,6 +1621,16 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow }) => {
                           type="button"
                           data-no-expand
                           className="hover:bg-gray-800 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedVineRow(row);
+                            // Reset claim history when opening modal
+                            setClaimHistory([]);
+                            setClaimDate('');
+                            setClaimUnits('0');
+                            setShowClaimDatePicker(false);
+                            setShowVineDetailsModal(true);
+                          }}
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -1048,6 +1737,1092 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow }) => {
             Close
           </button>
         </div>
+      )}
+
+      {/* CSS to hide number input spinners */}
+      <style>{`
+        .no-spinner::-webkit-inner-spin-button,
+        .no-spinner::-webkit-outer-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        .no-spinner {
+          -moz-appearance: textfield;
+        }
+      `}</style>
+
+      {/* Vine Details Modal */}
+      {showVineDetailsModal && selectedVineRow && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            padding: '16px',
+          }}
+          onClick={() => {
+            setShowVineDetailsModal(false);
+            setSelectedVineRow(null);
+            setClaimDate('');
+            setClaimUnits('0');
+            setShowClaimDatePicker(false);
+          }}
+        >
+          <div
+            style={{
+              width: '600px',
+              height: '490px',
+              backgroundColor: '#111827',
+              borderRadius: '12px',
+              border: '1px solid #374151',
+              borderWidth: '1px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid #374151',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexShrink: 0,
+                backgroundColor: '#111827',
+              }}
+            >
+              <h2 style={{ fontSize: '20px', fontWeight: '600', color: '#FFFFFF', margin: 0 }}>
+                Vine Details
+              </h2>
+              <span
+                onClick={() => {
+                  setShowVineDetailsModal(false);
+                  setSelectedVineRow(null);
+                  setClaimDate('');
+                  setClaimUnits('0');
+                  setShowClaimDatePicker(false);
+                }}
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  fontWeight: '400',
+                }}
+              >
+                Cancel
+              </span>
+            </div>
+
+            {/* Content */}
+            <div style={{ padding: '16px 20px', overflow: 'visible', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              {/* Product Information Section */}
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', flexShrink: 0 }}>
+                {/* Product Image */}
+                <div
+                  style={{
+                    width: '106px',
+                    height: '106px',
+                    flexShrink: 0,
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: '4px',
+                    border: '1px solid #E5E7EB',
+                    padding: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {selectedVineRow.imageUrl || selectedVineRow.image ? (
+                    <img
+                      src={selectedVineRow.imageUrl || selectedVineRow.image}
+                      alt={selectedVineRow.productName}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                      }}
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div style={{ 
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '100%',
+                      height: '100%',
+                      textAlign: 'center',
+                      color: '#9CA3AF',
+                      fontSize: '12px'
+                    }}>
+                      No Image
+                    </div>
+                  )}
+                </div>
+
+                {/* Product Details */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 }}>
+                  <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#FFFFFF', margin: 0, lineHeight: '1.3' }}>
+                    {selectedVineRow.productName || 'N/A'}
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <p style={{ fontSize: '12px', color: '#9CA3AF', margin: 0 }}>
+                      {selectedVineRow.brand || 'N/A'} • {selectedVineRow.size || 'N/A'} • {selectedVineRow.asin || 'N/A'}
+                    </p>
+                    <p style={{ fontSize: '12px', color: '#9CA3AF', margin: 0 }}>
+                      Launched: {selectedVineRow.launchDate ? (() => {
+                        // Try to parse the date if it's in MM/DD/YYYY format
+                        if (selectedVineRow.launchDate.includes('/')) {
+                          const parts = selectedVineRow.launchDate.split('/');
+                          if (parts.length === 3) {
+                            const date = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
+                            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                          }
+                        }
+                        // If it's already a date string or Date object
+                        const date = new Date(selectedVineRow.launchDate);
+                        if (!isNaN(date.getTime())) {
+                          return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                        }
+                        return selectedVineRow.launchDate;
+                      })() : 'N/A'}
+                    </p>
+                  </div>
+                  {/* Status Button */}
+                  <div style={{ marginTop: '2px' }}>
+                    <button
+                      style={{
+                        width: '63px',
+                        height: '19px',
+                        paddingTop: '6px',
+                        paddingRight: '16px',
+                        paddingBottom: '6px',
+                        paddingLeft: '16px',
+                        borderRadius: '4px',
+                        border: '1px solid transparent',
+                        borderWidth: '1px',
+                        backgroundColor: '#10B981',
+                        color: '#FFFFFF',
+                        fontSize: '12px',
+                        fontWeight: '500',
+                        cursor: 'default',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxSizing: 'border-box',
+                      }}
+                    >
+                      Active
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Summary Statistics */}
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', flexShrink: 0 }}>
+                {/* Units Enrolled */}
+                <div
+                  style={{
+                    width: '276px',
+                    height: '87px',
+                    backgroundColor: '#1F2937',
+                    borderRadius: '8px',
+                    paddingTop: '12px',
+                    paddingRight: '16px',
+                    paddingBottom: '12px',
+                    paddingLeft: '16px',
+                    border: '1px solid #374151',
+                    borderWidth: '1px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <div style={{ fontSize: '13px', color: '#9CA3AF' }}>
+                    Units Enrolled
+                  </div>
+                  <div style={{ fontSize: '28px', fontWeight: '700', color: '#FFFFFF' }}>
+                    {selectedVineRow.enrolled || 0}
+                  </div>
+                </div>
+
+                {/* Claimed */}
+                <div
+                  style={{
+                    width: '276px',
+                    height: '87px',
+                    backgroundColor: '#1F2937',
+                    borderRadius: '8px',
+                    paddingTop: '12px',
+                    paddingRight: '16px',
+                    paddingBottom: '12px',
+                    paddingLeft: '16px',
+                    border: '1px solid #374151',
+                    borderWidth: '1px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <div style={{ fontSize: '13px', color: '#9CA3AF' }}>
+                    Claimed
+                  </div>
+                  <div style={{ fontSize: '28px', fontWeight: '700', color: '#3B82F6' }}>
+                    {selectedVineRow.claimed || 0}
+                  </div>
+                </div>
+              </div>
+
+              {/* Claim History Section */}
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexShrink: 0 }}>
+                  <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#FFFFFF', margin: 0 }}>
+                    Claim History
+                  </h3>
+                  <span
+                    onClick={() => setShowAddClaimModal(true)}
+                    style={{
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      color: '#3B82F6',
+                      cursor: 'pointer',
+                      textDecoration: 'none',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = '#2563EB';
+                      e.currentTarget.style.textDecoration = 'underline';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = '#3B82F6';
+                      e.currentTarget.style.textDecoration = 'none';
+                    }}
+                  >
+                    + Add Claim Entry
+                  </span>
+                </div>
+
+                {/* Input Table */}
+                <table style={{ 
+                  width: '100%', 
+                  borderCollapse: 'separate', 
+                  borderSpacing: 0, 
+                  marginBottom: '12px',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  border: '1px solid #374151',
+                }}>
+                  <thead>
+                    <tr>
+                      <th style={{
+                        padding: '8px 12px',
+                        textAlign: 'left',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        color: '#9CA3AF',
+                        textTransform: 'uppercase',
+                        borderBottom: '1px solid #374151',
+                        backgroundColor: '#111827',
+                      }}>
+                        DATE CLAIMED
+                      </th>
+                      <th style={{
+                        padding: '8px 12px',
+                        textAlign: 'left',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        color: '#9CA3AF',
+                        textTransform: 'uppercase',
+                        borderBottom: '1px solid #374151',
+                        backgroundColor: '#111827',
+                      }}>
+                        UNITS
+                      </th>
+                      <th style={{
+                        padding: '8px 12px',
+                        textAlign: 'left',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        color: '#9CA3AF',
+                        textTransform: 'uppercase',
+                        borderBottom: '1px solid #374151',
+                        backgroundColor: '#111827',
+                      }}>
+                        ACTIONS
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td style={{ padding: '8px 12px', borderBottom: 'none', backgroundColor: '#111827' }}>
+                        <div style={{ position: 'relative', width: '129px' }}>
+                          <input
+                            ref={claimDateInputRef}
+                            type="text"
+                            placeholder="MM/DD/YYYY"
+                            value={claimDate}
+                            onChange={(e) => setClaimDate(e.target.value)}
+                            onFocus={() => setShowClaimDatePicker(true)}
+                            style={{
+                              width: '129px',
+                              height: '28px',
+                              padding: '6px 12px',
+                              paddingLeft: '36px',
+                              borderRadius: '4px',
+                              border: '1px solid #374151',
+                              backgroundColor: '#1F2937',
+                              color: '#9CA3AF',
+                              fontSize: '14px',
+                              boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                              boxSizing: 'border-box',
+                            }}
+                          />
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="#9CA3AF"
+                            strokeWidth="2"
+                            style={{
+                              position: 'absolute',
+                              left: '12px',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              pointerEvents: 'none',
+                            }}
+                          >
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
+                          </svg>
+                          {/* Calendar Dropdown */}
+                          {showClaimDatePicker && claimDateInputRef.current && (
+                            <CalendarDropdown
+                              value={claimDate}
+                              onChange={(date) => {
+                                setClaimDate(date);
+                                setShowClaimDatePicker(false);
+                              }}
+                              onClose={() => setShowClaimDatePicker(false)}
+                              inputRef={claimDateInputRef.current}
+                            />
+                          )}
+                        </div>
+                      </td>
+                      <td style={{ padding: '8px 12px', borderBottom: 'none', backgroundColor: '#111827' }}>
+                        <input
+                          type="number"
+                          value={claimUnits}
+                          onChange={(e) => setClaimUnits(e.target.value)}
+                          className="no-spinner"
+                          style={{
+                            width: '91px',
+                            height: '27px',
+                            padding: '6px',
+                            borderRadius: '4px',
+                            border: '1px solid #374151',
+                            borderWidth: '1px',
+                            backgroundColor: '#1F2937',
+                            color: '#9CA3AF',
+                            fontSize: '14px',
+                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                            textAlign: 'center',
+                            boxSizing: 'border-box',
+                          }}
+                          onWheel={(e) => e.target.blur()}
+                        />
+                      </td>
+                      <td style={{ padding: '8px 12px', borderBottom: 'none', backgroundColor: '#111827' }}>
+                        <button
+                          onClick={() => {
+                            if (claimDate && claimUnits && parseInt(claimUnits) > 0) {
+                              // Update the row's claimed count
+                              if (onUpdateRow) {
+                                const updatedRow = {
+                                  ...selectedVineRow,
+                                  claimed: (selectedVineRow.claimed || 0) + parseInt(claimUnits),
+                                };
+                                onUpdateRow(updatedRow);
+                              }
+                              
+                              // Show toast notification
+                              const productDetails = [selectedVineRow.size, selectedVineRow.asin].filter(Boolean).join(' • ');
+                              
+                              const toastId = toast.success('', {
+                                description: (
+                                  <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '24px',
+                                    minWidth: '400px',
+                                    width: 'fit-content',
+                                    maxWidth: '95vw',
+                                    height: '36px',
+                                    paddingTop: '8px',
+                                    paddingRight: '12px',
+                                    paddingBottom: '8px',
+                                    paddingLeft: '12px',
+                                    borderRadius: '12px',
+                                    backgroundColor: '#F0FDF4',
+                                    color: '#34C759',
+                                    margin: '0 auto',
+                                    overflow: 'visible',
+                                  }}>
+                                    {/* Check Icon */}
+                                    <svg
+                                      width="20"
+                                      height="20"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="#34C759"
+                                      strokeWidth="3"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      style={{ flexShrink: 0 }}
+                                    >
+                                      <path d="M20 6L9 17l-5-5" />
+                                    </svg>
+                                    {/* Product Name and Details */}
+                                    <div style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      flexShrink: 0,
+                                      overflow: 'visible',
+                                    }}>
+                                      <span style={{
+                                        fontSize: '0.875rem',
+                                        fontWeight: 500,
+                                        color: '#34C759',
+                                        whiteSpace: 'nowrap',
+                                        flexShrink: 0,
+                                      }}>
+                                        Claim entry submitted for{' '}
+                                      </span>
+                                      {selectedVineRow.productName && (
+                                        <span style={{
+                                          fontSize: '0.875rem',
+                                          fontWeight: 500,
+                                          color: '#34C759',
+                                          whiteSpace: 'nowrap',
+                                          overflow: 'visible',
+                                          flexShrink: 0,
+                                        }}>
+                                          {selectedVineRow.productName}
+                                        </span>
+                                      )}
+                                      {productDetails && (
+                                        <span style={{
+                                          fontSize: '0.875rem',
+                                          fontWeight: 500,
+                                          color: '#34C759',
+                                          whiteSpace: 'nowrap',
+                                          flexShrink: 0,
+                                        }}>
+                                          {' • ' + productDetails}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {/* Close Button (X) */}
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toast.dismiss(toastId);
+                                      }}
+                                      style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        padding: '4px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        flexShrink: 0,
+                                        color: '#34C759',
+                                      }}
+                                    >
+                                      <svg
+                                        width="16"
+                                        height="16"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      >
+                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                      </svg>
+                                    </button>
+                                  </div>
+                                ),
+                                duration: 4000,
+                                icon: null,
+                                closeButton: false,
+                                style: {
+                                  background: 'transparent',
+                                  padding: 0,
+                                  border: 'none',
+                                  boxShadow: 'none',
+                                  display: 'flex',
+                                  justifyContent: 'center',
+                                  alignItems: 'center',
+                                },
+                                className: 'claim-entry-submitted-toast',
+                              });
+                              
+                              // Close modal and reset everything
+                              setClaimDate('');
+                              setClaimUnits('0');
+                              setShowClaimDatePicker(false);
+                              setClaimHistory([]);
+                              setShowVineDetailsModal(false);
+                              setSelectedVineRow(null);
+                            }
+                          }}
+                          style={{
+                            width: '48px',
+                            height: '23px',
+                            paddingTop: '4px',
+                            paddingRight: '12px',
+                            paddingBottom: '4px',
+                            paddingLeft: '12px',
+                            borderRadius: '4px',
+                            border: 'none',
+                            backgroundColor: '#3B82F6',
+                            color: '#FFFFFF',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            cursor: 'pointer',
+                            boxSizing: 'border-box',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#2563EB';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = '#3B82F6';
+                          }}
+                        >
+                          Add
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                {/* Claim History Table */}
+                {claimHistory.length > 0 && (
+                  <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                    <table style={{ 
+                      width: '100%', 
+                      borderCollapse: 'separate', 
+                      borderSpacing: 0,
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      border: '1px solid #374151',
+                    }}>
+                      <thead>
+                        <tr>
+                          <th style={{
+                            padding: '8px 12px',
+                            textAlign: 'left',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            color: '#9CA3AF',
+                            textTransform: 'uppercase',
+                            borderBottom: '1px solid #374151',
+                            backgroundColor: '#111827',
+                          }}>
+                            DATE CLAIMED
+                          </th>
+                          <th style={{
+                            padding: '8px 12px',
+                            textAlign: 'left',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            color: '#9CA3AF',
+                            textTransform: 'uppercase',
+                            borderBottom: '1px solid #374151',
+                            backgroundColor: '#111827',
+                          }}>
+                            UNITS
+                          </th>
+                          <th style={{
+                            padding: '8px 12px',
+                            textAlign: 'left',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            color: '#9CA3AF',
+                            textTransform: 'uppercase',
+                            borderBottom: '1px solid #374151',
+                            backgroundColor: '#111827',
+                          }}>
+                            ACTIONS
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {claimHistory.map((claim, index) => (
+                          <tr key={index}>
+                            <td style={{
+                              padding: '8px 12px',
+                              fontSize: '13px',
+                              color: '#FFFFFF',
+                              borderBottom: index < claimHistory.length - 1 ? '1px solid #374151' : 'none',
+                              backgroundColor: '#111827',
+                            }}>
+                              {claim.date}
+                            </td>
+                            <td style={{
+                              padding: '8px 12px',
+                              fontSize: '13px',
+                              color: '#FFFFFF',
+                              borderBottom: index < claimHistory.length - 1 ? '1px solid #374151' : 'none',
+                              backgroundColor: '#111827',
+                            }}>
+                              {claim.units}
+                            </td>
+                            <td style={{
+                              padding: '8px 12px',
+                              fontSize: '13px',
+                              color: '#FFFFFF',
+                              borderBottom: index < claimHistory.length - 1 ? '1px solid #374151' : 'none',
+                              backgroundColor: '#111827',
+                            }}>
+                              <button
+                                onClick={() => {
+                                  const updatedHistory = claimHistory.filter((_, i) => i !== index);
+                                  setClaimHistory(updatedHistory);
+                                  
+                                  // Update the row's claimed count
+                                  if (onUpdateRow) {
+                                    const updatedRow = {
+                                      ...selectedVineRow,
+                                      claimed: Math.max(0, (selectedVineRow.claimed || 0) - claim.units),
+                                    };
+                                    onUpdateRow(updatedRow);
+                                  }
+                                }}
+                                style={{
+                                  padding: '4px 8px',
+                                  borderRadius: '4px',
+                                  border: '1px solid #374151',
+                                  backgroundColor: 'transparent',
+                                  color: '#9CA3AF',
+                                  fontSize: '12px',
+                                  fontWeight: '500',
+                                  cursor: 'pointer',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#374151';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Add Claim Entry Modal */}
+      {showAddClaimModal && selectedVineRow && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            padding: '16px',
+          }}
+          onClick={() => {
+            setShowAddClaimModal(false);
+            setClaimDate('');
+            setClaimUnits('0');
+            setShowClaimDatePicker(false);
+          }}
+        >
+          <div
+            style={{
+              width: '90%',
+              maxWidth: '500px',
+              backgroundColor: '#111827',
+              borderRadius: '12px',
+              border: '1px solid #374151',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid #374151',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexShrink: 0,
+                backgroundColor: '#111827',
+              }}
+            >
+              <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#FFFFFF', margin: 0 }}>
+                Add Claim Entry
+              </h2>
+              <button
+                onClick={() => {
+                  setShowAddClaimModal(false);
+                  setClaimDate('');
+                  setClaimUnits('0');
+                  setShowClaimDatePicker(false);
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* Date Input */}
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#9CA3AF', marginBottom: '8px' }}>
+                  DATE CLAIMED
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    ref={claimDateInputRef}
+                    type="text"
+                    placeholder="MM/DD/YYYY"
+                    value={claimDate}
+                    onChange={(e) => setClaimDate(e.target.value)}
+                    onFocus={() => setShowClaimDatePicker(true)}
+                    style={{
+                      width: '100%',
+                      height: '40px',
+                      padding: '6px 12px',
+                      paddingLeft: '40px',
+                      borderRadius: '4px',
+                      border: '1px solid #374151',
+                      backgroundColor: '#1F2937',
+                      color: '#9CA3AF',
+                      fontSize: '14px',
+                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#9CA3AF"
+                    strokeWidth="2"
+                    style={{
+                      position: 'absolute',
+                      left: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                  </svg>
+                  {/* Calendar Dropdown */}
+                  {showClaimDatePicker && claimDateInputRef.current && (
+                    <CalendarDropdown
+                      value={claimDate}
+                      onChange={(date) => {
+                        setClaimDate(date);
+                        setShowClaimDatePicker(false);
+                      }}
+                      onClose={() => setShowClaimDatePicker(false)}
+                      inputRef={claimDateInputRef.current}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Units Input */}
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#9CA3AF', marginBottom: '8px' }}>
+                  UNITS
+                </label>
+                <input
+                  type="number"
+                  value={claimUnits}
+                  onChange={(e) => setClaimUnits(e.target.value)}
+                  className="no-spinner"
+                  style={{
+                    width: '100%',
+                    height: '40px',
+                    padding: '6px 12px',
+                    borderRadius: '4px',
+                    border: '1px solid #374151',
+                    backgroundColor: '#1F2937',
+                    color: '#9CA3AF',
+                    fontSize: '14px',
+                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                    textAlign: 'left',
+                    boxSizing: 'border-box',
+                  }}
+                  onWheel={(e) => e.target.blur()}
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div
+              style={{
+                padding: '16px 20px',
+                borderTop: '1px solid #374151',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '12px',
+                flexShrink: 0,
+                backgroundColor: '#111827',
+              }}
+            >
+              <button
+                onClick={() => {
+                  setShowAddClaimModal(false);
+                  setClaimDate('');
+                  setClaimUnits('0');
+                  setShowClaimDatePicker(false);
+                }}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '4px',
+                  border: '1px solid #374151',
+                  backgroundColor: 'transparent',
+                  color: '#FFFFFF',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#374151';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (claimDate && claimUnits && parseInt(claimUnits) > 0) {
+                    // Update the row's claimed count
+                    if (onUpdateRow) {
+                      const updatedRow = {
+                        ...selectedVineRow,
+                        claimed: (selectedVineRow.claimed || 0) + parseInt(claimUnits),
+                      };
+                      onUpdateRow(updatedRow);
+                    }
+                    
+                    // Show toast notification
+                    const productDetails = [selectedVineRow.size, selectedVineRow.asin].filter(Boolean).join(' • ');
+                    
+                    const toastId = toast.success('', {
+                      description: (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '24px',
+                          minWidth: '400px',
+                          width: 'fit-content',
+                          maxWidth: '95vw',
+                          height: '36px',
+                          paddingTop: '8px',
+                          paddingRight: '12px',
+                          paddingBottom: '8px',
+                          paddingLeft: '12px',
+                          borderRadius: '12px',
+                          backgroundColor: '#F0FDF4',
+                          color: '#34C759',
+                          margin: '0 auto',
+                          overflow: 'visible',
+                        }}>
+                          {/* Check Icon */}
+                          <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="#34C759"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            style={{ flexShrink: 0 }}
+                          >
+                            <path d="M20 6L9 17l-5-5" />
+                          </svg>
+                          {/* Product Name and Details */}
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            flexShrink: 0,
+                            overflow: 'visible',
+                          }}>
+                            <span style={{
+                              fontSize: '0.875rem',
+                              fontWeight: 500,
+                              color: '#34C759',
+                              whiteSpace: 'nowrap',
+                              flexShrink: 0,
+                            }}>
+                              Claim entry submitted for{' '}
+                            </span>
+                            {selectedVineRow.productName && (
+                              <span style={{
+                                fontSize: '0.875rem',
+                                fontWeight: 500,
+                                color: '#34C759',
+                                whiteSpace: 'nowrap',
+                                overflow: 'visible',
+                                flexShrink: 0,
+                              }}>
+                                {selectedVineRow.productName}
+                              </span>
+                            )}
+                            {productDetails && (
+                              <span style={{
+                                fontSize: '0.875rem',
+                                fontWeight: 500,
+                                color: '#34C759',
+                                whiteSpace: 'nowrap',
+                                flexShrink: 0,
+                              }}>
+                                {' • ' + productDetails}
+                              </span>
+                            )}
+                          </div>
+                          {/* Close Button (X) */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toast.dismiss(toastId);
+                            }}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                              padding: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                              color: '#34C759',
+                            }}
+                          >
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <line x1="18" y1="6" x2="6" y2="18"></line>
+                              <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                          </button>
+                        </div>
+                      ),
+                      duration: 4000,
+                      icon: null,
+                      closeButton: false,
+                      style: {
+                        background: 'transparent',
+                        padding: 0,
+                        border: 'none',
+                        boxShadow: 'none',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      },
+                      className: 'claim-entry-submitted-toast',
+                    });
+                    
+                    // Close modal and reset everything
+                    setClaimDate('');
+                    setClaimUnits('0');
+                    setShowClaimDatePicker(false);
+                    setShowAddClaimModal(false);
+                  }
+                }}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '4px',
+                  border: 'none',
+                  backgroundColor: '#3B82F6',
+                  color: '#FFFFFF',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#2563EB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#3B82F6';
+                }}
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

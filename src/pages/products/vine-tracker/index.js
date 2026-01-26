@@ -3,6 +3,7 @@ import { useTheme } from '../../../context/ThemeContext';
 import VineTrackerHeader from './components/VineTrackerHeader';
 import SummaryCards from './components/SummaryCards';
 import VineTrackerTable from './components/VineTrackerTable';
+import VineDetailsModal from './components/VineDetailsModal';
 
 const VineTracker = () => {
   const { isDarkMode } = useTheme();
@@ -20,6 +21,11 @@ const VineTracker = () => {
       claimed: 12,
       enrolled: 30,
       imageUrl: null,
+      claimHistory: [
+        { id: 1, date: '2026-01-15', units: 2 },
+        { id: 2, date: '2026-01-18', units: 3 },
+        { id: 3, date: '2026-01-21', units: 7 },
+      ],
     },
     {
       id: 2,
@@ -30,9 +36,13 @@ const VineTracker = () => {
       size: '8oz',
       asin: 'B0C73TDZCQ',
       launchDate: 'Jan 15, 2026',
-      claimed: 12,
+      claimed: 8,
       enrolled: 30,
       imageUrl: null,
+      claimHistory: [
+        { id: 1, date: '2026-01-16', units: 3 },
+        { id: 2, date: '2026-01-20', units: 5 },
+      ],
     },
     {
       id: 3,
@@ -43,9 +53,15 @@ const VineTracker = () => {
       size: '8oz',
       asin: 'B0C73TDZCQ',
       launchDate: 'Jan 15, 2026',
-      claimed: 12,
+      claimed: 15,
       enrolled: 30,
       imageUrl: null,
+      claimHistory: [
+        { id: 1, date: '2026-01-15', units: 5 },
+        { id: 2, date: '2026-01-17', units: 4 },
+        { id: 3, date: '2026-01-19', units: 3 },
+        { id: 4, date: '2026-01-22', units: 3 },
+      ],
     },
     {
       id: 4,
@@ -56,9 +72,12 @@ const VineTracker = () => {
       size: '8oz',
       asin: 'B0C73TDZCQ',
       launchDate: 'Jan 15, 2026',
-      claimed: 12,
+      claimed: 6,
       enrolled: 30,
       imageUrl: null,
+      claimHistory: [
+        { id: 1, date: '2026-01-21', units: 6 },
+      ],
     },
     {
       id: 5,
@@ -69,9 +88,13 @@ const VineTracker = () => {
       size: '8oz',
       asin: 'B0C73TDZCQ',
       launchDate: 'Jan 15, 2026',
-      claimed: 12,
+      claimed: 10,
       enrolled: 30,
       imageUrl: null,
+      claimHistory: [
+        { id: 1, date: '2026-01-16', units: 4 },
+        { id: 2, date: '2026-01-19', units: 6 },
+      ],
     },
     {
       id: 6,
@@ -82,12 +105,19 @@ const VineTracker = () => {
       size: '8oz',
       asin: 'B0C73TDZCQ',
       launchDate: 'Jan 15, 2026',
-      claimed: 12,
+      claimed: 9,
       enrolled: 30,
       imageUrl: null,
+      claimHistory: [
+        { id: 1, date: '2026-01-17', units: 3 },
+        { id: 2, date: '2026-01-20', units: 3 },
+        { id: 3, date: '2026-01-23', units: 3 },
+      ],
     },
   ]);
   const [loading, setLoading] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [showVineDetailsModal, setShowVineDetailsModal] = useState(false);
 
   const themeClasses = {
     pageBg: isDarkMode ? 'bg-dark-bg-primary' : 'bg-light-bg-primary',
@@ -124,6 +154,23 @@ const VineTracker = () => {
     setVineProducts(prev => 
       prev.map(p => p.id === updatedRow.id ? updatedRow : p)
     );
+    
+    // Update selected product if it's the same one
+    if (selectedProduct && selectedProduct.id === updatedRow.id) {
+      setSelectedProduct(updatedRow);
+    }
+  };
+
+  const handleRowClick = (row) => {
+    // Only open modal for existing products (not new rows)
+    if (!row.isNew && row.productName) {
+      setSelectedProduct(row);
+      setShowVineDetailsModal(true);
+    }
+  };
+
+  const handleUpdateProduct = (updatedProduct) => {
+    handleUpdateRow(updatedProduct);
   };
 
   // Calculate summary card values
@@ -171,10 +218,22 @@ const VineTracker = () => {
               rows={vineProducts}
               searchValue={searchValue}
               onUpdateRow={handleUpdateRow}
+              onRowClick={handleRowClick}
             />
           </>
         )}
       </div>
+
+      {/* Vine Details Modal */}
+      <VineDetailsModal
+        isOpen={showVineDetailsModal}
+        onClose={() => {
+          setShowVineDetailsModal(false);
+          setSelectedProduct(null);
+        }}
+        productData={selectedProduct}
+        onUpdateProduct={handleUpdateProduct}
+      />
     </div>
   );
 };

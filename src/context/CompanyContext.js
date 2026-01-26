@@ -35,7 +35,7 @@ export const CompanyProvider = ({ children }) => {
     { id: 'selection', name: 'Selection', enabled: true, icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4', order: 1 },
     { id: 'development', name: 'Development', enabled: true, icon: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4', order: 2 },
     { id: 'catalog', name: 'Catalog', enabled: true, icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z', order: 3 },
-    { id: 'vine-tracker', name: 'Vine Tracker', enabled: true, icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', order: 4 }
+    { id: 'vine-tracker', name: 'Vine', enabled: true, icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', order: 4 }
   ];
 
   // Default custom fields
@@ -99,6 +99,12 @@ export const CompanyProvider = ({ children }) => {
           parsedModules.push(vineTrackerModule);
           // Sort by order after adding
           parsedModules.sort((a, b) => a.order - b.order);
+        }
+      } else {
+        // Update existing vine-tracker module name to "Vine"
+        const vineTrackerIndex = parsedModules.findIndex(m => m.id === 'vine-tracker');
+        if (vineTrackerIndex !== -1) {
+          parsedModules[vineTrackerIndex].name = 'Vine';
         }
       }
       setProductModules(parsedModules);
