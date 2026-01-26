@@ -33,7 +33,6 @@ const NewShipmentTable = ({
   const [hoveredQtyIndex, setHoveredQtyIndex] = useState(null);
   const [hoveredAddIndex, setHoveredAddIndex] = useState(null);
   const [hoveredWarningIndex, setHoveredWarningIndex] = useState(null);
-  const [hoveredRowIndex, setHoveredRowIndex] = useState(null);
   const qtyContainerRefs = useRef({});
   const popupRefs = useRef({});
   const qtyInputRefs = useRef({});
@@ -2479,6 +2478,18 @@ const NewShipmentTable = ({
     // Card/List view layout
     return (
       <>
+        {/* Pure CSS hover - fastest possible (browser native) */}
+        <style>{`
+          .non-table-row[data-selected="true"][data-dark="true"]:hover {
+            background-color: #234A6F !important;
+          }
+          .non-table-row[data-selected="true"][data-dark="false"]:hover {
+            background-color: #E3EFFE !important;
+          }
+          .non-table-row[data-selected="false"]:hover {
+            background-color: #1D2933 !important;
+          }
+        `}</style>
         <div
           ref={nonTableContainerRef}
           className={`${themeClasses.cardBg} ${themeClasses.border} border rounded-xl shadow-sm`}
@@ -2810,38 +2821,9 @@ const NewShipmentTable = ({
                       onProductClick(clickedRow, false);
                     }
                   }}
-                  onMouseEnter={(e) => {
-                    // Check if pencil is active first
-                    const pencilIcon = e.currentTarget.querySelector('img[alt="Edit Settings"]');
-                    const isPencilActive = pencilIcon && pencilIcon.getAttribute('data-pencil-active') === 'true';
-                    
-                    // Don't apply hover effects if pencil is active
-                    if (!isPencilActive) {
-                      setHoveredRowIndex(index);
-                      if (isSelected) {
-                        e.currentTarget.style.backgroundColor = isDarkMode ? '#234A6F' : '#E3EFFE';
-                      } else {
-                        e.currentTarget.style.backgroundColor = '#1D2933';
-                      }
-                      // Pencil icon is now always visible, no need to show/hide on hover
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    // Check if pencil is active first
-                    const pencilIcon = e.currentTarget.querySelector('img[alt="Edit Settings"]');
-                    const isPencilActive = pencilIcon && pencilIcon.getAttribute('data-pencil-active') === 'true';
-                    
-                    // Don't apply hover effects if pencil is active
-                    if (!isPencilActive) {
-                      setHoveredRowIndex(null);
-                      if (isSelected) {
-                        e.currentTarget.style.backgroundColor = isDarkMode ? '#1E3A5F' : '#DBEAFE';
-                      } else {
-                        e.currentTarget.style.backgroundColor = '#1A2235';
-                      }
-                      // Pencil icon is now always visible, no need to hide on mouse leave
-                    }
-                  }}
+                  className="non-table-row"
+                  data-selected={isSelected}
+                  data-dark={isDarkMode}
                   style={{
                     display: 'grid',
                     gridTemplateColumns: '1fr 140px 220px 140px',
