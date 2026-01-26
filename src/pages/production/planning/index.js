@@ -34,6 +34,21 @@ const Planning = () => {
   const [statusCommentRow, setStatusCommentRow] = useState(null);
   const [statusCommentField, setStatusCommentField] = useState(null);
   const preventNavigationRef = useRef(false);
+  
+  // DOI Settings state - managed at Planning level and passed to PlanningTable
+  const [doiSettings, setDoiSettings] = useState(null);
+  
+  // Handle DOI settings change from the header popover
+  const handleDoiSettingsChange = (settings, totalDoi) => {
+    console.log('DOI settings changed:', settings, 'Total DOI:', totalDoi);
+    // Convert from popover format to API format
+    const apiSettings = {
+      amazon_doi_goal: settings.amazonDoiGoal,
+      inbound_lead_time: settings.inboundLeadTime,
+      manufacture_lead_time: settings.manufactureLeadTime,
+    };
+    setDoiSettings(apiSettings);
+  };
 
   const extractComment = (notes, prefix) => {
     if (!notes || !prefix) return { hasComment: false, commentText: '' };
@@ -588,9 +603,16 @@ const Planning = () => {
 
   const handleCreateShipment = async () => {
     try {
+      // Generate unique shipment number with date + time + random suffix
+      const now = new Date();
+      const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
+      const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, ''); // HHMMSS
+      const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase(); // 4 random chars
+      const defaultShipmentNumber = `${dateStr}-${timeStr}-${randomSuffix}`;
+      
       const shipmentData = {
-        shipment_number: newShipment.shipmentName || `SHIP-${Date.now()}`,
-        shipment_date: new Date().toISOString().split('T')[0],
+        shipment_number: newShipment.shipmentName || defaultShipmentNumber,
+        shipment_date: dateStr,
         shipment_type: newShipment.shipmentType || 'AWD',
         account: newShipment.account || 'TPS Nutrients',
         marketplace: newShipment.marketplace || 'Amazon',
@@ -909,6 +931,7 @@ const Planning = () => {
         onTabChange={setActiveTab}
         onNewShipmentClick={() => setShowNewShipmentModal(true)}
         onSearch={handleSearch}
+        onDoiSettingsChange={handleDoiSettingsChange}
       />
 
       <NewShipmentModal
@@ -951,6 +974,7 @@ const Planning = () => {
                 onStatusClick={handleStatusClick}
                 onDeleteRow={handleDeleteRow}
                 onUpdateShipment={handleUpdateShipment}
+                doiSettingsFromParent={doiSettings}
               />
             )}
           </>

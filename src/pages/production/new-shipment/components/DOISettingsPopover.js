@@ -10,17 +10,25 @@ import React, { useState, useEffect, useRef } from 'react';
  * - Total Required DOI (calculated)
  * 
  * Save modes:
- * - "Save as Default" → persists to localStorage (will use database when API is available)
- * - "Apply" → session only (temporary)
+ * - "Save as Default" → persists to backend API database
+ * - "Apply" → session only (temporary, not saved to database)
  */
 
+// Toggle to switch between local and production API
+const USE_LOCAL_API = false;
+
+const LOCAL_API_URL = 'http://127.0.0.1:8000';
+const RAILWAY_API_URL = 'https://web-production-015c7.up.railway.app';
+
+const FORECAST_API_URL = USE_LOCAL_API ? LOCAL_API_URL : RAILWAY_API_URL;
+
 const DEFAULT_SETTINGS = {
-  amazonDoiGoal: 130,
+  amazonDoiGoal: 93,
   inboundLeadTime: 30,
   manufactureLeadTime: 7,
 };
 
-const STORAGE_KEY = 'doi_default_settings';
+const STORAGE_KEY = 'doi_default_settings'; // Fallback for localStorage if API fails
 
 const DOISettingsPopover = ({ 
   onSettingsChange, 
@@ -32,26 +40,85 @@ const DOISettingsPopover = ({
   const popoverRef = useRef(null);
   const buttonRef = useRef(null);
   
-  // Load default settings from localStorage on mount
-  const loadDefaultSettings = () => {
+  // Loading state
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  
+  // Load default settings from API or localStorage fallback
+  const loadDefaultSettings = async () => {
+    try {
+      // Try to fetch from backend API first
+      const response = await fetch(`${FORECAST_API_URL}/settings/doi`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Map API response to component format
+        return {
+          amazonDoiGoal: data.amazon_doi_goal || DEFAULT_SETTINGS.amazonDoiGoal,
+          inboundLeadTime: data.inbound_lead_time || DEFAULT_SETTINGS.inboundLeadTime,
+          manufactureLeadTime: data.manufacture_lead_time || DEFAULT_SETTINGS.manufactureLeadTime,
+        };
+      }
+    } catch (e) {
+      console.warn('Failed to load DOI settings from API, using localStorage fallback:', e);
+    }
+    
+    // Fallback to localStorage if API fails
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         return JSON.parse(saved);
       }
     } catch (e) {
-      console.error('Error loading DOI settings:', e);
+      console.error('Error loading DOI settings from localStorage:', e);
     }
+    
     return DEFAULT_SETTINGS;
   };
   
   // Current session settings (what's actually being used)
   const [sessionSettings, setSessionSettings] = useState(() => {
-    return initialSettings || loadDefaultSettings();
+    return initialSettings || DEFAULT_SETTINGS;
   });
   
   // Popover form values (editable)
   const [formValues, setFormValues] = useState(sessionSettings);
+  
+  // Load settings from API on mount
+  useEffect(() => {
+    const fetchSettings = async () => {
+      if (initialSettings) {
+        // If initial settings provided, use them
+        setSessionSettings(initialSettings);
+        setFormValues(initialSettings);
+        return;
+      }
+      
+      setLoading(true);
+      try {
+        const settings = await loadDefaultSettings();
+        setSessionSettings(settings);
+        setFormValues(settings);
+        // Notify parent of loaded settings
+        if (onSettingsChange) {
+          onSettingsChange(settings, calculateTotal(settings));
+        }
+      } catch (err) {
+        console.error('Error loading DOI settings:', err);
+        setError('Failed to load DOI settings');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchSettings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
   // Calculate total DOI
   const calculateTotal = (settings) => {
@@ -96,8 +163,8 @@ const DOISettingsPopover = ({
     }));
   };
   
-  // Apply settings (session only)
-  const handleApply = () => {
+  // Apply settings (session only - not saved to database)
+  const handleApply = async () => {
     const newSettings = {
       amazonDoiGoal: parseInt(formValues.amazonDoiGoal) || DEFAULT_SETTINGS.amazonDoiGoal,
       inboundLeadTime: parseInt(formValues.inboundLeadTime) || DEFAULT_SETTINGS.inboundLeadTime,
@@ -114,38 +181,59 @@ const DOISettingsPopover = ({
     setIsOpen(false);
   };
   
-  // Save as default (persists to localStorage/database)
-  const handleSaveAsDefault = () => {
+  // Save as default (persists to backend API database)
+  const handleSaveAsDefault = async () => {
     const newSettings = {
       amazonDoiGoal: parseInt(formValues.amazonDoiGoal) || DEFAULT_SETTINGS.amazonDoiGoal,
       inboundLeadTime: parseInt(formValues.inboundLeadTime) || DEFAULT_SETTINGS.inboundLeadTime,
       manufactureLeadTime: parseInt(formValues.manufactureLeadTime) || DEFAULT_SETTINGS.manufactureLeadTime,
     };
     
-    // Save to localStorage (will be replaced with API call when backend is ready)
+    setLoading(true);
+    setError(null);
+    
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newSettings));
-    } catch (e) {
-      console.error('Error saving DOI settings:', e);
+      // Save to backend API
+      const response = await fetch(`${FORECAST_API_URL}/settings/doi`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amazon_doi_goal: newSettings.amazonDoiGoal,
+          inbound_lead_time: newSettings.inboundLeadTime,
+          manufacture_lead_time: newSettings.manufactureLeadTime,
+          save_as_default: true,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to save settings' }));
+        throw new Error(errorData.detail || errorData.error || 'Failed to save settings');
+      }
+
+      // Also save to localStorage as fallback
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(newSettings));
+      } catch (e) {
+        console.warn('Failed to save to localStorage:', e);
+      }
+      
+      setSessionSettings(newSettings);
+      
+      // Notify parent of change
+      if (onSettingsChange) {
+        onSettingsChange(newSettings, calculateTotal(newSettings));
+      }
+      
+      setIsOpen(false);
+    } catch (err) {
+      console.error('Error saving DOI settings:', err);
+      setError(err.message || 'Failed to save settings');
+    } finally {
+      setLoading(false);
     }
-    
-    setSessionSettings(newSettings);
-    
-    // Notify parent of change
-    if (onSettingsChange) {
-      onSettingsChange(newSettings, calculateTotal(newSettings));
-    }
-    
-    setIsOpen(false);
   };
-  
-  // Notify parent on initial mount with current settings
-  useEffect(() => {
-    if (onSettingsChange) {
-      onSettingsChange(sessionSettings, totalRequiredDOI);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
   
   // Theme styles
   const theme = {
@@ -468,6 +556,20 @@ const DOISettingsPopover = ({
             </div>
           </div>
           
+          {/* Error message */}
+          {error && (
+            <div style={{
+              marginTop: '12px',
+              padding: '8px 12px',
+              borderRadius: '6px',
+              backgroundColor: isDarkMode ? '#7F1D1D' : '#FEE2E2',
+              color: isDarkMode ? '#FCA5A5' : '#DC2626',
+              fontSize: '12px',
+            }}>
+              {error}
+            </div>
+          )}
+          
           {/* Actions */}
           <div style={{ 
             display: 'flex', 
@@ -477,49 +579,69 @@ const DOISettingsPopover = ({
             {/* Save as Default */}
             <button
               onClick={handleSaveAsDefault}
+              disabled={loading}
               style={{
                 width: '113px',
                 height: '23px',
                 padding: 0,
                 borderRadius: '4px',
                 border: `1px solid ${theme.secondaryBtnBorder}`,
-                backgroundColor: theme.secondaryBtnBg,
+                backgroundColor: loading ? theme.inputBorder : theme.secondaryBtnBg,
                 color: theme.secondaryBtnText,
                 fontSize: '14px',
                 fontWeight: 500,
-                cursor: 'pointer',
+                cursor: loading ? 'not-allowed' : 'pointer',
                 transition: 'background-color 0.15s ease',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                opacity: loading ? 0.6 : 1,
               }}
-              onMouseEnter={(e) => e.target.style.backgroundColor = theme.secondaryBtnHover}
-              onMouseLeave={(e) => e.target.style.backgroundColor = theme.secondaryBtnBg}
+              onMouseEnter={(e) => {
+                if (!loading) {
+                  e.target.style.backgroundColor = theme.secondaryBtnHover;
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!loading) {
+                  e.target.style.backgroundColor = theme.secondaryBtnBg;
+                }
+              }}
             >
-              Save as Default
+              {loading ? 'Saving...' : 'Save as Default'}
             </button>
             
             {/* Apply */}
             <button
               onClick={handleApply}
+              disabled={loading}
               style={{
                 width: '57px',
                 height: '23px',
                 padding: 0,
                 borderRadius: '4px',
                 border: 'none',
-                backgroundColor: theme.primaryBtnBg,
+                backgroundColor: loading ? theme.inputBorder : theme.primaryBtnBg,
                 color: '#FFFFFF',
                 fontSize: '14px',
                 fontWeight: 500,
-                cursor: 'pointer',
+                cursor: loading ? 'not-allowed' : 'pointer',
                 transition: 'background-color 0.15s ease',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                opacity: loading ? 0.6 : 1,
               }}
-              onMouseEnter={(e) => e.target.style.backgroundColor = theme.primaryBtnHover}
-              onMouseLeave={(e) => e.target.style.backgroundColor = theme.primaryBtnBg}
+              onMouseEnter={(e) => {
+                if (!loading) {
+                  e.target.style.backgroundColor = theme.primaryBtnHover;
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!loading) {
+                  e.target.style.backgroundColor = theme.primaryBtnBg;
+                }
+              }}
             >
               Apply
             </button>

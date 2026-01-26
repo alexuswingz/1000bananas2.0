@@ -28,8 +28,8 @@ const USE_LOCAL_API = false;
 const API_BASE_URL = 'https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.com';
 
 // Railway API - for forecasts, charts, labels (our new backend)
-const LOCAL_API_URL = 'http://127.0.0.1:5000/api';
-const RAILWAY_API_URL = 'https://web-production-e39d6.up.railway.app/api';
+const LOCAL_API_URL = 'http://127.0.0.1:8000';
+const RAILWAY_API_URL = 'https://web-production-015c7.up.railway.app';
 const TPS_FORECAST_API_URL = USE_LOCAL_API ? LOCAL_API_URL : RAILWAY_API_URL;
 
 class NgoosAPI {
@@ -589,25 +589,34 @@ class NgoosAPI {
    */
   static async getTpsAllForecasts(options = {}) {
     try {
-      const {
-        amazonDoiGoal = null,
-        inboundLeadTime = null,
-        manufactureLeadTime = null,
-        sort = 'doi',
-        order = 'asc',
-      } = options;
+      let url;
+      let source;
       
-      let url = `${TPS_FORECAST_API_URL}/forecast/all?sort=${sort}&order=${order}`;
+      // Check if DOI settings are provided (use new instant accurate recalculation endpoint)
+      const hasDoiSettings = options.amazonDoiGoal !== undefined || 
+                             options.inboundLeadTime !== undefined || 
+                             options.manufactureLeadTime !== undefined;
       
-      // Add DOI settings if provided
-      if (amazonDoiGoal !== null) {
-        url += `&amazon_doi_goal=${amazonDoiGoal}`;
-      }
-      if (inboundLeadTime !== null) {
-        url += `&inbound_lead_time=${inboundLeadTime}`;
-      }
-      if (manufactureLeadTime !== null) {
-        url += `&manufacture_lead_time=${manufactureLeadTime}`;
+      if (hasDoiSettings) {
+        // Use the new instant accurate recalculation endpoint
+        const params = new URLSearchParams();
+        if (options.amazonDoiGoal !== undefined) {
+          params.append('amazon_doi_goal', options.amazonDoiGoal);
+        }
+        if (options.inboundLeadTime !== undefined) {
+          params.append('inbound_lead_time', options.inboundLeadTime);
+        }
+        if (options.manufactureLeadTime !== undefined) {
+          params.append('manufacture_lead_time', options.manufactureLeadTime);
+        }
+        url = `${TPS_FORECAST_API_URL}/forecast/recalculate-doi?${params.toString()}`;
+        source = 'recalculate-doi';
+        console.log('Using instant DOI recalculation endpoint (accurate + fast)');
+      } else {
+        // Use cached endpoint for default values (fast)
+        url = `${TPS_FORECAST_API_URL}/forecast/`;
+        source = 'railway-cache';
+        console.log('Using cached forecast endpoint (default DOI values)');
       }
       
       const response = await fetch(url, {
@@ -619,11 +628,32 @@ class NgoosAPI {
 
       const data = await response.json();
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to fetch TPS forecasts');
+      if (!response.ok) {
+        throw new Error(data.error || data.detail || 'Failed to fetch TPS forecasts');
       }
 
-      return data;
+      // Map our backend response format (forecasts array) to expected format (products array)
+      return {
+        success: true,
+        products: (data.forecasts || []).map(f => ({
+          asin: f.asin,
+          product_name: f.product_name,
+          image_url: f.image_url,  // Shopify product image
+          algorithm: f.algorithm,
+          age_months: f.age_months,
+          units_to_make: f.units_to_make || 0,
+          doi_total_days: f.doi_total_days || f.doi_total || 0,
+          doi_fba_days: f.doi_fba_days || f.doi_fba || 0,
+          total_inventory: f.total_inventory || 0,
+          fba_available: f.fba_available || 0,
+          status: f.status,
+          peak: f.peak,
+        })),
+        total_products: data.total_products || 0,
+        source: source,
+        count: data.total_products || 0,
+        doi_settings: data.doi_settings, // Include DOI settings that were used
+      };
     } catch (error) {
       console.error('Error fetching all TPS forecasts:', error);
       throw error;
@@ -679,6 +709,8 @@ class NgoosAPI {
         fba_available: product.inventory?.fba_available || product.fba_available || 0,
         status: product.status,
         needs_seasonality: product.needs_seasonality || false,
+        image_url: product.image_url,  // Shopify product image
+        imageUrl: product.image_url,   // Alternative casing for compatibility
       }));
 
       return {

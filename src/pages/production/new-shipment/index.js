@@ -389,21 +389,12 @@ const NewShipment = () => {
     loadProducts();
   }, [id]); // Re-run when ID changes to get fresh labels availability
 
-  // Reload products when DOI settings change (triggered by Apply button in DOISettingsPopover)
+  // DOI settings change - now uses instant accurate recalculation!
+  // The /recalculate-doi endpoint uses cached cumulative forecasts to instantly recalculate units_to_make
   useEffect(() => {
     if (doiSettingsChangeCount > 0) {
-      console.log('Reloading products due to DOI settings change...');
-      loadProducts().then(() => {
-        // After reload completes, the products will have new suggestedQty values
-        // But we need to recalculate qtyValues based on current forecastRange
-        // Force recalculation by resetting lastForecastRange so the recalculation useEffect runs
-        console.log('Products reloaded, triggering recalculation with forecastRange:', forecastRange);
-        setLastForecastRange(null);
-        // Use setTimeout to ensure products state has updated
-        setTimeout(() => {
-          setLastForecastRange(forecastRange);
-        }, 50);
-      });
+      console.log('DOI settings changed. Recalculating with instant accurate recalculation:', doiSettingsValues);
+      loadProducts(doiSettingsValues);
     }
   }, [doiSettingsChangeCount, forecastRange]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -485,19 +476,24 @@ const NewShipment = () => {
     }
   }, [id, location.state]); // Re-run when ID or navigation state changes
 
-  const loadProducts = async () => {
+  const loadProducts = async (doiSettings = null) => {
     try {
       setLoadingProducts(true);
       
       // Load TPS Forecast data (Railway/Lambda API), production supply chain data, and labels availability
       // Use production inventory as PRIMARY source (all products from our database)
       // Merge in forecast data where available
+      // If DOI settings provided, use instant accurate recalculation endpoint
+      // Otherwise, use cached data with default DOI values
+      
+      const apiOptions = doiSettings ? {
+        amazonDoiGoal: doiSettings.amazonDoiGoal,
+        inboundLeadTime: doiSettings.inboundLeadTime,
+        manufactureLeadTime: doiSettings.manufactureLeadTime,
+      } : {};
+      
       const [tpsForecastData, productionInventory, labelsAvailability] = await Promise.all([
-        NgoosAPI.getTpsAllForecasts({
-          amazonDoiGoal: doiSettingsValues.amazonDoiGoal,
-          inboundLeadTime: doiSettingsValues.inboundLeadTime,
-          manufactureLeadTime: doiSettingsValues.manufactureLeadTime
-        }), // Use TPS Forecast API with DOI settings
+        NgoosAPI.getTpsAllForecasts(apiOptions), // Uses recalculate-doi if settings provided, else cached
         import('../../../services/productionApi').then(api => api.getProductsInventory()),
         getLabelsAvailability(shipmentId) // Pass shipment ID to exclude current shipment
       ]);
@@ -523,6 +519,8 @@ const NewShipment = () => {
             algorithm: p.algorithm,
             needs_seasonality: p.needs_seasonality,
             status: p.status,
+            // Product image from Shopify (Railway API)
+            image_url: p.image_url || null,
           }))
       };
       
@@ -621,11 +619,12 @@ const NewShipment = () => {
           childSku: item.child_sku_final || '',
           marketplace: 'Amazon',
           account: 'TPS Nutrients',
-          // Image data - from AWS Lambda (keep existing)
-          mainImage: getImageUrl(item.mainImage || item.product_image_url || item.productImage || item.image || item.productImageUrl || null),
-          product_image_url: getImageUrl(item.product_image_url || item.mainImage || item.productImage || item.image || item.productImageUrl || null),
-          productImage: getImageUrl(item.productImage || item.mainImage || item.product_image_url || item.image || item.productImageUrl || null),
-          image: getImageUrl(item.image || item.mainImage || item.product_image_url || item.productImage || item.productImageUrl || null),
+          // Image data - prioritize Railway API (Shopify images), then AWS Lambda
+          mainImage: getImageUrl(forecast.image_url || item.mainImage || item.product_image_url || item.productImage || item.image || item.productImageUrl || null),
+          product_image_url: getImageUrl(forecast.image_url || item.product_image_url || item.mainImage || item.productImage || item.image || item.productImageUrl || null),
+          productImage: getImageUrl(forecast.image_url || item.productImage || item.mainImage || item.product_image_url || item.image || item.productImageUrl || null),
+          image: getImageUrl(forecast.image_url || item.image || item.mainImage || item.product_image_url || item.productImage || item.productImageUrl || null),
+          imageUrl: forecast.image_url || null, // Direct Shopify image URL
           // Inventory/DOI data - USE RAILWAY API (TPS Forecast) as source of truth
           fbaAvailable: railwayFbaAvailable,
           totalInventory: railwayTotalInventory,
@@ -3572,7 +3571,8 @@ const NewShipment = () => {
         labelsAvailable={(() => {
           if (!selectedRow?.label_location) return null;
           const labelLoc = selectedRow.label_location;
-          const baseAvailable = labelsAvailabilityMap[labelLoc]?.labels_available || selectedRow?.labelsAvailable || 0;
+          // PRIORITY: Use Railway API label_inventory first, fall back to AWS Lambda
+          const baseAvailable = selectedRow?.label_inventory || selectedRow?.labelsAvailable || labelsAvailabilityMap[labelLoc]?.labels_available || 0;
           
           // Subtract labels already committed in current shipment for products with same label_location
           const usedInCurrentShipment = products.reduce((sum, product, index) => {
@@ -3592,7 +3592,8 @@ const NewShipment = () => {
           const productIndex = products.findIndex(p => p.id === row.id);
           if (productIndex >= 0) {
             const labelLoc = row.label_location;
-            const baseAvailable = labelsAvailabilityMap[labelLoc]?.labels_available || row?.labelsAvailable || 0;
+            // PRIORITY: Use Railway API label_inventory first, fall back to AWS Lambda
+            const baseAvailable = row?.label_inventory || row?.labelsAvailable || labelsAvailabilityMap[labelLoc]?.labels_available || 0;
             
             // Calculate labels already used in current shipment for same label_location
             const usedInCurrentShipment = products.reduce((sum, product, idx) => {

@@ -3,8 +3,9 @@ import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 import ShipmentDetailsModal from './ShipmentDetailsModal';
 import { getProductsInventory } from '../../../../services/productionApi';
+import tpsForecastApi from '../../../../services/tpsForecastApi';
 
-const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabelCheckClick, onStatusCommentClick, onStatusClick, onDeleteRow, onUpdateShipment }) => {
+const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabelCheckClick, onStatusCommentClick, onStatusClick, onDeleteRow, onUpdateShipment, doiSettingsFromParent }) => {
   const { isDarkMode } = useTheme();
   const [openFilterColumn, setOpenFilterColumn] = useState(null);
   const filterIconRefs = useRef({});
@@ -23,6 +24,9 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
   const [selectedRow, setSelectedRow] = useState(null);
   const [products, setProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(false);
+  const [requiredDOI, setRequiredDOI] = useState(130); // Required DOI filter (will be loaded from API)
+  const [doiSettings, setDoiSettings] = useState(null);
+  const [isInitialLoad, setIsInitialLoad] = useState(true); // Track if this is the initial load
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -34,6 +38,118 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
   };
 
   const columnBorderColor = isDarkMode ? 'rgba(55, 65, 81, 0.9)' : '#E5E7EB';
+
+  // Load DOI settings from API on initial mount (only if not provided by parent)
+  useEffect(() => {
+    const loadDoiSettings = async () => {
+      // If parent provides actual DOI settings (not null), don't load from API
+      // Parent starts with null, so we load from API on initial mount
+      if (doiSettingsFromParent && doiSettingsFromParent.amazon_doi_goal) {
+        return;
+      }
+      
+      try {
+        // Use the same API URL as tpsForecastApi
+        const USE_LOCAL_API = false;
+        const LOCAL_API_URL = 'http://127.0.0.1:8000';
+        const RAILWAY_API_URL = 'https://web-production-015c7.up.railway.app';
+        const FORECAST_API_URL = USE_LOCAL_API ? LOCAL_API_URL : RAILWAY_API_URL;
+        
+        const response = await fetch(`${FORECAST_API_URL}/settings/doi`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const settings = {
+            amazon_doi_goal: data.amazon_doi_goal || 93,
+            inbound_lead_time: data.inbound_lead_time || 30,
+            manufacture_lead_time: data.manufacture_lead_time || 7,
+          };
+          setDoiSettings(settings);
+          // Calculate total required DOI: amazon_doi_goal + inbound_lead_time + manufacture_lead_time
+          const totalRequiredDOI = settings.amazon_doi_goal + settings.inbound_lead_time + settings.manufacture_lead_time;
+          setRequiredDOI(totalRequiredDOI);
+        } else {
+          // API returned error, use defaults
+          const defaultSettings = {
+            amazon_doi_goal: 93,
+            inbound_lead_time: 30,
+            manufacture_lead_time: 7,
+          };
+          setDoiSettings(defaultSettings);
+          setRequiredDOI(130);
+        }
+      } catch (error) {
+        console.error('Failed to load DOI settings:', error);
+        // Use defaults if API fails
+        const defaultSettings = {
+          amazon_doi_goal: 93,
+          inbound_lead_time: 30,
+          manufacture_lead_time: 7,
+        };
+        setDoiSettings(defaultSettings);
+        setRequiredDOI(130);
+      }
+    };
+    loadDoiSettings();
+  }, [doiSettingsFromParent]);
+
+  // Handle DOI settings from parent (when user changes DOI in header popover)
+  useEffect(() => {
+    if (doiSettingsFromParent) {
+      console.log('DOI settings received from parent:', doiSettingsFromParent);
+      setDoiSettings(doiSettingsFromParent);
+      const totalRequiredDOI = 
+        (doiSettingsFromParent.amazon_doi_goal || 93) + 
+        (doiSettingsFromParent.inbound_lead_time || 30) + 
+        (doiSettingsFromParent.manufacture_lead_time || 7);
+      setRequiredDOI(totalRequiredDOI);
+    }
+  }, [doiSettingsFromParent]);
+
+  // Load products from Railway API - uses cached values by default, or recalculates instantly when DOI changes
+  useEffect(() => {
+    const loadProductsForDashboard = async () => {
+      if (!doiSettings) return;
+      
+      setProductsLoading(true);
+      try {
+        let data;
+        
+        // If user has changed DOI settings (not initial load), use recalculate-doi endpoint for instant accurate results
+        // Otherwise, use cached endpoint with default DOI values
+        if (!isInitialLoad && doiSettingsFromParent) {
+          console.log('Recalculating forecasts with new DOI settings (instant + accurate):', doiSettingsFromParent);
+          data = await tpsForecastApi.getAllForecasts({
+            amazon_doi_goal: doiSettingsFromParent.amazon_doi_goal,
+            inbound_lead_time: doiSettingsFromParent.inbound_lead_time,
+            manufacture_lead_time: doiSettingsFromParent.manufacture_lead_time,
+          });
+        } else {
+          console.log('Loading cached forecasts (default DOI values)...');
+          data = await tpsForecastApi.getAllForecasts();
+        }
+        
+        setProducts(data.products || []);
+        console.log('Loaded products for dashboard:', (data.products || []).length, 'source:', data.source);
+        
+        // Mark initial load as complete
+        if (isInitialLoad) {
+          setIsInitialLoad(false);
+        }
+      } catch (error) {
+        console.error('Failed to load products for dashboard:', error);
+      } finally {
+        setProductsLoading(false);
+      }
+    };
+    
+    loadProductsForDashboard();
+  }, [doiSettings, isInitialLoad, doiSettingsFromParent]);
 
   const isFilterActive = (key) => {
     // Check if there's an active filter for this column or if sorting is applied
@@ -890,115 +1006,105 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
     }
   }, [rows, displayRows]);
 
-  // Calculate card values from rows data
+  // Calculate card values based on Required DOI filter
   const calculateCardValues = () => {
-    // Default DOI goal and lead time (can be made configurable later)
-    const DOI_GOAL = 30; // days
-    const LEAD_TIME = 37; // days (manufacturing + shipping)
-    const FORECAST_DAYS = DOI_GOAL + LEAD_TIME;
+    // Use requiredDOI from filter (default 130 days)
+    const DOI_GOAL = requiredDOI;
     
-    // Calculate products at risk (products not at "Good" status)
-    // Status is "Good" if DOI >= goal, otherwise it's at risk
+    // Calculate products at risk (products with DOI < Required DOI)
     const productsAtRisk = products.filter(product => {
-      const doi = product.days_of_inventory || 0;
-      // If DOI is 9999 (no sales data), consider it at risk
-      if (doi === 9999 || doi === null || doi === undefined) {
+      const doi = product.doi_total_days || product.doi_total || product.days_of_inventory || 0;
+      if (doi === 9999 || doi === null || doi === undefined || doi === 0) {
         return true;
       }
-      // Status is "Good" if DOI >= goal
       return doi < DOI_GOAL;
     }).length;
 
     // Calculate critical and low risk products
-    // Critical: DOI < 7 days (1 week)
-    // Low: 7 <= DOI < 30 days (between 1 week and goal)
     const criticalRisk = products.filter(product => {
-      const doi = product.days_of_inventory || 0;
+      const doi = product.doi_total_days || product.doi_total || product.days_of_inventory || 0;
       return doi > 0 && doi < 7 && doi !== 9999;
     }).length;
 
     const lowRisk = products.filter(product => {
-      const doi = product.days_of_inventory || 0;
+      const doi = product.doi_total_days || product.doi_total || product.days_of_inventory || 0;
       return doi >= 7 && doi < DOI_GOAL && doi !== 9999;
     }).length;
 
-    // Calculate Total DOI across all products as a whole
-    // Total DOI = Total Inventory / Total Daily Sales Rate
+    // Calculate Total DOI across all products (weighted by inventory)
     const totalDOI = (() => {
       if (products.length === 0) return 0;
       
       // Sum total inventory across all products
       const totalInventory = products.reduce((sum, p) => {
-        return sum + (p.bottle_inventory || 0);
+        return sum + (p.total_inventory || p.totalInventory || p.fba_available || 0);
       }, 0);
       
-      // Sum total daily sales velocity across all products
+      // Sum total daily sales velocity
       const totalDailySalesRate = products.reduce((sum, p) => {
-        // Use daily_sales_velocity if available, otherwise calculate from units_sold_30_days
-        const dailySales = p.daily_sales_velocity || (p.units_sold_30_days ? p.units_sold_30_days / 30.0 : 0);
+        // Calculate daily sales from 30-day sales or use provided velocity
+        const sales30 = p.sales_30_day || p.sales30Day || p.units_sold_30_days || 0;
+        const dailySales = p.daily_sales_velocity || (sales30 > 0 ? sales30 / 30.0 : 0);
         return sum + dailySales;
       }, 0);
       
-      // Calculate Total DOI: Total Inventory / Total Daily Sales Rate
+      // Total DOI = Total Inventory / Total Daily Sales Rate
       if (totalDailySalesRate > 0) {
         return Math.round(totalInventory / totalDailySalesRate);
       }
       
-      // If no sales data, return 0
       return 0;
     })();
 
-    // Calculate Units to Make - sum of all units to make across all products
-    // Units to Make = (Daily Sales Rate × Forecast Days) - Current Inventory
+    // Calculate Units to Make based on Required DOI filter
+    // Formula: For each product, units needed = (Required DOI * daily_sales) - current_inventory
     const unitsToMake = Math.round(products.reduce((sum, product) => {
-      const dailySalesRate = product.daily_sales_velocity || 0;
-      const currentInventory = product.bottle_inventory || 0;
+      const currentInventory = product.total_inventory || product.totalInventory || product.fba_available || 0;
+      const sales30 = product.sales_30_day || product.sales30Day || product.units_sold_30_days || 0;
+      const dailySales = product.daily_sales_velocity || (sales30 > 0 ? sales30 / 30.0 : 0);
       
-      // Only calculate if we have sales data
-      if (dailySalesRate > 0) {
-        const unitsNeeded = (dailySalesRate * FORECAST_DAYS) - currentInventory;
-        // Only add positive values (negative means we have enough inventory)
+      if (dailySales > 0) {
+        // Units needed to reach Required DOI
+        const unitsNeeded = (DOI_GOAL * dailySales) - currentInventory;
+        // Only count positive values (negative means we have enough)
         return sum + Math.max(0, unitsNeeded);
       }
       
       return sum;
     }, 0));
     
-    // Calculate Pallets to Make - sum of all pallets needed across all products
-    // For each product: calculate units to make, then convert to pallets
-    const palletsToMake = Math.round(products.reduce((sum, product) => {
-      const dailySalesRate = product.daily_sales_velocity || 0;
-      const currentInventory = product.bottle_inventory || 0;
+    // Calculate Pallets to Make based on calculated units to make
+    const palletsToMake = (() => {
+      let totalPallets = 0;
       
-      // Only calculate if we have sales data
-      if (dailySalesRate > 0) {
-        const unitsNeeded = (dailySalesRate * FORECAST_DAYS) - currentInventory;
+      products.forEach(product => {
+        const currentInventory = product.total_inventory || product.totalInventory || product.fba_available || 0;
+        const sales30 = product.sales_30_day || product.sales30Day || product.units_sold_30_days || 0;
+        const dailySales = product.daily_sales_velocity || (sales30 > 0 ? sales30 / 30.0 : 0);
         
-        // Only calculate pallets if units needed > 0
-        if (unitsNeeded > 0) {
-          // Calculate boxes needed
-          const unitsPerCase = product.finished_units_per_case || product.units_per_case || 60;
-          const boxesNeeded = unitsNeeded / unitsPerCase;
+        if (dailySales > 0) {
+          const unitsNeeded = (DOI_GOAL * dailySales) - currentInventory;
           
-          // Calculate pallet share using single_box_pallet_share or boxes_per_pallet
-          let palletShare = 0;
-          if (product.single_box_pallet_share && product.single_box_pallet_share > 0) {
-            // Each box takes this fraction of a pallet
-            palletShare = boxesNeeded * product.single_box_pallet_share;
-          } else if (product.boxes_per_pallet && product.boxes_per_pallet > 0) {
-            // boxes_per_pallet is max boxes that fit on one pallet
-            palletShare = boxesNeeded / product.boxes_per_pallet;
-          } else {
-            // Fallback: assume 50 boxes per pallet
-            palletShare = boxesNeeded / 50;
+          if (unitsNeeded > 0) {
+            const unitsPerCase = product.finished_units_per_case || product.units_per_case || 60;
+            const boxesNeeded = unitsNeeded / unitsPerCase;
+            
+            let palletShare = 0;
+            if (product.single_box_pallet_share && product.single_box_pallet_share > 0) {
+              palletShare = boxesNeeded * product.single_box_pallet_share;
+            } else if (product.boxes_per_pallet && product.boxes_per_pallet > 0) {
+              palletShare = boxesNeeded / product.boxes_per_pallet;
+            } else {
+              palletShare = boxesNeeded / 50;
+            }
+            
+            totalPallets += palletShare;
           }
-          
-          return sum + palletShare;
         }
-      }
+      });
       
-      return sum;
-    }, 0));
+      return Math.round(totalPallets * 10) / 10; // Round to 1 decimal
+    })();
     
     return { totalDOI, unitsToMake, palletsToMake, productsAtRisk, criticalRisk, lowRisk };
   };
@@ -1007,6 +1113,53 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
 
   return (
     <>
+      {/* Required DOI Filter */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          marginBottom: '16px',
+        }}
+      >
+        <label
+          style={{
+            fontSize: '14px',
+            fontWeight: 500,
+            color: isDarkMode ? '#E5E7EB' : '#374151',
+          }}
+        >
+          Required DOI:
+        </label>
+        <input
+          type="number"
+          value={requiredDOI}
+          onChange={(e) => {
+            const newValue = parseInt(e.target.value) || 130;
+            setRequiredDOI(newValue);
+          }}
+          style={{
+            width: '80px',
+            padding: '8px 12px',
+            borderRadius: '6px',
+            border: isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
+            backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+            color: isDarkMode ? '#F9FAFB' : '#111827',
+            fontSize: '14px',
+            fontWeight: 500,
+          }}
+          min="1"
+        />
+        <span
+          style={{
+            fontSize: '12px',
+            color: isDarkMode ? '#9CA3AF' : '#6B7280',
+          }}
+        >
+          days
+        </span>
+      </div>
+
       {/* Informational Cards */}
       <div
         style={{
@@ -1180,18 +1333,10 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
               color: isDarkMode ? '#9CA3AF' : '#6B7280',
             }}
           >
-            {cardValues.criticalRisk > 0 || cardValues.lowRisk > 0 ? (
-              <>
-                {cardValues.criticalRisk > 0 && (
-                  <span style={{ color: '#EF4444' }}>{cardValues.criticalRisk} critical</span>
-                )}
-                {cardValues.criticalRisk > 0 && cardValues.lowRisk > 0 && ', '}
-                {cardValues.lowRisk > 0 && (
-                  <span style={{ color: '#F59E0B' }}>{cardValues.lowRisk} low</span>
-                )}
-              </>
+            {cardValues.productsAtRisk > 0 ? (
+              <span>Below {requiredDOI} DOI</span>
             ) : (
-              <span>No products at risk</span>
+              <span style={{ color: '#10B981' }}>All products healthy</span>
             )}
           </div>
         </div>

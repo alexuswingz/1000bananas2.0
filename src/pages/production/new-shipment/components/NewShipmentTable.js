@@ -150,10 +150,11 @@ const NewShipmentTable = ({
 
   // Calculate available labels for a product, accounting for other products with same label_location
   const getAvailableLabelsForRow = (row, rowIndex) => {
-    if (!row?.label_location) return row?.labelsAvailable || 0;
+    if (!row?.label_location) return row?.label_inventory || row?.labelsAvailable || 0;
     
     const labelLoc = row.label_location;
-    const baseAvailable = labelsAvailabilityMap[labelLoc]?.labels_available || row?.labelsAvailable || 0;
+    // PRIORITY: Use Railway API label_inventory first, fall back to AWS Lambda
+    const baseAvailable = row?.label_inventory || row?.labelsAvailable || labelsAvailabilityMap[labelLoc]?.labels_available || 0;
     
     // Subtract labels used by OTHER products with same label_location in current shipment
     const usedByOthers = rows.reduce((sum, otherRow, idx) => {
@@ -1407,16 +1408,9 @@ const NewShipmentTable = ({
           values.add(row.size);
         }
       } else if (columnKey === 'unitsToMake') {
-        // Get units to make from qtyValues using original index
-        const index = row._originalIndex !== undefined ? row._originalIndex : idx;
-        const qty = effectiveQtyValues[index];
-        const val = typeof qty === 'number' ? qty : (qty === '' || qty === null || qty === undefined ? 0 : parseInt(qty, 10) || 0);
-        // Map numeric values to "add" or "added" labels
-        if (val === 0) {
-          values.add('add');
-        } else {
-          values.add('added');
-        }
+        // Always include both 'add' and 'added' options so filter works even before any items are added
+        values.add('add');
+        values.add('added');
       } else if (columnKey === 'doiDays') {
         // Get DOI value
         const val = row.doiTotal || row.daysOfInventory || 0;
@@ -1816,11 +1810,8 @@ const NewShipmentTable = ({
           else if (columnKey === 'size') value = row.size;
           else if (columnKey === 'fbaAvailable') value = row.fbaAvailable || 0;
           else if (columnKey === 'unitsToMake') {
-            const index = row._originalIndex !== undefined ? row._originalIndex : idx;
-            const qty = effectiveQtyValues[index];
-            const numericValue = typeof qty === 'number' ? qty : (qty === '' || qty === null || qty === undefined ? 0 : parseInt(qty, 10) || 0);
-            // Convert numeric value to label for filtering
-            value = numericValue === 0 ? 'add' : 'added';
+            // Use addedRows to match the UI button state (Add vs Added)
+            value = addedRows.has(row.id) ? 'added' : 'add';
           }
           else if (columnKey === 'doiDays') value = row.doiTotal || row.daysOfInventory || 0;
           
@@ -1862,11 +1853,8 @@ const NewShipmentTable = ({
           else if (columnKey === 'size') value = row.size;
           else if (columnKey === 'fbaAvailable') value = row.fbaAvailable || 0;
           else if (columnKey === 'unitsToMake') {
-            const index = row._originalIndex !== undefined ? row._originalIndex : idx;
-            const qty = effectiveQtyValues[index];
-            const numericValue = typeof qty === 'number' ? qty : (qty === '' || qty === null || qty === undefined ? 0 : parseInt(qty, 10) || 0);
-            // Convert numeric value to label for filtering
-            value = numericValue === 0 ? 'add' : 'added';
+            // Use addedRows to match the UI button state (Add vs Added)
+            value = addedRows.has(row.id) ? 'added' : 'add';
           }
           else if (columnKey === 'doiDays') value = row.doiTotal || row.daysOfInventory || 0;
           
@@ -1908,7 +1896,7 @@ const NewShipmentTable = ({
     }
 
     return result;
-  }, [filteredRowsWithSelection, nonTableFilters, nonTableSortedRowOrder, tableMode, account]);
+  }, [filteredRowsWithSelection, nonTableFilters, nonTableSortedRowOrder, tableMode, account, addedRows]);
 
   const currentRows = tableMode ? filteredRowsWithSelection : nonTableFilteredRows;
 
@@ -2882,20 +2870,21 @@ const NewShipmentTable = ({
                   />
                   {/* PRODUCTS Column */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    {/* Product Icon */}
+                    {/* Product Icon - Alternating placeholder images */}
                     <div style={{ width: '36px', height: '36px', minWidth: '36px', borderRadius: '3px', overflow: 'hidden', backgroundColor: isDarkMode ? '#374151' : '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginLeft: '20px' }}>
-                      {row.imageUrl || row.smallImage || row.image ? (
-                        <img 
-                          src={row.imageUrl || row.smallImage || row.image} 
-                          alt={row.product} 
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                          onError={(e) => { 
-                            e.target.style.display = 'none'; 
-                            if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'; 
-                          }} 
-                        />
-                      ) : null}
-                      <div style={{ display: row.imageUrl || row.smallImage || row.image ? 'none' : 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', borderRadius: '3px', gap: '7.5px', color: isDarkMode ? '#6B7280' : '#9CA3AF', fontSize: '12px' }}>
+                      <img 
+                        src={index % 2 === 0 
+                          ? "https://scontent.fcrk1-4.fna.fbcdn.net/v/t39.30808-6/324020813_5698060603642883_3730941176199502248_n.jpg?_nc_cat=109&ccb=1-7&_nc_sid=6ee11a&_nc_ohc=GGxaVG4-pVgQ7kNvwEPLk1T&_nc_oc=AdnEjj3CW2ATnumPvOuJ-FMNwcmhl9bJtNYRiqBX0KP8pIFYhMc84O-nNOk6kE4dvDA&_nc_zt=23&_nc_ht=scontent.fcrk1-4.fna&_nc_gid=9BGxqtl66s2GX15r0D2jdA&oh=00_Afowix4xzmWR-0krARMs91-l_crfPVOv-mYZt6pCBxQvqg&oe=697DA3B3"
+                          : "https://scontent.fcrk1-5.fna.fbcdn.net/v/t39.30808-6/487773950_3943908355860406_7417001938099264240_n.jpg?_nc_cat=103&ccb=1-7&_nc_sid=a5f93a&_nc_ohc=Q5i960Y67IMQ7kNvwHED1Xh&_nc_oc=AdksAIFb-tZtqjUdT8lcXCdpdtncAEhjlovtG4Wc28FurTc5KNPMj0mo0nnTblhxnAU&_nc_zt=23&_nc_ht=scontent.fcrk1-5.fna&_nc_gid=10fX7hhwHytZNZlfttK-qg&oh=00_AfqRi4SDD09H1FMPJCT0mt9b9LBaaeqw2GjRw966aKV1hg&oe=697D9F4B"
+                        }
+                        alt={row.product} 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                        onError={(e) => { 
+                          e.target.style.display = 'none'; 
+                          if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'; 
+                        }} 
+                      />
+                      <div style={{ display: 'none', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', borderRadius: '3px', gap: '7.5px', color: isDarkMode ? '#6B7280' : '#9CA3AF', fontSize: '12px' }}>
                         No img
                       </div>
                     </div>
