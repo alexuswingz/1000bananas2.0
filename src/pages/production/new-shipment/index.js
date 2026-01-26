@@ -2534,6 +2534,7 @@ const NewShipment = () => {
                     manuallyEditedIndicesRef={manuallyEditedIndicesRef}
                     onBrandFilterChange={setSelectedBrands}
                     account={shipmentData.account}
+                    doiSettingsChangeCount={doiSettingsChangeCount}
                   />
                 )}
               </>

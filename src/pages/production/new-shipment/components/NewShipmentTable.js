@@ -18,6 +18,7 @@ const NewShipmentTable = ({
   manuallyEditedIndicesRef = null, // Ref to expose manually edited indices to parent
   onBrandFilterChange = null, // Callback to pass brand filter to parent
   account = null, // Account name to determine which brands to show
+  doiSettingsChangeCount = 0, // Track when DOI settings have changed
 }) => {
   // Account to Brand mapping (for checking if all brands are selected)
   const ACCOUNT_BRAND_MAPPING = {
@@ -67,6 +68,7 @@ const NewShipmentTable = ({
   const rawQtyInputValues = useRef({}); // Store raw input values while typing (before rounding)
   const originalForecastValues = useRef({}); // Store original forecasted values for reset functionality (keyed by product ID)
   const originalForecastValuesByIndex = useRef({}); // Also store by index for quick lookup
+  const originalDoiValues = useRef({}); // Store original DOI values to detect changes (keyed by product ID)
   const [qtyInputUpdateTrigger, setQtyInputUpdateTrigger] = useState(0); // Trigger re-renders during typing
   const [openFilterIndex, setOpenFilterIndex] = useState(null);
   const filterRefs = useRef({});
@@ -225,6 +227,7 @@ const NewShipmentTable = ({
     if (rows && rows.length > 0) {
       rows.forEach((row, index) => {
         const forecastValue = row.weeklyForecast || row.forecast || 0; // NO ROUNDING - use exact value
+        const doiValue = row.doiTotal || row.daysOfInventory || 0;
         const productId = row.id || row.asin || row.child_asin || row.childAsin;
         // Use _originalIndex if available, otherwise use array index
         const storageIndex = row._originalIndex !== undefined ? row._originalIndex : index;
@@ -233,6 +236,11 @@ const NewShipmentTable = ({
         if (productId && originalForecastValues.current[productId] === undefined) {
           console.log(`Row ${index} (${row.product}): forecast=${forecastValue}, weeklyForecast=${row.weeklyForecast}, forecast=${row.forecast}, productId=${productId}, storageIndex=${storageIndex}`);
           originalForecastValues.current[productId] = forecastValue;
+        }
+        
+        // Store original DOI value (only if not already set to preserve the original)
+        if (productId && originalDoiValues.current[productId] === undefined) {
+          originalDoiValues.current[productId] = doiValue;
         }
         
         // Also store by index for current session
@@ -2489,6 +2497,10 @@ const NewShipmentTable = ({
           .non-table-row[data-selected="false"]:hover {
             background-color: #1D2933 !important;
           }
+          .non-table-row:hover .pencil-icon-hover {
+            opacity: 1 !important;
+            pointer-events: auto !important;
+          }
         `}</style>
         <div
           ref={nonTableContainerRef}
@@ -2754,6 +2766,16 @@ const NewShipmentTable = ({
               const hasCustomDoiSettings = row.customDoiSettings || row.hasCustomDoi || false;
               // Check if product has custom forecast settings
               const hasCustomForecastSettings = row.hasCustomForecastSettings || false;
+              
+              // Check if this specific product's DOI value has changed from its original value
+              const productId = row.id || row.asin || row.child_asin || row.childAsin;
+              const originalDoi = productId ? originalDoiValues.current[productId] : undefined;
+              const currentDoi = doiValue;
+              const hasDoiChanged = originalDoi !== undefined && originalDoi !== currentDoi;
+              
+              // Determine if pencil should be permanently visible (only if this product's DOI changed or has custom settings)
+              // Uses pure CSS hover for instant appearance when DOI hasn't changed
+              const shouldShowPencilPermanently = (!tableMode && hasDoiChanged) || hasCustomDoiSettings || hasCustomForecastSettings;
               
               return (
                 <div
@@ -3438,15 +3460,18 @@ const NewShipmentTable = ({
                   </div>
 
                   {/* DOI (DAYS) Column */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingLeft: '16px', marginLeft: '-220px', marginRight: '20px', position: 'relative' }}>
+                  <div 
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingLeft: '16px', marginLeft: '-220px', marginRight: '20px', position: 'relative' }}
+                  >
                     <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
                       <span style={{ fontSize: '24px', fontWeight: 500, color: doiColor, height: '32px', display: 'flex', alignItems: 'center' }}>
                         {doiValue}
                       </span>
-                      {/* Pencil Icon - Always visible and blue */}
+                      {/* Pencil Icon - Always reserve space to prevent DOI number from shifting, uses pure CSS hover for instant appearance */}
                       <img
                         src="/assets/pencil.png"
                         alt="Edit Settings"
+                        className={shouldShowPencilPermanently ? '' : 'pencil-icon-hover'}
                         data-pencil-active={(hasCustomDoiSettings || hasCustomForecastSettings) ? 'true' : 'false'}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -3457,9 +3482,13 @@ const NewShipmentTable = ({
                           width: '16px',
                           height: '16px',
                           cursor: 'pointer',
-                          opacity: 1,
+                          opacity: shouldShowPencilPermanently ? 1 : 0,
                           flexShrink: 0,
-                          filter: 'brightness(0) saturate(100%) invert(47%) sepia(98%) saturate(2476%) hue-rotate(209deg) brightness(100%) contrast(101%)', // Blue #3B82F6
+                          transition: 'none',
+                          filter: shouldShowPencilPermanently 
+                            ? 'brightness(0) saturate(100%) invert(47%) sepia(98%) saturate(2476%) hue-rotate(209deg) brightness(100%) contrast(101%)' // Blue #3B82F6
+                            : 'brightness(0) saturate(100%) invert(50%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(95%) contrast(90%)', // Gray
+                          pointerEvents: shouldShowPencilPermanently ? 'auto' : 'none',
                         }}
                       />
                     </div>

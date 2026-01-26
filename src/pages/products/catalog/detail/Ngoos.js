@@ -1846,10 +1846,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                       setShowIndicatorTooltip(true);
                       setShowForecastSettingsTooltip(false);
                     }}
-                    onMouseLeave={(e) => {
-                      e.stopPropagation();
-                      setShowIndicatorTooltip(false);
-                    }}
                   >
                     <div
                       style={{
@@ -1888,31 +1884,55 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                       </svg>
                     </div>
                     {showIndicatorTooltip && (
-                      <div
-                        onMouseEnter={(e) => {
-                          e.stopPropagation();
-                          setShowIndicatorTooltip(true);
-                          setShowForecastSettingsTooltip(false);
-                        }}
-                        onMouseLeave={(e) => {
-                          e.stopPropagation();
-                          setShowIndicatorTooltip(false);
-                        }}
-                        style={{
-                          position: 'absolute',
-                          bottom: 'calc(100% + 8px)',
-                          right: '50%',
-                          transform: 'translateX(50%)',
-                          backgroundColor: '#0F172A',
-                          borderRadius: '8px',
-                          padding: '12px',
-                          minWidth: '210px',
-                          maxWidth: '250px',
-                          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.5)',
-                          zIndex: 1000,
-                          border: '1px solid #1F2937',
-                        }}
-                      >
+                      <>
+                        {/* Invisible bridge to keep tooltip visible when moving mouse up */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            bottom: '100%',
+                            right: '50%',
+                            transform: 'translateX(-50%)',
+                            width: '250px',
+                            height: '8px',
+                            pointerEvents: 'auto',
+                            zIndex: 999,
+                          }}
+                          onMouseEnter={(e) => {
+                            e.stopPropagation();
+                            setShowIndicatorTooltip(true);
+                            setShowForecastSettingsTooltip(false);
+                          }}
+                          onMouseLeave={(e) => {
+                            e.stopPropagation();
+                            setShowIndicatorTooltip(false);
+                          }}
+                        />
+                        <div
+                          onMouseEnter={(e) => {
+                            e.stopPropagation();
+                            setShowIndicatorTooltip(true);
+                            setShowForecastSettingsTooltip(false);
+                          }}
+                          onMouseLeave={(e) => {
+                            e.stopPropagation();
+                            setShowIndicatorTooltip(false);
+                          }}
+                          style={{
+                            position: 'absolute',
+                            bottom: 'calc(100% + 8px)',
+                            right: '50%',
+                            transform: 'translateX(50%)',
+                            backgroundColor: '#0F172A',
+                            borderRadius: '8px',
+                            padding: '12px',
+                            minWidth: '210px',
+                            maxWidth: '250px',
+                            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.5)',
+                            zIndex: 1000,
+                            border: '1px solid #1F2937',
+                            pointerEvents: 'auto',
+                          }}
+                        >
                         {/* Text */}
                         <p style={{
                           fontSize: '0.875rem',
@@ -1929,21 +1949,74 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                         <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
                           <button
                           onClick={() => {
-                            // Get global DOI settings from localStorage
                             try {
+                              // Get global DOI settings from localStorage
                               const globalDoiSettings = JSON.parse(localStorage.getItem('doi_default_settings') || '{}');
+                              // Get global forecast settings from localStorage
+                              const globalForecastSettings = JSON.parse(localStorage.getItem('forecast_default_settings') || '{}');
+                              
+                              // Reset DOI settings
                               if (Object.keys(globalDoiSettings).length > 0) {
-                                // Reset to global settings
                                 setTempDoiSettings(globalDoiSettings);
                                 if (onDoiSettingsChange) {
                                   onDoiSettingsChange(globalDoiSettings);
                                 }
-                                setSettingsApplied(false);
-                                setShowIndicatorTooltip(false);
-                                toast.success('Reset to global DOI settings');
                               }
+                              
+                              // Reset forecast settings
+                              if (Object.keys(globalForecastSettings).length > 0) {
+                                const {
+                                  salesVelocityWeight: defaultSalesVelocityWeight = 25,
+                                  svVelocityWeight: defaultSvVelocityWeight = 15,
+                                  forecastModel: defaultForecastModel = 'Growing',
+                                  marketAdjustment: defaultMarketAdjustment = 5.0
+                                } = globalForecastSettings;
+                                
+                                // Reset all forecast settings state
+                                setSalesVelocityWeight(defaultSalesVelocityWeight);
+                                setSvVelocityWeight(defaultSvVelocityWeight);
+                                setForecastModel(defaultForecastModel);
+                                setMarketAdjustment(defaultMarketAdjustment);
+                                setTempSalesVelocityWeight(defaultSalesVelocityWeight);
+                                setTempSvVelocityWeight(defaultSvVelocityWeight);
+                                setTempForecastModel(defaultForecastModel);
+                                setTempMarketAdjustment(defaultMarketAdjustment);
+                                
+                                // Notify parent that forecast settings have been reset
+                                if (onForecastSettingsChange) {
+                                  onForecastSettingsChange({
+                                    salesVelocityWeight: defaultSalesVelocityWeight,
+                                    svVelocityWeight: defaultSvVelocityWeight,
+                                    forecastModel: defaultForecastModel,
+                                    marketAdjustment: defaultMarketAdjustment
+                                  });
+                                }
+                              } else {
+                                // If no global forecast settings, reset to defaults
+                                setSalesVelocityWeight(25);
+                                setSvVelocityWeight(15);
+                                setForecastModel('Growing');
+                                setMarketAdjustment(5.0);
+                                setTempSalesVelocityWeight(25);
+                                setTempSvVelocityWeight(15);
+                                setTempForecastModel('Growing');
+                                setTempMarketAdjustment(5.0);
+                                
+                                if (onForecastSettingsChange) {
+                                  onForecastSettingsChange({
+                                    salesVelocityWeight: 25,
+                                    svVelocityWeight: 15,
+                                    forecastModel: 'Growing',
+                                    marketAdjustment: 5.0
+                                  });
+                                }
+                              }
+                              
+                              setSettingsApplied(false);
+                              setShowIndicatorTooltip(false);
+                              toast.success('Reset to global settings');
                             } catch (e) {
-                              console.error('Error loading global DOI settings:', e);
+                              console.error('Error loading global settings:', e);
                             }
                           }}
                           style={{
@@ -1997,6 +2070,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                           }}
                         />
                       </div>
+                      </>
                     )}
                   </div>
                 )}
