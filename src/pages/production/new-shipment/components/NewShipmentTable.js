@@ -23,6 +23,7 @@ const NewShipmentTable = ({
   // Account to Brand mapping (for checking if all brands are selected)
   const ACCOUNT_BRAND_MAPPING = {
     'TPS Nutrients': ['TPS Nutrients', 'Bloom City', 'TPS Plant Foods'],
+    'The Plant Shoppe, LLC': ['TPS Nutrients', 'TPS Plant Foods', 'Bloom City'],
     'Total Pest Supply': ['NatureStop', "Ms. Pixie's", "Burke's", 'Mint +'],
   };
   const { isDarkMode } = useTheme();

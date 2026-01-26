@@ -68,6 +68,7 @@ const getImageUrl = (url) => {
 // Each account can only sell specific brands
 const ACCOUNT_BRAND_MAPPING = {
   'TPS Nutrients': ['TPS Nutrients', 'Bloom City', 'TPS Plant Foods'],
+  'The Plant Shoppe, LLC': ['TPS Nutrients', 'TPS Plant Foods', 'Bloom City'],
   'Total Pest Supply': ['NatureStop', "Ms. Pixie's", "Burke's", 'Mint +'],
 };
 
@@ -2118,6 +2119,7 @@ const NewShipment = () => {
       // Get account-specific brands to check if all are selected
       const ACCOUNT_BRAND_MAPPING = {
         'TPS Nutrients': ['TPS Nutrients', 'Bloom City', 'TPS Plant Foods'],
+        'The Plant Shoppe, LLC': ['TPS Nutrients', 'TPS Plant Foods', 'Bloom City'],
         'Total Pest Supply': ['NatureStop', "Ms. Pixie's", "Burke's", 'Mint +'],
       };
       const accountBrands = shipmentData.account && ACCOUNT_BRAND_MAPPING[shipmentData.account] 

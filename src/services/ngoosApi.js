@@ -699,6 +699,7 @@ class NgoosAPI {
         asin: product.asin,
         product_name: product.product_name,
         size: extractSizeFromName(product.product_name),
+        brand: product.brand || product.brand_name || product.product_info?.brand || null,
         algorithm: product.algorithm,
         age_months: product.age_months,
         qty: product.units_to_make || 0,           // QTY = units_to_make
