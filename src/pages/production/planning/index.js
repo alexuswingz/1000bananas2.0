@@ -291,6 +291,8 @@ const Planning = () => {
         workflowStatus: shipment.status, // Raw status value for determining in-progress steps (e.g., 'label_check', 'formula_check')
         shipment: shipment.shipment_number,
         marketplace: shipment.marketplace || 'Amazon',
+        type: shipment.shipment_type || shipment.type || null, // Add type field for display
+        shipmentType: shipment.shipment_type || shipment.type || null, // Add shipmentType field
         account: shipment.account || 'TPS Nutrients',
         addProducts: getStepStatus(shipment.add_products_completed, 'add_products', shipment.status, false),
         formulaCheck: formulaCheckStatus,

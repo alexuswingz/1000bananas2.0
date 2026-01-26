@@ -1768,7 +1768,24 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                 }}
               >
                 <span style={{ fontSize: '0.875rem', color: '#FFFFFF' }}>
-                  {row.marketplace || 'AWD'}
+                  {(() => {
+                    // Prioritize shipment type fields over marketplace
+                    const typeValue = (row.type || row.shipmentType || '').toLowerCase();
+                    
+                    // If type is found, format and return it
+                    if (typeValue === 'fba') return 'FBA';
+                    if (typeValue === 'awd') return 'AWD';
+                    if (typeValue === 'hazmat') return 'Hazmat';
+                    
+                    // If no type field, try to extract from shipment number
+                    const shipment = (row.shipment || '').toUpperCase();
+                    if (shipment.includes('FBA')) return 'FBA';
+                    if (shipment.includes('AWD')) return 'AWD';
+                    if (shipment.includes('HAZMAT')) return 'Hazmat';
+                    
+                    // Default fallback
+                    return 'AWD';
+                  })()}
                 </span>
               </td>
               <td
