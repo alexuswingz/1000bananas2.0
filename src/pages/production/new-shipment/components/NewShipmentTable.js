@@ -2823,10 +2823,7 @@ const NewShipmentTable = ({
                       } else {
                         e.currentTarget.style.backgroundColor = '#1D2933';
                       }
-                      // Show pencil icon instantly only if not in active state
-                      if (pencilIcon) {
-                        pencilIcon.style.opacity = '1';
-                      }
+                      // Pencil icon is now always visible, no need to show/hide on hover
                     }
                   }}
                   onMouseLeave={(e) => {
@@ -2842,10 +2839,7 @@ const NewShipmentTable = ({
                       } else {
                         e.currentTarget.style.backgroundColor = '#1A2235';
                       }
-                      // Hide pencil icon instantly only if not in active state
-                      if (pencilIcon) {
-                        pencilIcon.style.opacity = '0';
-                      }
+                      // Pencil icon is now always visible, no need to hide on mouse leave
                     }
                   }}
                   style={{
@@ -3467,7 +3461,7 @@ const NewShipmentTable = ({
                       <span style={{ fontSize: '24px', fontWeight: 500, color: doiColor, height: '32px', display: 'flex', alignItems: 'center' }}>
                         {doiValue}
                       </span>
-                      {/* Pencil Icon - Shows when DOI or Forecast Settings are customized */}
+                      {/* Pencil Icon - Always visible and blue */}
                       <img
                         src="/assets/pencil.png"
                         alt="Edit Settings"
@@ -3481,12 +3475,9 @@ const NewShipmentTable = ({
                           width: '16px',
                           height: '16px',
                           cursor: 'pointer',
-                          opacity: (hasCustomDoiSettings || hasCustomForecastSettings) ? 1 : 0,
+                          opacity: 1,
                           flexShrink: 0,
-                          willChange: 'opacity',
-                          filter: (hasCustomDoiSettings || hasCustomForecastSettings)
-                            ? 'brightness(0) saturate(100%) invert(47%) sepia(98%) saturate(2476%) hue-rotate(209deg) brightness(100%) contrast(101%)' // Blue #3B82F6
-                            : 'brightness(0) saturate(100%) invert(64%) sepia(6%) saturate(456%) hue-rotate(169deg) brightness(94%) contrast(88%)', // Gray #9CA3AF
+                          filter: 'brightness(0) saturate(100%) invert(47%) sepia(98%) saturate(2476%) hue-rotate(209deg) brightness(100%) contrast(101%)', // Blue #3B82F6
                         }}
                       />
                     </div>
