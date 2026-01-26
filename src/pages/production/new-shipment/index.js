@@ -393,9 +393,19 @@ const NewShipment = () => {
   useEffect(() => {
     if (doiSettingsChangeCount > 0) {
       console.log('Reloading products due to DOI settings change...');
-      loadProducts();
+      loadProducts().then(() => {
+        // After reload completes, the products will have new suggestedQty values
+        // But we need to recalculate qtyValues based on current forecastRange
+        // Force recalculation by resetting lastForecastRange so the recalculation useEffect runs
+        console.log('Products reloaded, triggering recalculation with forecastRange:', forecastRange);
+        setLastForecastRange(null);
+        // Use setTimeout to ensure products state has updated
+        setTimeout(() => {
+          setLastForecastRange(forecastRange);
+        }, 50);
+      });
     }
-  }, [doiSettingsChangeCount]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [doiSettingsChangeCount, forecastRange]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Re-sort products when sort option changes
   useEffect(() => {
@@ -770,11 +780,13 @@ const NewShipment = () => {
       // Preserve manually edited quantities when reloading
       // Build a map of product ID -> manually edited quantity
       const manuallyEditedQtyMap = {};
+      const manuallyEditedProductIds = new Set();
       if (manuallyEditedIndicesRef.current && products.length > 0) {
         manuallyEditedIndicesRef.current.forEach((index) => {
           const product = products[index];
           if (product && qtyValues[index] !== undefined) {
             manuallyEditedQtyMap[product.id] = qtyValues[index];
+            manuallyEditedProductIds.add(product.id);
           }
         });
       }
@@ -1130,6 +1142,9 @@ const NewShipment = () => {
   }, [shipmentProducts, products]);
 
   // Recalculate suggested quantities when forecastRange changes (but NOT on initial load)
+  // NOTE: This runs when forecastRange changes, but if products are being reloaded due to DOI settings change,
+  // the reload will happen and set qtyValues based on new API data. This recalculation is for when forecastRange
+  // changes WITHOUT a full reload (e.g., if user changes it directly)
   useEffect(() => {
     // Skip if no products or if this is an existing shipment
     if (products.length === 0 || shipmentId) {
@@ -1147,36 +1162,102 @@ const NewShipment = () => {
       return;
     }
     
-    console.log(`ForecastRange changed from ${lastForecastRange} to ${forecastRange}. Preserving TPS units_to_make values.`);
+    console.log(`ForecastRange changed from ${lastForecastRange} to ${forecastRange}. Recalculating Units to Make for ${products.length} products.`);
+    console.log(`Added rows count: ${addedRows.size}, Manually edited count: ${manuallyEditedIndicesRef.current?.size || 0}`);
     setLastForecastRange(forecastRange);
     
-    // NOTE: ForecastRange changes should NOT recalculate QTY values from scratch.
-    // The TPS API already provides accurate units_to_make based on DOI goals.
-    // We should preserve the product.suggestedQty values (from TPS) for products not manually added.
-    
-    const newQtyValues = {};
-    products.forEach((product, index) => {
-      // Keep existing quantity for:
-      // 1. Already added products (addedRows)
-      // 2. Manually edited quantities (manuallyEditedIndicesRef)
-      const isManuallyEdited = manuallyEditedIndicesRef.current?.has(index);
+    // Recalculate suggestedQty based on new forecastRange (DOI)
+    // This ensures Units to Make updates when DOI changes
+    // Use functional update to access current qtyValues without including it in dependencies
+    setQtyValues(prevQtyValues => {
+      const newQtyValues = {};
+      const targetDOI = parseInt(forecastRange) || 120;
       
-      if (addedRows.has(product.id) || isManuallyEdited) {
-        // Preserve the manually set or added quantity
-        if (qtyValues[index] !== undefined) {
-          newQtyValues[index] = qtyValues[index];
+      products.forEach((product, index) => {
+        // Keep existing quantity for:
+        // 1. Already added products (addedRows) - these are in the shipment
+        // 2. Manually edited quantities (manuallyEditedIndicesRef) - user explicitly changed
+        const isManuallyEdited = manuallyEditedIndicesRef.current?.has(index);
+        const isInAddedRows = addedRows.has(product.id);
+        
+        // Debug for Moth Repellent or products with value 2163
+        const isMothRepellent = product.product && product.product.toLowerCase().includes('moth');
+        const hasValue2163 = prevQtyValues[index] === 2163;
+        
+        if (isMothRepellent || hasValue2163) {
+          console.log(`[DOI Recalc] Product at index ${index}:`, {
+            productName: product.product,
+            productId: product.id,
+            childAsin: product.childAsin,
+            currentValue: prevQtyValues[index],
+            isInAddedRows,
+            isManuallyEdited,
+            addedRowsIds: Array.from(addedRows),
+            manuallyEditedIndices: Array.from(manuallyEditedIndicesRef.current || [])
+          });
         }
-      } else {
-        // Use the TPS suggestedQty (which is based on units_to_make)
-        // This preserves the accurate TPS forecast values
-        if (product.suggestedQty > 0) {
-          newQtyValues[index] = product.suggestedQty;
+        
+        // IMPORTANT: Only preserve quantities for products that are actually in the shipment
+        // Products that just have a suggestedQty value should be recalculated when DOI changes
+        if (isInAddedRows || isManuallyEdited) {
+          // Preserve the manually set or added quantity
+          if (prevQtyValues[index] !== undefined) {
+            newQtyValues[index] = prevQtyValues[index];
+            if (isMothRepellent || hasValue2163) {
+              console.log(`[DOI Recalc] PRESERVING value ${prevQtyValues[index]} for ${product.product} (isInAddedRows: ${isInAddedRows}, isManuallyEdited: ${isManuallyEdited})`);
+            }
+          }
+        } else {
+        // Recalculate suggestedQty based on new DOI
+        // Always recalculate when DOI changes, using the same logic as the fallback calculation
+        const needsSeasonality = product.tpsNeedsSeasonality || product.needsSeasonality || false;
+        
+        // If product needs seasonality, keep qty at 0
+        if (needsSeasonality) {
+          newQtyValues[index] = 0;
+        } else {
+          // Recalculate using the new target DOI
+          // Always recalculate from scratch using the same formula as the fallback calculation
+          // This ensures Units to Make updates correctly when DOI changes
+          const dailySalesRate = (product.sales30Day || 0) / 30;
+          const currentDOI = product.doiTotal || product.daysOfInventory || 0;
+          let recalculatedQty = 0;
+          
+          // Use the same calculation logic as in productsWithSuggestedQty fallback
+          // Formula: (targetDOI - currentDOI) * dailySalesRate
+          if (dailySalesRate > 0 && currentDOI < targetDOI) {
+            const daysNeeded = targetDOI - currentDOI;
+            const rawUnitsNeeded = daysNeeded * dailySalesRate;
+            recalculatedQty = Math.ceil(rawUnitsNeeded);
+          }
+          
+          // Always set the recalculated value, even if it's 0
+          // This ensures the Units to Make updates when DOI changes
+          newQtyValues[index] = recalculatedQty;
+          
+          // Debug logging for products that should update
+          if (isMothRepellent || hasValue2163) {
+            console.log(`[DOI Recalc] RECALCULATING for ${product.product}:`, {
+              currentDOI,
+              targetDOI,
+              dailySalesRate,
+              daysNeeded: targetDOI - currentDOI,
+              recalculatedQty,
+              wasInQtyValues: prevQtyValues[index],
+              isManuallyEdited,
+              isInAddedRows: addedRows.has(product.id),
+              sales30Day: product.sales30Day,
+              doiTotal: product.doiTotal,
+              daysOfInventory: product.daysOfInventory
+            });
+          }
         }
       }
-    });
-    
-    setQtyValues(newQtyValues);
-  }, [forecastRange, products.length, lastForecastRange, addedRows, qtyValues, shipmentId, products]);
+      }); // Close forEach loop
+      
+      return newQtyValues;
+    }); // Close setQtyValues arrow function
+  }, [forecastRange, products.length, lastForecastRange, addedRows, shipmentId, products]);
 
   // Compute the list of products for Sort Products and Sort Formulas tabs
   // This ensures all added products are included regardless of data source

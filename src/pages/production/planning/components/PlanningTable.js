@@ -1631,6 +1631,17 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                 }}
                 />
             </th>
+            <th
+              className="text-center text-white uppercase tracking-wider"
+              style={{
+                padding: '1rem 0.75rem',
+                width: '5%',
+                height: 'auto',
+                backgroundColor: '#111827',
+                boxSizing: 'border-box',
+              }}
+            >
+            </th>
           </tr>
         </thead>
         <tbody
@@ -1945,9 +1956,52 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                   row
                 )}
               </td>
+              <td
+                style={{
+                  padding: '0.75rem 1rem',
+                  verticalAlign: 'middle',
+                  textAlign: 'center',
+                  backgroundColor: '#111827',
+                  borderTop: 'none',
+                  height: 'auto',
+                  minHeight: '40px',
+                  display: 'table-cell',
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  ref={(el) => { if (el) actionMenuRefs.current[row.id || row.shipment || `row-${index}`] = el; }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const rowId = row.id || row.shipment || `row-${index}`;
+                    setOpenActionMenu(openActionMenu === rowId ? null : rowId);
+                  }}
+                  className="hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '9999px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    backgroundColor: 'transparent',
+                    color: '#9CA3AF',
+                  }}
+                  aria-label="Row actions"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="6" r="1.5" fill="currentColor"/>
+                    <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+                    <circle cx="12" cy="18" r="1.5" fill="currentColor"/>
+                  </svg>
+                </button>
+              </td>
             </tr>
               <tr style={{ height: '1px', backgroundColor: '#111827' }}>
-                <td colSpan={10} style={{ padding: 0, backgroundColor: '#111827' }}>
+                <td colSpan={11} style={{ padding: 0, backgroundColor: '#111827' }}>
                   <div
                     style={{
                       marginLeft: '1.25rem',
@@ -1976,6 +2030,42 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
           currentFilters={filters}
           isDarkMode={isDarkMode}
           addProductsFilterValues={openFilterColumn === 'addProducts' ? addProductsFilterValues : undefined}
+        />
+      )}
+
+      {/* Action Menu Dropdown */}
+      {openActionMenu !== null && displayRows.find((row, idx) => {
+        const rowId = row.id || row.shipment || `row-${idx}`;
+        return rowId === openActionMenu;
+      }) && (
+        <ActionMenuDropdown
+          ref={actionMenuDropdownRef}
+          row={displayRows.find((row, idx) => {
+            const rowId = row.id || row.shipment || `row-${idx}`;
+            return rowId === openActionMenu;
+          })}
+          menuIconRef={actionMenuRefs.current[openActionMenu]}
+          onClose={() => setOpenActionMenu(null)}
+          onShipmentDetails={() => {
+            const selectedRow = displayRows.find((row, idx) => {
+              const rowId = row.id || row.shipment || `row-${idx}`;
+              return rowId === openActionMenu;
+            });
+            setSelectedRow(selectedRow);
+            setShowShipmentDetailsModal(true);
+            setOpenActionMenu(null);
+          }}
+          onDelete={() => {
+            const selectedRow = displayRows.find((row, idx) => {
+              const rowId = row.id || row.shipment || `row-${idx}`;
+              return rowId === openActionMenu;
+            });
+            if (onDeleteRow && selectedRow) {
+              onDeleteRow(selectedRow);
+            }
+            setOpenActionMenu(null);
+          }}
+          isDarkMode={isDarkMode}
         />
       )}
     </div>

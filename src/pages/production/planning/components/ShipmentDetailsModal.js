@@ -148,9 +148,9 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
           width: '600px',
           maxWidth: '90vw',
           borderRadius: '12px',
-          border: '1px solid #E5E7EB',
+          border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
           boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
-          backgroundColor: '#FFFFFF',
+          backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
         }}
         onClick={(e) => {
           e.preventDefault();
@@ -161,7 +161,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
         <div
           style={{
             padding: '20px 24px',
-            borderBottom: '1px solid #E5E7EB',
+            borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -171,7 +171,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
             style={{ 
               fontSize: '16px', 
               fontWeight: 600, 
-              color: '#111827',
+              color: isDarkMode ? '#E5E7EB' : '#111827',
               margin: 0,
             }}
           >
@@ -204,7 +204,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
             >
               <path
                 d="M6 6L18 18M18 6L6 18"
-                stroke="#9CA3AF"
+                stroke={isDarkMode ? '#9CA3AF' : '#9CA3AF'}
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -230,7 +230,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
                 fontWeight: 500, 
                 display: 'block', 
                 marginBottom: '8px', 
-                color: '#374151' 
+                color: isDarkMode ? '#E5E7EB' : '#374151' 
               }}
             >
               Shipment Name<span style={{ color: '#EF4444' }}>*</span>
@@ -249,11 +249,15 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
                 padding: '10px 12px',
                 border: isEditMode && focusedField === 'shipmentName' 
                   ? '1px solid #3B82F6' 
-                  : '1px solid #D1D5DB',
+                  : isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
                 borderRadius: '6px',
                 fontSize: '14px',
-                color: isEditMode ? '#111827' : '#6B7280',
-                backgroundColor: isEditMode ? '#FFFFFF' : '#F9FAFB',
+                color: isEditMode 
+                  ? (isDarkMode ? '#E5E7EB' : '#111827')
+                  : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+                backgroundColor: isEditMode 
+                  ? (isDarkMode ? '#374151' : '#FFFFFF')
+                  : (isDarkMode ? '#111827' : '#F9FAFB'),
                 outline: 'none',
                 cursor: isEditMode ? 'text' : 'not-allowed',
                 transition: 'border-color 0.2s ease',
@@ -269,7 +273,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
                 fontWeight: 500, 
                 display: 'block', 
                 marginBottom: '8px', 
-                color: '#374151' 
+                color: isDarkMode ? '#E5E7EB' : '#374151' 
               }}
             >
               Marketplace<span style={{ color: '#EF4444' }}>*</span>
@@ -284,12 +288,14 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '10px 12px',
-                  border: '1px solid #D1D5DB',
+                  border: isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
                   borderRadius: '6px',
-                  backgroundColor: '#F9FAFB',
+                  backgroundColor: isDarkMode ? '#111827' : '#F9FAFB',
                   cursor: 'not-allowed',
                   fontSize: '14px',
-                  color: marketplace ? '#6B7280' : '#9CA3AF',
+                  color: marketplace 
+                    ? (isDarkMode ? '#9CA3AF' : '#6B7280')
+                    : (isDarkMode ? '#6B7280' : '#9CA3AF'),
                   outline: 'none',
                 }}
               >
@@ -323,8 +329,8 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
                     left: 0,
                     right: 0,
                     marginTop: '4px',
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid #D1D5DB',
+                    backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                    border: isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
                     borderRadius: '6px',
                     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
                     overflow: 'hidden',
@@ -345,13 +351,17 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
                         textAlign: 'left',
                         padding: '10px 12px',
                         fontSize: '14px',
-                        color: '#111827',
-                        backgroundColor: marketplace === option ? '#F3F4F6' : '#FFFFFF',
+                        color: isDarkMode ? '#E5E7EB' : '#111827',
+                        backgroundColor: marketplace === option 
+                          ? (isDarkMode ? '#374151' : '#F3F4F6')
+                          : (isDarkMode ? '#1F2937' : '#FFFFFF'),
                         border: 'none',
                         cursor: 'pointer',
                       }}
-                      onMouseEnter={(e) => e.target.style.backgroundColor = '#F3F4F6'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = marketplace === option ? '#F3F4F6' : '#FFFFFF'}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = marketplace === option 
+                        ? (isDarkMode ? '#374151' : '#F3F4F6')
+                        : (isDarkMode ? '#1F2937' : '#FFFFFF')}
                     >
                       {option}
                     </button>
@@ -369,7 +379,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
                 fontWeight: 500, 
                 display: 'block', 
                 marginBottom: '8px', 
-                color: '#374151' 
+                color: isDarkMode ? '#E5E7EB' : '#374151' 
               }}
             >
               Seller Account<span style={{ color: '#EF4444' }}>*</span>
@@ -384,12 +394,14 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '10px 12px',
-                  border: '1px solid #D1D5DB',
+                  border: isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
                   borderRadius: '6px',
-                  backgroundColor: '#F9FAFB',
+                  backgroundColor: isDarkMode ? '#111827' : '#F9FAFB',
                   cursor: 'not-allowed',
                   fontSize: '14px',
-                  color: account ? '#6B7280' : '#9CA3AF',
+                  color: account 
+                    ? (isDarkMode ? '#9CA3AF' : '#6B7280')
+                    : (isDarkMode ? '#6B7280' : '#9CA3AF'),
                   outline: 'none',
                 }}
               >
@@ -398,7 +410,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
                   style={{ 
                     width: '16px', 
                     height: '16px', 
-                    color: '#9CA3AF',
+                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
                     flexShrink: 0,
                   }}
                   viewBox="0 0 24 24"
@@ -423,8 +435,8 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
                     left: 0,
                     right: 0,
                     marginTop: '4px',
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid #D1D5DB',
+                    backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                    border: isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
                     borderRadius: '6px',
                     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
                     overflow: 'hidden',
@@ -447,20 +459,22 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
                         textAlign: 'left',
                         padding: '12px 14px',
                         fontSize: '14px',
-                        color: '#111827',
-                        backgroundColor: account === option.name ? '#EBF5FF' : '#FFFFFF',
+                        color: isDarkMode ? '#E5E7EB' : '#111827',
+                        backgroundColor: account === option.name 
+                          ? (isDarkMode ? '#1E3A8A' : '#EBF5FF')
+                          : (isDarkMode ? '#1F2937' : '#FFFFFF'),
                         border: 'none',
-                        borderBottom: '1px solid #F3F4F6',
+                        borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #F3F4F6',
                         cursor: 'pointer',
                       }}
                       onMouseEnter={(e) => {
                         if (account !== option.name) {
-                          e.currentTarget.style.backgroundColor = '#F9FAFB';
+                          e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F9FAFB';
                         }
                       }}
                       onMouseLeave={(e) => {
                         if (account !== option.name) {
-                          e.currentTarget.style.backgroundColor = '#FFFFFF';
+                          e.currentTarget.style.backgroundColor = isDarkMode ? '#1F2937' : '#FFFFFF';
                         }
                       }}
                     >
@@ -468,7 +482,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
                         <span style={{ fontWeight: 500 }}>{option.name}</span>
                         {account === option.name && (
                           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                            <path d="M13.3332 4L5.99984 11.3333L2.6665 8" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M13.3332 4L5.99984 11.3333L2.6665 8" stroke={isDarkMode ? '#60A5FA' : '#3B82F6'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         )}
                       </div>
@@ -485,8 +499,8 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
                               fontSize: '11px',
                               padding: '2px 6px',
                               borderRadius: '4px',
-                              backgroundColor: '#F3F4F6',
-                              color: '#6B7280',
+                              backgroundColor: isDarkMode ? '#374151' : '#F3F4F6',
+                              color: isDarkMode ? '#9CA3AF' : '#6B7280',
                             }}
                           >
                             {brand}
@@ -505,7 +519,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
         <div
           style={{
             padding: '16px 24px',
-            borderTop: '1px solid #E5E7EB',
+            borderTop: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
             display: 'flex',
             justifyContent: 'space-between',
             gap: '10px',
@@ -519,11 +533,11 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
               height: '31px',
               padding: '0',
               borderRadius: '4px',
-              border: '1px solid #D1D5DB',
-              backgroundColor: '#FFFFFF',
+              border: isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
+              backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
               fontSize: '14px',
               fontWeight: 500,
-              color: '#374151',
+              color: isDarkMode ? '#E5E7EB' : '#374151',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -549,7 +563,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
               backgroundColor: isEditMode 
                 ? (!shipmentName ? '#9CA3AF' : '#3B82F6')
                 : 'transparent',
-              color: isEditMode ? '#FFFFFF' : '#3B82F6',
+              color: isEditMode ? '#FFFFFF' : (isDarkMode ? '#60A5FA' : '#3B82F6'),
               cursor: (isEditMode && !shipmentName) ? 'not-allowed' : 'pointer',
               display: 'flex',
               flexDirection: 'row',
@@ -573,14 +587,14 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
                 >
                   <path
                     d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
-                    stroke="#3B82F6"
+                    stroke={isDarkMode ? '#60A5FA' : '#3B82F6'}
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />
                   <path
                     d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
-                    stroke="#3B82F6"
+                    stroke={isDarkMode ? '#60A5FA' : '#3B82F6'}
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
