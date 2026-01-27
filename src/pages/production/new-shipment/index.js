@@ -1604,6 +1604,17 @@ const NewShipment = () => {
     const asin = row?.child_asin || row?.childAsin || row?.asin;
     if (!asin) return;
 
+    // If newSettings is null, remove the custom settings for this product
+    if (newSettings === null) {
+      setProductDoiSettings(prev => {
+        const updated = { ...prev };
+        delete updated[asin];
+        return updated;
+      });
+      console.log(`Cleared custom DOI settings for ${asin}`);
+      return;
+    }
+
     // Save product-specific DOI settings
     setProductDoiSettings(prev => ({
       ...prev,
@@ -1620,6 +1631,17 @@ const NewShipment = () => {
   const handleProductForecastSettingsChange = (row, newSettings) => {
     const asin = row?.child_asin || row?.childAsin || row?.asin;
     if (!asin) return;
+
+    // If newSettings is null, remove the custom settings for this product
+    if (newSettings === null) {
+      setProductForecastSettings(prev => {
+        const updated = { ...prev };
+        delete updated[asin];
+        return updated;
+      });
+      console.log(`Cleared custom forecast settings for ${asin}`);
+      return;
+    }
 
     // Save product-specific forecast settings
     setProductForecastSettings(prev => ({

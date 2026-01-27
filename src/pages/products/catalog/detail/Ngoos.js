@@ -22,7 +22,7 @@ import {
   ReferenceLine
 } from 'recharts';
 
-const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = null, overrideUnitsToMake = null, onAddUnits = null, labelsAvailable = null, openDoiSettings = false, openForecastSettings = false, onDoiSettingsChange = null, onForecastSettingsChange = null }) => {
+const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = null, overrideUnitsToMake = null, onAddUnits = null, labelsAvailable = null, openDoiSettings = false, openForecastSettings = false, onDoiSettingsChange = null, onForecastSettingsChange = null, hasActiveForecastSettings = false }) => {
   const { isDarkMode } = useTheme();
   const [selectedView, setSelectedView] = useState('2 Years');
   const [loading, setLoading] = useState(true);
@@ -87,6 +87,14 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
       'organic_sales_pct'
     ]
   });
+
+  // Ensure the forecast settings indicator shows when this product already
+  // has active custom forecast/DOI settings (e.g. from the Add Products page).
+  useEffect(() => {
+    if (hasActiveForecastSettings) {
+      setSettingsApplied(true);
+    }
+  }, [hasActiveForecastSettings, data?.child_asin, data?.childAsin]);
 
   const themeClasses = {
     bg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -857,7 +865,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     setTempDoiSettings(doiSettings || { amazonDoiGoal: 130, inboundLeadTime: 30, manufactureLeadTime: 7 });
     setShowForecastSettingsModal(true);
     setShowForecastSettingsTooltip(false);
-    setSettingsApplied(false);
   };
 
   const calculateTotalDOI = (settings) => {
@@ -1943,7 +1950,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                     style={{ width: '20px', height: '20px' }}
                   />
                 </button>
-                {settingsApplied && (
+                {(settingsApplied || hasActiveForecastSettings) && (
                   <div
                     data-indicator-icon
                     style={{
@@ -2063,20 +2070,28 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                           <button
                           onClick={() => {
                             try {
-                              // Get global DOI settings from localStorage
-                              const globalDoiSettings = JSON.parse(localStorage.getItem('doi_default_settings') || '{}');
-                              // Get global forecast settings from localStorage
-                              const globalForecastSettings = JSON.parse(localStorage.getItem('forecast_default_settings') || '{}');
-                              
-                              // Reset DOI settings
-                              if (Object.keys(globalDoiSettings).length > 0) {
-                                setTempDoiSettings(globalDoiSettings);
-                                if (onDoiSettingsChange) {
-                                  onDoiSettingsChange(globalDoiSettings);
-                                }
+                              // Clear custom product-specific settings by passing null
+                              // This removes the custom settings and makes the pencil icon inactive
+                              if (onDoiSettingsChange) {
+                                onDoiSettingsChange(null);
+                              }
+                              if (onForecastSettingsChange) {
+                                onForecastSettingsChange(null);
                               }
                               
-                              // Reset forecast settings
+                              // Get global DOI settings from localStorage for local state
+                              const globalDoiSettings = JSON.parse(localStorage.getItem('doi_default_settings') || '{}');
+                              // Get global forecast settings from localStorage for local state
+                              const globalForecastSettings = JSON.parse(localStorage.getItem('forecast_default_settings') || '{}');
+                              
+                              // Reset DOI settings to global defaults (for local display only)
+                              if (Object.keys(globalDoiSettings).length > 0) {
+                                setTempDoiSettings(globalDoiSettings);
+                              } else {
+                                setTempDoiSettings({ amazonDoiGoal: 130, inboundLeadTime: 30, manufactureLeadTime: 7 });
+                              }
+                              
+                              // Reset forecast settings to global defaults (for local display only)
                               if (Object.keys(globalForecastSettings).length > 0) {
                                 const {
                                   salesVelocityWeight: defaultSalesVelocityWeight = 25,
@@ -2094,16 +2109,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                                 setTempSvVelocityWeight(defaultSvVelocityWeight);
                                 setTempForecastModel(defaultForecastModel);
                                 setTempMarketAdjustment(defaultMarketAdjustment);
-                                
-                                // Notify parent that forecast settings have been reset
-                                if (onForecastSettingsChange) {
-                                  onForecastSettingsChange({
-                                    salesVelocityWeight: defaultSalesVelocityWeight,
-                                    svVelocityWeight: defaultSvVelocityWeight,
-                                    forecastModel: defaultForecastModel,
-                                    marketAdjustment: defaultMarketAdjustment
-                                  });
-                                }
                               } else {
                                 // If no global forecast settings, reset to defaults
                                 setSalesVelocityWeight(25);
@@ -2114,15 +2119,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                                 setTempSvVelocityWeight(15);
                                 setTempForecastModel('Growing');
                                 setTempMarketAdjustment(5.0);
-                                
-                                if (onForecastSettingsChange) {
-                                  onForecastSettingsChange({
-                                    salesVelocityWeight: 25,
-                                    svVelocityWeight: 15,
-                                    forecastModel: 'Growing',
-                                    marketAdjustment: 5.0
-                                  });
-                                }
                               }
                               
                               setSettingsApplied(false);

@@ -2897,9 +2897,20 @@ const NewShipmentTable = ({
               const currentDoi = doiValue;
               const hasDoiChanged = originalDoi !== undefined && originalDoi !== currentDoi;
               
-              // Determine if pencil should be permanently visible (only if this product's DOI changed or has custom settings)
-              // Uses pure CSS hover for instant appearance when DOI hasn't changed
-              const shouldShowPencilPermanently = (!tableMode && hasDoiChanged) || hasCustomDoiSettings || hasCustomForecastSettings;
+              // Determine if pencil should be in "active" (blue) state.
+              // This is true whenever the product has custom DOI or forecast settings,
+              // regardless of table vs non-table mode.
+              const isPencilActive = hasCustomDoiSettings || hasCustomForecastSettings;
+              
+              // Determine if pencil should be permanently visible.
+              // - Non-table (card) mode:
+              //     - Default: pencil only shows on hover (CSS handles this).
+              //     - When active (blue): always visible, even without hover.
+              // - Table mode:
+              //     - Keep pencil visible when DOI changed or there are custom settings.
+              const shouldShowPencilPermanently =
+                (tableMode && (hasDoiChanged || isPencilActive)) ||
+                (!tableMode && isPencilActive);
               
               return (
                 <div
@@ -3646,7 +3657,8 @@ const NewShipmentTable = ({
                           opacity: shouldShowPencilPermanently ? 1 : 0,
                           flexShrink: 0,
                           transition: 'none',
-                          filter: shouldShowPencilPermanently 
+                          // Blue when there are custom settings (active), gray otherwise.
+                          filter: isPencilActive
                             ? 'brightness(0) saturate(100%) invert(47%) sepia(98%) saturate(2476%) hue-rotate(209deg) brightness(100%) contrast(101%)' // Blue #3B82F6
                             : 'brightness(0) saturate(100%) invert(50%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(95%) contrast(90%)', // Gray
                           pointerEvents: shouldShowPencilPermanently ? 'auto' : 'none',

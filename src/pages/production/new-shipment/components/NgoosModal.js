@@ -391,6 +391,12 @@ const NgoosModal = ({
               openForecastSettings={openForecastSettings}
               onDoiSettingsChange={onDoiSettingsChange}
               onForecastSettingsChange={onForecastSettingsChange}
+              hasActiveForecastSettings={
+                !!(
+                  selectedRow?.hasCustomForecastSettings ||
+                  selectedRow?.hasCustomDoiSettings
+                )
+              }
               onAddUnits={(units) => {
                 if (onAddUnits) {
                   onAddUnits(selectedRow, units);
