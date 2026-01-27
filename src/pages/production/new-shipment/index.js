@@ -561,12 +561,35 @@ const NewShipment = () => {
       
       console.log(`Deduplicated: ${productionInventory.length} → ${uniqueProducts.length} products`);
       
+      // DEBUG: Show sample production inventory item structure
+      if (uniqueProducts.length > 0) {
+        const sample = uniqueProducts[0];
+        console.log('Sample production inventory item ASIN fields:', {
+          child_asin: sample.child_asin,
+          asin: sample.asin,
+          childAsin: sample.childAsin,
+          product_name: sample.product_name
+        });
+      }
+      
       // USE PRODUCTION INVENTORY AS PRIMARY SOURCE (all products from our database)
       // This ensures we show ALL products, not just those with forecast data
+      let mergeSuccessCount = 0;
+      let mergeFailCount = 0;
       const formattedProducts = uniqueProducts.map((item, index) => {
         // Get forecast data for this product if available - try multiple ASIN fields
         const asinKey = item.child_asin || item.asin || item.childAsin || '';
         const forecast = forecastMap[asinKey] || {};
+        
+        // Debug: Log when merge fails (no forecast data found)
+        if (Object.keys(forecast).length === 0) {
+          mergeFailCount++;
+          if (mergeFailCount <= 5) {
+            console.warn(`Forecast merge FAILED for: ${item.product_name} (ASIN key: "${asinKey}")`);
+          }
+        } else {
+          mergeSuccessCount++;
+        }
         
         // Get sales data from forecast API if available
         const salesData = forecast.sales_30_day || item.units_sold_30_days || 0;
@@ -596,12 +619,6 @@ const NewShipment = () => {
           calculatedDoiFba = calculatedDoiTotal;
         }
         
-        // Calculate forecast (use ML forecast or fallback to recent sales trend)
-        let weeklyForecast = forecast.weekly_forecast || 0;
-        if (weeklyForecast === 0 && salesData > 0) {
-          weeklyForecast = (salesData / 30) * 7; // Convert daily avg to weekly
-        }
-        
         // Get inventory values from Railway API (TPS Forecast) - this is the source of truth
         const railwayTotalInventory = forecast.total_inventory || forecast.inventory || 0;
         const railwayFbaAvailable = forecast.fba_available || 0;
@@ -609,6 +626,13 @@ const NewShipment = () => {
         const railwayDoiFba = forecast.doi_fba || forecast.doi_fba_days || 0;
         const railwayUnitsToMake = forecast.units_to_make || 0;
         const railwayLabelInventory = forecast.label_inventory || 0;
+        
+        // Use units_to_make from Railway API as the forecast value
+        // Fallback to sales-based calculation only if API value is 0
+        let weeklyForecast = railwayUnitsToMake;
+        if (weeklyForecast === 0 && salesData > 0) {
+          weeklyForecast = (salesData / 30) * 7; // Convert daily avg to weekly
+        }
         
         return {
           id: `${item.id}-${index}`, // Unique key combining DB ID and index
@@ -668,6 +692,7 @@ const NewShipment = () => {
       });
       
       console.log('Loaded products with supply chain:', formattedProducts.length);
+      console.log(`Forecast merge: ${mergeSuccessCount} SUCCESS, ${mergeFailCount} FAILED (no forecast data)`);
       
       // Use units_to_make from TPS Forecast API as suggested qty
       // This already accounts for DOI goals, lead times, and seasonality

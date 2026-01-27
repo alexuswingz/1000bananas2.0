@@ -232,21 +232,44 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     }
   }, [openForecastSettings]);
 
-  // Extract inventory data from API response or use fallback
-  const inventoryData = productDetails?.inventory || {
-    fba: {
-      total: 0,
-      available: 0,
-      reserved: 0,
-      inbound: 0
-    },
-    awd: {
-      total: 0,
-      outbound_to_fba: 0,
-      available: 0,
-      reserved: 0
+  // Extract inventory data - PREFER forecastData (Railway/PostgreSQL) over productDetails (AWS Lambda)
+  // forecastData comes from our Railway API with accurate real-time inventory
+  const inventoryData = useMemo(() => {
+    // First try to get inventory from forecastData (Railway API - accurate)
+    if (forecastData?.fba_available !== undefined || forecastData?.inventory?.fba_available !== undefined) {
+      const inv = forecastData.inventory || forecastData;
+      return {
+        fba: {
+          total: (inv.fba_available || 0) + (inv.fba_reserved || 0) + (inv.fba_inbound || 0),
+          available: inv.fba_available || 0,
+          reserved: inv.fba_reserved || 0,
+          inbound: inv.fba_inbound || 0
+        },
+        awd: {
+          total: (inv.awd_available || 0) + (inv.awd_reserved || 0) + (inv.awd_inbound || 0),
+          outbound_to_fba: inv.awd_outbound_to_fba || 0,
+          available: inv.awd_available || 0,
+          reserved: inv.awd_reserved || 0,
+          inbound: inv.awd_inbound || 0
+        }
+      };
     }
-  };
+    // Fallback to productDetails (AWS Lambda API)
+    return productDetails?.inventory || {
+      fba: {
+        total: 0,
+        available: 0,
+        reserved: 0,
+        inbound: 0
+      },
+      awd: {
+        total: 0,
+        outbound_to_fba: 0,
+        available: 0,
+        reserved: 0
+      }
+    };
+  }, [forecastData, productDetails]);
 
   // Extract inventory data for timeline visualization
   // Uses same logic as backend: FBA inventory + Additional inventory + Units to Make
