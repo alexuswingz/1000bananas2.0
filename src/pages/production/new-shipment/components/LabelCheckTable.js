@@ -2,9 +2,29 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
+import { toast } from 'sonner';
 import { getShipmentProducts, getLabelFormulaByLocation, updateLabelInventoryByLocation, updateShipmentProductLabelCheck, updateShipment } from '../../../../services/productionApi';
+import CatalogAPI from '../../../../services/catalogApi';
+import { getDriveImageUrl, extractFileId } from '../../../../services/googleDriveApi';
 import VarianceStillExceededModal from './VarianceStillExceededModal';
 import SortFormulasFilterDropdown from './SortFormulasFilterDropdown';
+
+// Helper function to get image URL (handles both Drive URLs and regular URLs)
+const getImageUrl = (url) => {
+  if (!url) return null;
+  
+  // Check if URL is from Google Drive
+  if (typeof url === 'string' && url.includes('drive.google.com')) {
+    // Extract file ID and convert to direct image URL
+    const fileId = extractFileId(url);
+    if (fileId) {
+      return getDriveImageUrl(fileId);
+    }
+  }
+  
+  // Return as-is if it's already a direct URL
+  return url;
+};
 
 const LabelCheckTable = ({
   shipmentId,
@@ -116,6 +136,7 @@ const LabelCheckTable = ({
       const formattedRows = data.map(product => {
         const row = {
           id: product.id,
+          catalogId: product.catalog_id,
           brand: product.brand_name,
           product: product.product_name,
           size: product.size,
@@ -124,6 +145,8 @@ const LabelCheckTable = ({
           labelLocation: product.label_location,
           totalCount: product.label_check_count || '',
           label_check_status: product.label_check_status,
+          childAsin: product.child_asin || '',
+          childSku: product.child_sku || '',
         };
         
         // Restore completed/confirmed status from database
@@ -139,6 +162,36 @@ const LabelCheckTable = ({
         
         return row;
       });
+      
+      // Fetch product images for all rows
+      const imagePromises = formattedRows.map(async (row) => {
+        if (!row.catalogId) return;
+        try {
+          const catalogData = await CatalogAPI.getById(row.catalogId);
+          if (catalogData) {
+            const imageUrl = catalogData.productImages?.productImageUrl || 
+                           catalogData.slides?.productImage ||
+                           catalogData.mainImage ||
+                           catalogData.product_image_url ||
+                           null;
+            if (imageUrl) {
+              return { id: row.id, imageUrl: getImageUrl(imageUrl) };
+            }
+          }
+        } catch (error) {
+          console.error(`Error fetching image for product ${row.id}:`, error);
+        }
+        return null;
+      });
+      
+      const imageResults = await Promise.all(imagePromises);
+      const imagesMap = {};
+      imageResults.forEach(result => {
+        if (result) {
+          imagesMap[result.id] = result.imageUrl;
+        }
+      });
+      setProductImages(imagesMap);
       
       console.log('📋 Formatted label rows:', {
         rowCount: formattedRows.length,
@@ -304,6 +357,7 @@ const LabelCheckTable = ({
 
   // Initialize rows state with empty array - only use real data from API
   const [rows, setRows] = useState([]);
+  const [productImages, setProductImages] = useState({}); // Store product images by row id
 
   // Check all incomplete row checkboxes when trigger changes
   useEffect(() => {
@@ -325,11 +379,10 @@ const LabelCheckTable = ({
   const columns = [
     { key: 'checkbox', label: '', width: '50px' },
     { key: 'start', label: '', width: '100px' },
-    { key: 'brand', label: 'BRAND', width: '150px' },
-    { key: 'product', label: 'PRODUCT', width: '200px' },
+    { key: 'product', label: 'PRODUCTS', width: 'auto' },
     { key: 'size', label: 'SIZE', width: '100px' },
     { key: 'quantity', label: 'QUANTITY', width: '120px' },
-    { key: 'lblCurrentInv', label: 'LBL CURRENT INV', width: '150px' },
+    { key: 'lblCurrentInv', label: 'LABEL INV', width: '150px' },
     { key: 'labelLocation', label: 'LABEL LOCATION', width: '150px' },
   ];
 
@@ -1069,11 +1122,31 @@ const LabelCheckTable = ({
         <div style={{ overflowX: 'auto' }}>
           <table style={{
             width: '100%',
-            borderCollapse: 'separate',
+            borderCollapse: 'collapse',
             borderSpacing: 0,
           }}>
             <thead style={{ backgroundColor: '#1C2634' }}>
-              <tr style={{ height: '40px', maxHeight: '40px' }}>
+              <tr style={{ 
+                height: '66px', 
+                maxHeight: '66px',
+                borderBottom: 'none',
+                position: 'relative',
+              }}>
+                {/* Header separator line with 10px margins on both ends */}
+                <th
+                  colSpan={columns.length}
+                  style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: '10px',
+                    right: '10px',
+                    height: '1px',
+                    backgroundColor: '#4B5563',
+                    padding: 0,
+                    border: 'none',
+                    pointerEvents: 'none',
+                  }}
+                />
                 {(() => {
                   const filteredRows = getFilteredRows();
                   return columns.map((column) => {
@@ -1083,19 +1156,27 @@ const LabelCheckTable = ({
                       key={column.key}
                       className={column.key !== 'start' ? 'group cursor-pointer' : ''}
                       style={{
-                        padding: (column.key === 'start' || column.key === 'checkbox') ? '0 8px' : '0 16px',
-                        textAlign: (column.key === 'start' || column.key === 'checkbox') ? 'center' : 'left',
+                        padding: (column.key === 'start' || column.key === 'checkbox') 
+                          ? '0 8px' 
+                          : (column.key === 'size' || column.key === 'quantity' || column.key === 'lblCurrentInv' || column.key === 'labelLocation')
+                            ? '0 24px 0 4px' // Reduce left padding by 20px (24px - 20px = 4px)
+                            : '0 24px',
+                        marginLeft: (column.key === 'size' || column.key === 'quantity' || column.key === 'lblCurrentInv' || column.key === 'labelLocation')
+                          ? '-20px'
+                          : '0',
+                        textAlign: 'center',
                         fontSize: '11px',
                         fontWeight: 600,
-                        color: '#FFFFFF',
+                        color: isDarkMode ? '#9CA3AF' : '#6B7280',
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em',
                         width: column.width,
                         whiteSpace: 'nowrap',
-                        borderRight: (column.key === 'start' || column.key === 'checkbox') ? 'none' : '1px solid #FFFFFF',
-                        height: '40px',
+                        borderRight: 'none',
+                        height: '66px',
                         position: (column.key !== 'start' && column.key !== 'checkbox') ? 'relative' : 'static',
                         backgroundColor: isActive ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                        borderBottom: 'none',
                       }}
                     >
                       {column.key === 'checkbox' ? (
@@ -1103,6 +1184,7 @@ const LabelCheckTable = ({
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
+                          marginLeft: '35px',
                         }}>
                           <input
                             type="checkbox"
@@ -1118,12 +1200,16 @@ const LabelCheckTable = ({
                             title="Select all rows"
                           />
                         </div>
+                      ) : column.key === 'start' ? (
+                        // Empty header for Start column
+                        <div></div>
                       ) : (
                         <div style={{
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'space-between',
+                          justifyContent: column.key === 'product' ? 'flex-start' : 'center',
                           gap: '0.5rem',
+                          marginLeft: column.key === 'product' ? '40px' : '0',
                         }}>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             {column.label}
@@ -1181,9 +1267,13 @@ const LabelCheckTable = ({
                   key={row.id}
                   style={{
                     backgroundColor: isDarkMode ? '#1F2937' : '#F9FAFB',
-                    borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                    borderBottom: 'none',
+                    borderTop: 'none',
+                    borderLeft: 'none',
+                    borderRight: 'none',
                     transition: 'background-color 0.2s',
-                    height: '40px',
+                    height: '66px',
+                    position: 'relative',
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
@@ -1192,45 +1282,65 @@ const LabelCheckTable = ({
                     e.currentTarget.style.backgroundColor = isDarkMode ? '#1F2937' : '#F9FAFB';
                   }}
                 >
+                  {/* Separator line with 10px margins on both ends */}
+                  <td
+                    colSpan={columns.length}
+                    style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      left: '10px',
+                      right: '10px',
+                      height: '1px',
+                      backgroundColor: '#4B5563',
+                      padding: 0,
+                      border: 'none',
+                      pointerEvents: 'none',
+                    }}
+                  />
                   <td style={{
                     padding: '0 8px',
                     textAlign: 'center',
-                    height: '40px',
+                    height: '66px',
+                    borderBottom: 'none',
                   }}>
-                    <input
-                      type="checkbox"
-                      checked={isAdmin ? bulkSelectedRows.has(row.id) : selectedRows.has(row.id)}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        if (isAdmin) {
-                          handleBulkCheckboxChange(row.id);
-                        } else {
-                          setSelectedRows(prev => {
-                            const newSet = new Set(prev);
-                            if (e.target.checked) {
-                              newSet.add(row.id);
-                            } else {
-                              newSet.delete(row.id);
-                            }
-                            return newSet;
-                          });
-                        }
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      style={{
-                        width: '16px',
-                        height: '16px',
-                        cursor: 'pointer',
-                        accentColor: '#3B82F6',
-                      }}
-                      title={isAdmin ? "Select for bulk action" : undefined}
-                    />
+                    <div style={{ marginLeft: '30px', marginRight: '-10px' }}>
+                      <input
+                        type="checkbox"
+                        checked={isAdmin ? bulkSelectedRows.has(row.id) : selectedRows.has(row.id)}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          if (isAdmin) {
+                            handleBulkCheckboxChange(row.id);
+                          } else {
+                            setSelectedRows(prev => {
+                              const newSet = new Set(prev);
+                              if (e.target.checked) {
+                                newSet.add(row.id);
+                              } else {
+                                newSet.delete(row.id);
+                              }
+                              return newSet;
+                            });
+                          }
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          width: '16px',
+                          height: '16px',
+                          cursor: 'pointer',
+                          accentColor: '#3B82F6',
+                        }}
+                        title={isAdmin ? "Select for bulk action" : undefined}
+                      />
+                    </div>
                   </td>
                   <td style={{
                     padding: '0 8px',
                     textAlign: 'center',
-                    height: '40px',
+                    height: '66px',
+                    borderBottom: 'none',
                   }}>
+                    <div style={{ marginLeft: '20px' }}>
                     {completedRows.has(row.id) ? (
                       <button
                         type="button"
@@ -1342,60 +1452,218 @@ const LabelCheckTable = ({
                         Start
                       </button>
                     )}
+                    </div>
                   </td>
+                  {/* PRODUCTS Column - with image, name, SKU, brand */}
                   <td style={{
                     padding: '0 16px',
                     fontSize: '14px',
                     fontWeight: 400,
                     color: isDarkMode ? '#E5E7EB' : '#374151',
-                    height: '40px',
+                    height: '66px',
+                    verticalAlign: 'middle',
+                    borderBottom: 'none',
+                    textAlign: 'center',
                   }}>
-                    {row.brand}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+                      {/* Product Image Thumbnail */}
+                      <div style={{ 
+                        width: '36px', 
+                        height: '36px', 
+                        minWidth: '36px', 
+                        borderRadius: '3px', 
+                        overflow: 'hidden', 
+                        backgroundColor: isDarkMode ? '#374151' : '#F3F4F6', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        flexShrink: 0 
+                      }}>
+                        {productImages[row.id] ? (
+                          <img 
+                            src={productImages[row.id]} 
+                            alt={row.product} 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                            onError={(e) => { 
+                              e.target.style.display = 'none'; 
+                              if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex'; 
+                            }} 
+                          />
+                        ) : null}
+                        <div style={{ 
+                          display: productImages[row.id] ? 'none' : 'flex', 
+                          flexDirection: 'column', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          width: '100%', 
+                          height: '100%', 
+                          borderRadius: '3px', 
+                          gap: '7.5px', 
+                          color: isDarkMode ? '#6B7280' : '#9CA3AF', 
+                          fontSize: '12px' 
+                        }}>
+                          No img
+                        </div>
+                      </div>
+                      
+                      {/* Product Info */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: 0 }}>
+                        {/* Product Name - Clickable Link */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Could navigate to product detail page if needed
+                          }}
+                          style={{ 
+                            fontSize: '14px', 
+                            fontWeight: 500, 
+                            color: '#3B82F6',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            background: 'none',
+                            border: 'none',
+                            padding: 0,
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            textDecoration: 'none'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.color = '#2563EB';
+                            e.currentTarget.style.textDecoration = 'underline';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.color = '#3B82F6';
+                            e.currentTarget.style.textDecoration = 'none';
+                          }}
+                        >
+                          {row.product}
+                        </button>
+                        
+                        {/* SKU/ASIN with Copy Icon and Brand/Size */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px', flexWrap: 'wrap' }}>
+                          {/* SKU/ASIN with Copy Icon */}
+                          {(row.childSku || row.childAsin) && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
+                                {row.childSku || row.childAsin}
+                              </span>
+                              <img 
+                                src="/assets/copyy.png" 
+                                alt="Copy" 
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  const skuToCopy = row.childSku || row.childAsin;
+                                  try {
+                                    // Try modern clipboard API first
+                                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                                      await navigator.clipboard.writeText(skuToCopy);
+                                    } else {
+                                      // Fallback for non-secure contexts or older browsers
+                                      const textArea = document.createElement('textarea');
+                                      textArea.value = skuToCopy;
+                                      textArea.style.position = 'fixed';
+                                      textArea.style.left = '-999999px';
+                                      textArea.style.top = '-999999px';
+                                      document.body.appendChild(textArea);
+                                      textArea.focus();
+                                      textArea.select();
+                                      try {
+                                        document.execCommand('copy');
+                                      } finally {
+                                        document.body.removeChild(textArea);
+                                      }
+                                    }
+                                    toast.success('SKU copied to clipboard', {
+                                      description: skuToCopy,
+                                      duration: 2000,
+                                    });
+                                  } catch (err) {
+                                    console.error('Failed to copy SKU:', err);
+                                    toast.error('Failed to copy SKU', {
+                                      description: 'Please try again',
+                                      duration: 2000,
+                                    });
+                                  }
+                                }}
+                                style={{ width: '14px', height: '14px', cursor: 'pointer', flexShrink: 0 }} 
+                              />
+                            </div>
+                          )}
+                          
+                          {/* Brand and Size with dot separator */}
+                          {(row.childSku || row.childAsin) && (
+                            <span style={{ fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
+                              •
+                            </span>
+                          )}
+                          <span style={{ fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
+                            {row.brand} • {row.size}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </td>
                   <td style={{
-                    padding: '0 16px',
+                    padding: '0 16px 0 -4px',
                     fontSize: '14px',
                     fontWeight: 400,
                     color: isDarkMode ? '#E5E7EB' : '#374151',
-                    height: '40px',
+                    height: '66px',
+                    borderBottom: 'none',
+                    marginLeft: '-35px',
+                    textAlign: 'center',
+                    verticalAlign: 'middle',
                   }}>
-                    {row.product}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', marginLeft: '-15px' }}>
+                      {row.size}
+                    </div>
                   </td>
                   <td style={{
-                    padding: '0 16px',
+                    padding: '0 16px 0 -4px',
                     fontSize: '14px',
                     fontWeight: 400,
                     color: isDarkMode ? '#E5E7EB' : '#374151',
-                    height: '40px',
+                    height: '66px',
+                    textAlign: 'center',
+                    borderBottom: 'none',
+                    marginLeft: '-35px',
+                    verticalAlign: 'middle',
                   }}>
-                    {row.size}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', marginLeft: '-15px' }}>
+                      {formatNumber(row.quantity)}
+                    </div>
                   </td>
                   <td style={{
-                    padding: '0 16px',
+                    padding: '0 16px 0 -4px',
                     fontSize: '14px',
                     fontWeight: 400,
                     color: isDarkMode ? '#E5E7EB' : '#374151',
-                    height: '40px',
+                    height: '66px',
+                    textAlign: 'center',
+                    borderBottom: 'none',
+                    marginLeft: '-35px',
+                    verticalAlign: 'middle',
                   }}>
-                    {formatNumber(row.quantity)}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', marginLeft: '-15px' }}>
+                      {formatNumber(row.lblCurrentInv)}
+                    </div>
                   </td>
                   <td style={{
-                    padding: '0 16px',
+                    padding: '0 16px 0 -4px',
                     fontSize: '14px',
                     fontWeight: 400,
                     color: isDarkMode ? '#E5E7EB' : '#374151',
-                    height: '40px',
+                    height: '66px',
+                    borderBottom: 'none',
+                    marginLeft: '-35px',
+                    textAlign: 'center',
+                    verticalAlign: 'middle',
                   }}>
-                    {formatNumber(row.lblCurrentInv)}
-                  </td>
-                  <td style={{
-                    padding: '0 16px',
-                    fontSize: '14px',
-                    fontWeight: 400,
-                    color: isDarkMode ? '#E5E7EB' : '#374151',
-                    height: '40px',
-                  }}>
-                    {row.labelLocation}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', marginLeft: '-15px' }}>
+                      {row.labelLocation}
+                    </div>
                   </td>
                 </tr>
                 );
