@@ -1166,10 +1166,9 @@ const NewShipment = () => {
     }
   }, [shipmentProducts, products]);
 
-  // Recalculate suggested quantities when forecastRange changes (but NOT on initial load)
-  // NOTE: This runs when forecastRange changes, but if products are being reloaded due to DOI settings change,
-  // the reload will happen and set qtyValues based on new API data. This recalculation is for when forecastRange
-  // changes WITHOUT a full reload (e.g., if user changes it directly)
+  // When forecastRange changes, trigger a full API reload instead of client-side calculation
+  // The Railway API's /recalculate-doi endpoint properly calculates units_to_make using the algorithm
+  // Client-side formulas are inaccurate and should not be used
   useEffect(() => {
     // Skip if no products or if this is an existing shipment
     if (products.length === 0 || shipmentId) {
@@ -1187,9 +1186,21 @@ const NewShipment = () => {
       return;
     }
     
-    console.log(`ForecastRange changed from ${lastForecastRange} to ${forecastRange}. Recalculating Units to Make for ${products.length} products.`);
-    console.log(`Added rows count: ${addedRows.size}, Manually edited count: ${manuallyEditedIndicesRef.current?.size || 0}`);
+    console.log(`ForecastRange changed from ${lastForecastRange} to ${forecastRange}. Using API values for Units to Make.`);
     setLastForecastRange(forecastRange);
+    
+    // DON'T do client-side calculation - use the units_to_make values from the API (stored in products)
+    // The API values are calculated using the proper algorithm with seasonality, velocity, etc.
+    // Trigger a reload with updated DOI settings to get fresh API values
+    // Update doiSettingsValues to match forecastRange and trigger API call
+    const newTargetDOI = parseInt(forecastRange) || 130;
+    const newAmazonDoiGoal = Math.max(30, newTargetDOI - 30 - 7); // Subtract lead times
+    setDoiSettingsValues(prev => ({
+      ...prev,
+      amazonDoiGoal: newAmazonDoiGoal
+    }));
+    setDoiSettingsChangeCount(c => c + 1); // This triggers loadProducts() with new DOI
+    return; // Don't do client-side recalculation below
     
     // Recalculate suggestedQty based on new forecastRange (DOI)
     // This ensures Units to Make updates when DOI changes
