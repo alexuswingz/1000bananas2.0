@@ -3,7 +3,6 @@ import { useTheme } from '../../../context/ThemeContext';
 import VineTrackerHeader from './components/VineTrackerHeader';
 import SummaryCards from './components/SummaryCards';
 import VineTrackerTable from './components/VineTrackerTable';
-import VineDetailsModal from './components/VineDetailsModal';
 
 const VineTracker = () => {
   const { isDarkMode } = useTheme();
@@ -116,8 +115,6 @@ const VineTracker = () => {
     },
   ]);
   const [loading, setLoading] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [showVineDetailsModal, setShowVineDetailsModal] = useState(false);
 
   const themeClasses = {
     pageBg: isDarkMode ? 'bg-dark-bg-primary' : 'bg-light-bg-primary',
@@ -154,23 +151,13 @@ const VineTracker = () => {
     setVineProducts(prev => 
       prev.map(p => p.id === updatedRow.id ? updatedRow : p)
     );
-    
-    // Update selected product if it's the same one
-    if (selectedProduct && selectedProduct.id === updatedRow.id) {
-      setSelectedProduct(updatedRow);
-    }
   };
 
-  const handleRowClick = (row) => {
-    // Only open modal for existing products (not new rows)
-    if (!row.isNew && row.productName) {
-      setSelectedProduct(row);
-      setShowVineDetailsModal(true);
-    }
-  };
-
-  const handleUpdateProduct = (updatedProduct) => {
-    handleUpdateRow(updatedProduct);
+  const handleDeleteRow = (rowId) => {
+    // Remove the row from the vineProducts array
+    setVineProducts(prev => 
+      prev.filter(p => p.id !== rowId)
+    );
   };
 
   // Calculate summary card values
@@ -218,25 +205,13 @@ const VineTracker = () => {
               rows={vineProducts}
               searchValue={searchValue}
               onUpdateRow={handleUpdateRow}
-              onRowClick={handleRowClick}
+              onDeleteRow={handleDeleteRow}
             />
           </>
         )}
       </div>
-
-      {/* Vine Details Modal */}
-      <VineDetailsModal
-        isOpen={showVineDetailsModal}
-        onClose={() => {
-          setShowVineDetailsModal(false);
-          setSelectedProduct(null);
-        }}
-        productData={selectedProduct}
-        onUpdateProduct={handleUpdateProduct}
-      />
     </div>
   );
 };
 
 export default VineTracker;
-

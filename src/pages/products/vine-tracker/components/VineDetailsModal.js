@@ -2,12 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
-const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAddClaim }) => {
+const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAddClaim, onOpenAddClaimed }) => {
   const { isDarkMode } = useTheme();
   const [claimHistory, setClaimHistory] = useState([]);
-  const [showAddClaimModal, setShowAddClaimModal] = useState(false);
-  const [newClaimDate, setNewClaimDate] = useState('');
-  const [newClaimUnits, setNewClaimUnits] = useState('');
   const [actionMenuId, setActionMenuId] = useState(null);
   const [actionMenuPosition, setActionMenuPosition] = useState({ top: 0, left: 0 });
   const actionButtonRefs = useRef({});
@@ -16,8 +13,6 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
   const [editClaimUnits, setEditClaimUnits] = useState('');
   const [editModalClaimId, setEditModalClaimId] = useState(null);
   const [editModalPosition, setEditModalPosition] = useState({ top: 0, left: 0 });
-  const [showAddClaimPopup, setShowAddClaimPopup] = useState(false);
-  const [addClaimPopupPosition, setAddClaimPopupPosition] = useState({ top: 0, left: 0 });
 
   useEffect(() => {
     if (isOpen && productData) {
@@ -29,7 +24,7 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
 
   // Handle click outside to close action menu and edit modal
   useEffect(() => {
-    if (!showAddClaimPopup && !actionMenuId && !editModalClaimId) return;
+    if (!actionMenuId && !editModalClaimId) return;
 
     const handleClickOutside = (event) => {
       if (actionMenuId && !event.target.closest('[data-action-menu]') && !event.target.closest('[data-action-button]')) {
@@ -39,11 +34,6 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
         setEditModalClaimId(null);
         setEditClaimDate('');
         setEditClaimUnits('');
-      }
-      if (showAddClaimPopup && !event.target.closest('[data-add-claim-popup]') && !event.target.closest('[data-add-claim-button]')) {
-        setShowAddClaimPopup(false);
-        setNewClaimDate('');
-        setNewClaimUnits('');
       }
     };
 
@@ -56,7 +46,7 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
       clearTimeout(timeoutId);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [actionMenuId, editModalClaimId, showAddClaimPopup]);
+  }, [actionMenuId, editModalClaimId]);
 
   if (!isOpen || !productData) return null;
 
@@ -113,45 +103,6 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
     return dateString;
   };
 
-  const handleAddClaim = () => {
-    if (newClaimDate && newClaimUnits && parseInt(newClaimUnits) > 0) {
-      const newClaim = {
-        id: Date.now(),
-        date: newClaimDate,
-        units: parseInt(newClaimUnits),
-      };
-      
-      const updatedHistory = [...claimHistory, newClaim].sort((a, b) => {
-        const dateA = new Date(a.date);
-        const dateB = new Date(b.date);
-        return dateB - dateA; // Sort descending
-      });
-
-      setClaimHistory(updatedHistory);
-      
-      // Update product data
-      if (onUpdateProduct) {
-        const updatedProduct = {
-          ...productData,
-          claimHistory: updatedHistory,
-          claimed: (productData.claimed || 0) + parseInt(newClaimUnits),
-        };
-        onUpdateProduct(updatedProduct);
-      }
-
-      // Reset form
-      setNewClaimDate('');
-      setNewClaimUnits('');
-      setShowAddClaimModal(false);
-      setShowAddClaimPopup(false);
-
-      // Call onAddClaim if provided
-      if (onAddClaim) {
-        onAddClaim(newClaim);
-      }
-    }
-  };
-
   const handleDeleteClaim = (claimId) => {
     const claim = claimHistory.find(c => c.id === claimId);
     if (claim) {
@@ -176,11 +127,6 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
     
     if (isPlusButton) {
       // Show popup modal for editing this claim
-      // Close "Add Claim Entry" form if open
-      setShowAddClaimModal(false);
-      setNewClaimDate('');
-      setNewClaimUnits('');
-      
       const claim = claimHistory.find(c => c.id === claimId);
       if (claim) {
         // Convert date to YYYY-MM-DD format for date input
@@ -319,11 +265,10 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
         style={{
           width: '600px',
           height: 'auto',
-          maxHeight: '90vh',
           borderRadius: '12px',
           border: '1px solid #111827',
           backgroundColor: '#111827',
-          overflow: 'hidden',
+          overflow: 'visible',
           display: 'flex',
           flexDirection: 'column',
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
@@ -357,7 +302,15 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              transition: 'color 0.2s',
             }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = '#FFFFFF';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = '#9CA3AF';
+            }}
+            aria-label="Close"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -501,54 +454,38 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
           </div>
 
           {/* Claim History */}
-          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ flex: 'none', display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexShrink: 0 }}>
               <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#FFFFFF' }}>Claim History</h4>
-              <button
-                data-add-claim-button
-                onClick={(e) => {
-                  // Close any editing form if open
-                  setEditingClaimId(null);
-                  setEditClaimDate('');
-                  setEditClaimUnits('');
-                  
-                  // If no claim entries, show popup modal
-                  if (claimHistory.length === 0) {
+              {onOpenAddClaimed && (
+                <span
+                  onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    
-                    // Center the modal on screen
-                    const modalWidth = 400;
-                    const modalHeight = 280;
-                    const top = (window.innerHeight - modalHeight) / 2;
-                    const left = (window.innerWidth - modalWidth) / 2;
-                    
-                    setAddClaimPopupPosition({ top, left });
-                    // Use setTimeout to ensure state update happens after event propagation
-                    setTimeout(() => {
-                      setShowAddClaimPopup(true);
-                    }, 0);
-                  } else {
-                    // Open inline add claim form
-                    setShowAddClaimModal(true);
-                  }
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                  color: '#007AFF',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.25rem',
-                }}
-              >
-                <span style={{ fontSize: '1rem' }}>+</span>
-                <span>Add Claim Entry</span>
-              </button>
+                    onClose();
+                    if (onOpenAddClaimed) {
+                      onOpenAddClaimed(productData);
+                    }
+                  }}
+                  style={{
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: '#3B82F6',
+                    cursor: 'pointer',
+                    textDecoration: 'none',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = '#2563EB';
+                    e.currentTarget.style.textDecoration = 'underline';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = '#3B82F6';
+                    e.currentTarget.style.textDecoration = 'none';
+                  }}
+                >
+                  + Add Claim Entry
+                </span>
+              )}
             </div>
 
             <div
@@ -558,7 +495,7 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
                 borderRadius: '12px',
                 paddingTop: '24px',
                 paddingRight: '16px',
-                paddingBottom: '24px',
+                paddingBottom: '12px',
                 paddingLeft: '16px',
                 boxSizing: 'border-box',
                 overflow: 'hidden',
@@ -567,148 +504,10 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
             >
               <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
                 <colgroup>
-                  <col style={{ width: '40%' }} />
-                  <col style={{ width: '20%' }} />
+                  <col style={{ width: '60%' }} />
                   <col style={{ width: '40%' }} />
                 </colgroup>
-                <thead>
-                  <tr style={{ 
-                    backgroundColor: '#111827',
-                    borderBottom: '1px solid #374151',
-                  }}>
-                    <th
-                      style={{ 
-                        padding: '0.75rem 1rem', 
-                        textAlign: 'left',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                        color: '#9CA3AF',
-                        height: '48px',
-                        boxSizing: 'border-box',
-                      }}
-                    >
-                      DATE CLAIMED
-                    </th>
-                    <th
-                      style={{ 
-                        padding: '0.75rem 1rem', 
-                        textAlign: 'left',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                        color: '#9CA3AF',
-                        height: '48px',
-                        boxSizing: 'border-box',
-                      }}
-                    >
-                      UNITS
-                    </th>
-                    <th
-                      style={{ 
-                        padding: '0.75rem 1rem', 
-                        textAlign: 'left',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                        color: '#9CA3AF',
-                        height: '48px',
-                        boxSizing: 'border-box',
-                      }}
-                    >
-                      ACTIONS
-                    </th>
-                  </tr>
-                </thead>
                 <tbody>
-                  {/* Add Claim Entry Row */}
-                  {showAddClaimModal && (
-                    <tr style={{ backgroundColor: '#111827', borderBottom: '1px solid #374151' }}>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'left', width: '40%' }}>
-                        <div style={{ position: 'relative', width: '100%' }}>
-                          <input
-                            type="date"
-                            value={newClaimDate}
-                            onChange={(e) => setNewClaimDate(e.target.value)}
-                            placeholder="MM/DD/YYYY"
-                            style={{
-                              width: '100%',
-                              maxWidth: '100%',
-                              padding: '0.5rem 0.75rem',
-                              paddingLeft: '2.5rem',
-                              fontSize: '0.875rem',
-                              color: '#FFFFFF',
-                              backgroundColor: '#1F2937',
-                              border: '1px solid #374151',
-                              borderRadius: '6px',
-                              outline: 'none',
-                              boxSizing: 'border-box',
-                            }}
-                          />
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="#9CA3AF"
-                            strokeWidth="2"
-                            style={{
-                              position: 'absolute',
-                              left: '0.75rem',
-                              top: '50%',
-                              transform: 'translateY(-50%)',
-                              pointerEvents: 'none',
-                            }}
-                          >
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="16" y1="2" x2="16" y2="6"></line>
-                            <line x1="8" y1="2" x2="8" y2="6"></line>
-                            <line x1="3" y1="10" x2="21" y2="10"></line>
-                          </svg>
-                        </div>
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'left', width: '20%' }}>
-                        <input
-                          type="number"
-                          value={newClaimUnits}
-                          onChange={(e) => setNewClaimUnits(e.target.value)}
-                          placeholder="0"
-                          min="0"
-                          style={{
-                            width: '100%',
-                            maxWidth: '100%',
-                            padding: '0.5rem 0.75rem',
-                            fontSize: '0.875rem',
-                            color: '#FFFFFF',
-                            backgroundColor: '#1F2937',
-                            border: '1px solid #007AFF',
-                            borderRadius: '6px',
-                            outline: 'none',
-                            boxSizing: 'border-box',
-                          }}
-                        />
-                      </td>
-                      <td style={{ padding: '0.75rem 1rem', textAlign: 'left', width: '40%' }}>
-                        <button
-                          onClick={handleAddClaim}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            padding: 0,
-                            cursor: 'pointer',
-                            fontSize: '0.875rem',
-                            fontWeight: 500,
-                            color: '#007AFF',
-                          }}
-                        >
-                          Add
-                        </button>
-                      </td>
-                    </tr>
-                  )}
                   {claimHistory.length > 0 && claimHistory.map((claim, index) => (
                     <tr
                       key={claim.id}
@@ -723,7 +522,7 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
                           fontSize: '0.875rem',
                           color: '#FFFFFF',
                           textAlign: 'left',
-                          width: '40%',
+                          width: '60%',
                           boxSizing: 'border-box',
                         }}
                       >
@@ -735,73 +534,17 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
                           fontSize: '0.875rem',
                           color: '#FFFFFF',
                           textAlign: 'left',
-                          width: '20%',
+                          width: '40%',
                           boxSizing: 'border-box',
                         }}
                       >
                         {claim.units}
                       </td>
-                      <td style={{ 
-                        padding: '0.75rem 1rem', 
-                        textAlign: 'left',
-                        width: '40%',
-                        boxSizing: 'border-box',
-                      }}>
-                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                          <button
-                            type="button"
-                            data-action-button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleActionButtonClick(claim.id, e, true);
-                            }}
-                            style={{
-                              background: editModalClaimId === claim.id ? 'rgba(255, 255, 255, 0.1)' : 'none',
-                              border: editModalClaimId === claim.id ? '1px solid rgba(255, 255, 255, 0.2)' : 'none',
-                              borderRadius: editModalClaimId === claim.id ? '50%' : '0',
-                              cursor: 'pointer',
-                              color: '#FFFFFF',
-                              padding: '0.25rem',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: '24px',
-                              height: '24px',
-                            }}
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <line x1="12" y1="5" x2="12" y2="19"></line>
-                              <line x1="5" y1="12" x2="19" y2="12"></line>
-                            </svg>
-                          </button>
-                          <button
-                            data-action-button
-                            onClick={(e) => handleActionButtonClick(claim.id, e, false)}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              cursor: 'pointer',
-                              color: '#9CA3AF',
-                              padding: '0.25rem',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}
-                          >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <circle cx="12" cy="12" r="1"></circle>
-                              <circle cx="12" cy="5" r="1"></circle>
-                              <circle cx="12" cy="19" r="1"></circle>
-                            </svg>
-                          </button>
-                        </div>
-                      </td>
                     </tr>
                   ))}
-                  {claimHistory.length === 0 && !showAddClaimModal && !editModalClaimId && (
+                  {claimHistory.length === 0 && (
                     <tr>
-                      <td colSpan="3" style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF' }}>
+                      <td colSpan="2" style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF' }}>
                         No claim history yet
                       </td>
                     </tr>
@@ -995,143 +738,6 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
         document.body
       )}
 
-      {/* Add Claim Entry Popup Modal (when no entries exist) */}
-      {showAddClaimPopup && createPortal(
-        <div
-          data-add-claim-popup
-          style={{
-            position: 'fixed',
-            top: `${addClaimPopupPosition.top}px`,
-            left: `${addClaimPopupPosition.left}px`,
-            zIndex: 10002,
-            width: '400px',
-            padding: '1.5rem',
-            backgroundColor: '#1F2937',
-            border: '1px solid #374151',
-            borderRadius: '12px',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
-          }}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-          onMouseDown={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-        >
-          <h3 style={{ color: '#FFFFFF', fontSize: '1.125rem', fontWeight: 600, marginBottom: '1rem' }}>
-            Add Claim Entry
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div>
-              <label style={{ display: 'block', color: '#9CA3AF', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
-                Date Claimed
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type="date"
-                  value={newClaimDate}
-                  onChange={(e) => setNewClaimDate(e.target.value)}
-                  placeholder="MM/DD/YYYY"
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem 0.75rem',
-                    paddingLeft: '2.5rem',
-                    fontSize: '0.875rem',
-                    color: '#FFFFFF',
-                    backgroundColor: '#111827',
-                    border: '1px solid #374151',
-                    borderRadius: '6px',
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                  }}
-                />
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#9CA3AF"
-                  strokeWidth="2"
-                  style={{
-                    position: 'absolute',
-                    left: '0.75rem',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    pointerEvents: 'none',
-                  }}
-                >
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                  <line x1="16" y1="2" x2="16" y2="6"></line>
-                  <line x1="8" y1="2" x2="8" y2="6"></line>
-                  <line x1="3" y1="10" x2="21" y2="10"></line>
-                </svg>
-              </div>
-            </div>
-            <div>
-              <label style={{ display: 'block', color: '#9CA3AF', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
-                Units
-              </label>
-              <input
-                type="number"
-                value={newClaimUnits}
-                onChange={(e) => setNewClaimUnits(e.target.value)}
-                placeholder="0"
-                min="0"
-                style={{
-                  width: '100%',
-                  padding: '0.5rem 0.75rem',
-                  fontSize: '0.875rem',
-                  color: '#FFFFFF',
-                  backgroundColor: '#111827',
-                  border: '1px solid #007AFF',
-                  borderRadius: '6px',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-              <button
-                onClick={() => {
-                  setShowAddClaimPopup(false);
-                  setNewClaimDate('');
-                  setNewClaimUnits('');
-                }}
-                style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: '6px',
-                  backgroundColor: '#374151',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddClaim}
-                style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: '6px',
-                  backgroundColor: '#007AFF',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                }}
-              >
-                Add
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
     </div>,
     document.body
   );

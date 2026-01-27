@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 import NgoosAPI from '../../../../services/ngoosApi';
 import { toast } from 'sonner';
+import AddClaimed from './AddClaimed';
 
 // Calendar Dropdown Component
 const CalendarDropdown = ({ value, onChange, onClose, inputRef }) => {
@@ -280,7 +281,7 @@ const CalendarDropdown = ({ value, onChange, onClose, inputRef }) => {
   );
 };
 
-const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onRowClick }) => {
+const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDeleteRow }) => {
   const { isDarkMode } = useTheme();
   const [openFilterColumn, setOpenFilterColumn] = useState(null);
   const filterIconRefs = useRef({});
@@ -304,7 +305,51 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onRowCl
   const [claimHistory, setClaimHistory] = useState([]);
   const [showClaimDatePicker, setShowClaimDatePicker] = useState(false);
   const [showAddClaimModal, setShowAddClaimModal] = useState(false);
+  const [showAddClaimedModal, setShowAddClaimedModal] = useState(false);
+  const [selectedRowForAddClaim, setSelectedRowForAddClaim] = useState(null);
+  const [isOpenedFromPlusButton, setIsOpenedFromPlusButton] = useState(false);
   const claimDateInputRef = useRef(null);
+  const [openThreeDotsMenuId, setOpenThreeDotsMenuId] = useState(null);
+  const threeDotsMenuRefs = useRef({});
+
+  // Handler function to open the vine details modal - used by both plus button and row click
+  const handleOpenVineDetailsModal = (row, focusOnClaimEntry = false) => {
+    console.log('🔵 handleOpenVineDetailsModal CALLED for:', row.productName);
+    console.trace('Stack trace:');
+    // Load claim history from row data or use sample data for demo
+    const existingHistory = row.claimHistory || [];
+    // If no claim history exists, add sample data for demo purposes
+    const sampleHistory = existingHistory.length === 0 ? [
+      { date: 'Jan 15, 2026', units: 2 },
+      { date: 'Jan 18, 2026', units: 3 },
+      { date: 'Jan 21, 2026', units: 7 }
+    ] : existingHistory;
+    
+    // Calculate claimed count from history
+    const calculatedClaimed = sampleHistory.reduce((sum, claim) => sum + (claim.units || 0), 0);
+    
+    // Update selected row with calculated claimed if using sample data
+    const updatedRow = existingHistory.length === 0 
+      ? { ...row, claimed: calculatedClaimed, claimHistory: sampleHistory }
+      : row;
+    
+    setSelectedVineRow(updatedRow);
+    setClaimHistory(sampleHistory);
+    setClaimDate('');
+    setClaimUnits('0');
+    setShowClaimDatePicker(false);
+    setIsOpenedFromPlusButton(focusOnClaimEntry); // Track if opened from plus button
+    setShowVineDetailsModal(true);
+    
+    // If opening from plus button, focus on the date input after modal opens
+    if (focusOnClaimEntry) {
+      setTimeout(() => {
+        if (claimDateInputRef.current) {
+          claimDateInputRef.current.focus();
+        }
+      }, 100);
+    }
+  };
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -390,6 +435,23 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onRowCl
         }
       }
       
+      // Close three dots menu when clicking outside
+      if (openThreeDotsMenuId !== null) {
+        const menuElement = document.getElementById(`three-dots-menu-${openThreeDotsMenuId}`);
+        const triggerElement = threeDotsMenuRefs.current[openThreeDotsMenuId];
+        
+        if (triggerElement && menuElement) {
+          const isClickInsideTrigger = triggerElement.contains(event.target);
+          const isClickInsideMenu = menuElement.contains(event.target);
+          
+          if (!isClickInsideTrigger && !isClickInsideMenu) {
+            setOpenThreeDotsMenuId(null);
+          }
+        } else {
+          setOpenThreeDotsMenuId(null);
+        }
+      }
+      
       // Close date picker when clicking outside
       if (openDatePickerId !== null) {
         const dateInputElement = dateInputRefs.current[openDatePickerId];
@@ -406,7 +468,7 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onRowCl
       }
     };
 
-    if (openFilterColumn !== null || showProductDropdown || openProductDropdownId !== null || openDatePickerId !== null) {
+    if (openFilterColumn !== null || showProductDropdown || openProductDropdownId !== null || openDatePickerId !== null || openThreeDotsMenuId !== null) {
       const timeoutId = setTimeout(() => {
         document.addEventListener('click', handleClickOutside);
       }, 0);
@@ -416,7 +478,7 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onRowCl
         document.removeEventListener('click', handleClickOutside);
       };
     }
-  }, [openFilterColumn, showProductDropdown, openProductDropdownId, openDatePickerId]);
+  }, [openFilterColumn, showProductDropdown, openProductDropdownId, openDatePickerId, openThreeDotsMenuId]);
 
   // Handle filter icon click
   const handleFilterClick = (columnKey, e) => {
@@ -669,10 +731,13 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onRowCl
                     minHeight: '40px',
                     position: 'relative',
                     display: 'table-row',
-                    cursor: !row.isNew && row.productName && onRowClick ? 'pointer' : 'default',
+                    cursor: !row.isNew && row.productName ? 'pointer' : 'default',
                   }}
                   onClick={(e) => {
-                    // Only trigger row click if clicking on the row itself, not on interactive elements
+                    // DEBUG: Log all clicks to see what's happening
+                    console.log('🔴 onClick fired on row:', row.productName, 'target:', e.target.tagName, 'isNew:', row.isNew);
+                    
+                    // Block ALL single clicks - only double-click should open modal
                     const target = e.target;
                     const isInteractiveElement = 
                       target.tagName === 'INPUT' ||
@@ -681,10 +746,51 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onRowCl
                       target.closest('input') ||
                       target.closest('button') ||
                       target.closest('[data-date-picker]') || 
-                      target.closest('[data-dropdown]');
+                      target.closest('[data-dropdown]') ||
+                      target.closest('[data-no-expand]');
                     
-                    if (!isInteractiveElement && onRowClick && !row.isNew && row.productName) {
-                      onRowClick(row);
+                    // For non-interactive elements on product rows, completely block single clicks
+                    if (!isInteractiveElement && !row.isNew && row.productName) {
+                      console.log('🛑 BLOCKING single click - modal will NOT open');
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (e.stopImmediatePropagation && typeof e.stopImmediatePropagation === 'function') {
+                        e.stopImmediatePropagation();
+                      }
+                      
+                      // Also prevent on the native event
+                      if (e.nativeEvent) {
+                        e.nativeEvent.preventDefault();
+                        e.nativeEvent.stopPropagation();
+                        if (e.nativeEvent.stopImmediatePropagation && typeof e.nativeEvent.stopImmediatePropagation === 'function') {
+                          e.nativeEvent.stopImmediatePropagation();
+                        }
+                      }
+                      
+                      return false;
+                    }
+                  }}
+                  onDoubleClick={(e) => {
+                    // DEBUG: Log double-clicks
+                    console.log('onDoubleClick fired on row:', row.productName);
+                    
+                    // Only trigger row double-click if clicking on the row itself, not on interactive elements
+                    const target = e.target;
+                    const isInteractiveElement = 
+                      target.tagName === 'INPUT' ||
+                      target.tagName === 'BUTTON' ||
+                      target.tagName === 'SELECT' ||
+                      target.closest('input') ||
+                      target.closest('button') ||
+                      target.closest('[data-date-picker]') || 
+                      target.closest('[data-dropdown]') ||
+                      target.closest('[data-no-expand]');
+                    
+                    // Open the vine details modal when double-clicking on product row
+                    if (!isInteractiveElement && !row.isNew && row.productName) {
+                      console.log('Double-click confirmed - opening modal');
+                      e.stopPropagation();
+                      handleOpenVineDetailsModal(row);
                     }
                   }}
                 >
@@ -920,13 +1026,65 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onRowCl
                                   }}>
                                     {row.productName}
                                   </span>
-                                  {(row.size || row.asin) && (
+                                  {row.size && (
                                     <span style={{ 
                                       flexShrink: 0,
                                       whiteSpace: 'nowrap',
                                       marginLeft: '4px',
                                     }}>
-                                      {' • ' + [row.size, row.asin].filter(Boolean).join(' • ')}
+                                      {' • ' + row.size}
+                                    </span>
+                                  )}
+                                  {row.asin && (
+                                    <span style={{ 
+                                      flexShrink: 0,
+                                      whiteSpace: 'nowrap',
+                                      marginLeft: '4px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                    }}>
+                                      {' • '}
+                                      <span>{row.asin}</span>
+                                      <img 
+                                        src="/assets/copyy.png" 
+                                        alt="Copy ASIN" 
+                                        onClick={async (e) => {
+                                          e.stopPropagation();
+                                          try {
+                                            // Try modern clipboard API first
+                                            if (navigator.clipboard && navigator.clipboard.writeText) {
+                                              await navigator.clipboard.writeText(row.asin);
+                                            } else {
+                                              // Fallback for non-secure contexts or older browsers
+                                              const textArea = document.createElement('textarea');
+                                              textArea.value = row.asin;
+                                              textArea.style.position = 'fixed';
+                                              textArea.style.left = '-999999px';
+                                              textArea.style.top = '-999999px';
+                                              document.body.appendChild(textArea);
+                                              textArea.focus();
+                                              textArea.select();
+                                              try {
+                                                document.execCommand('copy');
+                                              } finally {
+                                                document.body.removeChild(textArea);
+                                              }
+                                            }
+                                            toast.success('ASIN copied to clipboard', {
+                                              description: row.asin,
+                                              duration: 2000,
+                                            });
+                                          } catch (err) {
+                                            console.error('Failed to copy ASIN:', err);
+                                            toast.error('Failed to copy ASIN', {
+                                              description: 'Please try again',
+                                              duration: 2000,
+                                            });
+                                          }
+                                        }}
+                                        style={{ width: '14px', height: '14px', cursor: 'pointer', flexShrink: 0 }} 
+                                      />
                                     </span>
                                   )}
                                 </>
@@ -1183,8 +1341,60 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onRowCl
                                             fontSize: '0.75rem', 
                                             color: isDisabled ? '#6B7280' : '#9CA3AF',
                                             lineHeight: '1.4',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            flexWrap: 'wrap',
                                           }}>
-                                            {[product.brand, product.size, product.asin].filter(Boolean).join(' • ') || 'N/A'}
+                                            {[product.brand, product.size].filter(Boolean).join(' • ')}
+                                            {product.asin && (
+                                              <>
+                                                {product.brand || product.size ? ' • ' : ''}
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                  <span>{product.asin}</span>
+                                                  <img 
+                                                    src="/assets/copyy.png" 
+                                                    alt="Copy" 
+                                                    onClick={async (e) => {
+                                                      e.stopPropagation();
+                                                      try {
+                                                        // Try modern clipboard API first
+                                                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                                                          await navigator.clipboard.writeText(product.asin);
+                                                        } else {
+                                                          // Fallback for non-secure contexts or older browsers
+                                                          const textArea = document.createElement('textarea');
+                                                          textArea.value = product.asin;
+                                                          textArea.style.position = 'fixed';
+                                                          textArea.style.left = '-999999px';
+                                                          textArea.style.top = '-999999px';
+                                                          document.body.appendChild(textArea);
+                                                          textArea.focus();
+                                                          textArea.select();
+                                                          try {
+                                                            document.execCommand('copy');
+                                                          } finally {
+                                                            document.body.removeChild(textArea);
+                                                          }
+                                                        }
+                                                        toast.success('ASIN copied to clipboard', {
+                                                          description: product.asin,
+                                                          duration: 2000,
+                                                        });
+                                                      } catch (err) {
+                                                        console.error('Failed to copy ASIN:', err);
+                                                        toast.error('Failed to copy ASIN', {
+                                                          description: 'Please try again',
+                                                          duration: 2000,
+                                                        });
+                                                      }
+                                                    }}
+                                                    style={{ width: '14px', height: '14px', cursor: 'pointer', flexShrink: 0, opacity: isDisabled ? 0.5 : 1 }} 
+                                                  />
+                                                </div>
+                                              </>
+                                            )}
+                                            {!product.brand && !product.size && !product.asin && 'N/A'}
                                           </div>
                                         </div>
                                       </div>
@@ -1219,8 +1429,56 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onRowCl
                           >
                             {row.productName || 'N/A'}
                           </span>
-                          <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>
-                            {row.brand || 'N/A'} • {row.size || 'N/A'} • {row.asin || 'N/A'}
+                          <span style={{ fontSize: '0.75rem', color: '#9CA3AF', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            {[row.brand, row.size].filter(Boolean).join(' • ') || 'N/A'}
+                            {row.asin && (
+                              <>
+                                {row.brand || row.size ? ' • ' : ''}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <span>{row.asin}</span>
+                                  <img 
+                                    src="/assets/copyy.png" 
+                                    alt="Copy ASIN" 
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      try {
+                                        // Try modern clipboard API first
+                                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                                          await navigator.clipboard.writeText(row.asin);
+                                        } else {
+                                          // Fallback for non-secure contexts or older browsers
+                                          const textArea = document.createElement('textarea');
+                                          textArea.value = row.asin;
+                                          textArea.style.position = 'fixed';
+                                          textArea.style.left = '-999999px';
+                                          textArea.style.top = '-999999px';
+                                          document.body.appendChild(textArea);
+                                          textArea.focus();
+                                          textArea.select();
+                                          try {
+                                            document.execCommand('copy');
+                                          } finally {
+                                            document.body.removeChild(textArea);
+                                          }
+                                        }
+                                        toast.success('ASIN copied to clipboard', {
+                                          description: row.asin,
+                                          duration: 2000,
+                                        });
+                                      } catch (err) {
+                                        console.error('Failed to copy ASIN:', err);
+                                        toast.error('Failed to copy ASIN', {
+                                          description: 'Please try again',
+                                          duration: 2000,
+                                        });
+                                      }
+                                    }}
+                                    style={{ width: '14px', height: '14px', cursor: 'pointer', flexShrink: 0 }} 
+                                  />
+                                </div>
+                              </>
+                            )}
+                            {!row.brand && !row.size && !row.asin && 'N/A'}
                           </span>
                         </div>
                       )}
@@ -1622,14 +1880,15 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onRowCl
                           data-no-expand
                           className="hover:bg-gray-800 transition-colors"
                           onClick={(e) => {
+                            e.preventDefault();
                             e.stopPropagation();
-                            setSelectedVineRow(row);
-                            // Reset claim history when opening modal
-                            setClaimHistory([]);
-                            setClaimDate('');
-                            setClaimUnits('0');
-                            setShowClaimDatePicker(false);
-                            setShowVineDetailsModal(true);
+                            console.log('Plus button clicked for row:', row);
+                            // Open AddClaimed modal instead of VineDetailsModal
+                            // Make sure VineDetailsModal is closed
+                            setShowVineDetailsModal(false);
+                            setSelectedVineRow(null);
+                            setSelectedRowForAddClaim(row);
+                            setShowAddClaimedModal(true);
                           }}
                           style={{
                             display: 'inline-flex',
@@ -1659,37 +1918,160 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onRowCl
                         </button>
                         
                         {/* Three dots icon */}
-                        <button
-                          type="button"
-                          data-no-expand
-                          className="hover:bg-gray-800 transition-colors"
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: '28px',
-                            height: '28px',
-                            borderRadius: '9999px',
-                            border: 'none',
-                            cursor: 'pointer',
-                            backgroundColor: 'transparent',
-                          }}
-                        >
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="#FFFFFF"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
+                        <div style={{ position: 'relative' }}>
+                          <button
+                            ref={(el) => { threeDotsMenuRefs.current[row.id] = el; }}
+                            type="button"
+                            data-no-expand
+                            className="hover:bg-gray-800 transition-colors"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setOpenThreeDotsMenuId(openThreeDotsMenuId === row.id ? null : row.id);
+                            }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '28px',
+                              height: '28px',
+                              borderRadius: '9999px',
+                              border: 'none',
+                              cursor: 'pointer',
+                              backgroundColor: openThreeDotsMenuId === row.id ? '#374151' : 'transparent',
+                            }}
                           >
-                            <circle cx="12" cy="12" r="1" />
-                            <circle cx="12" cy="5" r="1" />
-                            <circle cx="12" cy="19" r="1" />
-                          </svg>
-                        </button>
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="#FFFFFF"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <circle cx="12" cy="12" r="1" />
+                              <circle cx="12" cy="5" r="1" />
+                              <circle cx="12" cy="19" r="1" />
+                            </svg>
+                          </button>
+                          
+                          {/* Three dots dropdown menu */}
+                          {openThreeDotsMenuId === row.id && (
+                            <div
+                              id={`three-dots-menu-${row.id}`}
+                              style={{
+                                position: 'absolute',
+                                top: '100%',
+                                right: 0,
+                                marginTop: '8px',
+                                backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                                border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                                borderRadius: '8px',
+                                padding: '4px',
+                                minWidth: '180px',
+                                zIndex: 1000,
+                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                              }}
+                            >
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setOpenThreeDotsMenuId(null);
+                                  handleOpenVineDetailsModal(row, false);
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '8px 12px',
+                                  textAlign: 'left',
+                                  fontSize: '14px',
+                                  color: isDarkMode ? '#FFFFFF' : '#111827',
+                                  backgroundColor: 'transparent',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  borderRadius: '4px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                <svg
+                                  width="16"
+                                  height="16"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                                Edit Vine Details
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setOpenThreeDotsMenuId(null);
+                                  // Delete the row
+                                  if (window.confirm(`Are you sure you want to delete "${row.productName || 'this product'}"?`)) {
+                                    if (onDeleteRow) {
+                                      onDeleteRow(row.id);
+                                    } else if (onUpdateRow) {
+                                      // Fallback: mark as deleted if no delete handler provided
+                                      onUpdateRow({ ...row, status: 'archived', isDeleted: true });
+                                    }
+                                  }
+                                }}
+                                style={{
+                                  width: '100%',
+                                  padding: '8px 12px',
+                                  textAlign: 'left',
+                                  fontSize: '14px',
+                                  color: '#EF4444',
+                                  backgroundColor: 'transparent',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  borderRadius: '4px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                <svg
+                                  width="16"
+                                  height="16"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <polyline points="3 6 5 6 21 6"></polyline>
+                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                                Delete
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </td>
@@ -1775,7 +2157,8 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onRowCl
           <div
             style={{
               width: '600px',
-              height: '490px',
+              maxHeight: '90vh',
+              height: '650px',
               backgroundColor: '#111827',
               borderRadius: '12px',
               border: '1px solid #374151',
@@ -1802,23 +2185,49 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onRowCl
               <h2 style={{ fontSize: '20px', fontWeight: '600', color: '#FFFFFF', margin: 0 }}>
                 Vine Details
               </h2>
-              <span
+              <button
                 onClick={() => {
                   setShowVineDetailsModal(false);
                   setSelectedVineRow(null);
                   setClaimDate('');
                   setClaimUnits('0');
                   setShowClaimDatePicker(false);
+                  setIsOpenedFromPlusButton(false);
                 }}
                 style={{
+                  background: 'transparent',
+                  border: 'none',
                   color: '#FFFFFF',
-                  fontSize: '14px',
                   cursor: 'pointer',
-                  fontWeight: '400',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '4px',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#374151';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
                 }}
               >
-                Cancel
-              </span>
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
             </div>
 
             {/* Content */}
@@ -1875,29 +2284,24 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onRowCl
                   <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#FFFFFF', margin: 0, lineHeight: '1.3' }}>
                     {selectedVineRow.productName || 'N/A'}
                   </h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <p style={{ fontSize: '12px', color: '#9CA3AF', margin: 0 }}>
-                      {selectedVineRow.brand || 'N/A'} • {selectedVineRow.size || 'N/A'} • {selectedVineRow.asin || 'N/A'}
-                    </p>
-                    <p style={{ fontSize: '12px', color: '#9CA3AF', margin: 0 }}>
-                      Launched: {selectedVineRow.launchDate ? (() => {
-                        // Try to parse the date if it's in MM/DD/YYYY format
-                        if (selectedVineRow.launchDate.includes('/')) {
-                          const parts = selectedVineRow.launchDate.split('/');
-                          if (parts.length === 3) {
-                            const date = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
-                            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                          }
-                        }
-                        // If it's already a date string or Date object
-                        const date = new Date(selectedVineRow.launchDate);
-                        if (!isNaN(date.getTime())) {
+                  <p style={{ fontSize: '12px', color: '#9CA3AF', margin: 0 }}>
+                    {selectedVineRow.brand || 'N/A'} • {selectedVineRow.size || 'N/A'} • {selectedVineRow.asin || 'N/A'} • Launched: {selectedVineRow.launchDate ? (() => {
+                      // Try to parse the date if it's in MM/DD/YYYY format
+                      if (selectedVineRow.launchDate.includes('/')) {
+                        const parts = selectedVineRow.launchDate.split('/');
+                        if (parts.length === 3) {
+                          const date = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
                           return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
                         }
-                        return selectedVineRow.launchDate;
-                      })() : 'N/A'}
-                    </p>
-                  </div>
+                      }
+                      // If it's already a date string or Date object
+                      const date = new Date(selectedVineRow.launchDate);
+                      if (!isNaN(date.getTime())) {
+                        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                      }
+                      return selectedVineRow.launchDate;
+                    })() : 'N/A'}
+                  </p>
                   {/* Status Button */}
                   <div style={{ marginTop: '2px' }}>
                     <button
@@ -1989,461 +2393,173 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onRowCl
                   <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#FFFFFF', margin: 0 }}>
                     Claim History
                   </h3>
-                  <span
-                    onClick={() => setShowAddClaimModal(true)}
-                    style={{
-                      fontSize: '14px',
-                      fontWeight: '500',
-                      color: '#3B82F6',
-                      cursor: 'pointer',
-                      textDecoration: 'none',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.color = '#2563EB';
-                      e.currentTarget.style.textDecoration = 'underline';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.color = '#3B82F6';
-                      e.currentTarget.style.textDecoration = 'none';
-                    }}
-                  >
-                    + Add Claim Entry
-                  </span>
+                  {!isOpenedFromPlusButton && (
+                    <span
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // Close VineDetailsModal
+                        setShowVineDetailsModal(false);
+                        setSelectedVineRow(null);
+                        // Open AddClaimed modal
+                        setSelectedRowForAddClaim(selectedVineRow);
+                        setShowAddClaimedModal(true);
+                      }}
+                      style={{
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        color: '#3B82F6',
+                        cursor: 'pointer',
+                        textDecoration: 'none',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.color = '#2563EB';
+                        e.currentTarget.style.textDecoration = 'underline';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.color = '#3B82F6';
+                        e.currentTarget.style.textDecoration = 'none';
+                      }}
+                    >
+                      + Add Claim Entry
+                    </span>
+                  )}
                 </div>
 
-                {/* Input Table */}
-                <table style={{ 
-                  width: '100%', 
-                  borderCollapse: 'separate', 
-                  borderSpacing: 0, 
-                  marginBottom: '12px',
-                  borderRadius: '8px',
-                  overflow: 'hidden',
-                  border: '1px solid #374151',
-                }}>
-                  <thead>
-                    <tr>
-                      <th style={{
-                        padding: '8px 12px',
-                        textAlign: 'left',
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        color: '#9CA3AF',
-                        textTransform: 'uppercase',
-                        borderBottom: '1px solid #374151',
-                        backgroundColor: '#111827',
-                      }}>
-                        DATE CLAIMED
-                      </th>
-                      <th style={{
-                        padding: '8px 12px',
-                        textAlign: 'left',
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        color: '#9CA3AF',
-                        textTransform: 'uppercase',
-                        borderBottom: '1px solid #374151',
-                        backgroundColor: '#111827',
-                      }}>
-                        UNITS
-                      </th>
-                      <th style={{
-                        padding: '8px 12px',
-                        textAlign: 'left',
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        color: '#9CA3AF',
-                        textTransform: 'uppercase',
-                        borderBottom: '1px solid #374151',
-                        backgroundColor: '#111827',
-                      }}>
-                        ACTIONS
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td style={{ padding: '8px 12px', borderBottom: 'none', backgroundColor: '#111827' }}>
-                        <div style={{ position: 'relative', width: '129px' }}>
-                          <input
-                            ref={claimDateInputRef}
-                            type="text"
-                            placeholder="MM/DD/YYYY"
-                            value={claimDate}
-                            onChange={(e) => setClaimDate(e.target.value)}
-                            onFocus={() => setShowClaimDatePicker(true)}
-                            style={{
-                              width: '129px',
-                              height: '28px',
-                              padding: '6px 12px',
-                              paddingLeft: '36px',
-                              borderRadius: '4px',
-                              border: '1px solid #374151',
-                              backgroundColor: '#1F2937',
-                              color: '#9CA3AF',
-                              fontSize: '14px',
-                              boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                              boxSizing: 'border-box',
-                            }}
-                          />
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="#9CA3AF"
-                            strokeWidth="2"
-                            style={{
-                              position: 'absolute',
-                              left: '12px',
-                              top: '50%',
-                              transform: 'translateY(-50%)',
-                              pointerEvents: 'none',
-                            }}
-                          >
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="16" y1="2" x2="16" y2="6"></line>
-                            <line x1="8" y1="2" x2="8" y2="6"></line>
-                            <line x1="3" y1="10" x2="21" y2="10"></line>
-                          </svg>
-                          {/* Calendar Dropdown */}
-                          {showClaimDatePicker && claimDateInputRef.current && (
-                            <CalendarDropdown
-                              value={claimDate}
-                              onChange={(date) => {
-                                setClaimDate(date);
-                                setShowClaimDatePicker(false);
-                              }}
-                              onClose={() => setShowClaimDatePicker(false)}
-                              inputRef={claimDateInputRef.current}
-                            />
-                          )}
-                        </div>
-                      </td>
-                      <td style={{ padding: '8px 12px', borderBottom: 'none', backgroundColor: '#111827' }}>
-                        <input
-                          type="number"
-                          value={claimUnits}
-                          onChange={(e) => setClaimUnits(e.target.value)}
-                          className="no-spinner"
-                          style={{
-                            width: '91px',
-                            height: '27px',
-                            padding: '6px',
-                            borderRadius: '4px',
-                            border: '1px solid #374151',
-                            borderWidth: '1px',
-                            backgroundColor: '#1F2937',
-                            color: '#9CA3AF',
-                            fontSize: '14px',
-                            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                            textAlign: 'center',
-                            boxSizing: 'border-box',
-                          }}
-                          onWheel={(e) => e.target.blur()}
-                        />
-                      </td>
-                      <td style={{ padding: '8px 12px', borderBottom: 'none', backgroundColor: '#111827' }}>
-                        <button
-                          onClick={() => {
-                            if (claimDate && claimUnits && parseInt(claimUnits) > 0) {
-                              // Update the row's claimed count
-                              if (onUpdateRow) {
-                                const updatedRow = {
-                                  ...selectedVineRow,
-                                  claimed: (selectedVineRow.claimed || 0) + parseInt(claimUnits),
-                                };
-                                onUpdateRow(updatedRow);
-                              }
-                              
-                              // Show toast notification
-                              const productDetails = [selectedVineRow.size, selectedVineRow.asin].filter(Boolean).join(' • ');
-                              
-                              const toastId = toast.success('', {
-                                description: (
-                                  <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '24px',
-                                    minWidth: '400px',
-                                    width: 'fit-content',
-                                    maxWidth: '95vw',
-                                    height: '36px',
-                                    paddingTop: '8px',
-                                    paddingRight: '12px',
-                                    paddingBottom: '8px',
-                                    paddingLeft: '12px',
-                                    borderRadius: '12px',
-                                    backgroundColor: '#F0FDF4',
-                                    color: '#34C759',
-                                    margin: '0 auto',
-                                    overflow: 'visible',
-                                  }}>
-                                    {/* Check Icon */}
-                                    <svg
-                                      width="20"
-                                      height="20"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      stroke="#34C759"
-                                      strokeWidth="3"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      style={{ flexShrink: 0 }}
-                                    >
-                                      <path d="M20 6L9 17l-5-5" />
-                                    </svg>
-                                    {/* Product Name and Details */}
-                                    <div style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                      flexShrink: 0,
-                                      overflow: 'visible',
-                                    }}>
-                                      <span style={{
-                                        fontSize: '0.875rem',
-                                        fontWeight: 500,
-                                        color: '#34C759',
-                                        whiteSpace: 'nowrap',
-                                        flexShrink: 0,
-                                      }}>
-                                        Claim entry submitted for{' '}
-                                      </span>
-                                      {selectedVineRow.productName && (
-                                        <span style={{
-                                          fontSize: '0.875rem',
-                                          fontWeight: 500,
-                                          color: '#34C759',
-                                          whiteSpace: 'nowrap',
-                                          overflow: 'visible',
-                                          flexShrink: 0,
-                                        }}>
-                                          {selectedVineRow.productName}
-                                        </span>
-                                      )}
-                                      {productDetails && (
-                                        <span style={{
-                                          fontSize: '0.875rem',
-                                          fontWeight: 500,
-                                          color: '#34C759',
-                                          whiteSpace: 'nowrap',
-                                          flexShrink: 0,
-                                        }}>
-                                          {' • ' + productDetails}
-                                        </span>
-                                      )}
-                                    </div>
-                                    {/* Close Button (X) */}
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        toast.dismiss(toastId);
-                                      }}
-                                      style={{
-                                        background: 'transparent',
-                                        border: 'none',
-                                        cursor: 'pointer',
-                                        padding: '4px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        flexShrink: 0,
-                                        color: '#34C759',
-                                      }}
-                                    >
-                                      <svg
-                                        width="16"
-                                        height="16"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                      >
-                                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                                      </svg>
-                                    </button>
-                                  </div>
-                                ),
-                                duration: 4000,
-                                icon: null,
-                                closeButton: false,
-                                style: {
-                                  background: 'transparent',
-                                  padding: 0,
-                                  border: 'none',
-                                  boxShadow: 'none',
-                                  display: 'flex',
-                                  justifyContent: 'center',
-                                  alignItems: 'center',
-                                },
-                                className: 'claim-entry-submitted-toast',
-                              });
-                              
-                              // Close modal and reset everything
-                              setClaimDate('');
-                              setClaimUnits('0');
-                              setShowClaimDatePicker(false);
-                              setClaimHistory([]);
-                              setShowVineDetailsModal(false);
-                              setSelectedVineRow(null);
-                            }
-                          }}
-                          style={{
-                            width: '48px',
-                            height: '23px',
-                            paddingTop: '4px',
-                            paddingRight: '12px',
-                            paddingBottom: '4px',
-                            paddingLeft: '12px',
-                            borderRadius: '4px',
-                            border: 'none',
-                            backgroundColor: '#3B82F6',
+                {/* Combined Claim History Table */}
+                <div style={{ 
+                  flex: 1, 
+                  minHeight: 0, 
+                  maxHeight: '250px',
+                  overflowY: 'auto',
+                  overflowX: 'hidden',
+                  paddingRight: '4px',
+                }}
+                className="custom-scrollbar"
+                >
+                  <style>{`
+                    .custom-scrollbar::-webkit-scrollbar {
+                      width: 8px;
+                    }
+                    .custom-scrollbar::-webkit-scrollbar-track {
+                      background: #1F2937;
+                      border-radius: 4px;
+                    }
+                    .custom-scrollbar::-webkit-scrollbar-thumb {
+                      background: #4B5563;
+                      border-radius: 4px;
+                    }
+                    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                      background: #6B7280;
+                    }
+                  `}</style>
+                  <table style={{ 
+                    width: '100%', 
+                    borderCollapse: 'separate', 
+                    borderSpacing: 0,
+                    borderRadius: '8px',
+                    overflow: 'hidden',
+                    border: '1px solid #374151',
+                  }}>
+                    <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                      <tr>
+                        <th style={{
+                          padding: '8px 12px',
+                          textAlign: 'left',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          color: '#9CA3AF',
+                          textTransform: 'uppercase',
+                          borderBottom: '1px solid #374151',
+                          backgroundColor: '#111827',
+                        }}>
+                          DATE CLAIMED
+                        </th>
+                        <th style={{
+                          padding: '8px 12px',
+                          textAlign: 'left',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          color: '#9CA3AF',
+                          textTransform: 'uppercase',
+                          borderBottom: '1px solid #374151',
+                          backgroundColor: '#111827',
+                        }}>
+                          UNITS
+                        </th>
+                        <th style={{
+                          padding: '8px 12px',
+                          textAlign: 'left',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          color: '#9CA3AF',
+                          textTransform: 'uppercase',
+                          borderBottom: '1px solid #374151',
+                          backgroundColor: '#111827',
+                        }}>
+                          ACTIONS
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* Existing Claim History Entries */}
+                      {claimHistory.map((claim, index) => (
+                        <tr key={index}>
+                          <td style={{
+                            padding: '8px 12px',
+                            fontSize: '13px',
                             color: '#FFFFFF',
-                            fontSize: '14px',
-                            fontWeight: '500',
-                            cursor: 'pointer',
-                            boxSizing: 'border-box',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#2563EB';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = '#3B82F6';
-                          }}
-                        >
-                          Add
-                        </button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-
-                {/* Claim History Table */}
-                {claimHistory.length > 0 && (
-                  <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-                    <table style={{ 
-                      width: '100%', 
-                      borderCollapse: 'separate', 
-                      borderSpacing: 0,
-                      borderRadius: '8px',
-                      overflow: 'hidden',
-                      border: '1px solid #374151',
-                    }}>
-                      <thead>
-                        <tr>
-                          <th style={{
-                            padding: '8px 12px',
-                            textAlign: 'left',
-                            fontSize: '12px',
-                            fontWeight: '600',
-                            color: '#9CA3AF',
-                            textTransform: 'uppercase',
-                            borderBottom: '1px solid #374151',
+                            borderBottom: index < claimHistory.length - 1 ? '1px solid #374151' : 'none',
                             backgroundColor: '#111827',
                           }}>
-                            DATE CLAIMED
-                          </th>
-                          <th style={{
+                            {claim.date}
+                          </td>
+                          <td style={{
                             padding: '8px 12px',
-                            textAlign: 'left',
-                            fontSize: '12px',
-                            fontWeight: '600',
-                            color: '#9CA3AF',
-                            textTransform: 'uppercase',
-                            borderBottom: '1px solid #374151',
+                            fontSize: '13px',
+                            color: '#FFFFFF',
+                            borderBottom: index < claimHistory.length - 1 ? '1px solid #374151' : 'none',
                             backgroundColor: '#111827',
                           }}>
-                            UNITS
-                          </th>
-                          <th style={{
+                            {claim.units}
+                          </td>
+                          <td style={{
                             padding: '8px 12px',
-                            textAlign: 'left',
-                            fontSize: '12px',
-                            fontWeight: '600',
-                            color: '#9CA3AF',
-                            textTransform: 'uppercase',
-                            borderBottom: '1px solid #374151',
+                            fontSize: '13px',
+                            color: '#FFFFFF',
+                            borderBottom: index < claimHistory.length - 1 ? '1px solid #374151' : 'none',
                             backgroundColor: '#111827',
+                            position: 'relative',
                           }}>
-                            ACTIONS
-                          </th>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // Toggle action menu for this claim
+                                setOpenThreeDotsMenuId(openThreeDotsMenuId === `claim-${index}` ? null : `claim-${index}`);
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: '#9CA3AF',
+                                padding: '0.25rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <circle cx="12" cy="12" r="1"></circle>
+                                <circle cx="12" cy="5" r="1"></circle>
+                                <circle cx="12" cy="19" r="1"></circle>
+                              </svg>
+                            </button>
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {claimHistory.map((claim, index) => (
-                          <tr key={index}>
-                            <td style={{
-                              padding: '8px 12px',
-                              fontSize: '13px',
-                              color: '#FFFFFF',
-                              borderBottom: index < claimHistory.length - 1 ? '1px solid #374151' : 'none',
-                              backgroundColor: '#111827',
-                            }}>
-                              {claim.date}
-                            </td>
-                            <td style={{
-                              padding: '8px 12px',
-                              fontSize: '13px',
-                              color: '#FFFFFF',
-                              borderBottom: index < claimHistory.length - 1 ? '1px solid #374151' : 'none',
-                              backgroundColor: '#111827',
-                            }}>
-                              {claim.units}
-                            </td>
-                            <td style={{
-                              padding: '8px 12px',
-                              fontSize: '13px',
-                              color: '#FFFFFF',
-                              borderBottom: index < claimHistory.length - 1 ? '1px solid #374151' : 'none',
-                              backgroundColor: '#111827',
-                            }}>
-                              <button
-                                onClick={() => {
-                                  const updatedHistory = claimHistory.filter((_, i) => i !== index);
-                                  setClaimHistory(updatedHistory);
-                                  
-                                  // Update the row's claimed count
-                                  if (onUpdateRow) {
-                                    const updatedRow = {
-                                      ...selectedVineRow,
-                                      claimed: Math.max(0, (selectedVineRow.claimed || 0) - claim.units),
-                                    };
-                                    onUpdateRow(updatedRow);
-                                  }
-                                }}
-                                style={{
-                                  padding: '4px 8px',
-                                  borderRadius: '4px',
-                                  border: '1px solid #374151',
-                                  backgroundColor: 'transparent',
-                                  color: '#9CA3AF',
-                                  fontSize: '12px',
-                                  fontWeight: '500',
-                                  cursor: 'pointer',
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.backgroundColor = '#374151';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.backgroundColor = 'transparent';
-                                }}
-                              >
-                                Cancel
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
@@ -2824,6 +2940,26 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onRowCl
         </div>,
         document.body
       )}
+
+      {/* AddClaimed Modal */}
+      <AddClaimed
+        isOpen={showAddClaimedModal}
+        onClose={() => {
+          setShowAddClaimedModal(false);
+          setSelectedRowForAddClaim(null);
+        }}
+        productData={selectedRowForAddClaim}
+        onAddClaim={(newClaim) => {
+          // Handle the new claim if needed
+          console.log('New claim added:', newClaim);
+        }}
+        onUpdateRow={(updatedRow) => {
+          // Update the row in the table
+          if (onUpdateRow) {
+            onUpdateRow(updatedRow);
+          }
+        }}
+      />
     </div>
   );
 };
