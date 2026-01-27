@@ -36,14 +36,14 @@ const NewShipmentHeader = ({
     // This allows users to go back to previously completed steps
     if (completedTabs.has(tabName)) return true;
     
-    // Label Check and Formula Check are both accessible once products are added (can be done in any order)
+    // Label Check and Formula Check can be accessed as soon as the user
+    // decides to move forward. We only block if there are known
+    // unexported products (to prevent mismatches with the export file).
     if (tabName === 'label-check' || tabName === 'formula-check') {
-      // Block if there are unexported products
       if (productsAddedAfterExport) {
         return false;
       }
-      // Accessible once add-products is completed
-      return completedTabs.has('add-products');
+      return true;
     }
     
     // Book Shipment, Sort Products, Sort Formulas require BOTH formula-check AND label-check

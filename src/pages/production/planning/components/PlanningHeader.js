@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
-import DOISettingsPopover from '../../new-shipment/components/DOISettingsPopover';
 
-const PlanningHeader = ({ activeTab, onTabChange, onNewShipmentClick, onSearch, onDoiSettingsChange }) => {
+const PlanningHeader = ({ activeTab, onTabChange, onNewShipmentClick, onSearch }) => {
   const { isDarkMode } = useTheme();
   const [searchValue, setSearchValue] = useState('');
 
@@ -207,12 +206,6 @@ const PlanningHeader = ({ activeTab, onTabChange, onNewShipmentClick, onSearch, 
             </button>
           )}
         </div>
-
-        {/* DOI Settings */}
-        <DOISettingsPopover
-          onSettingsChange={onDoiSettingsChange}
-          isDarkMode={isDarkMode}
-        />
 
         {/* New Shipment button */}
         <button

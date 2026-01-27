@@ -1113,53 +1113,6 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
 
   return (
     <>
-      {/* Required DOI Filter */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          marginBottom: '16px',
-        }}
-      >
-        <label
-          style={{
-            fontSize: '14px',
-            fontWeight: 500,
-            color: isDarkMode ? '#E5E7EB' : '#374151',
-          }}
-        >
-          Required DOI:
-        </label>
-        <input
-          type="number"
-          value={requiredDOI}
-          onChange={(e) => {
-            const newValue = parseInt(e.target.value) || 130;
-            setRequiredDOI(newValue);
-          }}
-          style={{
-            width: '80px',
-            padding: '8px 12px',
-            borderRadius: '6px',
-            border: isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
-            backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-            color: isDarkMode ? '#F9FAFB' : '#111827',
-            fontSize: '14px',
-            fontWeight: 500,
-          }}
-          min="1"
-        />
-        <span
-          style={{
-            fontSize: '12px',
-            color: isDarkMode ? '#9CA3AF' : '#6B7280',
-          }}
-        >
-          days
-        </span>
-      </div>
-
       {/* Informational Cards */}
       <div
         style={{
@@ -1357,9 +1310,21 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         }}
       >
         {/* Table with 100% width to fit container */}
-        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'auto', display: 'table' }}>
-        <thead style={{ backgroundColor: '#111827' }}>
-          <tr style={{ borderBottom: '1px solid #374151', height: 'auto' }}>
+        <table
+          style={{
+            width: '100%',
+            borderCollapse: 'separate',
+            borderSpacing: 0,
+            tableLayout: 'auto',
+            display: 'table',
+          }}
+        >
+        <thead
+          style={{
+            backgroundColor: '#111827',
+          }}
+        >
+          <tr style={{ height: 'auto' }}>
             <th
               className="text-center text-xs font-bold text-white uppercase tracking-wider group cursor-pointer"
               style={{
@@ -1794,6 +1759,19 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         >
           {displayRows.map((row, index) => (
             <React.Fragment key={row.id || row.shipment || `row-${index}`}>
+              {/* Separator line above each data row (including first, so it sits directly under the header) */}
+              <tr style={{ height: '1px', backgroundColor: '#111827' }}>
+                <td colSpan={11} style={{ padding: 0, backgroundColor: '#111827' }}>
+                  <div
+                    style={{
+                      marginLeft: '1.25rem',
+                      marginRight: '1.25rem',
+                      height: '1px',
+                      backgroundColor: '#374151',
+                    }}
+                  />
+                </td>
+              </tr>
               <tr
                 onClick={(e) => {
                   // Don't navigate if clicking on label check cell
@@ -2162,18 +2140,6 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                 </button>
               </td>
             </tr>
-              <tr style={{ height: '1px', backgroundColor: '#111827' }}>
-                <td colSpan={11} style={{ padding: 0, backgroundColor: '#111827' }}>
-                  <div
-                    style={{
-                      marginLeft: '1.25rem',
-                      marginRight: '1.25rem',
-                      height: '1px',
-                      backgroundColor: '#374151',
-                    }}
-                  />
-                </td>
-              </tr>
             </React.Fragment>
           ))}
         </tbody>

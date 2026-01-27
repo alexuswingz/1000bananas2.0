@@ -197,6 +197,94 @@ const NewShipment = () => {
   
   // Sort option for product table
   const [sortOption, setSortOption] = useState('doi'); // 'doi', 'qty', 'name'
+
+  // If user navigates to Label Check after exporting (for example by
+  // clicking the top tab instead of the "Begin Label Check" button),
+  // automatically create the shipment and attach products so that
+  // LabelCheckTable has data to show.
+  useEffect(() => {
+    // Only run when:
+    // - user is on the label-check step
+    // - export has completed
+    // - we don't already have a shipmentId
+    if (activeAction !== 'label-check') return;
+    if (shipmentId) return;
+    if (!exportCompleted) return;
+
+    const ensureShipmentForLabelCheck = async () => {
+      try {
+        setLoading(true);
+
+        // Build list of products to attach to the shipment
+        const productsToAdd = Object.keys(qtyValues)
+          .filter(idx => {
+            const product = products[idx];
+            const qty = qtyValues[idx];
+            return product && addedRows.has(product.id) && qty > 0;
+          })
+          .map(idx => ({
+            catalog_id: products[idx].catalogId || products[idx].id,
+            quantity: qtyValues[idx],
+          }));
+
+        if (productsToAdd.length === 0) {
+          toast.error('Please add at least one product before starting Label Check');
+          return;
+        }
+
+        // Require shipment type before creating shipment
+        if (!shipmentData.shipmentType) {
+          toast.error('Please select a shipment type (FBA or AWD) in the export template before proceeding to Label Check.');
+          return;
+        }
+
+        const shipmentNumber = shipmentData.shipmentNumber || generateShipmentNumber();
+        const shipmentDate = shipmentData.shipmentDate || new Date().toISOString().split('T')[0];
+
+        const newShipment = await createShipment({
+          shipment_number: shipmentNumber,
+          shipment_date: shipmentDate,
+          shipment_type: shipmentData.shipmentType,
+          marketplace: 'Amazon',
+          account: shipmentData.account || 'TPS Nutrients',
+          location: shipmentData.location || '',
+          created_by: 'current_user',
+        });
+
+        const newShipmentId = newShipment?.id || newShipment?.shipment_id || newShipment?.data?.id;
+        if (!newShipmentId) {
+          throw new Error('Invalid response from createShipment API - missing shipment ID');
+        }
+
+        setShipmentId(newShipmentId);
+
+        await addShipmentProducts(newShipmentId, productsToAdd);
+
+        await updateShipment(newShipmentId, {
+          add_products_completed: true,
+          status: 'label_check',
+        });
+
+        setCompletedTabs(prev => {
+          const newSet = new Set(prev);
+          newSet.add('add-products');
+          newSet.add('export');
+          return newSet;
+        });
+        setExportCompleted(true);
+        toast.success('Shipment booked for Label Check.');
+      } catch (error) {
+        console.error('Error preparing shipment for Label Check:', error);
+        toast.error('Failed to prepare shipment for Label Check: ' + error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Fire and forget; LabelCheckTable will react when shipmentId is set
+    ensureShipmentForLabelCheck();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeAction, shipmentId, exportCompleted]);
   
   // Callback when DOI settings change from the popover
   const handleDoiSettingsChange = (newSettings, totalDoi) => {
@@ -830,10 +918,23 @@ const NewShipment = () => {
         }
         // Otherwise auto-populate qty with suggested qty if product needs restocking
         else if (product.suggestedQty > 0) {
-          initialQtyValues[index] = product.suggestedQty;
+          const increment = getSuggestedQtyIncrement(product);
+          const suggested = product.suggestedQty;
+          const roundedSuggested =
+            increment && increment > 1
+              ? Math.ceil(suggested / increment) * increment
+              : suggested;
+
+          initialQtyValues[index] = roundedSuggested;
         }
       });
-      setQtyValues(initialQtyValues);
+
+      // Merge with any existing qty values so we don't accidentally
+      // clear quantities that were already initialized elsewhere.
+      setQtyValues(prev => ({
+        ...(prev || {}),
+        ...initialQtyValues,
+      }));
       
       // Update manually edited indices with new indices after reload
       // IMPORTANT: Clear and repopulate the existing Set instead of replacing it
@@ -1060,6 +1161,50 @@ const NewShipment = () => {
   const [selectedBrands, setSelectedBrands] = useState(null); // Brand filter from products dropdown (Set of brands or null)
   const [lastAccount, setLastAccount] = useState(null); // Track account changes
   const [lastForecastRange, setLastForecastRange] = useState(null); // Track forecastRange changes
+
+  // Helper: determine case increment for a product's suggested quantity,
+  // so Units to Make defaults align with full cases (e.g. 60 units for 8oz).
+  const getSuggestedQtyIncrement = (product) => {
+    const rawSize = product?.size || '';
+    const size = rawSize.toLowerCase();
+    const sizeCompact = size.replace(/\s+/g, '');
+
+    // 8oz products change in full-case increments (60 units)
+    if (sizeCompact.includes('8oz')) return 60;
+
+    // 6oz products (bag or bottle) change in case increments (40 units)
+    const isSixOz =
+      sizeCompact.includes('6oz') ||
+      size.includes('6 oz') ||
+      size.includes('6-ounce') ||
+      size.includes('6 ounce');
+
+    // 1/2 lb bag products also use 40-unit increments
+    const isHalfPoundBag =
+      sizeCompact.includes('1/2lb') ||
+      size.includes('1/2 lb') ||
+      size.includes('0.5lb') ||
+      size.includes('0.5 lb') ||
+      size.includes('half lb');
+
+    if (isSixOz || isHalfPoundBag) return 40;
+
+    // 1 lb products change in case increments (25 units)
+    const isOnePound =
+      sizeCompact.includes('1lb') ||
+      size.includes('1 lb') ||
+      size.includes('1-pound') ||
+      size.includes('1 pound');
+    if (isOnePound) return 25;
+
+    // Quart products change in case increments (12 units)
+    if (size.includes('quart') || size.includes(' qt')) return 12;
+
+    // Gallon products change in case increments (4 units)
+    if (size.includes('gallon') || size.includes(' gal')) return 4;
+
+    return 1;
+  };
   
   // Clear brand filter when account changes
   useEffect(() => {
@@ -1206,7 +1351,9 @@ const NewShipment = () => {
     // This ensures Units to Make updates when DOI changes
     // Use functional update to access current qtyValues without including it in dependencies
     setQtyValues(prevQtyValues => {
-      const newQtyValues = {};
+      // Start from existing quantities so we never wipe out
+      // non-zero values unless we have a positive recalculation.
+      const newQtyValues = { ...(prevQtyValues || {}) };
       const targetDOI = parseInt(forecastRange) || 120;
       
       products.forEach((product, index) => {
@@ -1236,13 +1383,8 @@ const NewShipment = () => {
         // IMPORTANT: Only preserve quantities for products that are actually in the shipment
         // Products that just have a suggestedQty value should be recalculated when DOI changes
         if (isInAddedRows || isManuallyEdited) {
-          // Preserve the manually set or added quantity
-          if (prevQtyValues[index] !== undefined) {
-            newQtyValues[index] = prevQtyValues[index];
-            if (isMothRepellent || hasValue2163) {
-              console.log(`[DOI Recalc] PRESERVING value ${prevQtyValues[index]} for ${product.product} (isInAddedRows: ${isInAddedRows}, isManuallyEdited: ${isManuallyEdited})`);
-            }
-          }
+          // Preserve the manually set or added quantity exactly as-is
+          return;
         } else {
         // Recalculate suggestedQty based on new DOI
         // Always recalculate when DOI changes, using the same logic as the fallback calculation
@@ -1267,9 +1409,11 @@ const NewShipment = () => {
             recalculatedQty = Math.ceil(rawUnitsNeeded);
           }
           
-          // Always set the recalculated value, even if it's 0
-          // This ensures the Units to Make updates when DOI changes
-          newQtyValues[index] = recalculatedQty;
+          // Only overwrite when we have a positive recalculated value.
+          // If recalculatedQty is 0, keep whatever value we had before.
+          if (recalculatedQty > 0) {
+            newQtyValues[index] = recalculatedQty;
+          }
           
           // Debug logging for products that should update
           if (isMothRepellent || hasValue2163) {
@@ -3741,7 +3885,11 @@ const NewShipment = () => {
                 created_by: 'current_user',
               });
               
-              const newShipmentId = newShipment.id;
+              // Handle different response formats (id, shipment_id, or nested data)
+              const newShipmentId = newShipment?.id || newShipment?.shipment_id || newShipment?.data?.id;
+              if (!newShipmentId) {
+                throw new Error('Invalid response from createShipment API - missing shipment ID');
+              }
               setShipmentId(newShipmentId);
               
               // Add products to shipment
