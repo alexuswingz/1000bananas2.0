@@ -851,6 +851,7 @@ const Planning = () => {
         shipmentType: row.shipment?.includes('AWD') ? 'AWD' : row.shipment?.includes('FBA') ? 'FBA' : 'AWD',
         initialAction: nextStep,
         existingShipment: true,
+        fromPlanning: true, // Mark that we came from planning so back button refreshes
         // Pass the current status of each step
         stepStatuses: {
           addProducts: row.addProducts,
@@ -889,6 +890,7 @@ const Planning = () => {
         shipmentType: row.shipment?.includes('AWD') ? 'AWD' : row.shipment?.includes('FBA') ? 'FBA' : 'AWD',
         initialAction: action,
         existingShipment: true,
+        fromPlanning: true, // Mark that we came from planning so back button refreshes
         // Pass the current status of each step
         stepStatuses: {
           addProducts: row.addProducts,

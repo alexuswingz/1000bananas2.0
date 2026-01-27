@@ -197,6 +197,174 @@ const NewShipment = () => {
   
   // Sort option for product table
   const [sortOption, setSortOption] = useState('doi'); // 'doi', 'qty', 'name'
+
+  // If user navigates to Label Check after exporting (for example by
+  // clicking the top tab instead of the "Begin Label Check" button),
+  // automatically create the shipment and attach products so that
+  // LabelCheckTable has data to show.
+  useEffect(() => {
+    // Only run when:
+    // - user is on the label-check step
+    // - export has completed
+    // - we don't already have a shipmentId
+    if (activeAction !== 'label-check') return;
+    if (shipmentId) return;
+    if (!exportCompleted) return;
+
+    const ensureShipmentForLabelCheck = async () => {
+      try {
+        setLoading(true);
+
+        // Build list of products to attach to the shipment
+        // Build productsToAdd by iterating through allProducts to catch products even if filtered out
+        const productsToAdd = [];
+        
+        // First, try to get products from the current filtered products array
+        products.forEach((product, index) => {
+          if (addedRows.has(product.id)) {
+            const qty = qtyValues[index] || 0;
+            if (qty > 0) {
+              productsToAdd.push({
+                catalog_id: product.catalogId || product.id,
+                quantity: qty,
+              });
+            }
+          }
+        });
+        
+        // Also check allProducts for any products in addedRows that might have been filtered out
+        allProducts.forEach((product, allIndex) => {
+          // Skip if we already added this product
+          if (productsToAdd.some(p => (p.catalog_id === (product.catalogId || product.id)))) {
+            return;
+          }
+          
+          // If product is in addedRows, try to find it in current products array
+          if (addedRows.has(product.id)) {
+            const currentIndex = products.findIndex(p => p.id === product.id);
+            if (currentIndex >= 0) {
+              // Found in current products, use that index for qty lookup
+              const qty = qtyValues[currentIndex] || 0;
+              if (qty > 0) {
+                productsToAdd.push({
+                  catalog_id: product.catalogId || product.id,
+                  quantity: qty,
+                });
+              }
+            } else {
+              // Not in current products (filtered out), but was added - check if we have a qty
+              // Try to find qty by matching product ID across all indices
+              let foundQty = 0;
+              for (let idx = 0; idx < products.length; idx++) {
+                if (products[idx]?.id === product.id) {
+                  foundQty = qtyValues[idx] || 0;
+                  break;
+                }
+              }
+              // If still no qty found, check if there's a qty at the original allProducts index
+              if (foundQty === 0 && qtyValues[allIndex]) {
+                foundQty = qtyValues[allIndex];
+              }
+              if (foundQty > 0) {
+                productsToAdd.push({
+                  catalog_id: product.catalogId || product.id,
+                  quantity: foundQty,
+                });
+              }
+            }
+          }
+        });
+
+        console.log('📦 Auto-booking shipment for Label Check:', {
+          totalProducts: products.length,
+          allProductsCount: allProducts.length,
+          addedRowsCount: addedRows.size,
+          productsToAddCount: productsToAdd.length,
+          productsToAdd,
+          addedRows: Array.from(addedRows),
+        });
+
+        if (productsToAdd.length === 0) {
+          console.error('❌ No products to add - validation failed');
+          toast.error('Please add at least one product before starting Label Check');
+          return;
+        }
+
+        // Require shipment type before creating shipment
+        if (!shipmentData.shipmentType) {
+          console.error('❌ No shipment type selected');
+          toast.error('Please select a shipment type (FBA or AWD) in the export template before proceeding to Label Check.');
+          return;
+        }
+
+        const shipmentNumber = shipmentData.shipmentNumber || generateShipmentNumber();
+        const shipmentDate = shipmentData.shipmentDate || new Date().toISOString().split('T')[0];
+
+        console.log('🚀 Auto-creating shipment with data:', {
+          shipment_number: shipmentNumber,
+          shipment_date: shipmentDate,
+          shipment_type: shipmentData.shipmentType,
+          account: shipmentData.account,
+        });
+
+        const newShipment = await createShipment({
+          shipment_number: shipmentNumber,
+          shipment_date: shipmentDate,
+          shipment_type: shipmentData.shipmentType,
+          marketplace: 'Amazon',
+          account: shipmentData.account || 'TPS Nutrients',
+          location: shipmentData.location || '',
+          created_by: 'current_user',
+        });
+
+        console.log('✅ Shipment auto-created:', newShipment);
+
+        const newShipmentId = newShipment?.id || newShipment?.shipment_id || newShipment?.data?.id;
+        if (!newShipmentId) {
+          console.error('❌ No shipment ID in response:', newShipment);
+          throw new Error('Invalid response from createShipment API - missing shipment ID');
+        }
+
+        console.log('🆔 Shipment ID:', newShipmentId);
+        setShipmentId(newShipmentId);
+
+        console.log('📝 Auto-adding products to shipment:', productsToAdd);
+        const addResult = await addShipmentProducts(newShipmentId, productsToAdd);
+        console.log('✅ Products auto-added:', addResult);
+
+        console.log('🔄 Updating shipment status to label_check');
+        await updateShipment(newShipmentId, {
+          add_products_completed: true,
+          status: 'label_check',
+        });
+        console.log('✅ Shipment status updated');
+
+        setCompletedTabs(prev => {
+          const newSet = new Set(prev);
+          newSet.add('add-products');
+          newSet.add('export');
+          return newSet;
+        });
+        setExportCompleted(true);
+        console.log('✅ Auto-booking completed successfully');
+        toast.success('Shipment booked for Label Check.');
+      } catch (error) {
+        console.error('❌ Error preparing shipment for Label Check:', error);
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          error: error,
+        });
+        toast.error('Failed to prepare shipment for Label Check: ' + error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Fire and forget; LabelCheckTable will react when shipmentId is set
+    ensureShipmentForLabelCheck();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeAction, shipmentId, exportCompleted]);
   
   // Callback when DOI settings change from the popover
   const handleDoiSettingsChange = (newSettings, totalDoi) => {
@@ -561,12 +729,35 @@ const NewShipment = () => {
       
       console.log(`Deduplicated: ${productionInventory.length} → ${uniqueProducts.length} products`);
       
+      // DEBUG: Show sample production inventory item structure
+      if (uniqueProducts.length > 0) {
+        const sample = uniqueProducts[0];
+        console.log('Sample production inventory item ASIN fields:', {
+          child_asin: sample.child_asin,
+          asin: sample.asin,
+          childAsin: sample.childAsin,
+          product_name: sample.product_name
+        });
+      }
+      
       // USE PRODUCTION INVENTORY AS PRIMARY SOURCE (all products from our database)
       // This ensures we show ALL products, not just those with forecast data
+      let mergeSuccessCount = 0;
+      let mergeFailCount = 0;
       const formattedProducts = uniqueProducts.map((item, index) => {
         // Get forecast data for this product if available - try multiple ASIN fields
         const asinKey = item.child_asin || item.asin || item.childAsin || '';
         const forecast = forecastMap[asinKey] || {};
+        
+        // Debug: Log when merge fails (no forecast data found)
+        if (Object.keys(forecast).length === 0) {
+          mergeFailCount++;
+          if (mergeFailCount <= 5) {
+            console.warn(`Forecast merge FAILED for: ${item.product_name} (ASIN key: "${asinKey}")`);
+          }
+        } else {
+          mergeSuccessCount++;
+        }
         
         // Get sales data from forecast API if available
         const salesData = forecast.sales_30_day || item.units_sold_30_days || 0;
@@ -596,12 +787,6 @@ const NewShipment = () => {
           calculatedDoiFba = calculatedDoiTotal;
         }
         
-        // Calculate forecast (use ML forecast or fallback to recent sales trend)
-        let weeklyForecast = forecast.weekly_forecast || 0;
-        if (weeklyForecast === 0 && salesData > 0) {
-          weeklyForecast = (salesData / 30) * 7; // Convert daily avg to weekly
-        }
-        
         // Get inventory values from Railway API (TPS Forecast) - this is the source of truth
         const railwayTotalInventory = forecast.total_inventory || forecast.inventory || 0;
         const railwayFbaAvailable = forecast.fba_available || 0;
@@ -609,6 +794,13 @@ const NewShipment = () => {
         const railwayDoiFba = forecast.doi_fba || forecast.doi_fba_days || 0;
         const railwayUnitsToMake = forecast.units_to_make || 0;
         const railwayLabelInventory = forecast.label_inventory || 0;
+        
+        // Use units_to_make from Railway API as the forecast value
+        // Fallback to sales-based calculation only if API value is 0
+        let weeklyForecast = railwayUnitsToMake;
+        if (weeklyForecast === 0 && salesData > 0) {
+          weeklyForecast = (salesData / 30) * 7; // Convert daily avg to weekly
+        }
         
         return {
           id: `${item.id}-${index}`, // Unique key combining DB ID and index
@@ -668,6 +860,7 @@ const NewShipment = () => {
       });
       
       console.log('Loaded products with supply chain:', formattedProducts.length);
+      console.log(`Forecast merge: ${mergeSuccessCount} SUCCESS, ${mergeFailCount} FAILED (no forecast data)`);
       
       // Use units_to_make from TPS Forecast API as suggested qty
       // This already accounts for DOI goals, lead times, and seasonality
@@ -805,10 +998,23 @@ const NewShipment = () => {
         }
         // Otherwise auto-populate qty with suggested qty if product needs restocking
         else if (product.suggestedQty > 0) {
-          initialQtyValues[index] = product.suggestedQty;
+          const increment = getSuggestedQtyIncrement(product);
+          const suggested = product.suggestedQty;
+          const roundedSuggested =
+            increment && increment > 1
+              ? Math.ceil(suggested / increment) * increment
+              : suggested;
+
+          initialQtyValues[index] = roundedSuggested;
         }
       });
-      setQtyValues(initialQtyValues);
+
+      // Merge with any existing qty values so we don't accidentally
+      // clear quantities that were already initialized elsewhere.
+      setQtyValues(prev => ({
+        ...(prev || {}),
+        ...initialQtyValues,
+      }));
       
       // Update manually edited indices with new indices after reload
       // IMPORTANT: Clear and repopulate the existing Set instead of replacing it
@@ -1035,6 +1241,50 @@ const NewShipment = () => {
   const [selectedBrands, setSelectedBrands] = useState(null); // Brand filter from products dropdown (Set of brands or null)
   const [lastAccount, setLastAccount] = useState(null); // Track account changes
   const [lastForecastRange, setLastForecastRange] = useState(null); // Track forecastRange changes
+
+  // Helper: determine case increment for a product's suggested quantity,
+  // so Units to Make defaults align with full cases (e.g. 60 units for 8oz).
+  const getSuggestedQtyIncrement = (product) => {
+    const rawSize = product?.size || '';
+    const size = rawSize.toLowerCase();
+    const sizeCompact = size.replace(/\s+/g, '');
+
+    // 8oz products change in full-case increments (60 units)
+    if (sizeCompact.includes('8oz')) return 60;
+
+    // 6oz products (bag or bottle) change in case increments (40 units)
+    const isSixOz =
+      sizeCompact.includes('6oz') ||
+      size.includes('6 oz') ||
+      size.includes('6-ounce') ||
+      size.includes('6 ounce');
+
+    // 1/2 lb bag products also use 40-unit increments
+    const isHalfPoundBag =
+      sizeCompact.includes('1/2lb') ||
+      size.includes('1/2 lb') ||
+      size.includes('0.5lb') ||
+      size.includes('0.5 lb') ||
+      size.includes('half lb');
+
+    if (isSixOz || isHalfPoundBag) return 40;
+
+    // 1 lb products change in case increments (25 units)
+    const isOnePound =
+      sizeCompact.includes('1lb') ||
+      size.includes('1 lb') ||
+      size.includes('1-pound') ||
+      size.includes('1 pound');
+    if (isOnePound) return 25;
+
+    // Quart products change in case increments (12 units)
+    if (size.includes('quart') || size.includes(' qt')) return 12;
+
+    // Gallon products change in case increments (4 units)
+    if (size.includes('gallon') || size.includes(' gal')) return 4;
+
+    return 1;
+  };
   
   // Clear brand filter when account changes
   useEffect(() => {
@@ -1141,10 +1391,9 @@ const NewShipment = () => {
     }
   }, [shipmentProducts, products]);
 
-  // Recalculate suggested quantities when forecastRange changes (but NOT on initial load)
-  // NOTE: This runs when forecastRange changes, but if products are being reloaded due to DOI settings change,
-  // the reload will happen and set qtyValues based on new API data. This recalculation is for when forecastRange
-  // changes WITHOUT a full reload (e.g., if user changes it directly)
+  // When forecastRange changes, trigger a full API reload instead of client-side calculation
+  // The Railway API's /recalculate-doi endpoint properly calculates units_to_make using the algorithm
+  // Client-side formulas are inaccurate and should not be used
   useEffect(() => {
     // Skip if no products or if this is an existing shipment
     if (products.length === 0 || shipmentId) {
@@ -1162,15 +1411,29 @@ const NewShipment = () => {
       return;
     }
     
-    console.log(`ForecastRange changed from ${lastForecastRange} to ${forecastRange}. Recalculating Units to Make for ${products.length} products.`);
-    console.log(`Added rows count: ${addedRows.size}, Manually edited count: ${manuallyEditedIndicesRef.current?.size || 0}`);
+    console.log(`ForecastRange changed from ${lastForecastRange} to ${forecastRange}. Using API values for Units to Make.`);
     setLastForecastRange(forecastRange);
+    
+    // DON'T do client-side calculation - use the units_to_make values from the API (stored in products)
+    // The API values are calculated using the proper algorithm with seasonality, velocity, etc.
+    // Trigger a reload with updated DOI settings to get fresh API values
+    // Update doiSettingsValues to match forecastRange and trigger API call
+    const newTargetDOI = parseInt(forecastRange) || 130;
+    const newAmazonDoiGoal = Math.max(30, newTargetDOI - 30 - 7); // Subtract lead times
+    setDoiSettingsValues(prev => ({
+      ...prev,
+      amazonDoiGoal: newAmazonDoiGoal
+    }));
+    setDoiSettingsChangeCount(c => c + 1); // This triggers loadProducts() with new DOI
+    return; // Don't do client-side recalculation below
     
     // Recalculate suggestedQty based on new forecastRange (DOI)
     // This ensures Units to Make updates when DOI changes
     // Use functional update to access current qtyValues without including it in dependencies
     setQtyValues(prevQtyValues => {
-      const newQtyValues = {};
+      // Start from existing quantities so we never wipe out
+      // non-zero values unless we have a positive recalculation.
+      const newQtyValues = { ...(prevQtyValues || {}) };
       const targetDOI = parseInt(forecastRange) || 120;
       
       products.forEach((product, index) => {
@@ -1200,13 +1463,8 @@ const NewShipment = () => {
         // IMPORTANT: Only preserve quantities for products that are actually in the shipment
         // Products that just have a suggestedQty value should be recalculated when DOI changes
         if (isInAddedRows || isManuallyEdited) {
-          // Preserve the manually set or added quantity
-          if (prevQtyValues[index] !== undefined) {
-            newQtyValues[index] = prevQtyValues[index];
-            if (isMothRepellent || hasValue2163) {
-              console.log(`[DOI Recalc] PRESERVING value ${prevQtyValues[index]} for ${product.product} (isInAddedRows: ${isInAddedRows}, isManuallyEdited: ${isManuallyEdited})`);
-            }
-          }
+          // Preserve the manually set or added quantity exactly as-is
+          return;
         } else {
         // Recalculate suggestedQty based on new DOI
         // Always recalculate when DOI changes, using the same logic as the fallback calculation
@@ -1231,9 +1489,11 @@ const NewShipment = () => {
             recalculatedQty = Math.ceil(rawUnitsNeeded);
           }
           
-          // Always set the recalculated value, even if it's 0
-          // This ensures the Units to Make updates when DOI changes
-          newQtyValues[index] = recalculatedQty;
+          // Only overwrite when we have a positive recalculated value.
+          // If recalculatedQty is 0, keep whatever value we had before.
+          if (recalculatedQty > 0) {
+            newQtyValues[index] = recalculatedQty;
+          }
           
           // Debug logging for products that should update
           if (isMothRepellent || hasValue2163) {
@@ -1424,6 +1684,17 @@ const NewShipment = () => {
     const asin = row?.child_asin || row?.childAsin || row?.asin;
     if (!asin) return;
 
+    // If newSettings is null, remove the custom settings for this product
+    if (newSettings === null) {
+      setProductDoiSettings(prev => {
+        const updated = { ...prev };
+        delete updated[asin];
+        return updated;
+      });
+      console.log(`Cleared custom DOI settings for ${asin}`);
+      return;
+    }
+
     // Save product-specific DOI settings
     setProductDoiSettings(prev => ({
       ...prev,
@@ -1440,6 +1711,17 @@ const NewShipment = () => {
   const handleProductForecastSettingsChange = (row, newSettings) => {
     const asin = row?.child_asin || row?.childAsin || row?.asin;
     if (!asin) return;
+
+    // If newSettings is null, remove the custom settings for this product
+    if (newSettings === null) {
+      setProductForecastSettings(prev => {
+        const updated = { ...prev };
+        delete updated[asin];
+        return updated;
+      });
+      console.log(`Cleared custom forecast settings for ${asin}`);
+      return;
+    }
 
     // Save product-specific forecast settings
     setProductForecastSettings(prev => ({
@@ -1655,14 +1937,45 @@ const NewShipment = () => {
       return newSet;
     });
 
-    // Navigate based on whether label check is completed (only when formula check is complete)
-    if (labelCheckCompleted) {
-      // Both are completed, show modal (user will click button to navigate)
-      toast.success('Formula Check completed! Moving to Book Shipment');
-      setIsFormulaCheckCompleteOpen(true);
+    // If a comment was added, navigate back to planning table
+    if (hasComment) {
+      if (!isIncomplete) {
+        toast.success('Formula Check completed with comment!');
+      } else {
+        toast.info('Formula Check comment saved. Returning to shipments table.');
+      }
+      
+      // Navigate back to planning page with shipments tab
+      navigate('/dashboard/production/planning', {
+        state: {
+          activeTab: 'shipments',
+          refresh: Date.now(),
+          fromFormulaCheckComplete: true,
+        }
+      });
+    } else if (!isIncomplete) {
+      // If completed without comment, show completion modal
+      if (labelCheckCompleted) {
+        // Both are completed, show modal (user will click button to navigate)
+        toast.success('Formula Check completed! Moving to Book Shipment');
+        setIsFormulaCheckCompleteOpen(true);
+      } else {
+        // Show the completion modal instead of automatically navigating
+        toast.success('Formula Check completed!');
+        setIsFormulaCheckCompleteOpen(true);
+      }
     } else {
-      // Show the completion modal instead of automatically navigating
-      setIsFormulaCheckCompleteOpen(true);
+      // If incomplete without comment, navigate back to planning page
+      toast.info('Returning to shipments table.');
+      
+      // Navigate back to planning page with shipments tab
+      navigate('/dashboard/production/planning', {
+        state: {
+          activeTab: 'shipments',
+          refresh: Date.now(),
+          fromFormulaCheckComplete: true,
+        }
+      });
     }
   };
 
@@ -3065,7 +3378,7 @@ const NewShipment = () => {
                       padding: '0 16px',
                       borderRadius: '6px',
                       border: 'none',
-                      backgroundColor: '#007AFF',
+                      backgroundColor: '#3B82F6',
                       color: '#FFFFFF',
                       fontSize: '14px',
                       fontWeight: 500,
@@ -3080,7 +3393,7 @@ const NewShipment = () => {
                       e.currentTarget.style.backgroundColor = '#0056CC';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#007AFF';
+                      e.currentTarget.style.backgroundColor = '#3B82F6';
                     }}
                   >
                     <svg
@@ -3198,7 +3511,7 @@ const NewShipment = () => {
                       padding: '0 16px',
                       borderRadius: '6px',
                       border: 'none',
-                      backgroundColor: '#007AFF',
+                      backgroundColor: '#3B82F6',
                       color: '#FFFFFF',
                       fontSize: '14px',
                       fontWeight: 500,
@@ -3213,7 +3526,7 @@ const NewShipment = () => {
                       e.currentTarget.style.backgroundColor = '#0056CC';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#007AFF';
+                      e.currentTarget.style.backgroundColor = '#3B82F6';
                     }}
                   >
                     <svg
@@ -3514,7 +3827,7 @@ const NewShipment = () => {
                     padding: '0 10px',
                     borderRadius: '6px',
                     border: 'none',
-                    backgroundColor: addedRows.size > 0 ? '#007AFF' : '#9CA3AF',
+                    backgroundColor: addedRows.size > 0 ? '#3B82F6' : '#9CA3AF',
                     color: '#FFFFFF',
                     fontSize: '14px',
                     fontWeight: 500,
@@ -3661,24 +3974,87 @@ const NewShipment = () => {
         }}
         onBeginFormulaCheck={async () => {
           // Book shipment if not already booked (needed for formula check)
+          console.log('🎯 Begin Label Check clicked, current shipmentId:', shipmentId);
           if (!shipmentId) {
+            console.log('📌 No shipmentId exists, creating new shipment...');
             try {
               setLoading(true);
               
               // Validate: Must have products selected
-              // Only include products that are BOTH in addedRows AND have qty > 0
-              const productsToAdd = Object.keys(qtyValues)
-                .filter(idx => {
-                  const product = products[idx];
-                  const qty = qtyValues[idx];
-                  return product && addedRows.has(product.id) && qty > 0;
-                })
-                .map(idx => ({
-                  catalog_id: products[idx].catalogId || products[idx].id,
-                  quantity: qtyValues[idx],
-                }));
+              // Build productsToAdd by iterating through allProducts to catch products even if filtered out
+              // Then match to current products array to get the correct index for qty lookup
+              const productsToAdd = [];
+              
+              // First, try to get products from the current filtered products array
+              products.forEach((product, index) => {
+                if (addedRows.has(product.id)) {
+                  const qty = qtyValues[index] || 0;
+                  if (qty > 0) {
+                    productsToAdd.push({
+                      catalog_id: product.catalogId || product.id,
+                      quantity: qty,
+                    });
+                  }
+                }
+              });
+              
+              // Also check allProducts for any products in addedRows that might have been filtered out
+              // This handles the case where a product was added, then filtered out, but should still be included
+              allProducts.forEach((product, allIndex) => {
+                // Skip if we already added this product
+                if (productsToAdd.some(p => (p.catalog_id === (product.catalogId || product.id)))) {
+                  return;
+                }
+                
+                // If product is in addedRows, try to find it in current products array
+                if (addedRows.has(product.id)) {
+                  const currentIndex = products.findIndex(p => p.id === product.id);
+                  if (currentIndex >= 0) {
+                    // Found in current products, use that index for qty lookup
+                    const qty = qtyValues[currentIndex] || 0;
+                    if (qty > 0) {
+                      productsToAdd.push({
+                        catalog_id: product.catalogId || product.id,
+                        quantity: qty,
+                      });
+                    }
+                  } else {
+                    // Not in current products (filtered out), but was added - check if we have a qty
+                    // Try to find qty by matching product ID across all indices
+                    let foundQty = 0;
+                    for (let idx = 0; idx < products.length; idx++) {
+                      if (products[idx]?.id === product.id) {
+                        foundQty = qtyValues[idx] || 0;
+                        break;
+                      }
+                    }
+                    // If still no qty found, check if there's a qty at the original allProducts index
+                    // (This handles edge cases where qty was set before filtering)
+                    if (foundQty === 0 && qtyValues[allIndex]) {
+                      foundQty = qtyValues[allIndex];
+                    }
+                    if (foundQty > 0) {
+                      productsToAdd.push({
+                        catalog_id: product.catalogId || product.id,
+                        quantity: foundQty,
+                      });
+                    }
+                  }
+                }
+              });
+              
+              console.log('📦 Products to add to shipment:', {
+                totalProducts: products.length,
+                allProductsCount: allProducts.length,
+                addedRowsCount: addedRows.size,
+                productsToAddCount: productsToAdd.length,
+                productsToAdd,
+                addedRows: Array.from(addedRows),
+                qtyValuesKeys: Object.keys(qtyValues),
+              });
               
               if (productsToAdd.length === 0) {
+                console.error('❌ No products to add - validation failed');
                 toast.error('Please add at least one product before exporting');
                 setLoading(false);
                 return;
@@ -3687,6 +4063,7 @@ const NewShipment = () => {
               // Create shipment - ensure shipment number and date are always set
               // Require shipment type to be selected before creating shipment
               if (!shipmentData.shipmentType) {
+                console.error('❌ No shipment type selected');
                 toast.error('Please select a shipment type (FBA or AWD) in the export template before proceeding.');
                 setLoading(false);
                 return;
@@ -3694,6 +4071,13 @@ const NewShipment = () => {
               
               const shipmentNumber = shipmentData.shipmentNumber || generateShipmentNumber();
               const shipmentDate = shipmentData.shipmentDate || new Date().toISOString().split('T')[0];
+              
+              console.log('🚀 Creating shipment with data:', {
+                shipment_number: shipmentNumber,
+                shipment_date: shipmentDate,
+                shipment_type: shipmentData.shipmentType,
+                account: shipmentData.account,
+              });
               
               const newShipment = await createShipment({
                 shipment_number: shipmentNumber,
@@ -3705,17 +4089,30 @@ const NewShipment = () => {
                 created_by: 'current_user',
               });
               
-              const newShipmentId = newShipment.id;
+              console.log('✅ Shipment created:', newShipment);
+              
+              // Handle different response formats (id, shipment_id, or nested data)
+              const newShipmentId = newShipment?.id || newShipment?.shipment_id || newShipment?.data?.id;
+              if (!newShipmentId) {
+                console.error('❌ No shipment ID in response:', newShipment);
+                throw new Error('Invalid response from createShipment API - missing shipment ID');
+              }
+              
+              console.log('🆔 Shipment ID:', newShipmentId);
               setShipmentId(newShipmentId);
               
               // Add products to shipment
-              await addShipmentProducts(newShipmentId, productsToAdd);
+              console.log('📝 Adding products to shipment:', productsToAdd);
+              const addProductsResult = await addShipmentProducts(newShipmentId, productsToAdd);
+              console.log('✅ Products added to shipment:', addProductsResult);
               
               // Update shipment to mark add_products as completed
+              console.log('🔄 Updating shipment status to label_check');
               await updateShipment(newShipmentId, {
                 add_products_completed: true,
                 status: 'label_check',
               });
+              console.log('✅ Shipment status updated');
               
               // Mark 'add-products' and 'export' as completed
               setCompletedTabs(prev => {
@@ -3725,9 +4122,15 @@ const NewShipment = () => {
                 return newSet;
               });
               setExportCompleted(true);
+              console.log('✅ All steps completed successfully');
               toast.success('Shipment booked and exported!');
             } catch (error) {
-              console.error('Error booking shipment for export:', error);
+              console.error('❌ Error booking shipment for export:', error);
+              console.error('Error details:', {
+                message: error.message,
+                stack: error.stack,
+                error: error,
+              });
               toast.error('Failed to book shipment: ' + error.message);
               setLoading(false);
               return;
@@ -3735,16 +4138,104 @@ const NewShipment = () => {
               setLoading(false);
             }
           } else {
-            // If shipment already existed, still mark export as completed
-            setCompletedTabs(prev => {
-              const newSet = new Set(prev);
-              newSet.add('export');
-              return newSet;
-            });
-            setExportCompleted(true);
+            // Shipment already exists - we need to add products to it
+            console.log('⚠️ Shipment already exists:', shipmentId, '- adding products to existing shipment');
+            
+            try {
+              setLoading(true);
+              
+              // Build products list the same way
+              const productsToAdd = [];
+              
+              products.forEach((product, index) => {
+                if (addedRows.has(product.id)) {
+                  const qty = qtyValues[index] || 0;
+                  if (qty > 0) {
+                    productsToAdd.push({
+                      catalog_id: product.catalogId || product.id,
+                      quantity: qty,
+                    });
+                  }
+                }
+              });
+              
+              allProducts.forEach((product, allIndex) => {
+                if (productsToAdd.some(p => (p.catalog_id === (product.catalogId || product.id)))) {
+                  return;
+                }
+                
+                if (addedRows.has(product.id)) {
+                  const currentIndex = products.findIndex(p => p.id === product.id);
+                  if (currentIndex >= 0) {
+                    const qty = qtyValues[currentIndex] || 0;
+                    if (qty > 0) {
+                      productsToAdd.push({
+                        catalog_id: product.catalogId || product.id,
+                        quantity: qty,
+                      });
+                    }
+                  } else {
+                    let foundQty = 0;
+                    for (let idx = 0; idx < products.length; idx++) {
+                      if (products[idx]?.id === product.id) {
+                        foundQty = qtyValues[idx] || 0;
+                        break;
+                      }
+                    }
+                    if (foundQty === 0 && qtyValues[allIndex]) {
+                      foundQty = qtyValues[allIndex];
+                    }
+                    if (foundQty > 0) {
+                      productsToAdd.push({
+                        catalog_id: product.catalogId || product.id,
+                        quantity: foundQty,
+                      });
+                    }
+                  }
+                }
+              });
+              
+              console.log('📦 Products to add to existing shipment:', {
+                shipmentId,
+                productsToAddCount: productsToAdd.length,
+                productsToAdd,
+              });
+              
+              if (productsToAdd.length > 0) {
+                console.log('📝 Adding products to existing shipment:', productsToAdd);
+                const addResult = await addShipmentProducts(shipmentId, productsToAdd);
+                console.log('✅ Products added to existing shipment:', addResult);
+                
+                // Update shipment to mark add_products_completed as true and set status to label_check
+                console.log('🔄 Updating shipment to mark add_products_completed: true and status: label_check');
+                await updateShipment(shipmentId, {
+                  add_products_completed: true,
+                  status: 'label_check',
+                });
+                console.log('✅ Shipment updated - add_products_completed set to true, status set to label_check');
+              } else {
+                console.log('⚠️ No products to add - addedRows or qtyValues empty');
+              }
+              
+              // Mark tabs as completed
+              setCompletedTabs(prev => {
+                const newSet = new Set(prev);
+                newSet.add('add-products');
+                newSet.add('export');
+                return newSet;
+              });
+              setExportCompleted(true);
+              
+            } catch (error) {
+              console.error('❌ Error adding products to existing shipment:', error);
+              toast.error('Failed to add products: ' + error.message);
+            } finally {
+              setLoading(false);
+            }
           }
           
           // After exporting, move to Label Check and keep footer visible
+          console.log('🔄 Navigating to label-check with shipmentId:', shipmentId);
           handleActionChange('label-check');
         }}
         products={products.map((product, index) => ({
@@ -3883,7 +4374,7 @@ const NewShipment = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.35)',
+              backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.6)' : 'rgba(0, 0, 0, 0.35)',
               zIndex: 9998,
               display: 'flex',
               alignItems: 'center',
@@ -3894,11 +4385,13 @@ const NewShipment = () => {
             {/* Modal */}
             <div
               style={{
-                backgroundColor: '#FFFFFF',
+                backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
                 borderRadius: '14px',
                 width: '400px',
-                border: '1px solid #E5E7EB',
-                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                boxShadow: isDarkMode 
+                  ? '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.2)'
+                  : '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
                 zIndex: 9999,
                 position: 'relative',
                 display: 'flex',
@@ -3923,9 +4416,15 @@ const NewShipment = () => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#9CA3AF',
+                  color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
                   width: '24px',
                   height: '24px',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = isDarkMode ? '#D1D5DB' : '#6B7280';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = '#9CA3AF';
                 }}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -3960,7 +4459,7 @@ const NewShipment = () => {
                 <h2 style={{
                   fontSize: '20px',
                   fontWeight: 600,
-                  color: '#111827',
+                  color: isDarkMode ? '#F9FAFB' : '#111827',
                   margin: 0,
                   textAlign: 'center',
                 }}>
@@ -3991,19 +4490,19 @@ const NewShipment = () => {
                     height: '31px',
                     padding: '0 14px',
                     borderRadius: '4px',
-                    border: '1px solid #D1D5DB',
-                    backgroundColor: '#FFFFFF',
-                    color: '#374151',
+                    border: isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
+                    backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                    color: isDarkMode ? '#E5E7EB' : '#374151',
                     fontSize: '14px',
                     fontWeight: 500,
                     cursor: 'pointer',
                     transition: 'all 0.2s',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#F3F4F6';
+                    e.currentTarget.style.backgroundColor = isDarkMode ? '#4B5563' : '#F3F4F6';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#FFFFFF';
+                    e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#FFFFFF';
                   }}
                 >
                   Go to Shipments
@@ -4028,7 +4527,9 @@ const NewShipment = () => {
                     fontWeight: 600,
                     cursor: 'pointer',
                     transition: 'all 0.2s',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                    boxShadow: isDarkMode 
+                      ? '0 1px 2px rgba(0,0,0,0.3)'
+                      : '0 1px 2px rgba(0,0,0,0.04)',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',

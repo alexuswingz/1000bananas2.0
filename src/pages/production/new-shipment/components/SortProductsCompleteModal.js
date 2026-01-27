@@ -161,7 +161,7 @@ const SortProductsCompleteModal = ({ isOpen, onClose, onBeginSortFormulas }) => 
               padding: '0 12px',
               borderRadius: '4px',
               border: 'none',
-              backgroundColor: '#007AFF',
+              backgroundColor: '#3B82F6',
               color: '#FFFFFF',
               fontSize: '13px',
               fontWeight: 600,

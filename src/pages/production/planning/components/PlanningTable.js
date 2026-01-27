@@ -1113,53 +1113,6 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
 
   return (
     <>
-      {/* Required DOI Filter */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          marginBottom: '16px',
-        }}
-      >
-        <label
-          style={{
-            fontSize: '14px',
-            fontWeight: 500,
-            color: isDarkMode ? '#E5E7EB' : '#374151',
-          }}
-        >
-          Required DOI:
-        </label>
-        <input
-          type="number"
-          value={requiredDOI}
-          onChange={(e) => {
-            const newValue = parseInt(e.target.value) || 130;
-            setRequiredDOI(newValue);
-          }}
-          style={{
-            width: '80px',
-            padding: '8px 12px',
-            borderRadius: '6px',
-            border: isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
-            backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-            color: isDarkMode ? '#F9FAFB' : '#111827',
-            fontSize: '14px',
-            fontWeight: 500,
-          }}
-          min="1"
-        />
-        <span
-          style={{
-            fontSize: '12px',
-            color: isDarkMode ? '#9CA3AF' : '#6B7280',
-          }}
-        >
-          days
-        </span>
-      </div>
-
       {/* Informational Cards */}
       <div
         style={{
@@ -1357,9 +1310,21 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         }}
       >
         {/* Table with 100% width to fit container */}
-        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'auto', display: 'table' }}>
-        <thead style={{ backgroundColor: '#111827' }}>
-          <tr style={{ borderBottom: '1px solid #374151', height: 'auto' }}>
+        <table
+          style={{
+            width: '100%',
+            borderCollapse: 'separate',
+            borderSpacing: 0,
+            tableLayout: 'auto',
+            display: 'table',
+          }}
+        >
+        <thead
+          style={{
+            backgroundColor: '#111827',
+          }}
+        >
+          <tr style={{ height: 'auto' }}>
             <th
               className="text-center text-xs font-bold text-white uppercase tracking-wider group cursor-pointer"
               style={{
@@ -1379,7 +1344,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                   gap: '0.5rem',
                 }}
               >
-                <span style={{ color: (isFilterActive('status') || openFilterColumn === 'status') ? '#007AFF' : '#9CA3AF' }}>
+                <span style={{ color: (isFilterActive('status') || openFilterColumn === 'status') ? '#3B82F6' : '#9CA3AF' }}>
                   STATUS
                 </span>
                 <img
@@ -1422,7 +1387,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                   gap: '0.5rem',
                 }}
               >
-                <span style={{ color: (isFilterActive('shipment') || openFilterColumn === 'shipment') ? '#007AFF' : '#9CA3AF' }}>
+                <span style={{ color: (isFilterActive('shipment') || openFilterColumn === 'shipment') ? '#3B82F6' : '#9CA3AF' }}>
                   SHIPMENT
                 </span>
                 <img
@@ -1465,7 +1430,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                   gap: '0.5rem',
                 }}
               >
-                <span style={{ color: (isFilterActive('marketplace') || openFilterColumn === 'marketplace') ? '#007AFF' : '#9CA3AF' }}>
+                <span style={{ color: (isFilterActive('marketplace') || openFilterColumn === 'marketplace') ? '#3B82F6' : '#9CA3AF' }}>
                   TYPE
                 </span>
                 <svg
@@ -1474,7 +1439,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                   height="12"
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke={(isFilterActive('marketplace') || openFilterColumn === 'marketplace') ? '#007AFF' : '#9CA3AF'}
+                  stroke={(isFilterActive('marketplace') || openFilterColumn === 'marketplace') ? '#3B82F6' : '#9CA3AF'}
                   strokeWidth="2"
                   className={`transition-opacity cursor-pointer ${
                     (isFilterActive('marketplace') || openFilterColumn === 'marketplace')
@@ -1506,7 +1471,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                   gap: '0.5rem',
                 }}
               >
-                <span style={{ color: (isFilterActive('account') || openFilterColumn === 'account') ? '#007AFF' : '#9CA3AF' }}>
+                <span style={{ color: (isFilterActive('account') || openFilterColumn === 'account') ? '#3B82F6' : '#9CA3AF' }}>
                   ACCOUNT
                 </span>
                 <img
@@ -1546,12 +1511,12 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                 borderRight: 'none',
                 boxSizing: 'border-box',
                 position: 'relative',
-                color: (isFilterActive('addProducts') || openFilterColumn === 'addProducts') ? '#007AFF' : '#9CA3AF',
+                color: (isFilterActive('addProducts') || openFilterColumn === 'addProducts') ? '#3B82F6' : '#9CA3AF',
               }}
             >
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.1', gap: '1px' }}>
-                <span style={{ fontSize: '9px', fontWeight: 600, color: (isFilterActive('addProducts') || openFilterColumn === 'addProducts') ? '#007AFF' : '#9CA3AF' }}>ADD</span>
-                <span style={{ fontSize: '9px', fontWeight: 600, color: (isFilterActive('addProducts') || openFilterColumn === 'addProducts') ? '#007AFF' : '#9CA3AF' }}>PRODUCTS</span>
+                <span style={{ fontSize: '9px', fontWeight: 600, color: (isFilterActive('addProducts') || openFilterColumn === 'addProducts') ? '#3B82F6' : '#9CA3AF' }}>ADD</span>
+                <span style={{ fontSize: '9px', fontWeight: 600, color: (isFilterActive('addProducts') || openFilterColumn === 'addProducts') ? '#3B82F6' : '#9CA3AF' }}>PRODUCTS</span>
               </div>
               <img
                 ref={(el) => { if (el) filterIconRefs.current['addProducts'] = el; }}
@@ -1794,6 +1759,19 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         >
           {displayRows.map((row, index) => (
             <React.Fragment key={row.id || row.shipment || `row-${index}`}>
+              {/* Separator line above each data row (including first, so it sits directly under the header) */}
+              <tr style={{ height: '1px', backgroundColor: '#111827' }}>
+                <td colSpan={11} style={{ padding: 0, backgroundColor: '#111827' }}>
+                  <div
+                    style={{
+                      marginLeft: '1.25rem',
+                      marginRight: '1.25rem',
+                      height: '1px',
+                      backgroundColor: '#374151',
+                    }}
+                  />
+                </td>
+              </tr>
               <tr
                 onClick={(e) => {
                   // Don't navigate if clicking on label check cell
@@ -2162,18 +2140,6 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                 </button>
               </td>
             </tr>
-              <tr style={{ height: '1px', backgroundColor: '#111827' }}>
-                <td colSpan={11} style={{ padding: 0, backgroundColor: '#111827' }}>
-                  <div
-                    style={{
-                      marginLeft: '1.25rem',
-                      marginRight: '1.25rem',
-                      height: '1px',
-                      backgroundColor: '#374151',
-                    }}
-                  />
-                </td>
-              </tr>
             </React.Fragment>
           ))}
         </tbody>

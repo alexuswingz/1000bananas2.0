@@ -1901,6 +1901,141 @@ const NewShipmentTable = ({
 
   const currentRows = tableMode ? filteredRowsWithSelection : nonTableFilteredRows;
 
+  // Ensure Units to Make inputs always default to forecast values when empty.
+  // This runs for both table and non-table modes and initializes qtyValues
+  // anywhere a product has a suggested forecast (suggestedQty / units_to_make)
+  // but the qty entry is still blank.
+  useEffect(() => {
+    if (!rows || rows.length === 0) return;
+
+    effectiveSetQtyValues(prev => {
+      const baseValues = prev || {};
+      const newValues = { ...baseValues };
+      let changed = false;
+
+      rows.forEach((row, arrayIndex) => {
+        const index = row._originalIndex !== undefined ? row._originalIndex : arrayIndex;
+
+        const existing = newValues[index];
+        const hasExisting =
+          existing !== undefined &&
+          existing !== null &&
+          !(typeof existing === 'string' && existing.trim() === '');
+
+        if (hasExisting) return;
+
+        const suggested =
+          row.suggestedQty ||
+          row.units_to_make ||
+          row.unitsToMake ||
+          0;
+
+        if (suggested > 0) {
+          newValues[index] = suggested;
+          changed = true;
+        }
+      });
+
+      return changed ? newValues : prev;
+    });
+  }, [rows, effectiveSetQtyValues]);
+
+  // Normalize existing qty values for case-based sizes (8oz, 6oz, 1/2 lb, 1 lb,
+  // quarts, gallons, etc.), rounding *up* to the nearest increment, but only
+  // for values the user has not manually edited.
+  useEffect(() => {
+    if (!rows || rows.length === 0) return;
+
+    effectiveSetQtyValues(prev => {
+      const baseValues = prev || {};
+      const newValues = { ...baseValues };
+      let changed = false;
+
+      rows.forEach((row, arrayIndex) => {
+        const index = row._originalIndex !== undefined ? row._originalIndex : arrayIndex;
+
+        // Don't touch values the user has manually edited
+        if (manuallyEditedIndices.current.has(index)) return;
+
+        const raw = newValues[index];
+        if (raw === undefined || raw === null || raw === '') return;
+
+        const num = typeof raw === 'number' ? raw : parseInt(raw, 10);
+        if (!num || isNaN(num) || num <= 0) return;
+
+        const increment = getQtyIncrement(row);
+        if (!increment || increment <= 1) return;
+
+        const rounded = Math.ceil(num / increment) * increment;
+        if (rounded !== num) {
+          newValues[index] = rounded;
+          changed = true;
+        }
+      });
+
+      return changed ? newValues : prev;
+    });
+  }, [rows, effectiveSetQtyValues]);
+
+  // Helper: determine step size for qty increments
+  const getQtyIncrement = (row) => {
+    const sizeRaw = row?.size || '';
+    const size = sizeRaw.toLowerCase();
+    const sizeCompact = size.replace(/\s+/g, '');
+
+    // 8oz products change in full-case increments (60 units)
+    if (sizeCompact.includes('8oz')) return 60;
+
+    // 6oz products (bag or bottle) change in case increments (40 units)
+    const isSixOz =
+      sizeCompact.includes('6oz') ||
+      size.includes('6 oz') ||
+      size.includes('6-ounce') ||
+      size.includes('6 ounce');
+
+    // 1/2 lb bag products also use 40-unit increments
+    const isHalfPoundBag =
+      sizeCompact.includes('1/2lb') ||
+      size.includes('1/2 lb') ||
+      size.includes('0.5lb') ||
+      size.includes('0.5 lb') ||
+      size.includes('half lb');
+
+    if (isSixOz || isHalfPoundBag) return 40;
+
+    // 1 lb products change in case increments (25 units)
+    const isOnePound =
+      sizeCompact.includes('1lb') ||
+      size.includes('1 lb') ||
+      size.includes('1-pound') ||
+      size.includes('1 pound');
+    if (isOnePound) return 25;
+
+    // 25 lb products should use single-unit increments
+    const isTwentyFivePound =
+      sizeCompact.includes('25lb') ||
+      size.includes('25 lb') ||
+      size.includes('25-pound') ||
+      size.includes('25 pound');
+    if (isTwentyFivePound) return 1;
+
+    // 5 lb products change in small increments (5 units)
+    const isFivePound =
+      sizeCompact.includes('5lb') ||
+      size.includes('5 lb') ||
+      size.includes('5-pound') ||
+      size.includes('5 pound');
+    if (isFivePound) return 5;
+
+    // Gallon products change in case increments (4 units)
+    if (size.includes('gallon') || size.includes('gal ')) return 4;
+
+    // Quart products change in case increments (12 units)
+    if (size.includes('quart') || size.includes(' qt')) return 12;
+
+    return 1;
+  };
+
   // Keyboard support for bulk increase/decrease (non-table mode)
   useEffect(() => {
     if (tableMode || nonTableSelectedIndices.size === 0) {
@@ -1926,8 +2061,8 @@ const NewShipmentTable = ({
               const currentQty = newValues[selectedIndex] ?? 0;
               const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
               
-              // Use increment of 1 for all sizes
-              const increment = 1;
+              // Use size-based increment (e.g. 60 units for 8oz)
+              const increment = getQtyIncrement(selectedRow);
               
               if (isIncrease) {
                 newValues[selectedIndex] = numQty + increment;
@@ -2762,9 +2897,20 @@ const NewShipmentTable = ({
               const currentDoi = doiValue;
               const hasDoiChanged = originalDoi !== undefined && originalDoi !== currentDoi;
               
-              // Determine if pencil should be permanently visible (only if this product's DOI changed or has custom settings)
-              // Uses pure CSS hover for instant appearance when DOI hasn't changed
-              const shouldShowPencilPermanently = (!tableMode && hasDoiChanged) || hasCustomDoiSettings || hasCustomForecastSettings;
+              // Determine if pencil should be in "active" (blue) state.
+              // This is true whenever the product has custom DOI or forecast settings,
+              // regardless of table vs non-table mode.
+              const isPencilActive = hasCustomDoiSettings || hasCustomForecastSettings;
+              
+              // Determine if pencil should be permanently visible.
+              // - Non-table (card) mode:
+              //     - Default: pencil only shows on hover (CSS handles this).
+              //     - When active (blue): always visible, even without hover.
+              // - Table mode:
+              //     - Keep pencil visible when DOI changed or there are custom settings.
+              const shouldShowPencilPermanently =
+                (tableMode && (hasDoiChanged || isPencilActive)) ||
+                (!tableMode && isPencilActive);
               
               return (
                 <div
@@ -2956,9 +3102,45 @@ const NewShipmentTable = ({
                           )}
                         </div>
                         
-                        {/* Brand and Size */}
+                        {/* Brand and Size (with package hint for 6oz / 1/2lb / 1lb / 5lb) */}
                         <span style={{ fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
                           {row.brand} • {row.size}
+                          {(() => {
+                            const rawSize = row.size || '';
+                            const sizeLower = rawSize.toLowerCase();
+                            const sizeCompact = sizeLower.replace(/\s+/g, '');
+
+                            const isSixOz =
+                              sizeCompact.includes('6oz') ||
+                              sizeLower.includes('6 oz') ||
+                              sizeLower.includes('6-ounce') ||
+                              sizeLower.includes('6 ounce');
+
+                            const isHalfPound =
+                              sizeCompact.includes('1/2lb') ||
+                              sizeLower.includes('1/2 lb') ||
+                              sizeLower.includes('0.5lb') ||
+                              sizeLower.includes('0.5 lb') ||
+                              sizeLower.includes('half lb');
+
+                            const isOnePound =
+                              sizeCompact.includes('1lb') ||
+                              sizeLower.includes('1 lb') ||
+                              sizeLower.includes('1-pound') ||
+                              sizeLower.includes('1 pound');
+
+                            const isFivePound =
+                              sizeCompact.includes('5lb') ||
+                              sizeLower.includes('5 lb') ||
+                              sizeLower.includes('5-pound') ||
+                              sizeLower.includes('5 pound');
+
+                            if (isSixOz || isHalfPound || isOnePound || isFivePound) {
+                              return ' • Bag';
+                            }
+
+                            return null;
+                          })()}
                         </span>
                       </div>
                     </div>
@@ -3194,8 +3376,8 @@ const NewShipmentTable = ({
                                   const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
                                   if (numQty <= 0) return;
                                   
-                                  // Use increment of 1 for all sizes
-                                  const increment = 1;
+                                  // Use size-based increment (e.g. 60 units for 8oz)
+                                  const increment = getQtyIncrement(selectedRow);
                                   
                                   newValues[selectedIndex] = Math.max(0, numQty - increment);
                                   manuallyEditedIndices.current.add(selectedIndex);
@@ -3208,8 +3390,8 @@ const NewShipmentTable = ({
                             const currentQty = effectiveQtyValues[index] ?? 0;
                             const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
                             if (numQty <= 0) return;
-                            // Use increment of 1 for all sizes
-                            const increment = 1;
+                            // Use size-based increment (e.g. 60 units for 8oz)
+                            const increment = getQtyIncrement(row);
                             const newQty = Math.max(0, numQty - increment);
                             manuallyEditedIndices.current.add(index);
                             effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty }));
@@ -3261,8 +3443,8 @@ const NewShipmentTable = ({
                                   const currentQty = newValues[selectedIndex] ?? 0;
                                   const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
                                   
-                                  // Use increment of 1 for all sizes
-                                  const increment = 1;
+                                  // Use size-based increment (e.g. 60 units for 8oz)
+                                  const increment = getQtyIncrement(selectedRow);
                                   
                                   newValues[selectedIndex] = numQty + increment;
                                   manuallyEditedIndices.current.add(selectedIndex);
@@ -3274,8 +3456,8 @@ const NewShipmentTable = ({
                             // Single product increase
                             const currentQty = effectiveQtyValues[index] ?? 0;
                             const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
-                            // Use increment of 1 for all sizes
-                            const increment = 1;
+                            // Use size-based increment (e.g. 60 units for 8oz)
+                            const increment = getQtyIncrement(row);
                             const newQty = numQty + increment;
                             manuallyEditedIndices.current.add(index);
                             effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty }));
@@ -3475,7 +3657,8 @@ const NewShipmentTable = ({
                           opacity: shouldShowPencilPermanently ? 1 : 0,
                           flexShrink: 0,
                           transition: 'none',
-                          filter: shouldShowPencilPermanently 
+                          // Blue when there are custom settings (active), gray otherwise.
+                          filter: isPencilActive
                             ? 'brightness(0) saturate(100%) invert(47%) sepia(98%) saturate(2476%) hue-rotate(209deg) brightness(100%) contrast(101%)' // Blue #3B82F6
                             : 'brightness(0) saturate(100%) invert(50%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(95%) contrast(90%)', // Gray
                           pointerEvents: shouldShowPencilPermanently ? 'auto' : 'none',
@@ -4995,8 +5178,8 @@ const NewShipmentTable = ({
                                   ? 0
                                   : parseInt(currentQty, 10) || 0;
                               
-                              // Use increment of 1 for all sizes
-                              const increment = 1;
+                              // Use size-based increment (e.g. 60 units for 8oz)
+                              const increment = getQtyIncrement(rows[index] || currentRows.find(r => r._originalIndex === index) || {});
                               
                               const newQty = Math.max(0, numQty + increment);
                               // Mark as manually edited since user clicked increment button
@@ -5055,8 +5238,8 @@ const NewShipmentTable = ({
                                 return;
                               }
                               
-                              // Use increment of 1 for all sizes
-                              const increment = 1;
+                              // Use size-based increment (e.g. 60 units for 8oz)
+                              const increment = getQtyIncrement(rows[index] || currentRows.find(r => r._originalIndex === index) || {});
                               
                               const newQty = Math.max(0, numQty - increment);
                               // Mark as manually edited since user clicked decrement button

@@ -355,7 +355,7 @@ const ShinersView = () => {
                 transform: 'translateY(-50%)',
                 fontSize: '0.7rem',
                 fontWeight: 600,
-                color: '#007AFF',
+                color: '#3B82F6',
               }}
             >
               {timeline.variance > 0 ? '+' : ''}{timeline.variance}

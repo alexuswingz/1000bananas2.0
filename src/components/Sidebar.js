@@ -152,7 +152,12 @@ const Sidebar = (props = {}) => {
   const displayClasses = isForcedMobile ? 'flex' : 'hidden md:flex';
 
   return (
-    <div className={`${displayClasses} ${effectiveWidth} h-screen ${themeClasses.bg} ${isForcedMobile ? '' : themeClasses.border + ' border-r'} flex-col transition-all duration-300 relative`}>
+    <div 
+      className={`${displayClasses} ${effectiveWidth} h-screen ${isForcedMobile ? '' : themeClasses.border + ' border-r'} flex-col transition-all duration-300 relative`}
+      style={{
+        background: 'linear-gradient(180deg, #1A2235 0%, #1A2235 15%, #243347 50%, #10151C 85%, #10151C 100%)'
+      }}
+    >
       {/* Logo Header - Hide on forced mobile since parent provides header */}
       {!isForcedMobile && (
         <div className={`p-4 ${themeClasses.border} border-b flex items-center ${isMinimized ? 'justify-center' : 'justify-between'}`}>
