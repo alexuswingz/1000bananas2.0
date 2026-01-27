@@ -23,6 +23,17 @@ const NewShipmentHeader = ({
   productsAddedAfterExport = false,
   canAccessTab,
 }) => {
+  // Debug logging to trace completedTabs
+  useEffect(() => {
+    console.log('📊 NewShipmentHeader completedTabs:', {
+      completedTabs: Array.from(completedTabs),
+      addProductsComplete: completedTabs.has('add-products'),
+      exportComplete: completedTabs.has('export'),
+      labelCheckComplete: completedTabs.has('label-check'),
+      formulaCheckComplete: completedTabs.has('formula-check'),
+      activeAction,
+    });
+  }, [completedTabs, activeAction]);
   const location = useLocation();
   // Stepper logic - determine which tabs are accessible
   // Workflow: Add Products → (Label Check & Formula Check in any order) → Book Shipment → Sort Products → Sort Formulas

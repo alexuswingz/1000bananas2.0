@@ -216,30 +216,96 @@ const NewShipment = () => {
         setLoading(true);
 
         // Build list of products to attach to the shipment
-        const productsToAdd = Object.keys(qtyValues)
-          .filter(idx => {
-            const product = products[idx];
-            const qty = qtyValues[idx];
-            return product && addedRows.has(product.id) && qty > 0;
-          })
-          .map(idx => ({
-            catalog_id: products[idx].catalogId || products[idx].id,
-            quantity: qtyValues[idx],
-          }));
+        // Build productsToAdd by iterating through allProducts to catch products even if filtered out
+        const productsToAdd = [];
+        
+        // First, try to get products from the current filtered products array
+        products.forEach((product, index) => {
+          if (addedRows.has(product.id)) {
+            const qty = qtyValues[index] || 0;
+            if (qty > 0) {
+              productsToAdd.push({
+                catalog_id: product.catalogId || product.id,
+                quantity: qty,
+              });
+            }
+          }
+        });
+        
+        // Also check allProducts for any products in addedRows that might have been filtered out
+        allProducts.forEach((product, allIndex) => {
+          // Skip if we already added this product
+          if (productsToAdd.some(p => (p.catalog_id === (product.catalogId || product.id)))) {
+            return;
+          }
+          
+          // If product is in addedRows, try to find it in current products array
+          if (addedRows.has(product.id)) {
+            const currentIndex = products.findIndex(p => p.id === product.id);
+            if (currentIndex >= 0) {
+              // Found in current products, use that index for qty lookup
+              const qty = qtyValues[currentIndex] || 0;
+              if (qty > 0) {
+                productsToAdd.push({
+                  catalog_id: product.catalogId || product.id,
+                  quantity: qty,
+                });
+              }
+            } else {
+              // Not in current products (filtered out), but was added - check if we have a qty
+              // Try to find qty by matching product ID across all indices
+              let foundQty = 0;
+              for (let idx = 0; idx < products.length; idx++) {
+                if (products[idx]?.id === product.id) {
+                  foundQty = qtyValues[idx] || 0;
+                  break;
+                }
+              }
+              // If still no qty found, check if there's a qty at the original allProducts index
+              if (foundQty === 0 && qtyValues[allIndex]) {
+                foundQty = qtyValues[allIndex];
+              }
+              if (foundQty > 0) {
+                productsToAdd.push({
+                  catalog_id: product.catalogId || product.id,
+                  quantity: foundQty,
+                });
+              }
+            }
+          }
+        });
+
+        console.log('📦 Auto-booking shipment for Label Check:', {
+          totalProducts: products.length,
+          allProductsCount: allProducts.length,
+          addedRowsCount: addedRows.size,
+          productsToAddCount: productsToAdd.length,
+          productsToAdd,
+          addedRows: Array.from(addedRows),
+        });
 
         if (productsToAdd.length === 0) {
+          console.error('❌ No products to add - validation failed');
           toast.error('Please add at least one product before starting Label Check');
           return;
         }
 
         // Require shipment type before creating shipment
         if (!shipmentData.shipmentType) {
+          console.error('❌ No shipment type selected');
           toast.error('Please select a shipment type (FBA or AWD) in the export template before proceeding to Label Check.');
           return;
         }
 
         const shipmentNumber = shipmentData.shipmentNumber || generateShipmentNumber();
         const shipmentDate = shipmentData.shipmentDate || new Date().toISOString().split('T')[0];
+
+        console.log('🚀 Auto-creating shipment with data:', {
+          shipment_number: shipmentNumber,
+          shipment_date: shipmentDate,
+          shipment_type: shipmentData.shipmentType,
+          account: shipmentData.account,
+        });
 
         const newShipment = await createShipment({
           shipment_number: shipmentNumber,
@@ -251,19 +317,27 @@ const NewShipment = () => {
           created_by: 'current_user',
         });
 
+        console.log('✅ Shipment auto-created:', newShipment);
+
         const newShipmentId = newShipment?.id || newShipment?.shipment_id || newShipment?.data?.id;
         if (!newShipmentId) {
+          console.error('❌ No shipment ID in response:', newShipment);
           throw new Error('Invalid response from createShipment API - missing shipment ID');
         }
 
+        console.log('🆔 Shipment ID:', newShipmentId);
         setShipmentId(newShipmentId);
 
-        await addShipmentProducts(newShipmentId, productsToAdd);
+        console.log('📝 Auto-adding products to shipment:', productsToAdd);
+        const addResult = await addShipmentProducts(newShipmentId, productsToAdd);
+        console.log('✅ Products auto-added:', addResult);
 
+        console.log('🔄 Updating shipment status to label_check');
         await updateShipment(newShipmentId, {
           add_products_completed: true,
           status: 'label_check',
         });
+        console.log('✅ Shipment status updated');
 
         setCompletedTabs(prev => {
           const newSet = new Set(prev);
@@ -272,9 +346,15 @@ const NewShipment = () => {
           return newSet;
         });
         setExportCompleted(true);
+        console.log('✅ Auto-booking completed successfully');
         toast.success('Shipment booked for Label Check.');
       } catch (error) {
-        console.error('Error preparing shipment for Label Check:', error);
+        console.error('❌ Error preparing shipment for Label Check:', error);
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          error: error,
+        });
         toast.error('Failed to prepare shipment for Label Check: ' + error.message);
       } finally {
         setLoading(false);
@@ -1857,14 +1937,45 @@ const NewShipment = () => {
       return newSet;
     });
 
-    // Navigate based on whether label check is completed (only when formula check is complete)
-    if (labelCheckCompleted) {
-      // Both are completed, show modal (user will click button to navigate)
-      toast.success('Formula Check completed! Moving to Book Shipment');
-      setIsFormulaCheckCompleteOpen(true);
+    // If a comment was added, navigate back to planning table
+    if (hasComment) {
+      if (!isIncomplete) {
+        toast.success('Formula Check completed with comment!');
+      } else {
+        toast.info('Formula Check comment saved. Returning to shipments table.');
+      }
+      
+      // Navigate back to planning page with shipments tab
+      navigate('/dashboard/production/planning', {
+        state: {
+          activeTab: 'shipments',
+          refresh: Date.now(),
+          fromFormulaCheckComplete: true,
+        }
+      });
+    } else if (!isIncomplete) {
+      // If completed without comment, show completion modal
+      if (labelCheckCompleted) {
+        // Both are completed, show modal (user will click button to navigate)
+        toast.success('Formula Check completed! Moving to Book Shipment');
+        setIsFormulaCheckCompleteOpen(true);
+      } else {
+        // Show the completion modal instead of automatically navigating
+        toast.success('Formula Check completed!');
+        setIsFormulaCheckCompleteOpen(true);
+      }
     } else {
-      // Show the completion modal instead of automatically navigating
-      setIsFormulaCheckCompleteOpen(true);
+      // If incomplete without comment, navigate back to planning page
+      toast.info('Returning to shipments table.');
+      
+      // Navigate back to planning page with shipments tab
+      navigate('/dashboard/production/planning', {
+        state: {
+          activeTab: 'shipments',
+          refresh: Date.now(),
+          fromFormulaCheckComplete: true,
+        }
+      });
     }
   };
 
@@ -3863,24 +3974,87 @@ const NewShipment = () => {
         }}
         onBeginFormulaCheck={async () => {
           // Book shipment if not already booked (needed for formula check)
+          console.log('🎯 Begin Label Check clicked, current shipmentId:', shipmentId);
           if (!shipmentId) {
+            console.log('📌 No shipmentId exists, creating new shipment...');
             try {
               setLoading(true);
               
               // Validate: Must have products selected
-              // Only include products that are BOTH in addedRows AND have qty > 0
-              const productsToAdd = Object.keys(qtyValues)
-                .filter(idx => {
-                  const product = products[idx];
-                  const qty = qtyValues[idx];
-                  return product && addedRows.has(product.id) && qty > 0;
-                })
-                .map(idx => ({
-                  catalog_id: products[idx].catalogId || products[idx].id,
-                  quantity: qtyValues[idx],
-                }));
+              // Build productsToAdd by iterating through allProducts to catch products even if filtered out
+              // Then match to current products array to get the correct index for qty lookup
+              const productsToAdd = [];
+              
+              // First, try to get products from the current filtered products array
+              products.forEach((product, index) => {
+                if (addedRows.has(product.id)) {
+                  const qty = qtyValues[index] || 0;
+                  if (qty > 0) {
+                    productsToAdd.push({
+                      catalog_id: product.catalogId || product.id,
+                      quantity: qty,
+                    });
+                  }
+                }
+              });
+              
+              // Also check allProducts for any products in addedRows that might have been filtered out
+              // This handles the case where a product was added, then filtered out, but should still be included
+              allProducts.forEach((product, allIndex) => {
+                // Skip if we already added this product
+                if (productsToAdd.some(p => (p.catalog_id === (product.catalogId || product.id)))) {
+                  return;
+                }
+                
+                // If product is in addedRows, try to find it in current products array
+                if (addedRows.has(product.id)) {
+                  const currentIndex = products.findIndex(p => p.id === product.id);
+                  if (currentIndex >= 0) {
+                    // Found in current products, use that index for qty lookup
+                    const qty = qtyValues[currentIndex] || 0;
+                    if (qty > 0) {
+                      productsToAdd.push({
+                        catalog_id: product.catalogId || product.id,
+                        quantity: qty,
+                      });
+                    }
+                  } else {
+                    // Not in current products (filtered out), but was added - check if we have a qty
+                    // Try to find qty by matching product ID across all indices
+                    let foundQty = 0;
+                    for (let idx = 0; idx < products.length; idx++) {
+                      if (products[idx]?.id === product.id) {
+                        foundQty = qtyValues[idx] || 0;
+                        break;
+                      }
+                    }
+                    // If still no qty found, check if there's a qty at the original allProducts index
+                    // (This handles edge cases where qty was set before filtering)
+                    if (foundQty === 0 && qtyValues[allIndex]) {
+                      foundQty = qtyValues[allIndex];
+                    }
+                    if (foundQty > 0) {
+                      productsToAdd.push({
+                        catalog_id: product.catalogId || product.id,
+                        quantity: foundQty,
+                      });
+                    }
+                  }
+                }
+              });
+              
+              console.log('📦 Products to add to shipment:', {
+                totalProducts: products.length,
+                allProductsCount: allProducts.length,
+                addedRowsCount: addedRows.size,
+                productsToAddCount: productsToAdd.length,
+                productsToAdd,
+                addedRows: Array.from(addedRows),
+                qtyValuesKeys: Object.keys(qtyValues),
+              });
               
               if (productsToAdd.length === 0) {
+                console.error('❌ No products to add - validation failed');
                 toast.error('Please add at least one product before exporting');
                 setLoading(false);
                 return;
@@ -3889,6 +4063,7 @@ const NewShipment = () => {
               // Create shipment - ensure shipment number and date are always set
               // Require shipment type to be selected before creating shipment
               if (!shipmentData.shipmentType) {
+                console.error('❌ No shipment type selected');
                 toast.error('Please select a shipment type (FBA or AWD) in the export template before proceeding.');
                 setLoading(false);
                 return;
@@ -3896,6 +4071,13 @@ const NewShipment = () => {
               
               const shipmentNumber = shipmentData.shipmentNumber || generateShipmentNumber();
               const shipmentDate = shipmentData.shipmentDate || new Date().toISOString().split('T')[0];
+              
+              console.log('🚀 Creating shipment with data:', {
+                shipment_number: shipmentNumber,
+                shipment_date: shipmentDate,
+                shipment_type: shipmentData.shipmentType,
+                account: shipmentData.account,
+              });
               
               const newShipment = await createShipment({
                 shipment_number: shipmentNumber,
@@ -3907,21 +4089,30 @@ const NewShipment = () => {
                 created_by: 'current_user',
               });
               
+              console.log('✅ Shipment created:', newShipment);
+              
               // Handle different response formats (id, shipment_id, or nested data)
               const newShipmentId = newShipment?.id || newShipment?.shipment_id || newShipment?.data?.id;
               if (!newShipmentId) {
+                console.error('❌ No shipment ID in response:', newShipment);
                 throw new Error('Invalid response from createShipment API - missing shipment ID');
               }
+              
+              console.log('🆔 Shipment ID:', newShipmentId);
               setShipmentId(newShipmentId);
               
               // Add products to shipment
-              await addShipmentProducts(newShipmentId, productsToAdd);
+              console.log('📝 Adding products to shipment:', productsToAdd);
+              const addProductsResult = await addShipmentProducts(newShipmentId, productsToAdd);
+              console.log('✅ Products added to shipment:', addProductsResult);
               
               // Update shipment to mark add_products as completed
+              console.log('🔄 Updating shipment status to label_check');
               await updateShipment(newShipmentId, {
                 add_products_completed: true,
                 status: 'label_check',
               });
+              console.log('✅ Shipment status updated');
               
               // Mark 'add-products' and 'export' as completed
               setCompletedTabs(prev => {
@@ -3931,9 +4122,15 @@ const NewShipment = () => {
                 return newSet;
               });
               setExportCompleted(true);
+              console.log('✅ All steps completed successfully');
               toast.success('Shipment booked and exported!');
             } catch (error) {
-              console.error('Error booking shipment for export:', error);
+              console.error('❌ Error booking shipment for export:', error);
+              console.error('Error details:', {
+                message: error.message,
+                stack: error.stack,
+                error: error,
+              });
               toast.error('Failed to book shipment: ' + error.message);
               setLoading(false);
               return;
@@ -3941,16 +4138,104 @@ const NewShipment = () => {
               setLoading(false);
             }
           } else {
-            // If shipment already existed, still mark export as completed
-            setCompletedTabs(prev => {
-              const newSet = new Set(prev);
-              newSet.add('export');
-              return newSet;
-            });
-            setExportCompleted(true);
+            // Shipment already exists - we need to add products to it
+            console.log('⚠️ Shipment already exists:', shipmentId, '- adding products to existing shipment');
+            
+            try {
+              setLoading(true);
+              
+              // Build products list the same way
+              const productsToAdd = [];
+              
+              products.forEach((product, index) => {
+                if (addedRows.has(product.id)) {
+                  const qty = qtyValues[index] || 0;
+                  if (qty > 0) {
+                    productsToAdd.push({
+                      catalog_id: product.catalogId || product.id,
+                      quantity: qty,
+                    });
+                  }
+                }
+              });
+              
+              allProducts.forEach((product, allIndex) => {
+                if (productsToAdd.some(p => (p.catalog_id === (product.catalogId || product.id)))) {
+                  return;
+                }
+                
+                if (addedRows.has(product.id)) {
+                  const currentIndex = products.findIndex(p => p.id === product.id);
+                  if (currentIndex >= 0) {
+                    const qty = qtyValues[currentIndex] || 0;
+                    if (qty > 0) {
+                      productsToAdd.push({
+                        catalog_id: product.catalogId || product.id,
+                        quantity: qty,
+                      });
+                    }
+                  } else {
+                    let foundQty = 0;
+                    for (let idx = 0; idx < products.length; idx++) {
+                      if (products[idx]?.id === product.id) {
+                        foundQty = qtyValues[idx] || 0;
+                        break;
+                      }
+                    }
+                    if (foundQty === 0 && qtyValues[allIndex]) {
+                      foundQty = qtyValues[allIndex];
+                    }
+                    if (foundQty > 0) {
+                      productsToAdd.push({
+                        catalog_id: product.catalogId || product.id,
+                        quantity: foundQty,
+                      });
+                    }
+                  }
+                }
+              });
+              
+              console.log('📦 Products to add to existing shipment:', {
+                shipmentId,
+                productsToAddCount: productsToAdd.length,
+                productsToAdd,
+              });
+              
+              if (productsToAdd.length > 0) {
+                console.log('📝 Adding products to existing shipment:', productsToAdd);
+                const addResult = await addShipmentProducts(shipmentId, productsToAdd);
+                console.log('✅ Products added to existing shipment:', addResult);
+                
+                // Update shipment to mark add_products_completed as true and set status to label_check
+                console.log('🔄 Updating shipment to mark add_products_completed: true and status: label_check');
+                await updateShipment(shipmentId, {
+                  add_products_completed: true,
+                  status: 'label_check',
+                });
+                console.log('✅ Shipment updated - add_products_completed set to true, status set to label_check');
+              } else {
+                console.log('⚠️ No products to add - addedRows or qtyValues empty');
+              }
+              
+              // Mark tabs as completed
+              setCompletedTabs(prev => {
+                const newSet = new Set(prev);
+                newSet.add('add-products');
+                newSet.add('export');
+                return newSet;
+              });
+              setExportCompleted(true);
+              
+            } catch (error) {
+              console.error('❌ Error adding products to existing shipment:', error);
+              toast.error('Failed to add products: ' + error.message);
+            } finally {
+              setLoading(false);
+            }
           }
           
           // After exporting, move to Label Check and keep footer visible
+          console.log('🔄 Navigating to label-check with shipmentId:', shipmentId);
           handleActionChange('label-check');
         }}
         products={products.map((product, index) => ({
@@ -4089,7 +4374,7 @@ const NewShipment = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.35)',
+              backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.6)' : 'rgba(0, 0, 0, 0.35)',
               zIndex: 9998,
               display: 'flex',
               alignItems: 'center',
@@ -4100,11 +4385,13 @@ const NewShipment = () => {
             {/* Modal */}
             <div
               style={{
-                backgroundColor: '#FFFFFF',
+                backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
                 borderRadius: '14px',
                 width: '400px',
-                border: '1px solid #E5E7EB',
-                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                boxShadow: isDarkMode 
+                  ? '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.2)'
+                  : '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
                 zIndex: 9999,
                 position: 'relative',
                 display: 'flex',
@@ -4129,9 +4416,15 @@ const NewShipment = () => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#9CA3AF',
+                  color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
                   width: '24px',
                   height: '24px',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = isDarkMode ? '#D1D5DB' : '#6B7280';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = '#9CA3AF';
                 }}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -4166,7 +4459,7 @@ const NewShipment = () => {
                 <h2 style={{
                   fontSize: '20px',
                   fontWeight: 600,
-                  color: '#111827',
+                  color: isDarkMode ? '#F9FAFB' : '#111827',
                   margin: 0,
                   textAlign: 'center',
                 }}>
@@ -4197,19 +4490,19 @@ const NewShipment = () => {
                     height: '31px',
                     padding: '0 14px',
                     borderRadius: '4px',
-                    border: '1px solid #D1D5DB',
-                    backgroundColor: '#FFFFFF',
-                    color: '#374151',
+                    border: isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
+                    backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                    color: isDarkMode ? '#E5E7EB' : '#374151',
                     fontSize: '14px',
                     fontWeight: 500,
                     cursor: 'pointer',
                     transition: 'all 0.2s',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#F3F4F6';
+                    e.currentTarget.style.backgroundColor = isDarkMode ? '#4B5563' : '#F3F4F6';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#FFFFFF';
+                    e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#FFFFFF';
                   }}
                 >
                   Go to Shipments
@@ -4234,7 +4527,9 @@ const NewShipment = () => {
                     fontWeight: 600,
                     cursor: 'pointer',
                     transition: 'all 0.2s',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                    boxShadow: isDarkMode 
+                      ? '0 1px 2px rgba(0,0,0,0.3)'
+                      : '0 1px 2px rgba(0,0,0,0.04)',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',

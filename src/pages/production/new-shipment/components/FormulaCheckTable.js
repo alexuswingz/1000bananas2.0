@@ -141,7 +141,13 @@ const FormulaCheckTable = ({
   const loadFormulaData = async () => {
     try {
       setLoading(true);
+      console.log('🔍 Loading formula data for shipmentId:', shipmentId);
       const data = await getShipmentFormulaCheck(shipmentId);
+      console.log('✅ Formula data loaded:', {
+        shipmentId,
+        formulaCount: data?.length || 0,
+        formulas: data,
+      });
       
       // Transform API data to match table format
       // Apply manufacturing volume formula: spillage + round to nearest 5
@@ -168,6 +174,11 @@ const FormulaCheckTable = ({
         };
       });
       
+      console.log('📋 Formatted formula rows:', {
+        formulaCount: formattedFormulas.length,
+        formulas: formattedFormulas,
+      });
+      
       setFormulas(formattedFormulas);
       
       // DO NOT initialize selectedRows from isChecked status
@@ -186,7 +197,13 @@ const FormulaCheckTable = ({
       // Mark data as loaded so parent state doesn't override backend data
       setDataLoaded(true);
     } catch (error) {
-      console.error('Error loading formula data:', error);
+      console.error('❌ Error loading formula data:', error);
+      console.error('Error details:', {
+        shipmentId,
+        message: error.message,
+        stack: error.stack,
+        error: error,
+      });
       setFormulas([]);
       setDataLoaded(true); // Still mark as loaded even on error to prevent parent override
     } finally {

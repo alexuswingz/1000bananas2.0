@@ -99,7 +99,13 @@ const LabelCheckTable = ({
   const loadLabelData = async () => {
     try {
       setLoading(true);
+      console.log('🔍 Loading label data for shipmentId:', shipmentId);
       const data = await getShipmentProducts(shipmentId);
+      console.log('✅ Label data loaded:', {
+        shipmentId,
+        productCount: data?.length || 0,
+        products: data,
+      });
       
       // Initialize completed/confirmed rows from saved database status
       const newCompletedRows = new Set();
@@ -134,12 +140,23 @@ const LabelCheckTable = ({
         return row;
       });
       
+      console.log('📋 Formatted label rows:', {
+        rowCount: formattedRows.length,
+        rows: formattedRows,
+      });
+      
       setRows(formattedRows);
       setCompletedRows(newCompletedRows);
       setConfirmedRows(newConfirmedRows);
       setCompletedRowStatus(newCompletedRowStatus);
     } catch (error) {
-      console.error('Error loading label data:', error);
+      console.error('❌ Error loading label data:', error);
+      console.error('Error details:', {
+        shipmentId,
+        message: error.message,
+        stack: error.stack,
+        error: error,
+      });
       setRows([]); // Use empty array on error instead of dummy data
     } finally {
       setLoading(false);
