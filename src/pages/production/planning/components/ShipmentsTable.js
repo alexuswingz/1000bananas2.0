@@ -351,7 +351,7 @@ const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
                 >
                   <span
                     style={{
-                      color: (isFilterActive(col.key) || openFilterColumn === col.key) ? '#007AFF' : '#FFFFFF',
+                      color: (isFilterActive(col.key) || openFilterColumn === col.key) ? '#3B82F6' : '#FFFFFF',
                     }}
                   >
                     {col.label}

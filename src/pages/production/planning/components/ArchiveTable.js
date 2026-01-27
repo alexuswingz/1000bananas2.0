@@ -271,7 +271,7 @@ const ArchiveTable = ({ rows = [] }) => {
                     gap: '0.5rem',
                   }}
                 >
-                  <span style={{ color: (openFilterColumn === 'status') ? '#007AFF' : '#FFFFFF' }}>
+                  <span style={{ color: (openFilterColumn === 'status') ? '#3B82F6' : '#FFFFFF' }}>
                     STATUS
                   </span>
                   <img
@@ -314,7 +314,7 @@ const ArchiveTable = ({ rows = [] }) => {
                     gap: '0.5rem',
                   }}
                 >
-                  <span style={{ color: (openFilterColumn === 'shipment') ? '#007AFF' : '#FFFFFF' }}>
+                  <span style={{ color: (openFilterColumn === 'shipment') ? '#3B82F6' : '#FFFFFF' }}>
                     SHIPMENT
                   </span>
                   <img
@@ -357,7 +357,7 @@ const ArchiveTable = ({ rows = [] }) => {
                     gap: '0.5rem',
                   }}
                 >
-                  <span style={{ color: (openFilterColumn === 'marketplace') ? '#007AFF' : '#FFFFFF' }}>
+                  <span style={{ color: (openFilterColumn === 'marketplace') ? '#3B82F6' : '#FFFFFF' }}>
                     MARKETPLACE
                   </span>
                   <img
@@ -400,7 +400,7 @@ const ArchiveTable = ({ rows = [] }) => {
                     gap: '0.5rem',
                   }}
                 >
-                  <span style={{ color: (openFilterColumn === 'account') ? '#007AFF' : '#FFFFFF' }}>
+                  <span style={{ color: (openFilterColumn === 'account') ? '#3B82F6' : '#FFFFFF' }}>
                     ACCOUNT
                   </span>
                   <img

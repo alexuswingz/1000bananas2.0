@@ -327,7 +327,7 @@ const NewShipmentHeader = ({
                 width: '48px',
                 height: '28px',
                 borderRadius: '14px',
-                backgroundColor: tableMode ? '#007AFF' : (isDarkMode ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.1)'),
+                backgroundColor: tableMode ? '#3B82F6' : (isDarkMode ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.1)'),
                 border: 'none',
                 cursor: 'pointer',
                 position: 'relative',
@@ -985,10 +985,10 @@ const NewShipmentHeader = ({
             padding: '12px 16px',
             fontSize: '14px',
             fontWeight: 500,
-            color: activeAction === 'add-products' ? '#007AFF' : (isDarkMode ? '#9CA3AF' : '#6B7280'),
-            backgroundColor: activeAction === 'add-products' ? (isDarkMode ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.05)') : 'transparent',
+            color: activeAction === 'add-products' ? '#3B82F6' : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+            backgroundColor: activeAction === 'add-products' ? (isDarkMode ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)') : 'transparent',
             border: 'none',
-            borderBottom: activeAction === 'add-products' ? '2px solid #007AFF' : '2px solid transparent',
+            borderBottom: activeAction === 'add-products' ? '2px solid #3B82F6' : '2px solid transparent',
             cursor: 'pointer',
             transition: 'all 0.2s',
             whiteSpace: 'nowrap',
@@ -999,7 +999,7 @@ const NewShipmentHeader = ({
               <circle cx="12" cy="12" r="6"/>
             </svg>
           ) : activeAction === 'add-products' ? (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="#007AFF">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#3B82F6">
               <circle cx="12" cy="12" r="6"/>
             </svg>
           ) : (
@@ -1023,10 +1023,10 @@ const NewShipmentHeader = ({
             padding: '12px 16px',
             fontSize: '14px',
             fontWeight: 500,
-            color: activeAction === 'label-check' ? '#007AFF' : (isDarkMode ? '#9CA3AF' : '#6B7280'),
-            backgroundColor: activeAction === 'label-check' ? (isDarkMode ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.05)') : 'transparent',
+            color: activeAction === 'label-check' ? '#3B82F6' : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+            backgroundColor: activeAction === 'label-check' ? (isDarkMode ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)') : 'transparent',
             border: 'none',
-            borderBottom: activeAction === 'label-check' ? '2px solid #007AFF' : '2px solid transparent',
+            borderBottom: activeAction === 'label-check' ? '2px solid #3B82F6' : '2px solid transparent',
             cursor: isTabAccessible('label-check') ? 'pointer' : 'not-allowed',
             opacity: isTabAccessible('label-check') ? 1 : 0.5,
             transition: 'all 0.2s',
@@ -1038,7 +1038,7 @@ const NewShipmentHeader = ({
               <circle cx="12" cy="12" r="6"/>
             </svg>
           ) : activeAction === 'label-check' ? (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="#007AFF">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#3B82F6">
               <circle cx="12" cy="12" r="6"/>
             </svg>
           ) : (labelCheckHasComment || labelCheckRemainingCount > 0) ? (
@@ -1066,10 +1066,10 @@ const NewShipmentHeader = ({
             padding: '12px 16px',
             fontSize: '14px',
             fontWeight: 500,
-            color: activeAction === 'formula-check' ? '#007AFF' : (isDarkMode ? '#9CA3AF' : '#6B7280'),
-            backgroundColor: activeAction === 'formula-check' ? (isDarkMode ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.05)') : 'transparent',
+            color: activeAction === 'formula-check' ? '#3B82F6' : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+            backgroundColor: activeAction === 'formula-check' ? (isDarkMode ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)') : 'transparent',
             border: 'none',
-            borderBottom: activeAction === 'formula-check' ? '2px solid #007AFF' : '2px solid transparent',
+            borderBottom: activeAction === 'formula-check' ? '2px solid #3B82F6' : '2px solid transparent',
             cursor: isTabAccessible('formula-check') ? 'pointer' : 'not-allowed',
             opacity: isTabAccessible('formula-check') ? 1 : 0.5,
             transition: 'all 0.2s',
@@ -1081,7 +1081,7 @@ const NewShipmentHeader = ({
               <circle cx="12" cy="12" r="6"/>
             </svg>
           ) : activeAction === 'formula-check' ? (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="#007AFF">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#3B82F6">
               <circle cx="12" cy="12" r="6"/>
             </svg>
           ) : (formulaCheckHasComment || formulaCheckRemainingCount > 0) ? (
@@ -1109,10 +1109,10 @@ const NewShipmentHeader = ({
             padding: '12px 16px',
             fontSize: '14px',
             fontWeight: 500,
-            color: activeAction === 'book-shipment' ? '#007AFF' : (isDarkMode ? '#9CA3AF' : '#6B7280'),
-            backgroundColor: activeAction === 'book-shipment' ? (isDarkMode ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.05)') : 'transparent',
+            color: activeAction === 'book-shipment' ? '#3B82F6' : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+            backgroundColor: activeAction === 'book-shipment' ? (isDarkMode ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)') : 'transparent',
             border: 'none',
-            borderBottom: activeAction === 'book-shipment' ? '2px solid #007AFF' : '2px solid transparent',
+            borderBottom: activeAction === 'book-shipment' ? '2px solid #3B82F6' : '2px solid transparent',
             cursor: isTabAccessible('book-shipment') ? 'pointer' : 'not-allowed',
             opacity: isTabAccessible('book-shipment') ? 1 : 0.5,
             transition: 'all 0.2s',
@@ -1124,7 +1124,7 @@ const NewShipmentHeader = ({
               <circle cx="12" cy="12" r="6"/>
             </svg>
           ) : activeAction === 'book-shipment' ? (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="#007AFF">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#3B82F6">
               <circle cx="12" cy="12" r="6"/>
             </svg>
           ) : (
@@ -1148,10 +1148,10 @@ const NewShipmentHeader = ({
             padding: '12px 16px',
             fontSize: '14px',
             fontWeight: 500,
-            color: activeAction === 'sort-products' ? '#007AFF' : (isDarkMode ? '#9CA3AF' : '#6B7280'),
-            backgroundColor: activeAction === 'sort-products' ? (isDarkMode ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.05)') : 'transparent',
+            color: activeAction === 'sort-products' ? '#3B82F6' : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+            backgroundColor: activeAction === 'sort-products' ? (isDarkMode ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)') : 'transparent',
             border: 'none',
-            borderBottom: activeAction === 'sort-products' ? '2px solid #007AFF' : '2px solid transparent',
+            borderBottom: activeAction === 'sort-products' ? '2px solid #3B82F6' : '2px solid transparent',
             cursor: isTabAccessible('sort-products') ? 'pointer' : 'not-allowed',
             opacity: isTabAccessible('sort-products') ? 1 : 0.5,
             transition: 'all 0.2s',
@@ -1163,7 +1163,7 @@ const NewShipmentHeader = ({
               <circle cx="12" cy="12" r="6"/>
             </svg>
           ) : activeAction === 'sort-products' ? (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="#007AFF">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#3B82F6">
               <circle cx="12" cy="12" r="6"/>
             </svg>
           ) : (
@@ -1187,10 +1187,10 @@ const NewShipmentHeader = ({
             padding: '12px 16px',
             fontSize: '14px',
             fontWeight: 500,
-            color: activeAction === 'sort-formulas' ? '#007AFF' : (isDarkMode ? '#9CA3AF' : '#6B7280'),
-            backgroundColor: activeAction === 'sort-formulas' ? (isDarkMode ? 'rgba(0, 122, 255, 0.1)' : 'rgba(0, 122, 255, 0.05)') : 'transparent',
+            color: activeAction === 'sort-formulas' ? '#3B82F6' : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+            backgroundColor: activeAction === 'sort-formulas' ? (isDarkMode ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)') : 'transparent',
             border: 'none',
-            borderBottom: activeAction === 'sort-formulas' ? '2px solid #007AFF' : '2px solid transparent',
+            borderBottom: activeAction === 'sort-formulas' ? '2px solid #3B82F6' : '2px solid transparent',
             cursor: isTabAccessible('sort-formulas') ? 'pointer' : 'not-allowed',
             opacity: isTabAccessible('sort-formulas') ? 1 : 0.5,
             transition: 'all 0.2s',
@@ -1202,7 +1202,7 @@ const NewShipmentHeader = ({
               <circle cx="12" cy="12" r="6"/>
             </svg>
           ) : activeAction === 'sort-formulas' ? (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="#007AFF">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#3B82F6">
               <circle cx="12" cy="12" r="6"/>
             </svg>
           ) : (

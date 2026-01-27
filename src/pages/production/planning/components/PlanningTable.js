@@ -1344,7 +1344,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                   gap: '0.5rem',
                 }}
               >
-                <span style={{ color: (isFilterActive('status') || openFilterColumn === 'status') ? '#007AFF' : '#9CA3AF' }}>
+                <span style={{ color: (isFilterActive('status') || openFilterColumn === 'status') ? '#3B82F6' : '#9CA3AF' }}>
                   STATUS
                 </span>
                 <img
@@ -1387,7 +1387,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                   gap: '0.5rem',
                 }}
               >
-                <span style={{ color: (isFilterActive('shipment') || openFilterColumn === 'shipment') ? '#007AFF' : '#9CA3AF' }}>
+                <span style={{ color: (isFilterActive('shipment') || openFilterColumn === 'shipment') ? '#3B82F6' : '#9CA3AF' }}>
                   SHIPMENT
                 </span>
                 <img
@@ -1430,7 +1430,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                   gap: '0.5rem',
                 }}
               >
-                <span style={{ color: (isFilterActive('marketplace') || openFilterColumn === 'marketplace') ? '#007AFF' : '#9CA3AF' }}>
+                <span style={{ color: (isFilterActive('marketplace') || openFilterColumn === 'marketplace') ? '#3B82F6' : '#9CA3AF' }}>
                   TYPE
                 </span>
                 <svg
@@ -1439,7 +1439,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                   height="12"
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke={(isFilterActive('marketplace') || openFilterColumn === 'marketplace') ? '#007AFF' : '#9CA3AF'}
+                  stroke={(isFilterActive('marketplace') || openFilterColumn === 'marketplace') ? '#3B82F6' : '#9CA3AF'}
                   strokeWidth="2"
                   className={`transition-opacity cursor-pointer ${
                     (isFilterActive('marketplace') || openFilterColumn === 'marketplace')
@@ -1471,7 +1471,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                   gap: '0.5rem',
                 }}
               >
-                <span style={{ color: (isFilterActive('account') || openFilterColumn === 'account') ? '#007AFF' : '#9CA3AF' }}>
+                <span style={{ color: (isFilterActive('account') || openFilterColumn === 'account') ? '#3B82F6' : '#9CA3AF' }}>
                   ACCOUNT
                 </span>
                 <img
@@ -1511,12 +1511,12 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                 borderRight: 'none',
                 boxSizing: 'border-box',
                 position: 'relative',
-                color: (isFilterActive('addProducts') || openFilterColumn === 'addProducts') ? '#007AFF' : '#9CA3AF',
+                color: (isFilterActive('addProducts') || openFilterColumn === 'addProducts') ? '#3B82F6' : '#9CA3AF',
               }}
             >
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: '1.1', gap: '1px' }}>
-                <span style={{ fontSize: '9px', fontWeight: 600, color: (isFilterActive('addProducts') || openFilterColumn === 'addProducts') ? '#007AFF' : '#9CA3AF' }}>ADD</span>
-                <span style={{ fontSize: '9px', fontWeight: 600, color: (isFilterActive('addProducts') || openFilterColumn === 'addProducts') ? '#007AFF' : '#9CA3AF' }}>PRODUCTS</span>
+                <span style={{ fontSize: '9px', fontWeight: 600, color: (isFilterActive('addProducts') || openFilterColumn === 'addProducts') ? '#3B82F6' : '#9CA3AF' }}>ADD</span>
+                <span style={{ fontSize: '9px', fontWeight: 600, color: (isFilterActive('addProducts') || openFilterColumn === 'addProducts') ? '#3B82F6' : '#9CA3AF' }}>PRODUCTS</span>
               </div>
               <img
                 ref={(el) => { if (el) filterIconRefs.current['addProducts'] = el; }}

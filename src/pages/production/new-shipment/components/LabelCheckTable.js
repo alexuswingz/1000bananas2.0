@@ -1829,9 +1829,9 @@ const LabelCheckTable = ({
                     onMouseLeave={() => setShowInfoTooltip(false)}
                     style={{ cursor: 'pointer' }}
                   >
-                    <circle cx="12" cy="12" r="10" stroke="#007AFF" strokeWidth="2" />
-                    <path d="M12 10v6" stroke="#007AFF" strokeWidth="2" strokeLinecap="round" />
-                    <circle cx="12" cy="7" r="1" fill="#007AFF" />
+                    <circle cx="12" cy="12" r="10" stroke="#3B82F6" strokeWidth="2" />
+                    <path d="M12 10v6" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" />
+                    <circle cx="12" cy="7" r="1" fill="#3B82F6" />
                   </svg>
                   {showInfoTooltip && (
                     <div
@@ -1869,9 +1869,9 @@ const LabelCheckTable = ({
                         }}
                       />
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style={{ marginTop: '2px' }}>
-                        <rect x="5" y="3" width="14" height="18" rx="2" stroke="#007AFF" strokeWidth="2" />
-                        <path d="M9 7h6" stroke="#007AFF" strokeWidth="2" strokeLinecap="round" />
-                        <path d="M9 11h6" stroke="#007AFF" strokeWidth="2" strokeLinecap="round" />
+                        <rect x="5" y="3" width="14" height="18" rx="2" stroke="#3B82F6" strokeWidth="2" />
+                        <path d="M9 7h6" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" />
+                        <path d="M9 11h6" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" />
                       </svg>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
                         <span style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>

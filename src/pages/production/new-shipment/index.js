@@ -3378,7 +3378,7 @@ const NewShipment = () => {
                       padding: '0 16px',
                       borderRadius: '6px',
                       border: 'none',
-                      backgroundColor: '#007AFF',
+                      backgroundColor: '#3B82F6',
                       color: '#FFFFFF',
                       fontSize: '14px',
                       fontWeight: 500,
@@ -3393,7 +3393,7 @@ const NewShipment = () => {
                       e.currentTarget.style.backgroundColor = '#0056CC';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#007AFF';
+                      e.currentTarget.style.backgroundColor = '#3B82F6';
                     }}
                   >
                     <svg
@@ -3511,7 +3511,7 @@ const NewShipment = () => {
                       padding: '0 16px',
                       borderRadius: '6px',
                       border: 'none',
-                      backgroundColor: '#007AFF',
+                      backgroundColor: '#3B82F6',
                       color: '#FFFFFF',
                       fontSize: '14px',
                       fontWeight: 500,
@@ -3526,7 +3526,7 @@ const NewShipment = () => {
                       e.currentTarget.style.backgroundColor = '#0056CC';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#007AFF';
+                      e.currentTarget.style.backgroundColor = '#3B82F6';
                     }}
                   >
                     <svg
@@ -3827,7 +3827,7 @@ const NewShipment = () => {
                     padding: '0 10px',
                     borderRadius: '6px',
                     border: 'none',
-                    backgroundColor: addedRows.size > 0 ? '#007AFF' : '#9CA3AF',
+                    backgroundColor: addedRows.size > 0 ? '#3B82F6' : '#9CA3AF',
                     color: '#FFFFFF',
                     fontSize: '14px',
                     fontWeight: 500,

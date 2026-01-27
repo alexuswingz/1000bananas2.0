@@ -175,7 +175,7 @@ const LabelCheckCompleteModal = ({ isOpen, onClose, onGoToShipments, onBeginForm
                 padding: '0 12px',
                 borderRadius: '4px',
                 border: 'none',
-                backgroundColor: '#007AFF',
+                backgroundColor: '#3B82F6',
                 color: '#FFFFFF',
                 fontSize: '13px',
                 fontWeight: 600,
@@ -190,7 +190,7 @@ const LabelCheckCompleteModal = ({ isOpen, onClose, onGoToShipments, onBeginForm
                 e.currentTarget.style.backgroundColor = '#005FCC';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#007AFF';
+                e.currentTarget.style.backgroundColor = '#3B82F6';
               }}
             >
               {isFormulaCheckCompleted ? 'Begin Book Shipment' : 'Begin Formula Check'}
