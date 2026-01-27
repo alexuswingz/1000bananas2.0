@@ -16,7 +16,10 @@ import {
   Legend, 
   ResponsiveContainer,
   ComposedChart,
-  Brush
+  Brush,
+  Area,
+  ReferenceArea,
+  ReferenceLine
 } from 'recharts';
 
 const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = null, overrideUnitsToMake = null, onAddUnits = null, labelsAvailable = null, openDoiSettings = false, openForecastSettings = false, onDoiSettingsChange = null, onForecastSettingsChange = null }) => {
@@ -432,6 +435,29 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     const getForecastValue = (item) => {
       return item.forecast || item.adj_forecast || 0;
     };
+
+    // Helper to calculate prior year value from historical data (fallback when backend doesn't provide it)
+    const getPriorYearValue = (targetDate, historicalData) => {
+      const priorYearDate = new Date(targetDate);
+      priorYearDate.setFullYear(priorYearDate.getFullYear() - 1);
+      const priorYearTs = priorYearDate.getTime();
+
+      let closest = null;
+      let minDiff = Infinity;
+
+      historicalData.forEach((h) => {
+        if (!h?.week_end) return;
+        const itemTs = new Date(h.week_end).getTime();
+        const diff = Math.abs(itemTs - priorYearTs);
+        // Only accept matches within ~1 week
+        if (diff < minDiff && diff < 7 * 24 * 60 * 60 * 1000) {
+          minDiff = diff;
+          closest = h;
+        }
+      });
+
+      return closest ? getSmoothValue(closest) : null;
+    };
     
     // Find max value to make bars span full chart height
     let maxValue = 0;
@@ -449,7 +475,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     const combinedData = [];
     
     // Add historical data
-    historical.forEach(item => {
+    historical.forEach((item, index) => {
       const itemDate = new Date(item.week_end);
       const isInInventoryPeriod = itemDate >= currentDate && itemDate <= doiGoalDate;
       const isInFbaAvailPeriod = itemDate >= currentDate && itemDate < runoutDate;
@@ -457,6 +483,19 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
       
       const smoothVal = getSmoothValue(item);
       const unitsSoldVal = getUnitsSoldValue(item);
+      // Get prior year data if available on historical points
+      const priorYearValHist = item.prior_year_smoothed ||
+                               item.priorYearSmoothed ||
+                               item.prior_year ||
+                               item.prior_year_smooth ||
+                               item.priorYear ||
+                               null;
+      
+      // Debug first historical item
+      if (index === 0) {
+        console.log('First historical item structure:', item);
+        console.log('Historical available properties:', Object.keys(item));
+      }
       
       combinedData.push({
         date: item.week_end,
@@ -464,6 +503,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         unitsSold: unitsSoldVal,
         unitsSmooth: smoothVal,
         forecastBase: smoothVal, // Smoothed units sold (forecast base) - shown from start
+        priorYearSmoothed: priorYearValHist,
         isForecast: false,
         isInDoiPeriod: isInInventoryPeriod,
         // Bars span full height when in their respective periods
@@ -484,6 +524,27 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
       
       const forecastVal = getForecastValue(item);
       
+      // Get prior year data if available (for comparison)
+      // Check multiple possible property names, then fall back to calculating from historical data
+      let priorYearVal = item.prior_year_smoothed || 
+                         item.priorYearSmoothed || 
+                         item.prior_year || 
+                         item.prior_year_smooth ||
+                         item.priorYear ||
+                         null;
+
+      // Fallback: if backend did not include prior year for this forecast point, derive it from historical data
+      if (priorYearVal == null) {
+        priorYearVal = getPriorYearValue(item.week_end, historical);
+      }
+      
+      // Debug logging for first forecast item to see data structure
+      if (index === 0) {
+        console.log('First forecast item structure:', item);
+        console.log('Prior year value found:', priorYearVal);
+        console.log('Available properties:', Object.keys(item));
+      }
+      
       // Only first forecast point gets forecastBase value for smooth transition from historical
       // After that, only forecastAdjusted (dashed) is shown
       combinedData.push({
@@ -492,6 +553,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         // forecastBase (solid) only at first point for smooth transition, then null
         forecastBase: index === 0 ? forecastVal : null,
         forecastAdjusted: forecastVal, // Forecast (dashed) takes over after Today
+        priorYearSmoothed: priorYearVal, // Prior year data for comparison (shows on forecast side)
         isForecast: true,
         isInDoiPeriod: isInInventoryPeriod,
         // Bars span full height when in their respective periods
@@ -508,12 +570,40 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         chartMaxValue,
         item.unitsSold || 0,
         item.forecastBase || 0,
-        item.forecastAdjusted || 0
+        item.forecastAdjusted || 0,
+        item.priorYearSmoothed || 0
       );
     });
     
     return { data: combinedData, maxValue: chartMaxValue };
   }, [chartData, forecastData, selectedView, doiGoalDays, doiSettings]);
+
+  // Y-axis tick values for Unit Forecast chart (exactly 5 numbers, evenly spaced)
+  const unitForecastYTicks = useMemo(() => {
+    const max = chartDisplayData.maxValue || 0;
+    if (max <= 0) return [];
+    const upper = Math.ceil(max * 1.1);
+    const tickCount = 5; // show 5 numbers including 0 and top
+    const rawStep = upper / (tickCount - 1);
+
+    // Round step to a clean number (1, 2, 5, 10, etc.)
+    const pow10 = Math.pow(10, Math.floor(Math.log10(rawStep || 1)));
+    const normalized = rawStep / pow10;
+    let nice;
+    if (normalized <= 1) nice = 1;
+    else if (normalized <= 2) nice = 2;
+    else if (normalized <= 5) nice = 5;
+    else nice = 10;
+    const step = nice * pow10;
+
+    const ticks = [];
+    for (let i = 0; i < tickCount; i++) {
+      // Use a consistent multiple of the step so gaps between ticks are equal
+      ticks.push(Math.round(i * step));
+    }
+
+    return ticks;
+  }, [chartDisplayData.maxValue]);
 
   // Timeline periods are now provided by the backend via forecastData.chart_rendering
   // This eliminates complex date calculations on the frontend
@@ -2177,235 +2267,349 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
 
 
           {/* Chart Area - More compact height when inventoryOnly */}
-          <div style={{ height: inventoryOnly ? '180px' : '320px', width: '100%', marginTop: '0.25rem', position: 'relative' }}>
+          <div style={{ height: inventoryOnly ? '188px' : '328px', width: '100%', marginTop: '0.25rem', position: 'relative' }}>
             {/* 
-              BACKEND-DRIVEN CHART RENDERING
-              Uses pre-calculated percentages from forecastData.chart_rendering
-              This ensures continuous backgrounds without gaps
+              ENHANCED CHART RENDERING
+              Using Recharts ReferenceArea and ReferenceLine for better integration
+              Colored backgrounds and Today marker are now rendered inside the chart
             */}
-            
-            {/* Colored Period Backgrounds - Position calculated from actual chart data timestamps */}
-            {forecastData?.chart_rendering?.periods && chartDisplayData?.data?.length > 0 && (() => {
-              const { periods } = forecastData.chart_rendering;
-              // These margins approximate Recharts' actual chart area
-              const leftMargin = 8.5;  // ~8.5% for Y-axis + labels
-              const chartWidth = 88;   // ~88% chart drawing area
-              
-              // Get actual chart data range (aligns with X-axis)
-              const data = chartDisplayData.data;
-              const startIdx = brushRange.startIndex ?? 0;
-              const endIdx = brushRange.endIndex ?? (data.length - 1);
-              
-              const minTs = data[startIdx]?.timestamp;
-              const maxTs = data[endIdx]?.timestamp;
-              
-              if (!minTs || !maxTs || minTs === maxTs) return null;
-              
-              const totalRange = maxTs - minTs;
-              
-              return periods.map(period => {
-                // IMPORTANT: Calculate timestamps the SAME way as chart data
-                // Using JavaScript Date parsing ensures perfect alignment with X-axis
-                const periodStartTs = new Date(period.start_date).getTime();
-                const periodEndTs = new Date(period.end_date).getTime();
-                
-                // Clamp to visible range
-                const clampedStart = Math.max(periodStartTs, minTs);
-                const clampedEnd = Math.min(periodEndTs, maxTs);
-                
-                // Skip if period is completely outside visible range
-                if (clampedStart >= clampedEnd || clampedEnd <= minTs || clampedStart >= maxTs) {
-                  return null;
-                }
-                
-                // Calculate percentages within visible range
-                const startPct = ((clampedStart - minTs) / totalRange) * 100;
-                const endPct = ((clampedEnd - minTs) / totalRange) * 100;
-                const widthPct = endPct - startPct;
-                
-                // Skip if width is negligible
-                if (widthPct <= 0) return null;
-                
-                const leftPos = leftMargin + (startPct * chartWidth / 100);
-                const width = widthPct * chartWidth / 100;
-                
-                return (
-                  <div
-                    key={period.id}
-                    style={{
-                      position: 'absolute',
-                      left: `${leftPos}%`,
-                      width: `${width}%`,
-                      top: '10px',
-                      bottom: '25%',  // Match exactly at X-axis line (bottom margin)
-                      backgroundColor: period.color,
-                      opacity: period.opacity,
-                      zIndex: 0,  // Behind chart lines
-                      pointerEvents: 'none'
-                    }}
-                    title={`${period.label}: ${period.days} days`}
-                  />
-                );
-              });
-            })()}
-            
-            {/* Today Marker - Position calculated from actual current date */}
-            {chartDisplayData?.data?.length > 0 && (() => {
-              // These margins approximate Recharts' actual chart area
-              // Adjusted for Y-axis labels and padding
-              const leftMargin = 8.5;  // ~8.5% for Y-axis + labels
-              const chartWidth = 88;   // ~88% chart drawing area
-              
-              // Calculate position based on ACTUAL chart data range (aligns with X-axis)
-              const data = chartDisplayData.data;
-              const startIdx = brushRange.startIndex ?? 0;
-              const endIdx = brushRange.endIndex ?? (data.length - 1);
-              
-              const minTs = data[startIdx]?.timestamp;
-              const maxTs = data[endIdx]?.timestamp;
-              
-              // Use ACTUAL current date from browser (not backend)
-              // This ensures Today is always the real current date
-              const now = new Date();
-              const todayTs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-              const formattedDate = `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear().toString().slice(-2)}`;
-              
-              // If today is outside visible range, don't render
-              if (!minTs || !maxTs || minTs === maxTs || todayTs < minTs || todayTs > maxTs) {
-                return null;
-              }
-              
-              // Calculate percentage within actual chart data range
-              const rawPercentage = ((todayTs - minTs) / (maxTs - minTs)) * 100;
-              const adjustedLeft = leftMargin + (rawPercentage * chartWidth / 100);
-              
-              return (
-                <>
-                  {/* Today Label - Above chart */}
-                  <div style={{
-                    position: 'absolute',
-                    top: inventoryOnly ? '-25px' : '-30px',
-                    left: `${adjustedLeft}%`,
-                    transform: 'translateX(-50%)',
-                    textAlign: 'center',
-                    whiteSpace: 'nowrap',
-                    zIndex: 10,
-                    pointerEvents: 'none',
-                    padding: inventoryOnly ? '0.25rem 0.5rem' : '0',
-                    minWidth: inventoryOnly ? '80px' : 'auto'
-                  }}>
-                    <div style={{ color: '#fff', fontSize: inventoryOnly ? '12px' : '14px', fontWeight: 700, lineHeight: 1.2 }}>Today</div>
-                    <div style={{ color: '#64748b', fontSize: inventoryOnly ? '10px' : '11px', lineHeight: 1.2 }}>{formattedDate}</div>
-                  </div>
-                  
-                  {/* Today Divider Line - Inside chart */}
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: `${adjustedLeft}%`,
-                      top: '10px',
-                      bottom: '25%',  // Match exactly at X-axis line
-                      width: '2px',
-                      background: 'repeating-linear-gradient(to bottom, #fff 0px, #fff 4px, transparent 4px, transparent 8px)',
-                      zIndex: 5,  // Above colors but below tooltips
-                      pointerEvents: 'none'
-                    }}
-                  />
-                </>
-              );
-            })()}
             
             {chartDisplayData?.data && chartDisplayData.data.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart
                   data={chartDisplayData.data}
-                  margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
+                  margin={{ top: 20, right: 20, left: 0, bottom: 20 }}
                   style={{ backgroundColor: 'transparent' }}
                 >
+                  <defs>
+                    <linearGradient id="unitsSoldGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6b7280" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#6b7280" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="forecastGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#f97316" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  {/* Base grid (no horizontal lines; we draw them via ReferenceLine below) */}
                   <CartesianGrid 
-                    strokeDasharray="0" 
-                    stroke="rgba(148, 163, 184, 0.15)" 
+                    strokeDasharray="3 3" 
+                    stroke="#111827" 
                     vertical={false} 
+                    horizontal={false}
                     strokeWidth={1}
-                    yAxisId="left"
                   />
-                  
-                  {/* Period backgrounds are now rendered via CSS absolute divs above for pixel-perfect continuous rendering */}
                   
                   <XAxis 
                     dataKey="timestamp" 
                     type="number"
                     domain={['dataMin', 'dataMax']}
-                    stroke="#64748b"
-                    tick={{ fill: '#94a3b8', fontSize: 10 }}
-                    tickLine={{ stroke: '#64748b' }}
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#6b7280', fontSize: 10 }}
                     tickFormatter={(value) => {
                       const date = new Date(value);
-                      return `${date.getUTCMonth() + 1}/${date.getUTCDate()}/${date.getUTCFullYear().toString().slice(-2)}`;
+                      return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
                     }}
-                    tickCount={8}
-                    interval="preserveStartEnd"
-                    height={30}
+                    interval={Math.max(0, Math.floor(chartDisplayData.data.length / 8))}
                   />
                   <YAxis 
                     yAxisId="left"
                     axisLine={false}
-                    tick={{ fill: '#94a3b8', fontSize: 11 }}
-                    tickLine={{ stroke: '#64748b' }}
+                    tickLine={false}
+                    tick={{ fill: '#6b7280', fontSize: 11 }}
+                    ticks={unitForecastYTicks}
                     tickFormatter={(value) => {
                       if (value >= 1000) {
-                        const k = value / 1000;
-                        return k % 1 === 0 ? `${k}k` : `${k.toFixed(1)}k`;
+                        return `${(value / 1000).toFixed(0)}k`;
                       }
                       return Math.round(value);
                     }}
-                    domain={[0, chartDisplayData.maxValue ? Math.ceil(chartDisplayData.maxValue * 1.1) : 'auto']}
-                    tickCount={6}
-                    allowDecimals={false}
-                    label={{ value: 'Units Sold', angle: -90, position: 'insideLeft', style: { fill: '#94a3b8', fontSize: 12 } }}
+                    domain={[0, unitForecastYTicks.length ? unitForecastYTicks[unitForecastYTicks.length - 1] : (chartDisplayData.maxValue ? Math.ceil(chartDisplayData.maxValue * 1.1) : 'auto')]}
                   />
-                  <Tooltip content={<CustomTooltip />} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#1f2937', 
+                      border: '1px solid #374151',
+                      borderRadius: '8px',
+                      color: '#fff'
+                    }}
+                    labelStyle={{ color: '#9ca3af' }}
+                  />
                   
-                  {/* Period backgrounds are rendered via CSS absolute divs (see above) */}
+                  {/* Render horizontal dashed lines for each Y tick */}
+                  {unitForecastYTicks.map((v) => (
+                    <ReferenceLine
+                      key={`unit-y-${v}`}
+                      y={v}
+                      yAxisId="left"
+                      stroke="rgba(148, 163, 184, 0.55)"
+                      strokeDasharray="3 3"
+                      strokeWidth={0.75}
+                    />
+                  ))}
                   
-                  {/* Unit Sales - Grey line (matching image) */}
-                  <Line 
+                  {/* Render colored DOI segments and Today marker */}
+                  {(() => {
+                    const data = chartDisplayData.data;
+                    if (!data || data.length === 0) return null;
+                    
+                    // Use backend-provided periods if available (fallback method)
+                    if (forecastData?.chart_rendering?.periods && forecastData.chart_rendering.periods.length > 0) {
+                      const periods = forecastData.chart_rendering.periods;
+                      console.log('Using backend-provided periods:', periods.length);
+                      
+                      // Map period colors to match our new color scheme
+                      const colorMap = {
+                        '#a855f7': '#a855f7', // Violet - FBA
+                        '#15803d': '#10b981', // Green - Total (updated to brighter green)
+                        '#3b82f6': '#3b82f6'  // Blue - Forecast
+                      };
+                      
+                      // Narrow all periods while keeping them touching (no gaps between neighbors)
+                      const narrowFactor = 0.6; // 60% of original span
+                      const firstStart = new Date(periods[0].start_date).getTime();
+                      const lastEnd = new Date(periods[periods.length - 1].end_date).getTime();
+                      const totalSpan = lastEnd - firstStart || 1;
+
+                      return (
+                        <>
+                          {periods.map((period, idx) => {
+                            const startTs = new Date(period.start_date).getTime();
+                            const endTs = new Date(period.end_date).getTime();
+                            const mappedColor = colorMap[period.color] || period.color;
+
+                            // Linearly compress segment positions towards the firstStart to keep bands contiguous
+                            const narrowStart = firstStart + (startTs - firstStart) * narrowFactor;
+                            const narrowEnd = firstStart + (endTs - firstStart) * narrowFactor;
+                            
+                            return (
+                              <ReferenceArea
+                                key={`period-${idx}`}
+                                x1={narrowStart}
+                                x2={narrowEnd}
+                                fill={mappedColor}
+                                fillOpacity={0.2}
+                                yAxisId="left"
+                              />
+                            );
+                          })}
+                          
+                          {/* Today marker from backend or calculated */}
+                          {(() => {
+                            const todayTs = new Date().setHours(0, 0, 0, 0);
+                            let todayPoint = data.find(p => Math.abs(new Date(p.timestamp).setHours(0, 0, 0, 0) - todayTs) < 86400000);
+                            if (!todayPoint) todayPoint = data[Math.floor(data.length / 3)]; // Fallback
+                            
+                            return todayPoint ? (
+                              <ReferenceLine 
+                                x={todayPoint.timestamp}
+                                stroke="#ffffff"
+                                strokeDasharray="4 4"
+                                strokeWidth={2}
+                                strokeOpacity={0.9}
+                                yAxisId="left"
+                                label={{ 
+                                  value: 'Today', 
+                                  position: 'top', 
+                                  fill: '#ffffff', 
+                                  fontSize: 12,
+                                  fontWeight: '600',
+                                  offset: 8
+                                }}
+                              />
+                            ) : null;
+                          })()}
+                        </>
+                      );
+                    }
+                    
+                    // Find today's data point
+                    const todayTs = new Date().setHours(0, 0, 0, 0);
+                    let todayDataPoint = null;
+                    let todayIndex = -1;
+                    let minDiff = Infinity;
+                    
+                    data.forEach((point, idx) => {
+                      const pointTs = new Date(point.timestamp).setHours(0, 0, 0, 0);
+                      const diff = Math.abs(pointTs - todayTs);
+                      if (diff < minDiff) {
+                        minDiff = diff;
+                        todayDataPoint = point;
+                        todayIndex = idx;
+                      }
+                    });
+                    
+                    if (!todayDataPoint || todayIndex === -1) {
+                      console.log('No today data point found');
+                      return null;
+                    }
+                    
+                    // Get DOI days from forecastData
+                    const fbaD = forecastData?.doi_fba || forecastData?.fba_days || 0;
+                    const totalD = forecastData?.doi_total || forecastData?.total_days || 0;
+                    
+                    // Calculate forecast end based on units to make and velocity
+                    const dailyVelocity = forecastData?.daily_velocity || forecastData?.velocity_daily || 1;
+                    const unitsToMake = forecastData?.units_to_make || 0;
+                    const forecastDays = dailyVelocity > 0 ? Math.round(unitsToMake / dailyVelocity) : 0;
+                    const forecastD = totalD + forecastDays;
+                    
+                    console.log('DOI Values:', { fbaD, totalD, forecastD, forecastDays, dailyVelocity, unitsToMake });
+                    
+                    // Find data points for each segment boundary using index-based approach
+                    const findClosestPoint = (targetDays) => {
+                      if (targetDays <= 0) return null;
+                      const targetDate = new Date(todayTs + targetDays * 86400000);
+                      let closest = null;
+                      let closestIdx = -1;
+                      let minDiff = Infinity;
+                      
+                      // Start searching from today's index forward
+                      for (let i = todayIndex; i < data.length; i++) {
+                        const point = data[i];
+                        const diff = Math.abs(new Date(point.timestamp) - targetDate);
+                        if (diff < minDiff) {
+                          minDiff = diff;
+                          closest = point;
+                          closestIdx = i;
+                        }
+                        // Stop if we're moving away from target
+                        if (i > todayIndex && diff > minDiff * 2) break;
+                      }
+                      
+                      console.log(`Finding point for ${targetDays} days:`, closest ? 'Found' : 'Not found', closestIdx);
+                      return closest;
+                    };
+                    
+                    const fbaPoint = fbaD > 0 ? findClosestPoint(fbaD) : null;
+                    const totalPoint = totalD > 0 ? findClosestPoint(totalD) : null;
+                    const forecastPoint = forecastD > 0 ? findClosestPoint(forecastD) : null;
+                    
+                    console.log('Segment Points:', { 
+                      today: todayDataPoint?.timestamp, 
+                      fba: fbaPoint?.timestamp, 
+                      total: totalPoint?.timestamp, 
+                      forecast: forecastPoint?.timestamp 
+                    });
+                    
+                    return (
+                      <>
+                        {/* Violet area: Today to FBA (narrow, contiguous with next segments) */}
+                        {todayDataPoint && fbaPoint && fbaD > 0 && (
+                          <ReferenceArea
+                            x1={todayDataPoint.timestamp}
+                            x2={todayDataPoint.timestamp + (fbaPoint.timestamp - todayDataPoint.timestamp) * 0.6}
+                            fill="#a855f7"
+                            fillOpacity={0.2}
+                            yAxisId="left"
+                          />
+                        )}
+                        
+                        {/* Green area: FBA to Total (narrow, starts where previous ends) */}
+                        {fbaPoint && totalPoint && totalD > fbaD && (
+                          <ReferenceArea
+                            x1={todayDataPoint.timestamp + (fbaPoint.timestamp - todayDataPoint.timestamp) * 0.6}
+                            x2={todayDataPoint.timestamp + (fbaPoint.timestamp - todayDataPoint.timestamp) * 0.6 + (totalPoint.timestamp - fbaPoint.timestamp) * 0.6}
+                            fill="#10b981"
+                            fillOpacity={0.2}
+                            yAxisId="left"
+                          />
+                        )}
+                        
+                        {/* Blue area: Total to Forecast end (narrow, starts where previous ends) */}
+                        {totalPoint && forecastPoint && forecastD > totalD && (
+                          <ReferenceArea
+                            x1={todayDataPoint.timestamp + (fbaPoint.timestamp - todayDataPoint.timestamp) * 0.6 + (totalPoint.timestamp - fbaPoint.timestamp) * 0.6}
+                            x2={todayDataPoint.timestamp + (fbaPoint.timestamp - todayDataPoint.timestamp) * 0.6 + (totalPoint.timestamp - fbaPoint.timestamp) * 0.6 + (forecastPoint.timestamp - totalPoint.timestamp) * 0.6}
+                            fill="#3b82f6"
+                            fillOpacity={0.2}
+                            yAxisId="left"
+                          />
+                        )}
+                        
+                        {/* Fallback: If segments aren't showing, render full forecast area in blue */}
+                        {todayDataPoint && forecastPoint && (!fbaPoint || !totalPoint) && (
+                          <ReferenceArea
+                            x1={todayDataPoint.timestamp}
+                            x2={forecastPoint.timestamp}
+                            fill="#3b82f6"
+                            fillOpacity={0.15}
+                            yAxisId="left"
+                          />
+                        )}
+                        
+                        {/* Today marker */}
+                        {todayDataPoint && (
+                          <ReferenceLine 
+                            x={todayDataPoint.timestamp}
+                            stroke="#ffffff"
+                            strokeDasharray="4 4"
+                            strokeWidth={2}
+                            strokeOpacity={0.9}
+                            yAxisId="left"
+                            label={{ 
+                              value: 'Today', 
+                              position: 'top', 
+                              fill: '#ffffff', 
+                              fontSize: 12,
+                              fontWeight: '600',
+                              offset: 8
+                            }}
+                          />
+                        )}
+                      </>
+                    );
+                  })()}
+                  
+                  {/* Units Sold Area (Historical) */}
+                  <Area 
                     yAxisId="left"
                     type="monotone" 
                     dataKey="unitsSold" 
-                    stroke="#64748b" 
-                    strokeWidth={2.5}
-                    dot={false}
+                    stroke="#6b7280"
+                    strokeWidth={1}
+                    fill="url(#unitsSoldGradient)"
                     name="Units Sold"
-                    connectNulls
-                    activeDot={{ r: 4, fill: '#64748b' }}
+                    connectNulls={false}
                   />
                   
-                  {/* Smoothed Units Sold - Orange solid line from start, continues into forecast period (matching image) */}
+                  {/* Smoothed Units Sold - Orange solid line */}
                   <Line 
                     yAxisId="left"
                     type="monotone" 
                     dataKey="forecastBase" 
                     stroke="#f97316" 
-                    strokeWidth={2.5}
+                    strokeWidth={2}
                     dot={false}
-                    name="Smoothed Units Sold"
-                    connectNulls
-                    activeDot={{ r: 4, fill: '#f97316' }}
+                    name="Units Sold Smoothed"
+                    connectNulls={false}
                   />
                   
-                  {/* Forecast - Orange dashed line (continues from forecastBase in forecast period, matching image) */}
+                  {/* Prior Year Smoothed - Gray dashed line (shows on forecast side) */}
+                  <Line 
+                    yAxisId="left"
+                    type="monotone" 
+                    dataKey="priorYearSmoothed" 
+                    stroke="#9ca3af"
+                    strokeWidth={1.5}
+                    strokeDasharray="4 4"
+                    dot={false}
+                    name="Prior Year Smoothed"
+                    connectNulls={false}
+                  />
+                  
+                  {/* Forecast - Orange dashed line */}
                   <Line 
                     yAxisId="left"
                     type="monotone" 
                     dataKey="forecastAdjusted" 
                     stroke="#f97316" 
-                    strokeWidth={2.5}
-                    strokeDasharray="8 4"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
                     dot={false}
                     name="Forecast"
-                    connectNulls
-                    activeDot={{ r: 4, fill: '#f97316' }}
+                    connectNulls={false}
                   />
                   
                 </ComposedChart>
@@ -2422,30 +2626,149 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             )}
           </div>
 
-          {/* Legend at bottom - matching image format: Lines on left, squares on right */}
+          {/* Legend at bottom - Enhanced style with gradients and colored backgrounds */}
           <div style={{ 
             display: 'flex', 
-            gap: inventoryOnly ? '0.35rem' : '0.75rem', 
-            marginTop: inventoryOnly ? '0.35rem' : '0.5rem', 
+            gap: inventoryOnly ? '0.5rem' : '1rem', 
+            marginTop: inventoryOnly ? '0.5rem' : '0.75rem', 
+            paddingTop: inventoryOnly ? '0.5rem' : '0.75rem',
+            borderTop: '1px solid #1f2937',
             justifyContent: 'center', 
-            fontSize: inventoryOnly ? '0.65rem' : '0.75rem',
+            fontSize: inventoryOnly ? '0.7rem' : '0.75rem',
             flexWrap: 'wrap'
           }}>
-            {/* Left side - Lines */}
-            <div style={{ display: 'flex', gap: inventoryOnly ? '0.35rem' : '0.5rem', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                <div style={{ width: inventoryOnly ? '18px' : '24px', height: '2px', backgroundColor: '#64748b' }}></div>
-                <span style={{ color: '#94a3b8' }}>Units Sold</span>
+            {/* Chart Series Legend */}
+            <div style={{ display: 'flex', gap: inventoryOnly ? '0.75rem' : '1.25rem', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.5rem',
+                padding: '0.375rem 0.75rem',
+                borderRadius: '0.5rem',
+                backgroundColor: 'rgba(17, 24, 39, 0.5)',
+                transition: 'background-color 0.2s'
+              }}>
+                <div style={{ width: '20px', height: '12px', backgroundColor: 'rgba(107, 114, 128, 0.5)', borderRadius: '2px', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }}></div>
+                <span style={{ color: '#d1d5db', fontWeight: '500' }}>Units Sold</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                <div style={{ width: inventoryOnly ? '18px' : '24px', height: '2px', backgroundColor: '#f97316' }}></div>
-                <span style={{ color: '#94a3b8' }}>Smoothed Units Sold</span>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.5rem',
+                padding: '0.375rem 0.75rem',
+                borderRadius: '0.5rem',
+                backgroundColor: 'rgba(17, 24, 39, 0.5)',
+                transition: 'background-color 0.2s'
+              }}>
+                <div style={{ width: '24px', height: '2px', backgroundColor: '#f97316', borderRadius: '1px', boxShadow: '0 1px 2px rgba(249, 115, 22, 0.3)' }}></div>
+                <span style={{ color: '#d1d5db', fontWeight: '500' }}>Units Sold Smoothed</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                <div style={{ width: inventoryOnly ? '18px' : '24px', height: '2px', borderTop: '2px dashed #f97316' }}></div>
-                <span style={{ color: '#94a3b8' }}>Forecast</span>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.5rem',
+                padding: '0.375rem 0.75rem',
+                borderRadius: '0.5rem',
+                backgroundColor: 'rgba(17, 24, 39, 0.5)',
+                transition: 'background-color 0.2s'
+              }}>
+                <div style={{ 
+                  width: '24px', 
+                  height: '2px', 
+                  backgroundImage: 'repeating-linear-gradient(90deg, #9ca3af 0, #9ca3af 3px, transparent 3px, transparent 6px)',
+                  borderRadius: '1px'
+                }}></div>
+                <span style={{ color: '#d1d5db', fontWeight: '500' }}>Prior Year Smoothed</span>
+              </div>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.5rem',
+                padding: '0.375rem 0.75rem',
+                borderRadius: '0.5rem',
+                backgroundColor: 'rgba(17, 24, 39, 0.5)',
+                transition: 'background-color 0.2s'
+              }}>
+                <div style={{ 
+                  width: '24px', 
+                  height: '2px', 
+                  backgroundImage: 'repeating-linear-gradient(90deg, #f97316 0, #f97316 3px, transparent 3px, transparent 6px)',
+                  borderRadius: '1px'
+                }}></div>
+                <span style={{ color: '#d1d5db', fontWeight: '500' }}>Forecast</span>
               </div>
             </div>
+            
+            {/* DOI Segment Legend with Gradients */}
+            <div style={{ 
+              display: 'flex', 
+              gap: inventoryOnly ? '0.75rem' : '1.25rem', 
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexWrap: 'wrap',
+              paddingLeft: inventoryOnly ? '0' : '1rem',
+              marginLeft: inventoryOnly ? '0' : '1rem',
+              borderLeft: inventoryOnly ? 'none' : '1px solid #1f2937'
+            }}>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.5rem',
+                padding: '0.375rem 0.75rem',
+                borderRadius: '0.5rem',
+                backgroundColor: 'rgba(17, 24, 39, 0.5)',
+                transition: 'background-color 0.2s'
+              }}>
+                <div style={{ 
+                  width: '16px', 
+                  height: '16px', 
+                  background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
+                  borderRadius: '4px',
+                  boxShadow: '0 1px 3px rgba(124, 58, 237, 0.3)'
+                }}></div>
+                <span style={{ color: '#d1d5db', fontWeight: '500' }}>FBA Available</span>
+              </div>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.5rem',
+                padding: '0.375rem 0.75rem',
+                borderRadius: '0.5rem',
+                backgroundColor: 'rgba(17, 24, 39, 0.5)',
+                transition: 'background-color 0.2s'
+              }}>
+                <div style={{ 
+                  width: '16px', 
+                  height: '16px', 
+                  background: 'linear-gradient(135deg, #22c55e, #4ade80)',
+                  borderRadius: '4px',
+                  boxShadow: '0 1px 3px rgba(34, 197, 94, 0.3)'
+                }}></div>
+                <span style={{ color: '#d1d5db', fontWeight: '500' }}>Total Inv.</span>
+              </div>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.5rem',
+                padding: '0.375rem 0.75rem',
+                borderRadius: '0.5rem',
+                backgroundColor: 'rgba(17, 24, 39, 0.5)',
+                transition: 'background-color 0.2s'
+              }}>
+                <div style={{ 
+                  width: '16px', 
+                  height: '16px', 
+                  background: 'linear-gradient(135deg, #3b82f6, #60a5fa)',
+                  borderRadius: '4px',
+                  boxShadow: '0 1px 3px rgba(59, 130, 246, 0.3)'
+                }}></div>
+                <span style={{ color: '#d1d5db', fontWeight: '500' }}>Forecast</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Legacy Right side - Period squares (kept for backwards compatibility but can be removed if not needed) */}
+          <div style={{ display: 'none' }}>
             
             {/* Right side - Squares */}
             <div style={{ display: 'flex', gap: inventoryOnly ? '0.35rem' : '0.5rem', alignItems: 'center' }}>
@@ -2582,7 +2905,13 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               <div className={themeClasses.cardBg} style={{ borderRadius: '0.75rem', padding: '1.5rem' }}>
                 <ResponsiveContainer width="100%" height={300}>
                   <ComposedChart data={salesChartData?.chart_data || []}>
-                    <CartesianGrid strokeDasharray="0" stroke="rgba(148, 163, 184, 0.5)" vertical={false} strokeWidth={1} />
+                    <CartesianGrid 
+                      strokeDasharray="4 4" 
+                      stroke="rgba(148, 163, 184, 0.45)" 
+                      vertical={false} 
+                      horizontal={true}
+                      strokeWidth={1} 
+                    />
                     <XAxis 
                       dataKey="date" 
                       stroke="#64748b"
@@ -3019,7 +3348,13 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               <div className={themeClasses.cardBg} style={{ borderRadius: '0.75rem', padding: '1.5rem' }}>
                 <ResponsiveContainer width="100%" height={300}>
                   <ComposedChart data={adsChartData?.chart_data || []}>
-                    <CartesianGrid strokeDasharray="0" stroke="rgba(148, 163, 184, 0.5)" vertical={false} strokeWidth={1} />
+                    <CartesianGrid 
+                      strokeDasharray="4 4" 
+                      stroke="rgba(148, 163, 184, 0.45)" 
+                      vertical={false} 
+                      horizontal={true}
+                      strokeWidth={1} 
+                    />
                     <XAxis 
                       dataKey="date" 
                       stroke="#64748b"
