@@ -1931,16 +1931,44 @@ const NewShipmentTable = ({
           0;
 
         if (suggested > 0) {
-          // For 8oz (and other case-based sizes), round up to the nearest
-          // size-based increment (e.g. 60 units for 8oz) so the default
-          // "Units to Make" quantity aligns with full-case production.
-          const increment = getQtyIncrement(row);
-          const roundedSuggested =
-            increment && increment > 1
-              ? Math.ceil(suggested / increment) * increment
-              : suggested;
+          newValues[index] = suggested;
+          changed = true;
+        }
+      });
 
-          newValues[index] = roundedSuggested;
+      return changed ? newValues : prev;
+    });
+  }, [rows, effectiveSetQtyValues]);
+
+  // Normalize existing qty values for case-based sizes (8oz, 6oz, 1/2 lb, 1 lb,
+  // quarts, gallons, etc.), rounding *up* to the nearest increment, but only
+  // for values the user has not manually edited.
+  useEffect(() => {
+    if (!rows || rows.length === 0) return;
+
+    effectiveSetQtyValues(prev => {
+      const baseValues = prev || {};
+      const newValues = { ...baseValues };
+      let changed = false;
+
+      rows.forEach((row, arrayIndex) => {
+        const index = row._originalIndex !== undefined ? row._originalIndex : arrayIndex;
+
+        // Don't touch values the user has manually edited
+        if (manuallyEditedIndices.current.has(index)) return;
+
+        const raw = newValues[index];
+        if (raw === undefined || raw === null || raw === '') return;
+
+        const num = typeof raw === 'number' ? raw : parseInt(raw, 10);
+        if (!num || isNaN(num) || num <= 0) return;
+
+        const increment = getQtyIncrement(row);
+        if (!increment || increment <= 1) return;
+
+        const rounded = Math.ceil(num / increment) * increment;
+        if (rounded !== num) {
+          newValues[index] = rounded;
           changed = true;
         }
       });
