@@ -1,6 +1,7 @@
 ﻿import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
+import { toast } from 'sonner';
 import SortFormulasFilterDropdown from '../../new-shipment/components/SortFormulasFilterDropdown';
 import ProductionNotesModal from './ProductionNotesModal';
 import SplitProductModal from './SplitProductModal';
@@ -308,15 +309,55 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
     setOpenFilterColumn((prev) => (prev === columnKey ? null : columnKey));
   };
 
+  // Handle copy ASIN to clipboard
+  const handleCopy = async (asin, e) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    if (!asin) return;
+    
+    try {
+      // Try modern clipboard API first
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(asin);
+      } else {
+        // Fallback for non-secure contexts or older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = asin;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+          document.execCommand('copy');
+        } finally {
+          document.body.removeChild(textArea);
+        }
+      }
+      toast.success('ASIN copied to clipboard', {
+        description: asin,
+        duration: 2000,
+      });
+    } catch (err) {
+      console.error('Failed to copy ASIN:', err);
+      toast.error('Failed to copy ASIN', {
+        description: 'Please try again',
+        duration: 2000,
+      });
+    }
+  };
+
   const columns = [
     { key: 'status', label: 'STATUS', minWidth: '140px', flex: '1.1', align: 'center' },
     { key: 'tpsShipNumber', label: 'TPS SHIP #', minWidth: '60px', flex: '0.8', align: 'center' },
     { key: 'type', label: 'TYPE', minWidth: '40px', flex: '0.5', align: 'center' },
-    { key: 'brand', label: 'BRAND', minWidth: '60px', flex: '1.1', align: 'center' },
-    { key: 'product', label: 'PRODUCT', minWidth: '80px', flex: '1.6', align: 'center', sortable: true },
-    { key: 'size', label: 'SIZE', minWidth: '50px', flex: '0.6', align: 'center' },
-    { key: 'qty', label: 'QTY', minWidth: '50px', flex: '0.7', align: 'center' },
-    { key: 'caseNumber', label: 'CASE #', minWidth: '50px', flex: '0.6', align: 'center' },
+    { key: 'brand', label: 'BRAND', minWidth: '80px', flex: '1.2', align: 'left' },
+    { key: 'product', label: 'PRODUCTS', minWidth: '80px', flex: '2.0', align: 'left', sortable: true },
+    { key: 'size', label: 'SIZE', minWidth: '100px', flex: '1.0', align: 'left' },
+    { key: 'qty', label: 'QUANTITY', minWidth: '50px', flex: '0.7', align: 'center' },
+    { key: 'caseNumber', label: 'CASE QTY', minWidth: '50px', flex: '0.6', align: 'center' },
     { key: 'sku', label: 'SKU', minWidth: '80px', flex: '2.2', align: 'center', sortable: true },
     { key: 'formula', label: 'FORMULA', minWidth: '60px', flex: '1.1', align: 'center' },
     { key: 'labelLocation', label: 'LABEL LOCATION', minWidth: '60px', flex: '1.0', align: 'center' },
@@ -353,11 +394,16 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
       {/* Desktop View */}
       {!isMobile && (
       <div
-        className={`w-full ${themeClasses.cardBg}`}
+        className="border rounded-xl"
         style={{
-          borderRadius: '8px',
-          border: '1px solid #E5E7EB',
-          overflow: 'hidden',
+          overflowX: 'hidden',
+          overflowY: 'visible',
+          position: 'relative',
+          backgroundColor: '#111827',
+          borderColor: '#111827',
+          borderWidth: '1px',
+          borderStyle: 'solid',
+          minHeight: 'auto',
           width: '100%',
           maxWidth: '100%',
           boxSizing: 'border-box',
@@ -365,10 +411,8 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
       >
         {/* Table header */}
         <div
-          className="bg-[#2C3544] border-b border-[#3C4656] w-full"
           style={{ 
-            height: '40px', 
-            borderRadius: '8px 8px 0 0',
+            backgroundColor: '#111827',
             width: '100%',
           }}
         >
@@ -392,12 +436,10 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   column.align === 'right' ? 'justify-end' : column.align === 'center' ? 'justify-center' : 'justify-start'
                 }`}
                 style={{
-                  paddingLeft: column.key === 'actions' ? '4px' : '6px',
-                  paddingRight: column.key === 'actions' ? '6px' : '6px',
-                  paddingTop: '10px',
-                  paddingBottom: '10px',
+                  padding: '0.75rem 1.25rem',
                   position: 'relative',
-                  borderRight: idx < columns.length - 1 && column.key !== 'actions' ? '1px solid rgba(255, 255, 255, 0.15)' : 'none',
+                  borderRight: 'none',
+                  boxSizing: 'border-box',
                 }}
               >
                 {column.key === 'actions' ? (
@@ -415,10 +457,10 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                     >
                       <span
                         style={{
-                          color: openFilterColumn === column.key ? '#007AFF' : '#FFFFFF',
-                          fontSize: '9px',
-                          fontWeight: 700,
-                          letterSpacing: '0.03em',
+                          color: openFilterColumn === column.key ? '#3B82F6' : '#9CA3AF',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          letterSpacing: '0.05em',
                           whiteSpace: 'nowrap',
                         }}
                       >
@@ -453,10 +495,10 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                     >
                       <span
                         style={{
-                          color: openFilterColumn === column.key ? '#007AFF' : '#FFFFFF',
-                          fontSize: '9px',
-                          fontWeight: 700,
-                          letterSpacing: '0.03em',
+                          color: openFilterColumn === column.key ? '#3B82F6' : '#9CA3AF',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          letterSpacing: '0.05em',
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
@@ -492,27 +534,38 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
         <div className="w-full">
           {filteredData.length === 0 ? (
             <div
-              className={`px-6 py-6 text-center text-sm ${themeClasses.textSecondary}`}
+              style={{
+                padding: '1.5rem',
+                textAlign: 'center',
+                fontSize: '0.875rem',
+                color: '#9CA3AF',
+              }}
             >
               No data available.
             </div>
           ) : (
             filteredData.map((row, index) => (
-              <div
-                key={row.id || index}
-                className={`grid ${themeClasses.cardBg} ${themeClasses.rowHover}`}
-                style={{
-                  gridTemplateColumns: columns.map((col) => {
-                    // Use minmax with fr units - allows columns to shrink below preferred but maintain minimum
-                    // At 90% zoom, columns can shrink more aggressively
-                    return `minmax(${col.minWidth}, ${col.flex}fr)`;
-                  }).join(' '),
-                  gap: '0',
-                  borderBottom:
-                    index === filteredData.length - 1
-                      ? 'none'
-                      : '1px solid #e5e7eb',
-                  minHeight: '38px',
+              <React.Fragment key={row.id || index}>
+                {/* Separator line above each row */}
+                <div
+                  style={{
+                    marginLeft: '1.25rem',
+                    marginRight: '1.25rem',
+                    height: '1px',
+                    backgroundColor: '#374151',
+                  }}
+                />
+                <div
+                  className="grid hover:bg-gray-800 transition-colors"
+                  style={{
+                    gridTemplateColumns: columns.map((col) => {
+                      // Use minmax with fr units - allows columns to shrink below preferred but maintain minimum
+                      // At 90% zoom, columns can shrink more aggressively
+                      return `minmax(${col.minWidth}, ${col.flex}fr)`;
+                    }).join(' '),
+                    gap: '0',
+                    borderBottom: 'none',
+                    minHeight: '60px',
                   opacity: draggedRowIndex === index ? 0.4 : (row.status === 'moved_s' || row.status === 'moved_fg') ? 0.6 : 1,
                   backgroundColor: row.status === 'moved_s' || row.status === 'moved_fg'
                     ? '#F3F4F6'
@@ -522,7 +575,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                         ? '#E0F2FE' 
                         : justMovedRowIndex === index
                           ? '#BFDBFE'
-                          : 'transparent',
+                          : '#111827',
                   border: draggedRowIndex === index 
                     ? '2px dashed #3B82F6' 
                     : draggedOverRowIndex === index && isSortMode 
@@ -556,10 +609,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                 <div
                   className="flex items-center justify-center"
                   style={{ 
-                    paddingLeft: '6px',
-                    paddingRight: '6px',
-                    paddingTop: '10px',
-                    paddingBottom: '10px',
+                    padding: '0.75rem 1.25rem',
                     minWidth: '120px',
                     width: '100%',
                     boxSizing: 'border-box',
@@ -746,15 +796,13 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
 
                 {/* TPS SHIP # */}
                 <div
-                  className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                  className="flex items-center justify-center"
                   style={{ 
-                    paddingLeft: '6px',
-                    paddingRight: '6px',
-                    paddingTop: '10px',
-                    paddingBottom: '10px',
+                    padding: '0.75rem 1.25rem',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
+                    color: '#FFFFFF',
                   }}
                 >
                   {row.tpsShipNumber}
@@ -762,15 +810,13 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
 
                 {/* TYPE */}
                 <div
-                  className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                  className="flex items-center justify-center"
                   style={{ 
-                    paddingLeft: '6px',
-                    paddingRight: '6px',
-                    paddingTop: '10px',
-                    paddingBottom: '10px',
+                    padding: '0.75rem 1.25rem',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
+                    color: '#FFFFFF',
                   }}
                 >
                   {row.type}
@@ -778,91 +824,271 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
 
                 {/* BRAND */}
                 <div
-                  className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                  className="flex items-center justify-start"
                   style={{ 
-                    paddingLeft: '6px',
-                    paddingRight: '6px',
-                    paddingTop: '10px',
-                    paddingBottom: '10px',
-                    cursor: 'pointer',
+                    padding: '0.75rem 1.25rem',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedProductForNotes(row);
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.textDecoration = 'underline';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.textDecoration = 'none';
+                    color: '#FFFFFF',
                   }}
                 >
-                  {row.brand}
+                  {row.brand || row.brand_name || ''}
                 </div>
 
                 {/* PRODUCT */}
                 <div
-                  className={`flex items-center justify-center ${themeClasses.textPrimary}`}
-                  style={{ 
-                    paddingLeft: '6px',
-                    paddingRight: '6px',
-                    paddingTop: '10px',
-                    paddingBottom: '10px',
+                  className="flex items-center"
+                  style={{
+                    padding: '0.75rem 1.25rem',
+                    gap: '12px',
+                    color: '#FFFFFF',
+                    justifyContent: 'flex-start',
+                    minWidth: 0,
+                    width: '100%',
+                    alignItems: 'flex-start',
                     overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    gap: '4px',
+                    boxSizing: 'border-box',
                   }}
                 >
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {row.product}
-                  </span>
-                  {row.isSplit && (
-                    <svg 
-                      width="14" 
-                      height="14" 
-                      viewBox="0 0 24 24" 
-                      fill="none" 
-                      stroke="#007AFF" 
-                      strokeWidth="2.5" 
-                      strokeLinecap="round" 
-                      strokeLinejoin="round"
-                      style={{ flexShrink: 0 }}
-                      title="Split Product"
-                    >
-                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                    </svg>
-                  )}
+                  {/* Product Image */}
+                  <div
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      minWidth: '36px',
+                      maxWidth: '36px',
+                      borderRadius: '3px',
+                      overflow: 'hidden',
+                      backgroundColor: '#374151',
+                      border: '1px solid #4B5563',
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {row.productImage ? (
+                      <img
+                        src={row.productImage}
+                        alt={row.product || 'Product'}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                        }}
+                      />
+                    ) : null}
+                    <div style={{
+                      display: row.productImage ? 'none' : 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '100%',
+                      height: '100%',
+                      borderRadius: '3px',
+                      gap: '2px',
+                      color: '#9CA3AF',
+                      fontSize: '10px'
+                    }}>
+                      <span>No</span>
+                      <span>img</span>
+                    </div>
+                  </div>
+
+                  {/* Product Info - Vertical Layout: Name on top, ASIN/Brand/Size below */}
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    minWidth: 0,
+                    flex: 1,
+                    width: '100%',
+                    overflow: 'hidden',
+                    boxSizing: 'border-box',
+                  }}>
+                    {/* Product Name - Clickable Link (Top) */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0, width: '100%' }}>
+                      <span
+                        style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          color: '#3B82F6',
+                          textDecoration: 'underline',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          fontWeight: 600,
+                          flexShrink: 1,
+                          minWidth: 0,
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onMoreDetails) {
+                            onMoreDetails(row);
+                          }
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.color = '#2563EB';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.color = '#3B82F6';
+                        }}
+                      >
+                        {row.product || 'Product Name'}
+                      </span>
+                      {row.isSplit && (
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#3B82F6"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          style={{ flexShrink: 0 }}
+                          title="Split Product"
+                        >
+                          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                        </svg>
+                      )}
+                    </div>
+
+                    {/* ASIN, Copy Icon, Brand, Size - Single Line (Below) */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      minWidth: 0,
+                      width: '100%',
+                      fontSize: '12px',
+                      flexWrap: 'nowrap',
+                      overflow: 'hidden',
+                      lineHeight: '1.5',
+                      boxSizing: 'border-box',
+                    }}>
+                      {/* ASIN */}
+                      {(() => {
+                        const asin = row.childAsin || row.asin || row.child_asin || '';
+                        return asin ? (
+                          <>
+                            <span style={{
+                              color: '#9CA3AF',
+                              fontSize: '12px',
+                              whiteSpace: 'nowrap',
+                              flexShrink: 0,
+                              letterSpacing: '0.01em',
+                              lineHeight: '1.5',
+                            }}>
+                              {asin}
+                            </span>
+                            {/* Copy Icon */}
+                            <img
+                              src="/assets/copyy.png"
+                              alt="Copy"
+                              onClick={(e) => handleCopy(asin, e)}
+                              style={{
+                                width: '14px',
+                                height: '14px',
+                                cursor: 'pointer',
+                                flexShrink: 0,
+                                display: 'block',
+                                verticalAlign: 'middle',
+                                marginLeft: '2px',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.opacity = '0.8';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.opacity = '1';
+                              }}
+                              title="Copy ASIN"
+                            />
+                          </>
+                        ) : null;
+                      })()}
+
+                      {/* Brand */}
+                      {row.brand && (
+                        <>
+                          <span style={{ 
+                            color: '#9CA3AF', 
+                            fontSize: '12px', 
+                            flexShrink: 0, 
+                            whiteSpace: 'nowrap', 
+                            lineHeight: '1.5',
+                            marginLeft: '2px',
+                            marginRight: '2px',
+                          }}>•</span>
+                          <span style={{
+                            color: '#9CA3AF',
+                            fontSize: '12px',
+                            flexShrink: 1,
+                            whiteSpace: 'nowrap',
+                            lineHeight: '1.5',
+                            minWidth: 0,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}>
+                            {row.brand}
+                          </span>
+                        </>
+                      )}
+
+                      {/* Size */}
+                      {row.size && (
+                        <>
+                          <span style={{ 
+                            color: '#9CA3AF', 
+                            fontSize: '12px', 
+                            flexShrink: 0, 
+                            whiteSpace: 'nowrap', 
+                            lineHeight: '1.5',
+                            marginLeft: '2px',
+                            marginRight: '2px',
+                          }}>•</span>
+                          <span style={{
+                            color: '#9CA3AF',
+                            fontSize: '12px',
+                            flexShrink: 1,
+                            whiteSpace: 'nowrap',
+                            lineHeight: '1.5',
+                            minWidth: 0,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}>
+                            {row.size}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* SIZE */}
                 <div
-                  className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                  className="flex items-center justify-start"
                   style={{ 
-                    paddingLeft: '6px',
-                    paddingRight: '6px',
-                    paddingTop: '10px',
-                    paddingBottom: '10px',
+                    color: '#FFFFFF',
+                    padding: '0.75rem 1.25rem',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
+                    minWidth: 0,
+                    boxSizing: 'border-box',
                   }}
                 >
-                  {row.size}
+                  {row.size || ''}
                 </div>
 
-                {/* QTY */}
+                {/* QUANTITY */}
                 <div
-                  className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                  className="flex items-center justify-center"
                   style={{ 
-                    paddingLeft: '6px',
-                    paddingRight: '6px',
-                    paddingTop: '10px',
-                    paddingBottom: '10px',
+                    color: '#FFFFFF',
+                    padding: '0.75rem 1.25rem',
                   }}
                 >
                   <input
@@ -878,18 +1104,17 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                       textAlign: 'center',
                       fontSize: '12px',
                       padding: '4px 6px',
+                      color: '#000000',
                     }}
                   />
                 </div>
 
-                {/* CASE # */}
+                {/* CASE QTY */}
                 <div
-                  className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                  className="flex items-center justify-center"
                   style={{ 
-                    paddingLeft: '6px',
-                    paddingRight: '6px',
-                    paddingTop: '10px',
-                    paddingBottom: '10px',
+                    color: '#FFFFFF',
+                    padding: '0.75rem 1.25rem',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
@@ -900,12 +1125,10 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
 
                 {/* SKU */}
                 <div
-                  className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                  className="flex items-center justify-center"
                   style={{ 
-                    paddingLeft: '6px',
-                    paddingRight: '6px',
-                    paddingTop: '10px',
-                    paddingBottom: '10px',
+                    color: '#FFFFFF',
+                    padding: '0.75rem 1.25rem',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
@@ -916,12 +1139,10 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
 
                 {/* FORMULA */}
                 <div
-                  className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                  className="flex items-center justify-center"
                   style={{ 
-                    paddingLeft: '6px',
-                    paddingRight: '6px',
-                    paddingTop: '10px',
-                    paddingBottom: '10px',
+                    color: '#FFFFFF',
+                    padding: '0.75rem 1.25rem',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
@@ -932,12 +1153,10 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
 
                 {/* LABEL LOCATION */}
                 <div
-                  className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                  className="flex items-center justify-center"
                   style={{ 
-                    paddingLeft: '6px',
-                    paddingRight: '6px',
-                    paddingTop: '10px',
-                    paddingBottom: '10px',
+                    color: '#FFFFFF',
+                    padding: '0.75rem 1.25rem',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
@@ -948,12 +1167,10 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
 
                 {/* CAP */}
                 <div
-                  className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                  className="flex items-center justify-center"
                   style={{ 
-                    paddingLeft: '6px',
-                    paddingRight: '6px',
-                    paddingTop: '10px',
-                    paddingBottom: '10px',
+                    color: '#FFFFFF',
+                    padding: '0.75rem 1.25rem',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
@@ -964,12 +1181,10 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
 
                 {/* TYPE (second instance - product type) */}
                 <div
-                  className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                  className="flex items-center justify-center"
                   style={{ 
-                    paddingLeft: '6px',
-                    paddingRight: '6px',
-                    paddingTop: '10px',
-                    paddingBottom: '10px',
+                    color: '#FFFFFF',
+                    padding: '0.75rem 1.25rem',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
@@ -980,12 +1195,10 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
 
                 {/* FILTER */}
                 <div
-                  className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                  className="flex items-center justify-center"
                   style={{ 
-                    paddingLeft: '6px',
-                    paddingRight: '6px',
-                    paddingTop: '10px',
-                    paddingBottom: '10px',
+                    color: '#FFFFFF',
+                    padding: '0.75rem 1.25rem',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
@@ -998,10 +1211,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                 <div
                   className="flex items-center justify-center"
                   style={{ 
-                    paddingLeft: '6px',
-                    paddingRight: '6px',
-                    paddingTop: '10px',
-                    paddingBottom: '10px',
+                    padding: '0.75rem 1.25rem',
                   }}
                 >
                   <button
@@ -1071,6 +1281,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   </button>
                 </div>
               </div>
+              </React.Fragment>
             ))
           )}
         </div>

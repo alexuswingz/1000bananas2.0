@@ -638,6 +638,9 @@ class NgoosAPI {
         products: (data.forecasts || []).map(f => ({
           asin: f.asin,
           product_name: f.product_name,
+          brand: f.brand || f.brand_name || null,
+          brand_name: f.brand_name || f.brand || null,
+          size: f.size || null,
           image_url: f.image_url,  // Shopify product image
           algorithm: f.algorithm,
           age_months: f.age_months,
@@ -698,8 +701,9 @@ class NgoosAPI {
       const products = (data.products || []).map(product => ({
         asin: product.asin,
         product_name: product.product_name,
-        size: extractSizeFromName(product.product_name),
+        size: product.size || extractSizeFromName(product.product_name),
         brand: product.brand || product.brand_name || product.product_info?.brand || null,
+        brand_name: product.brand_name || product.brand || null,
         algorithm: product.algorithm,
         age_months: product.age_months,
         qty: product.units_to_make || 0,           // QTY = units_to_make

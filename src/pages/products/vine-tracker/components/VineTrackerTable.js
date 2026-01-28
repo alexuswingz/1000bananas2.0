@@ -1224,10 +1224,12 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
                                     const filteredProducts = planningProducts.filter(product => {
                                       if (!productDropdownSearchValue) return true;
                                       const searchLower = productDropdownSearchValue.toLowerCase();
+                                      const brand = (product.brand || product.brand_name || '').toLowerCase();
+                                      const asin = (product.asin || product.child_asin || '').toLowerCase();
                                       return (
                                         (product.product_name || '').toLowerCase().includes(searchLower) ||
-                                        (product.brand || '').toLowerCase().includes(searchLower) ||
-                                        (product.asin || '').toLowerCase().includes(searchLower) ||
+                                        brand.includes(searchLower) ||
+                                        asin.includes(searchLower) ||
                                         (product.size || '').toLowerCase().includes(searchLower)
                                       );
                                     });
@@ -1257,9 +1259,9 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
                                           if (isDisabled) return; // Don't allow selection if disabled
                                           const selectedProduct = {
                                             productName: product.product_name || '',
-                                            brand: product.brand || '',
+                                            brand: product.brand || product.brand_name || '',
                                             size: product.size || '',
-                                            asin: product.asin || '',
+                                            asin: product.asin || product.child_asin || '',
                                           };
                                           if (onUpdateRow) {
                                             onUpdateRow({ ...row, ...selectedProduct });
@@ -1344,57 +1346,68 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
                                             display: 'flex',
                                             alignItems: 'center',
                                             gap: '6px',
-                                            flexWrap: 'wrap',
+                                            flexWrap: 'nowrap',
                                           }}>
-                                            {[product.brand, product.size].filter(Boolean).join(' • ')}
-                                            {product.asin && (
-                                              <>
-                                                {product.brand || product.size ? ' • ' : ''}
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                  <span>{product.asin}</span>
-                                                  <img 
-                                                    src="/assets/copyy.png" 
-                                                    alt="Copy" 
-                                                    onClick={async (e) => {
-                                                      e.stopPropagation();
-                                                      try {
-                                                        // Try modern clipboard API first
-                                                        if (navigator.clipboard && navigator.clipboard.writeText) {
-                                                          await navigator.clipboard.writeText(product.asin);
-                                                        } else {
-                                                          // Fallback for non-secure contexts or older browsers
-                                                          const textArea = document.createElement('textarea');
-                                                          textArea.value = product.asin;
-                                                          textArea.style.position = 'fixed';
-                                                          textArea.style.left = '-999999px';
-                                                          textArea.style.top = '-999999px';
-                                                          document.body.appendChild(textArea);
-                                                          textArea.focus();
-                                                          textArea.select();
-                                                          try {
-                                                            document.execCommand('copy');
-                                                          } finally {
-                                                            document.body.removeChild(textArea);
-                                                          }
-                                                        }
-                                                        toast.success('ASIN copied to clipboard', {
-                                                          description: product.asin,
-                                                          duration: 2000,
-                                                        });
-                                                      } catch (err) {
-                                                        console.error('Failed to copy ASIN:', err);
-                                                        toast.error('Failed to copy ASIN', {
-                                                          description: 'Please try again',
-                                                          duration: 2000,
-                                                        });
-                                                      }
-                                                    }}
-                                                    style={{ width: '14px', height: '14px', cursor: 'pointer', flexShrink: 0, opacity: isDisabled ? 0.5 : 1 }} 
-                                                  />
-                                                </div>
-                                              </>
-                                            )}
-                                            {!product.brand && !product.size && !product.asin && 'N/A'}
+                                            {(() => {
+                                              const brand = product.brand || product.brand_name || '';
+                                              const size = product.size || '';
+                                              const asin = product.asin || '';
+                                              const parts = [brand, size].filter(Boolean);
+                                              
+                                              return (
+                                                <>
+                                                  {parts.length > 0 && parts.join(' • ')}
+                                                  {asin && (
+                                                    <>
+                                                      {parts.length > 0 && ' • '}
+                                                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <span>{asin}</span>
+                                                        <img 
+                                                          src="/assets/copyy.png" 
+                                                          alt="Copy" 
+                                                          onClick={async (e) => {
+                                                            e.stopPropagation();
+                                                            try {
+                                                              // Try modern clipboard API first
+                                                              if (navigator.clipboard && navigator.clipboard.writeText) {
+                                                                await navigator.clipboard.writeText(asin);
+                                                              } else {
+                                                                // Fallback for non-secure contexts or older browsers
+                                                                const textArea = document.createElement('textarea');
+                                                                textArea.value = asin;
+                                                                textArea.style.position = 'fixed';
+                                                                textArea.style.left = '-999999px';
+                                                                textArea.style.top = '-999999px';
+                                                                document.body.appendChild(textArea);
+                                                                textArea.focus();
+                                                                textArea.select();
+                                                                try {
+                                                                  document.execCommand('copy');
+                                                                } finally {
+                                                                  document.body.removeChild(textArea);
+                                                                }
+                                                              }
+                                                              toast.success('ASIN copied to clipboard', {
+                                                                description: asin,
+                                                                duration: 2000,
+                                                              });
+                                                            } catch (err) {
+                                                              console.error('Failed to copy ASIN:', err);
+                                                              toast.error('Failed to copy ASIN', {
+                                                                description: 'Please try again',
+                                                                duration: 2000,
+                                                              });
+                                                            }
+                                                          }}
+                                                          style={{ width: '14px', height: '14px', cursor: 'pointer', flexShrink: 0, opacity: isDisabled ? 0.5 : 1 }} 
+                                                        />
+                                                      </div>
+                                                    </>
+                                                  )}
+                                                  {parts.length === 0 && !asin && 'N/A'}
+                                                </>
+                                              );
+                                            })()}
                                           </div>
                                         </div>
                                       </div>
@@ -1627,6 +1640,7 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
                               onUpdateRow({ ...row, claimed: parseInt(e.target.value) || 0 });
                             }
                           }}
+                          className="no-spinner"
                           style={{
                             width: '72px',
                             height: '27px',
@@ -1642,6 +1656,7 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
                             boxSizing: 'border-box',
                             textAlign: 'center',
                           }}
+                          onWheel={(e) => e.target.blur()}
                         />
                       </div>
                     ) : (
@@ -1674,6 +1689,7 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
                               onUpdateRow({ ...row, enrolled: parseInt(e.target.value) || 0 });
                             }
                           }}
+                          className="no-spinner"
                           style={{
                             width: '72px',
                             height: '27px',
@@ -1689,6 +1705,7 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
                             boxSizing: 'border-box',
                             textAlign: 'center',
                           }}
+                          onWheel={(e) => e.target.blur()}
                         />
                       </div>
                     ) : (

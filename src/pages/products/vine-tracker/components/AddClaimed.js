@@ -618,7 +618,7 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
         <div
           style={{
             width: '600px',
-            height: '490px',
+            maxHeight: '90vh',
             backgroundColor: '#111827',
             borderRadius: '12px',
             borderWidth: '1px',
@@ -627,14 +627,14 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
             display: 'flex',
             flexDirection: 'column',
-            overflow: 'hidden',
+            overflow: 'visible',
           }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
           <div
             style={{
-              width: '600px',
+              width: '100%',
               height: '52px',
               padding: '16px',
               borderBottom: '1px solid #374151',
@@ -645,6 +645,8 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
               flexShrink: 0,
               backgroundColor: '#111827',
               boxSizing: 'border-box',
+              borderTopLeftRadius: '12px',
+              borderTopRightRadius: '12px',
             }}
           >
             <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#FFFFFF', margin: 0 }}>
@@ -684,7 +686,15 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
           </div>
 
           {/* Content */}
-          <div style={{ padding: '1.5rem', overflow: 'visible', flex: 1, minHeight: 0, backgroundColor: '#111827', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+          <div style={{ 
+            padding: '1.5rem', 
+            backgroundColor: '#111827', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            overflow: 'visible',
+            borderBottomLeftRadius: '12px',
+            borderBottomRightRadius: '12px',
+          }}>
             {/* Product Info */}
             <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '2rem', flexShrink: 0 }}>
               {/* Product Image */}
@@ -858,10 +868,10 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
               </div>
             </div>
 
-            {/* Claim History */}
-            <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+            {/* Add Claim Form */}
+            <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0, marginBottom: '24px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexShrink: 0 }}>
-                <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#FFFFFF' }}>Claim History</h4>
+                <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#FFFFFF', margin: 0 }}>Add Claimed Vine</h4>
                 <button
                   onClick={(e) => {
                     e.preventDefault();
@@ -887,6 +897,7 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                 </button>
               </div>
 
+              {/* Input Table */}
               <div
                 style={{
                   width: '100%',
@@ -894,7 +905,7 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                   borderRadius: '8px',
                   padding: '0',
                   boxSizing: 'border-box',
-                  overflow: 'hidden',
+                  overflow: 'visible',
                   backgroundColor: '#111827',
                   flexShrink: 0,
                 }}
@@ -920,6 +931,7 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                           color: '#9CA3AF',
                           boxSizing: 'border-box',
                           borderBottom: '1px solid #374151',
+                          borderTopLeftRadius: '8px',
                         }}
                       >
                         DATE CLAIMED
@@ -950,6 +962,7 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                           color: '#9CA3AF',
                           boxSizing: 'border-box',
                           borderBottom: '1px solid #374151',
+                          borderTopRightRadius: '8px',
                         }}
                       >
                         ACTIONS
@@ -967,6 +980,7 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                           textAlign: 'left',
                           width: '40%',
                           boxSizing: 'border-box',
+                          borderBottomLeftRadius: '8px',
                         }}
                       >
                         <div style={{ position: 'relative' }}>
@@ -1065,6 +1079,7 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                         width: '40%',
                         boxSizing: 'border-box',
                         textAlign: 'right',
+                        borderBottomRightRadius: '8px',
                       }}>
                         <button
                             onClick={handleSubmit}
@@ -1099,6 +1114,126 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                         </button>
                       </td>
                     </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Claim History Table */}
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#FFFFFF', marginBottom: '24px', marginTop: '24px' }}>Claim History</h4>
+              
+              <div
+                style={{
+                  width: '100%',
+                  border: '1px solid #374151',
+                  borderRadius: '8px',
+                  padding: '0',
+                  boxSizing: 'border-box',
+                  overflow: 'visible',
+                  backgroundColor: '#111827',
+                }}
+              >
+                <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed' }}>
+                  <colgroup>
+                    <col style={{ width: '50%' }} />
+                    <col style={{ width: '50%' }} />
+                  </colgroup>
+                  <thead>
+                    <tr style={{ 
+                      backgroundColor: '#0F172A',
+                    }}>
+                      <th
+                        style={{ 
+                          padding: '12px 16px', 
+                          textAlign: 'left',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          color: '#9CA3AF',
+                          boxSizing: 'border-box',
+                          borderBottom: '1px solid #374151',
+                          borderTopLeftRadius: '8px',
+                        }}
+                      >
+                        DATE CLAIMED
+                      </th>
+                      <th
+                        style={{ 
+                          padding: '12px 16px', 
+                          textAlign: 'left',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          color: '#9CA3AF',
+                          boxSizing: 'border-box',
+                          borderBottom: '1px solid #374151',
+                          borderTopRightRadius: '8px',
+                        }}
+                      >
+                        UNITS
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* Existing Claim History Entries */}
+                    {claimHistory.length > 0 ? (
+                      claimHistory.map((claim, index) => {
+                        const isLastRow = index === claimHistory.length - 1;
+                        return (
+                          <tr 
+                            key={claim.id || index}
+                            style={{ 
+                              backgroundColor: '#111827',
+                              borderBottom: index < claimHistory.length - 1 ? '1px solid #374151' : 'none',
+                            }}
+                          >
+                            <td
+                              style={{ 
+                                padding: '12px 16px', 
+                                fontSize: '0.875rem',
+                                color: '#FFFFFF',
+                                textAlign: 'left',
+                                boxSizing: 'border-box',
+                                borderBottomLeftRadius: isLastRow ? '8px' : '0',
+                              }}
+                            >
+                              {formatDisplayDate(claim.date)}
+                            </td>
+                            <td
+                              style={{ 
+                                padding: '12px 16px', 
+                                fontSize: '0.875rem',
+                                color: '#FFFFFF',
+                                textAlign: 'left',
+                                boxSizing: 'border-box',
+                                borderBottomRightRadius: isLastRow ? '8px' : '0',
+                              }}
+                            >
+                              {claim.units}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td 
+                          colSpan="2" 
+                          style={{ 
+                            padding: '2rem', 
+                            textAlign: 'center', 
+                            color: '#9CA3AF',
+                            fontSize: '0.875rem',
+                            borderBottomLeftRadius: '8px',
+                            borderBottomRightRadius: '8px',
+                          }}
+                        >
+                          No claim history yet
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>

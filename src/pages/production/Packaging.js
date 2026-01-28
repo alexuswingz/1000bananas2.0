@@ -48,6 +48,7 @@ const Packaging = () => {
       brand: 'TPS Plant Foods',
       product: 'Cherry Tree Fertilizer',
       productImage: '/assets/TPS_Cherry Tree_8oz_Wrap (1).png',
+      childAsin: 'B0C73TDZCQ',
       size: '1 Gallon',
       qty: 72000,
       caseNumber: 488,
@@ -66,6 +67,7 @@ const Packaging = () => {
       brand: 'TPS Plant Foods',
       product: 'Cherry Tree Fertilizer',
       productImage: '/assets/TPS_Cherry Tree_8oz_Wrap (1).png',
+      childAsin: 'B0C73TDZCQ',
       size: '1 Gallon',
       qty: 72000,
       caseNumber: 488,
@@ -84,6 +86,7 @@ const Packaging = () => {
       brand: 'TPS Plant Foods',
       product: 'Cherry Tree Fertilizer',
       productImage: '/assets/TPS_Cherry Tree_8oz_Wrap (1).png',
+      childAsin: 'B0C73TDZCQ',
       size: '1 Gallon',
       qty: 72000,
       caseNumber: 488,
@@ -499,242 +502,6 @@ const Packaging = () => {
         onViewReportHistory={handleViewReportHistory}
       />
 
-      {/* Desktop Sub-navigation tabs - Simple tabs with Select Shipment */}
-      {activeTab === 'active' && (
-        <div
-          className={`${themeClasses.pageBg} hidden md:flex`}
-          style={{
-            padding: '1rem 2rem',
-            borderBottom: '1px solid #E5E7EB',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-            {subTabs.map((tab) => {
-              const isActive = activeSubTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveSubTab(tab.id)}
-                  style={{
-                    padding: '0.5rem 0',
-                    fontSize: '14px',
-                    fontWeight: isActive ? 600 : 400,
-                    color: isActive ? '#2563EB' : themeClasses.textSecondary,
-                    borderBottom: isActive ? '2px solid #2563EB' : '2px solid transparent',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    background: 'none',
-                    borderTop: 'none',
-                    borderLeft: 'none',
-                    borderRight: 'none',
-                  }}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Select Shipment Dropdown */}
-          <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => setShowShipmentDropdown(!showShipmentDropdown)}
-              className={`${isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white'} ${isDarkMode ? 'text-dark-text-primary' : 'text-gray-900'} ${isDarkMode ? 'border-dark-border-primary' : 'border-gray-200'} border text-sm transition-all hover:shadow-sm`}
-              style={{
-                padding: '0.5rem 1rem',
-                paddingRight: '2rem',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                whiteSpace: 'nowrap',
-                minWidth: '150px',
-                position: 'relative',
-              }}
-            >
-              <span>{selectedShipment || 'Select Shipment'}</span>
-              <svg
-                className={isDarkMode ? 'text-dark-text-secondary' : 'text-gray-500'}
-                style={{
-                  position: 'absolute',
-                  right: '0.75rem',
-                  width: '1rem',
-                  height: '1rem',
-                }}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            </button>
-            {showShipmentDropdown && (
-              <div
-                className={`${isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white'} ${isDarkMode ? 'border-dark-border-primary' : 'border-gray-200'} border shadow-lg rounded-md`}
-                style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  marginTop: '0.25rem',
-                  zIndex: 50,
-                  maxHeight: '200px',
-                  overflowY: 'auto',
-                }}
-              >
-                <button
-                  onClick={() => {
-                    setSelectedShipment('');
-                    setShowShipmentDropdown(false);
-                  }}
-                  className={`w-full text-left px-3 py-2 text-sm ${isDarkMode ? 'text-dark-text-primary' : 'text-gray-900'} hover:bg-gray-50 dark:hover:bg-gray-700`}
-                >
-                  All Shipments
-                </button>
-                {/* Add more shipment options here */}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Mobile Sub-navigation tabs with counts and Select Shipment */}
-      {activeTab === 'active' && (
-        <div
-          className="md:hidden flex"
-          style={{
-            padding: '1rem',
-            borderBottom: '1px solid #E5E7EB',
-            flexDirection: 'column',
-            gap: '0.75rem',
-          }}
-        >
-          {/* Tabs with counts */}
-          <div
-            style={{
-              display: 'flex',
-              gap: '1rem',
-              alignItems: 'center',
-              overflowX: 'auto',
-              WebkitOverflowScrolling: 'touch',
-            }}
-          >
-            {subTabs.map((tab) => {
-              const isActive = activeSubTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveSubTab(tab.id)}
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '13px',
-                    fontWeight: 500,
-                    color: isActive ? '#2563EB' : '#6B7280',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    borderBottom: isActive ? '2px solid #2563EB' : '2px solid transparent',
-                    transition: 'all 0.2s ease',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                  }}
-                >
-                  <span>{tab.label}</span>
-                  <span
-                    style={{
-                      backgroundColor: isActive ? '#DBEAFE' : '#F3F4F6',
-                      color: isActive ? '#2563EB' : '#6B7280',
-                      borderRadius: '10px',
-                      padding: '2px 8px',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      minWidth: '24px',
-                      textAlign: 'center',
-                    }}
-                  >
-                    {tab.count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Select Shipment Dropdown */}
-          <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => setShowShipmentDropdown(!showShipmentDropdown)}
-              className={`${isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white'} ${isDarkMode ? 'text-dark-text-primary' : 'text-gray-900'} ${isDarkMode ? 'border-dark-border-primary' : 'border-gray-200'} border text-sm transition-all hover:shadow-sm`}
-              style={{
-                padding: '0.5rem 1rem',
-                paddingRight: '2rem',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                whiteSpace: 'nowrap',
-                width: '100%',
-                position: 'relative',
-              }}
-            >
-              <span>{selectedShipment || 'Select Shipment'}</span>
-              <svg
-                className={isDarkMode ? 'text-dark-text-secondary' : 'text-gray-500'}
-                style={{
-                  position: 'absolute',
-                  right: '0.75rem',
-                  width: '1rem',
-                  height: '1rem',
-                }}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            </button>
-            {showShipmentDropdown && (
-              <div
-                className={`${isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white'} ${isDarkMode ? 'border-dark-border-primary' : 'border-gray-200'} border shadow-lg rounded-md`}
-                style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  marginTop: '0.25rem',
-                  zIndex: 50,
-                  maxHeight: '200px',
-                  overflowY: 'auto',
-                }}
-              >
-                <button
-                  onClick={() => {
-                    setSelectedShipment('');
-                    setShowShipmentDropdown(false);
-                  }}
-                  className={`w-full text-left px-3 py-2 text-sm ${isDarkMode ? 'text-dark-text-primary' : 'text-gray-900'} hover:bg-gray-50 dark:hover:bg-gray-700`}
-                >
-                  All Shipments
-                </button>
-                {/* Add more shipment options here */}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
 
       {/* Main content */}
