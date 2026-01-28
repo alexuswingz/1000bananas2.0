@@ -7,6 +7,7 @@ import React, {
   useMemo 
 } from 'react';
 import { createPortal } from 'react-dom';
+import { useTheme } from '../../../../context/ThemeContext';
 
 const ProductsFilterDropdown = forwardRef(({ 
   filterIconRef, 
@@ -18,6 +19,34 @@ const ProductsFilterDropdown = forwardRef(({
   onClose,
   account = null, // Account name to determine which brands to show
 }, ref) => {
+  const { isDarkMode } = useTheme();
+
+  const theme = {
+    bg: isDarkMode ? '#111827' : '#FFFFFF',
+    border: isDarkMode ? '#374151' : '#E5E7EB',
+    shadow: isDarkMode
+      ? '0 18px 45px rgba(0, 0, 0, 0.85)'
+      : '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+    headerText: isDarkMode ? '#E5E7EB' : '#111827',
+    subtleText: isDarkMode ? '#9CA3AF' : '#6B7280',
+    iconSubtle: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+    sectionBorder: isDarkMode ? '#374151' : '#E5E7EB',
+    inputBg: isDarkMode ? '#111827' : '#FFFFFF',
+    inputBorder: isDarkMode ? '#4B5563' : '#E5E7EB',
+    inputText: isDarkMode ? '#E5E7EB' : '#111827',
+    chipBgActive: '#3B82F6',
+    chipBg: isDarkMode ? '#4B5563' : '#E5E7EB',
+    chipTextActive: '#FFFFFF',
+    chipText: isDarkMode ? '#E5E7EB' : '#6B7280',
+    hoverRow: isDarkMode ? '#1F2937' : '#F9FAFB',
+    valueText: isDarkMode ? '#E5E7EB' : '#374151',
+    resetBg: isDarkMode ? '#111827' : '#FFFFFF',
+    resetBgHover: isDarkMode ? '#1F2937' : '#F9FAFB',
+    resetBorder: isDarkMode ? '#4B5563' : '#E5E7EB',
+    resetText: isDarkMode ? '#E5E7EB' : '#374151',
+    footerBorder: isDarkMode ? '#374151' : '#E5E7EB',
+  };
+
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [isPositioned, setIsPositioned] = useState(false);
   const [sortOrder, setSortOrder] = useState('');
@@ -168,6 +197,7 @@ const ProductsFilterDropdown = forwardRef(({
   // Condition filter state
   const [conditionType, setConditionType] = useState(currentFilter.conditionType || '');
   const [conditionValue, setConditionValue] = useState(currentFilter.conditionValue || '');
+  const [conditionMenuOpen, setConditionMenuOpen] = useState(false);
   
   // Convert values to strings for filtering
   const stringValues = availableValues.map(v => String(v));
@@ -292,6 +322,7 @@ const ProductsFilterDropdown = forwardRef(({
 
   // Universal conditions
   const conditions = [
+    { value: '', label: 'None' },
     { value: 'greaterThan', label: 'Greater than' },
     { value: 'greaterOrEqual', label: 'Greater than or equal to' },
     { value: 'lessThan', label: 'Less than' },
@@ -303,28 +334,37 @@ const ProductsFilterDropdown = forwardRef(({
   ];
 
   return createPortal(
-    <div
-      ref={dropdownRef}
-      data-filter-dropdown={columnKey}
-      style={{
-        position: 'fixed',
-        top: `${position.top}px`,
-        left: `${position.left}px`,
-        width: '204px',
-        backgroundColor: '#FFFFFF',
-        borderRadius: '8px',
-        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-        border: '1px solid #E5E7EB',
-        zIndex: 10000,
-        overflow: 'hidden',
-        opacity: isPositioned ? 1 : 0,
-        transition: 'opacity 0.15s ease-in',
-      }}
-      onClick={(e) => e.stopPropagation()}
-      onMouseDown={(e) => e.stopPropagation()}
-    >
+      <div
+        ref={dropdownRef}
+        data-filter-dropdown={columnKey}
+        style={{
+          position: 'fixed',
+          top: `${position.top}px`,
+          left: `${position.left}px`,
+          width: '204px',
+          backgroundColor: theme.bg,
+          borderRadius: '8px',
+          boxShadow: theme.shadow,
+          border: `1px solid ${theme.border}`,
+          zIndex: 10000,
+          overflow: 'hidden',
+          opacity: isPositioned ? 1 : 0,
+          transition: 'opacity 0.15s ease-in',
+        }}
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+      <style>{`
+        .tps-filter-scroll {
+          scrollbar-width: none; /* Firefox */
+          -ms-overflow-style: none; /* IE 10+ */
+        }
+        .tps-filter-scroll::-webkit-scrollbar {
+          display: none; /* Chrome, Safari */
+        }
+      `}</style>
       {/* Sort Options */}
-      <div style={{ padding: '8px 12px', borderBottom: '1px solid #E5E7EB' }}>
+      <div style={{ padding: '8px 12px', borderBottom: `1px solid ${theme.border}` }}>
         {/* Sort Ascending */}
         <div
           onClick={(e) => {
@@ -359,7 +399,7 @@ const ProductsFilterDropdown = forwardRef(({
             transition: 'background-color 0.2s',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#F9FAFB';
+            e.currentTarget.style.backgroundColor = theme.hoverRow;
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = 'transparent';
@@ -369,22 +409,22 @@ const ProductsFilterDropdown = forwardRef(({
             style={{
               width: '20px',
               height: '20px',
-              backgroundColor: sortOrder === 'asc' ? '#3B82F6' : '#E5E7EB',
+              backgroundColor: sortOrder === 'asc' ? theme.chipBgActive : theme.chipBg,
               borderRadius: '3px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: '9px',
               fontWeight: 700,
-              color: sortOrder === 'asc' ? '#FFFFFF' : '#6B7280',
+              color: sortOrder === 'asc' ? theme.chipTextActive : theme.chipText,
               flexShrink: 0,
             }}
           >
             AZ
           </div>
-          <div style={{ fontSize: '12px', color: '#111827', fontWeight: 400, lineHeight: '1.3' }}>
+          <div style={{ fontSize: '12px', color: theme.headerText, fontWeight: 400, lineHeight: '1.3' }}>
             Sort ascending<br/>
-            <span style={{ color: '#9CA3AF', fontSize: '11px' }}>(A to Z)</span>
+            <span style={{ color: theme.subtleText, fontSize: '11px' }}>(A to Z)</span>
           </div>
         </div>
 
@@ -421,7 +461,7 @@ const ProductsFilterDropdown = forwardRef(({
             transition: 'background-color 0.2s',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#F9FAFB';
+            e.currentTarget.style.backgroundColor = theme.hoverRow;
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = 'transparent';
@@ -431,28 +471,28 @@ const ProductsFilterDropdown = forwardRef(({
             style={{
               width: '20px',
               height: '20px',
-              backgroundColor: sortOrder === 'desc' ? '#3B82F6' : '#E5E7EB',
+              backgroundColor: sortOrder === 'desc' ? theme.chipBgActive : theme.chipBg,
               borderRadius: '3px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: '9px',
               fontWeight: 700,
-              color: sortOrder === 'desc' ? '#FFFFFF' : '#6B7280',
+              color: sortOrder === 'desc' ? theme.chipTextActive : theme.chipText,
               flexShrink: 0,
             }}
           >
             ZA
           </div>
-          <div style={{ fontSize: '12px', color: '#111827', fontWeight: 400, lineHeight: '1.3' }}>
+          <div style={{ fontSize: '12px', color: theme.headerText, fontWeight: 400, lineHeight: '1.3' }}>
             Sort descending<br/>
-            <span style={{ color: '#9CA3AF', fontSize: '11px' }}>(Z to A)</span>
+            <span style={{ color: theme.subtleText, fontSize: '11px' }}>(Z to A)</span>
           </div>
         </div>
       </div>
 
       {/* Filter by condition */}
-      <div style={{ borderBottom: '1px solid #E5E7EB' }}>
+      <div style={{ borderBottom: `1px solid ${theme.border}` }}>
         <div
           onClick={() => setFilterConditionExpanded(!filterConditionExpanded)}
           style={{
@@ -464,7 +504,7 @@ const ProductsFilterDropdown = forwardRef(({
             userSelect: 'none',
           }}
         >
-          <span style={{ fontSize: '12px', color: conditionType ? '#3B82F6' : '#6B7280', fontWeight: conditionType ? 500 : 400 }}>
+          <span style={{ fontSize: '12px', color: conditionType ? '#3B82F6' : theme.subtleText, fontWeight: conditionType ? 500 : 400 }}>
             Filter by condition: {conditionType && <span style={{ color: '#10B981' }}>●</span>}
           </span>
           <svg
@@ -479,7 +519,7 @@ const ProductsFilterDropdown = forwardRef(({
           >
             <path
               d="M3 4.5L6 7.5L9 4.5"
-              stroke="#6B7280"
+              stroke={theme.subtleText}
               strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -488,29 +528,104 @@ const ProductsFilterDropdown = forwardRef(({
         </div>
         {filterConditionExpanded && (
           <div style={{ padding: '0 12px 8px 12px' }}>
-            <select
-              value={conditionType}
-              onChange={(e) => setConditionType(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '6px 8px',
-                border: '1px solid #E5E7EB',
-                borderRadius: '4px',
-                fontSize: '12px',
-                outline: 'none',
-                marginBottom: '8px',
-                backgroundColor: '#FFFFFF',
-                cursor: 'pointer',
-              }}
-              onFocus={(e) => { e.target.style.borderColor = '#3B82F6'; }}
-              onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
-            >
-              <option value="">Select condition...</option>
-              {conditions.map(c => (
-                <option key={c.value} value={c.value}>{c.label}</option>
-              ))}
-            </select>
-            
+            {/* Custom styled condition dropdown */}
+            <div style={{ position: 'relative', marginBottom: '8px' }}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setConditionMenuOpen(!conditionMenuOpen);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '6px 10px',
+                  borderRadius: '6px',
+                  border: `1px solid ${theme.inputBorder}`,
+                  backgroundColor: theme.inputBg,
+                  color: theme.inputText,
+                  fontSize: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  cursor: 'pointer',
+                }}
+              >
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {conditions.find(c => c.value === conditionType)?.label || 'None'}
+                </span>
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 12 12"
+                  fill="none"
+                  style={{
+                    flexShrink: 0,
+                    transform: conditionMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.15s ease-out',
+                  }}
+                >
+                  <path
+                    d="M3 4.5L6 7.5L9 4.5"
+                    stroke={theme.subtleText}
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+
+              {conditionMenuOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    marginTop: '4px',
+                    backgroundColor: theme.bg,
+                    borderRadius: '10px',
+                    border: `1px solid ${theme.border}`,
+                    boxShadow: theme.shadow,
+                    padding: '4px 0',
+                    zIndex: 50,
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {conditions.map((c) => {
+                    const selected = c.value === conditionType || (!conditionType && c.value === '');
+                    return (
+                      <button
+                        key={c.value}
+                        type="button"
+                        onClick={() => {
+                          setConditionType(c.value);
+                          setConditionMenuOpen(false);
+                        }}
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '6px 10px',
+                          backgroundColor: selected ? 'rgba(59,130,246,0.15)' : 'transparent',
+                          color: selected ? '#FFFFFF' : theme.valueText,
+                          fontSize: '12px',
+                          border: 'none',
+                          cursor: 'pointer',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!selected) e.currentTarget.style.backgroundColor = theme.hoverRow;
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!selected) e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                      >
+                        {c.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             {conditionType && conditionType !== 'isEmpty' && conditionType !== 'isNotEmpty' && (
               <>
                 {conditionType === 'between' || conditionType === 'notBetween' ? (
@@ -538,14 +653,16 @@ const ProductsFilterDropdown = forwardRef(({
                           width: '100%',
                           padding: '6px 8px',
                           paddingRight: (conditionValue.includes('-') ? conditionValue.split('-')[0] : conditionValue) ? '26px' : '8px',
-                          border: '1px solid #E5E7EB',
+                          border: `1px solid ${theme.inputBorder}`,
                           borderRadius: '4px',
                           fontSize: '12px',
                           outline: 'none',
                           boxSizing: 'border-box',
+                          backgroundColor: theme.inputBg,
+                          color: theme.inputText,
                         }}
                         onFocus={(e) => { e.target.style.borderColor = '#3B82F6'; }}
-                        onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
+                        onBlur={(e) => { e.target.style.borderColor = theme.inputBorder; }}
                       />
                       {(conditionValue.includes('-') ? conditionValue.split('-')[0] : conditionValue) && (
                         <button
@@ -566,9 +683,9 @@ const ProductsFilterDropdown = forwardRef(({
                             transform: 'translateY(-50%)',
                             width: '14px',
                             height: '14px',
-                            border: '1px solid #D1D5DB',
+                            border: `1px solid ${theme.inputBorder}`,
                             borderRadius: '3px',
-                            backgroundColor: '#FFFFFF',
+                            backgroundColor: theme.inputBg,
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
@@ -577,12 +694,12 @@ const ProductsFilterDropdown = forwardRef(({
                             zIndex: 2,
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = '#9CA3AF';
-                            e.currentTarget.style.backgroundColor = '#F3F4F6';
+                            e.currentTarget.style.borderColor = theme.subtleText;
+                            e.currentTarget.style.backgroundColor = theme.hoverRow;
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = '#D1D5DB';
-                            e.currentTarget.style.backgroundColor = '#FFFFFF';
+                            e.currentTarget.style.borderColor = theme.inputBorder;
+                            e.currentTarget.style.backgroundColor = theme.inputBg;
                           }}
                         >
                           <svg
@@ -590,7 +707,7 @@ const ProductsFilterDropdown = forwardRef(({
                             height="8"
                             viewBox="0 0 24 24"
                             fill="none"
-                            stroke="#6B7280"
+                            stroke={theme.subtleText}
                             strokeWidth="2"
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -601,7 +718,7 @@ const ProductsFilterDropdown = forwardRef(({
                         </button>
                       )}
                     </div>
-                    <span style={{ fontSize: '12px', color: '#6B7280' }}>to</span>
+                    <span style={{ fontSize: '12px', color: theme.subtleText }}>to</span>
                     <div style={{ position: 'relative', flex: 1 }}>
                       <input
                         type="number"
@@ -625,14 +742,16 @@ const ProductsFilterDropdown = forwardRef(({
                           width: '100%',
                           padding: '6px 8px',
                           paddingRight: (conditionValue.includes('-') ? conditionValue.split('-')[1] : '') ? '26px' : '8px',
-                          border: '1px solid #E5E7EB',
+                          border: `1px solid ${theme.inputBorder}`,
                           borderRadius: '4px',
                           fontSize: '12px',
                           outline: 'none',
                           boxSizing: 'border-box',
+                          backgroundColor: theme.inputBg,
+                          color: theme.inputText,
                         }}
                         onFocus={(e) => { e.target.style.borderColor = '#3B82F6'; }}
-                        onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
+                        onBlur={(e) => { e.target.style.borderColor = theme.inputBorder; }}
                       />
                       {(conditionValue.includes('-') ? conditionValue.split('-')[1] : '') && (
                         <button
@@ -653,9 +772,9 @@ const ProductsFilterDropdown = forwardRef(({
                             transform: 'translateY(-50%)',
                             width: '14px',
                             height: '14px',
-                            border: '1px solid #D1D5DB',
+                            border: `1px solid ${theme.inputBorder}`,
                             borderRadius: '3px',
-                            backgroundColor: '#FFFFFF',
+                            backgroundColor: theme.inputBg,
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
@@ -664,12 +783,12 @@ const ProductsFilterDropdown = forwardRef(({
                             zIndex: 2,
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = '#9CA3AF';
-                            e.currentTarget.style.backgroundColor = '#F3F4F6';
+                            e.currentTarget.style.borderColor = theme.subtleText;
+                            e.currentTarget.style.backgroundColor = theme.hoverRow;
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = '#D1D5DB';
-                            e.currentTarget.style.backgroundColor = '#FFFFFF';
+                            e.currentTarget.style.borderColor = theme.inputBorder;
+                            e.currentTarget.style.backgroundColor = theme.inputBg;
                           }}
                         >
                           <svg
@@ -677,7 +796,7 @@ const ProductsFilterDropdown = forwardRef(({
                             height="8"
                             viewBox="0 0 24 24"
                             fill="none"
-                            stroke="#6B7280"
+                            stroke={theme.subtleText}
                             strokeWidth="2"
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -700,14 +819,16 @@ const ProductsFilterDropdown = forwardRef(({
                         width: '100%',
                         padding: '6px 8px',
                         paddingRight: conditionValue ? '26px' : '8px',
-                        border: '1px solid #E5E7EB',
+                        border: `1px solid ${theme.inputBorder}`,
                         borderRadius: '4px',
                         fontSize: '12px',
                         outline: 'none',
                         boxSizing: 'border-box',
+                        backgroundColor: theme.inputBg,
+                        color: theme.inputText,
                       }}
                       onFocus={(e) => { e.target.style.borderColor = '#3B82F6'; }}
-                      onBlur={(e) => { e.target.style.borderColor = '#E5E7EB'; }}
+                      onBlur={(e) => { e.target.style.borderColor = theme.inputBorder; }}
                     />
                     {conditionValue && (
                       <button
@@ -720,9 +841,9 @@ const ProductsFilterDropdown = forwardRef(({
                           transform: 'translateY(-50%)',
                           width: '14px',
                           height: '14px',
-                          border: '1px solid #D1D5DB',
+                            border: `1px solid ${theme.inputBorder}`,
                           borderRadius: '3px',
-                          backgroundColor: '#FFFFFF',
+                            backgroundColor: theme.inputBg,
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
@@ -730,12 +851,12 @@ const ProductsFilterDropdown = forwardRef(({
                           padding: 0,
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = '#9CA3AF';
-                          e.currentTarget.style.backgroundColor = '#F3F4F6';
+                            e.currentTarget.style.borderColor = theme.subtleText;
+                            e.currentTarget.style.backgroundColor = theme.hoverRow;
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = '#D1D5DB';
-                          e.currentTarget.style.backgroundColor = '#FFFFFF';
+                            e.currentTarget.style.borderColor = theme.inputBorder;
+                            e.currentTarget.style.backgroundColor = theme.inputBg;
                         }}
                       >
                         <svg
@@ -743,7 +864,7 @@ const ProductsFilterDropdown = forwardRef(({
                           height="8"
                           viewBox="0 0 24 24"
                           fill="none"
-                          stroke="#6B7280"
+                            stroke={theme.subtleText}
                           strokeWidth="2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
@@ -763,7 +884,7 @@ const ProductsFilterDropdown = forwardRef(({
 
       {/* Brand Filter (only for product column) */}
       {columnKey === 'product' && (
-      <div style={{ borderBottom: '1px solid #E5E7EB' }}>
+      <div style={{ borderBottom: `1px solid ${theme.border}` }}>
         <div
           onClick={() => {
             setBrandFilterExpanded(!brandFilterExpanded);
@@ -780,7 +901,7 @@ const ProductsFilterDropdown = forwardRef(({
             userSelect: 'none',
           }}
         >
-          <span style={{ fontSize: '12px', color: (selectedBrands.size > 0 && selectedBrands.size < availableBrands.length) ? '#3B82F6' : '#6B7280', fontWeight: (selectedBrands.size > 0 && selectedBrands.size < availableBrands.length) ? 500 : 400 }}>
+          <span style={{ fontSize: '12px', color: (selectedBrands.size > 0 && selectedBrands.size < availableBrands.length) ? '#3B82F6' : theme.subtleText, fontWeight: (selectedBrands.size > 0 && selectedBrands.size < availableBrands.length) ? 500 : 400 }}>
             Filter by brand: {(selectedBrands.size > 0 && selectedBrands.size < availableBrands.length) && <span style={{ color: '#10B981' }}>●</span>}
           </span>
           <svg
@@ -795,7 +916,7 @@ const ProductsFilterDropdown = forwardRef(({
           >
             <path
               d="M3 4.5L6 7.5L9 4.5"
-              stroke="#6B7280"
+              stroke={theme.subtleText}
               strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -843,7 +964,7 @@ const ProductsFilterDropdown = forwardRef(({
                   Clear all
                 </button>
               </div>
-              <span style={{ fontSize: '11px', color: '#9CA3AF' }}>
+              <span style={{ fontSize: '11px', color: theme.subtleText }}>
                 {filteredBrands.length} results
               </span>
             </div>
@@ -887,67 +1008,70 @@ const ProductsFilterDropdown = forwardRef(({
                   width: '100%',
                   padding: '5px 8px 5px 26px',
                   paddingRight: brandSearchTerm ? '26px' : '8px',
-                  border: '1px solid #E5E7EB',
+                  border: `1px solid ${theme.inputBorder}`,
                   borderRadius: '4px',
                   fontSize: '11px',
                   outline: 'none',
                   boxSizing: 'border-box',
+                  backgroundColor: theme.inputBg,
+                  color: theme.inputText,
                 }}
                 onFocus={(e) => {
                   e.target.style.borderColor = '#3B82F6';
                 }}
                 onBlur={(e) => {
-                  e.target.style.borderColor = '#E5E7EB';
+                  e.target.style.borderColor = theme.inputBorder;
                 }}
               />
               {brandSearchTerm && (
-                <button
-                  type="button"
-                  onClick={() => setBrandSearchTerm('')}
-                  style={{
-                    position: 'absolute',
-                    right: '6px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    width: '14px',
-                    height: '14px',
-                    border: '1px solid #D1D5DB',
-                    borderRadius: '3px',
-                    backgroundColor: '#FFFFFF',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: 0,
-                    zIndex: 2,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = '#9CA3AF';
-                    e.currentTarget.style.backgroundColor = '#F3F4F6';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = '#D1D5DB';
-                    e.currentTarget.style.backgroundColor = '#FFFFFF';
-                  }}
+              <button
+                type="button"
+                onClick={() => setBrandSearchTerm('')}
+                style={{
+                  position: 'absolute',
+                  right: '6px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '14px',
+                  height: '14px',
+                  border: `1px solid ${theme.inputBorder}`,
+                  borderRadius: '3px',
+                  backgroundColor: theme.inputBg,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
+                  zIndex: 2,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = theme.subtleText;
+                  e.currentTarget.style.backgroundColor = theme.hoverRow;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = theme.inputBorder;
+                  e.currentTarget.style.backgroundColor = theme.inputBg;
+                }}
+              >
+                <svg
+                  width="8"
+                  height="8"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={theme.subtleText}
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 >
-                  <svg
-                    width="8"
-                    height="8"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#6B7280"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
               )}
             </div>
             
             <div
+              className="tps-filter-scroll"
               style={{
                 maxHeight: '120px',
                 overflowY: 'auto',
@@ -1014,7 +1138,7 @@ const ProductsFilterDropdown = forwardRef(({
             userSelect: 'none',
           }}
         >
-          <span style={{ fontSize: '12px', color: selectedValues.size > 0 ? '#3B82F6' : '#6B7280', fontWeight: selectedValues.size > 0 ? 500 : 400 }}>
+          <span style={{ fontSize: '12px', color: selectedValues.size > 0 ? '#3B82F6' : theme.subtleText, fontWeight: selectedValues.size > 0 ? 500 : 400 }}>
             Filter by values: {selectedValues.size > 0 && <span style={{ color: '#10B981' }}>●</span>}
           </span>
           <svg
@@ -1029,7 +1153,7 @@ const ProductsFilterDropdown = forwardRef(({
           >
             <path
               d="M3 4.5L6 7.5L9 4.5"
-              stroke="#6B7280"
+              stroke={theme.subtleText}
               strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -1077,7 +1201,7 @@ const ProductsFilterDropdown = forwardRef(({
                   Clear all
                 </button>
               </div>
-              <span style={{ fontSize: '11px', color: '#9CA3AF' }}>
+              <span style={{ fontSize: '11px', color: theme.subtleText }}>
                 {filteredValues.length} results
               </span>
             </div>
@@ -1121,17 +1245,19 @@ const ProductsFilterDropdown = forwardRef(({
                   width: '100%',
                   padding: '5px 8px 5px 26px',
                   paddingRight: searchTerm ? '26px' : '8px',
-                  border: '1px solid #E5E7EB',
+                  border: `1px solid ${theme.inputBorder}`,
                   borderRadius: '4px',
                   fontSize: '11px',
                   outline: 'none',
                   boxSizing: 'border-box',
+                  backgroundColor: theme.inputBg,
+                  color: theme.inputText,
                 }}
                 onFocus={(e) => {
                   e.target.style.borderColor = '#3B82F6';
                 }}
                 onBlur={(e) => {
-                  e.target.style.borderColor = '#E5E7EB';
+                  e.target.style.borderColor = theme.inputBorder;
                 }}
               />
               {searchTerm && (
@@ -1145,9 +1271,9 @@ const ProductsFilterDropdown = forwardRef(({
                     transform: 'translateY(-50%)',
                     width: '14px',
                     height: '14px',
-                    border: '1px solid #D1D5DB',
+                    border: `1px solid ${theme.inputBorder}`,
                     borderRadius: '3px',
-                    backgroundColor: '#FFFFFF',
+                    backgroundColor: theme.inputBg,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
@@ -1156,12 +1282,12 @@ const ProductsFilterDropdown = forwardRef(({
                     zIndex: 2,
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = '#9CA3AF';
-                    e.currentTarget.style.backgroundColor = '#F3F4F6';
+                    e.currentTarget.style.borderColor = theme.subtleText;
+                    e.currentTarget.style.backgroundColor = theme.hoverRow;
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = '#D1D5DB';
-                    e.currentTarget.style.backgroundColor = '#FFFFFF';
+                    e.currentTarget.style.borderColor = theme.inputBorder;
+                    e.currentTarget.style.backgroundColor = theme.inputBg;
                   }}
                 >
                   <svg
@@ -1169,7 +1295,7 @@ const ProductsFilterDropdown = forwardRef(({
                     height="8"
                     viewBox="0 0 24 24"
                     fill="none"
-                    stroke="#6B7280"
+                    stroke={theme.subtleText}
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -1182,12 +1308,13 @@ const ProductsFilterDropdown = forwardRef(({
             </div>
 
             <div
+              className="tps-filter-scroll"
               style={{
-                maxHeight: '140px',
-                overflowY: 'auto',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '6px',
+               maxHeight: '140px',
+               overflowY: 'auto',
+               display: 'flex',
+               flexDirection: 'column',
+               gap: '6px',
               }}
             >
               {filteredValues.map((value) => (
@@ -1213,7 +1340,7 @@ const ProductsFilterDropdown = forwardRef(({
                       flexShrink: 0,
                     }}
                   />
-                  <span style={{ fontSize: '12px', color: '#374151', lineHeight: '1.2' }}>{value}</span>
+                  <span style={{ fontSize: '12px', color: theme.valueText, lineHeight: '1.2' }}>{value}</span>
                 </label>
               ))}
             </div>
@@ -1228,7 +1355,7 @@ const ProductsFilterDropdown = forwardRef(({
           justifyContent: 'flex-end',
           gap: '10px',
           padding: '8px 12px',
-          borderTop: '1px solid #E5E7EB',
+          borderTop: `1px solid ${theme.footerBorder}`,
         }}
       >
         <button
@@ -1236,10 +1363,10 @@ const ProductsFilterDropdown = forwardRef(({
           onClick={handleReset}
           style={{
             padding: '4px 14px',
-            border: '1px solid #E5E7EB',
+            border: `1px solid ${theme.resetBorder}`,
             borderRadius: '4px',
-            backgroundColor: '#FFFFFF',
-            color: '#374151',
+            backgroundColor: theme.resetBg,
+            color: theme.resetText,
             fontSize: '12px',
             fontWeight: 500,
             cursor: 'pointer',
@@ -1251,10 +1378,10 @@ const ProductsFilterDropdown = forwardRef(({
             justifyContent: 'center',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#F9FAFB';
+            e.currentTarget.style.backgroundColor = theme.resetBgHover;
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#FFFFFF';
+            e.currentTarget.style.backgroundColor = theme.resetBg;
           }}
         >
           Reset
