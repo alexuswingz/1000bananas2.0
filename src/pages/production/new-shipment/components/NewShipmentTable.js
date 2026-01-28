@@ -41,6 +41,9 @@ const NewShipmentTable = ({
   const addButtonRefs = useRef({});
   const addPopupRefs = useRef({});
   const warningIconRefs = useRef({});
+  // Track when the "Use Available" label-inventory suggestion has been applied per product
+  // so we can show a permanent reset icon in those cases
+  const [labelSuggestionUsage, setLabelSuggestionUsage] = useState({});
   // Initialize local ref once
   const localManuallyEditedIndicesRef = useRef(new Set());
   
@@ -3247,6 +3250,15 @@ const NewShipmentTable = ({
                           });
                           // Remove from manually edited set when reset to forecast
                           manuallyEditedIndices.current.delete(index);
+                          // Clear any stored label-inventory suggestion usage for this product
+                          if (productId) {
+                            setLabelSuggestionUsage(prev => {
+                              if (!prev || prev[productId] === undefined) return prev;
+                              const next = { ...prev };
+                              delete next[productId];
+                              return next;
+                            });
+                          }
                         }}
                         style={{
                           position: 'absolute',
@@ -3279,7 +3291,18 @@ const NewShipmentTable = ({
                                 ? parseInt(qtyValue, 10) || 0
                                 : 0;
                             const hasChanged = wasManuallyEdited && currentQty !== originalForecast;
-                            return hoveredQtyIndex === index && hasChanged ? 'flex' : 'none';
+                          // Determine if we are currently using the value suggested by the
+                          // Label Inventory warning (i.e., "Use Available" was clicked and
+                          // the qty still matches that suggested value). In this case, the
+                          // reset icon should be permanently visible.
+                          const productIdForReset = row.id || row.asin || row.child_asin || row.childAsin;
+                          const suggestedFromLabels = productIdForReset && labelSuggestionUsage
+                            ? labelSuggestionUsage[productIdForReset]
+                            : undefined;
+                          const isUsingLabelSuggestion =
+                            suggestedFromLabels !== undefined && currentQty === suggestedFromLabels;
+                          const shouldShowReset = hasChanged && (hoveredQtyIndex === index || isUsingLabelSuggestion);
+                          return shouldShowReset ? 'flex' : 'none';
                           })(),
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -3610,6 +3633,16 @@ const NewShipmentTable = ({
                               ...prev,
                               [index]: labelsAvailable
                             }));
+                            // Remember that this product is now using the Label Inventory
+                            // suggested value so we can show a permanent reset icon until
+                            // the quantity is reset or changed away from this value.
+                            const productId = row.id || row.asin || row.child_asin || row.childAsin;
+                            if (productId) {
+                              setLabelSuggestionUsage(prev => ({
+                                ...(prev || {}),
+                                [productId]: labelsAvailable
+                              }));
+                            }
                             
                             setTimeout(() => setClickedQtyIndex(null), 100);
                           }}
