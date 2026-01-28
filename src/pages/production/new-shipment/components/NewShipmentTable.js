@@ -2479,7 +2479,6 @@ const NewShipmentTable = ({
 
     const isShiftClick = e.shiftKey;
     const isCmdClick = e.metaKey || e.ctrlKey;
-    const isAlreadySelected = nonTableSelectedIndices.has(originalIndex);
 
     // Prevent text selection on Shift+Click
     if (isShiftClick) {
@@ -2488,15 +2487,6 @@ const NewShipmentTable = ({
       if (window.getSelection) {
         window.getSelection().removeAllRanges();
       }
-    }
-
-    // If clicking on an already selected row (and no modifier keys), deselect it
-    if (!isShiftClick && !isCmdClick && isAlreadySelected) {
-      const newSelected = new Set(nonTableSelectedIndices);
-      newSelected.delete(originalIndex);
-      setNonTableSelectedIndices(newSelected);
-      setNonTableLastSelectedIndex(null);
-      return;
     }
 
     if (isShiftClick && nonTableLastSelectedIndex !== null) {
