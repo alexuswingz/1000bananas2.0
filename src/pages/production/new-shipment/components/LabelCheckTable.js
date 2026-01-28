@@ -1125,21 +1125,21 @@ const LabelCheckTable = ({
             borderCollapse: 'collapse',
             borderSpacing: 0,
           }}>
-            <thead style={{ backgroundColor: '#1C2634' }}>
+            <thead style={{ backgroundColor: '#1A2235' }}>
               <tr style={{ 
                 height: '66px', 
                 maxHeight: '66px',
                 borderBottom: 'none',
                 position: 'relative',
               }}>
-                {/* Header separator line with 10px margins on both ends */}
+                {/* Header separator line with 20px margins on both ends */}
                 <th
                   colSpan={columns.length}
                   style={{
                     position: 'absolute',
                     bottom: 0,
-                    left: '10px',
-                    right: '10px',
+                    left: '20px',
+                    right: '20px',
                     height: '1px',
                     backgroundColor: '#4B5563',
                     padding: 0,
@@ -1186,19 +1186,55 @@ const LabelCheckTable = ({
                           justifyContent: 'center',
                           marginLeft: '35px',
                         }}>
-                          <input
-                            type="checkbox"
-                            checked={areAllRowsSelected()}
-                            onChange={(e) => handleSelectAll(e.target.checked)}
-                            onClick={(e) => e.stopPropagation()}
+                          <label
                             style={{
-                              width: '16px',
-                              height: '16px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
                               cursor: 'pointer',
-                              accentColor: '#3B82F6',
                             }}
-                            title="Select all rows"
-                          />
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={areAllRowsSelected()}
+                              onChange={(e) => handleSelectAll(e.target.checked)}
+                              style={{
+                                position: 'absolute',
+                                opacity: 0,
+                                width: 0,
+                                height: 0,
+                              }}
+                              title="Select all rows"
+                            />
+                            <span
+                              style={{
+                                width: '16px',
+                                height: '16px',
+                                border: '1px solid #6B7280',
+                                borderRadius: '3px',
+                                boxSizing: 'border-box',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: areAllRowsSelected() ? '#3B82F6' : 'transparent',
+                              }}
+                            >
+                              {areAllRowsSelected() && (
+                                <span
+                                  style={{
+                                    width: '10px',
+                                    height: '6px',
+                                    borderBottom: '2px solid #FFFFFF',
+                                    borderLeft: '2px solid #FFFFFF',
+                                    transform: 'rotate(-45deg)',
+                                    marginTop: '-1px',
+                                    marginLeft: '0px',
+                                  }}
+                                />
+                              )}
+                            </span>
+                          </label>
                         </div>
                       ) : column.key === 'start' ? (
                         // Empty header for Start column
@@ -1264,9 +1300,9 @@ const LabelCheckTable = ({
                 const originalIndex = rows.findIndex(r => r.id === row.id);
                 return (
                 <tr
-                  key={row.id}
+                  key={`${row.id}-${index}`}
                   style={{
-                    backgroundColor: isDarkMode ? '#1F2937' : '#F9FAFB',
+                    backgroundColor: isDarkMode ? '#1A2235' : '#F9FAFB',
                     borderBottom: 'none',
                     borderTop: 'none',
                     borderLeft: 'none',
@@ -1276,20 +1312,20 @@ const LabelCheckTable = ({
                     position: 'relative',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                    e.currentTarget.style.backgroundColor = isDarkMode ? '#232c41' : '#F3F4F6';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = isDarkMode ? '#1F2937' : '#F9FAFB';
+                    e.currentTarget.style.backgroundColor = isDarkMode ? '#1A2235' : '#F9FAFB';
                   }}
                 >
-                  {/* Separator line with 10px margins on both ends */}
+                  {/* Separator line with 20px margins on both ends */}
                   <td
                     colSpan={columns.length}
                     style={{
                       position: 'absolute',
                       bottom: 0,
-                      left: '10px',
-                      right: '10px',
+                      left: '20px',
+                      right: '20px',
                       height: '1px',
                       backgroundColor: '#4B5563',
                       padding: 0,
@@ -1304,34 +1340,72 @@ const LabelCheckTable = ({
                     borderBottom: 'none',
                   }}>
                     <div style={{ marginLeft: '30px', marginRight: '-10px' }}>
-                      <input
-                        type="checkbox"
-                        checked={isAdmin ? bulkSelectedRows.has(row.id) : selectedRows.has(row.id)}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          if (isAdmin) {
-                            handleBulkCheckboxChange(row.id);
-                          } else {
-                            setSelectedRows(prev => {
-                              const newSet = new Set(prev);
-                              if (e.target.checked) {
-                                newSet.add(row.id);
-                              } else {
-                                newSet.delete(row.id);
-                              }
-                              return newSet;
-                            });
-                          }
+                      <label
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
                         }}
                         onClick={(e) => e.stopPropagation()}
-                        style={{
-                          width: '16px',
-                          height: '16px',
-                          cursor: 'pointer',
-                          accentColor: '#3B82F6',
-                        }}
-                        title={isAdmin ? "Select for bulk action" : undefined}
-                      />
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isAdmin ? bulkSelectedRows.has(row.id) : selectedRows.has(row.id)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            if (isAdmin) {
+                              handleBulkCheckboxChange(row.id);
+                            } else {
+                              setSelectedRows(prev => {
+                                const newSet = new Set(prev);
+                                if (e.target.checked) {
+                                  newSet.add(row.id);
+                                } else {
+                                  newSet.delete(row.id);
+                                }
+                                return newSet;
+                              });
+                            }
+                          }}
+                          style={{
+                            position: 'absolute',
+                            opacity: 0,
+                            width: 0,
+                            height: 0,
+                          }}
+                          title={isAdmin ? "Select for bulk action" : undefined}
+                        />
+                        <span
+                          style={{
+                            width: '16px',
+                            height: '16px',
+                            border: '1px solid #6B7280',
+                            borderRadius: '3px',
+                            boxSizing: 'border-box',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: (isAdmin ? bulkSelectedRows.has(row.id) : selectedRows.has(row.id))
+                              ? '#3B82F6'
+                              : 'transparent',
+                          }}
+                        >
+                          {(isAdmin ? bulkSelectedRows.has(row.id) : selectedRows.has(row.id)) && (
+                            <span
+                              style={{
+                                width: '10px',
+                                height: '6px',
+                                borderBottom: '2px solid #FFFFFF',
+                                borderLeft: '2px solid #FFFFFF',
+                                transform: 'rotate(-45deg)',
+                                marginTop: '-1px',
+                                marginLeft: '0px',
+                              }}
+                            />
+                          )}
+                        </span>
+                      </label>
                     </div>
                   </td>
                   <td style={{
@@ -2438,7 +2512,23 @@ const LabelCheckTable = ({
           availableValues={getColumnValues(openFilterColumn)}
           currentFilter={filters[openFilterColumn] || {}}
           currentSort={sortField === openFilterColumn ? sortOrder : ''}
-          onApply={(filterData) => handleApplyFilter(openFilterColumn, filterData)}
+          enableBrandFilter={false}
+          onApply={(data) => {
+            // Handle sort independently so it never touches the underlying rows array
+            if (data?.sortOrder) {
+              setSortField(openFilterColumn);
+              setSortOrder(data.sortOrder);
+            } else if (sortField === openFilterColumn) {
+              setSortField('');
+              setSortOrder('');
+            }
+
+            // Only apply filters when this wasn't a pure sort click
+            if (!data?.__fromSortClick) {
+              handleApplyFilter(openFilterColumn, data ?? null);
+              setOpenFilterColumn(null);
+            }
+          }}
           onClose={() => setOpenFilterColumn(null)}
         />
       )}

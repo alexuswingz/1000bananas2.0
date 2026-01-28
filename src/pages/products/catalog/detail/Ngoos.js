@@ -2299,15 +2299,21 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                   <XAxis 
                     dataKey="timestamp" 
                     type="number"
+                    scale="time"
                     domain={['dataMin', 'dataMax']}
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fill: '#6b7280', fontSize: 10 }}
+                    // Brighter tick color + extra margin so dates are always visible
+                    tick={{ fill: '#e5e7eb', fontSize: 10 }}
+                    tickMargin={8}
+                    // Ask Recharts for ~6 ticks across the width
+                    tickCount={6}
+                    minTickGap={20}
+                    interval="preserveStartEnd"
                     tickFormatter={(value) => {
                       const date = new Date(value);
                       return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
                     }}
-                    interval={Math.max(0, Math.floor(chartDisplayData.data.length / 8))}
                   />
                   <YAxis 
                     yAxisId="left"

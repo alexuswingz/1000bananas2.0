@@ -15,7 +15,8 @@ const SortFormulasFilterDropdown = forwardRef(({
   currentFilter = {},
   currentSort = '',
   onApply,
-  onClose 
+  onClose,
+  enableBrandFilter = true, // allow callers to disable brand filter section
 }, ref) => {
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [isPositioned, setIsPositioned] = useState(false);
@@ -77,11 +78,11 @@ const SortFormulasFilterDropdown = forwardRef(({
   const [brandFilterExpanded, setBrandFilterExpanded] = useState(false);
   const [brandSearchTerm, setBrandSearchTerm] = useState('');
   const [selectedBrands, setSelectedBrands] = useState(() => {
-    if (columnKey === 'product' && currentFilter.selectedBrands && currentFilter.selectedBrands.size > 0) {
+    if (enableBrandFilter && columnKey === 'product' && currentFilter.selectedBrands && currentFilter.selectedBrands.size > 0) {
       return new Set(currentFilter.selectedBrands);
     }
     // For product column, get unique brands from availableValues
-    if (columnKey === 'product') {
+    if (enableBrandFilter && columnKey === 'product') {
       const allowedBrands = ['TPS Nutrients', 'TPS Plant Foods', 'Bloom City', 'NatureStop', 'GreenThumbs'];
       return new Set(allowedBrands);
     }
@@ -90,7 +91,7 @@ const SortFormulasFilterDropdown = forwardRef(({
   
   // Extract unique brands from availableValues (for product column)
   const availableBrands = useMemo(() => {
-    if (columnKey !== 'product') return [];
+    if (!enableBrandFilter || columnKey !== 'product') return [];
     const allowedBrands = ['TPS Nutrients', 'TPS Plant Foods', 'Bloom City', 'NatureStop', 'GreenThumbs'];
     // Also check availableValues for any brands
     const brandsFromValues = availableValues
@@ -115,7 +116,7 @@ const SortFormulasFilterDropdown = forwardRef(({
   
   // Update selectedBrands when dropdown opens
   useEffect(() => {
-    if (filterIconRef && columnKey === 'product') {
+    if (filterIconRef && enableBrandFilter && columnKey === 'product') {
       const existingBrands = currentFilter.selectedBrands;
       if (existingBrands && existingBrands instanceof Set && existingBrands.size > 0) {
         setSelectedBrands(new Set(existingBrands));
@@ -215,7 +216,7 @@ const SortFormulasFilterDropdown = forwardRef(({
     setConditionType('');
     setConditionValue('');
     // Reset brand filter for product column
-    if (columnKey === 'product') {
+      if (enableBrandFilter && columnKey === 'product') {
       setSelectedBrands(new Set(availableBrands));
       setBrandSearchTerm('');
     }
@@ -254,7 +255,7 @@ const SortFormulasFilterDropdown = forwardRef(({
         conditionValue,
       };
       // Add brand filter for product column
-      if (columnKey === 'product') {
+      if (enableBrandFilter && columnKey === 'product') {
         filterData.selectedBrands = selectedBrands;
       }
       onApply(filterData);
@@ -743,8 +744,8 @@ const SortFormulasFilterDropdown = forwardRef(({
         )}
       </div>
 
-      {/* Brand Filter (only for product column) */}
-      {columnKey === 'product' && (
+      {/* Brand Filter (only for product column, and only when enabled) */}
+      {enableBrandFilter && columnKey === 'product' && (
         <div style={{ borderBottom: '1px solid #E5E7EB' }}>
           <div
             onClick={() => {
