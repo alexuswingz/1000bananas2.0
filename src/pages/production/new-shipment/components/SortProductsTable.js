@@ -136,6 +136,15 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
         formula: product.formula_name || product.formula || '',
         volume: product.volume || product.volume_gallons || '',
         productType: 'Liquid', // Default to Liquid for fertilizers
+        // Optional visual/identifier data used only for table presentation
+        imageUrl: product.image || product.image_url || product.imageUrl || '',
+        identifier:
+          product.asin ||
+          product.sku ||
+          product.sku_id ||
+          product.skuId ||
+          product.catalog_sku ||
+          '',
       }));
       
       // Load and apply saved splits before setting products
@@ -2081,6 +2090,18 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
 
   const filteredProducts = getFilteredAndSortedProducts();
 
+  // Footer summary metrics
+  const totalProducts = filteredProducts.length;
+  const totalUnits = filteredProducts.reduce((sum, p) => sum + (p.qty || 0), 0);
+  const totalFormulas = Array.from(
+    new Set(filteredProducts.map((p) => p.formula).filter(Boolean))
+  ).length;
+  // For now, size swaps, formula changes, and time (hrs) are placeholders.
+  // They can be wired to real metrics later.
+  const totalSizeSwaps = 0;
+  const totalFormulaChanges = 0;
+  const totalTimeHours = 0;
+
   return (
     <>
       <style>{`
@@ -2098,24 +2119,34 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
       <div 
         ref={tableContainerRef}
         style={{
-          backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+          backgroundColor: isDarkMode ? '#0B1220' : '#FFFFFF',
           borderRadius: '12px',
-          border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+          // No outer stroke (prevents dark vertical lines on sides)
+          border: 'none',
           overflow: 'hidden',
         }}
       >
       {/* Table Container */}
       <div style={{ overflowX: 'auto' }}>
+        <div
+          style={{
+            // Table border color matches design (#334155)
+            border: '1px solid #334155',
+            borderRadius: '12px',
+            overflow: 'hidden',
+          }}
+        >
         <table style={{
           width: '100%',
           borderCollapse: 'collapse',
+          backgroundColor: isDarkMode ? '#1A2235' : '#FFFFFF',
         }}>
           {/* Header */}
           <thead>
             <tr style={{
-              backgroundColor: '#1C2634',
-              borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
-              height: '40px',
+              backgroundColor: '#1A2235',
+              borderBottom: 'none',
+              height: '56px',
             }}>
               {columns.map((column) => {
                 const isActive = hasActiveFilter(column.key);
@@ -2135,8 +2166,8 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                     letterSpacing: '0.05em',
                     width: column.width,
                     whiteSpace: 'nowrap',
-                    borderRight: column.key === 'drag' || column.key === 'menu' ? 'none' : '1px solid #FFFFFF',
-                    height: '40px',
+                    borderRight: 'none',
+                    height: '56px',
                     position: column.key === 'drag' || column.key === 'menu' ? 'static' : 'relative',
                   }}
                 >
@@ -2190,6 +2221,25 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                 </th>
                 );
               })}
+            </tr>
+            {/* Inset separator line under header, 16px from both ends */}
+            <tr>
+              <th
+                colSpan={columns.length}
+                style={{
+                  padding: 0,
+                  border: 'none',
+                  height: '1px',
+                  backgroundColor: '#1A2235',
+                }}
+              >
+                <div
+                  style={{
+                    margin: '0 16px',
+                    borderBottom: '1px solid #334155',
+                  }}
+                />
+              </th>
             </tr>
           </thead>
 
@@ -2257,11 +2307,11 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                         ? (isDarkMode ? '#4B5563' : '#E5E7EB')
                         : isSelected
                         ? (isDarkMode ? '#1E3A5F' : '#DBEAFE')
-                        : (isDarkMode ? '#1F2937' : '#FFFFFF'),
-                      borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                        : (isDarkMode ? '#1A2235' : '#FFFFFF'),
+                      borderBottom: 'none',
                       borderLeft: isSelected ? '3px solid #3B82F6' : 'none',
                       transition: isDragging ? 'none' : 'background-color 0.2s',
-                      height: '40px',
+                      height: '66px',
                       opacity: isDragging ? 0.5 : 1,
                       cursor: isDragging ? 'grabbing' : 'grab',
                       boxShadow: isDragging ? '0 4px 12px rgba(0, 0, 0, 0.15)' : 'none',
@@ -2272,14 +2322,14 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                       if (!isDragging && draggedIndex === null) {
                         e.currentTarget.style.backgroundColor = isSelected
                           ? (isDarkMode ? '#1E3A5F' : '#DBEAFE')
-                          : (isDarkMode ? '#374151' : '#F3F4F6');
+                          : (isDarkMode ? '#232c41' : '#F3F4F6');
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (!isDragging && draggedIndex === null) {
                         e.currentTarget.style.backgroundColor = isSelected
                           ? (isDarkMode ? '#1E3A5F' : '#DBEAFE')
-                          : (isDarkMode ? '#1F2937' : '#FFFFFF');
+                          : (isDarkMode ? '#1A2235' : '#FFFFFF');
                       }
                     }}
                   >
@@ -2372,94 +2422,242 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                 })()}
                 <td style={{
                   padding: '0 16px',
-                  fontSize: '14px',
-                  fontWeight: 400,
-                  color: isDarkMode ? '#E5E7EB' : '#374151',
-                  height: '40px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: isDarkMode ? '#E5E7EB' : '#111827',
+                  height: '66px',
+                  verticalAlign: 'middle',
                 }}>
                   {product.type}
                 </td>
                 <td style={{
                   padding: '0 16px',
-                  fontSize: '14px',
-                  fontWeight: 400,
-                  color: isDarkMode ? '#E5E7EB' : '#374151',
-                  height: '40px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: isDarkMode ? '#E5E7EB' : '#111827',
+                  height: '66px',
+                  verticalAlign: 'middle',
                 }}>
                   {product.brand}
                 </td>
                 <td style={{
-                  padding: '0 16px',
-                  fontSize: '14px',
-                  fontWeight: 400,
-                  color: isDarkMode ? '#E5E7EB' : '#374151',
-                  height: '40px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
+                  padding: '8px 16px',
+                  height: '66px',
+                  verticalAlign: 'middle',
                 }}>
-                  <span>{product.product}</span>
-                  {product.splitTag && (
-                    <img
-                      src="/assets/split.png"
-                      alt="Split"
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                    }}
+                  >
+                    {/* Thumbnail */}
+                    <div
                       style={{
-                        width: 'auto',
-                        height: '16px',
-                        display: 'inline-block',
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '8px',
+                        overflow: 'hidden',
+                        flexShrink: 0,
+                        background: isDarkMode
+                          ? 'linear-gradient(135deg, #1F2937, #020617)'
+                          : 'linear-gradient(135deg, #E5E7EB, #FFFFFF)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        border: isDarkMode ? '1px solid #111827' : '1px solid #E5E7EB',
                       }}
-                    />
-                  )}
+                    >
+                      {product.imageUrl ? (
+                        <img
+                          src={product.imageUrl}
+                          alt={product.product}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                          }}
+                        />
+                      ) : (
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                            textAlign: 'center',
+                            padding: '0 4px',
+                          }}
+                        >
+                          {product.brand?.[0] || '?'}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Product text */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '2px',
+                        minWidth: 0,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          maxWidth: '320px',
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: '13px',
+                            fontWeight: 500,
+                            color: '#38BDF8',
+                            whiteSpace: 'nowrap',
+                            textOverflow: 'ellipsis',
+                            overflow: 'hidden',
+                            cursor: 'pointer',
+                          }}
+                          title={product.product}
+                        >
+                          {product.product}
+                        </span>
+                        {product.splitTag && (
+                          <img
+                            src="/assets/split.png"
+                            alt="Split"
+                            style={{
+                              width: 'auto',
+                              height: '15px',
+                              display: 'inline-block',
+                            }}
+                          />
+                        )}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '11px',
+                          color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          whiteSpace: 'nowrap',
+                          textOverflow: 'ellipsis',
+                          overflow: 'hidden',
+                          maxWidth: '340px',
+                        }}
+                      >
+                        {product.identifier && (
+                          <>
+                            <span>{product.identifier}</span>
+                            <svg
+                              width="12"
+                              height="12"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke={isDarkMode ? '#6B7280' : '#9CA3AF'}
+                              strokeWidth="2"
+                              style={{ flexShrink: 0, opacity: 0.85 }}
+                            >
+                              <rect x="9" y="9" width="13" height="13" rx="2" />
+                              <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+                            </svg>
+                            <span
+                              style={{
+                                width: '3px',
+                                height: '3px',
+                                borderRadius: '999px',
+                                backgroundColor: isDarkMode ? '#4B5563' : '#D1D5DB',
+                              }}
+                            />
+                          </>
+                        )}
+                        <span>{product.brand}</span>
+                        <span
+                          style={{
+                            width: '3px',
+                            height: '3px',
+                            borderRadius: '999px',
+                            backgroundColor: isDarkMode ? '#4B5563' : '#D1D5DB',
+                          }}
+                        />
+                        <span>{product.size}</span>
+                      </div>
+                    </div>
+                  </div>
                 </td>
                 <td style={{
                   padding: '0 16px',
-                  fontSize: '14px',
-                  fontWeight: 400,
-                  color: isDarkMode ? '#E5E7EB' : '#374151',
-                  height: '40px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: isDarkMode ? '#E5E7EB' : '#111827',
+                  height: '66px',
+                  verticalAlign: 'middle',
+                  textAlign: 'left',
+                  transform: 'translateX(0px)',
                 }}>
                   {product.size}
                 </td>
                 <td style={{
                   padding: '0 16px',
-                  height: '40px',
+                  height: '66px',
+                  verticalAlign: 'middle',
+                  textAlign: 'center',
                 }}>
-                  <input
-                    type="text"
-                    value={product.qty}
-                    readOnly
+                  <div
                     style={{
-                      width: '107px',
-                      height: '24px',
-                      padding: '0 10px',
-                      borderRadius: '6px',
-                      border: '1px solid #D1D5DB',
-                      backgroundColor: isDarkMode ? '#374151' : '#F9FAFB',
-                      color: isDarkMode ? '#E5E7EB' : '#374151',
-                      fontSize: '14px',
-                      fontWeight: 400,
-                      textAlign: 'center',
-                      outline: 'none',
-                      cursor: 'default',
-                      boxSizing: 'border-box',
+                      width: '96px',
+                      height: '34px',
+                      borderRadius: '8px',
+                      border: '1px solid #334155',
+                      backgroundColor: '#020617',
+                      color: '#F9FAFB',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      letterSpacing: '0.04em',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 0 0 1px rgba(15,23,42,0.85), 0 10px 25px rgba(15,23,42,0.55)',
+                      transform: 'translateX(-30px)',
                     }}
-                  />
+                  >
+                    {Number(product.qty || 0).toLocaleString()}
+                  </div>
                 </td>
                 <td style={{
                   padding: '0 16px',
-                  fontSize: '14px',
-                  fontWeight: 400,
-                  color: isDarkMode ? '#E5E7EB' : '#374151',
-                  height: '40px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: isDarkMode ? '#E5E7EB' : '#111827',
+                  height: '66px',
+                  verticalAlign: 'middle',
                 }}>
-                  {product.formula}
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      maxWidth: '200px',
+                      whiteSpace: 'nowrap',
+                      textOverflow: 'ellipsis',
+                      overflow: 'hidden',
+                    }}
+                    title={product.formula}
+                  >
+                    {product.formula}
+                  </span>
                 </td>
                 <td style={{
                   padding: '0 16px',
-                  fontSize: '14px',
-                  fontWeight: 400,
-                  color: isDarkMode ? '#E5E7EB' : '#374151',
-                  height: '40px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: isDarkMode ? '#E5E7EB' : '#111827',
+                  height: '66px',
+                  verticalAlign: 'middle',
+                  textAlign: 'left',
+                  transform: 'translateX(-2px)',
                 }}>
                   {product.productType}
                 </td>
@@ -2700,6 +2898,25 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                   )}
                 </td>
                   </tr>
+                  {/* Inset separator line under this row, 16px from both ends */}
+                  <tr>
+                    <td
+                      colSpan={columns.length}
+                      style={{
+                        padding: 0,
+                        border: 'none',
+                        height: '1px',
+                        backgroundColor: '#1A2235',
+                      }}
+                    >
+                      <div
+                        style={{
+                          margin: '0 16px',
+                          borderBottom: '1px solid #334155',
+                        }}
+                      />
+                    </td>
+                  </tr>
                   {/* Drop line below the row */}
                   {showDropLineBelow && (
                     <tr>
@@ -2732,6 +2949,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Column Filter Dropdowns - Multiple can be open at once */}
@@ -3039,6 +3257,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
             width: 'fit-content',
             minWidth: '1014px',
             height: '65px',
+            // Match Book Shipment footer container styling
             backgroundColor: isDarkMode ? 'rgba(31, 41, 55, 0.85)' : 'rgba(255, 255, 255, 0.85)',
             backdropFilter: 'blur(12px)',
             WebkitBackdropFilter: 'blur(12px)',
@@ -3054,33 +3273,172 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
             boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
           }}
         >
-          <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
-            {/* Empty left side */}
+          {/* Metrics */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '40px',
+            }}
+          >
+            {[
+              { label: 'PRODUCTS', value: totalProducts },
+              { label: 'UNITS', value: totalUnits.toLocaleString() },
+              { label: 'SIZE SWAPS', value: totalSizeSwaps },
+              { label: 'FORMULAS', value: totalFormulas },
+              { label: 'FORMULA CHANGES', value: totalFormulaChanges },
+              { label: 'TIME (HRS)', value: totalTimeHours.toFixed(1) },
+            ].map((item) => (
+              <div
+                key={item.label}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                  alignItems: 'center',
+                  minWidth: '72px',
+                }}
+              >
+                <span
+                  style={{
+                    // Match Book Shipment metrics label style
+                    fontSize: '12px',
+                    fontWeight: 400,
+                    color: '#9CA3AF',
+                    textAlign: 'center',
+                  }}
+                >
+                  {item.label}
+                </span>
+                <span
+                  style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                    textAlign: 'center',
+                  }}
+                >
+                  {item.value}
+                </span>
+              </div>
+            ))}
           </div>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+
+          {/* Actions */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}
+          >
+            {/* Undo/Redo buttons - grouped together with shared divider */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                borderRadius: '6px',
+                border: '0.5px solid #334155',
+                backgroundColor: '#0F172A',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Undo */}
+              <button
+                type="button"
+                style={{
+                  width: '29.5px',
+                  height: '29.5px',
+                  border: 'none',
+                  borderRight: '0.5px solid #334155',
+                  backgroundColor: 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  padding: '6px',
+                  transition: 'background-color 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                <img
+                  src="/assets/Vector (8).png"
+                  alt="Undo"
+                  style={{
+                    width: '14.63px',
+                    height: '5.83px',
+                    display: 'block',
+                  }}
+                />
+              </button>
+
+              {/* Redo */}
+              <button
+                type="button"
+                style={{
+                  width: '29.5px',
+                  height: '29.5px',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  padding: '6px',
+                  transition: 'background-color 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                <img
+                  src="/assets/Vector (9).png"
+                  alt="Redo"
+                  style={{
+                    width: '14.63px',
+                    height: '5.83px',
+                    display: 'block',
+                  }}
+                />
+              </button>
+            </div>
+
+            {/* Complete button */}
             <button
               type="button"
               onClick={onCompleteClick}
               style={{
-                height: '38px',
+                height: '36px',
                 padding: '0 24px',
-                borderRadius: '8px',
+                borderRadius: '999px',
                 border: 'none',
-                backgroundColor: '#007AFF',
+                backgroundImage: 'linear-gradient(90deg, #2563EB 0%, #3B82F6 50%, #38BDF8 100%)',
                 color: '#FFFFFF',
                 fontSize: '14px',
-                fontWeight: 500,
+                fontWeight: 600,
                 cursor: 'pointer',
-                transition: 'all 0.2s',
+                transition: 'background-color 0.2s, transform 0.1s',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#0056CC';
+                e.currentTarget.style.backgroundImage =
+                  'linear-gradient(90deg, #1D4ED8 0%, #2563EB 50%, #0EA5E9 100%)';
+                e.currentTarget.style.transform = 'translateY(-1px)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#007AFF';
+                e.currentTarget.style.backgroundImage =
+                  'linear-gradient(90deg, #2563EB 0%, #3B82F6 50%, #38BDF8 100%)';
+                e.currentTarget.style.transform = 'translateY(0)';
               }}
             >
               Complete
