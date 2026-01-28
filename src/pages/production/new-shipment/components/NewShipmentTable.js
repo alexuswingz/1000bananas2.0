@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
+import { useSidebar } from '../../../../context/SidebarContext';
 import { toast } from 'sonner';
 import SortFormulasFilterDropdown from './SortFormulasFilterDropdown';
 import ProductsFilterDropdown from './ProductsFilterDropdown';
@@ -19,6 +20,15 @@ const NewShipmentTable = ({
   onBrandFilterChange = null, // Callback to pass brand filter to parent
   account = null, // Account name to determine which brands to show
   doiSettingsChangeCount = 0, // Track when DOI settings have changed
+  totalPalettes = 0,
+  totalProducts = 0,
+  totalBoxes = 0,
+  totalUnits = 0,
+  totalTimeHours = 0,
+  onClear = null, // Callback for Clear button
+  onExport = null, // Callback for Export button
+  totalWeightLbs = 0,
+  totalFormulas = 0,
 }) => {
   // Account to Brand mapping (for checking if all brands are selected)
   const ACCOUNT_BRAND_MAPPING = {
@@ -27,6 +37,7 @@ const NewShipmentTable = ({
     'Total Pest Supply': ['NatureStop', "Ms. Pixie's", "Burke's", 'Mint +'],
   };
   const { isDarkMode } = useTheme();
+  const { sidebarWidth } = useSidebar();
   const [selectedRows, setSelectedRows] = useState(new Set());
   const [addedRows, setAddedRows] = useState(new Set());
   const [selectionFilter, setSelectionFilter] = useState('all'); // all | checked | unchecked
@@ -2543,11 +2554,18 @@ const NewShipmentTable = ({
             newAdded.delete(selectedRow.id);
           } else {
             // Check if quantity is greater than 0 before adding
-            const currentQty = typeof effectiveQtyValues[selectedIndex] === 'number' 
+            let currentQty = typeof effectiveQtyValues[selectedIndex] === 'number' 
               ? effectiveQtyValues[selectedIndex] 
               : (effectiveQtyValues[selectedIndex] === '' || effectiveQtyValues[selectedIndex] === null || effectiveQtyValues[selectedIndex] === undefined) 
                 ? 0 
                 : parseInt(effectiveQtyValues[selectedIndex], 10) || 0;
+            
+            // In non-table mode, if quantity is 0, use totalInventory from Ngoos
+            if (!tableMode && currentQty === 0 && selectedRow.totalInventory) {
+              currentQty = selectedRow.totalInventory;
+              // Update the qty value to use totalInventory
+              effectiveSetQtyValues(prev => ({ ...prev, [selectedIndex]: currentQty }));
+            }
             
             if (currentQty > 0) {
               newAdded.add(selectedRow.id);
@@ -2562,19 +2580,25 @@ const NewShipmentTable = ({
         newAdded.delete(row.id);
       } else {
         // Check if quantity is 0 before adding
-        const currentQty = typeof effectiveQtyValues[index] === 'number' 
+        let currentQty = typeof effectiveQtyValues[index] === 'number' 
           ? effectiveQtyValues[index] 
           : (effectiveQtyValues[index] === '' || effectiveQtyValues[index] === null || effectiveQtyValues[index] === undefined) 
             ? 0 
             : parseInt(effectiveQtyValues[index], 10) || 0;
         
+        // In non-table mode, if quantity is 0, use totalInventory from Ngoos
+        if (!tableMode && currentQty === 0 && row.totalInventory) {
+          currentQty = row.totalInventory;
+          // Update the qty value to use totalInventory
+          effectiveSetQtyValues(prev => ({ ...prev, [index]: currentQty }));
+        }
+        
         if (currentQty === 0) {
-          // Don't add if quantity is 0 - the hover popup will show
+          // Don't add if quantity is still 0 after trying to use totalInventory
           return;
         }
         
-        // Add - just mark as added, don't change qty value
-        // User should have already entered qty before clicking Add
+        // Add - mark as added (qty value already set above if needed)
         newAdded.add(row.id);
       }
     }
@@ -3141,7 +3165,7 @@ const NewShipmentTable = ({
 
                   {/* INVENTORY Column */}
                   <div style={{ textAlign: 'center', fontSize: '14px', fontWeight: 500, color: isDarkMode ? '#F9FAFB' : '#111827', paddingLeft: '16px', marginLeft: '-220px', marginRight: '20px' }}>
-                    {(row.fbaAvailable || 0).toLocaleString()}
+                    {(row.totalInventory || 0).toLocaleString()}
                   </div>
 
                   {/* UNITS TO MAKE Column */}
@@ -4040,6 +4064,235 @@ const NewShipmentTable = ({
             />
           )
         )}
+
+        {/* Footer */}
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '16px',
+            left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2)`,
+            transform: 'translateX(-50%)',
+            width: 'fit-content',
+            minWidth: '1014px',
+            height: '65px',
+            backgroundColor: isDarkMode ? 'rgba(31, 41, 55, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+            borderRadius: '32px',
+            padding: '16px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '32px',
+            zIndex: 1000,
+            transition: 'left 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+            boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
+          }}
+        >
+          <div style={{ display: 'flex', gap: '48px', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+              <span style={{
+                fontSize: '12px',
+                fontWeight: 400,
+                color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                textAlign: 'center',
+              }}>
+                PALETTES
+              </span>
+              <span style={{
+                fontSize: '18px',
+                fontWeight: 700,
+                color: isDarkMode ? '#FFFFFF' : '#000000',
+                textAlign: 'center',
+              }}>
+                {totalPalettes.toFixed(2)}
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+              <span style={{
+                fontSize: '12px',
+                fontWeight: 400,
+                color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                textAlign: 'center',
+              }}>
+                PRODUCTS
+              </span>
+              <span style={{
+                fontSize: '18px',
+                fontWeight: 700,
+                color: isDarkMode ? '#FFFFFF' : '#000000',
+                textAlign: 'center',
+              }}>
+                {totalProducts}
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+              <span style={{
+                fontSize: '12px',
+                fontWeight: 400,
+                color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                textAlign: 'center',
+              }}>
+                BOXES
+              </span>
+              <span style={{
+                fontSize: '18px',
+                fontWeight: 700,
+                color: isDarkMode ? '#FFFFFF' : '#000000',
+                textAlign: 'center',
+              }}>
+                {Math.ceil(totalBoxes).toLocaleString()}
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+              <span style={{
+                fontSize: '12px',
+                fontWeight: 400,
+                color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                textAlign: 'center',
+              }}>
+                UNITS
+              </span>
+              <span style={{
+                fontSize: '18px',
+                fontWeight: 700,
+                color: isDarkMode ? '#FFFFFF' : '#000000',
+                textAlign: 'center',
+              }}>
+                {totalUnits.toLocaleString()}
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+              <span style={{
+                fontSize: '12px',
+                fontWeight: 400,
+                color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                textAlign: 'center',
+                whiteSpace: 'nowrap',
+              }}>
+                TIME (HRS)
+              </span>
+              <span style={{
+                fontSize: '18px',
+                fontWeight: 700,
+                color: isDarkMode ? '#FFFFFF' : '#000000',
+                textAlign: 'center',
+              }}>
+                {totalTimeHours.toFixed(2)}
+              </span>
+            </div>
+            {totalWeightLbs > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                <span style={{
+                  fontSize: '12px',
+                  fontWeight: 400,
+                  color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                  textAlign: 'center',
+                  whiteSpace: 'nowrap',
+                }}>
+                  WEIGHT (LBS)
+                </span>
+                <span style={{
+                  fontSize: '18px',
+                  fontWeight: 700,
+                  color: isDarkMode ? '#FFFFFF' : '#000000',
+                  textAlign: 'center',
+                }}>
+                  {Math.round(totalWeightLbs).toLocaleString()}
+                </span>
+              </div>
+            )}
+            {totalFormulas > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                <span style={{
+                  fontSize: '12px',
+                  fontWeight: 400,
+                  color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                  textAlign: 'center',
+                }}>
+                  FORMULAS
+                </span>
+                <span style={{
+                  fontSize: '18px',
+                  fontWeight: 700,
+                  color: isDarkMode ? '#FFFFFF' : '#000000',
+                  textAlign: 'center',
+                }}>
+                  {totalFormulas}
+                </span>
+              </div>
+            )}
+          </div>
+          {(onClear || onExport) && (
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              {onClear && (
+                <button
+                  type="button"
+                  onClick={onClear}
+                  style={{
+                    height: '31px',
+                    padding: '0 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: 'transparent',
+                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+              {onExport && (
+                <button
+                  type="button"
+                  onClick={onExport}
+                  style={{
+                    height: '31px',
+                    padding: '0 10px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: (addedRows && addedRows.size > 0) ? '#3B82F6' : '#9CA3AF',
+                    color: '#FFFFFF',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: (addedRows && addedRows.size > 0) ? 'pointer' : 'not-allowed',
+                    transition: 'background-color 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (addedRows && addedRows.size > 0) {
+                      e.currentTarget.style.backgroundColor = '#2563EB';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (addedRows && addedRows.size > 0) {
+                      e.currentTarget.style.backgroundColor = '#3B82F6';
+                    } else {
+                      e.currentTarget.style.backgroundColor = '#9CA3AF';
+                    }
+                  }}
+                >
+                  Export for Upload
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </>
     );
   }
@@ -5583,6 +5836,234 @@ const NewShipmentTable = ({
       );
     })}
 
+      {/* Footer */}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: '16px',
+          left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2)`,
+          transform: 'translateX(-50%)',
+          width: 'fit-content',
+          minWidth: '1014px',
+          height: '65px',
+          backgroundColor: isDarkMode ? 'rgba(31, 41, 55, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+          borderRadius: '32px',
+          padding: '16px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '32px',
+          zIndex: 1000,
+          transition: 'left 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+          boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
+        }}
+      >
+        <div style={{ display: 'flex', gap: '48px', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+            <span style={{
+              fontSize: '12px',
+              fontWeight: 400,
+              color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+              textAlign: 'center',
+            }}>
+              PALETTES
+            </span>
+            <span style={{
+              fontSize: '18px',
+              fontWeight: 700,
+              color: isDarkMode ? '#FFFFFF' : '#000000',
+              textAlign: 'center',
+            }}>
+              {totalPalettes.toFixed(2)}
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+            <span style={{
+              fontSize: '12px',
+              fontWeight: 400,
+              color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+              textAlign: 'center',
+            }}>
+              PRODUCTS
+            </span>
+            <span style={{
+              fontSize: '18px',
+              fontWeight: 700,
+              color: isDarkMode ? '#FFFFFF' : '#000000',
+              textAlign: 'center',
+            }}>
+              {totalProducts}
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+            <span style={{
+              fontSize: '12px',
+              fontWeight: 400,
+              color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+              textAlign: 'center',
+            }}>
+              BOXES
+            </span>
+            <span style={{
+              fontSize: '18px',
+              fontWeight: 700,
+              color: isDarkMode ? '#FFFFFF' : '#000000',
+              textAlign: 'center',
+            }}>
+              {Math.ceil(totalBoxes).toLocaleString()}
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+            <span style={{
+              fontSize: '12px',
+              fontWeight: 400,
+              color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+              textAlign: 'center',
+            }}>
+              UNITS
+            </span>
+            <span style={{
+              fontSize: '18px',
+              fontWeight: 700,
+              color: isDarkMode ? '#FFFFFF' : '#000000',
+              textAlign: 'center',
+            }}>
+              {totalUnits.toLocaleString()}
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+            <span style={{
+              fontSize: '12px',
+              fontWeight: 400,
+              color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+              textAlign: 'center',
+              whiteSpace: 'nowrap',
+            }}>
+              TIME (HRS)
+            </span>
+            <span style={{
+              fontSize: '18px',
+              fontWeight: 700,
+              color: isDarkMode ? '#FFFFFF' : '#000000',
+              textAlign: 'center',
+            }}>
+              {totalTimeHours.toFixed(2)}
+            </span>
+          </div>
+          {totalWeightLbs > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+              <span style={{
+                fontSize: '12px',
+                fontWeight: 400,
+                color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                textAlign: 'center',
+                whiteSpace: 'nowrap',
+              }}>
+                WEIGHT (LBS)
+              </span>
+              <span style={{
+                fontSize: '18px',
+                fontWeight: 700,
+                color: isDarkMode ? '#FFFFFF' : '#000000',
+                textAlign: 'center',
+              }}>
+                {Math.round(totalWeightLbs).toLocaleString()}
+              </span>
+            </div>
+          )}
+          {totalFormulas > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+              <span style={{
+                fontSize: '12px',
+                fontWeight: 400,
+                color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                textAlign: 'center',
+              }}>
+                FORMULAS
+              </span>
+              <span style={{
+                fontSize: '18px',
+                fontWeight: 700,
+                color: isDarkMode ? '#FFFFFF' : '#000000',
+                textAlign: 'center',
+              }}>
+                {totalFormulas}
+              </span>
+            </div>
+          )}
+        </div>
+        {(onClear || onExport) && (
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            {onClear && (
+              <button
+                type="button"
+                onClick={onClear}
+                style={{
+                  height: '31px',
+                  padding: '0 16px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                Clear
+              </button>
+            )}
+            {onExport && (
+              <button
+                type="button"
+                onClick={onExport}
+                style={{
+                  height: '31px',
+                  padding: '0 10px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: (addedRows && addedRows.size > 0) ? '#3B82F6' : '#9CA3AF',
+                  color: '#FFFFFF',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  cursor: (addedRows && addedRows.size > 0) ? 'pointer' : 'not-allowed',
+                  transition: 'background-color 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onMouseEnter={(e) => {
+                  if (addedRows && addedRows.size > 0) {
+                    e.currentTarget.style.backgroundColor = '#2563EB';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (addedRows && addedRows.size > 0) {
+                    e.currentTarget.style.backgroundColor = '#3B82F6';
+                  } else {
+                    e.currentTarget.style.backgroundColor = '#9CA3AF';
+                  }
+                }}
+              >
+                Export for Upload
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </>
   );
 };

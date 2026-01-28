@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
+import { useSidebar } from '../../../../context/SidebarContext';
 import SortFormulasFilterDropdown from './SortFormulasFilterDropdown';
 import { showInfoToast } from '../../../../utils/notifications';
 
@@ -28,8 +29,9 @@ const calculateManufacturingVolume = (rawGallons) => {
 
 const GALLONS_PER_TOTE = 275;
 
-const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
+const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onCompleteClick = null }) => {
   const { isDarkMode } = useTheme();
+  const { sidebarWidth } = useSidebar();
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
   const [dropPosition, setDropPosition] = useState(null); // { index: number, position: 'above' | 'below' }
@@ -2439,6 +2441,67 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null }) => {
             </div>
           </div>
         </>
+      )}
+
+      {/* Footer */}
+      {onCompleteClick && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '16px',
+            left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2)`,
+            transform: 'translateX(-50%)',
+            width: 'fit-content',
+            minWidth: '1014px',
+            height: '65px',
+            backgroundColor: isDarkMode ? 'rgba(31, 41, 55, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+            borderRadius: '32px',
+            padding: '16px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '32px',
+            zIndex: 1000,
+            transition: 'left 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+            boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
+          }}
+        >
+          <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
+            {/* Empty left side */}
+          </div>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={onCompleteClick}
+              style={{
+                height: '38px',
+                padding: '0 24px',
+                borderRadius: '8px',
+                border: 'none',
+                backgroundColor: '#007AFF',
+                color: '#FFFFFF',
+                fontSize: '14px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#0056CC';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#007AFF';
+              }}
+            >
+              Complete
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

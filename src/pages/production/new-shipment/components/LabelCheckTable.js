@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
 import { useTheme } from '../../../../context/ThemeContext';
+import { useSidebar } from '../../../../context/SidebarContext';
 import { toast } from 'sonner';
 import { getShipmentProducts, getLabelFormulaByLocation, updateLabelInventoryByLocation, updateShipmentProductLabelCheck, updateShipment } from '../../../../services/productionApi';
 import CatalogAPI from '../../../../services/catalogApi';
@@ -37,8 +38,11 @@ const LabelCheckTable = ({
   checkAllIncompleteTrigger = 0, // Increment to check all incomplete row checkboxes
   isAdmin = false, // Admin role check for bulk actions
   onSelectedRowsChange, // Callback to notify parent of selected rows count
+  onCompleteClick = null, // Callback for Complete button
+  onMarkAllLabelChecksAsDone = null, // Callback for Mark All as Done button
 }) => {
   const { isDarkMode } = useTheme();
+  const { sidebarWidth } = useSidebar();
   const location = useLocation();
   const isPlanningView = location.pathname.includes('planning');
   // Show column dropdown filters in Label Check table (except in planning view)
@@ -2540,6 +2544,175 @@ const LabelCheckTable = ({
         onGoBack={handleVarianceGoBack}
         onConfirm={handleVarianceConfirm}
       />
+
+      {/* Footer */}
+      {(() => {
+        const totalRows = rows.length;
+        const completedCount = rows.filter(row => 
+          completedRows.has(row.id) || confirmedRows.has(row.id)
+        ).length;
+        const remainingCount = totalRows - completedCount;
+        const selectedRowsCount = selectedRows.size;
+
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              bottom: '16px',
+              left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2)`,
+              transform: 'translateX(-50%)',
+              width: 'fit-content',
+              minWidth: '1014px',
+              height: '65px',
+              backgroundColor: isDarkMode ? 'rgba(31, 41, 55, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+              borderRadius: '32px',
+              padding: '16px 24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '32px',
+              zIndex: 1000,
+              transition: 'left 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+              boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
+            }}
+          >
+            <div style={{ display: 'flex', gap: '48px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{
+                  fontSize: '12px',
+                  fontWeight: 400,
+                  color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                  letterSpacing: '0.05em',
+                }}>
+                  TOTAL LABELS
+                </span>
+                <span style={{
+                  fontSize: '18px',
+                  fontWeight: 700,
+                  color: isDarkMode ? '#FFFFFF' : '#000000',
+                }}>
+                  {totalRows}
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{
+                  fontSize: '12px',
+                  fontWeight: 400,
+                  color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                  letterSpacing: '0.05em',
+                }}>
+                  COMPLETED
+                </span>
+                <span style={{
+                  fontSize: '18px',
+                  fontWeight: 700,
+                  color: isDarkMode ? '#FFFFFF' : '#000000',
+                }}>
+                  {completedCount}
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{
+                  fontSize: '12px',
+                  fontWeight: 400,
+                  color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                  letterSpacing: '0.05em',
+                }}>
+                  REMAINING
+                </span>
+                <span style={{
+                  fontSize: '18px',
+                  fontWeight: 700,
+                  color: isDarkMode ? '#FFFFFF' : '#000000',
+                }}>
+                  {remainingCount}
+                </span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              {remainingCount > 0 && selectedRowsCount > 0 && onMarkAllLabelChecksAsDone && (
+                <button
+                  type="button"
+                  onClick={onMarkAllLabelChecksAsDone}
+                  style={{
+                    height: '31px',
+                    padding: '0 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: '#3B82F6',
+                    color: '#FFFFFF',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#0056CC';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#3B82F6';
+                  }}
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    style={{ flexShrink: 0 }}
+                  >
+                    <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" fill="none" />
+                    <path
+                      d="M5 8L7 10L11 6"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  Mark All as Done
+                </button>
+              )}
+              {onCompleteClick && (
+                <button
+                  type="button"
+                  onClick={onCompleteClick}
+                  style={{
+                    height: '31px',
+                    padding: '0 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: '#007AFF',
+                    color: '#FFFFFF',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#0056CC';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#007AFF';
+                  }}
+                >
+                  Complete
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

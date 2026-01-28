@@ -2233,6 +2233,7 @@ const NewShipment = () => {
 
       if (activeAction === 'book-shipment') {
         // Validate required fields before booking
+        const trimmedShipmentName = (shipmentData.shipmentNumber || '').trim();
         const trimmedShipmentType = (shipmentData.shipmentType || '').trim();
         const trimmedAmazonNumber = (shipmentData.amazonShipmentNumber || '').trim();
         const trimmedAmazonRef = (shipmentData.amazonRefId || '').trim();
@@ -2240,13 +2241,14 @@ const NewShipment = () => {
         const trimmedShipTo = (shipmentData.shipTo || '').trim();
         const trimmedCarrier = (selectedCarrier || '').trim();
 
-        if (!trimmedShipmentType || !trimmedAmazonNumber || !trimmedAmazonRef || !trimmedShipFrom || !trimmedShipTo || !trimmedCarrier) {
-          toast.error('Please fill Shipment Type, Amazon IDs, Ship From, Ship To, and Carrier.');
+        if (!trimmedShipmentName || !trimmedShipmentType || !trimmedAmazonNumber || !trimmedAmazonRef || !trimmedShipFrom || !trimmedShipTo || !trimmedCarrier) {
+          toast.error('Please fill all required fields: Shipment Name, Shipment Type, Amazon IDs, Ship From, Ship To, and Carrier.');
           return;
         }
 
         // Book Shipment: Complete and show modal
         await updateShipment(shipmentId, {
+          shipment_number: trimmedShipmentName,
           shipment_type: trimmedShipmentType,
           amazon_shipment_number: trimmedAmazonNumber,
           amazon_ref_id: trimmedAmazonRef,
@@ -2909,6 +2911,18 @@ const NewShipment = () => {
                     onBrandFilterChange={setSelectedBrands}
                     account={shipmentData.account}
                     doiSettingsChangeCount={doiSettingsChangeCount}
+                    totalPalettes={totalPalettes}
+                    totalProducts={totalProducts}
+                    totalBoxes={totalBoxes}
+                    totalUnits={totalUnits}
+                    totalTimeHours={totalTimeHours}
+                    totalWeightLbs={totalWeightLbs}
+                    totalFormulas={totalFormulas.size}
+                    onClear={() => {
+                      setAddedRows(new Set());
+                      setQtyValues({});
+                    }}
+                    onExport={handleExport}
                   />
                 )}
               </>
@@ -2943,6 +2957,7 @@ const NewShipment = () => {
               shipmentProducts={productsForSortTabs}
               shipmentType={shipmentData.shipmentType}
               shipmentId={shipmentId}
+              onCompleteClick={handleCompleteClick}
             />
           </div>
         )}
@@ -2952,6 +2967,7 @@ const NewShipment = () => {
             <SortFormulasTable 
               shipmentProducts={productsForSortTabs}
               shipmentId={shipmentId}
+              onCompleteClick={handleCompleteClick}
             />
           </div>
         )}
@@ -2967,6 +2983,8 @@ const NewShipment = () => {
               onSelectedRowsChange={setFormulaSelectedRows}
               refreshKey={formulaCheckRefreshKey}
               isAdmin={false} // TODO: Connect to actual user role check (e.g., user?.role === 'admin')
+              onCompleteClick={handleCompleteClick}
+              onMarkAllAsCompleted={handleMarkAllAsCompleted}
             />
           </div>
         )}
@@ -2987,35 +3005,33 @@ const NewShipment = () => {
               refreshKey={labelCheckRefreshKey}
               checkAllIncompleteTrigger={checkAllIncompleteTrigger}
               isAdmin={false} // TODO: Connect to actual user role check (e.g., user?.role === 'admin')
+              onCompleteClick={handleCompleteClick}
+              onMarkAllLabelChecksAsDone={handleMarkAllLabelChecksAsDone}
             />
           </div>
         )}
 
         {activeAction === 'book-shipment' && (
           <div style={{ marginTop: '1.5rem', padding: '0' }}>
-            <div style={{
-              backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-              padding: '24px',
+            <h2 style={{
+              fontSize: '18px',
+              fontWeight: 600,
+              color: isDarkMode ? '#FFFFFF' : '#111827',
+              marginBottom: '24px',
             }}>
-              <h2 style={{
-                fontSize: '18px',
-                fontWeight: 600,
-                color: isDarkMode ? '#FFFFFF' : '#111827',
-                marginBottom: '24px',
-              }}>
-                Shipment Details
-              </h2>
+              Shipment Details
+            </h2>
 
               {/* Row 1: Shipment Name & Shipment Type */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '6px' }}>
-                    Shipment Name
+                    Shipment Name<span style={{ color: '#EF4444' }}>*</span>
                   </label>
                   <input
                     type="text"
-                    value={`${shipmentData.shipmentNumber} ${shipmentData.shipmentType}`}
-                    readOnly
+                    value={shipmentData.shipmentNumber}
+                    onChange={(e) => setShipmentData({ ...shipmentData, shipmentNumber: e.target.value })}
                     style={{
                       width: '100%',
                       padding: '10px 12px',
@@ -3026,6 +3042,13 @@ const NewShipment = () => {
                       fontSize: '14px',
                       outline: 'none',
                       boxSizing: 'border-box',
+                      transition: 'border-color 0.2s',
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#3B82F6';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = isDarkMode ? '#374151' : '#E5E7EB';
                     }}
                   />
                 </div>
@@ -3039,18 +3062,26 @@ const NewShipment = () => {
                     style={{
                       width: '100%',
                       padding: '10px 12px',
+                      paddingRight: '36px',
                       borderRadius: '6px',
                       border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
                       backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
-                      color: shipmentData.shipmentType ? (isDarkMode ? '#FFFFFF' : '#111827') : '#9CA3AF',
+                      color: shipmentData.shipmentType ? (isDarkMode ? '#FFFFFF' : '#111827') : (isDarkMode ? '#9CA3AF' : '#9CA3AF'),
                       fontSize: '14px',
                       outline: 'none',
                       boxSizing: 'border-box',
                       cursor: 'pointer',
                       appearance: 'none',
-                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%239CA3AF' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='${isDarkMode ? '%23FFFFFF' : '%239CA3AF'}' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
                       backgroundRepeat: 'no-repeat',
                       backgroundPosition: 'right 12px center',
+                      transition: 'border-color 0.2s',
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#3B82F6';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = isDarkMode ? '#374151' : '#E5E7EB';
                     }}
                   >
                     <option value="">Select Shipment Type</option>
@@ -3082,6 +3113,13 @@ const NewShipment = () => {
                       fontSize: '14px',
                       outline: 'none',
                       boxSizing: 'border-box',
+                      transition: 'border-color 0.2s',
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#3B82F6';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = isDarkMode ? '#374151' : '#E5E7EB';
                     }}
                   />
                 </div>
@@ -3104,6 +3142,13 @@ const NewShipment = () => {
                       fontSize: '14px',
                       outline: 'none',
                       boxSizing: 'border-box',
+                      transition: 'border-color 0.2s',
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#3B82F6';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = isDarkMode ? '#374151' : '#E5E7EB';
                     }}
                   />
                 </div>
@@ -3112,7 +3157,7 @@ const NewShipment = () => {
               {/* Row 3: Ship From */}
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '6px' }}>
-                  Ship From<span style={{ color: '#EF4444', marginLeft: '4px' }}>*</span>
+                  Ship From<span style={{ color: '#EF4444' }}>*</span>
                 </label>
                 <input
                   type="text"
@@ -3129,6 +3174,13 @@ const NewShipment = () => {
                     fontSize: '14px',
                     outline: 'none',
                     boxSizing: 'border-box',
+                    transition: 'border-color 0.2s',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#3B82F6';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = isDarkMode ? '#374151' : '#E5E7EB';
                   }}
                 />
               </div>
@@ -3136,7 +3188,7 @@ const NewShipment = () => {
               {/* Row 4: Ship To */}
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '6px' }}>
-                  Ship To<span style={{ color: '#EF4444', marginLeft: '4px' }}>*</span>
+                  Ship To<span style={{ color: '#EF4444' }}>*</span>
                 </label>
                 <input
                   type="text"
@@ -3153,6 +3205,13 @@ const NewShipment = () => {
                     fontSize: '14px',
                     outline: 'none',
                     boxSizing: 'border-box',
+                    transition: 'border-color 0.2s',
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#3B82F6';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = isDarkMode ? '#374151' : '#E5E7EB';
                   }}
                 />
               </div>
@@ -3160,30 +3219,61 @@ const NewShipment = () => {
               {/* Row 5: Carrier */}
               <div style={{ marginBottom: '16px', position: 'relative' }}>
                 <label style={{ display: 'block', fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '6px' }}>
-                  Carrier<span style={{ color: '#EF4444', marginLeft: '4px' }}>*</span>
+                  Carrier<span style={{ color: '#EF4444' }}>*</span>
                 </label>
                 <div
                   ref={carrierButtonRef}
                   onClick={() => setIsCarrierDropdownOpen(!isCarrierDropdownOpen)}
                   style={{
                     width: '100%',
-                    padding: '6px 10px',
+                    padding: '10px 12px',
+                    paddingRight: '36px',
                     borderRadius: '6px',
-                    border: '1px solid #D1D5DB',
-                    backgroundColor: '#FFFFFF',
-                    color: selectedCarrier ? '#111827' : '#9CA3AF',
-                    fontSize: '13px',
+                    border: `1px solid ${isCarrierDropdownOpen ? '#3B82F6' : (isDarkMode ? '#374151' : '#E5E7EB')}`,
+                    backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                    color: selectedCarrier ? (isDarkMode ? '#FFFFFF' : '#111827') : (isDarkMode ? '#9CA3AF' : '#9CA3AF'),
+                    fontSize: '14px',
                     cursor: 'pointer',
                     boxSizing: 'border-box',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    minHeight: '28px',
+                    minHeight: '42px',
+                    transition: 'border-color 0.2s',
+                    position: 'relative',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isCarrierDropdownOpen) {
+                      e.currentTarget.style.borderColor = '#3B82F6';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isCarrierDropdownOpen) {
+                      e.currentTarget.style.borderColor = isDarkMode ? '#374151' : '#E5E7EB';
+                    }
                   }}
                 >
-                  <span>{selectedCarrier || 'Select Carrier'}</span>
-                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M1 1L6 6L11 1" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <span>{selectedCarrier || 'Select Carrier Name...'}</span>
+                  <svg 
+                    width="12" 
+                    height="12" 
+                    viewBox="0 0 12 12" 
+                    fill="none" 
+                    xmlns="http://www.w3.org/2000/svg"
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                    }}
+                  >
+                    <path 
+                      d="M3 4.5L6 7.5L9 4.5" 
+                      stroke={isDarkMode ? '#FFFFFF' : '#9CA3AF'} 
+                      strokeWidth="1.5" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round"
+                    />
                   </svg>
                 </div>
 
@@ -3195,8 +3285,8 @@ const NewShipment = () => {
                       top: `${carrierDropdownPos.top}px`,
                       left: `${carrierDropdownPos.left}px`,
                       width: `${carrierDropdownPos.width}px`,
-                      backgroundColor: '#FFFFFF',
-                      border: '1px solid #E5E7EB',
+                      backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                      border: `1px solid ${isDarkMode ? '#4B5563' : '#E5E7EB'}`,
                       borderRadius: '6px',
                       boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
                       zIndex: 10000,
@@ -3204,11 +3294,11 @@ const NewShipment = () => {
                     }}
                   >
                     {/* Known Carriers */}
-                    <div style={{ padding: '8px 10px', borderBottom: '1px solid #E5E7EB' }}>
+                    <div style={{ padding: '8px 10px', borderBottom: `1px solid ${isDarkMode ? '#4B5563' : '#E5E7EB'}` }}>
                       <div style={{
                         fontSize: '11px',
                         fontWeight: 500,
-                        color: '#6B7280',
+                        color: isDarkMode ? '#9CA3AF' : '#6B7280',
                         marginBottom: '6px',
                       }}>
                         Known Carriers:
@@ -3222,12 +3312,12 @@ const NewShipment = () => {
                               padding: '4px 6px',
                               cursor: 'pointer',
                               borderRadius: '4px',
-                              color: '#111827',
+                              color: isDarkMode ? '#FFFFFF' : '#111827',
                               fontSize: '12px',
                               transition: 'background-color 0.2s',
                             }}
                             onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#F3F4F6';
+                              e.currentTarget.style.backgroundColor = isDarkMode ? '#4B5563' : '#F3F4F6';
                             }}
                             onMouseLeave={(e) => {
                               e.currentTarget.style.backgroundColor = 'transparent';
@@ -3240,11 +3330,11 @@ const NewShipment = () => {
                     </div>
 
                     {/* Custom Entry */}
-                    <div style={{ padding: '8px 10px', borderBottom: '1px solid #E5E7EB' }}>
+                    <div style={{ padding: '8px 10px', borderBottom: `1px solid ${isDarkMode ? '#4B5563' : '#E5E7EB'}` }}>
                       <div style={{
                         fontSize: '11px',
                         fontWeight: 500,
-                        color: '#6B7280',
+                        color: isDarkMode ? '#9CA3AF' : '#6B7280',
                         marginBottom: '6px',
                       }}>
                         Custom Entry:
@@ -3259,9 +3349,9 @@ const NewShipment = () => {
                             flex: 1,
                             padding: '4px 8px',
                             borderRadius: '4px',
-                            border: '1px solid #D1D5DB',
-                            backgroundColor: '#FFFFFF',
-                            color: '#111827',
+                            border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
+                            backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                            color: isDarkMode ? '#FFFFFF' : '#111827',
                             fontSize: '12px',
                             outline: 'none',
                             boxSizing: 'border-box',
@@ -3270,7 +3360,7 @@ const NewShipment = () => {
                             e.target.style.borderColor = '#3B82F6';
                           }}
                           onBlur={(e) => {
-                            e.target.style.borderColor = '#D1D5DB';
+                            e.target.style.borderColor = isDarkMode ? '#4B5563' : '#D1D5DB';
                           }}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
@@ -3285,7 +3375,7 @@ const NewShipment = () => {
                             padding: '4px 12px',
                             borderRadius: '4px',
                             border: 'none',
-                            backgroundColor: '#9CA3AF',
+                            backgroundColor: '#3B82F6',
                             color: '#FFFFFF',
                             fontSize: '12px',
                             fontWeight: 500,
@@ -3293,10 +3383,10 @@ const NewShipment = () => {
                             transition: 'background-color 0.2s',
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#6B7280';
+                            e.currentTarget.style.backgroundColor = '#2563EB';
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = '#9CA3AF';
+                            e.currentTarget.style.backgroundColor = '#3B82F6';
                           }}
                         >
                           Use
@@ -3309,7 +3399,7 @@ const NewShipment = () => {
                       <div style={{
                         fontSize: '11px',
                         fontWeight: 500,
-                        color: '#6B7280',
+                        color: isDarkMode ? '#9CA3AF' : '#6B7280',
                         marginBottom: '6px',
                       }}>
                         Create a Carrier:
@@ -3342,569 +3432,45 @@ const NewShipment = () => {
                   document.body
                 )}
               </div>
-            </div>
-          </div>
-        )}
-      </div>
 
-      {(activeAction === 'add-products' || activeAction === 'formula-check' || activeAction === 'label-check' || activeAction === 'book-shipment' || activeAction === 'sort-products' || activeAction === 'sort-formulas') && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: '16px',
-            left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2)`,
-            transform: 'translateX(-50%)',
-            width: 'fit-content',
-            minWidth: '1014px',
-            height: '65px',
-            backgroundColor: isDarkMode ? 'rgba(31, 41, 55, 0.85)' : 'rgba(255, 255, 255, 0.85)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-            border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
-            borderRadius: '32px',
-            padding: '16px 24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '32px',
-            zIndex: 1000,
-            transition: 'left 300ms cubic-bezier(0.4, 0, 0.2, 1)',
-            boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
-          }}
-        >
-          {activeAction === 'formula-check' ? (
-            /* Formula Check Footer */
-            <>
-              <div style={{ display: 'flex', gap: '48px', alignItems: 'center' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <span style={{
-                    fontSize: '12px',
-                    fontWeight: 400,
-                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                    letterSpacing: '0.05em',
-                  }}>
-                    TOTAL FORMULAS
-                  </span>
-                  <span style={{
-                    fontSize: '18px',
-                    fontWeight: 700,
-                    color: isDarkMode ? '#FFFFFF' : '#000000',
-                  }}>
-                    {formulaCheckData.total}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <span style={{
-                    fontSize: '12px',
-                    fontWeight: 400,
-                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                    letterSpacing: '0.05em',
-                  }}>
-                    COMPLETED
-                  </span>
-                  <span style={{
-                    fontSize: '18px',
-                    fontWeight: 700,
-                    color: isDarkMode ? '#FFFFFF' : '#000000',
-                  }}>
-                    {formulaCheckData.completed}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <span style={{
-                    fontSize: '12px',
-                    fontWeight: 400,
-                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                    letterSpacing: '0.05em',
-                  }}>
-                    REMAINING
-                  </span>
-                  <span style={{
-                    fontSize: '18px',
-                    fontWeight: 700,
-                    color: isDarkMode ? '#FFFFFF' : '#000000',
-                  }}>
-                    {formulaCheckData.remaining}
-                  </span>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                {formulaSelectedRows.size > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleMarkAllAsCompleted}
-                    style={{
-                      height: '31px',
-                      padding: '0 16px',
-                      borderRadius: '6px',
-                      border: 'none',
-                      backgroundColor: '#3B82F6',
-                      color: '#FFFFFF',
-                      fontSize: '14px',
-                      fontWeight: 500,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#0056CC';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#3B82F6';
-                    }}
-                  >
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 16 16"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                      style={{ flexShrink: 0 }}
-                    >
-                      <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" fill="none" />
-                      <path
-                        d="M5 8L7 10L11 6"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                    Mark All as Completed
-                  </button>
-                )}
+              {/* Book Shipment Button */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
                 <button
                   type="button"
                   onClick={handleCompleteClick}
                   style={{
+                    width: '120px',
                     height: '31px',
-                    padding: '0 16px',
-                    borderRadius: '6px',
+                    borderRadius: '8px',
                     border: 'none',
-                    backgroundColor: '#007AFF',
+                    background: 'linear-gradient(to right, #007AFF, #004999)',
                     color: '#FFFFFF',
                     fontSize: '14px',
                     fontWeight: 500,
                     cursor: 'pointer',
                     transition: 'all 0.2s',
                     display: 'flex',
+                    flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    padding: 0,
+                    boxSizing: 'border-box',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#0056CC';
+                    e.currentTarget.style.background = 'linear-gradient(to right, #0056CC, #003366)';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#007AFF';
-                  }}
-                >
-                  Complete
-                </button>
-              </div>
-            </>
-          ) : activeAction === 'label-check' ? (
-            /* Label Check Footer */
-            <>
-              <div style={{ display: 'flex', gap: '48px', alignItems: 'center' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <span style={{
-                    fontSize: '12px',
-                    fontWeight: 400,
-                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                    letterSpacing: '0.05em',
-                  }}>
-                    TOTAL LABELS
-                  </span>
-                  <span style={{
-                    fontSize: '18px',
-                    fontWeight: 700,
-                    color: isDarkMode ? '#FFFFFF' : '#000000',
-                  }}>
-                    {totalLabelCheckRows}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <span style={{
-                    fontSize: '12px',
-                    fontWeight: 400,
-                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                    letterSpacing: '0.05em',
-                  }}>
-                    COMPLETED
-                  </span>
-                  <span style={{
-                    fontSize: '18px',
-                    fontWeight: 700,
-                    color: isDarkMode ? '#FFFFFF' : '#000000',
-                  }}>
-                    {labelCheckCompletedCount}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <span style={{
-                    fontSize: '12px',
-                    fontWeight: 400,
-                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                    letterSpacing: '0.05em',
-                  }}>
-                    REMAINING
-                  </span>
-                  <span style={{
-                    fontSize: '18px',
-                    fontWeight: 700,
-                    color: isDarkMode ? '#FFFFFF' : '#000000',
-                  }}>
-                    {labelCheckRemainingCount}
-                  </span>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                {labelCheckRemainingCount > 0 && labelCheckSelectedRowsCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleMarkAllLabelChecksAsDone}
-                    style={{
-                      height: '31px',
-                      padding: '0 16px',
-                      borderRadius: '6px',
-                      border: 'none',
-                      backgroundColor: '#3B82F6',
-                      color: '#FFFFFF',
-                      fontSize: '14px',
-                      fontWeight: 500,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#0056CC';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#3B82F6';
-                    }}
-                  >
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 16 16"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                      style={{ flexShrink: 0 }}
-                    >
-                      <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" fill="none" />
-                      <path
-                        d="M5 8L7 10L11 6"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                    Mark All as Done
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={handleCompleteClick}
-                  style={{
-                    height: '31px',
-                    padding: '0 16px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: '#007AFF',
-                    color: '#FFFFFF',
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    opacity: isLabelCheckReadyToComplete ? 1 : 0.7,
-                    transition: 'all 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#0056CC';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#007AFF';
-                  }}
-                >
-                  Complete
-                </button>
-              </div>
-            </>
-          ) : activeAction === 'book-shipment' ? (
-            /* Book Shipment Footer */
-            <>
-              <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }} />
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                <button
-                  type="button"
-                  onClick={handleCompleteClick}
-                  style={{
-                    height: '31px',
-                    padding: '0 16px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: '#007AFF',
-                    color: '#FFFFFF',
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#0056CC';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#007AFF';
+                    e.currentTarget.style.background = 'linear-gradient(to right, #007AFF, #004999)';
                   }}
                 >
                   Book Shipment
                 </button>
               </div>
-            </>
-          ) : (activeAction === 'sort-products' || activeAction === 'sort-formulas') ? (
-            /* Sort Products / Sort Formulas Footer */
-            <>
-              <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
-                {/* Empty left side */}
-              </div>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                <button
-                  type="button"
-                  onClick={handleCompleteClick}
-                  style={{
-                    height: '38px',
-                    padding: '0 24px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    backgroundColor: '#007AFF',
-                    color: '#FFFFFF',
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#0056CC';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#007AFF';
-                  }}
-                >
-                  Complete
-                </button>
-              </div>
-            </>
-          ) : (
-            /* Default Footer (Add Products) */
-            <>
-              <div style={{ display: 'flex', gap: '48px', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                  <span style={{
-                    fontSize: '12px',
-                    fontWeight: 400,
-                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-                    textAlign: 'center',
-                  }}>
-                    PALETTES
-                  </span>
-                  <span style={{
-                    fontSize: '18px',
-                    fontWeight: 700,
-                    color: isDarkMode ? '#FFFFFF' : '#000000',
-                    textAlign: 'center',
-                  }}>
-                    {totalPalettes.toFixed(2)}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                  <span style={{
-                    fontSize: '12px',
-                    fontWeight: 400,
-                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-                    textAlign: 'center',
-                  }}>
-                    PRODUCTS
-                  </span>
-                  <span style={{
-                    fontSize: '18px',
-                    fontWeight: 700,
-                    color: isDarkMode ? '#FFFFFF' : '#000000',
-                    textAlign: 'center',
-                  }}>
-                    {totalProducts}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                  <span style={{
-                    fontSize: '12px',
-                    fontWeight: 400,
-                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-                    textAlign: 'center',
-                  }}>
-                    BOXES
-                  </span>
-                  <span style={{
-                    fontSize: '18px',
-                    fontWeight: 700,
-                    color: isDarkMode ? '#FFFFFF' : '#000000',
-                    textAlign: 'center',
-                  }}>
-                    {Math.ceil(totalBoxes).toLocaleString()}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                  <span style={{
-                    fontSize: '12px',
-                    fontWeight: 400,
-                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-                    textAlign: 'center',
-                  }}>
-                    UNITS
-                  </span>
-                  <span style={{
-                    fontSize: '18px',
-                    fontWeight: 700,
-                    color: isDarkMode ? '#FFFFFF' : '#000000',
-                    textAlign: 'center',
-                  }}>
-                    {totalUnits.toLocaleString()}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                  <span style={{
-                    fontSize: '12px',
-                    fontWeight: 400,
-                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-                    textAlign: 'center',
-                    whiteSpace: 'nowrap',
-                  }}>
-                    TIME (HRS)
-                  </span>
-                  <span style={{
-                    fontSize: '18px',
-                    fontWeight: 700,
-                    color: isDarkMode ? '#FFFFFF' : '#000000',
-                    textAlign: 'center',
-                  }}>
-                    {totalTimeHours.toFixed(1)}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                  <span style={{
-                    fontSize: '12px',
-                    fontWeight: 400,
-                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-                    textAlign: 'center',
-                    whiteSpace: 'nowrap',
-                  }}>
-                    WEIGHT (LBS)
-                  </span>
-                  <span style={{
-                    fontSize: '18px',
-                    fontWeight: 700,
-                    color: isDarkMode ? '#FFFFFF' : '#000000',
-                    textAlign: 'center',
-                  }}>
-                    {Math.round(totalWeightLbs).toLocaleString()}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                  <span style={{
-                    fontSize: '12px',
-                    fontWeight: 400,
-                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-                    textAlign: 'center',
-                  }}>
-                    FORMULAS
-                  </span>
-                  <span style={{
-                    fontSize: '18px',
-                    fontWeight: 700,
-                    color: isDarkMode ? '#FFFFFF' : '#000000',
-                    textAlign: 'center',
-                  }}>
-                    {totalFormulas}
-                  </span>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAddedRows(new Set());
-                    setQtyValues({});
-                  }}
-                  style={{
-                    height: '31px',
-                    padding: '0 16px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: 'transparent',
-                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  Clear
-                </button>
-                <button
-                  type="button"
-                  onClick={handleExport}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = addedRows.size > 0 ? '#0066CC' : '#6B7280';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = addedRows.size > 0 ? '#007AFF' : '#9CA3AF';
-                  }}
-                  style={{
-                    height: '31px',
-                    padding: '0 10px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: addedRows.size > 0 ? '#3B82F6' : '#9CA3AF',
-                    color: '#FFFFFF',
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  Export for Upload
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
+
+      {/* Shared footer is now handled by individual table components */}
 
       <NgoosModal
         isOpen={isNgoosOpen}
@@ -4461,7 +4027,7 @@ const NewShipment = () => {
               style={{
                 backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
                 borderRadius: '14px',
-                width: '400px',
+                width: '278px',
                 border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
                 boxShadow: isDarkMode 
                   ? '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.2)'
@@ -4512,19 +4078,19 @@ const NewShipment = () => {
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: '14px',
+                gap: '16px',
               }}>
                 {/* Green checkmark icon */}
                 <div style={{
-                  width: '44px',
-                  height: '44px',
+                  width: '32px',
+                  height: '32px',
                   borderRadius: '50%',
                   backgroundColor: '#10B981',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M5 12L10 17L19 8" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </div>
@@ -4550,7 +4116,7 @@ const NewShipment = () => {
                 alignItems: 'center',
                 gap: '10px',
               }}>
-                {/* Go to Shipments button */}
+                {/* Close button */}
                 <button
                   type="button"
                   onClick={() => {
@@ -4560,9 +4126,9 @@ const NewShipment = () => {
                     });
                   }}
                   style={{
-                    minWidth: '170px',
+                    width: '65px',
                     height: '31px',
-                    padding: '0 14px',
+                    padding: 0,
                     borderRadius: '4px',
                     border: isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
                     backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
@@ -4571,6 +4137,11 @@ const NewShipment = () => {
                     fontWeight: 500,
                     cursor: 'pointer',
                     transition: 'all 0.2s',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxSizing: 'border-box',
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = isDarkMode ? '#4B5563' : '#F3F4F6';
@@ -4579,7 +4150,7 @@ const NewShipment = () => {
                     e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#FFFFFF';
                   }}
                 >
-                  Go to Shipments
+                  Close
                 </button>
 
                 {/* Begin Sort Products button */}
@@ -4595,7 +4166,7 @@ const NewShipment = () => {
                     padding: '0 12px',
                     borderRadius: '4px',
                     border: 'none',
-                    backgroundColor: '#007AFF',
+                    background: 'linear-gradient(to right, #007AFF, #004999)',
                     color: '#FFFFFF',
                     fontSize: '13px',
                     fontWeight: 600,
@@ -4609,10 +4180,10 @@ const NewShipment = () => {
                     textOverflow: 'ellipsis',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#005FCC';
+                    e.currentTarget.style.background = 'linear-gradient(to right, #0056CC, #003366)';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#007AFF';
+                    e.currentTarget.style.background = 'linear-gradient(to right, #007AFF, #004999)';
                   }}
                 >
                   Begin Sort Products

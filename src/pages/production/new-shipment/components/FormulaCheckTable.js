@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
+import { useSidebar } from '../../../../context/SidebarContext';
 import { getShipmentFormulaCheck, updateShipmentFormulaCheck, updateShipment } from '../../../../services/productionApi';
 import SortFormulasFilterDropdown from './SortFormulasFilterDropdown';
 
@@ -12,8 +13,11 @@ const FormulaCheckTable = ({
   onSelectedRowsChange,
   refreshKey = 0, // Increment to trigger reload while preserving checked status
   isAdmin = false, // Admin role check for bulk actions
+  onCompleteClick = null, // Callback for Complete button
+  onMarkAllAsCompleted = null, // Callback for Mark All as Completed button
 }) => {
   const { isDarkMode } = useTheme();
+  const { sidebarWidth } = useSidebar();
   const [selectedRows, setSelectedRows] = useState(new Set());
   const [formulas, setFormulas] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -1271,6 +1275,164 @@ const FormulaCheckTable = ({
           isDarkMode={isDarkMode}
         />
       )}
+
+      {/* Footer */}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: '16px',
+          left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2)`,
+          transform: 'translateX(-50%)',
+          width: 'fit-content',
+          minWidth: '1014px',
+          height: '65px',
+          backgroundColor: isDarkMode ? 'rgba(31, 41, 55, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+          borderRadius: '32px',
+          padding: '16px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '32px',
+          zIndex: 1000,
+          transition: 'left 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+          boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
+        }}
+      >
+        <div style={{ display: 'flex', gap: '48px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span style={{
+              fontSize: '12px',
+              fontWeight: 400,
+              color: isDarkMode ? '#9CA3AF' : '#6B7280',
+              letterSpacing: '0.05em',
+            }}>
+              TOTAL FORMULAS
+            </span>
+            <span style={{
+              fontSize: '18px',
+              fontWeight: 700,
+              color: isDarkMode ? '#FFFFFF' : '#000000',
+            }}>
+              {formulas.length}
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span style={{
+              fontSize: '12px',
+              fontWeight: 400,
+              color: isDarkMode ? '#9CA3AF' : '#6B7280',
+              letterSpacing: '0.05em',
+            }}>
+              COMPLETED
+            </span>
+            <span style={{
+              fontSize: '18px',
+              fontWeight: 700,
+              color: isDarkMode ? '#FFFFFF' : '#000000',
+            }}>
+              {formulas.filter(f => f.isChecked).length}
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <span style={{
+              fontSize: '12px',
+              fontWeight: 400,
+              color: isDarkMode ? '#9CA3AF' : '#6B7280',
+              letterSpacing: '0.05em',
+            }}>
+              REMAINING
+            </span>
+            <span style={{
+              fontSize: '18px',
+              fontWeight: 700,
+              color: isDarkMode ? '#FFFFFF' : '#000000',
+            }}>
+              {formulas.length - formulas.filter(f => f.isChecked).length}
+            </span>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          {selectedRows.size > 0 && onMarkAllAsCompleted && (
+            <button
+              type="button"
+              onClick={onMarkAllAsCompleted}
+              style={{
+                height: '31px',
+                padding: '0 16px',
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: '#3B82F6',
+                color: '#FFFFFF',
+                fontSize: '14px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#0056CC';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#3B82F6';
+              }}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                style={{ flexShrink: 0 }}
+              >
+                <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" fill="none" />
+                <path
+                  d="M5 8L7 10L11 6"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Mark All as Completed
+            </button>
+          )}
+          {onCompleteClick && (
+            <button
+              type="button"
+              onClick={onCompleteClick}
+              style={{
+                height: '31px',
+                padding: '0 16px',
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: '#007AFF',
+                color: '#FFFFFF',
+                fontSize: '14px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#0056CC';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#007AFF';
+              }}
+            >
+              Complete
+            </button>
+          )}
+        </div>
+      </div>
     </div>
     </>
   );
