@@ -48,9 +48,39 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
   };
 
   // Helper function to get the increment step based on product size
-  // Returns the step value for the number input (always 1 - no case pack rounding)
+  // Returns the case-pack size so splits are by cases, not single units
   const getIncrementStep = (size) => {
-    // Always return 1 for all sizes
+    const sizeLower = (size || '').toLowerCase();
+
+    // Mirror the same size → case-size mapping used in new-shipment/index.js,
+    // with an explicit case pack for 6oz as well
+    if (sizeLower.includes('8oz')) {
+      // 60 units = 1 box (case)
+      return 60;
+    } else if (sizeLower.includes('6oz')) {
+      // 40 units = 1 box (case)
+      return 40;
+    } else if (sizeLower.includes('1/2lb') || sizeLower.includes('1/2 lb')) {
+      // 40 units = 1 box (case) for 1/2lb Bag
+      return 40;
+    } else if (sizeLower.includes('1lb') || sizeLower.includes('1 lb')) {
+      // 25 units = 1 box (case) for 1lb Bag
+      return 25;
+    } else if (sizeLower.includes('25lb') || sizeLower.includes('25 lb')) {
+      // 1 unit = 1 box (case) for 25lb Bag
+      return 1;
+    } else if (sizeLower.includes('5lb') || sizeLower.includes('5 lb')) {
+      // 5 units = 1 box (case) for 5lb Bag
+      return 5;
+    } else if (sizeLower.includes('quart')) {
+      // 12 units = 1 box
+      return 12;
+    } else if (sizeLower.includes('gallon')) {
+      // 4 units = 1 box
+      return 4;
+    }
+
+    // Fallback: use 1 when we don't recognize the size
     return 1;
   };
 
