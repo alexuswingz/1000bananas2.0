@@ -662,119 +662,211 @@ const FormulaCheckTable = ({
         <table style={{
           width: '100%',
           borderCollapse: 'collapse',
+          borderSpacing: 0,
         }}>
           {/* Header */}
-          <thead>
-            <tr style={{
-              backgroundColor: '#1C2634',
-              borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
-              height: '40px',
-            }}>
+          <thead style={{ backgroundColor: '#1A2235' }}>
+            {/* Header row */}
+            <tr
+              style={{
+                height: '66px',
+                maxHeight: '66px',
+                borderBottom: 'none',
+              }}
+            >
               {columns.map((column) => {
                 const isActive = hasActiveFilter(column.key);
                 const isDropdownOpen = openFilterColumn === column.key;
                 const shouldShowIcon = isActive || isDropdownOpen;
-                
+
                 return (
-                <th
-                  key={column.key}
-                  className="group"
-                  style={{
-                    padding: column.key === 'checkbox' || column.key === 'complete' ? '0 8px' : '0 16px',
-                    textAlign: column.key === 'checkbox' || column.key === 'complete' ? 'center' : 'left',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    color: isActive ? '#3B82F6' : '#9CA3AF',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                    width: column.width,
-                    whiteSpace: 'nowrap',
-                    borderRight: column.key === 'checkbox' || column.key === 'complete' ? 'none' : '1px solid #FFFFFF',
-                    height: '40px',
-                    cursor: column.key !== 'checkbox' && column.key !== 'complete' ? 'pointer' : 'default',
-                    position: 'relative',
-                    backgroundColor: isActive ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
-                  }}
-                >
-                  {column.key === 'checkbox' ? (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                      <input
-                        type="checkbox"
-                        checked={areAllRowsSelected()}
-                        onChange={(e) => handleSelectAll(e.target.checked)}
-                        onClick={(e) => e.stopPropagation()}
+                  <th
+                    key={column.key}
+                    className="group"
+                    style={{
+                      padding:
+                        column.key === 'checkbox' || column.key === 'complete'
+                          ? '0 8px'
+                          : '0 24px',
+                      textAlign:
+                        column.key === 'checkbox' || column.key === 'complete'
+                          ? 'center'
+                          : 'center',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      width: column.width,
+                      whiteSpace: 'nowrap',
+                      borderRight: 'none',
+                      height: '66px',
+                      cursor:
+                        column.key !== 'checkbox' && column.key !== 'complete'
+                          ? 'pointer'
+                          : 'default',
+                      position:
+                        column.key !== 'checkbox' && column.key !== 'complete'
+                          ? 'relative'
+                          : 'static',
+                      backgroundColor: isActive
+                        ? 'rgba(59, 130, 246, 0.1)'
+                        : 'transparent',
+                      borderBottom: 'none',
+                    }}
+                  >
+                    {column.key === 'checkbox' ? (
+                      <div
                         style={{
-                          width: '16px',
-                          height: '16px',
-                          cursor: 'pointer',
-                          accentColor: '#3B82F6',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'flex-start',
                         }}
-                        title="Select all rows"
-                      />
-                    </div>
-                  ) : column.key === 'complete' ? (
-                    column.label
-                  ) : (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '8px',
-                    }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        {column.label}
-                        {isActive && (
-                          <span style={{ 
-                            display: 'inline-block',
-                            width: '6px', 
-                            height: '6px', 
-                            borderRadius: '50%', 
-                            backgroundColor: '#10B981',
-                          }} />
-                        )}
-                      </span>
-                      {column.key !== 'notes' && (
-                        <img
-                          ref={(el) => { if (el) filterIconRefs.current[column.key] = el; }}
-                          src="/assets/Vector (1).png"
-                          alt="Filter"
-                          className="transition-opacity"
-                          data-filter-open={isDropdownOpen ? 'true' : 'false'}
+                      >
+                        <label
                           style={{
-                            width: '12px',
-                            height: '12px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
                             cursor: 'pointer',
-                            opacity: shouldShowIcon ? 1 : 0,
-                            filter: shouldShowIcon
-                              ? 'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)'
-                              : undefined,
                           }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.opacity = '1';
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={areAllRowsSelected()}
+                            onChange={(e) => handleSelectAll(e.target.checked)}
+                            style={{
+                              position: 'absolute',
+                              opacity: 0,
+                              width: 0,
+                              height: 0,
+                            }}
+                            title="Select all rows"
+                          />
+                          <span
+                            style={{
+                              width: '16px',
+                              height: '16px',
+                              border: '1px solid #6B7280',
+                              borderRadius: '3px',
+                              boxSizing: 'border-box',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transform: 'translateX(37px)',
+                              backgroundColor: areAllRowsSelected()
+                                ? '#3B82F6'
+                                : 'transparent',
+                            }}
+                          >
+                            {areAllRowsSelected() && (
+                              <span
+                                style={{
+                                  width: '10px',
+                                  height: '6px',
+                                  borderBottom: '2px solid #FFFFFF',
+                                  borderLeft: '2px solid #FFFFFF',
+                                  transform: 'rotate(-45deg)',
+                                  marginTop: '-1px',
+                                  marginLeft: '0px',
+                                }}
+                              />
+                            )}
+                          </span>
+                        </label>
+                      </div>
+                    ) : column.key === 'complete' ? (
+                      <div />
+                    ) : (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: column.key === 'notes' ? 'flex-start' : 'center',
+                          gap: '0.5rem',
+                        }}
+                      >
+                        <span
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transform: column.key === 'notes' ? 'translateX(-20px)' : 'none',
                           }}
-                          onMouseLeave={(e) => {
-                            // Keep visible if dropdown is open or filter is active
-                            if (shouldShowIcon) {
+                        >
+                          {column.label}
+                          {isActive && (
+                            <span
+                              style={{
+                                display: 'inline-block',
+                                width: '6px',
+                                height: '6px',
+                                borderRadius: '50%',
+                                backgroundColor: '#10B981',
+                              }}
+                            />
+                          )}
+                        </span>
+                        {column.key !== 'notes' && (
+                          <img
+                            ref={(el) => {
+                              if (el) filterIconRefs.current[column.key] = el;
+                            }}
+                            src="/assets/Vector (1).png"
+                            alt="Filter"
+                            className="transition-opacity"
+                            data-filter-open={isDropdownOpen ? 'true' : 'false'}
+                            style={{
+                              width: '12px',
+                              height: '12px',
+                              cursor: 'pointer',
+                              opacity: shouldShowIcon ? 1 : 0,
+                              filter: shouldShowIcon
+                                ? 'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)'
+                                : undefined,
+                            }}
+                            onMouseEnter={(e) => {
                               e.currentTarget.style.opacity = '1';
-                            } else {
-                              e.currentTarget.style.opacity = '0';
-                            }
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOpenFilterColumn(openFilterColumn === column.key ? null : column.key);
-                          }}
-                        />
-                      )}
-                    </div>
-                  )}
-                </th>
+                            }}
+                            onMouseLeave={(e) => {
+                              if (shouldShowIcon) {
+                                e.currentTarget.style.opacity = '1';
+                              } else {
+                                e.currentTarget.style.opacity = '0';
+                              }
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenFilterColumn(
+                                openFilterColumn === column.key ? null : column.key
+                              );
+                            }}
+                          />
+                        )}
+                      </div>
+                    )}
+                  </th>
                 );
               })}
+            </tr>
+            {/* Inset separator line under header, 16px from both ends */}
+            <tr>
+              <th
+                colSpan={columns.length}
+                style={{
+                  padding: 0,
+                  border: 'none',
+                  height: '1px',
+                }}
+              >
+                <div
+                  style={{
+                    margin: '0 16px',
+                    borderBottom: '1px solid #334155',
+                  }}
+                />
+              </th>
             </tr>
           </thead>
 
@@ -810,54 +902,93 @@ const FormulaCheckTable = ({
               const hasNote = !!notes[formula.id];
 
               return (
+              <React.Fragment key={formula.id}>
               <tr
-                key={formula.id}
                 style={{
-                  backgroundColor: originalIndex % 2 === 0
-                    ? (isDarkMode ? '#1F2937' : '#FFFFFF')
-                    : (isDarkMode ? '#1A1F2E' : '#F9FAFB'),
-                  borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                  backgroundColor: isDarkMode ? '#1A2235' : '#F9FAFB',
+                  borderBottom: 'none',
                   transition: 'background-color 0.2s',
-                  height: '40px',
+                  height: '66px',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                  e.currentTarget.style.backgroundColor = isDarkMode ? '#232c41' : '#F3F4F6';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = originalIndex % 2 === 0
-                    ? (isDarkMode ? '#1F2937' : '#FFFFFF')
-                    : (isDarkMode ? '#1A1F2E' : '#F9FAFB');
+                  e.currentTarget.style.backgroundColor = isDarkMode ? '#1A2235' : '#F9FAFB';
                 }}
               >
                 <td style={{
-                  padding: '0 8px',
-                  textAlign: 'center',
-                  height: '40px',
+                  padding: '0 24px 0 20px',
+                  textAlign: 'left',
+                  height: '66px',
+                  borderBottom: 'none',
                 }}>
-                  <input
-                    type="checkbox"
-                    checked={isAdmin ? bulkSelectedRows.has(formula.id) : selectedRows.has(formula.id)}
-                    onChange={() => {
-                      if (isAdmin) {
-                        handleBulkCheckboxChange(formula.id);
-                      } else {
-                        handleCheckboxChange(formula.id);
-                      }
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    style={{
-                      width: '16px',
-                      height: '16px',
-                      cursor: 'pointer',
-                      accentColor: hasNote ? '#F59E0B' : '#3B82F6',
-                    }}
-                    title={isAdmin ? "Select for bulk action" : "Check to mark as complete"}
-                  />
+                  <div>
+                    <label
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isAdmin ? bulkSelectedRows.has(formula.id) : selectedRows.has(formula.id)}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          if (isAdmin) {
+                            handleBulkCheckboxChange(formula.id);
+                          } else {
+                            handleCheckboxChange(formula.id);
+                          }
+                        }}
+                        style={{
+                          position: 'absolute',
+                          opacity: 0,
+                          width: 0,
+                          height: 0,
+                        }}
+                        title={isAdmin ? "Select for bulk action" : "Check to mark as complete"}
+                      />
+                      <span
+                        style={{
+                          width: '16px',
+                          height: '16px',
+                          border: '1px solid #6B7280',
+                          borderRadius: '3px',
+                          boxSizing: 'border-box',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transform: 'translateX(25px)',
+                          backgroundColor: (isAdmin ? bulkSelectedRows.has(formula.id) : selectedRows.has(formula.id))
+                            ? (hasNote ? '#F59E0B' : '#3B82F6')
+                            : 'transparent',
+                        }}
+                      >
+                        {(isAdmin ? bulkSelectedRows.has(formula.id) : selectedRows.has(formula.id)) && (
+                          <span
+                            style={{
+                              width: '10px',
+                              height: '6px',
+                              borderBottom: '2px solid #FFFFFF',
+                              borderLeft: '2px solid #FFFFFF',
+                              transform: 'rotate(-45deg)',
+                              marginTop: '-1px',
+                              marginLeft: '0px',
+                            }}
+                          />
+                        )}
+                      </span>
+                    </label>
+                  </div>
                 </td>
                 <td style={{
                   padding: '0 8px',
                   textAlign: 'center',
-                  height: '40px',
+                  height: '66px',
                 }}>
                   {(() => {
                     const isCompleted = formula.isChecked; // Use backend completion status, not checkbox selection
@@ -948,6 +1079,7 @@ const FormulaCheckTable = ({
                 </td>
                 <td style={{
                   padding: '0 16px',
+                  textAlign: 'center',
                   fontSize: '14px',
                   fontWeight: 400,
                   color: isDarkMode ? '#E5E7EB' : '#374151',
@@ -957,6 +1089,7 @@ const FormulaCheckTable = ({
                 </td>
                 <td style={{
                   padding: '0 16px',
+                  textAlign: 'center',
                   fontSize: '14px',
                   fontWeight: 400,
                   color: isDarkMode ? '#E5E7EB' : '#374151',
@@ -966,6 +1099,7 @@ const FormulaCheckTable = ({
                 </td>
                 <td style={{
                   padding: '0 16px',
+                  textAlign: 'center',
                   fontSize: '14px',
                   fontWeight: 400,
                   color: isDarkMode ? '#E5E7EB' : '#374151',
@@ -975,6 +1109,7 @@ const FormulaCheckTable = ({
                 </td>
                 <td style={{
                   padding: '0 16px',
+                  textAlign: 'center',
                   fontSize: '14px',
                   fontWeight: 400,
                   color: isDarkMode ? '#E5E7EB' : '#374151',
@@ -984,31 +1119,35 @@ const FormulaCheckTable = ({
                 </td>
                 <td style={{
                   padding: '0 16px',
+                  textAlign: 'center',
                   height: '40px',
                 }}>
-                  <input
-                    type="text"
-                    value={formula.totalVolume}
-                    readOnly
+                  <div
                     style={{
                       width: '107px',
-                      height: '24px',
-                      padding: '0 10px',
-                      borderRadius: '6px',
-                      border: '1px solid #D1D5DB',
-                      backgroundColor: isDarkMode ? '#374151' : '#F9FAFB',
-                      color: isDarkMode ? '#E5E7EB' : '#374151',
+                      height: '34px',
+                      padding: '8px 6px',
+                      borderRadius: '8px',
+                      border: '1px solid #334155',
+                      backgroundColor: isDarkMode ? '#020617' : '#0F172A',
+                      color: '#F9FAFB',
                       fontSize: '14px',
-                      fontWeight: 400,
-                      textAlign: 'center',
-                      outline: 'none',
-                      cursor: 'default',
-                      boxSizing: 'border-box',
+                      lineHeight: '18px',
+                      fontWeight: 600,
+                      letterSpacing: '0.04em',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 0 0 1px rgba(15,23,42,0.85), 0 10px 25px rgba(15,23,42,0.55)',
+                      textShadow: '0 0 8px rgba(15,23,42,0.9)',
                     }}
-                  />
+                  >
+                    {Number(formula.totalVolume || 0).toLocaleString()}
+                  </div>
                 </td>
                 <td style={{
                   padding: '0 16px',
+                  textAlign: 'center',
                   fontSize: '14px',
                   fontWeight: 400,
                   color: isDarkMode ? '#E5E7EB' : '#374151',
@@ -1018,6 +1157,7 @@ const FormulaCheckTable = ({
                 </td>
                 <td style={{
                   padding: '0 16px',
+                  textAlign: 'center',
                   fontSize: '14px',
                   fontWeight: 400,
                   color: isDarkMode ? '#E5E7EB' : '#374151',
@@ -1030,7 +1170,7 @@ const FormulaCheckTable = ({
                   textAlign: 'center',
                   height: '40px',
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginLeft: 0 }}>
                     <button
                       type="button"
                       onClick={() => handleNotesClick(formula)}
@@ -1043,6 +1183,7 @@ const FormulaCheckTable = ({
                         alignItems: 'center',
                         justifyContent: 'center',
                         transition: 'opacity 0.2s',
+                        transform: 'translateX(-24px)',
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.opacity = '0.8';
@@ -1081,6 +1222,25 @@ const FormulaCheckTable = ({
                   </div>
                 </td>
               </tr>
+              {/* Inset separator line under this row, 16px from both ends */}
+              <tr>
+                <td
+                  colSpan={columns.length}
+                  style={{
+                    padding: 0,
+                    border: 'none',
+                    height: '1px',
+                  }}
+                >
+                  <div
+                    style={{
+                      margin: '0 16px',
+                      borderBottom: '1px solid #334155',
+                    }}
+                  />
+                </td>
+              </tr>
+              </React.Fragment>
               );
             })}
           </tbody>
