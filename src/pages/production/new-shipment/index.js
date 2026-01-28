@@ -4407,12 +4407,13 @@ const NewShipment = () => {
         }}
         onBeginFormulaCheck={() => {
           setIsLabelCheckCompleteOpen(false);
-          // Navigate to formula-check if not completed, otherwise to book-shipment
-          if (completedTabs.has('formula-check')) {
-            setActiveAction('book-shipment');
-          } else {
-            handleActionChange('formula-check');
-          }
+          // Navigate to formula-check section
+          handleActionChange('formula-check');
+        }}
+        onBeginBookShipment={() => {
+          setIsLabelCheckCompleteOpen(false);
+          // Navigate to book-shipment section
+          handleActionChange('book-shipment');
         }}
         isFormulaCheckCompleted={completedTabs.has('formula-check')}
       />
