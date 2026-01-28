@@ -26,6 +26,7 @@ const NgoosModal = ({
   isOpen, 
   onClose, 
   selectedRow,
+  isAlreadyAdded = false,
   labelsAvailable = null,
   onAddUnits = null,
   currentQty = 0,
@@ -397,6 +398,7 @@ const NgoosModal = ({
                   selectedRow?.hasCustomDoiSettings
                 )
               }
+              isAlreadyAdded={isAlreadyAdded}
               onAddUnits={(units) => {
                 if (onAddUnits) {
                   onAddUnits(selectedRow, units);

@@ -22,7 +22,66 @@ import {
   ReferenceLine
 } from 'recharts';
 
-const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = null, overrideUnitsToMake = null, onAddUnits = null, labelsAvailable = null, openDoiSettings = false, openForecastSettings = false, onDoiSettingsChange = null, onForecastSettingsChange = null, hasActiveForecastSettings = false }) => {
+// Helper: determine step size for qty increments based on product size.
+// This mirrors the non-table \"Add products\" behavior so N-GOOS rounds to case sizes.
+const getQtyIncrementForSize = (sizeRaw) => {
+  const size = (sizeRaw || '').toLowerCase();
+  const sizeCompact = size.replace(/\s+/g, '');
+
+  // 8oz products change in full-case increments (60 units)
+  if (sizeCompact.includes('8oz')) return 60;
+
+  // 6oz products (bag or bottle) change in case increments (40 units)
+  const isSixOz =
+    sizeCompact.includes('6oz') ||
+    size.includes('6 oz') ||
+    size.includes('6-ounce') ||
+    size.includes('6 ounce');
+
+  // 1/2 lb bag products also use 40-unit increments
+  const isHalfPoundBag =
+    sizeCompact.includes('1/2lb') ||
+    size.includes('1/2 lb') ||
+    size.includes('0.5lb') ||
+    size.includes('0.5 lb') ||
+    size.includes('half lb');
+
+  if (isSixOz || isHalfPoundBag) return 40;
+
+  // 1 lb products change in case increments (25 units)
+  const isOnePound =
+    sizeCompact.includes('1lb') ||
+    size.includes('1 lb') ||
+    size.includes('1-pound') ||
+    size.includes('1 pound');
+  if (isOnePound) return 25;
+
+  // 25 lb products should use single-unit increments
+  const isTwentyFivePound =
+    sizeCompact.includes('25lb') ||
+    size.includes('25 lb') ||
+    size.includes('25-pound') ||
+    size.includes('25 pound');
+  if (isTwentyFivePound) return 1;
+
+  // 5 lb products change in small increments (5 units)
+  const isFivePound =
+    sizeCompact.includes('5lb') ||
+    size.includes('5 lb') ||
+    size.includes('5-pound') ||
+    size.includes('5 pound');
+  if (isFivePound) return 5;
+
+  // Gallon products change in case increments (4 units)
+  if (size.includes('gallon') || size.includes('gal ')) return 4;
+
+  // Quart products change in case increments (12 units)
+  if (size.includes('quart') || size.includes(' qt')) return 12;
+
+  return 1;
+};
+
+const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = null, overrideUnitsToMake = null, onAddUnits = null, labelsAvailable = null, openDoiSettings = false, openForecastSettings = false, onDoiSettingsChange = null, onForecastSettingsChange = null, hasActiveForecastSettings = false, isAlreadyAdded = false }) => {
   const { isDarkMode } = useTheme();
   const [selectedView, setSelectedView] = useState('2 Years');
   const [loading, setLoading] = useState(true);
@@ -290,9 +349,17 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     const awdUnits = inventoryData?.awd?.available || inventoryData?.awd?.total || 0;
     const totalUnits = fbaUnits + awdUnits;
     const additionalUnits = awdUnits; // Additional inventory beyond FBA
-    
-    // Get units_to_make - use override if provided (from parent component), otherwise from forecast API
-    const unitsToMake = overrideUnitsToMake ?? forecastData?.units_to_make ?? 0;
+
+    // Get units_to_make - use override if provided (from parent component), otherwise from forecast API.
+    // Then normalize to the nearest case size using the same rules as non-table mode.
+    const rawUnitsToMake = overrideUnitsToMake ?? forecastData?.units_to_make ?? 0;
+    const sizeForIncrement = productDetails?.product?.size || data?.size || data?.variations?.[0] || '';
+    const increment = getQtyIncrementForSize(sizeForIncrement);
+    const numUnits = typeof rawUnitsToMake === 'number' ? rawUnitsToMake : parseInt(rawUnitsToMake, 10);
+    const unitsToMake =
+      numUnits && !Number.isNaN(numUnits) && increment && increment > 1
+        ? Math.ceil(numUnits / increment) * increment
+        : numUnits || 0;
     const adjustment = forecastData?.forecast_adjustment || 0;
     
     // Get DOI days from API
@@ -1298,7 +1365,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               </span>
             </div>
             {productDetails?.inventory && (
-              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                 <div className="px-3 py-1 rounded-md bg-red-500/10 border border-red-500/20" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: '600' }}>●</span>
                   <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#ef4444' }}>
@@ -1306,15 +1373,46 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                   </span>
                 </div>
                 <button 
+                type="button"
+                disabled={isAlreadyAdded}
                   onClick={() => {
-                    if (onAddUnits) {
-                      const unitsToAdd = overrideUnitsToMake ?? forecastData?.units_to_make ?? 0;
+                  if (onAddUnits && !isAlreadyAdded) {
+                      const sizeForIncrement = productDetails?.product?.size || data?.size || data?.variations?.[0] || '';
+                      const increment = getQtyIncrementForSize(sizeForIncrement);
+                      const rawUnitsToAdd = overrideUnitsToMake ?? forecastData?.units_to_make ?? 0;
+                      const numUnits = typeof rawUnitsToAdd === 'number' ? rawUnitsToAdd : parseInt(rawUnitsToAdd, 10);
+                      const unitsToAdd =
+                        numUnits && !Number.isNaN(numUnits) && increment && increment > 1
+                          ? Math.ceil(numUnits / increment) * increment
+                          : numUnits || 0;
                       onAddUnits(unitsToAdd);
                     }
                   }}
-                  className="px-4 py-1.5 rounded-md bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 transition-colors"
+                  className="px-4 py-1.5 rounded-md text-sm font-medium transition-colors"
+                  style={{
+                    backgroundColor: isAlreadyAdded ? '#059669' : '#3B82F6',
+                    color: '#FFFFFF',
+                    cursor: isAlreadyAdded ? 'default' : 'pointer',
+                    opacity: isAlreadyAdded ? 0.9 : 1,
+                  }}
                 >
-                  Add Units ({forecastData?.units_to_make || 0})
+                  {isAlreadyAdded ? (
+                    'Added'
+                  ) : (
+                    <>
+                      Add Units ({(() => {
+                        const sizeForIncrement = productDetails?.product?.size || data?.size || data?.variations?.[0] || '';
+                        const increment = getQtyIncrementForSize(sizeForIncrement);
+                        const rawUnitsToAdd = overrideUnitsToMake ?? forecastData?.units_to_make ?? 0;
+                        const numUnits = typeof rawUnitsToAdd === 'number' ? rawUnitsToAdd : parseInt(rawUnitsToAdd, 10);
+                        const unitsToAdd =
+                          numUnits && !Number.isNaN(numUnits) && increment && increment > 1
+                            ? Math.ceil(numUnits / increment) * increment
+                            : numUnits || 0;
+                        return unitsToAdd;
+                      })().toLocaleString()})
+                    </>
+                  )}
                 </button>
               </div>
             )}
@@ -1330,7 +1428,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
       }}>
         {/* Tabs and Add Units Button - Only show in inventoryOnly mode */}
         {inventoryOnly && (
-          <div style={{ 
+            <div style={{ 
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'space-between', 
@@ -1433,11 +1531,28 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 minWidth: '80px',
                 boxSizing: 'border-box',
               }}>
-                {(overrideUnitsToMake ?? forecastData?.units_to_make ?? 0).toLocaleString()}
+                {(() => {
+                  const sizeForIncrement = productDetails?.product?.size || data?.size || data?.variations?.[0] || '';
+                  const increment = getQtyIncrementForSize(sizeForIncrement);
+                  const rawUnitsToAdd = overrideUnitsToMake ?? forecastData?.units_to_make ?? 0;
+                  const numUnits = typeof rawUnitsToAdd === 'number' ? rawUnitsToAdd : parseInt(rawUnitsToAdd, 10);
+                  const units =
+                    numUnits && !Number.isNaN(numUnits) && increment && increment > 1
+                      ? Math.ceil(numUnits / increment) * increment
+                      : numUnits || 0;
+                  return units.toLocaleString();
+                })()}
                 
                 {/* Label warning icon - shown when units exceed labels available */}
                 {(() => {
-                  const unitsNeeded = overrideUnitsToMake ?? forecastData?.units_to_make ?? 0;
+                  const sizeForIncrement = productDetails?.product?.size || data?.size || data?.variations?.[0] || '';
+                  const increment = getQtyIncrementForSize(sizeForIncrement);
+                  const rawUnitsToAdd = overrideUnitsToMake ?? forecastData?.units_to_make ?? 0;
+                  const numUnits = typeof rawUnitsToAdd === 'number' ? rawUnitsToAdd : parseInt(rawUnitsToAdd, 10);
+                  const unitsNeeded =
+                    numUnits && !Number.isNaN(numUnits) && increment && increment > 1
+                      ? Math.ceil(numUnits / increment) * increment
+                      : numUnits || 0;
                   const availableLabels = labelsAvailable ?? 0;
                   // Only show warning if units needed exceed available labels
                   if (unitsNeeded > availableLabels && unitsNeeded > 0 && availableLabels !== null) {
@@ -1501,9 +1616,17 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               {/* Add Button */}
               <button
                 type="button"
+                disabled={isAlreadyAdded}
                 onClick={() => {
-                  if (onAddUnits) {
-                    const unitsToAdd = overrideUnitsToMake ?? forecastData?.units_to_make ?? 0;
+                  if (onAddUnits && !isAlreadyAdded) {
+                    const sizeForIncrement = productDetails?.product?.size || data?.size || data?.variations?.[0] || '';
+                    const increment = getQtyIncrementForSize(sizeForIncrement);
+                    const rawUnitsToAdd = overrideUnitsToMake ?? forecastData?.units_to_make ?? 0;
+                    const numUnits = typeof rawUnitsToAdd === 'number' ? rawUnitsToAdd : parseInt(rawUnitsToAdd, 10);
+                    const unitsToAdd =
+                      numUnits && !Number.isNaN(numUnits) && increment && increment > 1
+                        ? Math.ceil(numUnits / increment) * increment
+                        : numUnits || 0;
                     console.log('Add Units clicked:', {
                       unitsToAdd,
                       overrideUnitsToMake,
@@ -1517,7 +1640,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                   padding: '4px 12px',
                   borderRadius: '4px',
                   border: 'none',
-                  backgroundColor: '#2563EB',
+                  backgroundColor: isAlreadyAdded ? '#059669' : '#2563EB',
                   color: '#FFFFFF',
                   fontSize: '0.875rem',
                   fontWeight: 500,
@@ -1527,12 +1650,19 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                   justifyContent: 'center',
                   gap: '6px',
                   whiteSpace: 'nowrap',
-                  cursor: 'pointer',
+                  cursor: isAlreadyAdded ? 'default' : 'pointer',
                   boxSizing: 'border-box',
+                  opacity: isAlreadyAdded ? 0.9 : 1,
                 }}
               >
-                <span style={{ fontSize: '1rem', lineHeight: 1 }}>+</span>
-                <span>Add</span>
+                {isAlreadyAdded ? (
+                  <span>Added</span>
+                ) : (
+                  <>
+                    <span style={{ fontSize: '1rem', lineHeight: 1 }}>+</span>
+                    <span>Add</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

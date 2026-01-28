@@ -47,6 +47,66 @@ const extractSizeFromProductName = (productName) => {
   return null;
 };
 
+// Helper: determine step size for qty increments based on product size
+// Mirrors the logic used in NewShipmentTable non-table mode so N-GOOS additions
+// use the same case-based rounding behavior.
+const getQtyIncrementForSize = (sizeRaw) => {
+  const size = (sizeRaw || '').toLowerCase();
+  const sizeCompact = size.replace(/\s+/g, '');
+
+  // 8oz products change in full-case increments (60 units)
+  if (sizeCompact.includes('8oz')) return 60;
+
+  // 6oz products (bag or bottle) change in case increments (40 units)
+  const isSixOz =
+    sizeCompact.includes('6oz') ||
+    size.includes('6 oz') ||
+    size.includes('6-ounce') ||
+    size.includes('6 ounce');
+
+  // 1/2 lb bag products also use 40-unit increments
+  const isHalfPoundBag =
+    sizeCompact.includes('1/2lb') ||
+    size.includes('1/2 lb') ||
+    size.includes('0.5lb') ||
+    size.includes('0.5 lb') ||
+    size.includes('half lb');
+
+  if (isSixOz || isHalfPoundBag) return 40;
+
+  // 1 lb products change in case increments (25 units)
+  const isOnePound =
+    sizeCompact.includes('1lb') ||
+    size.includes('1 lb') ||
+    size.includes('1-pound') ||
+    size.includes('1 pound');
+  if (isOnePound) return 25;
+
+  // 25 lb products should use single-unit increments
+  const isTwentyFivePound =
+    sizeCompact.includes('25lb') ||
+    size.includes('25 lb') ||
+    size.includes('25-pound') ||
+    size.includes('25 pound');
+  if (isTwentyFivePound) return 1;
+
+  // 5 lb products change in small increments (5 units)
+  const isFivePound =
+    sizeCompact.includes('5lb') ||
+    size.includes('5 lb') ||
+    size.includes('5-pound') ||
+    size.includes('5 pound');
+  if (isFivePound) return 5;
+
+  // Gallon products change in case increments (4 units)
+  if (size.includes('gallon') || size.includes('gal ')) return 4;
+
+  // Quart products change in case increments (12 units)
+  if (size.includes('quart') || size.includes(' qt')) return 12;
+
+  return 1;
+};
+
 // Utility function to handle Google Drive image URLs
 const getImageUrl = (url) => {
   if (!url) return null;
@@ -3855,6 +3915,10 @@ const NewShipment = () => {
           setOpenForecastSettings(false);
         }}
         selectedRow={selectedRow}
+        isAlreadyAdded={(() => {
+          if (!selectedRow || !addedRows || !(addedRows instanceof Set)) return false;
+          return addedRows.has(selectedRow.id);
+        })()}
         forecastRange={parseInt(forecastRange) || 150}
         doiSettings={(() => {
           // Use product-specific DOI settings if available, otherwise use general settings
@@ -3917,26 +3981,35 @@ const NewShipment = () => {
               }
               return sum;
             }, 0);
-            
+
             const maxAvailable = Math.max(0, baseAvailable - usedInCurrentShipment);
-            
+
+            // Round units to nearest case increment, mirroring non-table mode behavior
+            const sizeForIncrement = row?.size || extractSizeFromProductName(row?.product);
+            const increment = getQtyIncrementForSize(sizeForIncrement);
+            const rawNum = typeof unitsToAdd === 'number' ? unitsToAdd : parseInt(unitsToAdd, 10);
+            const roundedUnitsToAdd =
+              rawNum && !Number.isNaN(rawNum) && increment && increment > 1
+                ? Math.ceil(rawNum / increment) * increment
+                : rawNum || 0;
+
             // Add the forecast units WITHOUT capping - let user see and adjust
             // Just show a warning if it exceeds available labels
-            if (unitsToAdd > maxAvailable) {
-              toast.warning(`⚠️ Adding ${unitsToAdd.toLocaleString()} units but only ${maxAvailable.toLocaleString()} labels available!`, {
+            if (roundedUnitsToAdd > maxAvailable) {
+              toast.warning(`⚠️ Adding ${roundedUnitsToAdd.toLocaleString()} units but only ${maxAvailable.toLocaleString()} labels available!`, {
                 duration: 5000
               });
             }
             
             setQtyValues(prev => ({
               ...prev,
-              [productIndex]: unitsToAdd
+              [productIndex]: roundedUnitsToAdd
             }));
             
             // Also add the row to addedRows so button shows "Added"
             setAddedRows(prev => new Set([...prev, row.id]));
             
-            toast.success(`Added ${unitsToAdd.toLocaleString()} units of ${row.product}`);
+            toast.success(`Added ${roundedUnitsToAdd.toLocaleString()} units of ${row.product}`);
           }
         }}
       />
