@@ -43,13 +43,12 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
   ];
 
   useEffect(() => {
-    if (isAddingNote && textareaRef.current) {
+    if (isProductionNotesExpanded && textareaRef.current) {
       setTimeout(() => {
         textareaRef.current?.focus();
-        textareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }, 100);
     }
-  }, [isAddingNote]);
+  }, [isProductionNotesExpanded]);
 
   // Detect mobile view
   useEffect(() => {
@@ -144,7 +143,7 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
       
       setNotes([...notes, newNote]);
       setNewNoteText('');
-      setIsAddingNote(false);
+      // Keep input visible - don't set isAddingNote to false
     }
   };
 
@@ -155,6 +154,27 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
 
   return createPortal(
     <div>
+      {/* Dark Mode Scrollbar Styles */}
+      <style>{`
+        .production-modal-scrollbar::-webkit-scrollbar {
+          width: 8px;
+        }
+        .production-modal-scrollbar::-webkit-scrollbar-track {
+          background: ${isDarkMode ? '#1F2937' : '#F3F4F6'};
+          border-radius: 4px;
+        }
+        .production-modal-scrollbar::-webkit-scrollbar-thumb {
+          background: ${isDarkMode ? '#4B5563' : '#9CA3AF'};
+          border-radius: 4px;
+        }
+        .production-modal-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: ${isDarkMode ? '#6B7280' : '#6B7280'};
+        }
+        .production-modal-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: ${isDarkMode ? '#4B5563 #1F2937' : '#9CA3AF #F3F4F6'};
+        }
+      `}</style>
       {/* Mobile Layout - Modal Overlay */}
       {isMobile && (
       <div
@@ -219,7 +239,7 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
           </div>
 
           {/* Content - Scrollable */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="production-modal-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {/* Production Status Section - Show when paused (Mobile) */}
           {isProductionPaused && (
             <div
@@ -399,6 +419,7 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
               <div style={{ minHeight: 0, overflow: 'hidden' }}>
                 {/* Quality Check Tabs - Horizontal Scrollable */}
                 <div
+                  className="production-modal-scrollbar"
                   style={{
                     display: 'flex',
                     gap: '0.5rem',
@@ -408,6 +429,7 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
                     overflowY: 'hidden',
                     WebkitOverflowScrolling: 'touch',
                     scrollbarWidth: 'thin',
+                    scrollbarColor: isDarkMode ? '#4B5563 #1F2937' : '#9CA3AF #F3F4F6',
                     paddingBottom: '8px',
                     whiteSpace: 'nowrap',
                     flexWrap: 'nowrap',
@@ -957,10 +979,10 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
         onClick={onClose}
       >
         <div
-          className={themeClasses.modalBg}
           style={{
             borderRadius: '12px',
             width: '648px',
+            backgroundColor: '#111827',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
             display: 'flex',
             flexDirection: 'column',
@@ -971,10 +993,10 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
         >
         {/* Header */}
         <div
-          className="bg-[#2C3544]"
           style={{
             width: '100%',
             height: '56px',
+            backgroundColor: '#111827',
             borderTopLeftRadius: '12px',
             borderTopRightRadius: '12px',
             paddingTop: '16px',
@@ -1018,7 +1040,7 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
         </div>
 
         {/* Content */}
-        <div style={{ padding: '1rem 1.5rem', overflowY: 'auto', overflowX: 'hidden', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <div className="production-modal-scrollbar" style={{ padding: '1rem 1.5rem', overflowY: 'auto', overflowX: 'hidden', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, backgroundColor: '#111827' }}>
           {/* Product Information Section */}
           <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', flexShrink: 0 }}>
             {/* Product Image */}
@@ -1027,9 +1049,9 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
                 width: '160px',
                 height: '212px',
                 flexShrink: 0,
-                backgroundColor: 'white',
+                backgroundColor: '#1F2937',
                 borderRadius: '12px',
-                border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                border: '1px solid #374151',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -1092,9 +1114,9 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
               style={{ 
                 width: '424px',
                 height: '212px',
-                backgroundColor: '#F3F4F6',
+                backgroundColor: '#1F2937',
                 borderRadius: '12px',
-                border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                border: '1px solid #374151',
                 paddingTop: '12px',
                 paddingRight: '16px',
                 paddingBottom: '12px',
@@ -1107,68 +1129,68 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
             >
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ height: '35px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <span className={themeClasses.textSecondary} style={{ fontSize: '12px', display: 'block', marginBottom: '0.25rem', color: '#6B7280' }}>
+                  <span style={{ fontSize: '12px', display: 'block', marginBottom: '0.25rem', color: '#9CA3AF' }}>
                     Brand:
                   </span>
-                  <span className={themeClasses.textPrimary} style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>
+                  <span style={{ fontSize: '14px', fontWeight: '600', color: '#FFFFFF' }}>
                     {productData?.brand || 'TPS Plant Foods'}
                   </span>
                 </div>
                 <div style={{ height: '35px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <span className={themeClasses.textSecondary} style={{ fontSize: '12px', display: 'block', marginBottom: '0.25rem', color: '#6B7280' }}>
+                  <span style={{ fontSize: '12px', display: 'block', marginBottom: '0.25rem', color: '#9CA3AF' }}>
                     Product Name:
                   </span>
-                  <span className={themeClasses.textPrimary} style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>
+                  <span style={{ fontSize: '14px', fontWeight: '600', color: '#FFFFFF' }}>
                     {productData?.product || 'Cherry Tree Fertilizer'}
                   </span>
                 </div>
                 <div style={{ height: '35px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <span className={themeClasses.textSecondary} style={{ fontSize: '12px', display: 'block', marginBottom: '0.25rem', color: '#6B7280' }}>
+                  <span style={{ fontSize: '12px', display: 'block', marginBottom: '0.25rem', color: '#9CA3AF' }}>
                     Size:
                   </span>
-                  <span className={themeClasses.textPrimary} style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>
+                  <span style={{ fontSize: '14px', fontWeight: '600', color: '#FFFFFF' }}>
                     {productData?.size || '8oz'}
                   </span>
                 </div>
                 <div style={{ height: '35px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <span className={themeClasses.textSecondary} style={{ fontSize: '12px', display: 'block', marginBottom: '0.25rem', color: '#6B7280' }}>
+                  <span style={{ fontSize: '12px', display: 'block', marginBottom: '0.25rem', color: '#9CA3AF' }}>
                     Label Location:
                   </span>
-                  <span className={themeClasses.textPrimary} style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>
+                  <span style={{ fontSize: '14px', fontWeight: '600', color: '#FFFFFF' }}>
                     {productData?.labelLocation || 'LBL-PLANT-218'}
                   </span>
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ height: '35px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <span className={themeClasses.textSecondary} style={{ fontSize: '12px', display: 'block', marginBottom: '0.25rem', color: '#6B7280' }}>
+                  <span style={{ fontSize: '12px', display: 'block', marginBottom: '0.25rem', color: '#9CA3AF' }}>
                     Formula:
                   </span>
-                  <span className={themeClasses.textPrimary} style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>
+                  <span style={{ fontSize: '14px', fontWeight: '600', color: '#FFFFFF' }}>
                     {productData?.formula || 'F.Ultra Grow'}
                   </span>
                 </div>
                 <div style={{ height: '35px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <span className={themeClasses.textSecondary} style={{ fontSize: '12px', display: 'block', marginBottom: '0.25rem', color: '#6B7280' }}>
+                  <span style={{ fontSize: '12px', display: 'block', marginBottom: '0.25rem', color: '#9CA3AF' }}>
                     QTY:
                   </span>
-                  <span className={themeClasses.textPrimary} style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>
+                  <span style={{ fontSize: '14px', fontWeight: '600', color: '#FFFFFF' }}>
                     {productData?.qty?.toLocaleString() || '72,000'}
                   </span>
                 </div>
                 <div style={{ height: '35px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <span className={themeClasses.textSecondary} style={{ fontSize: '12px', display: 'block', marginBottom: '0.25rem', color: '#6B7280' }}>
+                  <span style={{ fontSize: '12px', display: 'block', marginBottom: '0.25rem', color: '#9CA3AF' }}>
                     Case #:
                   </span>
-                  <span className={themeClasses.textPrimary} style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>
+                  <span style={{ fontSize: '14px', fontWeight: '600', color: '#FFFFFF' }}>
                     {productData?.caseNumber || '488'}
                   </span>
                 </div>
                 <div style={{ height: '35px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <span className={themeClasses.textSecondary} style={{ fontSize: '12px', display: 'block', marginBottom: '0.25rem', color: '#6B7280' }}>
+                  <span style={{ fontSize: '12px', display: 'block', marginBottom: '0.25rem', color: '#9CA3AF' }}>
                     TPS Ship #:
                   </span>
-                  <span className={themeClasses.textPrimary} style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>
+                  <span style={{ fontSize: '14px', fontWeight: '600', color: '#FFFFFF' }}>
                     {productData?.tpsShipNumber || '10-01-2025'}
                   </span>
                 </div>
@@ -1182,11 +1204,19 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
             <div 
               style={{ 
                 borderRadius: '12px',
-                border: '1px solid #E5E7EB',
-                backgroundColor: '#F9FAFB',
+                border: '1px solid #374151',
+                backgroundColor: '#1F2937',
+                width: '600px',
+                height: isQualityChecksExpanded ? 'auto' : '43px',
+                paddingTop: '12px',
+                paddingRight: '16px',
+                paddingBottom: '12px',
+                paddingLeft: '16px',
                 display: 'flex',
-                alignItems: 'center',
-                padding: '10px 14px',
+                flexDirection: 'column',
+                gap: '10px',
+                overflow: 'hidden',
+                transition: 'height 0.3s ease',
               }}
             >
               {/* Quality Checks Title with Status */}
@@ -1199,7 +1229,7 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <h3 className={themeClasses.textPrimary} style={{ fontSize: '16px', fontWeight: '600', margin: 0 }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: '600', margin: 0, color: '#FFFFFF' }}>
                     Quality Checks
                   </h3>
                   <span style={{ color: '#10B981', fontSize: '14px', fontWeight: '500' }}>
@@ -1211,7 +1241,7 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
                   height="16"
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke={isDarkMode ? '#9CA3AF' : '#6B7280'}
+                  stroke="#9CA3AF"
                   strokeWidth={2}
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -1228,175 +1258,182 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
                   <path d="M6 9l6 6 6-6" />
                 </svg>
               </div>
-            </div>
-            
-            {/* Collapsible Content */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateRows: isQualityChecksExpanded ? '1fr' : '0fr',
-                transition: 'grid-template-rows 0.3s ease',
-                overflow: 'hidden',
-              }}
-            >
-              <div style={{ minHeight: 0, overflow: 'hidden' }}>
-                {/* Quality Check Tabs - Horizontal Scrollable */}
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: '0.5rem',
-                    marginBottom: '0.75rem',
-                    marginTop: '0.75rem',
-                    overflowX: 'auto',
-                    overflowY: 'hidden',
-                    WebkitOverflowScrolling: 'touch',
-                    scrollbarWidth: 'thin',
-                    paddingBottom: '8px',
-                    whiteSpace: 'nowrap',
-                    flexWrap: 'nowrap',
-                  }}
-                >
-                  {qualityCheckTabs.map((tab, index) => {
-                    const isCompleted = qualityCheckImages && qualityCheckImages[index] !== null;
-                    const hasImage = qualityCheckImages && qualityCheckImages[index];
-                    const isSelected = selectedTab === tab.id;
-                    return (
-                      <div
-                        key={tab.id}
-                        onClick={() => {
-                          if (hasImage) {
-                            setSelectedTab(tab.id);
-                            setCurrentImageIndex(index);
-                          }
-                        }}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          padding: '0.5rem 0.75rem',
-                          borderRadius: '6px',
-                          backgroundColor: isSelected ? '#EBF5FF' : 'transparent',
-                          border: isSelected ? '1px solid #3B82F6' : '1px solid transparent',
-                          cursor: hasImage ? 'pointer' : 'default',
-                          flexShrink: 0,
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            backgroundColor: isCompleted ? '#10B981' : '#D1D5DB',
-                            flexShrink: 0,
-                          }}
-                        />
-                        <span style={{ 
-                          fontSize: '14px', 
-                          color: isSelected ? '#3B82F6' : '#111827', 
-                          fontWeight: isSelected ? '600' : '400' 
-                        }}>
-                          {tab.label}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
 
-                {/* Quality Check Images - Mobile View (Simple Display) */}
-                {(() => {
-                  const selectedTabIndex = qualityCheckTabs.findIndex(tab => tab.id === selectedTab);
-                  const displayImage = qualityCheckImages && qualityCheckImages[selectedTabIndex];
-                  
-                  return displayImage ? (
-                    <div style={{ position: 'relative', width: '100%', marginTop: '0.75rem' }}>
-                      <div style={{ position: 'relative', width: '100%', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#F9FAFB' }}>
-                        <img
-                          src={displayImage}
-                          alt={`Quality check ${selectedTab}`}
-                          style={{
-                            width: '100%',
-                            height: 'auto',
-                            maxHeight: '400px',
-                            objectFit: 'contain',
-                            display: 'block',
-                          }}
-                          onError={(e) => {
-                            console.error('Failed to load quality check image:', e.target.src);
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                  /* Upload Area - Only show when no images */
+              {/* Collapsible Content - Steps Row and Drag and Drop Area */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateRows: isQualityChecksExpanded ? '1fr' : '0fr',
+                  transition: 'grid-template-rows 0.3s ease',
+                  overflow: 'hidden',
+                }}
+              >
+                <div style={{ minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                  {/* Quality Check Steps Table Row */}
                   <div
-                    ref={uploadAreaRef}
-                    onDrop={handleDrop}
-                    onDragOver={handleDragOver}
-                    onClick={() => document.getElementById('file-upload-production').click()}
                     style={{
-                      border: `2px dashed #D1D5DB`,
-                      borderRadius: '8px',
-                      padding: '2rem 1.5rem',
-                      textAlign: 'center',
-                      cursor: 'pointer',
-                      backgroundColor: '#F9FAFB',
-                      transition: 'all 0.2s ease',
-                      marginTop: '0.75rem',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#F3F4F6';
-                      e.currentTarget.style.borderColor = '#9CA3AF';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#F9FAFB';
-                      e.currentTarget.style.borderColor = '#D1D5DB';
+                      display: 'flex',
+                      gap: '0',
+                      width: '100%',
+                      borderTop: '1px solid #374151',
+                      borderBottom: '1px solid #374151',
+                      paddingTop: '8px',
+                      paddingBottom: '8px',
                     }}
                   >
-                    <input
-                      id="file-upload-production"
-                      type="file"
-                      accept="image/jpeg,image/png"
-                      onChange={handleFileChange}
-                      style={{ display: 'none' }}
-                    />
-                    {uploadedFile ? (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth={2}>
-                          <path d="M20 6L9 17l-5-5" />
-                        </svg>
-                        <span style={{ fontSize: '14px', color: '#10B981', fontWeight: '500' }}>
-                          {uploadedFile.name}
-                        </span>
+                    {qualityCheckTabs.map((tab, index) => {
+                      const isCompleted = qualityCheckImages && qualityCheckImages[index] !== null;
+                      const hasImage = qualityCheckImages && qualityCheckImages[index];
+                      const isSelected = selectedTab === tab.id;
+                      return (
+                        <div
+                          key={tab.id}
+                          onClick={() => {
+                            setSelectedTab(tab.id);
+                            setCurrentImageIndex(index);
+                          }}
+                          style={{
+                            flex: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.375rem',
+                            padding: '0.25rem 0.125rem',
+                            cursor: 'pointer',
+                            position: 'relative',
+                            backgroundColor: isSelected ? '#374151' : 'transparent',
+                            borderBottom: isSelected ? '2px solid #3B82F6' : '2px solid transparent',
+                            transition: 'all 0.2s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isSelected) {
+                              e.currentTarget.style.backgroundColor = '#2A3441';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isSelected) {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                            }
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: '6px',
+                              height: '6px',
+                              borderRadius: '50%',
+                              backgroundColor: isCompleted ? '#10B981' : '#4B5563',
+                              flexShrink: 0,
+                            }}
+                          />
+                          <span style={{ 
+                            fontSize: '12px', 
+                            color: isSelected ? '#3B82F6' : '#FFFFFF', 
+                            fontWeight: isSelected ? '600' : '400',
+                            whiteSpace: 'nowrap',
+                          }}>
+                            {tab.label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Drag and Drop Area */}
+                  <div style={{ marginTop: '12px' }}>
+                  {(() => {
+                    const selectedTabIndex = qualityCheckTabs.findIndex(tab => tab.id === selectedTab);
+                    const displayImage = qualityCheckImages && qualityCheckImages[selectedTabIndex];
+                    
+                    return displayImage ? (
+                      <div style={{ position: 'relative', width: '100%' }}>
+                        <div style={{ position: 'relative', width: '100%', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#1F2937' }}>
+                          <img
+                            src={displayImage}
+                            alt={`Quality check ${selectedTab}`}
+                            style={{
+                              width: '100%',
+                              height: 'auto',
+                              maxHeight: '400px',
+                              objectFit: 'contain',
+                              display: 'block',
+                            }}
+                            onError={(e) => {
+                              console.error('Failed to load quality check image:', e.target.src);
+                            }}
+                          />
+                        </div>
                       </div>
                     ) : (
-                      <>
-                        <div style={{ marginBottom: '0.75rem' }}>
-                          <svg
-                            width="64"
-                            height="64"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="#9CA3AF"
-                            strokeWidth={1.5}
-                            style={{ margin: '0 auto', opacity: 0.5 }}
-                          >
-                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                            <circle cx="12" cy="13" r="4" />
-                          </svg>
-                        </div>
-                        <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '0.25rem' }}>
-                          Drag and drop photo or{' '}
-                          <span style={{ color: '#2563EB', fontWeight: '500' }}>Click to upload</span>
-                        </p>
-                        <p style={{ fontSize: '12px', color: '#9CA3AF' }}>
-                          Max size: 3MB (JPG, PNG)
-                        </p>
+                      /* Upload Area - Only show when no images */
+                      <div
+                        ref={uploadAreaRef}
+                        onDrop={handleDrop}
+                        onDragOver={handleDragOver}
+                        onClick={() => document.getElementById('file-upload-production').click()}
+                        style={{
+                          border: `2px dashed #374151`,
+                          borderRadius: '8px',
+                          padding: '2rem 1.5rem',
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          backgroundColor: '#1F2937',
+                          transition: 'all 0.2s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#374151';
+                          e.currentTarget.style.borderColor = '#4B5563';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = '#1F2937';
+                          e.currentTarget.style.borderColor = '#374151';
+                        }}
+                      >
+                        <input
+                          id="file-upload-production"
+                          type="file"
+                          accept="image/jpeg,image/png"
+                          onChange={handleFileChange}
+                          style={{ display: 'none' }}
+                        />
+                        {uploadedFile ? (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth={2}>
+                              <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                            <span style={{ fontSize: '14px', color: '#10B981', fontWeight: '500' }}>
+                              {uploadedFile.name}
+                            </span>
+                          </div>
+                        ) : (
+                          <>
+                            <div style={{ marginBottom: '0.75rem' }}>
+                              <svg
+                                width="64"
+                                height="64"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="#9CA3AF"
+                                strokeWidth={1.5}
+                                style={{ margin: '0 auto', opacity: 0.5 }}
+                              >
+                                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                                <circle cx="12" cy="13" r="4" />
+                              </svg>
+                            </div>
+                            <p style={{ fontSize: '14px', color: '#9CA3AF', marginBottom: '0.25rem' }}>
+                              Drag and drop photo or{' '}
+                              <span style={{ color: '#3B82F6', fontWeight: '500' }}>Click to upload</span>
+                            </p>
+                            <p style={{ fontSize: '12px', color: '#6B7280' }}>
+                              Max size: 5MB (JPG, PNG)
+                            </p>
                       </>
                     )}
                   </div>
-                  );
-                })()}
+                    );
+                  })()}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1474,13 +1511,22 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
             <div 
               style={{ 
                 borderRadius: '12px',
-                border: '1px solid #E5E7EB',
-                backgroundColor: '#F9FAFB',
+                border: '1px solid #374151',
+                backgroundColor: '#1F2937',
+                width: '600px',
+                height: isProductionNotesExpanded ? 'auto' : '43px',
+                paddingTop: '12px',
+                paddingRight: '16px',
+                paddingBottom: '12px',
+                paddingLeft: '16px',
                 display: 'flex',
-                alignItems: 'center',
-                padding: '10px 14px',
+                flexDirection: 'column',
+                gap: '10px',
+                overflow: 'hidden',
+                transition: 'height 0.3s ease',
               }}
             >
+              {/* Header */}
               <div
                 style={{
                   display: 'flex',
@@ -1489,226 +1535,245 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
                   width: '100%',
                 }}
               >
-                <h3 className={themeClasses.textPrimary} style={{ fontSize: '16px', fontWeight: '600', margin: 0 }}>
-                  Production Notes
-                </h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ color: '#6B7280', fontSize: '14px', fontWeight: '400' }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: '600', margin: 0, color: '#FFFFFF' }}>
+                    Production Notes
+                  </h3>
+                  <span style={{ color: '#9CA3AF', fontSize: '12px', fontWeight: '400' }}>
                     {notes.length} Notes
                   </span>
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke={isDarkMode ? '#9CA3AF' : '#6B7280'}
-                    strokeWidth={2}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    style={{
-                      transform: isProductionNotesExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                      transition: 'transform 0.2s ease',
-                      cursor: 'pointer',
-                      flexShrink: 0,
-                    }}
-                    onClick={() => {
-                      setIsProductionNotesExpanded(!isProductionNotesExpanded);
-                    }}
-                  >
-                    <path d="M6 9l6 6 6-6" />
-                  </svg>
                 </div>
-              </div>
-            </div>
-            
-            {/* Collapsible Content */}
-            <div
-              style={{
-                maxHeight: isProductionNotesExpanded ? '2000px' : '0',
-                overflow: 'hidden',
-                transition: 'max-height 0.3s ease-out, opacity 0.2s ease-out',
-                opacity: isProductionNotesExpanded ? 1 : 0,
-                pointerEvents: isProductionNotesExpanded ? 'auto' : 'none',
-              }}
-            >
-              {/* Separator Line Below Production Notes Header */}
-              <div
-                style={{
-                  width: '100%',
-                  height: '1px',
-                  backgroundColor: isDarkMode ? '#374151' : '#E5E7EB',
-                  marginTop: '0.5rem',
-                  marginBottom: '0.75rem',
-                }}
-              />
-              
-              {/* Notes List */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {notes.map((note) => (
-            <div
-                  key={note.id}
-              style={{
-                padding: '0.75rem',
-                    backgroundColor: isDarkMode ? '#1F2937' : '#F9FAFB',
-                borderRadius: '8px',
-                border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
-                display: 'flex',
-                    alignItems: 'flex-start',
-                gap: '0.75rem',
-              }}
-            >
-              <div
-                style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                      backgroundColor: note.color,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#FFFFFF',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  flexShrink: 0,
-                }}
-              >
-                    {note.initials}
-              </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                      <span className={themeClasses.textPrimary} style={{ fontSize: '14px', fontWeight: '500' }}>
-                        {note.author}
-                </span>
-                      <span className={themeClasses.textSecondary} style={{ fontSize: '14px' }}>
-                        {note.date}
-                </span>
-              </div>
-                    <p className={themeClasses.textSecondary} style={{ fontSize: '14px', margin: 0, lineHeight: '1.5' }}>
-                      {note.text}
-                    </p>
-                  </div>
-                </div>
-              ))}
-              
-              {/* Units Produced Info */}
-              {productData?.unitsProduced && (
-                <div
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#9CA3AF"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                   style={{
-                    padding: '0.75rem',
-                    backgroundColor: isDarkMode ? '#1F2937' : '#F9FAFB',
-                    borderRadius: '8px',
-                    border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: '0.75rem',
+                    transform: isProductionNotesExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.2s ease',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
+                  onClick={() => {
+                    setIsProductionNotesExpanded(!isProductionNotesExpanded);
                   }}
                 >
-                  <div
-                    style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '50%',
-                      backgroundColor: '#1F2937',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2">
-                      <circle cx="12" cy="12" r="10" />
-                      <path d="M12 16v-4M12 8h.01" />
-                    </svg>
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p className={themeClasses.textSecondary} style={{ fontSize: '14px', margin: 0, lineHeight: '1.5' }}>
-                      {productData.unitsProduced.toLocaleString()} Units marked as produced. {productData.remainingQty?.toLocaleString() || 0} units remain for production.
-                    </p>
-                  </div>
-                </div>
-              )}
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
               </div>
 
-              {/* Separator Line Below Production Notes Content */}
+              {/* Collapsible Content - Notes and Comment Input */}
               <div
                 style={{
-                  width: '100%',
-                  height: '1px',
-                  backgroundColor: isDarkMode ? '#374151' : '#E5E7EB',
-                  marginTop: '0.75rem',
-                  marginBottom: '0.75rem',
-                }}
-              />
-
-              {/* Add Note Input */}
-              {isAddingNote && (
-              <div
-                style={{
-                  marginTop: '0.75rem',
-                  padding: '0.75rem',
-                  backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-                  borderRadius: '8px',
-                  border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.75rem',
+                  display: 'grid',
+                  gridTemplateRows: isProductionNotesExpanded ? '1fr' : '0fr',
+                  transition: 'grid-template-rows 0.3s ease',
+                  overflow: 'hidden',
                 }}
               >
-                <textarea
-                  ref={textareaRef}
-                  value={newNoteText}
-                  onChange={(e) => setNewNoteText(e.target.value)}
-                  placeholder="Add a comment..."
-                  style={{
-                    width: '100%',
-                    minHeight: '80px',
-                    padding: '12px',
-                    borderRadius: '6px',
-                    border: `1px solid ${isDarkMode ? '#4B5563' : '#60A5FA'}`,
-                    backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-                    color: themeClasses.textPrimary,
-                    fontSize: '14px',
-                    fontFamily: 'inherit',
-                    outline: 'none',
-                    resize: 'vertical',
-                    boxSizing: 'border-box',
-                  }}
-                />
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                  <button
-                    onClick={handleCancelNote}
+                <div style={{ minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {/* Separator Line Below Header */}
+                  <div
                     style={{
-                      padding: '0.5rem 1rem',
-                      borderRadius: '6px',
-                      border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
-                      backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
-                      color: themeClasses.textPrimary,
-                      fontSize: '14px',
-                      fontWeight: 500,
-                      cursor: 'pointer',
+                      width: '100%',
+                      height: '1px',
+                      backgroundColor: '#374151',
+                      marginBottom: '0.75rem',
+                    }}
+                  />
+
+                  {/* Notes List */}
+                  {notes.map((note) => (
+                    <div
+                      key={note.id}
+                      style={{
+                        padding: '0.75rem',
+                        backgroundColor: '#1F2937',
+                        borderRadius: '8px',
+                        border: '1px solid #374151',
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '0.75rem',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          backgroundColor: note.color || '#F59E0B',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#FFFFFF',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {note.initials}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                          <span style={{ fontSize: '14px', fontWeight: '500', color: '#FFFFFF' }}>
+                            {note.author}
+                          </span>
+                          <span style={{ fontSize: '12px', color: '#9CA3AF' }}>
+                            {note.date}
+                          </span>
+                        </div>
+                        <p style={{ fontSize: '14px', margin: 0, lineHeight: '1.5', color: '#FFFFFF' }}>
+                          {note.text}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+              
+                  {/* Units Produced Info */}
+                  {productData?.unitsProduced && (
+                    <div
+                      style={{
+                        padding: '0.75rem',
+                        backgroundColor: '#374151',
+                        borderRadius: '8px',
+                        border: '1px solid #4B5563',
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '0.75rem',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          backgroundColor: '#1F2937',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2">
+                          <circle cx="12" cy="12" r="10" />
+                          <path d="M12 16v-4M12 8h.01" />
+                        </svg>
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: '14px', margin: 0, lineHeight: '1.5', color: '#9CA3AF' }}>
+                          {productData.unitsProduced.toLocaleString()} Units marked as produced. {productData.remainingQty?.toLocaleString() || 0} units remain for production.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Separator Line Above Comment Input */}
+                  <div
+                    style={{
+                      width: '100%',
+                      height: '1px',
+                      backgroundColor: '#374151',
+                      marginTop: '0.5rem',
+                    }}
+                  />
+
+                  {/* Add Comment Input - Always visible when expanded */}
+                  <div
+                    style={{
+                      marginTop: '0.75rem',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '0.75rem',
                     }}
                   >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSaveNote}
-                    disabled={!newNoteText.trim()}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      borderRadius: '6px',
-                      border: 'none',
-                      backgroundColor: newNoteText.trim() ? '#2563EB' : '#9CA3AF',
-                      color: '#FFFFFF',
-                      fontSize: '14px',
-                      fontWeight: 500,
-                      cursor: newNoteText.trim() ? 'pointer' : 'not-allowed',
-                    }}
-                  >
-                    Comment
-                  </button>
+                    {/* User Avatar */}
+                    <div
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        backgroundColor: '#F59E0B',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#FFFFFF',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {getUserInfo().userInitials}
+                    </div>
+                    
+                    {/* Input Container */}
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input
+                        ref={textareaRef}
+                        type="text"
+                        value={newNoteText}
+                        onChange={(e) => setNewNoteText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && newNoteText.trim()) {
+                            handleSaveNote();
+                          }
+                        }}
+                        placeholder="Add a comment here..."
+                        style={{
+                          flex: 1,
+                          padding: '0.75rem',
+                          borderRadius: '8px',
+                          border: '1px solid #374151',
+                          backgroundColor: '#1F2937',
+                          color: '#FFFFFF',
+                          fontSize: '14px',
+                          fontFamily: 'inherit',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                      
+                      {/* Send Button */}
+                      <button
+                        onClick={handleSaveNote}
+                        disabled={!newNoteText.trim()}
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '8px',
+                          border: 'none',
+                          backgroundColor: newNoteText.trim() ? '#3B82F6' : '#374151',
+                          color: '#FFFFFF',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: newNoteText.trim() ? 'pointer' : 'not-allowed',
+                          flexShrink: 0,
+                          transition: 'all 0.2s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (newNoteText.trim()) {
+                            e.currentTarget.style.backgroundColor = '#2563EB';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (newNoteText.trim()) {
+                            e.currentTarget.style.backgroundColor = '#3B82F6';
+                          }
+                        }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="22" y1="2" x2="11" y2="13"></line>
+                          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
-              )}
             </div>
           </div>
         </div>
@@ -1717,7 +1782,8 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
         <div
           style={{
             padding: '1rem 1.5rem',
-            borderTop: `1px solid ${themeClasses.border}`,
+            borderTop: '1px solid #374151',
+            backgroundColor: '#111827',
             display: 'flex',
             justifyContent: 'space-between',
             gap: '0.75rem',
@@ -1741,9 +1807,9 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
               width: '92px',
               height: '32px',
               borderRadius: '4px',
-              border: `1px solid ${isDarkMode ? '#374151' : '#D1D5DB'}`,
-              backgroundColor: 'white',
-              color: themeClasses.textPrimary,
+              border: '1px solid #374151',
+              backgroundColor: '#1F2937',
+              color: '#FFFFFF',
               fontSize: '14px',
               fontWeight: '500',
               cursor: 'pointer',
@@ -1755,10 +1821,10 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
               boxSizing: 'border-box',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F9FAFB';
+              e.currentTarget.style.backgroundColor = '#374151';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'white';
+              e.currentTarget.style.backgroundColor = '#1F2937';
             }}
           >
             {isProductionPaused ? (

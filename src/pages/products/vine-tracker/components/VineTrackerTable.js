@@ -1612,7 +1612,29 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
                       </div>
                     ) : (
                       <span style={{ fontSize: '0.875rem', color: '#FFFFFF' }}>
-                        {row.launchDate || 'N/A'}
+                        {(() => {
+                          if (!row.launchDate) return 'N/A';
+                          // Try to parse and format the date
+                          let date;
+                          // Handle MM/DD/YYYY format
+                          if (row.launchDate.includes('/')) {
+                            const parts = row.launchDate.split('/');
+                            if (parts.length === 3) {
+                              const month = parseInt(parts[0]) - 1;
+                              const day = parseInt(parts[1]);
+                              const year = parseInt(parts[2]);
+                              date = new Date(year, month, day);
+                            }
+                          } else {
+                            // Try parsing as Date object or ISO string
+                            date = new Date(row.launchDate);
+                          }
+                          if (date && !isNaN(date.getTime())) {
+                            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                            return `${monthNames[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+                          }
+                          return row.launchDate;
+                        })()}
                       </span>
                     )}
                   </td>

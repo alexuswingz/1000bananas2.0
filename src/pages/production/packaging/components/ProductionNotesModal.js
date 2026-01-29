@@ -55,6 +55,11 @@ const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote,
   const userName = localStorage.getItem('userName') || 'User';
   const userInitials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
+  // Check if desktop mode (matching vine table styling)
+  const isDesktop = typeof window !== 'undefined' && window.innerWidth > 640;
+  const modalBgColor = isDesktop ? '#111827' : (darkMode ? '#1F2937' : '#FFFFFF');
+  const headerBgColor = isDesktop ? '#2C3544' : '#1C2634';
+
   return createPortal(
     <>
       {/* Backdrop */}
@@ -79,7 +84,7 @@ const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote,
             width: '90%',
             maxWidth: '640px',
             maxHeight: 'calc(90vh - 10px)',
-            backgroundColor: darkMode ? '#1F2937' : '#FFFFFF',
+            backgroundColor: modalBgColor,
             borderRadius: '12px',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
             display: 'flex',
@@ -91,7 +96,7 @@ const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote,
           {/* Header */}
           <div
             style={{
-              backgroundColor: '#1C2634',
+              backgroundColor: headerBgColor,
               padding: '16px 24px',
               display: 'flex',
               flexDirection: 'row',
@@ -99,7 +104,7 @@ const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote,
               justifyContent: 'space-between',
               height: '56px',
               width: '100%',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+              borderBottom: isDesktop ? '1px solid #374151' : '1px solid rgba(255, 255, 255, 0.1)',
               borderTopLeftRadius: '12px',
               borderTopRightRadius: '12px',
               boxSizing: 'border-box',
@@ -148,9 +153,9 @@ const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote,
               overflowY: 'auto',
               padding: '16px 24px 32px 24px',
               gap: '24px',
-              backgroundColor: darkMode ? '#1F2937' : '#FFFFFF',
+              backgroundColor: modalBgColor,
               border: '1px solid',
-              borderColor: darkMode ? '#374151' : '#E5E7EB',
+              borderColor: isDesktop ? '#374151' : (darkMode ? '#374151' : '#E5E7EB'),
               borderTop: 'none',
               borderBottomLeftRadius: '12px',
               borderBottomRightRadius: '12px',
@@ -169,7 +174,7 @@ const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote,
                 style={{
                   fontSize: '18px',
                   fontWeight: 600,
-                  color: darkMode ? '#F9FAFB' : '#111827',
+                  color: isDesktop ? '#FFFFFF' : (darkMode ? '#F9FAFB' : '#111827'),
                   margin: 0,
                 }}
               >

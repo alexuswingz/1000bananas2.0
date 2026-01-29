@@ -578,11 +578,11 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
       onClick={onClose}
     >
       <div
-        className={themeClasses.modalBg}
         style={{
           borderRadius: '12px',
           width: '648px',
           height: '558px',
+          backgroundColor: '#111827',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -592,8 +592,8 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
       >
         {/* Header */}
         <div
-          className="bg-[#2C3544]"
           style={{
+            backgroundColor: '#111827',
             padding: '1rem 1.5rem',
             borderRadius: '12px 12px 0 0',
             display: 'flex',
@@ -626,12 +626,12 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
           style={{
             width: '100%',
             height: '1px',
-            backgroundColor: '#E5E7EB',
+            backgroundColor: '#374151',
           }}
         />
 
         {/* Content */}
-        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', flex: 1, overflow: 'auto' }}>
+        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', flex: 1, overflow: 'auto', backgroundColor: '#111827' }}>
           {/* Step Header with Dropdown */}
           <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             {/* Step Counter */}
@@ -654,9 +654,9 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
                   padding: '8px 32px 8px 12px',
                   fontSize: '13px',
                   fontWeight: '500',
-                  color: '#374151',
-                  backgroundColor: '#FFFFFF',
-                  border: '1px solid #D1D5DB',
+                  color: '#FFFFFF',
+                  backgroundColor: '#1F2937',
+                  border: '1px solid #374151',
                   borderRadius: '6px',
                   appearance: 'none',
                   cursor: 'pointer',
@@ -793,7 +793,7 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
 
           {/* Step Confirmation */}
           <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <p style={{ fontSize: '14px', fontWeight: '400', margin: 0, color: '#374151' }}>
+            <p style={{ fontSize: '14px', fontWeight: '400', margin: 0, color: '#FFFFFF' }}>
               {currentStep.id === 'formula' && productData?.formula 
                 ? (
                   <>
@@ -832,8 +832,8 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
               width: '100%',
               height: '240px',
               cursor: 'pointer',
-              border: '2px dashed #D1D5DB',
-              backgroundColor: '#F9FAFB',
+              border: '2px dashed #374151',
+              backgroundColor: '#1F2937',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
@@ -844,14 +844,14 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
             }}
             onMouseEnter={() => {
               if (uploadAreaRef.current) {
-                uploadAreaRef.current.style.borderColor = '#9CA3AF';
-                uploadAreaRef.current.style.backgroundColor = '#F3F4F6';
+                uploadAreaRef.current.style.borderColor = '#4B5563';
+                uploadAreaRef.current.style.backgroundColor = '#374151';
               }
             }}
             onMouseLeave={() => {
               if (uploadAreaRef.current) {
-                uploadAreaRef.current.style.borderColor = '#D1D5DB';
-                uploadAreaRef.current.style.backgroundColor = '#F9FAFB';
+                uploadAreaRef.current.style.borderColor = '#374151';
+                uploadAreaRef.current.style.backgroundColor = '#1F2937';
               }
             }}
             onClick={() => document.getElementById('file-upload').click()}
@@ -893,13 +893,13 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
 
             {/* Upload Text */}
             <div style={{ textAlign: 'center' }}>
-              <p style={{ fontSize: '14px', color: '#374151', margin: '0 0 4px 0' }}>
+              <p style={{ fontSize: '14px', color: '#9CA3AF', margin: '0 0 4px 0' }}>
                 Drag and drop photo or{' '}
                 <span style={{ color: '#3B82F6', fontWeight: '500', cursor: 'pointer' }}>
                   Click to upload
                 </span>
               </p>
-              <p style={{ fontSize: '12px', color: '#9CA3AF', margin: 0 }}>
+              <p style={{ fontSize: '12px', color: '#6B7280', margin: 0 }}>
                 Max size: 3MB (JPG, PNG)
               </p>
             </div>
@@ -910,30 +910,32 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
         <div
           style={{
             padding: '1rem 1.5rem',
-            borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+            borderTop: '1px solid #374151',
+            backgroundColor: '#141C2D',
             display: 'flex',
-            justifyContent: 'flex-end',
+            justifyContent: 'space-between',
+            alignItems: 'center',
             gap: '0.75rem',
           }}
         >
           <button
             onClick={onClose}
-            className={themeClasses.modalBg}
             style={{
               padding: '0.5rem 1.5rem',
               borderRadius: '6px',
-              border: `1px solid ${isDarkMode ? '#374151' : '#D1D5DB'}`,
-              color: themeClasses.textPrimary,
+              border: '1px solid #374151',
+              backgroundColor: '#1F2937',
+              color: '#FFFFFF',
               fontSize: '14px',
               fontWeight: '500',
               cursor: 'pointer',
               transition: 'all 0.2s ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F9FAFB';
+              e.currentTarget.style.backgroundColor = '#374151';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = themeClasses.modalBg.includes('dark') ? '#1F2937' : '#FFFFFF';
+              e.currentTarget.style.backgroundColor = '#1F2937';
             }}
           >
             Cancel

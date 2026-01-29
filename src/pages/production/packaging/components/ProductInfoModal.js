@@ -24,6 +24,11 @@ const ProductInfoModal = ({ isOpen, onClose, onBeginQC, productData }) => {
     border: isDarkMode ? 'border-dark-border-primary' : 'border-gray-200',
   };
 
+  // Use dark colors for desktop mode (matching vine table)
+  const desktopModalBg = !isMobile ? '#111827' : (isDarkMode ? '#1a1a1a' : '#FFFFFF');
+  const desktopTextPrimary = !isMobile ? '#FFFFFF' : (isDarkMode ? '#FFFFFF' : '#111827');
+  const desktopTextSecondary = !isMobile ? '#9CA3AF' : (isDarkMode ? '#a0a0a0' : '#6B7280');
+
   return (
     <div
       style={{
@@ -42,12 +47,12 @@ const ProductInfoModal = ({ isOpen, onClose, onBeginQC, productData }) => {
       onClick={onClose}
     >
       <div
-        className={themeClasses.modalBg}
         style={{
           borderRadius: '12px',
           width: isMobile ? '100%' : '580px',
           maxWidth: isMobile ? '640px' : '90vw',
           maxHeight: '90vh',
+          backgroundColor: desktopModalBg,
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
           display: 'flex',
           flexDirection: 'column',
@@ -57,10 +62,10 @@ const ProductInfoModal = ({ isOpen, onClose, onBeginQC, productData }) => {
       >
         {/* Header */}
         <div
-          className="bg-[#2C3544]"
           style={{
             width: '100%',
             height: '56px',
+            backgroundColor: '#111827',
             borderTopLeftRadius: '12px',
             borderTopRightRadius: '12px',
             paddingTop: '16px',
@@ -93,6 +98,15 @@ const ProductInfoModal = ({ isOpen, onClose, onBeginQC, productData }) => {
           </button>
         </div>
 
+        {/* Separation Line */}
+        <div
+          style={{
+            width: '100%',
+            height: '1px',
+            backgroundColor: '#374151',
+          }}
+        />
+
         {/* Content */}
         <div
           style={{
@@ -102,6 +116,7 @@ const ProductInfoModal = ({ isOpen, onClose, onBeginQC, productData }) => {
             display: 'flex',
             gap: '16px',
             flexDirection: isMobile ? 'column' : 'row',
+            backgroundColor: desktopModalBg,
           }}
         >
           {/* Product Image Container - First on desktop, second on mobile */}
@@ -110,9 +125,9 @@ const ProductInfoModal = ({ isOpen, onClose, onBeginQC, productData }) => {
               style={{
                 flexShrink: 0,
                 position: 'relative',
-                backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                backgroundColor: !isMobile ? '#1F2937' : (isDarkMode ? '#1F2937' : '#FFFFFF'),
                 borderRadius: '8px',
-                border: '1px solid #E5E7EB',
+                border: `1px solid ${!isMobile ? '#374151' : '#E5E7EB'}`,
                 padding: '12px',
                 display: 'flex',
                 alignItems: 'center',
@@ -162,87 +177,88 @@ const ProductInfoModal = ({ isOpen, onClose, onBeginQC, productData }) => {
               gridTemplateColumns: '1fr 1fr',
               gap: '12px 16px',
               alignContent: 'start',
-              padding: isMobile ? '12px' : '0',
-              backgroundColor: isMobile ? (isDarkMode ? '#111827' : '#F3F4F6') : 'transparent',
-              borderRadius: isMobile ? '8px' : '0',
+              padding: isMobile ? '12px' : '16px',
+              backgroundColor: !isMobile ? '#1F2937' : (isDarkMode ? '#111827' : '#F3F4F6'),
+              borderRadius: '8px',
+              border: `1px solid ${!isMobile ? '#374151' : (isDarkMode ? '#2d2d2d' : '#E5E7EB')}`,
             }}
           >
             {/* Left Column */}
             <div>
-              <span className={themeClasses.textSecondary} style={{ fontSize: '11px', display: 'block', marginBottom: '2px' }}>
+              <span style={{ fontSize: '11px', display: 'block', marginBottom: '2px', color: desktopTextSecondary }}>
                 Brand
               </span>
-              <span className={themeClasses.textPrimary} style={{ fontSize: '13px', fontWeight: '600', display: 'block' }}>
+              <span style={{ fontSize: '13px', fontWeight: '600', display: 'block', color: desktopTextPrimary }}>
                 {productData?.brand || 'TPS Plant Foods'}
               </span>
             </div>
 
             {/* Right Column */}
             <div>
-              <span className={themeClasses.textSecondary} style={{ fontSize: '11px', display: 'block', marginBottom: '2px' }}>
+              <span style={{ fontSize: '11px', display: 'block', marginBottom: '2px', color: desktopTextSecondary }}>
                 Formula
               </span>
-              <span className={themeClasses.textPrimary} style={{ fontSize: '13px', fontWeight: '600', display: 'block' }}>
+              <span style={{ fontSize: '13px', fontWeight: '600', display: 'block', color: desktopTextPrimary }}>
                 {productData?.formula || 'F.Ultra Grow'}
               </span>
             </div>
 
             {/* Product Name */}
             <div>
-              <span className={themeClasses.textSecondary} style={{ fontSize: '11px', display: 'block', marginBottom: '2px' }}>
+              <span style={{ fontSize: '11px', display: 'block', marginBottom: '2px', color: desktopTextSecondary }}>
                 Product Name
               </span>
-              <span className={themeClasses.textPrimary} style={{ fontSize: '13px', fontWeight: '600', display: 'block' }}>
+              <span style={{ fontSize: '13px', fontWeight: '600', display: 'block', color: desktopTextPrimary }}>
                 {productData?.product || 'Cherry Tree Fertilizer'}
               </span>
             </div>
 
             {/* QTY */}
             <div>
-              <span className={themeClasses.textSecondary} style={{ fontSize: '11px', display: 'block', marginBottom: '2px' }}>
+              <span style={{ fontSize: '11px', display: 'block', marginBottom: '2px', color: desktopTextSecondary }}>
                 QTY
               </span>
-              <span className={themeClasses.textPrimary} style={{ fontSize: '13px', fontWeight: '600', display: 'block' }}>
+              <span style={{ fontSize: '13px', fontWeight: '600', display: 'block', color: desktopTextPrimary }}>
                 {productData?.qty?.toLocaleString() || '72,000'}
               </span>
             </div>
 
             {/* Size */}
             <div>
-              <span className={themeClasses.textSecondary} style={{ fontSize: '11px', display: 'block', marginBottom: '2px' }}>
+              <span style={{ fontSize: '11px', display: 'block', marginBottom: '2px', color: desktopTextSecondary }}>
                 Size
               </span>
-              <span className={themeClasses.textPrimary} style={{ fontSize: '13px', fontWeight: '600', display: 'block' }}>
+              <span style={{ fontSize: '13px', fontWeight: '600', display: 'block', color: desktopTextPrimary }}>
                 {productData?.size || '8oz'}
               </span>
             </div>
 
             {/* Case # */}
             <div>
-              <span className={themeClasses.textSecondary} style={{ fontSize: '11px', display: 'block', marginBottom: '2px' }}>
+              <span style={{ fontSize: '11px', display: 'block', marginBottom: '2px', color: desktopTextSecondary }}>
                 Case #
               </span>
-              <span className={themeClasses.textPrimary} style={{ fontSize: '13px', fontWeight: '600', display: 'block' }}>
+              <span style={{ fontSize: '13px', fontWeight: '600', display: 'block', color: desktopTextPrimary }}>
                 {productData?.caseNumber || '488'}
               </span>
             </div>
 
             {/* Label Location */}
             <div>
-              <span className={themeClasses.textSecondary} style={{ fontSize: '11px', display: 'block', marginBottom: '2px' }}>
+              <span style={{ fontSize: '11px', display: 'block', marginBottom: '2px', color: desktopTextSecondary }}>
                 Label Location
               </span>
-              <span className={themeClasses.textPrimary} style={{ fontSize: '13px', fontWeight: '600', display: 'block' }}>
+              <span style={{ fontSize: '13px', fontWeight: '600', display: 'block', color: desktopTextPrimary }}>
                 {productData?.labelLocation || 'LBL-PLANT-218'}
               </span>
             </div>
 
             {/* TPS Ship # */}
             <div>
-              <span className={themeClasses.textSecondary} style={{ fontSize: '11px', display: 'block', marginBottom: '2px' }}>
+              <span style={{ fontSize: '11px', display: 'block', marginBottom: '2px', color: desktopTextSecondary }}>
                 TPS Ship #
               </span>
-              <span className={themeClasses.textPrimary} style={{ fontSize: '13px', fontWeight: '600', display: 'block' }}>
+              <span style={{ fontSize: '13px', fontWeight: '600', display: 'block', color: desktopTextPrimary }}>
                 {productData?.tpsShipNumber || '10-01-2025'}
               </span>
             </div>
@@ -304,7 +320,8 @@ const ProductInfoModal = ({ isOpen, onClose, onBeginQC, productData }) => {
         <div
           style={{
             padding: '1rem 1.5rem',
-            borderTop: `1px solid ${themeClasses.border}`,
+            borderTop: '1px solid #374151',
+            backgroundColor: '#141C2D',
             display: 'flex',
             justifyContent: 'space-between',
             gap: '0.75rem',
@@ -315,19 +332,19 @@ const ProductInfoModal = ({ isOpen, onClose, onBeginQC, productData }) => {
             style={{
               padding: '0.5rem 1.5rem',
               borderRadius: '6px',
-              border: `1px solid ${themeClasses.border}`,
-              backgroundColor: themeClasses.modalBg,
-              color: themeClasses.textPrimary,
+              border: `1px solid ${!isMobile ? '#374151' : (isDarkMode ? '#2d2d2d' : '#E5E7EB')}`,
+              backgroundColor: !isMobile ? '#1F2937' : (isDarkMode ? '#1a1a1a' : '#FFFFFF'),
+              color: desktopTextPrimary,
               fontSize: '14px',
               fontWeight: '500',
               cursor: 'pointer',
               transition: 'all 0.2s ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F9FAFB';
+              e.currentTarget.style.backgroundColor = !isMobile ? '#374151' : (isDarkMode ? '#2a2a2a' : '#F9FAFB');
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = themeClasses.modalBg;
+              e.currentTarget.style.backgroundColor = !isMobile ? '#1F2937' : (isDarkMode ? '#1a1a1a' : '#FFFFFF');
             }}
           >
             Cancel
