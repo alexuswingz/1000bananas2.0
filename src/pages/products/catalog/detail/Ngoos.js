@@ -2733,11 +2733,11 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             */}
             
             {chartDataForDisplay.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" style={{ cursor: zKeyHeld ? 'zoom-in' : 'inherit' }}>
                   <ComposedChart
                   data={chartDataForDisplay}
                   margin={{ top: 20, right: 20, left: 0, bottom: 20 }}
-                  style={{ backgroundColor: 'transparent' }}
+                  style={{ backgroundColor: 'transparent', cursor: zKeyHeld ? 'zoom-in' : 'inherit' }}
                 >
                   <defs>
                     <linearGradient id="unitsSoldGradient" x1="0" y1="0" x2="0" y2="1">
