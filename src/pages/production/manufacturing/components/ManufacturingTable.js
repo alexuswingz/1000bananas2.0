@@ -693,11 +693,11 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
     { key: 'tpsShipNumber', label: 'TPS SHIP #', width: '160px' },
     { key: 'type', label: 'TYPE', width: '130px' },
     { key: 'formula', label: 'FORMULA', width: '190px' },
-    { key: 'size', label: 'SIZE', width: '150px' },
+    { key: 'size', label: 'VESSEL', width: '150px' },
     { key: 'qty', label: 'QTY', width: '110px' },
-    { key: 'tote', label: 'TOTE', width: '150px' },
-    { key: 'volume', label: 'VOLUME', width: '150px' },
-    { key: 'measure', label: 'MEASURE', width: '150px' },
+    { key: 'tote', label: 'VESSEL TYPE', width: '150px' },
+    { key: 'volume', label: 'TOTAL VOL. (GAL)', width: '150px' },
+    { key: 'measure', label: 'FORMULA TYPE', width: '150px' },
     { key: 'notes', label: 'NOTES', width: '170px' },
   ];
 
@@ -1765,20 +1765,28 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
         className={`w-full ${themeClasses.cardBg}`}
         style={{
           borderRadius: '8px',
-          border: '1px solid #E5E7EB',
+          border: '1px solid #111827',
           overflow: 'hidden',
+          backgroundColor: '#111827',
         }}
       >
         {/* Table header */}
         <div
-          className="bg-[#2C3544] border-b border-[#3C4656] w-full"
-          style={{ height: '40px', borderRadius: '8px 8px 0 0' }}
+          className="bg-[#111827] w-full"
+          style={{ 
+            height: '40px', 
+            borderRadius: '8px 8px 0 0',
+            borderBottom: '1px solid #374151',
+            paddingLeft: '1rem',
+            paddingRight: '1rem',
+          }}
         >
           <div
             className="grid h-full"
             style={{
-              gridTemplateColumns: columns.map((col) => col.width).join(' '),
+              gridTemplateColumns: columns.map((col) => `minmax(${col.width}, 1fr)`).join(' '),
               gap: '0',
+              width: '100%',
             }}
           >
             {columns.map((column, idx) => {
@@ -1793,13 +1801,13 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                     paddingTop: '12px',
                     paddingBottom: '12px',
                     position: 'relative',
-                    borderRight: idx < columns.length - 1 ? '1px solid rgba(255, 255, 255, 0.15)' : 'none',
+                    borderRight: 'none',
                     backgroundColor: isActive ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
                   }}
                 >
                   <span
                     style={{
-                      color: (isActive || openFilterColumn === column.key) ? '#007AFF' : '#FFFFFF',
+                      color: (isActive || openFilterColumn === column.key) ? '#007AFF' : '#9CA3AF',
                       fontSize: '11px',
                       fontWeight: 700,
                       letterSpacing: '0.05em',
@@ -1843,7 +1851,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
         </div>
 
         {/* Table body */}
-        <div className="w-full">
+        <div className="w-full" style={{ paddingLeft: '1rem', paddingRight: '1rem' }}>
           {finalData.length === 0 ? (
             <div
               className={`px-6 py-6 text-center text-sm ${themeClasses.textSecondary}`}
@@ -1893,16 +1901,18 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                 }}
                 className={`grid text-sm ${themeClasses.cardBg} ${themeClasses.rowHover}`}
                 style={{
-                  gridTemplateColumns: columns.map((col) => col.width).join(' '),
+                  gridTemplateColumns: columns.map((col) => `minmax(${col.width}, 1fr)`).join(' '),
                   gap: '0',
-                  borderBottom: '1px solid #e5e7eb',
+                  borderBottom: index < finalData.length - 1 ? '1px solid #374151' : 'none',
                   height: '41px',
                   cursor: isSortMode ? 'grab' : 'default',
                   backgroundColor: isHighlighted 
                     ? (isDarkMode ? 'rgba(0, 122, 255, 0.15)' : 'rgba(0, 122, 255, 0.1)')
-                    : (draggedOverRowIndex === index ? (isDarkMode ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)') : 'transparent'),
+                    : (draggedOverRowIndex === index ? (isDarkMode ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)') : '#111827'),
                   borderLeft: isHighlighted ? '3px solid #007AFF' : 'none',
+                  borderRight: 'none',
                   transition: 'background-color 0.2s ease, border-left 0.2s ease',
+                  width: '100%',
                 }}
               >
                 {/* STATUS */}
@@ -1955,8 +1965,8 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                           maxWidth: '135px',
                           minHeight: '24px',
                           height: 'auto',
-                          backgroundColor: '#FFFFFF',
-                          border: '1px solid #E5E7EB',
+                          backgroundColor: '#2C3544',
+                          border: '1px solid #3C4656',
                           borderRadius: '4px',
                           paddingTop: '4px',
                           paddingRight: '12px',
@@ -1967,11 +1977,11 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                           transition: 'all 0.2s ease',
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = '#D1D5DB';
+                          e.currentTarget.style.borderColor = '#4B5563';
                           e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.borderColor = '#E5E7EB';
+                          e.currentTarget.style.borderColor = '#3C4656';
                           e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
                         }}
                       >
@@ -1980,7 +1990,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                           style={{
                             fontSize: '13px',
                             fontWeight: 400,
-                            color: '#374151',
+                            color: '#FFFFFF',
                             flex: 1,
                             textAlign: 'left',
                             lineHeight: '1',
@@ -2013,10 +2023,10 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                             left: '22px',
                             right: '22px',
                             zIndex: 1000,
-                            backgroundColor: '#FFFFFF',
-                            border: '1px solid #E5E7EB',
+                            backgroundColor: '#1F2937',
+                            border: '1px solid #374151',
                             borderRadius: '8px',
-                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3)',
                             overflow: 'hidden',
                           }}
                         >
@@ -2029,17 +2039,17 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                                 textAlign: 'left',
                                 padding: '8px 12px',
                                 fontSize: '14px',
-                                color: '#111827',
+                                color: '#FFFFFF',
                                 backgroundColor: 'transparent',
                                 border: 'none',
                                 cursor: 'pointer',
-                                borderBottom: status !== statusOptions[statusOptions.length - 1] ? '1px solid #E5E7EB' : 'none',
+                                borderBottom: status !== statusOptions[statusOptions.length - 1] ? '1px solid #374151' : 'none',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '8px',
                               }}
                               onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = '#F3F4F6';
+                                e.currentTarget.style.backgroundColor = '#374151';
                               }}
                               onMouseLeave={(e) => {
                                 e.currentTarget.style.backgroundColor = 'transparent';
@@ -2057,12 +2067,13 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
 
                 {/* TPS SHIP # */}
                 <div
-                  className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                  className="flex items-center justify-center"
                   style={{
                     paddingLeft: '22px',
                     paddingRight: '22px',
                     paddingTop: '8px',
                     paddingBottom: '8px',
+                    color: '#FFFFFF',
                   }}
                 >
                   {row.tpsShipNumber}
@@ -2070,12 +2081,13 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
 
                 {/* TYPE */}
                 <div
-                  className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                  className="flex items-center justify-center"
                   style={{
                     paddingLeft: '22px',
                     paddingRight: '22px',
                     paddingTop: '8px',
                     paddingBottom: '8px',
+                    color: '#FFFFFF',
                   }}
                 >
                   {row.type}
@@ -2083,7 +2095,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
 
                 {/* FORMULA */}
                 <div
-                  className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                  className="flex items-center justify-center"
                   style={{
                     paddingLeft: '22px',
                     paddingRight: '22px',
@@ -2092,6 +2104,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
+                    color: '#FFFFFF',
                   }}
                 >
                   <span>{row.formula}</span>
@@ -2110,12 +2123,13 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
 
                 {/* SIZE */}
                 <div
-                  className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                  className="flex items-center justify-center"
                   style={{
                     paddingLeft: '22px',
                     paddingRight: '22px',
                     paddingTop: '8px',
                     paddingBottom: '8px',
+                    color: '#FFFFFF',
                   }}
                 >
                   {row.size}
@@ -2123,12 +2137,13 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
 
                 {/* QTY */}
                 <div
-                  className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                  className="flex items-center justify-center"
                   style={{
                     paddingLeft: '22px',
                     paddingRight: '22px',
                     paddingTop: '8px',
                     paddingBottom: '8px',
+                    color: '#FFFFFF',
                   }}
                 >
                   {row.qty}
@@ -2136,12 +2151,13 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
 
                 {/* TOTE */}
                 <div
-                  className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                  className="flex items-center justify-center"
                   style={{
                     paddingLeft: '22px',
                     paddingRight: '22px',
                     paddingTop: '8px',
                     paddingBottom: '8px',
+                    color: '#FFFFFF',
                   }}
                 >
                   {row.tote}
@@ -2164,8 +2180,8 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                     style={{
                       width: '88px',
                       height: '24px',
-                      backgroundColor: '#F9FAFB',
-                      border: '1px solid #E5E7EB',
+                      backgroundColor: '#2C3544',
+                      border: '1px solid #3C4656',
                       borderRadius: '8px',
                       paddingTop: '4px',
                       paddingRight: '6px',
@@ -2173,29 +2189,30 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                       paddingLeft: '6px',
                       textAlign: 'center',
                       fontSize: '13px',
-                      color: isDarkMode ? '#E5E7EB' : '#374151',
+                      color: '#FFFFFF',
                       outline: 'none',
                       boxSizing: 'border-box',
                     }}
                     onFocus={(e) => {
                       e.currentTarget.style.borderColor = '#3B82F6';
-                      e.currentTarget.style.backgroundColor = '#FFFFFF';
+                      e.currentTarget.style.backgroundColor = '#374151';
                     }}
                     onBlur={(e) => {
-                      e.currentTarget.style.borderColor = '#E5E7EB';
-                      e.currentTarget.style.backgroundColor = '#F9FAFB';
+                      e.currentTarget.style.borderColor = '#3C4656';
+                      e.currentTarget.style.backgroundColor = '#2C3544';
                     }}
                   />
                 </div>
 
                 {/* MEASURE */}
                 <div
-                  className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                  className="flex items-center justify-center"
                   style={{
                     paddingLeft: '22px',
                     paddingRight: '22px',
                     paddingTop: '8px',
                     paddingBottom: '8px',
+                    color: '#FFFFFF',
                   }}
                 >
                   {row.measure}
@@ -2316,10 +2333,10 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
               zIndex: 10000,
               minWidth: '220px',
               padding: '6px',
-              backgroundColor: '#FFFFFF',
-              border: '1px solid #E5E7EB',
+              backgroundColor: '#1F2937',
+              border: '1px solid #374151',
               borderRadius: '8px',
-              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2)',
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -2332,7 +2349,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                 padding: '8px 12px',
                 fontSize: '13px',
                 fontWeight: 400,
-                color: '#374151',
+                color: '#FFFFFF',
                 borderRadius: '4px',
                 backgroundColor: 'transparent',
                 border: 'none',
@@ -2343,7 +2360,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                 gap: '10px',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#F3F4F6';
+                e.currentTarget.style.backgroundColor = '#374151';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = 'transparent';
@@ -2375,7 +2392,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                 padding: '8px 12px',
                 fontSize: '13px',
                 fontWeight: 400,
-                color: '#374151',
+                color: '#FFFFFF',
                 borderRadius: '4px',
                 backgroundColor: 'transparent',
                 border: 'none',
@@ -2386,7 +2403,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                 gap: '10px',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#F3F4F6';
+                e.currentTarget.style.backgroundColor = '#374151';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = 'transparent';
@@ -2413,7 +2430,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                 padding: '8px 12px',
                 fontSize: '13px',
                 fontWeight: 400,
-                color: '#374151',
+                color: '#FFFFFF',
                 borderRadius: '4px',
                 backgroundColor: 'transparent',
                 border: 'none',
@@ -2424,7 +2441,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                 gap: '10px',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#F3F4F6';
+                e.currentTarget.style.backgroundColor = '#374151';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = 'transparent';
@@ -2604,81 +2621,137 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
         >
           <div
             style={{
-              backgroundColor: '#FFFFFF',
+              backgroundColor: '#1F2937',
               borderRadius: '12px',
-              border: '1px solid #E5E7EB',
+              border: '1px solid #374151',
               padding: '24px',
-              width: '473px',
-              height: '154px',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              width: '299px',
+              height: '202px',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
               display: 'flex',
               flexDirection: 'column',
               boxSizing: 'border-box',
+              position: 'relative',
+              gap: '24px',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Title */}
-            <h2
+            {/* Close Button */}
+            <button
+              onClick={handleCancelConfirm}
               style={{
-                fontSize: '18px',
-                fontWeight: 700,
-                color: '#111827',
-                margin: 0,
-                textAlign: 'center',
-                marginBottom: '12px',
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '24px',
+                height: '24px',
+                zIndex: 1,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                e.currentTarget.style.borderRadius = '4px';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
               }}
             >
-              Are you sure?
-            </h2>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
 
-            {/* Message */}
-            <p
-              style={{
-                fontSize: '14px',
-                color: '#6B7280',
-                margin: 0,
-                lineHeight: '1.5',
-                textAlign: 'center',
-                marginBottom: '24px',
-              }}
-            >
-              Your changes will be applied to the current manufacturing order.
-            </p>
+            {/* Icon and Content */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', flex: 1, justifyContent: 'center' }}>
+              {/* Orange Warning Icon */}
+              <div
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  backgroundColor: '#F59E0B',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#FFFFFF' }}>!</span>
+              </div>
+
+              {/* Title */}
+              <h2
+                style={{
+                  fontSize: '16px',
+                  fontWeight: 700,
+                  color: '#FFFFFF',
+                  margin: 0,
+                  textAlign: 'center',
+                }}
+              >
+                Are you sure?
+              </h2>
+
+              {/* Message */}
+              <p
+                style={{
+                  fontSize: '12px',
+                  color: '#9CA3AF',
+                  margin: 0,
+                  lineHeight: '1.4',
+                  textAlign: 'center',
+                }}
+              >
+                This is where the body copy will exist.
+              </p>
+            </div>
 
             {/* Buttons */}
             <div
               style={{
                 display: 'flex',
                 flexDirection: 'row',
-                gap: '10px',
+                gap: '8px',
                 justifyContent: 'center',
-                marginTop: 'auto',
               }}
             >
               <button
                 onClick={handleCancelConfirm}
                 style={{
-                  width: '204.5px',
+                  width: '80px',
                   height: '31px',
-                  borderRadius: '4px',
-                  border: '1px solid #D1D5DB',
-                  backgroundColor: '#FFFFFF',
-                  color: '#374151',
-                  fontSize: '14px',
+                  borderRadius: '6px',
+                  border: '1px solid #6B7280',
+                  backgroundColor: '#374151',
+                  color: '#FFFFFF',
+                  fontSize: '13px',
                   fontWeight: 500,
                   cursor: 'pointer',
                   transition: 'all 0.2s',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  padding: 0,
+                  paddingTop: '8px',
+                  paddingRight: '16px',
+                  paddingBottom: '8px',
+                  paddingLeft: '16px',
                   boxSizing: 'border-box',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#F9FAFB';
+                  e.currentTarget.style.backgroundColor = '#4B5563';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  e.currentTarget.style.backgroundColor = '#374151';
                 }}
               >
                 Go back
@@ -2686,29 +2759,33 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
               <button
                 onClick={handleConfirmSave}
                 style={{
-                  width: '204.5px',
+                  width: '80px',
                   height: '31px',
-                  borderRadius: '4px',
-                  border: '1px solid #3B82F6',
+                  borderRadius: '6px',
+                  border: 'none',
                   backgroundColor: '#3B82F6',
                   color: '#FFFFFF',
-                  fontSize: '14px',
+                  fontSize: '13px',
                   fontWeight: 500,
                   cursor: 'pointer',
                   transition: 'background-color 0.2s',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  padding: 0,
+                  paddingTop: '8px',
+                  paddingRight: '16px',
+                  paddingBottom: '8px',
+                  paddingLeft: '16px',
                   boxSizing: 'border-box',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = '#2563EB';
-                  e.currentTarget.style.borderColor = '#2563EB';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = '#3B82F6';
-                  e.currentTarget.style.borderColor = '#3B82F6';
                 }}
               >
                 Confirm ({unsavedChangesCount})
@@ -2741,7 +2818,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
         >
           <div
             style={{
-              backgroundColor: '#FFFFFF',
+              backgroundColor: !isMobile && isDarkMode ? '#111827' : '#FFFFFF',
               borderRadius: '12px',
               width: '500px',
               maxWidth: '90vw',
@@ -2812,7 +2889,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                   style={{
                     fontSize: '14px',
                     fontWeight: 500,
-                    color: '#374151',
+                    color: !isMobile && isDarkMode ? '#FFFFFF' : '#374151',
                   }}
                 >
                   First Batch Quantity
@@ -2820,7 +2897,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                 <p
                   style={{
                     fontSize: '12px',
-                    color: '#6B7280',
+                    color: !isMobile && isDarkMode ? '#9CA3AF' : '#6B7280',
                     margin: 0,
                   }}
                 >
@@ -2838,10 +2915,10 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                     height: '40px',
                     padding: '8px 12px',
                     borderRadius: '6px',
-                    border: '1px solid #D1D5DB',
-                    backgroundColor: '#FFFFFF',
+                    border: !isMobile && isDarkMode ? '1px solid #374151' : '1px solid #D1D5DB',
+                    backgroundColor: !isMobile && isDarkMode ? '#1F2937' : '#FFFFFF',
                     fontSize: '14px',
-                    color: '#111827',
+                    color: !isMobile && isDarkMode ? '#FFFFFF' : '#111827',
                     outline: 'none',
                     cursor: 'text',
                     boxSizing: 'border-box',
@@ -2850,7 +2927,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                     e.currentTarget.style.borderColor = '#3B82F6';
                   }}
                   onBlur={(e) => {
-                    e.currentTarget.style.borderColor = '#D1D5DB';
+                    e.currentTarget.style.borderColor = !isMobile && isDarkMode ? '#374151' : '#D1D5DB';
                   }}
                 />
               </div>
@@ -2861,7 +2938,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                   style={{
                     fontSize: '14px',
                     fontWeight: 500,
-                    color: '#374151',
+                    color: !isMobile && isDarkMode ? '#FFFFFF' : '#374151',
                   }}
                 >
                   Second Batch Quantity
@@ -2869,7 +2946,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                 <p
                   style={{
                     fontSize: '12px',
-                    color: '#6B7280',
+                    color: !isMobile && isDarkMode ? '#9CA3AF' : '#6B7280',
                     margin: 0,
                   }}
                 >
@@ -2884,10 +2961,10 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                     height: '40px',
                     padding: '8px 12px',
                     borderRadius: '6px',
-                    border: '1px solid #D1D5DB',
-                    backgroundColor: '#F9FAFB',
+                    border: !isMobile && isDarkMode ? '1px solid #374151' : '1px solid #D1D5DB',
+                    backgroundColor: !isMobile && isDarkMode ? '#1F2937' : '#F9FAFB',
                     fontSize: '14px',
-                    color: '#6B7280',
+                    color: !isMobile && isDarkMode ? '#9CA3AF' : '#6B7280',
                     cursor: 'not-allowed',
                     boxSizing: 'border-box',
                   }}
@@ -2899,7 +2976,7 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
             <div
               style={{
                 padding: '20px 24px',
-                borderTop: '1px solid #E5E7EB',
+                borderTop: !isMobile && isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
                 display: 'flex',
                 justifyContent: 'flex-end',
                 gap: '12px',
@@ -2914,19 +2991,19 @@ const ManufacturingTable = ({ data = [], searchQuery = '', selectedShipment = ''
                 style={{
                   padding: '8px 16px',
                   borderRadius: '6px',
-                  border: '1px solid #D1D5DB',
-                  backgroundColor: '#FFFFFF',
-                  color: '#374151',
+                  border: !isMobile && isDarkMode ? '1px solid #374151' : '1px solid #D1D5DB',
+                  backgroundColor: !isMobile && isDarkMode ? '#1F2937' : '#FFFFFF',
+                  color: !isMobile && isDarkMode ? '#FFFFFF' : '#374151',
                   fontSize: '14px',
                   fontWeight: 500,
                   cursor: 'pointer',
                   transition: 'all 0.2s',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#F9FAFB';
+                  e.currentTarget.style.backgroundColor = !isMobile && isDarkMode ? '#374151' : '#F9FAFB';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  e.currentTarget.style.backgroundColor = !isMobile && isDarkMode ? '#1F2937' : '#FFFFFF';
                 }}
               >
                 Cancel

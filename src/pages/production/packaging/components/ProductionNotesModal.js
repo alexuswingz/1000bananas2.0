@@ -56,9 +56,9 @@ const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote,
   const userInitials = userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 
   // Check if desktop mode (matching vine table styling)
-  const isDesktop = typeof window !== 'undefined' && window.innerWidth > 640;
-  const modalBgColor = isDesktop ? '#111827' : (darkMode ? '#1F2937' : '#FFFFFF');
-  const headerBgColor = isDesktop ? '#2C3544' : '#1C2634';
+  const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 768;
+  const modalBgColor = (isDesktop && darkMode) ? '#111827' : (darkMode ? '#1F2937' : '#FFFFFF');
+  const headerBgColor = (isDesktop && darkMode) ? '#2C3544' : (darkMode ? '#1C2634' : '#2C3544');
 
   return createPortal(
     <>
@@ -104,7 +104,7 @@ const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote,
               justifyContent: 'space-between',
               height: '56px',
               width: '100%',
-              borderBottom: isDesktop ? '1px solid #374151' : '1px solid rgba(255, 255, 255, 0.1)',
+              borderBottom: (isDesktop && darkMode) ? '1px solid #374151' : (darkMode ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid #E5E7EB'),
               borderTopLeftRadius: '12px',
               borderTopRightRadius: '12px',
               boxSizing: 'border-box',
@@ -155,7 +155,7 @@ const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote,
               gap: '24px',
               backgroundColor: modalBgColor,
               border: '1px solid',
-              borderColor: isDesktop ? '#374151' : (darkMode ? '#374151' : '#E5E7EB'),
+              borderColor: (isDesktop && darkMode) ? '#374151' : (darkMode ? '#374151' : '#E5E7EB'),
               borderTop: 'none',
               borderBottomLeftRadius: '12px',
               borderBottomRightRadius: '12px',
@@ -174,7 +174,7 @@ const ProductionNotesModal = ({ isOpen, onClose, product, notes = [], onAddNote,
                 style={{
                   fontSize: '18px',
                   fontWeight: 600,
-                  color: isDesktop ? '#FFFFFF' : (darkMode ? '#F9FAFB' : '#111827'),
+                  color: (isDesktop && darkMode) ? '#FFFFFF' : (darkMode ? '#F9FAFB' : '#111827'),
                   margin: 0,
                 }}
               >
