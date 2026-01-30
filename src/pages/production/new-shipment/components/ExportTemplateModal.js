@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 import { exportShipmentTemplate } from '../../../../utils/shipmentExport';
 import { toast } from 'sonner';
@@ -8,6 +8,17 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck, p
   const [selectedType, setSelectedType] = useState(null);
   const [showExportComplete, setShowExportComplete] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+
+  // When modal opens, pre-select the type chosen before booking (FBA or AWD)
+  useEffect(() => {
+    if (isOpen && shipmentData?.shipmentType) {
+      const t = String(shipmentData.shipmentType).trim();
+      if (t === 'FBA') setSelectedType('fba');
+      else if (t === 'AWD') setSelectedType('awd');
+      else if (t === 'Production Order' || t.toLowerCase() === 'production-order') setSelectedType('production-order');
+    }
+    if (!isOpen) setSelectedType(null);
+  }, [isOpen, shipmentData?.shipmentType]);
 
   if (!isOpen) return null;
 
@@ -408,6 +419,7 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck, p
                     width: '176px',
                     height: '174px',
                     boxSizing: 'border-box',
+                    position: 'relative',
                   }}
                   onMouseEnter={(e) => {
                     if (selectedType !== type.id) {
@@ -420,6 +432,24 @@ const ExportTemplateModal = ({ isOpen, onClose, onExport, onBeginFormulaCheck, p
                     }
                   }}
                 >
+                  {selectedType === type.id && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '10px',
+                      right: '10px',
+                      width: '22px',
+                      height: '22px',
+                      borderRadius: '50%',
+                      backgroundColor: '#3B82F6',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </div>
+                  )}
                   <div style={{ 
                     display: 'flex', 
                     alignItems: 'center', 

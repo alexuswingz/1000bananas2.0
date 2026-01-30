@@ -902,15 +902,10 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     };
   }, []);
 
-  // Apply magnifying-glass cursor to body when Z is held (so it shows over chart/SVG)
-  useEffect(() => {
-    if (!zKeyHeld) return;
-    const prev = document.body.style.cursor;
-    document.body.style.cursor = 'zoom-in';
-    return () => {
-      document.body.style.cursor = prev || '';
-    };
-  }, [zKeyHeld]);
+  // Memoized chart cursor styles so Recharts don't see new object refs every render (avoids update loops)
+  const chartContainerCursor = zKeyHeld ? 'zoom-in' : (zoomBox.startTimestamp != null ? 'zoom-in' : (chartRangeSelecting ? 'col-resize' : 'crosshair'));
+  const responsiveContainerStyle = useMemo(() => ({ cursor: zKeyHeld ? 'zoom-in' : 'inherit' }), [zKeyHeld]);
+  const composedChartStyle = useMemo(() => ({ backgroundColor: 'transparent', cursor: zKeyHeld ? 'zoom-in' : 'inherit' }), [zKeyHeld]);
 
   // Available metrics configuration
   // Sales Metrics Configuration
@@ -2713,13 +2708,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               width: '100%',
               marginTop: '0.25rem',
               position: 'relative',
-              cursor: zoomBox.startTimestamp != null
-                ? 'zoom-in'
-                : zKeyHeld
-                  ? 'zoom-in'
-                  : chartRangeSelecting
-                    ? 'col-resize'
-                    : 'crosshair'
+              cursor: chartContainerCursor
             }}
             onMouseDown={handleChartRangeMouseDown}
             onMouseMove={handleChartRangeMouseMove}
@@ -2733,11 +2722,11 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             */}
             
             {chartDataForDisplay.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%" style={{ cursor: zKeyHeld ? 'zoom-in' : 'inherit' }}>
+              <ResponsiveContainer width="100%" height="100%" style={responsiveContainerStyle}>
                   <ComposedChart
                   data={chartDataForDisplay}
                   margin={{ top: 20, right: 20, left: 0, bottom: 20 }}
-                  style={{ backgroundColor: 'transparent', cursor: zKeyHeld ? 'zoom-in' : 'inherit' }}
+                  style={composedChartStyle}
                 >
                   <defs>
                     <linearGradient id="unitsSoldGradient" x1="0" y1="0" x2="0" y2="1">

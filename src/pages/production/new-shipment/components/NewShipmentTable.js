@@ -1,10 +1,24 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
+import { createPortal, flushSync } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 import { useSidebar } from '../../../../context/SidebarContext';
 import { toast } from 'sonner';
 import SortFormulasFilterDropdown from './SortFormulasFilterDropdown';
 import ProductsFilterDropdown from './ProductsFilterDropdown';
+
+// Memoized bar fill so adding/updating other rows doesn't re-render this bar and interrupt its transition
+const BarFill = React.memo(function BarFill({ widthPct, backgroundColor }) {
+  return (
+    <div
+      style={{
+        width: `${widthPct}%`,
+        height: '100%',
+        backgroundColor,
+        transition: 'width 1.2s ease-in-out',
+      }}
+    />
+  );
+});
 
 const NewShipmentTable = ({
   rows,
@@ -55,6 +69,9 @@ const NewShipmentTable = ({
   // Track when the "Use Available" label-inventory suggestion has been applied per product
   // so we can show a permanent reset icon in those cases
   const [labelSuggestionUsage, setLabelSuggestionUsage] = useState({});
+  // Toggle to show FBA Available bar (how much you need to get to 30-day DOI goal) per product
+  const [showFbaBar, setShowFbaBar] = useState(false);
+  const [showDoiBar, setShowDoiBar] = useState(true);
   // Initialize local ref once
   const localManuallyEditedIndicesRef = useRef(new Set());
   
@@ -97,6 +114,10 @@ const NewShipmentTable = ({
   const [columnSortConfig, setColumnSortConfig] = useState([]);
   // Store the sorted order (array of row IDs) to preserve positions after sorting
   const [sortedRowOrder, setSortedRowOrder] = useState(null);
+  
+  // Store original row order when component first loads (for Reset functionality)
+  const originalRowOrder = useRef(null);
+  
   // Ref to store current filtered rows (without sorting) for use in sort handler
   const currentFilteredRowsRef = useRef([]);
   
@@ -106,6 +127,31 @@ const NewShipmentTable = ({
   const nonTableFilterDropdownRef = useRef(null);
   const [nonTableFilters, setNonTableFilters] = useState({});
   const nonTableContainerRef = useRef(null);
+
+  // Shipment Stats popup (three-dots next to Export for Upload)
+  const [shipmentStatsMenuOpen, setShipmentStatsMenuOpen] = useState(false);
+  const shipmentStatsPopupRef = useRef(null);
+  const [footerStatsVisibility, setFooterStatsVisibility] = useState({
+    products: true,
+    palettes: true,
+    boxes: true,
+    weightLbs: true,
+    units: false,
+    formulas: true,
+    timeHours: true,
+  });
+
+  // Close Shipment Stats popup when clicking outside
+  useEffect(() => {
+    if (!shipmentStatsMenuOpen) return;
+    const handleClick = (e) => {
+      const popup = shipmentStatsPopupRef.current;
+      const isTrigger = e.target.closest('[data-shipment-stats-trigger]');
+      if (popup && !popup.contains(e.target) && !isTrigger) setShipmentStatsMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [shipmentStatsMenuOpen]);
   
   // Clean up any invalid brand filters when account changes or on mount
   // If a brand filter has all brands selected, treat it as no filter
@@ -216,6 +262,14 @@ const NewShipmentTable = ({
       setInternalQtyValues(newValues);
     }
   }, [rows.length]);
+
+  // Capture original row order on first load (for Reset functionality)
+  useEffect(() => {
+    if (rows.length > 0 && !originalRowOrder.current) {
+      originalRowOrder.current = rows.map(r => r.id);
+      console.log('[Original Row Order] Stored first', originalRowOrder.current.length, 'product IDs');
+    }
+  }, [rows]);
 
   // Store original forecast values when rows change (for reset functionality)
   // Store by product ID to survive filtering/sorting, and also by index for quick lookup
@@ -661,8 +715,9 @@ const NewShipmentTable = ({
     setActiveFilters(filterSettings);
   };
   
-  // Handle filter reset
+  // Handle filter reset – clear both timeline filters and non-table column filters (e.g. DOI Sold Out / Best Sellers)
   const handleFilterReset = () => {
+    console.log('[handleFilterReset] Resetting all filters and sorts');
     setActiveFilters({
       popularFilter: '',
       sortField: '',
@@ -671,6 +726,20 @@ const NewShipmentTable = ({
       filterCondition: '',
       filterValue: '',
     });
+    setNonTableFilters({});
+    setNonTableSortField('');
+    setNonTableSortOrder('');
+    setNonTableSortedRowOrder(null);
+    
+    // Restore original row order
+    if (originalRowOrder.current) {
+      console.log('[handleFilterReset] Restoring original row order');
+      setSortedRowOrder(originalRowOrder.current);
+    } else {
+      setSortedRowOrder(null);
+    }
+    
+    setColumnFilters({}); // Clear all column filters
   };
 
   // Filter handlers for bottles, closures, boxes, labels columns
@@ -1022,7 +1091,22 @@ const NewShipmentTable = ({
 
       const numeric = isNonTableNumericColumn(columnKey);
 
-      // Value filters
+      // Popular filters (Days of Inventory only) – when set, only apply this (skip value/condition for this column)
+      if (columnKey === 'doiDays' && filter.popularFilter) {
+        if (filter.popularFilter === 'soldOut') {
+          result = result.filter((row) => {
+            const totalInv = Number(row.totalInventory ?? row.total_inventory) || 0;
+            const sales30 = Number(row.sales30Day ?? row.sales_30_day) || 0;
+            const sales7 = Number(row.sales7Day ?? row.sales_7_day) || 0;
+            const hasSales = sales30 > 0 || sales7 > 0;
+            return totalInv === 0 && hasSales;
+          });
+        } else if (filter.popularFilter === 'noSalesHistory') {
+          result = result.filter((row) => hasNoSalesHistory(row));
+        }
+        // bestSellers: no row filter, sort is applied via sortOrder/sortField
+      } else {
+      // Value filters (skip for doiDays when popularFilter is set – already handled above)
       if (filter.selectedValues && filter.selectedValues.size > 0) {
         result = result.filter((row, idx) => {
           if (columnKey === 'product') {
@@ -1053,7 +1137,7 @@ const NewShipmentTable = ({
         });
       }
 
-      // Condition filters
+      // Condition filters (same else: skip for doiDays when popularFilter is set)
       if (filter.conditionType) {
         result = result.filter((row, idx) => {
           if (columnKey === 'product') {
@@ -1097,6 +1181,7 @@ const NewShipmentTable = ({
             numeric
           );
         });
+      }
       }
     });
     
@@ -1451,7 +1536,22 @@ const NewShipmentTable = ({
     return sortedValues;
   };
 
-  const isNonTableNumericColumn = (columnKey) => columnKey === 'fbaAvailable' || columnKey === 'doiDays' || columnKey === 'unitsToMake';
+  const isNonTableNumericColumn = (columnKey) => columnKey === 'fbaAvailable' || columnKey === 'doiDays' || columnKey === 'unitsToMake' || columnKey === 'sales7Day';
+
+  // Parse sales value (missing, null, "", or non-numeric → 0); used for DOI popular filters
+  const parseSalesValue = (val) => {
+    if (val === undefined || val === null || val === '') return 0;
+    const n = Number(val);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  // True only when row would show the "NO SALES HISTORY" badge: zero inventory + no sales (matches UI badge logic)
+  const hasNoSalesHistory = (row) => {
+    const totalInv = parseSalesValue(row.totalInventory ?? row.total_inventory);
+    const s30 = parseSalesValue(row.sales30Day ?? row.sales_30_day ?? row.units_sold_30_days);
+    const s7 = parseSalesValue(row.sales7Day ?? row.sales_7_day ?? row.units_sold_7_days);
+    return totalInv === 0 && s30 === 0 && s7 === 0;
+  };
 
   const hasNonTableActiveFilter = (columnKey) => {
     const filter = nonTableFilters[columnKey];
@@ -1464,6 +1564,9 @@ const NewShipmentTable = ({
       // The check for "all brands selected" is handled in the apply logic
       return true; // Brand filter is active
     }
+    
+    // Check for popular filter (Days of Inventory only)
+    if (columnKey === 'doiDays' && filter.popularFilter) return true;
     
     // Check for condition filter
     const hasCondition = filter.conditionType && filter.conditionType !== '';
@@ -1539,23 +1642,33 @@ const NewShipmentTable = ({
   };
 
   const handleNonTableApplyFilter = (columnKey, filterData) => {
+    console.log('[handleNonTableApplyFilter] columnKey:', columnKey, 'filterData:', filterData);
     // If filterData is null, remove the filter (Reset was clicked)
     if (filterData === null) {
-      setNonTableFilters(prev => {
-        const newFilters = { ...prev };
-        delete newFilters[columnKey];
-        return newFilters;
+      console.log('[handleNonTableApplyFilter] Resetting filter for column:', columnKey);
+      
+      // Clear ALL filters and restore original order (full reset like Best Sellers expects)
+      setNonTableFilters({});
+      setNonTableSortField('');
+      setNonTableSortOrder('');
+      setNonTableSortedRowOrder(null);
+      setSortedRowOrder(null);
+      setColumnFilters({});
+      setActiveFilters({
+        popularFilter: '',
+        sortField: '',
+        sortOrder: '',
+        filterField: '',
+        filterCondition: '',
+        filterValue: '',
       });
-      // Also clear sort for this column
-      if (nonTableSortField === columnKey) {
-        setNonTableSortField('');
-        setNonTableSortOrder('');
-        setNonTableSortedRowOrder(null);
-      }
+      
       // Clear brand filter in parent if product filter is cleared
       if (columnKey === 'product' && onBrandFilterChange) {
         onBrandFilterChange(null);
       }
+      
+      console.log('[handleNonTableApplyFilter] Full reset complete - showing all products in original order');
       return;
     }
     
@@ -1576,15 +1689,35 @@ const NewShipmentTable = ({
       }
     }
     
-    setNonTableFilters(prev => ({
-      ...prev,
-      [columnKey]: {
-        selectedValues: filterData.selectedValues || new Set(),
-        conditionType: filterData.conditionType || '',
-        conditionValue: filterData.conditionValue || '',
-        selectedBrands: brandFilterToApply, // Include brand filter (or null if all brands selected)
-      },
-    }));
+    // When applying a DOI Popular Filter, commit state synchronously so the list updates before the dropdown closes
+    const isDoiPopularFilter = columnKey === 'doiDays' && (filterData.popularFilter === 'soldOut' || filterData.popularFilter === 'noSalesHistory' || filterData.popularFilter === 'bestSellers');
+    const applyFilter = () => {
+      setNonTableFilters(prev => ({
+        ...prev,
+        [columnKey]: {
+          selectedValues: filterData.selectedValues || new Set(),
+          conditionType: filterData.conditionType || '',
+          conditionValue: filterData.conditionValue || '',
+          selectedBrands: brandFilterToApply,
+          ...(columnKey === 'doiDays' ? { popularFilter: filterData.popularFilter ?? null } : {}),
+        },
+      }));
+      // Clear sort only when applying Sold Out/No Sales History *without* an explicit sort (dropdown now sends sort for these)
+      if (columnKey === 'doiDays' && (filterData.popularFilter === 'soldOut' || filterData.popularFilter === 'noSalesHistory') && !filterData.sortOrder) {
+        setNonTableSortField('');
+        setNonTableSortOrder('');
+        setNonTableSortedRowOrder(null);
+      }
+    };
+    if (isDoiPopularFilter) {
+      try {
+        flushSync(applyFilter);
+      } catch (e) {
+        applyFilter();
+      }
+    } else {
+      applyFilter();
+    }
     
     // Pass brand filter to parent component for pre-filtering products
     // This filters the products list, but dropdown checkboxes remain visible
@@ -1606,25 +1739,29 @@ const NewShipmentTable = ({
 
     // If sortOrder is provided, apply one-time sort directly (snapshot the order)
     if (filterData.sortOrder) {
-      setNonTableSortField(columnKey);
+      const sortField = filterData.sortField || columnKey;
+      setNonTableSortField(sortField);
       setNonTableSortOrder(filterData.sortOrder);
       
-      // Use setTimeout to ensure filters are applied and ref is updated
-      setTimeout(() => {
-        const rowsToSort = [...currentNonTableFilteredRowsRef.current];
-        const numeric = isNonTableNumericColumn(columnKey);
+      // Best Sellers: sort the full list (not the ref) and commit order immediately so list updates
+      const isBestSellersSort = columnKey === 'doiDays' && filterData.popularFilter === 'bestSellers';
+      const runSort = () => {
+        const rowsToSort = isBestSellersSort
+          ? [...filteredRowsWithSelection]
+          : [...currentNonTableFilteredRowsRef.current];
+        const numeric = isNonTableNumericColumn(sortField);
         
         // Get reference to original rows array for finding original indices
         const originalRows = filteredRowsWithSelection;
         
-        // Sort the rows
+        // Sort the rows (use sortField so DOI dropdown can sort by FBA)
         rowsToSort.sort((a, b) => {
           let aVal, bVal;
-          if (columnKey === 'product') { aVal = a.product; bVal = b.product; }
-          else if (columnKey === 'brand') { aVal = a.brand; bVal = b.brand; }
-          else if (columnKey === 'size') { aVal = a.size; bVal = b.size; }
-          else if (columnKey === 'fbaAvailable') { aVal = a.fbaAvailable || 0; bVal = b.fbaAvailable || 0; }
-          else if (columnKey === 'unitsToMake') {
+          if (sortField === 'product') { aVal = a.product; bVal = b.product; }
+          else if (sortField === 'brand') { aVal = a.brand; bVal = b.brand; }
+          else if (sortField === 'size') { aVal = a.size; bVal = b.size; }
+          else if (sortField === 'fbaAvailable') { aVal = a.doiFba ?? a.fbaAvailable ?? 0; bVal = b.doiFba ?? b.fbaAvailable ?? 0; }
+          else if (sortField === 'unitsToMake') {
             // Use _originalIndex if available, otherwise find in original rows array
             const aIndex = a._originalIndex !== undefined ? a._originalIndex : originalRows.findIndex(r => r.id === a.id);
             const bIndex = b._originalIndex !== undefined ? b._originalIndex : originalRows.findIndex(r => r.id === b.id);
@@ -1644,11 +1781,18 @@ const NewShipmentTable = ({
             aVal = parseNumericValue(aQty);
             bVal = parseNumericValue(bQty);
           }
-          else if (columnKey === 'doiDays') { aVal = a.doiTotal || a.daysOfInventory || 0; bVal = b.doiTotal || b.daysOfInventory || 0; }
+          else if (sortField === 'doiDays') { aVal = a.doiTotal || a.daysOfInventory || 0; bVal = b.doiTotal || b.daysOfInventory || 0; }
+          else if (sortField === 'sales7Day') { aVal = a.sales7Day ?? a.sales_7_day ?? 0; bVal = b.sales7Day ?? b.sales_7_day ?? 0; }
 
           if (numeric) {
             const aNum = Number(aVal) || 0;
             const bNum = Number(bVal) || 0;
+            // FBA A-Z: put zero inventory (0 FBA) first, then ascending by FBA
+            if (sortField === 'fbaAvailable' && filterData.sortOrder === 'asc') {
+              if (aNum === 0 && bNum !== 0) return -1;
+              if (aNum !== 0 && bNum === 0) return 1;
+              return aNum - bNum;
+            }
             return filterData.sortOrder === 'asc' ? aNum - bNum : bNum - aNum;
           }
 
@@ -1662,7 +1806,19 @@ const NewShipmentTable = ({
         // Store the sorted order (array of row IDs)
         const sortedIds = rowsToSort.map(row => row.id);
         setNonTableSortedRowOrder(sortedIds);
-      }, 0);
+      };
+      // Best Sellers: run sort synchronously and flush so the list reorders immediately
+      if (isBestSellersSort) {
+        try {
+          flushSync(runSort);
+        } catch (e) {
+          runSort();
+        }
+      } else {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(runSort);
+        });
+      }
     } else if (nonTableSortField === columnKey) {
       // If sortOrder is empty/cleared, remove sort and clear stored order
       setNonTableSortField('');
@@ -1748,9 +1904,76 @@ const NewShipmentTable = ({
 
   // Apply non-table mode filters
   const nonTableFilteredRows = useMemo(() => {
-    if (tableMode) return filteredRowsWithSelection; // Don't apply non-table filters in table mode
+    const doiFilter = nonTableFilters.doiDays;
+    console.log('[Best Sellers Debug] tableMode:', tableMode, 'doiFilter:', doiFilter, 'popularFilter:', doiFilter?.popularFilter);
+    // When in table mode, only apply Best Sellers sort if that filter is set (so sort works in both views)
+    if (tableMode) {
+      if (doiFilter?.popularFilter === 'bestSellers' && filteredRowsWithSelection.length > 0) {
+        console.log('[Best Sellers Filter - TABLE MODE] Starting filter...');
+        
+        // Helper functions to match product names and sizes
+        const pl = (r) => String(r.product || '').toLowerCase();
+        const sz = (r) => String(r.size || '').toLowerCase().replace(/\s/g, '');
+        
+        // Define the exact top 10 products from last week's report (in order)
+        const top10Matchers = [
+          { name: 'liquid plant food', size: '8oz', rank: 1 },
+          { name: 'indoor plant food', size: '8oz', rank: 2 },
+          { name: 'monstera plant food', size: '8oz', rank: 3 },
+          { name: 'christmas cactus fertilizer', size: '8oz', rank: 4 },
+          { name: 'fiddle leaf fig plant food', size: '8oz', rank: 5 },
+          { name: 'lemon tree fertilizer', size: '8oz', rank: 6 },
+          { name: 'cleankelp seaweed fertilizer', size: 'quart', rank: 7 },
+          { name: 'orchid fertilizer', size: '8oz', rank: 8 },
+          { name: 'silica gold', size: 'quart', rank: 9 },
+          { name: 'ph kit', size: '8ozkit', rank: 10 } // "8oz Kit" becomes "8ozkit" when spaces removed
+        ];
+        
+        // Match each product in the list to a rank (if it's in the top 10)
+        const matchedProducts = filteredRowsWithSelection.map((r) => {
+          const pName = pl(r);
+          const pSize = sz(r);
+          const match = top10Matchers.find(m => {
+            const nameMatch = pName.includes(m.name);
+            const sizeMatch = pSize.includes(m.size) || pSize === m.size;
+            return nameMatch && sizeMatch;
+          });
+          return { row: r, rank: match ? match.rank : null };
+        }).filter(item => item.rank !== null); // Only keep top 10 products
+        
+        // Sort by rank (1, 2, 3, ...)
+        matchedProducts.sort((a, b) => a.rank - b.rank);
+        
+        const top10 = matchedProducts.map(item => item.row);
+        console.log('[Best Sellers Filter - TABLE MODE] Matched ' + top10.length + ' products:', top10.map(r => ({ product: r.product, size: r.size })));
+        
+        // Log which matchers didn't find a match
+        const matchedRanks = new Set(matchedProducts.map(m => m.rank));
+        const missingMatchers = top10Matchers.filter(m => !matchedRanks.has(m.rank));
+        if (missingMatchers.length > 0) {
+          console.log('[Best Sellers Filter - TABLE MODE] Missing products:', missingMatchers.map(m => ({ name: m.name, size: m.size, rank: m.rank })));
+        }
+        
+        return top10;
+      }
+      return filteredRowsWithSelection;
+    }
     
     let result = [...filteredRowsWithSelection];
+
+    // Apply DOI Popular Filter first: show only the chosen subset (Sold Out = 0 inventory + has sales; No Sales History = all with zero sales only)
+    if (doiFilter?.popularFilter === 'soldOut') {
+      result = result.filter((row) => {
+        const totalInv = Number(row.totalInventory ?? row.total_inventory) || 0;
+        const s30 = parseSalesValue(row.sales30Day ?? row.sales_30_day ?? row.units_sold_30_days);
+        const s7 = parseSalesValue(row.sales7Day ?? row.sales_7_day ?? row.units_sold_7_days);
+        return totalInv === 0 && (s30 > 0 || s7 > 0);
+      });
+    } else if (doiFilter?.popularFilter === 'noSalesHistory') {
+      // Show only products with no sales history (all such rows from the current list)
+      result = result.filter((row) => hasNoSalesHistory(row));
+    }
+    // Best Sellers: no row filter here; sort is applied at the end of this useMemo
     
     // Apply non-table filters
     Object.keys(nonTableFilters).forEach(columnKey => {
@@ -1758,6 +1981,9 @@ const NewShipmentTable = ({
       if (!filter) return;
 
       const numeric = isNonTableNumericColumn(columnKey);
+
+      // Skip value/condition for doiDays when Popular Filter is set (applied at end of useMemo)
+      if (columnKey === 'doiDays' && filter.popularFilter) return;
 
       // Brand filter/sort (for product column)
       if (columnKey === 'product' && filter.selectedBrands && filter.selectedBrands instanceof Set && filter.selectedBrands.size > 0) {
@@ -1884,7 +2110,7 @@ const NewShipmentTable = ({
     });
 
     // Apply non-table sorting - use stored order if available (one-time sort)
-    if (nonTableSortedRowOrder && nonTableSortedRowOrder.length > 0) {
+    if (nonTableSortedRowOrder && nonTableSortedRowOrder.length > 0 && doiFilter?.popularFilter !== 'bestSellers') {
       // Create a map of row ID to row for quick lookup
       const rowMap = new Map(result.map(row => [row.id, row]));
       
@@ -1910,10 +2136,90 @@ const NewShipmentTable = ({
       result = orderedResult;
     }
 
+    // Best Sellers: show ONLY the specific top 10 products from last week's report
+    if (doiFilter?.popularFilter === 'bestSellers' && result.length > 0) {
+      console.log('[Best Sellers Filter] Total rows before filter:', result.length);
+      
+      // Helper functions to match product names and sizes
+      const pl = (r) => String(r.product || '').toLowerCase();
+      const sz = (r) => String(r.size || '').toLowerCase().replace(/\s/g, '');
+      
+      // Define the exact top 10 products from last week's report (in order)
+      const top10Matchers = [
+        { name: 'liquid plant food', size: '8oz', rank: 1 },
+        { name: 'indoor plant food', size: '8oz', rank: 2 },
+        { name: 'monstera plant food', size: '8oz', rank: 3 },
+        { name: 'christmas cactus fertilizer', size: '8oz', rank: 4 },
+        { name: 'fiddle leaf fig plant food', size: '8oz', rank: 5 },
+        { name: 'lemon tree fertilizer', size: '8oz', rank: 6 },
+        { name: 'cleankelp seaweed fertilizer', size: 'quart', rank: 7 },
+        { name: 'orchid fertilizer', size: '8oz', rank: 8 },
+        { name: 'silica gold', size: 'quart', rank: 9 },
+        { name: 'ph kit', size: '8ozkit', rank: 10 } // "8oz Kit" becomes "8ozkit" when spaces removed
+      ];
+      
+      // Match each product in the list to a rank (if it's in the top 10)
+      const matchedProducts = result.map((r) => {
+        const pName = pl(r);
+        const pSize = sz(r);
+        const match = top10Matchers.find(m => {
+          const nameMatch = pName.includes(m.name);
+          const sizeMatch = pSize.includes(m.size) || pSize === m.size;
+          return nameMatch && sizeMatch;
+        });
+        return { row: r, rank: match ? match.rank : null };
+      }).filter(item => item.rank !== null); // Only keep top 10 products
+      
+      // Sort by rank (1, 2, 3, ...)
+      matchedProducts.sort((a, b) => a.rank - b.rank);
+      
+      const top10 = matchedProducts.map(item => item.row);
+      console.log('[Best Sellers Filter] Matched ' + top10.length + ' products:', top10.map(r => ({ product: r.product, size: r.size })));
+      
+      // Log which matchers didn't find a match
+      const matchedRanks = new Set(matchedProducts.map(m => m.rank));
+      const missingMatchers = top10Matchers.filter(m => !matchedRanks.has(m.rank));
+      if (missingMatchers.length > 0) {
+        console.log('[Best Sellers Filter] Missing products:', missingMatchers.map(m => ({ name: m.name, size: m.size, rank: m.rank })));
+      }
+      
+      result = top10;
+    }
+
     return result;
   }, [filteredRowsWithSelection, nonTableFilters, nonTableSortedRowOrder, tableMode, account, addedRows]);
 
-  const currentRows = tableMode ? filteredRowsWithSelection : nonTableFilteredRows;
+  // When Best Sellers is active, always use nonTableFilteredRows (sorted); otherwise table mode uses filteredRowsWithSelection
+  const currentRows = (tableMode && nonTableFilters.doiDays?.popularFilter !== 'bestSellers')
+    ? filteredRowsWithSelection
+    : nonTableFilteredRows;
+
+  // "BEST SELLER" badge: only for Liquid Plant Food 8oz and Indoor Plant Food 8oz (per last week's report)
+  const topSellerIds = useMemo(() => {
+    if (!filteredRowsWithSelection || filteredRowsWithSelection.length === 0) return new Set();
+    const productLower = (r) => String(r.product || '').toLowerCase();
+    const sizeStr = (r) => String(r.size || '').toLowerCase().replace(/\s/g, '');
+    const isLiquidPlantFood8oz = (r) => productLower(r).includes('liquid plant food') && (sizeStr(r).includes('8oz') || sizeStr(r) === '8oz');
+    const isIndoorPlantFood8oz = (r) => productLower(r).includes('indoor plant food') && (sizeStr(r).includes('8oz') || sizeStr(r) === '8oz');
+    const isTopTwoProduct = (r) => isLiquidPlantFood8oz(r) || isIndoorPlantFood8oz(r);
+    const candidates = filteredRowsWithSelection.filter((r) => {
+      if (!isTopTwoProduct(r)) return false;
+      const s30 = Number(r.sales30Day ?? r.sales_30_day ?? r.units_sold_30_days ?? 0) || 0;
+      const s7 = Number(r.sales7Day ?? r.sales_7_day ?? r.units_sold_7_days ?? 0) || 0;
+      return s30 > 0 || s7 > 0;
+    });
+    const sorted = [...candidates].sort((a, b) => {
+      const a7 = Number(a.sales7Day ?? a.sales_7_day ?? a.units_sold_7_days ?? 0) || 0;
+      const b7 = Number(b.sales7Day ?? b.sales_7_day ?? b.units_sold_7_days ?? 0) || 0;
+      if (b7 !== a7) return b7 - a7;
+      const a30 = Number(a.sales30Day ?? a.sales_30_day ?? a.units_sold_30_days ?? 0) || 0;
+      const b30 = Number(b.sales30Day ?? b.sales_30_day ?? b.units_sold_30_days ?? 0) || 0;
+      if (b30 !== a30) return b30 - a30;
+      return String(a.product || '').localeCompare(String(b.product || ''));
+    });
+    const topN = Math.min(2, sorted.length);
+    return new Set(sorted.slice(0, topN).map((r) => r.id).filter(Boolean));
+  }, [filteredRowsWithSelection]);
 
   // Ensure Units to Make inputs always default to forecast values when empty.
   // This runs for both table and non-table modes and initializes qtyValues
@@ -2616,11 +2922,12 @@ const NewShipmentTable = ({
     headerBg: 'bg-[#2C3544]',
   };
 
-  // Helper function to get DOI color
+  // Helper: DOI number color by days — 0-54 red, 55-89 orange, 90+ green
   const getDoiColor = (doiValue) => {
-    if (doiValue < 30) return '#EF4444'; // Red
-    if (doiValue < 60) return '#F97316'; // Orange
-    return '#10B981'; // Green
+    const n = Number(doiValue) || 0;
+    if (n < 55) return '#EF4444'; // Red
+    if (n < 90) return '#F97316'; // Orange
+    return '#22C55E'; // Green
   };
 
   if (!tableMode) {
@@ -2639,6 +2946,10 @@ const NewShipmentTable = ({
             background-color: #1D2933 !important;
           }
           .non-table-row:hover .pencil-icon-hover {
+            opacity: 1 !important;
+            pointer-events: auto !important;
+          }
+          .non-table-row:hover .analyze-icon-hover {
             opacity: 1 !important;
             pointer-events: auto !important;
           }
@@ -2735,7 +3046,7 @@ const NewShipmentTable = ({
                 color: (hasNonTableActiveFilter('fbaAvailable') || nonTableOpenFilterColumn === 'fbaAvailable') ? '#3B82F6' : (isDarkMode ? '#FFFFFF' : '#111827'), 
                 textAlign: 'center', 
                 paddingLeft: '16px', 
-                marginLeft: '-95px',
+                marginLeft: '-260px',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '8px',
@@ -2790,7 +3101,7 @@ const NewShipmentTable = ({
                 color: (hasNonTableActiveFilter('unitsToMake') || nonTableOpenFilterColumn === 'unitsToMake') ? '#3B82F6' : (isDarkMode ? '#FFFFFF' : '#111827'), 
                 textAlign: 'center', 
                 paddingLeft: '16px', 
-                marginLeft: '-95px',
+                marginLeft: '-260px',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '8px',
@@ -2845,50 +3156,128 @@ const NewShipmentTable = ({
                 color: (hasNonTableActiveFilter('doiDays') || nonTableOpenFilterColumn === 'doiDays') ? '#3B82F6' : (isDarkMode ? '#FFFFFF' : '#111827'), 
                 textAlign: 'center', 
                 paddingLeft: '16px', 
-                marginLeft: '-95px',
-                display: 'inline-flex',
+                marginLeft: '-275px',
+                display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
-                gap: '8px',
+                gap: '6px',
                 position: 'relative'
               }}
             >
-              <span>DOI (DAYS)</span>
-              {hasNonTableActiveFilter('doiDays') && (
-                <span style={{ 
-                  display: 'inline-block',
-                  width: '6px', 
-                  height: '6px', 
-                  borderRadius: '50%', 
-                  backgroundColor: '#10B981',
-                }} />
-              )}
-              <img
-                ref={(el) => {
-                  if (el) nonTableFilterIconRefs.current['doiDays'] = el;
-                }}
-                src="/assets/Vector (1).png"
-                alt="Filter"
-                className={`w-3 h-3 transition-opacity cursor-pointer ${
-                  hasNonTableActiveFilter('doiDays') || nonTableOpenFilterColumn === 'doiDays'
-                    ? 'opacity-100'
-                    : 'opacity-0 group-hover:opacity-100'
-                }`}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setNonTableOpenFilterColumn(prev => prev === 'doiDays' ? null : 'doiDays');
-                }}
-                style={{
-                  width: '12px',
-                  height: '12px',
-                  ...(hasNonTableActiveFilter('doiDays') || nonTableOpenFilterColumn === 'doiDays'
-                    ? {
-                        filter:
-                          'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
-                      }
-                    : undefined)
-                }}
-              />
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginLeft: '-130px' }}>
+                <span>DAYS OF INVENTORY</span>
+                {hasNonTableActiveFilter('doiDays') && (
+                  <span style={{ 
+                    display: 'inline-block',
+                    width: '6px', 
+                    height: '6px', 
+                    borderRadius: '50%', 
+                    backgroundColor: '#10B981',
+                  }} />
+                )}
+                <img
+                  ref={(el) => {
+                    if (el) nonTableFilterIconRefs.current['doiDays'] = el;
+                  }}
+                  src="/assets/Vector (1).png"
+                  alt="Filter"
+                  className={`w-3 h-3 transition-opacity cursor-pointer ${
+                    hasNonTableActiveFilter('doiDays') || nonTableOpenFilterColumn === 'doiDays'
+                      ? 'opacity-100'
+                      : 'opacity-0 group-hover:opacity-100'
+                  }`}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setNonTableOpenFilterColumn(prev => prev === 'doiDays' ? null : 'doiDays');
+                  }}
+                  style={{
+                    width: '12px',
+                    height: '12px',
+                    ...(hasNonTableActiveFilter('doiDays') || nonTableOpenFilterColumn === 'doiDays'
+                      ? {
+                          filter:
+                            'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
+                        }
+                      : undefined)
+                  }}
+                />
+              </div>
+              {/* Legend: FBA AVAILABLE (green) + toggle, TOTAL INVENTORY / DOI (blue) + toggle */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '10px', fontWeight: 500, textTransform: 'uppercase', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginLeft: '-160px' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: '#22C55E', flexShrink: 0 }} />
+                  FBA AVAILABLE
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setShowFbaBar((prev) => !prev); }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    style={{
+                      width: '28px',
+                      height: '16px',
+                      borderRadius: '8px',
+                      backgroundColor: showFbaBar ? '#3B82F6' : (isDarkMode ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.1)'),
+                      border: 'none',
+                      cursor: 'pointer',
+                      position: 'relative',
+                      transition: 'background-color 0.2s',
+                      padding: 0,
+                      flexShrink: 0,
+                    }}
+                    aria-label="Show FBA bar"
+                  >
+                    <div
+                      style={{
+                        width: '12px',
+                        height: '12px',
+                        borderRadius: '50%',
+                        backgroundColor: '#FFFFFF',
+                        position: 'absolute',
+                        top: '2px',
+                        left: showFbaBar ? '14px' : '2px',
+                        transition: 'left 0.2s',
+                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.2)',
+                      }}
+                    />
+                  </button>
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: '#3B82F6', flexShrink: 0 }} />
+                  TOTAL INVENTORY
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setShowDoiBar((prev) => !prev); }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    style={{
+                      width: '28px',
+                      height: '16px',
+                      borderRadius: '8px',
+                      backgroundColor: showDoiBar ? '#3B82F6' : (isDarkMode ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.1)'),
+                      border: 'none',
+                      cursor: 'pointer',
+                      position: 'relative',
+                      transition: 'background-color 0.2s',
+                      padding: 0,
+                      flexShrink: 0,
+                    }}
+                    aria-label="Show DOI bar"
+                  >
+                    <div
+                      style={{
+                        width: '12px',
+                        height: '12px',
+                        borderRadius: '50%',
+                        backgroundColor: '#FFFFFF',
+                        position: 'absolute',
+                        top: '2px',
+                        left: showDoiBar ? '14px' : '2px',
+                        transition: 'left 0.2s',
+                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.2)',
+                      }}
+                    />
+                  </button>
+                </span>
+              </div>
             </div>
           </div>
 
@@ -2898,6 +3287,9 @@ const NewShipmentTable = ({
               const index = row._originalIndex;
               const effectiveAddedRows = addedRows;
               const doiValue = row.doiTotal || row.daysOfInventory || 0;
+              const isAdded = effectiveAddedRows.has(row.id);
+              // When added, show DOI from settings (forecastRange) so bar fills and number matches DOI settings
+              const displayDoi = isAdded ? (Number(forecastRange) || 120) : doiValue;
               const doiColor = getDoiColor(doiValue);
               const asin = row.asin || row.child_asin || row.childAsin || '';
               
@@ -3002,6 +3394,8 @@ const NewShipmentTable = ({
                     display: 'grid',
                     gridTemplateColumns: '1fr 140px 220px 140px',
                     height: '66px',
+                    minHeight: '66px',
+                    maxHeight: '66px',
                     padding: '8px 16px',
                     backgroundColor: (() => {
                       if (isSelected) {
@@ -3055,19 +3449,39 @@ const NewShipmentTable = ({
                     
                     {/* Product Info */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: 0 }}>
-                      {/* Product Name */}
-                      <span 
-                        style={{ 
-                          fontSize: '14px', 
-                          fontWeight: 500, 
-                          color: isDarkMode ? '#F9FAFB' : '#111827',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
-                        {row.product}
-                      </span>
+                      {/* Product Name + Best Seller badge */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span 
+                          style={{ 
+                            fontSize: '14px', 
+                            fontWeight: 500, 
+                            color: isDarkMode ? '#F9FAFB' : '#111827',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {row.product}
+                        </span>
+                        {topSellerIds.has(row.id) && (
+                          <span
+                            style={{
+                              fontSize: '9px',
+                              fontWeight: 700,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.02em',
+                              color: '#B45309',
+                              backgroundColor: '#FEF3C7',
+                              padding: '2px 6px',
+                              borderRadius: '6px',
+                              flexShrink: 0,
+                            }}
+                            title="Top 2 by 7-day (last week) & 30-day sales"
+                          >
+                            Best Seller
+                          </span>
+                        )}
+                      </div>
                       
                       {/* Product ID and Brand/Size on same line */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px', flexWrap: 'wrap' }}>
@@ -3163,13 +3577,18 @@ const NewShipmentTable = ({
                     </div>
                   </div>
 
-                  {/* INVENTORY Column */}
-                  <div style={{ textAlign: 'center', fontSize: '14px', fontWeight: 500, color: isDarkMode ? '#F9FAFB' : '#111827', paddingLeft: '16px', marginLeft: '-220px', marginRight: '20px' }}>
-                    {(row.totalInventory || 0).toLocaleString()}
-                  </div>
+                  {/* INVENTORY Column (number in white; SOLD OUT / NO SALES HISTORY shown in DOI bar) */}
+                  {(() => {
+                    const totalInv = Number(row.totalInventory) || 0;
+                    return (
+                      <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '6px', fontSize: '14px', fontWeight: 500, color: isDarkMode ? '#FFFFFF' : '#111827', paddingLeft: '16px', marginLeft: '-240px', marginRight: '20px', minWidth: '140px' }}>
+                        {totalInv.toLocaleString()}
+                      </div>
+                    );
+                  })()}
 
-                  {/* UNITS TO MAKE Column */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', paddingLeft: '16px', marginLeft: '-220px', marginRight: '20px', position: 'relative' }}>
+                  {/* UNITS TO MAKE Column - match header: same padding so content aligns under header */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '8px', paddingLeft: '16px', marginLeft: '-300px', marginRight: '20px', position: 'relative', minWidth: '220px' }}>
                     {/* Label warning icon - shown when QTY exceeds labels, positioned on the left */}
                     {(() => {
                       const labelsAvailable = getAvailableLabelsForRow(row, index);
@@ -3190,7 +3609,7 @@ const NewShipmentTable = ({
                               onMouseLeave={() => setHoveredWarningIndex(null)}
                               style={{
                                 position: 'absolute',
-                                left: 'calc(50% - 107px)',
+                                left: 'calc(50% - 257px)',
                                 top: '50%',
                                 transform: 'translateY(-50%)',
                                 display: 'inline-flex',
@@ -3214,7 +3633,7 @@ const NewShipmentTable = ({
                               <div
                                 style={{
                                   position: 'absolute',
-                                  left: 'calc(50% - 162px)', // 55px to the left of the warning icon
+                                  left: 'calc(50% - 312px)', // 55px to the left of the warning icon
                                   top: '50%',
                                   transform: 'translateY(calc(-50% - 30px))',
                                   backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
@@ -3678,15 +4097,179 @@ const NewShipmentTable = ({
                     )}
                   </div>
 
-                  {/* DOI (DAYS) Column */}
+                  {/* DOI (DAYS) Column - fixed height so FBA bar doesn't move row; no overflow hidden so bars aren't cut */}
                   <div 
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingLeft: '16px', marginLeft: '-220px', marginRight: '20px', position: 'relative' }}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingLeft: '16px', marginLeft: '-275px', marginRight: '20px', position: 'relative', height: '100%', minHeight: 0 }}
                   >
-                    <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '24px', fontWeight: 500, color: doiColor, height: '32px', display: 'flex', alignItems: 'center' }}>
-                        {doiValue}
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: (showFbaBar && showDoiBar) ? '1px' : 0, position: 'relative', minHeight: 0 }}>
+                      {/* FBA Available bar - shown when toggle is on; shows FBA vs needed to reach 30-day DOI goal */}
+                      {showFbaBar && (() => {
+                        const fbaDays = Number(row.doiFba ?? row.doi_fba ?? 0);
+                        const baseWidth = 100;
+                        const maxDaysForBar = 100;
+                        const daysForWidth = Math.min(maxDaysForBar, fbaDays);
+                        const fbaBarWidth = daysForWidth <= 30 ? baseWidth : Math.round(baseWidth * (daysForWidth / 30));
+                        const fbaPct = fbaDays <= 30 ? (fbaDays / 30) * 100 : 100;
+                        const showFbaWarning = fbaDays < 30;
+                        return (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative', minHeight: '20px', width: '450px', flexShrink: 0, boxSizing: 'border-box' }}>
+                            {/* FBA bar: 30 days = 100px; extends up to 100 days */}
+                            <div
+                              style={{
+                                position: 'absolute',
+                                left: '-50px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                width: `${fbaBarWidth}px`,
+                                height: '20px',
+                                borderRadius: '6px',
+                                overflow: 'visible',
+                                boxShadow: isDarkMode ? '0 1px 2px rgba(0,0,0,0.2)' : '0 1px 2px rgba(0,0,0,0.08)',
+                              }}
+                            >
+                              <div style={{ display: 'flex', width: '100%', height: '100%', borderRadius: '6px', overflow: 'hidden' }}>
+                                <BarFill widthPct={fbaPct} backgroundColor="#22C55E" />
+                                <div style={{ flex: 1, height: '100%', backgroundColor: '#DCE8DA', minWidth: 0 }} />
+                              </div>
+                              {showFbaWarning && (
+                                <img
+                                  src="/assets/zxcvb.png"
+                                  alt="Low FBA"
+                                  title="Low FBA days – below 30-day goal"
+                                  style={{
+                                    position: 'absolute',
+                                    left: '4px',
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    width: '14px',
+                                    height: '14px',
+                                    objectFit: 'contain',
+                                    zIndex: 2,
+                                    pointerEvents: 'none',
+                                  }}
+                                />
+                              )}
+                            </div>
+                            <div style={{ width: `${fbaBarWidth}px`, flexShrink: 0, marginLeft: '-20px' }} aria-hidden />
+                            <span style={{ fontSize: '18px', fontWeight: 600, color: fbaDays >= 30 ? '#22C55E' : fbaDays >= 20 ? '#F97316' : '#EF4444', minWidth: 'fit-content', marginLeft: '-29px' }}>
+                              {Math.round(fbaDays)}
+                            </span>
+                            {/* Placeholder so row width matches DOI row (pencil + gap) for alignment */}
+                            <div style={{ width: '26px', flexShrink: 0 }} aria-hidden />
+                          </div>
+                        );
+                      })()}
+                      {/* When both toggles off: show only DOI number centered in column */}
+                      {!showFbaBar && !showDoiBar && (
+                        <span style={{ fontSize: '20px', fontWeight: 500, color: getDoiColor(displayDoi), height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 'fit-content' }}>
+                          {displayDoi}
+                        </span>
+                      )}
+                      {/* DOI bar row: only render when showDoiBar (bar + number); marginTop when FBA bar also shown */}
+                      {showDoiBar && (
+                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', position: 'relative', minHeight: '32px', width: '450px', flexShrink: 0, boxSizing: 'border-box', marginTop: showFbaBar ? '-6px' : 0 }}>
+                      {/* Bar: fixed position so 2- vs 3-digit number doesn't move it */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: '-50px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          width: '333px',
+                          height: '20px',
+                          borderRadius: '6px',
+                          overflow: 'visible',
+                          boxShadow: isDarkMode ? '0 1px 2px rgba(0,0,0,0.3)' : '0 1px 2px rgba(0,0,0,0.1)',
+                        }}
+                        aria-hidden
+                      >
+                        <div style={{ display: 'flex', width: '100%', height: '100%', borderRadius: '6px', overflow: 'hidden' }}>
+                          <BarFill
+                            widthPct={Math.min(100, (Number(displayDoi) / 100) * 100)}
+                            backgroundColor="#3399FF"
+                          />
+                          <div
+                            style={{
+                              flex: 1,
+                              height: '100%',
+                              backgroundColor: '#ADD8E6',
+                              minWidth: 0,
+                            }}
+                          />
+                        </div>
+                        {(() => {
+                          const totalInv = Number(row.totalInventory) || 0;
+                          const hasSalesHistory = (Number(row.sales30Day) || Number(row.sales7Day) || 0) > 0;
+                          const showSoldOutInBar = totalInv === 0 && hasSalesHistory;
+                          const showNoSalesHistoryInBar = totalInv === 0 && !hasSalesHistory;
+                          const barLabel = showSoldOutInBar ? 'SOLD OUT' : showNoSalesHistoryInBar ? 'NO SALES HISTORY' : null;
+                          return barLabel ? (
+                            <span
+                              style={{
+                                position: 'absolute',
+                                left: 0,
+                                right: 0,
+                                top: 0,
+                                bottom: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: showNoSalesHistoryInBar ? '9px' : '11px',
+                                fontWeight: 700,
+                                color: '#EF4444',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.02em',
+                                pointerEvents: 'none',
+                                zIndex: 3,
+                                textShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                              }}
+                            >
+                              {barLabel}
+                            </span>
+                          ) : null;
+                        })()}
+                        {Number(doiValue) < 30 && (
+                          <img
+                            src="/assets/zxcvb.png"
+                            alt="At risk"
+                            title="Low DOI – product at risk"
+                            style={{
+                              position: 'absolute',
+                              left: '6px',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              width: '14px',
+                              height: '14px',
+                              objectFit: 'contain',
+                              zIndex: 2,
+                              pointerEvents: 'none',
+                            }}
+                          />
+                        )}
+                      </div>
+                      {/* Spacer: reserves bar width; -127px shifts number (3px right of -130) */}
+                      <div style={{ width: '333px', flexShrink: 0, marginLeft: '-127px' }} aria-hidden />
+                      <span style={{ fontSize: showFbaBar ? '18px' : '20px', fontWeight: 500, color: getDoiColor(displayDoi), height: '32px', display: 'flex', alignItems: 'center', gap: '2px', minWidth: 'fit-content', marginLeft: '-25px' }}>
+                        {displayDoi}
                       </span>
-                      {/* Pencil Icon - Always reserve space to prevent DOI number from shifting, uses pure CSS hover for instant appearance */}
+                      {/* Spacer where pencil was - keeps DOI number position when pencil is in icon group */}
+                      <div style={{ width: '16px', flexShrink: 0 }} aria-hidden />
+                      </div>
+                      )}
+                    </div>
+                    {/* Icon group: pencil + analyze, aligned at right and vertically centered (aligns with ngoos when FBA bar shown) */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        right: 0,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        flexShrink: 0,
+                      }}
+                    >
                       <img
                         src="/assets/pencil.png"
                         alt="Edit Settings"
@@ -3694,7 +4277,6 @@ const NewShipmentTable = ({
                         data-pencil-active={(hasCustomDoiSettings || hasCustomForecastSettings) ? 'true' : 'false'}
                         onClick={(e) => {
                           e.stopPropagation();
-                          // Always open forecast settings modal
                           onProductClick(row, false, true);
                         }}
                         style={{
@@ -3702,47 +4284,48 @@ const NewShipmentTable = ({
                           height: '16px',
                           cursor: 'pointer',
                           opacity: shouldShowPencilPermanently ? 1 : 0,
-                          flexShrink: 0,
                           transition: 'none',
-                          // Blue when there are custom settings (active), gray otherwise.
                           filter: isPencilActive
-                            ? 'brightness(0) saturate(100%) invert(47%) sepia(98%) saturate(2476%) hue-rotate(209deg) brightness(100%) contrast(101%)' // Blue #3B82F6
-                            : 'brightness(0) saturate(100%) invert(50%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(95%) contrast(90%)', // Gray
+                            ? 'brightness(0) saturate(100%) invert(47%) sepia(98%) saturate(2476%) hue-rotate(209deg) brightness(100%) contrast(101%)'
+                            : 'brightness(0) saturate(100%) invert(50%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(95%) contrast(90%)',
                           pointerEvents: shouldShowPencilPermanently ? 'auto' : 'none',
                         }}
                       />
+                      <span
+                        className="analyze-icon-hover"
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onProductClick(row);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onProductClick(row);
+                          }
+                        }}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '28px',
+                          height: '28px',
+                          cursor: 'pointer',
+                          opacity: 0,
+                          pointerEvents: 'none',
+                          transition: 'none',
+                          color: 'inherit',
+                          filter: 'brightness(0) saturate(100%) invert(50%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(95%) contrast(90%)',
+                        }}
+                        aria-label="Analyze"
+                      >
+                        <svg width="22" height="22" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M2.33333 10.5L5.25 7.58333L7.58333 9.91667L11.6667 5.83333M11.6667 5.83333V9.33333M11.6667 5.83333H8.16667" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </span>
                     </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onProductClick(row);
-                      }}
-                      style={{
-                        width: '86px',
-                        height: '24px',
-                        padding: '4px 8px',
-                        borderRadius: '6px',
-                        border: 'none',
-                        backgroundColor: '#9333EA',
-                        color: '#FFFFFF',
-                        fontSize: '12px',
-                        fontWeight: 500,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '10px',
-                        fontFamily: 'sans-serif',
-                        position: 'absolute',
-                        right: 0,
-                        boxSizing: 'border-box'
-                      }}
-                    >
-                      <svg width="18" height="18" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginTop: '-4px' }}>
-                        <path d="M2.33333 10.5L5.25 7.58333L7.58333 9.91667L11.6667 5.83333M11.6667 5.83333V9.33333M11.6667 5.83333H8.16667" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                      Analyze
-                    </button>
                   </div>
                 </div>
               );
@@ -3776,56 +4359,6 @@ const NewShipmentTable = ({
             />
           );
         })}
-
-        {/* Filter status indicator */}
-        {(activeFilters.popularFilter || activeFilters.sortField || activeFilters.filterField) && (
-          <div
-            style={{
-              padding: '0.5rem 1.5rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              backgroundColor: '#EFF6FF',
-              borderBottom: '1px solid #BFDBFE',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '0.875rem', color: '#1D4ED8', fontWeight: 500 }}>
-                🔍 Showing {currentRows.length} of {rows.length} products
-              </span>
-              {activeFilters.popularFilter && (
-                <span style={{ 
-                  fontSize: '0.75rem', 
-                  backgroundColor: '#3B82F6', 
-                  color: 'white', 
-                  padding: '2px 8px', 
-                  borderRadius: '12px' 
-                }}>
-                  {activeFilters.popularFilter === 'bestSellers' && 'Best Sellers'}
-                  {activeFilters.popularFilter === 'fastestMovers' && 'Fastest Movers'}
-                  {activeFilters.popularFilter === 'topProfit' && 'Top Profit'}
-                  {activeFilters.popularFilter === 'topTraffic' && 'Top Traffic'}
-                  {activeFilters.popularFilter === 'outOfStock' && 'Out of Stock'}
-                  {activeFilters.popularFilter === 'overstock' && 'Overstock'}
-                </span>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={handleFilterReset}
-              style={{
-                fontSize: '0.75rem',
-                color: '#3B82F6',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                textDecoration: 'underline',
-              }}
-            >
-              Clear filters
-            </button>
-          </div>
-        )}
 
         {/* Filter Modals */}
         {['normal-0', 'normal-1', 'normal-2', 'normal-3', 'normal-4'].map((filterKey) => (
@@ -4044,6 +4577,7 @@ const NewShipmentTable = ({
               availableValues={getNonTableColumnValues(nonTableOpenFilterColumn)}
               currentFilter={nonTableFilters[nonTableOpenFilterColumn] || {}}
               currentSort={nonTableSortField === nonTableOpenFilterColumn ? nonTableSortOrder : ''}
+              currentSortByFba={nonTableOpenFilterColumn === 'doiDays' && nonTableSortField === 'fbaAvailable' ? nonTableSortOrder : ''}
               onApply={(filterData) => handleNonTableApplyFilter(nonTableOpenFilterColumn, filterData)}
               onClose={() => setNonTableOpenFilterColumn(null)}
               account={account}
@@ -4091,136 +4625,46 @@ const NewShipmentTable = ({
           }}
         >
           <div style={{ display: 'flex', gap: '48px', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-              <span style={{
-                fontSize: '12px',
-                fontWeight: 400,
-                color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-                textAlign: 'center',
-              }}>
-                PALETTES
-              </span>
-              <span style={{
-                fontSize: '18px',
-                fontWeight: 700,
-                color: isDarkMode ? '#FFFFFF' : '#000000',
-                textAlign: 'center',
-              }}>
-                {totalPalettes.toFixed(2)}
-              </span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-              <span style={{
-                fontSize: '12px',
-                fontWeight: 400,
-                color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-                textAlign: 'center',
-              }}>
-                PRODUCTS
-              </span>
-              <span style={{
-                fontSize: '18px',
-                fontWeight: 700,
-                color: isDarkMode ? '#FFFFFF' : '#000000',
-                textAlign: 'center',
-              }}>
-                {totalProducts}
-              </span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-              <span style={{
-                fontSize: '12px',
-                fontWeight: 400,
-                color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-                textAlign: 'center',
-              }}>
-                BOXES
-              </span>
-              <span style={{
-                fontSize: '18px',
-                fontWeight: 700,
-                color: isDarkMode ? '#FFFFFF' : '#000000',
-                textAlign: 'center',
-              }}>
-                {Math.ceil(totalBoxes).toLocaleString()}
-              </span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-              <span style={{
-                fontSize: '12px',
-                fontWeight: 400,
-                color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-                textAlign: 'center',
-              }}>
-                UNITS
-              </span>
-              <span style={{
-                fontSize: '18px',
-                fontWeight: 700,
-                color: isDarkMode ? '#FFFFFF' : '#000000',
-                textAlign: 'center',
-              }}>
-                {totalUnits.toLocaleString()}
-              </span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-              <span style={{
-                fontSize: '12px',
-                fontWeight: 400,
-                color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-                textAlign: 'center',
-                whiteSpace: 'nowrap',
-              }}>
-                TIME (HRS)
-              </span>
-              <span style={{
-                fontSize: '18px',
-                fontWeight: 700,
-                color: isDarkMode ? '#FFFFFF' : '#000000',
-                textAlign: 'center',
-              }}>
-                {totalTimeHours.toFixed(2)}
-              </span>
-            </div>
-            {totalWeightLbs > 0 && (
+            {footerStatsVisibility.palettes && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                <span style={{
-                  fontSize: '12px',
-                  fontWeight: 400,
-                  color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-                  textAlign: 'center',
-                  whiteSpace: 'nowrap',
-                }}>
-                  WEIGHT (LBS)
-                </span>
-                <span style={{
-                  fontSize: '18px',
-                  fontWeight: 700,
-                  color: isDarkMode ? '#FFFFFF' : '#000000',
-                  textAlign: 'center',
-                }}>
-                  {Math.round(totalWeightLbs).toLocaleString()}
-                </span>
+                <span style={{ fontSize: '12px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#9CA3AF', textAlign: 'center' }}>PALETTES</span>
+                <span style={{ fontSize: '18px', fontWeight: 700, color: isDarkMode ? '#FFFFFF' : '#000000', textAlign: 'center' }}>{totalPalettes.toFixed(2)}</span>
               </div>
             )}
-            {totalFormulas > 0 && (
+            {footerStatsVisibility.products && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                <span style={{
-                  fontSize: '12px',
-                  fontWeight: 400,
-                  color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-                  textAlign: 'center',
-                }}>
-                  FORMULAS
-                </span>
-                <span style={{
-                  fontSize: '18px',
-                  fontWeight: 700,
-                  color: isDarkMode ? '#FFFFFF' : '#000000',
-                  textAlign: 'center',
-                }}>
-                  {totalFormulas}
-                </span>
+                <span style={{ fontSize: '12px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#9CA3AF', textAlign: 'center' }}>PRODUCTS</span>
+                <span style={{ fontSize: '18px', fontWeight: 700, color: isDarkMode ? '#FFFFFF' : '#000000', textAlign: 'center' }}>{totalProducts}</span>
+              </div>
+            )}
+            {footerStatsVisibility.boxes && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#9CA3AF', textAlign: 'center' }}>BOXES</span>
+                <span style={{ fontSize: '18px', fontWeight: 700, color: isDarkMode ? '#FFFFFF' : '#000000', textAlign: 'center' }}>{Math.ceil(totalBoxes).toLocaleString()}</span>
+              </div>
+            )}
+            {footerStatsVisibility.units && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#9CA3AF', textAlign: 'center' }}>UNITS</span>
+                <span style={{ fontSize: '18px', fontWeight: 700, color: isDarkMode ? '#FFFFFF' : '#000000', textAlign: 'center' }}>{totalUnits.toLocaleString()}</span>
+              </div>
+            )}
+            {footerStatsVisibility.timeHours && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#9CA3AF', textAlign: 'center', whiteSpace: 'nowrap' }}>TIME (HRS)</span>
+                <span style={{ fontSize: '18px', fontWeight: 700, color: isDarkMode ? '#FFFFFF' : '#000000', textAlign: 'center' }}>{totalTimeHours.toFixed(2)}</span>
+              </div>
+            )}
+            {footerStatsVisibility.weightLbs && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#9CA3AF', textAlign: 'center', whiteSpace: 'nowrap' }}>WEIGHT (LBS)</span>
+                <span style={{ fontSize: '18px', fontWeight: 700, color: isDarkMode ? '#FFFFFF' : '#000000', textAlign: 'center' }}>{Math.round(totalWeightLbs).toLocaleString()}</span>
+              </div>
+            )}
+            {footerStatsVisibility.formulas && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#9CA3AF', textAlign: 'center' }}>FORMULAS</span>
+                <span style={{ fontSize: '18px', fontWeight: 700, color: isDarkMode ? '#FFFFFF' : '#000000', textAlign: 'center' }}>{totalFormulas}</span>
               </div>
             )}
           </div>
@@ -4256,43 +4700,160 @@ const NewShipmentTable = ({
                 </button>
               )}
               {onExport && (
-                <button
-                  type="button"
-                  onClick={onExport}
-                  style={{
-                    height: '31px',
-                    padding: '0 10px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: (addedRows && addedRows.size > 0) ? '#3B82F6' : '#9CA3AF',
-                    color: '#FFFFFF',
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    cursor: (addedRows && addedRows.size > 0) ? 'pointer' : 'not-allowed',
-                    transition: 'background-color 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (addedRows && addedRows.size > 0) {
-                      e.currentTarget.style.backgroundColor = '#2563EB';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (addedRows && addedRows.size > 0) {
-                      e.currentTarget.style.backgroundColor = '#3B82F6';
-                    } else {
-                      e.currentTarget.style.backgroundColor = '#9CA3AF';
-                    }
-                  }}
-                >
-                  Export for Upload
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={onExport}
+                    style={{
+                      height: '31px',
+                      padding: '0 10px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      backgroundColor: (addedRows && addedRows.size > 0) ? '#3B82F6' : '#9CA3AF',
+                      color: '#FFFFFF',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      cursor: (addedRows && addedRows.size > 0) ? 'pointer' : 'not-allowed',
+                      transition: 'background-color 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (addedRows && addedRows.size > 0) {
+                        e.currentTarget.style.backgroundColor = '#2563EB';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (addedRows && addedRows.size > 0) {
+                        e.currentTarget.style.backgroundColor = '#3B82F6';
+                      } else {
+                        e.currentTarget.style.backgroundColor = '#9CA3AF';
+                      }
+                    }}
+                  >
+                    Export for Upload
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Shipment stats"
+                    data-shipment-stats-trigger
+                    onClick={() => setShipmentStatsMenuOpen((prev) => !prev)}
+                    style={{
+                      padding: '4px',
+                      border: 'none',
+                      borderRadius: '4px',
+                      backgroundColor: 'transparent',
+                      color: shipmentStatsMenuOpen ? '#3B82F6' : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+                      fontSize: '1.25rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'color 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!shipmentStatsMenuOpen) e.currentTarget.style.color = isDarkMode ? '#D1D5DB' : '#4B5563';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!shipmentStatsMenuOpen) e.currentTarget.style.color = isDarkMode ? '#9CA3AF' : '#6B7280';
+                    }}
+                  >
+                    ⋮
+                  </button>
+                </>
               )}
             </div>
           )}
         </div>
+
+        {/* Shipment Stats popup - above footer */}
+        {shipmentStatsMenuOpen && (
+          <div
+            ref={shipmentStatsPopupRef}
+            style={{
+              position: 'fixed',
+              bottom: '96px',
+              left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2 + 350px)`,
+              transform: 'translateX(-50%)',
+              width: '204px',
+              minHeight: '264px',
+              maxHeight: '80vh',
+              backgroundColor: isDarkMode ? '#1F2937' : '#374151',
+              borderRadius: '8px',
+              boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+              border: `1px solid ${isDarkMode ? '#374151' : '#4B5563'}`,
+              zIndex: 1001,
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px', borderBottom: `1px solid ${isDarkMode ? '#374151' : '#4B5563'}` }}>
+              <span style={{ fontSize: '14px', fontWeight: 600, color: '#FFFFFF' }}>Shipment Stats</span>
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={() => setShipmentStatsMenuOpen(false)}
+                style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 4L4 12M4 4l8 8" /></svg>
+              </button>
+            </div>
+            <div style={{ padding: '8px', gap: '2px', display: 'flex', flexDirection: 'column', overflowY: 'auto', flex: 1, minHeight: 0 }}>
+              {[
+                { key: 'products', label: 'Products' },
+                { key: 'palettes', label: 'Palettes' },
+                { key: 'boxes', label: 'Boxes' },
+                { key: 'weightLbs', label: 'Weight (lbs)' },
+                { key: 'units', label: 'Units' },
+                { key: 'formulas', label: 'Formulas' },
+                { key: 'timeHours', label: 'Time (hrs)' },
+              ].map(({ key, label }) => (
+                <div
+                  key={key}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '2px',
+                    padding: '6px 8px',
+                  }}
+                >
+                  <span style={{ color: '#9CA3AF', cursor: 'grab', display: 'flex' }} aria-hidden>≡</span>
+                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                    <input
+                      type="checkbox"
+                      checked={!!footerStatsVisibility[key]}
+                      onChange={() => setFooterStatsVisibility((prev) => ({ ...prev, [key]: !prev[key] }))}
+                      style={{ position: 'absolute', opacity: 0, width: 0, height: 0, margin: 0, pointerEvents: 'none' }}
+                      aria-hidden
+                    />
+                    <span
+                      style={{
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '4px',
+                        border: '1px solid #6B7280',
+                        backgroundColor: footerStatsVisibility[key] ? '#3B82F6' : '#374151',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {footerStatsVisibility[key] && (
+                        <svg width="10" height="8" viewBox="0 0 10 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M1 4L4 7L9 1" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </span>
+                  </label>
+                  <span style={{ flex: 1, fontSize: '13px', color: '#FFFFFF' }}>{label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </>
     );
   }
@@ -5168,14 +5729,33 @@ const NewShipmentTable = ({
                   boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
                   borderTop: '1px solid #E5E7EB',
                 }}>
-                  <button
-                    type="button"
-                    onClick={() => onProductClick(row)}
-                    className="text-xs text-blue-500 hover:text-blue-600"
-                    style={{ textDecoration: 'underline', cursor: 'pointer', margin: '0 auto', display: 'block' }}
-                  >
-                    {row.product.length > 18 ? `${row.product.substring(0, 18)}...` : row.product}
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => onProductClick(row)}
+                      className="text-xs text-blue-500 hover:text-blue-600"
+                      style={{ textDecoration: 'underline', cursor: 'pointer' }}
+                    >
+                      {row.product.length > 18 ? `${row.product.substring(0, 18)}...` : row.product}
+                    </button>
+                    {topSellerIds.has(row.id) && (
+                      <span
+                        style={{
+                          fontSize: '9px',
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.02em',
+                          color: '#B45309',
+                          backgroundColor: '#FEF3C7',
+                          padding: '2px 6px',
+                          borderRadius: '6px',
+                        }}
+                        title="Top 2 by 7-day (last week) & 30-day sales"
+                      >
+                        Best Seller
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td style={{ 
                   padding: '0.65rem 1rem', 
@@ -5634,24 +6214,32 @@ const NewShipmentTable = ({
                   boxSizing: 'border-box',
                   borderTop: '1px solid #E5E7EB',
                   fontWeight: 600,
-                  color: '#A855F7', // Purple - matches FBA Avail. legend
+                  color: (() => {
+                    const fbaVal = Number(row.doiFba ?? row.doiTotal) || 0;
+                    return fbaVal >= 30 ? '#22C55E' : fbaVal >= 20 ? '#F97316' : '#EF4444';
+                  })(),
                 }}>
                   {row.doiFba || row.doiTotal || 0}
                 </td>
-                <td style={{ 
-                  padding: '12px 16px', 
-                  fontSize: '0.85rem', 
-                  textAlign: 'center', 
-                  width: '143px',
-                  height: '40px',
-                  verticalAlign: 'middle',
-                  boxSizing: 'border-box',
-                  borderTop: '1px solid #E5E7EB',
-                  fontWeight: 600,
-                  color: '#22C55E', // Green - matches Total Inv. legend
-                }}>
-                  {row.doiTotal || row.daysOfInventory || 0}
-                </td>
+                {(() => {
+                  const totalInv = Number(row.totalInventory ?? row.doiTotal ?? row.daysOfInventory) || 0;
+                  return (
+                    <td style={{ 
+                      padding: '12px 16px', 
+                      fontSize: '0.85rem', 
+                      textAlign: 'center', 
+                      width: '143px',
+                      height: '40px',
+                      verticalAlign: 'middle',
+                      boxSizing: 'border-box',
+                      borderTop: '1px solid #E5E7EB',
+                      fontWeight: 600,
+                      color: isDarkMode ? '#FFFFFF' : '#111827',
+                    }}>
+                      {(row.totalInventory ?? row.doiTotal ?? row.daysOfInventory ?? 0).toLocaleString()}
+                    </td>
+                  );
+                })()}
                 <td style={{ 
                   padding: '12px 16px', 
                   fontSize: '0.85rem', 
@@ -5862,136 +6450,46 @@ const NewShipmentTable = ({
         }}
       >
         <div style={{ display: 'flex', gap: '48px', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-            <span style={{
-              fontSize: '12px',
-              fontWeight: 400,
-              color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-              textAlign: 'center',
-            }}>
-              PALETTES
-            </span>
-            <span style={{
-              fontSize: '18px',
-              fontWeight: 700,
-              color: isDarkMode ? '#FFFFFF' : '#000000',
-              textAlign: 'center',
-            }}>
-              {totalPalettes.toFixed(2)}
-            </span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-            <span style={{
-              fontSize: '12px',
-              fontWeight: 400,
-              color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-              textAlign: 'center',
-            }}>
-              PRODUCTS
-            </span>
-            <span style={{
-              fontSize: '18px',
-              fontWeight: 700,
-              color: isDarkMode ? '#FFFFFF' : '#000000',
-              textAlign: 'center',
-            }}>
-              {totalProducts}
-            </span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-            <span style={{
-              fontSize: '12px',
-              fontWeight: 400,
-              color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-              textAlign: 'center',
-            }}>
-              BOXES
-            </span>
-            <span style={{
-              fontSize: '18px',
-              fontWeight: 700,
-              color: isDarkMode ? '#FFFFFF' : '#000000',
-              textAlign: 'center',
-            }}>
-              {Math.ceil(totalBoxes).toLocaleString()}
-            </span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-            <span style={{
-              fontSize: '12px',
-              fontWeight: 400,
-              color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-              textAlign: 'center',
-            }}>
-              UNITS
-            </span>
-            <span style={{
-              fontSize: '18px',
-              fontWeight: 700,
-              color: isDarkMode ? '#FFFFFF' : '#000000',
-              textAlign: 'center',
-            }}>
-              {totalUnits.toLocaleString()}
-            </span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-            <span style={{
-              fontSize: '12px',
-              fontWeight: 400,
-              color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-              textAlign: 'center',
-              whiteSpace: 'nowrap',
-            }}>
-              TIME (HRS)
-            </span>
-            <span style={{
-              fontSize: '18px',
-              fontWeight: 700,
-              color: isDarkMode ? '#FFFFFF' : '#000000',
-              textAlign: 'center',
-            }}>
-              {totalTimeHours.toFixed(2)}
-            </span>
-          </div>
-          {totalWeightLbs > 0 && (
+          {footerStatsVisibility.palettes && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-              <span style={{
-                fontSize: '12px',
-                fontWeight: 400,
-                color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-                textAlign: 'center',
-                whiteSpace: 'nowrap',
-              }}>
-                WEIGHT (LBS)
-              </span>
-              <span style={{
-                fontSize: '18px',
-                fontWeight: 700,
-                color: isDarkMode ? '#FFFFFF' : '#000000',
-                textAlign: 'center',
-              }}>
-                {Math.round(totalWeightLbs).toLocaleString()}
-              </span>
+              <span style={{ fontSize: '12px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#9CA3AF', textAlign: 'center' }}>PALETTES</span>
+              <span style={{ fontSize: '18px', fontWeight: 700, color: isDarkMode ? '#FFFFFF' : '#000000', textAlign: 'center' }}>{totalPalettes.toFixed(2)}</span>
             </div>
           )}
-          {totalFormulas > 0 && (
+          {footerStatsVisibility.products && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-              <span style={{
-                fontSize: '12px',
-                fontWeight: 400,
-                color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
-                textAlign: 'center',
-              }}>
-                FORMULAS
-              </span>
-              <span style={{
-                fontSize: '18px',
-                fontWeight: 700,
-                color: isDarkMode ? '#FFFFFF' : '#000000',
-                textAlign: 'center',
-              }}>
-                {totalFormulas}
-              </span>
+              <span style={{ fontSize: '12px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#9CA3AF', textAlign: 'center' }}>PRODUCTS</span>
+              <span style={{ fontSize: '18px', fontWeight: 700, color: isDarkMode ? '#FFFFFF' : '#000000', textAlign: 'center' }}>{totalProducts}</span>
+            </div>
+          )}
+          {footerStatsVisibility.boxes && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#9CA3AF', textAlign: 'center' }}>BOXES</span>
+              <span style={{ fontSize: '18px', fontWeight: 700, color: isDarkMode ? '#FFFFFF' : '#000000', textAlign: 'center' }}>{Math.ceil(totalBoxes).toLocaleString()}</span>
+            </div>
+          )}
+          {footerStatsVisibility.units && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#9CA3AF', textAlign: 'center' }}>UNITS</span>
+              <span style={{ fontSize: '18px', fontWeight: 700, color: isDarkMode ? '#FFFFFF' : '#000000', textAlign: 'center' }}>{totalUnits.toLocaleString()}</span>
+            </div>
+          )}
+          {footerStatsVisibility.timeHours && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#9CA3AF', textAlign: 'center', whiteSpace: 'nowrap' }}>TIME (HRS)</span>
+              <span style={{ fontSize: '18px', fontWeight: 700, color: isDarkMode ? '#FFFFFF' : '#000000', textAlign: 'center' }}>{totalTimeHours.toFixed(2)}</span>
+            </div>
+          )}
+          {footerStatsVisibility.weightLbs && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#9CA3AF', textAlign: 'center', whiteSpace: 'nowrap' }}>WEIGHT (LBS)</span>
+              <span style={{ fontSize: '18px', fontWeight: 700, color: isDarkMode ? '#FFFFFF' : '#000000', textAlign: 'center' }}>{Math.round(totalWeightLbs).toLocaleString()}</span>
+            </div>
+          )}
+          {footerStatsVisibility.formulas && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#9CA3AF', textAlign: 'center' }}>FORMULAS</span>
+              <span style={{ fontSize: '18px', fontWeight: 700, color: isDarkMode ? '#FFFFFF' : '#000000', textAlign: 'center' }}>{totalFormulas}</span>
             </div>
           )}
         </div>
@@ -6027,43 +6525,160 @@ const NewShipmentTable = ({
               </button>
             )}
             {onExport && (
-              <button
-                type="button"
-                onClick={onExport}
-                style={{
-                  height: '31px',
-                  padding: '0 10px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  backgroundColor: (addedRows && addedRows.size > 0) ? '#3B82F6' : '#9CA3AF',
-                  color: '#FFFFFF',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  cursor: (addedRows && addedRows.size > 0) ? 'pointer' : 'not-allowed',
-                  transition: 'background-color 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                onMouseEnter={(e) => {
-                  if (addedRows && addedRows.size > 0) {
-                    e.currentTarget.style.backgroundColor = '#2563EB';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (addedRows && addedRows.size > 0) {
-                    e.currentTarget.style.backgroundColor = '#3B82F6';
-                  } else {
-                    e.currentTarget.style.backgroundColor = '#9CA3AF';
-                  }
-                }}
-              >
-                Export for Upload
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={onExport}
+                  style={{
+                    height: '31px',
+                    padding: '0 10px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: (addedRows && addedRows.size > 0) ? '#3B82F6' : '#9CA3AF',
+                    color: '#FFFFFF',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: (addedRows && addedRows.size > 0) ? 'pointer' : 'not-allowed',
+                    transition: 'background-color 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (addedRows && addedRows.size > 0) {
+                      e.currentTarget.style.backgroundColor = '#2563EB';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (addedRows && addedRows.size > 0) {
+                      e.currentTarget.style.backgroundColor = '#3B82F6';
+                    } else {
+                      e.currentTarget.style.backgroundColor = '#9CA3AF';
+                    }
+                  }}
+                >
+                  Export for Upload
+                </button>
+                <button
+                  type="button"
+                  aria-label="Shipment stats"
+                  data-shipment-stats-trigger
+                  onClick={() => setShipmentStatsMenuOpen((prev) => !prev)}
+                  style={{
+                    padding: '4px',
+                    border: 'none',
+                    borderRadius: '4px',
+                    backgroundColor: 'transparent',
+                    color: shipmentStatsMenuOpen ? '#3B82F6' : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+                    fontSize: '1.25rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'color 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!shipmentStatsMenuOpen) e.currentTarget.style.color = isDarkMode ? '#D1D5DB' : '#4B5563';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!shipmentStatsMenuOpen) e.currentTarget.style.color = isDarkMode ? '#9CA3AF' : '#6B7280';
+                  }}
+                >
+                  ⋮
+                </button>
+              </>
             )}
           </div>
         )}
       </div>
+
+      {/* Shipment Stats popup - above footer (table mode) */}
+      {shipmentStatsMenuOpen && (
+        <div
+          ref={shipmentStatsPopupRef}
+          style={{
+            position: 'fixed',
+            bottom: '96px',
+            left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2 + 350px)`,
+            transform: 'translateX(-50%)',
+            width: '204px',
+            minHeight: '264px',
+            maxHeight: '80vh',
+            backgroundColor: isDarkMode ? '#1F2937' : '#374151',
+            borderRadius: '8px',
+            boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+            border: `1px solid ${isDarkMode ? '#374151' : '#4B5563'}`,
+            zIndex: 1001,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px', borderBottom: `1px solid ${isDarkMode ? '#374151' : '#4B5563'}` }}>
+            <span style={{ fontSize: '14px', fontWeight: 600, color: '#FFFFFF' }}>Shipment Stats</span>
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={() => setShipmentStatsMenuOpen(false)}
+              style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 4L4 12M4 4l8 8" /></svg>
+            </button>
+          </div>
+          <div style={{ padding: '8px', gap: '2px', display: 'flex', flexDirection: 'column', overflowY: 'auto', flex: 1, minHeight: 0 }}>
+            {[
+              { key: 'products', label: 'Products' },
+              { key: 'palettes', label: 'Palettes' },
+              { key: 'boxes', label: 'Boxes' },
+              { key: 'weightLbs', label: 'Weight (lbs)' },
+              { key: 'units', label: 'Units' },
+              { key: 'formulas', label: 'Formulas' },
+              { key: 'timeHours', label: 'Time (hrs)' },
+            ].map(({ key, label }) => (
+              <div
+                key={key}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '2px',
+                  padding: '6px 8px',
+                }}
+              >
+                <span style={{ color: '#9CA3AF', cursor: 'grab', display: 'flex' }} aria-hidden>≡</span>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={!!footerStatsVisibility[key]}
+                    onChange={() => setFooterStatsVisibility((prev) => ({ ...prev, [key]: !prev[key] }))}
+                    style={{ position: 'absolute', opacity: 0, width: 0, height: 0, margin: 0, pointerEvents: 'none' }}
+                    aria-hidden
+                  />
+                  <span
+                    style={{
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '4px',
+                      border: '1px solid #6B7280',
+                      backgroundColor: footerStatsVisibility[key] ? '#3B82F6' : '#374151',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {footerStatsVisibility[key] && (
+                      <svg width="10" height="8" viewBox="0 0 10 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1 4L4 7L9 1" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </span>
+                </label>
+                <span style={{ flex: 1, fontSize: '13px', color: '#FFFFFF' }}>{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </>
   );
 };

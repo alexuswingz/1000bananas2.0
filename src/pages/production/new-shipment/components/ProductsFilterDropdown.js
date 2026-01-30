@@ -15,6 +15,7 @@ const ProductsFilterDropdown = forwardRef(({
   availableValues = [], 
   currentFilter = {},
   currentSort = '',
+  currentSortByFba = '', // When columnKey is doiDays: 'asc' | 'desc' if sorted by FBA
   onApply,
   onClose,
   account = null, // Account name to determine which brands to show
@@ -198,6 +199,9 @@ const ProductsFilterDropdown = forwardRef(({
   const [conditionType, setConditionType] = useState(currentFilter.conditionType || '');
   const [conditionValue, setConditionValue] = useState(currentFilter.conditionValue || '');
   const [conditionMenuOpen, setConditionMenuOpen] = useState(false);
+  // Popular Filters (DOI only): section expanded + dropdown open
+  const [popularFilterExpanded, setPopularFilterExpanded] = useState(true);
+  const [popularFilterMenuOpen, setPopularFilterMenuOpen] = useState(false);
   
   // Convert values to strings for filtering
   const stringValues = availableValues.map(v => String(v));
@@ -276,6 +280,7 @@ const ProductsFilterDropdown = forwardRef(({
   };
 
   const handleReset = () => {
+    console.log('[ProductsFilterDropdown] Reset clicked for column:', columnKey);
     setSortOrder('');
     setSearchTerm('');
     setBrandSearchTerm('');
@@ -287,6 +292,7 @@ const ProductsFilterDropdown = forwardRef(({
     setConditionType('');
     setConditionValue('');
     if (onApply) {
+      console.log('[ProductsFilterDropdown] Calling onApply(null)');
       onApply(null);
     }
     // Close dropdown after reset
@@ -363,6 +369,179 @@ const ProductsFilterDropdown = forwardRef(({
           display: none; /* Chrome, Safari */
         }
       `}</style>
+      {/* Popular Filters (Days of Inventory only) – dropdown like Filter by condition */}
+      {columnKey === 'doiDays' && (
+        <div style={{ borderBottom: `1px solid ${theme.border}` }}>
+          <div
+            onClick={() => setPopularFilterExpanded(!popularFilterExpanded)}
+            style={{
+              padding: '8px 12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              cursor: 'pointer',
+              userSelect: 'none',
+            }}
+          >
+            <span style={{ fontSize: '12px', color: currentFilter.popularFilter ? '#3B82F6' : theme.subtleText, fontWeight: currentFilter.popularFilter ? 500 : 400 }}>
+              Popular Filters: {currentFilter.popularFilter && <span style={{ color: '#10B981' }}>●</span>}
+            </span>
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 12 12"
+              fill="none"
+              style={{
+                transform: popularFilterExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.2s',
+              }}
+            >
+              <path
+                d="M3 4.5L6 7.5L9 4.5"
+                stroke={theme.subtleText}
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+          {popularFilterExpanded && (
+            <div style={{ padding: '0 12px 8px 12px' }}>
+              <div style={{ position: 'relative', marginBottom: '4px' }}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPopularFilterMenuOpen(!popularFilterMenuOpen);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '6px 10px',
+                    borderRadius: '6px',
+                    border: `1px solid ${theme.inputBorder}`,
+                    backgroundColor: theme.inputBg,
+                    color: theme.inputText,
+                    fontSize: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {currentFilter.popularFilter === 'soldOut'
+                      ? 'Sold Out'
+                      : currentFilter.popularFilter === 'noSalesHistory'
+                        ? 'No Sales History'
+                        : currentFilter.popularFilter === 'bestSellers'
+                          ? 'Best Sellers'
+                          : 'None'}
+                  </span>
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    style={{
+                      flexShrink: 0,
+                      transform: popularFilterMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.15s ease-out',
+                    }}
+                  >
+                    <path
+                      d="M3 4.5L6 7.5L9 4.5"
+                      stroke={theme.subtleText}
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+
+                {popularFilterMenuOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      marginTop: '4px',
+                      backgroundColor: theme.bg,
+                      borderRadius: '10px',
+                      border: `1px solid ${theme.border}`,
+                      boxShadow: theme.shadow,
+                      padding: '4px 0',
+                      zIndex: 50,
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {[
+                      { id: null, label: 'None' },
+                      { id: 'soldOut', label: 'Sold Out' },
+                      { id: 'noSalesHistory', label: 'No Sales History' },
+                      { id: 'bestSellers', label: 'Best Sellers' },
+                    ].map(({ id, label }) => {
+                      const selected = currentFilter.popularFilter === id;
+                      return (
+                        <button
+                          key={id ?? 'none'}
+                          type="button"
+                          onClick={() => {
+                            setPopularFilterMenuOpen(false);
+                            if (onApply) {
+                              const filterData = {
+                                selectedValues,
+                                conditionType,
+                                conditionValue,
+                                popularFilter: id,
+                                __fromSortClick: true,
+                              };
+                              if (id === 'bestSellers') {
+                                filterData.sortOrder = 'desc';
+                                filterData.sortField = 'sales7Day';
+                              } else if (id === 'noSalesHistory' || id === 'soldOut') {
+                                // Sort by product A–Z so the filtered list has a visible order
+                                filterData.sortOrder = 'asc';
+                                filterData.sortField = 'product';
+                              }
+                              onApply(filterData);
+                              // Close after a short delay so the list can update first (Popular Filters use flushSync in parent)
+                              setTimeout(() => onClose?.(), 50);
+                            } else {
+                              onClose?.();
+                            }
+                          }}
+                          style={{
+                            width: '100%',
+                            textAlign: 'left',
+                            padding: '6px 10px',
+                            backgroundColor: selected ? 'rgba(59,130,246,0.15)' : 'transparent',
+                            color: selected ? '#FFFFFF' : theme.valueText,
+                            fontSize: '12px',
+                            border: 'none',
+                            cursor: 'pointer',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!selected) e.currentTarget.style.backgroundColor = theme.hoverRow;
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!selected) e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <div style={{ fontSize: '10px', color: theme.subtleText, fontStyle: 'italic' }}>
+                Best Sellers: sort by prior week units sold (high to low)
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       {/* Sort Options */}
       <div style={{ padding: '8px 12px', borderBottom: `1px solid ${theme.border}` }}>
         {/* Sort Ascending */}
@@ -489,6 +668,120 @@ const ProductsFilterDropdown = forwardRef(({
             <span style={{ color: theme.subtleText, fontSize: '11px' }}>(Z to A)</span>
           </div>
         </div>
+
+        {/* Sort by FBA (only for DAYS OF INVENTORY column) */}
+        {columnKey === 'doiDays' && (
+          <>
+            <div style={{ borderTop: `1px solid ${theme.sectionBorder}`, marginTop: '6px', paddingTop: '6px' }}>
+              <span style={{ fontSize: '10px', fontWeight: 600, color: theme.subtleText, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sort by FBA</span>
+            </div>
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onApply) {
+                  const sortData = {
+                    sortOrder: 'asc',
+                    sortField: 'fbaAvailable',
+                    selectedValues,
+                    conditionType,
+                    conditionValue,
+                    __fromSortClick: true,
+                  };
+                  onApply(sortData);
+                }
+                setSortOrder('');
+                onClose?.();
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px',
+                cursor: 'pointer',
+                borderRadius: '4px',
+                backgroundColor: 'transparent',
+                marginTop: '4px',
+                transition: 'background-color 0.2s',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = theme.hoverRow; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+            >
+              <div
+                style={{
+                  width: '20px',
+                  height: '20px',
+                  backgroundColor: currentSortByFba === 'asc' ? theme.chipBgActive : theme.chipBg,
+                  borderRadius: '3px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '9px',
+                  fontWeight: 700,
+                  color: currentSortByFba === 'asc' ? theme.chipTextActive : theme.chipText,
+                  flexShrink: 0,
+                }}
+              >
+                AZ
+              </div>
+              <div style={{ fontSize: '12px', color: theme.headerText, fontWeight: 400, lineHeight: '1.3' }}>
+                FBA A-Z
+              </div>
+            </div>
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onApply) {
+                  const sortData = {
+                    sortOrder: 'desc',
+                    sortField: 'fbaAvailable',
+                    selectedValues,
+                    conditionType,
+                    conditionValue,
+                    __fromSortClick: true,
+                  };
+                  onApply(sortData);
+                }
+                setSortOrder('');
+                onClose?.();
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px',
+                cursor: 'pointer',
+                borderRadius: '4px',
+                backgroundColor: 'transparent',
+                transition: 'background-color 0.2s',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = theme.hoverRow; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+            >
+              <div
+                style={{
+                  width: '20px',
+                  height: '20px',
+                  backgroundColor: currentSortByFba === 'desc' ? theme.chipBgActive : theme.chipBg,
+                  borderRadius: '3px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '9px',
+                  fontWeight: 700,
+                  color: currentSortByFba === 'desc' ? theme.chipTextActive : theme.chipText,
+                  flexShrink: 0,
+                }}
+              >
+                ZA
+              </div>
+              <div style={{ fontSize: '12px', color: theme.headerText, fontWeight: 400, lineHeight: '1.3' }}>
+                FBA Z-A
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Filter by condition */}

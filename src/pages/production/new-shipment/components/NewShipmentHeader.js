@@ -236,7 +236,24 @@ const NewShipmentHeader = ({
                 fontWeight: 400,
                 color: isDarkMode ? '#FFFFFF' : '#000000',
               }}>
-                {shipmentNumber}{shipmentType ? ` ${shipmentType}` : ''}
+                {shipmentNumber}
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div style={{ 
+                fontSize: '10px', 
+                fontWeight: 400,
+                letterSpacing: '0.05em',
+                color: isDarkMode ? '#9CA3AF' : '#6B7280',
+              }}>
+                TYPE
+              </div>
+              <div style={{ 
+                fontSize: '16px', 
+                fontWeight: 400,
+                color: isDarkMode ? '#FFFFFF' : '#000000',
+              }}>
+                {shipmentType || '—'}
               </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
