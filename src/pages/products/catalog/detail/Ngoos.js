@@ -117,6 +117,8 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   const [showTemporaryConfirmModal, setShowTemporaryConfirmModal] = useState(false);
   const [dontRemindAgain, setDontRemindAgain] = useState(false);
   const [hoveredWarning, setHoveredWarning] = useState(false);
+  const [hoveredUnitsContainer, setHoveredUnitsContainer] = useState(false);
+  const [displayUnitsOverride, setDisplayUnitsOverride] = useState(null); // user-adjusted units in N-GOOS modal (arrows)
   const [settingsApplied, setSettingsApplied] = useState(false);
   const [showIndicatorTooltip, setShowIndicatorTooltip] = useState(false);
   const [salesVelocityWeight, setSalesVelocityWeight] = useState(25);
@@ -426,6 +428,11 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
       adjustment: Math.round(adjustment)
     };
   }, [forecastData, inventoryData, overrideUnitsToMake, doiSettings]);
+
+  // Reset user-adjusted units when forecast/override changes (e.g. DOI settings)
+  useEffect(() => {
+    setDisplayUnitsOverride(null);
+  }, [overrideUnitsToMake, forecastData?.units_to_make]);
 
   // Calculate bar widths proportionally based on inventory units (matches backend logic)
   // Total span = FBA inventory + Additional inventory + Units to Make
@@ -1794,49 +1801,109 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', position: 'relative' }}>
-              {/* Units Display Field */}
-              <div style={{
-                position: 'relative',
-                padding: '4px 12px',
-                borderRadius: '4px',
-                border: `1px solid ${isDarkMode ? '#374151' : '#D1D5DB'}`,
-                backgroundColor: isDarkMode ? '#1F2937' : '#F3F4F6',
-                color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                height: '23px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minWidth: '80px',
-                boxSizing: 'border-box',
-              }}>
-                {(() => {
-                  const sizeForIncrement = productDetails?.product?.size || data?.size || data?.variations?.[0] || '';
-                  const increment = getQtyIncrementForSize(sizeForIncrement);
-                  const rawUnitsToAdd = overrideUnitsToMake ?? forecastData?.units_to_make ?? 0;
-                  const numUnits = typeof rawUnitsToAdd === 'number' ? rawUnitsToAdd : parseInt(rawUnitsToAdd, 10);
-                  const units =
-                    numUnits && !Number.isNaN(numUnits) && increment && increment > 1
-                      ? Math.ceil(numUnits / increment) * increment
-                      : numUnits || 0;
-                  return units.toLocaleString();
-                })()}
-                
-                {/* Label warning icon - shown when units exceed labels available */}
-                {(() => {
-                  const sizeForIncrement = productDetails?.product?.size || data?.size || data?.variations?.[0] || '';
-                  const increment = getQtyIncrementForSize(sizeForIncrement);
-                  const rawUnitsToAdd = overrideUnitsToMake ?? forecastData?.units_to_make ?? 0;
-                  const numUnits = typeof rawUnitsToAdd === 'number' ? rawUnitsToAdd : parseInt(rawUnitsToAdd, 10);
-                  const unitsNeeded =
-                    numUnits && !Number.isNaN(numUnits) && increment && increment > 1
-                      ? Math.ceil(numUnits / increment) * increment
-                      : numUnits || 0;
-                  const availableLabels = labelsAvailable ?? 0;
-                  // Only show warning if units needed exceed available labels
-                  if (unitsNeeded > availableLabels && unitsNeeded > 0 && availableLabels !== null) {
-                    return (
+              {/* Units Display Field - same look as Add products: rounded box, arrows on right on hover */}
+              {(() => {
+                const sizeForIncrement = productDetails?.product?.size || data?.size || data?.variations?.[0] || '';
+                const increment = Math.max(1, getQtyIncrementForSize(sizeForIncrement) || 1);
+                const displayedUnits = displayUnitsOverride ?? timeline.unitsToMake ?? 0;
+                const availableLabels = labelsAvailable ?? 0;
+                const showLabelWarning = displayedUnits > availableLabels && displayedUnits > 0 && availableLabels !== null;
+                return (
+                  <div
+                    style={{
+                      position: 'relative',
+                      width: '110px',
+                      height: '28px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      backgroundColor: isDarkMode ? '#2C3544' : '#F3F4F6',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxSizing: 'border-box',
+                    }}
+                    onMouseEnter={() => setHoveredUnitsContainer(true)}
+                    onMouseLeave={() => setHoveredUnitsContainer(false)}
+                  >
+                    <div style={{
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: isDarkMode ? '#E5E7EB' : '#111827',
+                      fontSize: '15px',
+                      fontWeight: 500,
+                      padding: '0 28px',
+                      boxSizing: 'border-box',
+                    }}>
+                      {displayedUnits.toLocaleString()}
+                    </div>
+                    {/* Decrement - bottom right, same as Add products */}
+                    <button
+                      type="button"
+                      onClick={() => setDisplayUnitsOverride(Math.max(0, displayedUnits - increment))}
+                      style={{
+                        position: 'absolute',
+                        right: '4px',
+                        bottom: '2px',
+                        width: '20px',
+                        height: '10px',
+                        borderRadius: '4px',
+                        border: 'none',
+                        backgroundColor: 'transparent',
+                        color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                        cursor: 'pointer',
+                        display: hoveredUnitsContainer ? 'flex' : 'none',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 0,
+                        outline: 'none',
+                        zIndex: 1,
+                        transition: 'color 0.2s',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = isDarkMode ? '#D1D5DB' : '#374151'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = isDarkMode ? '#9CA3AF' : '#6B7280'; }}
+                      aria-label="Decrease units"
+                      title="Decrease quantity"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M3 8L6 11L9 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                    {/* Increment - top right, same as Add products */}
+                    <button
+                      type="button"
+                      onClick={() => setDisplayUnitsOverride(displayedUnits + increment)}
+                      style={{
+                        position: 'absolute',
+                        right: '4px',
+                        top: '2px',
+                        width: '20px',
+                        height: '10px',
+                        borderRadius: '4px',
+                        border: 'none',
+                        backgroundColor: 'transparent',
+                        color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                        cursor: 'pointer',
+                        display: hoveredUnitsContainer ? 'flex' : 'none',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: 0,
+                        outline: 'none',
+                        zIndex: 1,
+                        transition: 'color 0.2s',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = isDarkMode ? '#D1D5DB' : '#374151'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = isDarkMode ? '#9CA3AF' : '#6B7280'; }}
+                      aria-label="Increase units"
+                      title="Increase quantity"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M3 4L6 1L9 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                    {showLabelWarning && (
                       <>
                         <span
                           onMouseEnter={() => setHoveredWarning(true)}
@@ -1862,7 +1929,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                         >
                           !
                         </span>
-                        {/* Custom tooltip for warning icon */}
                         {hoveredWarning && (
                           <div
                             style={{
@@ -1887,11 +1953,10 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                           </div>
                         )}
                       </>
-                    );
-                  }
-                  return null;
-                })()}
-              </div>
+                    )}
+                  </div>
+                );
+              })()}
               
               {/* Add Button */}
               <button
@@ -1899,18 +1964,11 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 disabled={isAlreadyAdded}
                 onClick={() => {
                   if (onAddUnits && !isAlreadyAdded) {
-                    const sizeForIncrement = productDetails?.product?.size || data?.size || data?.variations?.[0] || '';
-                    const increment = getQtyIncrementForSize(sizeForIncrement);
-                    const rawUnitsToAdd = overrideUnitsToMake ?? forecastData?.units_to_make ?? 0;
-                    const numUnits = typeof rawUnitsToAdd === 'number' ? rawUnitsToAdd : parseInt(rawUnitsToAdd, 10);
-                    const unitsToAdd =
-                      numUnits && !Number.isNaN(numUnits) && increment && increment > 1
-                        ? Math.ceil(numUnits / increment) * increment
-                        : numUnits || 0;
+                    const unitsToAdd = displayUnitsOverride ?? timeline.unitsToMake ?? 0;
                     console.log('Add Units clicked:', {
                       unitsToAdd,
-                      overrideUnitsToMake,
-                      forecastUnitsToMake: forecastData?.units_to_make,
+                      displayUnitsOverride,
+                      timelineUnitsToMake: timeline.unitsToMake,
                       labelsAvailable
                     });
                     onAddUnits(unitsToAdd);
@@ -2288,7 +2346,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 color: '#94a3b8',
                 fontWeight: 400
               }}>
-                ({(overrideUnitsToMake ?? forecastData?.units_to_make ?? 0).toLocaleString()} units)
+                ({(timeline.unitsToMake ?? 0).toLocaleString()} units)
               </span>
             </div>
             <div style={{ 
