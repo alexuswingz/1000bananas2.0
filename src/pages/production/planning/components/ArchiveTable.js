@@ -812,19 +812,29 @@ const ArchiveTable = ({ rows = [] }) => {
                     height: '40px',
                   }}
                 >
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke={isDarkMode ? '#9CA3AF' : '#6B7280'}
-                    strokeWidth="2"
-                    style={{ cursor: 'pointer' }}
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: '4px',
+                      height: '16px',
+                      flexShrink: 0,
+                      lineHeight: 0,
+                      cursor: 'pointer',
+                    }}
                   >
-                    <circle cx="12" cy="12" r="1" />
-                    <circle cx="12" cy="5" r="1" />
-                    <circle cx="12" cy="19" r="1" />
-                  </svg>
+                    <svg
+                      viewBox="0 0 4 16"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="4"
+                      height="16"
+                      style={{ display: 'block', width: '100%', height: '100%', verticalAlign: 'top' }}
+                    >
+                      <circle cx="2" cy="3" r="1" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
+                      <circle cx="2" cy="8" r="1" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
+                      <circle cx="2" cy="13" r="1" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
+                    </svg>
+                  </span>
                 </td>
               </tr>
             ))}

@@ -2,6 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
+// Shipment type options (FBA, AWD, Hazmat)
+const TYPE_OPTIONS = ['FBA', 'AWD', 'Hazmat'];
+
 // Account to Brand mapping based on Amazon Seller Account Structure
 const ACCOUNT_OPTIONS = [
   {
@@ -24,12 +27,15 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
   
   // Initialize form state from row data
   const [shipmentName, setShipmentName] = useState(row?.shipment || '');
+  const [type, setType] = useState(row?.shipmentType || row?.type || '');
   const [marketplace, setMarketplace] = useState(row?.marketplace || 'Amazon');
   const [account, setAccount] = useState(row?.account || '');
   
   // Dropdown states
+  const [typeOpen, setTypeOpen] = useState(false);
   const [marketplaceOpen, setMarketplaceOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const typeRef = useRef(null);
   const marketplaceRef = useRef(null);
   const accountRef = useRef(null);
   
@@ -40,6 +46,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
   useEffect(() => {
     if (row) {
       setShipmentName(row.shipment || '');
+      setType(row.shipmentType || row.type || '');
       setMarketplace(row.marketplace || 'Amazon');
       setAccount(row.account || '');
       setIsEditMode(false); // Reset edit mode when row changes
@@ -57,6 +64,9 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
+      if (typeRef.current && !typeRef.current.contains(event.target)) {
+        setTypeOpen(false);
+      }
       if (marketplaceRef.current && !marketplaceRef.current.contains(event.target)) {
         setMarketplaceOpen(false);
       }
@@ -65,14 +75,14 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
       }
     };
 
-    if (marketplaceOpen || accountOpen) {
+    if (typeOpen || marketplaceOpen || accountOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [marketplaceOpen, accountOpen]);
+  }, [typeOpen, marketplaceOpen, accountOpen]);
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -92,10 +102,11 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
     } else {
       // Save changes and exit edit mode
       if (onUpdate && row) {
-      const updates = {
-        shipment_number: shipmentName,
-        // Marketplace and account are not editable for existing shipments
-      };
+        const updates = {
+          shipment_number: shipmentName,
+          shipment_type: type || undefined,
+          // Marketplace and account are not editable for existing shipments
+        };
         onUpdate(row.id, updates);
       }
       setIsEditMode(false);
@@ -111,6 +122,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
       // Reset to original values and exit edit mode
       if (row) {
         setShipmentName(row.shipment || '');
+        setType(row.shipmentType || row.type || '');
         setMarketplace(row.marketplace || 'Amazon');
         setAccount(row.account || '');
       }
@@ -263,6 +275,128 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
                 transition: 'border-color 0.2s ease',
               }}
             />
+          </div>
+
+          {/* Type */}
+          <div>
+            <label
+              style={{ 
+                fontSize: '13px', 
+                fontWeight: 500, 
+                display: 'block', 
+                marginBottom: '8px', 
+                color: isDarkMode ? '#E5E7EB' : '#374151' 
+              }}
+            >
+              Type<span style={{ color: '#EF4444' }}>*</span>
+            </label>
+            <div ref={typeRef} style={{ position: 'relative' }}>
+              <button
+                type="button"
+                disabled={!isEditMode}
+                onClick={() => isEditMode && setTypeOpen((prev) => !prev)}
+                onFocus={() => isEditMode && setFocusedField('type')}
+                onBlur={() => setFocusedField(null)}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 12px',
+                  border: isEditMode && (focusedField === 'type' || typeOpen)
+                    ? '1px solid #3B82F6'
+                    : isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
+                  borderRadius: '6px',
+                  backgroundColor: isEditMode
+                    ? (isDarkMode ? '#374151' : '#FFFFFF')
+                    : (isDarkMode ? '#111827' : '#F9FAFB'),
+                  cursor: isEditMode ? 'pointer' : 'not-allowed',
+                  fontSize: '14px',
+                  color: type
+                    ? (isEditMode ? (isDarkMode ? '#E5E7EB' : '#111827') : (isDarkMode ? '#9CA3AF' : '#6B7280'))
+                    : (isDarkMode ? '#6B7280' : '#9CA3AF'),
+                  outline: 'none',
+                  transition: 'border-color 0.2s ease',
+                }}
+              >
+                <span>{type || 'Select Type'}</span>
+                <svg
+                  style={{
+                    width: '16px',
+                    height: '16px',
+                    color: '#9CA3AF',
+                    flexShrink: 0,
+                    transform: typeOpen ? 'rotate(180deg)' : 'none',
+                    transition: 'transform 0.2s ease',
+                  }}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M19 9L12 16L5 9"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+
+              {typeOpen && isEditMode && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    marginTop: '4px',
+                    backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                    border: isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
+                    borderRadius: '6px',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                    overflow: 'hidden',
+                    zIndex: 100,
+                  }}
+                >
+                  {TYPE_OPTIONS.map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => {
+                        setType(option);
+                        setTypeOpen(false);
+                        setFocusedField(null);
+                      }}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '10px 12px',
+                        fontSize: '14px',
+                        color: isDarkMode ? '#E5E7EB' : '#111827',
+                        backgroundColor: type === option
+                          ? (isDarkMode ? '#374151' : '#F3F4F6')
+                          : (isDarkMode ? '#1F2937' : '#FFFFFF'),
+                        border: 'none',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = type === option
+                          ? (isDarkMode ? '#374151' : '#F3F4F6')
+                          : (isDarkMode ? '#374151' : '#F3F4F6');
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = type === option
+                          ? (isDarkMode ? '#374151' : '#F3F4F6')
+                          : (isDarkMode ? '#1F2937' : '#FFFFFF');
+                      }}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Marketplace */}

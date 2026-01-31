@@ -2120,10 +2120,11 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                   className="hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
                   style={{
                     display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: '28px',
-                    height: '28px',
+                    alignItems: 'flex-start',
+                    justifyContent: 'flex-start',
+                    padding: '4px 10px',
+                    width: '36px',
+                    height: '36px',
                     borderRadius: '9999px',
                     border: 'none',
                     cursor: 'pointer',
@@ -2132,11 +2133,28 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                   }}
                   aria-label="Row actions"
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="12" cy="6" r="1.5" fill="currentColor"/>
-                    <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
-                    <circle cx="12" cy="18" r="1.5" fill="currentColor"/>
-                  </svg>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: '8px',
+                      height: '24px',
+                      flexShrink: 0,
+                      lineHeight: 0,
+                    }}
+                  >
+                    <svg
+                      viewBox="0 0 4 16"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="8"
+                      height="24"
+                      style={{ display: 'block', width: '100%', height: '100%', verticalAlign: 'top' }}
+                    >
+                      <circle cx="2" cy="3" r="1" fill="currentColor"/>
+                      <circle cx="2" cy="8" r="1" fill="currentColor"/>
+                      <circle cx="2" cy="13" r="1" fill="currentColor"/>
+                    </svg>
+                  </span>
                 </button>
               </td>
             </tr>
