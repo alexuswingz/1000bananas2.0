@@ -83,7 +83,7 @@ const getQtyIncrementForSize = (sizeRaw) => {
 
 const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = null, overrideUnitsToMake = null, onAddUnits = null, labelsAvailable = null, openDoiSettings = false, openForecastSettings = false, onDoiSettingsChange = null, onForecastSettingsChange = null, hasActiveForecastSettings = false, isAlreadyAdded = false }) => {
   const { isDarkMode } = useTheme();
-  const [selectedView, setSelectedView] = useState('2 Years');
+  const [selectedView, setSelectedView] = useState('30 Day');
   const [loading, setLoading] = useState(true);
   const [productDetails, setProductDetails] = useState(null);
   const [forecastData, setForecastData] = useState(null);
@@ -176,12 +176,14 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     inputBg: isDarkMode ? 'bg-dark-bg-tertiary' : 'bg-gray-50',
   };
 
-  // Get weeks based on selected view
+  // Get weeks based on selected time span (used for chart API and display)
   const getWeeksForView = (view) => {
-    switch(view) {
+    switch (view) {
+      case '30 Day': return 5;           // ~4.3 weeks, round up
+      case '6 Months': return 26;
       case '1 Year': return 52;
       case '2 Years': return 104;
-      case '3 Years': return 156;
+      case 'All Time': return 260;      // ~5 years
       default: return 52;
     }
   };
@@ -481,8 +483,9 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     let forecast = chartData.forecast || [];
     const algorithm = chartData.algorithm || '18m+';
     
-    // 🎯 Limit forecast to half of selected period for better detail/zoom
-    const maxForecastWeeks = getWeeksForView(selectedView) / 2;
+    // Limit forecast to half of selected period (minimum 4 weeks so 30 Day shows a full month of forecast)
+    const totalWeeks = getWeeksForView(selectedView);
+    const maxForecastWeeks = Math.max(4, Math.ceil(totalWeeks / 2));
     forecast = forecast.slice(0, maxForecastWeeks);
     
     // Get current date - prefer from chart data metadata, then forecastData, then today
@@ -738,6 +741,51 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     return [zoomMin, zoomMax];
   }, [zoomDomain?.left, zoomDomain?.right]);
 
+  // Effective X domain as [minTs, maxTs] for tick generation
+  const chartXDomainTimestamps = useMemo(() => {
+    const data = chartDisplayData?.data;
+    if (!data?.length) return null;
+    if (chartXDomainWhenZoomed?.length === 2) return chartXDomainWhenZoomed;
+    const timestamps = data.map((d) => (typeof d.timestamp === 'number' ? d.timestamp : new Date(d.timestamp).getTime()));
+    return [Math.min(...timestamps), Math.max(...timestamps)];
+  }, [chartDisplayData?.data, chartXDomainWhenZoomed]);
+
+  // Same month indices for every year so the axis is consistent (Jan, Apr, Jul, Oct).
+  // Number of months can be reduced on narrow screens to avoid crowding.
+  const X_AXIS_MONTH_INDICES = [0, 3, 6, 9]; // Jan, Apr, Jul, Oct (1st of each)
+
+  const [chartAxisWidth, setChartAxisWidth] = useState(null);
+  useEffect(() => {
+    const el = chartContainerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect?.width;
+      if (typeof w === 'number') setChartAxisWidth(w);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const xAxisTicks = useMemo(() => {
+    const domain = chartXDomainTimestamps;
+    if (!domain || domain.length < 2) return undefined;
+    const [tMin, tMax] = domain;
+    const startYear = new Date(tMin).getFullYear();
+    const endYear = new Date(tMax).getFullYear();
+    // Use same months every year; show fewer on narrow chart to avoid crowding
+    const monthCount = chartAxisWidth != null
+      ? (chartAxisWidth < 400 ? 2 : chartAxisWidth < 600 ? 3 : 4)
+      : 4;
+    const indices = X_AXIS_MONTH_INDICES.slice(0, Math.min(monthCount, X_AXIS_MONTH_INDICES.length));
+    const ticks = [];
+    for (let y = startYear; y <= endYear; y++) {
+      for (const monthIdx of indices) {
+        ticks.push(new Date(y, monthIdx, 1).getTime());
+      }
+    }
+    return ticks.filter((t) => t >= tMin && t <= tMax);
+  }, [chartXDomainTimestamps, chartAxisWidth]);
+
   // Chart data actually shown: when zoomed, filter to zoom range so the graph visibly zooms
   const chartDataForDisplay = useMemo(() => {
     const data = chartDisplayData?.data;
@@ -751,7 +799,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     });
   }, [chartDisplayData?.data, zoomDomain?.left, zoomDomain?.right]);
 
-  // Sum of Units Sold and Potential Units Sold for the drag-selected range; Potential Revenue = (potential - actual) × price
+  // Sum of Units Sold and Potential Units Sold for the drag-selected range
   const chartRangeSum = useMemo(() => {
     if (!chartDisplayData?.data?.length || chartRangeSelection.startTimestamp == null || chartRangeSelection.endTimestamp == null) return null;
     const data = chartDisplayData.data;
@@ -765,11 +813,8 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         unitsSmoothed += Number(d.forecastBase ?? d.unitsSmooth) || 0;
       }
     });
-    const price = metrics?.current_period?.price ?? 0;
-    const unitGap = Math.max(0, unitsSmoothed - unitsSold);
-    const potentialRevenue = unitGap * price;
-    return { unitsSold, unitsSmoothed, potentialRevenue, price };
-  }, [chartDisplayData?.data, chartRangeSelection.startTimestamp, chartRangeSelection.endTimestamp, metrics?.current_period?.price]);
+    return { unitsSold, unitsSmoothed };
+  }, [chartDisplayData?.data, chartRangeSelection.startTimestamp, chartRangeSelection.endTimestamp]);
 
   // Map client X to timestamp using the chart's actual plot area and current visible domain (zoom-aware)
   const getTimestampFromClientX = (clientX) => {
@@ -2738,9 +2783,11 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                   alignItems: 'center'
                 }}
               >
+                <option value="30 Day">30 Day</option>
+                <option value="6 Months">6 Months</option>
                 <option value="1 Year">1 Year</option>
                 <option value="2 Years">2 Years</option>
-                <option value="3 Years">3 Years</option>
+                <option value="All Time">All Time</option>
               </select>
               {(zoomDomain.left != null || zoomDomain.right != null) && (
                 <button
@@ -2828,15 +2875,14 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                     // Brighter tick color + extra margin so dates are always visible
                     tick={{ fill: '#e5e7eb', fontSize: 10 }}
                     tickMargin={8}
-                    // Ask Recharts for ~6 ticks across the width
-                    tickCount={6}
+                    ticks={xAxisTicks}
                     minTickGap={20}
-                    interval={chartDataForDisplay.length > 0 
-                      ? Math.max(1, Math.floor(chartDataForDisplay.length / 8)) 
-                      : 0}
                     tickFormatter={(value) => {
                       const date = new Date(value);
-                      return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                      // Jan 1 of each year: show year only; other ticks: month only (no year)
+                      const isJan1 = date.getMonth() === 0 && date.getDate() === 1;
+                      if (isJan1) return String(date.getFullYear());
+                      return date.toLocaleDateString('en-US', { month: 'short' });
                     }}
                   />
                   <YAxis 
@@ -3205,6 +3251,18 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             const hi = Math.max(chartRangeSelection.startTimestamp, chartRangeSelection.endTimestamp);
             const startStr = new Date(lo).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
             const endStr = new Date(hi).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            // Unit cost for Potential Revenue: prefer cost, fallback to price
+            const unitCost = Number(
+              productDetails?.product?.cost ??
+              productDetails?.product?.price ??
+              productDetails?.price ??
+              data?.cost ??
+              data?.price ??
+              metrics?.current?.price ??
+              0
+            ) || 0;
+            const unitsDiff = chartRangeSum.unitsSmoothed - chartRangeSum.unitsSold;
+            const potentialRevenue = unitsDiff * unitCost;
             return (
             <div style={{
               marginTop: '0.5rem',
@@ -3223,10 +3281,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 <span style={{ fontSize: '0.8125rem', color: '#e5e7eb' }}>
                   <strong>Units Sold</strong> {chartRangeSum.unitsSold.toLocaleString()}
                   <span style={{ marginLeft: '1rem' }}><strong>Potential Units Sold</strong> {chartRangeSum.unitsSmoothed.toLocaleString()}</span>
-                  <span style={{ marginLeft: '1rem' }}><strong>Potential Revenue</strong> {chartRangeSum.price != null && chartRangeSum.price > 0
-                    ? '$' + chartRangeSum.potentialRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                    : '—'}
-                  </span>
+                  <span style={{ marginLeft: '1rem' }}><strong>Potential Revenue</strong> {potentialRevenue.toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
                 </span>
               </span>
               <button
