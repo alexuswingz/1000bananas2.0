@@ -6,6 +6,27 @@ import { toast } from 'sonner';
 import SortFormulasFilterDropdown from './SortFormulasFilterDropdown';
 import ProductsFilterDropdown from './ProductsFilterDropdown';
 
+const parseSuggestedQtyValue = (value) => {
+  if (value === undefined || value === null) return undefined;
+  const cleaned = typeof value === 'number'
+    ? String(value)
+    : String(value).trim();
+  if (cleaned === '') return undefined;
+  const numeric = Number(cleaned.replace(/,/g, ''));
+  return Number.isNaN(numeric) ? undefined : numeric;
+};
+
+const getSuggestedQtyFromRow = (row) => {
+  const candidates = [row.suggestedQty, row.units_to_make, row.unitsToMake];
+  for (const candidate of candidates) {
+    const parsed = parseSuggestedQtyValue(candidate);
+    if (parsed !== undefined) {
+      return parsed;
+    }
+  }
+  return undefined;
+};
+
 // Memoized bar fill so adding/updating other rows doesn't re-render this bar and interrupt its transition
 const BarFill = React.memo(function BarFill({ widthPct, backgroundColor }) {
   return (
@@ -98,9 +119,26 @@ const NewShipmentTable = ({
     }
   };
   const rawQtyInputValues = useRef({}); // Store raw input values while typing (before rounding)
-  const originalForecastValues = useRef({}); // Store original forecasted values for reset functionality (keyed by product ID)
-  const originalForecastValuesByIndex = useRef({}); // Also store by index for quick lookup
+  const originalSuggestedQtyValues = useRef({}); // Store original suggested quantities for reset functionality (keyed by product ID)
+  const originalSuggestedQtyValuesByIndex = useRef({}); // Also store by index for quick lookup
   const originalDoiValues = useRef({}); // Store original DOI values to detect changes (keyed by product ID)
+  const getStoredOriginalQtyValue = (productId, idx) => {
+    if (productId && Object.prototype.hasOwnProperty.call(originalSuggestedQtyValues.current, productId)) {
+      return originalSuggestedQtyValues.current[productId];
+    }
+    if (idx !== undefined && Object.prototype.hasOwnProperty.call(originalSuggestedQtyValuesByIndex.current, idx)) {
+      return originalSuggestedQtyValuesByIndex.current[idx];
+    }
+    return '';
+  };
+  const storeOriginalQtyValue = (row, storageIndex, value) => {
+    const normalizedValue = value !== undefined && value !== null ? value : '';
+    const productId = row.id || row.asin || row.child_asin || row.childAsin;
+    if (productId && originalSuggestedQtyValues.current[productId] === undefined) {
+      originalSuggestedQtyValues.current[productId] = normalizedValue;
+    }
+    originalSuggestedQtyValuesByIndex.current[storageIndex] = normalizedValue;
+  };
   const [qtyInputUpdateTrigger, setQtyInputUpdateTrigger] = useState(0); // Trigger re-renders during typing
   const [openFilterIndex, setOpenFilterIndex] = useState(null);
   const filterRefs = useRef({});
@@ -293,32 +331,25 @@ const NewShipmentTable = ({
     
     previousRowsSignatureRef.current = rowsSignature;
     
-    console.log('Storing original forecast values for', rows.length, 'rows');
+    console.log('Storing original suggested qtys for', rows.length, 'rows');
     if (rows && rows.length > 0) {
       rows.forEach((row, index) => {
-        const forecastValue = row.weeklyForecast || row.forecast || 0; // NO ROUNDING - use exact value
+        const suggestedQty = getSuggestedQtyFromRow(row);
+        const storageValue = suggestedQty !== undefined ? suggestedQty : '';
         const doiValue = row.doiTotal || row.daysOfInventory || 0;
-        const productId = row.id || row.asin || row.child_asin || row.childAsin;
-        // Use _originalIndex if available, otherwise use array index
         const storageIndex = row._originalIndex !== undefined ? row._originalIndex : index;
         
-        // Store by product ID (only if not already set to preserve the original)
-        if (productId && originalForecastValues.current[productId] === undefined) {
-          console.log(`Row ${index} (${row.product}): forecast=${forecastValue}, weeklyForecast=${row.weeklyForecast}, forecast=${row.forecast}, productId=${productId}, storageIndex=${storageIndex}`);
-          originalForecastValues.current[productId] = forecastValue;
-        }
+        storeOriginalQtyValue(row, storageIndex, storageValue);
         
         // Store original DOI value (only if not already set to preserve the original)
+        const productId = row.id || row.asin || row.child_asin || row.childAsin;
         if (productId && originalDoiValues.current[productId] === undefined) {
           originalDoiValues.current[productId] = doiValue;
         }
-        
-        // Also store by index for current session
-        originalForecastValuesByIndex.current[storageIndex] = forecastValue;
       });
     }
-    console.log('All original forecasts by ID:', originalForecastValues.current);
-    console.log('All original forecasts by index:', originalForecastValuesByIndex.current);
+    console.log('All original suggested qtys by ID:', originalSuggestedQtyValues.current);
+    console.log('All original suggested qtys by index:', originalSuggestedQtyValuesByIndex.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rowsSignature]); // Only use stable signature to avoid dependency array size issues
 
@@ -1508,9 +1539,9 @@ const NewShipmentTable = ({
           values.add(row.size);
         }
       } else if (columnKey === 'unitsToMake') {
-        // Always include both 'add' and 'added' options so filter works even before any items are added
-        values.add('add');
-        values.add('added');
+        // Filter by Units to Make: Added | Not Added
+        values.add('Not Added');
+        values.add('Added');
       } else if (columnKey === 'doiDays') {
         // Get DOI value
         const val = row.doiTotal || row.daysOfInventory || 0;
@@ -1643,32 +1674,39 @@ const NewShipmentTable = ({
 
   const handleNonTableApplyFilter = (columnKey, filterData) => {
     console.log('[handleNonTableApplyFilter] columnKey:', columnKey, 'filterData:', filterData);
-    // If filterData is null, remove the filter (Reset was clicked)
+    // If filterData is null, remove the filter (Reset was clicked) for this column only
     if (filterData === null) {
-      console.log('[handleNonTableApplyFilter] Resetting filter for column:', columnKey);
+      console.log('[handleNonTableApplyFilter] Resetting filter for column only:', columnKey);
       
-      // Clear ALL filters and restore original order (full reset like Best Sellers expects)
-      setNonTableFilters({});
-      setNonTableSortField('');
-      setNonTableSortOrder('');
-      setNonTableSortedRowOrder(null);
-      setSortedRowOrder(null);
-      setColumnFilters({});
-      setActiveFilters({
-        popularFilter: '',
-        sortField: '',
-        sortOrder: '',
-        filterField: '',
-        filterCondition: '',
-        filterValue: '',
+      // Clear only this column's filter (non-table and table column filters)
+      setNonTableFilters(prev => {
+        const next = { ...prev };
+        delete next[columnKey];
+        return next;
+      });
+      setColumnFilters(prev => {
+        const next = { ...prev };
+        delete next[columnKey];
+        return next;
       });
       
-      // Clear brand filter in parent if product filter is cleared
+      // Clear sort only if the current sort is for this column (e.g. DOI sort or FBA sort on DOI column)
+      setNonTableSortField(prev => {
+        const sortIsForThisColumn = prev === columnKey || (columnKey === 'doiDays' && prev === 'fbaAvailable');
+        if (sortIsForThisColumn) {
+          setNonTableSortOrder('');
+          setNonTableSortedRowOrder(null);
+          return '';
+        }
+        return prev;
+      });
+      
+      // Clear brand filter in parent only when resetting the product column
       if (columnKey === 'product' && onBrandFilterChange) {
         onBrandFilterChange(null);
       }
       
-      console.log('[handleNonTableApplyFilter] Full reset complete - showing all products in original order');
+      console.log('[handleNonTableApplyFilter] Reset complete for column:', columnKey);
       return;
     }
     
@@ -2051,8 +2089,12 @@ const NewShipmentTable = ({
           else if (columnKey === 'size') value = row.size;
           else if (columnKey === 'fbaAvailable') value = row.fbaAvailable || 0;
           else if (columnKey === 'unitsToMake') {
-            // Use addedRows to match the UI button state (Add vs Added)
-            value = addedRows.has(row.id) ? 'added' : 'add';
+            // Units to Make filter: Added | Not Added (based on addedRows)
+            const isAdded = addedRows.has(row.id);
+            if (filter.selectedValues.has('Added') && filter.selectedValues.has('Not Added')) return true;
+            if (filter.selectedValues.has('Added')) return isAdded;
+            if (filter.selectedValues.has('Not Added')) return !isAdded;
+            return false;
           }
           else if (columnKey === 'doiDays') value = row.doiTotal || row.daysOfInventory || 0;
           
@@ -2094,8 +2136,7 @@ const NewShipmentTable = ({
           else if (columnKey === 'size') value = row.size;
           else if (columnKey === 'fbaAvailable') value = row.fbaAvailable || 0;
           else if (columnKey === 'unitsToMake') {
-            // Use addedRows to match the UI button state (Add vs Added)
-            value = addedRows.has(row.id) ? 'added' : 'add';
+            value = addedRows.has(row.id) ? 'Added' : 'Not Added';
           }
           else if (columnKey === 'doiDays') value = row.doiTotal || row.daysOfInventory || 0;
           
@@ -3284,13 +3325,28 @@ const NewShipmentTable = ({
           {/* Product Rows */}
           <div>
             {currentRows.map((row, arrayIndex) => {
-              const index = row._originalIndex;
+              const index = row._originalIndex !== undefined ? row._originalIndex : arrayIndex;
               const effectiveAddedRows = addedRows;
               const doiValue = row.doiTotal || row.daysOfInventory || 0;
               const isAdded = effectiveAddedRows.has(row.id);
-              // When added, show DOI from settings (forecastRange) so bar fills and number matches DOI settings
-              const displayDoi = isAdded ? (Number(forecastRange) || 120) : doiValue;
-              const doiColor = getDoiColor(doiValue);
+              // Average daily demand for DOI calculation (same as your code: QTY / demand => DOI)
+              const sales7 = Number(row.sales7Day ?? row.sales_7_day ?? row.units_sold_7_days ?? 0) || 0;
+              const sales30 = Number(row.sales30Day ?? row.sales_30_day ?? row.units_sold_30_days ?? 0) || 0;
+              const avgDailyDemand = sales7 > 0 ? sales7 / 7 : (sales30 > 0 ? sales30 / 30 : 0);
+              const currentQtyForDoi = (() => {
+                const q = effectiveQtyValues[index];
+                if (q === undefined || q === null || q === '') return 0;
+                return typeof q === 'number' ? q : (parseInt(q, 10) || 0);
+              })();
+              // When added: DOI = QTY / demand (your formula) so DOI responds to QTY changes in real time.
+              // Use default demand (10) when no sales history so DOI still updates with QTY.
+              const effectiveDemand = avgDailyDemand > 0 ? avgDailyDemand : 10;
+              const displayDoi = (() => {
+                if (!isAdded) return doiValue;
+                const calculatedDoi = Math.floor(currentQtyForDoi / effectiveDemand);
+                return Math.max(0, calculatedDoi);
+              })();
+              const doiColor = getDoiColor(displayDoi);
               const asin = row.asin || row.child_asin || row.childAsin || '';
               
               const isSelected = nonTableSelectedIndices.has(index);
@@ -3305,6 +3361,7 @@ const NewShipmentTable = ({
               const originalDoi = productId ? originalDoiValues.current[productId] : undefined;
               const currentDoi = doiValue;
               const hasDoiChanged = originalDoi !== undefined && originalDoi !== currentDoi;
+              const originalQtyValueForRow = getStoredOriginalQtyValue(productId, index);
               
               // Determine if pencil should be in "active" (blue) state.
               // This is true whenever the product has custom DOI or forecast settings,
@@ -3670,28 +3727,23 @@ const NewShipmentTable = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          // Get product ID for looking up the original forecast
-                          const productId = row.id || row.asin || row.child_asin || row.childAsin;
-                          // Look up by product ID first (most reliable), then by index
-                          const originalForecast = (productId && originalForecastValues.current[productId] !== undefined)
-                            ? originalForecastValues.current[productId]
-                            : (originalForecastValuesByIndex.current[index] || 0);
+                          const originalQtyValue = originalQtyValueForRow;
                           
                           console.log('Reset clicked for index:', index);
                           console.log('Product ID:', productId);
                           console.log('Row data:', row);
-                          console.log('Original forecast value:', originalForecast);
+                          console.log('Original suggested value:', originalQtyValue);
                           console.log('Current qty value:', effectiveQtyValues[index]);
-                          console.log('All original forecasts by ID:', originalForecastValues.current);
-                          console.log('All original forecasts by index:', originalForecastValuesByIndex.current);
+                          console.log('All original suggested qtys by ID:', originalSuggestedQtyValues.current);
+                          console.log('All original suggested qtys by index:', originalSuggestedQtyValuesByIndex.current);
                           
                           effectiveSetQtyValues(prev => {
                             console.log('Previous state:', prev);
-                            const newState = { ...prev, [index]: originalForecast };
+                            const newState = { ...prev, [index]: originalQtyValue };
                             console.log('New state:', newState);
                             return newState;
                           });
-                          // Remove from manually edited set when reset to forecast
+                          // Remove from manually edited set when reset to suggestion
                           manuallyEditedIndices.current.delete(index);
                           // Clear any stored label-inventory suggestion usage for this product
                           if (productId) {
@@ -3716,13 +3768,6 @@ const NewShipmentTable = ({
                           color: isDarkMode ? '#9CA3AF' : '#6B7280',
                           cursor: 'pointer',
                           display: (() => {
-                            // Get product ID for looking up the original forecast
-                            const productId = row.id || row.asin || row.child_asin || row.childAsin;
-                            // Look up by product ID first (most reliable), then by index
-                            const originalForecast = (productId && originalForecastValues.current[productId] !== undefined)
-                              ? originalForecastValues.current[productId]
-                              : (originalForecastValuesByIndex.current[index] || 0);
-                            
                             const qtyValue = effectiveQtyValues[index];
                             // Check if value has been manually edited
                             const wasManuallyEdited = manuallyEditedIndices.current.has(index);
@@ -3733,14 +3778,13 @@ const NewShipmentTable = ({
                               : isValueSet 
                                 ? parseInt(qtyValue, 10) || 0
                                 : 0;
-                            const hasChanged = wasManuallyEdited && currentQty !== originalForecast;
+                            const hasChanged = wasManuallyEdited && currentQty !== originalQtyValueForRow;
                           // Determine if we are currently using the value suggested by the
                           // Label Inventory warning (i.e., "Use Available" was clicked and
                           // the qty still matches that suggested value). In this case, the
                           // reset icon should be permanently visible.
-                          const productIdForReset = row.id || row.asin || row.child_asin || row.childAsin;
-                          const suggestedFromLabels = productIdForReset && labelSuggestionUsage
-                            ? labelSuggestionUsage[productIdForReset]
+                          const suggestedFromLabels = productId && labelSuggestionUsage
+                            ? labelSuggestionUsage[productId]
                             : undefined;
                           const isUsingLabelSuggestion =
                             suggestedFromLabels !== undefined && currentQty === suggestedFromLabels;
@@ -3788,7 +3832,8 @@ const NewShipmentTable = ({
                             if (!isNaN(numValue) && numValue >= 0) { 
                               effectiveSetQtyValues(prev => ({ ...prev, [index]: numValue })); 
                             } 
-                          } 
+                          }
+                          setQtyInputUpdateTrigger(prev => prev + 1);
                         }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
@@ -3851,6 +3896,7 @@ const NewShipmentTable = ({
                             const newQty = Math.max(0, numQty - increment);
                             manuallyEditedIndices.current.add(index);
                             effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty }));
+                            setQtyInputUpdateTrigger(prev => prev + 1);
                           }
                         }}
                         style={{
@@ -3917,6 +3963,7 @@ const NewShipmentTable = ({
                             const newQty = numQty + increment;
                             manuallyEditedIndices.current.add(index);
                             effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty }));
+                            setQtyInputUpdateTrigger(prev => prev + 1);
                           }
                         }}
                         style={{
