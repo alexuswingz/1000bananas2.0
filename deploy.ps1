@@ -60,6 +60,14 @@ if ($confirm -ne "y" -and $confirm -ne "Y") {
     exit 0
 }
 
+# Ensure S3 static website hosting uses index.html for 404 (SPA client-side routing)
+Write-Host ""
+Write-Host "Configuring S3 website (index + error document for React Router)..." -ForegroundColor Cyan
+aws s3 website s3://1000bananasv2/ --index-document index.html --error-document index.html
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "⚠ Could not set website config (bucket may need console setup). Continuing sync..." -ForegroundColor Yellow
+}
+
 # Deploy to S3
 Write-Host ""
 Write-Host "Deploying to S3..." -ForegroundColor Cyan

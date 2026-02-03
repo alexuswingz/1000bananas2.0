@@ -127,6 +127,20 @@ aws s3 sync build/ s3://1000bananasv2 --delete
    - Clear browser cache if needed (Ctrl+Shift+R)
    - Test main functionality
 
+## Fix 404 on direct / deep links (e.g. /dashboard/production/shipment/new)
+
+If opening or refreshing a URL like `/dashboard/production/shipment/new` returns **404 Not Found**, S3 is treating the path as an object key. The bucket must serve `index.html` for missing paths so the React app loads and React Router can handle the route.
+
+**One-time fix (run once):**
+
+```powershell
+aws s3 website s3://1000bananasv2/ --index-document index.html --error-document index.html
+```
+
+Or in **AWS Console**: S3 → bucket `1000bananasv2` → **Properties** → **Static website hosting** → set **Error document** to `index.html` (and **Index document** to `index.html`), then Save.
+
+After this, direct links and refresh on any route will work.
+
 ## Troubleshooting
 
 ### "AWS CLI not found"
