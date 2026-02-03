@@ -751,7 +751,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     });
   }, [chartDisplayData?.data, zoomDomain?.left, zoomDomain?.right]);
 
-  // Sum of Units Sold and Potential Units Sold for the drag-selected range
+  // Sum of Units Sold and Potential Units Sold for the drag-selected range; Potential Revenue = (potential - actual) × price
   const chartRangeSum = useMemo(() => {
     if (!chartDisplayData?.data?.length || chartRangeSelection.startTimestamp == null || chartRangeSelection.endTimestamp == null) return null;
     const data = chartDisplayData.data;
@@ -765,8 +765,11 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         unitsSmoothed += Number(d.forecastBase ?? d.unitsSmooth) || 0;
       }
     });
-    return { unitsSold, unitsSmoothed };
-  }, [chartDisplayData?.data, chartRangeSelection.startTimestamp, chartRangeSelection.endTimestamp]);
+    const price = metrics?.current_period?.price ?? 0;
+    const unitGap = Math.max(0, unitsSmoothed - unitsSold);
+    const potentialRevenue = unitGap * price;
+    return { unitsSold, unitsSmoothed, potentialRevenue, price };
+  }, [chartDisplayData?.data, chartRangeSelection.startTimestamp, chartRangeSelection.endTimestamp, metrics?.current_period?.price]);
 
   // Map client X to timestamp using the chart's actual plot area and current visible domain (zoom-aware)
   const getTimestampFromClientX = (clientX) => {
@@ -3220,6 +3223,10 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 <span style={{ fontSize: '0.8125rem', color: '#e5e7eb' }}>
                   <strong>Units Sold</strong> {chartRangeSum.unitsSold.toLocaleString()}
                   <span style={{ marginLeft: '1rem' }}><strong>Potential Units Sold</strong> {chartRangeSum.unitsSmoothed.toLocaleString()}</span>
+                  <span style={{ marginLeft: '1rem' }}><strong>Potential Revenue</strong> {chartRangeSum.price != null && chartRangeSum.price > 0
+                    ? '$' + chartRangeSum.potentialRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                    : '—'}
+                  </span>
                 </span>
               </span>
               <button
