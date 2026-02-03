@@ -133,6 +133,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     return doiSettings || { amazonDoiGoal: 130, inboundLeadTime: 30, manufactureLeadTime: 7 };
   });
   const [currentProductAsin, setCurrentProductAsin] = useState(null);
+  const [chartLoadError, setChartLoadError] = useState(null); // e.g. CORS / network when chart fails on live
   const [visibleSalesMetrics, setVisibleSalesMetrics] = useState(['units_sold', 'sales']);
   const [visibleAdsMetrics, setVisibleAdsMetrics] = useState(['total_sales', 'tacos']);
   const [selectedMetrics, setSelectedMetrics] = useState({
@@ -219,6 +220,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
 
       try {
         setLoading(true);
+        setChartLoadError(null);
         
               const weeks = getWeeksForView(selectedView);
               
@@ -248,6 +250,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 setProductDetails(details);
                 setForecastData(forecast);
                 setChartData(chart);
+                setChartLoadError(results[2].status === 'rejected' ? (results[2].reason?.message || results[2].reason?.toString?.() || 'Chart request failed') : null);
                 // Don't set metrics/salesChart/adsChart - not needed for inventory-only mode
               } else {
                 // Full mode - fetch all data including metrics/sales/ads
@@ -281,6 +284,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 setProductDetails(details);
                 setForecastData(forecast);
                 setChartData(chart);
+                setChartLoadError(results[2].status === 'rejected' ? (results[2].reason?.message || results[2].reason?.toString?.() || 'Chart request failed') : null);
                 setMetrics(metricsData);
                 setSalesChartData(salesChart);
                 setAdsChartData(adsChart);
@@ -3235,11 +3239,16 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               </ResponsiveContainer>
             ) : (
               <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed #475569', borderRadius: '0.5rem' }}>
-                <div style={{ textAlign: 'center', color: '#64748b' }}>
+                <div style={{ textAlign: 'center', color: '#64748b', maxWidth: '320px', padding: '0.5rem' }}>
                   <svg style={{ width: '48px', height: '48px', margin: '0 auto', marginBottom: '0.5rem' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                   </svg>
                   <p style={{ fontSize: '0.875rem' }}>No chart data available</p>
+                  {chartLoadError && (
+                    <p style={{ fontSize: '0.75rem', marginTop: '0.25rem', color: '#94a3b8' }} title={chartLoadError}>
+                      If this works locally, the forecast API may be blocking your live domain (CORS). Check the browser console for details.
+                    </p>
+                  )}
                 </div>
               </div>
             )}

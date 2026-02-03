@@ -50,19 +50,20 @@ const NgoosModal = ({
     textSecondary: isDarkMode ? 'text-dark-text-secondary' : 'text-gray-500',
   };
 
+  // Stable keys for DOI settings so effect doesn't re-run on every parent re-render (avoids React #185 infinite loop)
+  const doiSettingsKey = doiSettings
+    ? `${doiSettings.amazonDoiGoal ?? ''}_${doiSettings.inboundLeadTime ?? ''}_${doiSettings.manufactureLeadTime ?? ''}`
+    : '';
+
   // Fetch forecast data for Add Units button (refetch when forecastRange or doiSettings changes)
+  const childAsinForEffect = selectedRow?.child_asin || selectedRow?.childAsin || selectedRow?.asin;
   useEffect(() => {
+    if (!isOpen || !childAsinForEffect) return;
+
     const fetchForecastData = async () => {
-      if (!isOpen || !selectedRow) return;
-
-      const childAsin = selectedRow?.child_asin || selectedRow?.childAsin || selectedRow?.asin;
-      if (!childAsin) return;
-
       try {
-        // Pass DOI settings object for accurate units_to_make calculation
-        // Falls back to forecastRange if doiSettings not provided
         const settings = doiSettings || forecastRange;
-        const forecast = await NgoosAPI.getForecast(childAsin, settings);
+        const forecast = await NgoosAPI.getForecast(childAsinForEffect, settings);
         setForecastData(forecast);
       } catch (error) {
         console.error('Error fetching forecast data:', error);
@@ -70,51 +71,52 @@ const NgoosModal = ({
     };
 
     fetchForecastData();
-  }, [isOpen, selectedRow, forecastRange, doiSettings]);
+  }, [isOpen, childAsinForEffect, forecastRange, doiSettingsKey]);
 
   // Fetch catalog data to get image if not available in selectedRow
+  // Use stable primitives (id, child_asin) to avoid effect re-running every render (avoids React #185)
+  const selectedRowId = selectedRow?.id;
+  const selectedRowChildAsin = selectedRow?.child_asin ?? selectedRow?.childAsin ?? selectedRow?.asin;
+  const selectedRowHasImage = !!(selectedRow?.mainImage || selectedRow?.product_image_url || selectedRow?.productImage || selectedRow?.image || selectedRow?.productImageUrl);
+  const selectedRowCatalogId = selectedRow?.catalogId || selectedRow?.id;
+
   useEffect(() => {
+    if (!isOpen || !selectedRowId) {
+      setCatalogImageData(null);
+      return;
+    }
+
+    if (selectedRowHasImage) {
+      setCatalogImageData(null);
+      return;
+    }
+
+    if (!selectedRowCatalogId) return;
+
+    let cancelled = false;
     const fetchCatalogImage = async () => {
-      if (!isOpen || !selectedRow) {
-        setCatalogImageData(null);
-        return;
-      }
-
-      // Check if image already exists
-      const hasImage = selectedRow?.mainImage || 
-                      selectedRow?.product_image_url || 
-                      selectedRow?.productImage || 
-                      selectedRow?.image ||
-                      selectedRow?.productImageUrl;
-      
-      if (hasImage) {
-        setCatalogImageData(null);
-        return; // Image already available, no need to fetch
-      }
-
-      // Try to fetch from catalog using catalogId
-      const catalogId = selectedRow?.catalogId || selectedRow?.id;
-      if (!catalogId) return;
-
       try {
-        const catalogData = await CatalogAPI.getById(catalogId);
+        const catalogData = await CatalogAPI.getById(selectedRowCatalogId);
+        if (cancelled) return;
         if (catalogData) {
-          // Extract image from catalog data and convert Drive URLs
-          const imageUrl = catalogData.productImages?.productImageUrl || 
-                          catalogData.slides?.productImage ||
-                          catalogData.mainImage ||
-                          catalogData.product_image_url ||
-                          null;
+          const imageUrl = catalogData.productImages?.productImageUrl ||
+            catalogData.slides?.productImage ||
+            catalogData.mainImage ||
+            catalogData.product_image_url ||
+            null;
           setCatalogImageData(getImageUrl(imageUrl));
         }
       } catch (error) {
-        console.error('Error fetching catalog image data:', error);
-        setCatalogImageData(null);
+        if (!cancelled) {
+          console.error('Error fetching catalog image data:', error);
+          setCatalogImageData(null);
+        }
       }
     };
 
     fetchCatalogImage();
-  }, [isOpen, selectedRow]);
+    return () => { cancelled = true; };
+  }, [isOpen, selectedRowId, selectedRowHasImage, selectedRowCatalogId]);
 
   if (!isOpen || !selectedRow) return null;
 
@@ -136,15 +138,6 @@ const NgoosModal = ({
   const realLabelInventory = labelsAvailable !== null && labelsAvailable !== undefined 
     ? labelsAvailable 
     : selectedRow?.label_inventory ?? selectedRow?.labelsAvailable ?? 0;
-  
-  // Debug: Log the values to verify
-  console.log('N-GOOS Modal Values:', {
-    forecastUnits,
-    realLabelInventory,
-    forecastData: forecastData?.units_to_make,
-    selectedRowUnits: selectedRow?.units_to_make,
-    product: selectedRow?.product
-  });
   
   // Get image from selectedRow or catalog, and convert Drive URLs
   const convertedImage = getImageUrl(

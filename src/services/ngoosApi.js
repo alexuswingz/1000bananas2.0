@@ -29,7 +29,7 @@ const API_BASE_URL = 'https://sl2r0ip8zl.execute-api.ap-southeast-2.amazonaws.co
 
 // Railway API - for forecasts, charts, labels (our new backend)
 const LOCAL_API_URL = 'http://127.0.0.1:8000';
-const RAILWAY_API_URL = 'https://web-production-015c7.up.railway.app';
+const RAILWAY_API_URL = process.env.REACT_APP_TPS_FORECAST_API_URL || 'https://web-production-015c7.up.railway.app';
 const TPS_FORECAST_API_URL = USE_LOCAL_API ? LOCAL_API_URL : RAILWAY_API_URL;
 
 class NgoosAPI {

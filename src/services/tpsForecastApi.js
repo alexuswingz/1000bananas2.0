@@ -8,7 +8,7 @@
 const USE_LOCAL_API = false;
 
 const LOCAL_API_URL = 'http://127.0.0.1:8000';
-const RAILWAY_API_URL = 'https://web-production-015c7.up.railway.app';
+const RAILWAY_API_URL = process.env.REACT_APP_TPS_FORECAST_API_URL || 'https://web-production-015c7.up.railway.app';
 
 const FORECAST_API_URL = USE_LOCAL_API ? LOCAL_API_URL : RAILWAY_API_URL;
 
