@@ -649,6 +649,7 @@ class NgoosAPI {
           doi_fba_days: f.doi_fba_days || f.doi_fba || 0,
           total_inventory: f.total_inventory || 0,
           fba_available: f.fba_available || 0,
+          label_inventory: f.label_inventory || 0,  // Labels from Railway database
           status: f.status,
           peak: f.peak,
         })),
@@ -727,6 +728,75 @@ class NgoosAPI {
     } catch (error) {
       console.error('Error fetching TPS planning data:', error);
       throw error;
+    }
+  }
+
+  /**
+   * GET /forecast/labels - Get all label inventory from Railway database
+   * Returns label_inventory for all ASINs
+   */
+  static async getAllLabels() {
+    try {
+      const response = await fetch(`${TPS_FORECAST_API_URL}/forecast/labels`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch labels: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Fetched labels from Railway:', data.count, 'ASINs with labels');
+      
+      return {
+        success: true,
+        count: data.count,
+        labels: data.labels || [],
+        byAsin: data.byAsin || {},
+      };
+    } catch (error) {
+      console.error('Error fetching labels from Railway:', error);
+      return {
+        success: false,
+        count: 0,
+        labels: [],
+        byAsin: {},
+      };
+    }
+  }
+
+  /**
+   * GET /forecast/labels/{asin} - Get label inventory for specific ASIN from Railway
+   */
+  static async getLabelByAsin(asin) {
+    try {
+      const response = await fetch(`${TPS_FORECAST_API_URL}/forecast/labels/${asin}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch label for ${asin}: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return {
+        success: true,
+        asin: data.asin,
+        label_inventory: data.label_inventory || 0,
+      };
+    } catch (error) {
+      console.error(`Error fetching label for ${asin}:`, error);
+      return {
+        success: false,
+        asin,
+        label_inventory: 0,
+      };
     }
   }
 }

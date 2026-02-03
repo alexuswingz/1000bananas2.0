@@ -1652,7 +1652,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 <div className="px-3 py-1 rounded-md bg-red-500/10 border border-red-500/20" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: '600' }}>●</span>
                   <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#ef4444' }}>
-                    Label Inventory: {inventoryData.fba.total + inventoryData.awd.total}
+                    Labels Available: {(labelsAvailable ?? 0).toLocaleString()}
                   </span>
                 </div>
                 <button 
