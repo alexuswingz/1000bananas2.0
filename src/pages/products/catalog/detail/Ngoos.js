@@ -751,7 +751,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     });
   }, [chartDisplayData?.data, zoomDomain?.left, zoomDomain?.right]);
 
-  // Sum of Units Sold and Units Sold Smoothed for the drag-selected range
+  // Sum of Units Sold and Potential Units Sold for the drag-selected range
   const chartRangeSum = useMemo(() => {
     if (!chartDisplayData?.data?.length || chartRangeSelection.startTimestamp == null || chartRangeSelection.endTimestamp == null) return null;
     const data = chartDisplayData.data;
@@ -804,6 +804,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     if (!chartDisplayData?.data?.length) return;
     const t = getTimestampFromClientX(e.clientX);
     if (t == null) return;
+    e.preventDefault(); // prevent text/element selection when dragging on chart
     if (zKeyHeld) {
       zoomBoxDragRef.current = { startTimestamp: t, endTimestamp: t };
       setZoomBox({ startTimestamp: t, endTimestamp: t });
@@ -911,8 +912,8 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
 
   // Memoized chart cursor styles so Recharts don't see new object refs every render (avoids update loops)
   const chartContainerCursor = zKeyHeld ? 'zoom-in' : (zoomBox.startTimestamp != null ? 'zoom-in' : (chartRangeSelecting ? 'col-resize' : 'crosshair'));
-  const responsiveContainerStyle = useMemo(() => ({ cursor: zKeyHeld ? 'zoom-in' : 'inherit' }), [zKeyHeld]);
-  const composedChartStyle = useMemo(() => ({ backgroundColor: 'transparent', cursor: zKeyHeld ? 'zoom-in' : 'inherit' }), [zKeyHeld]);
+  const responsiveContainerStyle = useMemo(() => ({ cursor: zKeyHeld ? 'zoom-in' : 'inherit', outline: 'none' }), [zKeyHeld]);
+  const composedChartStyle = useMemo(() => ({ backgroundColor: 'transparent', cursor: zKeyHeld ? 'zoom-in' : 'inherit', outline: 'none' }), [zKeyHeld]);
 
   // Available metrics configuration
   // Sales Metrics Configuration
@@ -1577,7 +1578,8 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         backgroundColor: '#1A2235',
         display: 'flex',
         flexDirection: 'column',
-        minHeight: 0
+        minHeight: 0,
+        outline: 'none'
       }}
     >
       {/* Tab Navigation - Hidden when inventoryOnly is true */}
@@ -1652,7 +1654,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 <div className="px-3 py-1 rounded-md bg-red-500/10 border border-red-500/20" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: '600' }}>●</span>
                   <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#ef4444' }}>
-                    Labels Available: {(labelsAvailable ?? 0).toLocaleString()}
+                    Label Inventory: {inventoryData.fba.total + inventoryData.awd.total}
                   </span>
                 </div>
                 <button 
@@ -2118,6 +2120,9 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                   </div>
                   <div style={{ fontSize: inventoryOnly ? '0.875rem' : '0.875rem', color: '#94a3b8' }}>
                     <span style={{ fontWeight: 500 }}>BRAND:</span> <span style={{ color: '#fff' }}>{productDetails?.product?.brand || data?.brand || 'N/A'}</span>
+                  </div>
+                  <div style={{ fontSize: inventoryOnly ? '0.875rem' : '0.875rem', color: '#94a3b8' }}>
+                    <span style={{ fontWeight: 500 }}>SKU:</span> <span style={{ color: '#fff' }}>{productDetails?.product?.sku || data?.childSku || data?.sku || data?.sku_id || data?.skuId || data?.catalog_sku || data?.child_sku || data?.child_sku_final || 'N/A'}</span>
                   </div>
                 </div>
               </div>
@@ -2758,15 +2763,20 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           </div>
 
 
-          {/* Chart Area - Hold Z and drag to zoom; drag without Z to sum Units Sold / Units Sold Smoothed. */}
+          {/* Chart Area - Hold Z and drag to zoom; drag without Z to sum Units Sold / Potential Units Sold. */}
           <div
             ref={chartContainerRef}
+            className="ngoos-chart-area"
+            tabIndex={-1}
             style={{
               height: inventoryOnly ? 188 : 420,
               width: '100%',
               marginTop: '0.25rem',
               position: 'relative',
-              cursor: chartContainerCursor
+              cursor: chartContainerCursor,
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+              outline: 'none'
             }}
             onMouseDown={handleChartRangeMouseDown}
             onMouseMove={handleChartRangeMouseMove}
@@ -3155,7 +3165,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                     stroke="#f97316" 
                     strokeWidth={2}
                     dot={false}
-                    name="Units Sold Smoothed"
+                    name="Potential Units Sold"
                     connectNulls={false}
                   />
                   
@@ -3187,7 +3197,12 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           </div>
 
           {/* Range selection sum - show when user has dragged a range */}
-          {chartRangeSum != null && (
+          {chartRangeSum != null && (() => {
+            const lo = Math.min(chartRangeSelection.startTimestamp, chartRangeSelection.endTimestamp);
+            const hi = Math.max(chartRangeSelection.startTimestamp, chartRangeSelection.endTimestamp);
+            const startStr = new Date(lo).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            const endStr = new Date(hi).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            return (
             <div style={{
               marginTop: '0.5rem',
               padding: '0.5rem 0.75rem',
@@ -3200,10 +3215,12 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               flexWrap: 'wrap',
               gap: '0.5rem'
             }}>
-              <span style={{ fontSize: '0.8125rem', color: '#94a3b8' }}>Selected range:</span>
-              <span style={{ fontSize: '0.8125rem', color: '#e5e7eb' }}>
-                <strong>Units Sold</strong> {chartRangeSum.unitsSold.toLocaleString()}
-                <span style={{ marginLeft: '1rem' }}><strong>Units Sold Smoothed</strong> {chartRangeSum.unitsSmoothed.toLocaleString()}</span>
+              <span style={{ fontSize: '0.8125rem', color: '#ffffff' }}>Selected Dates: {startStr} to {endStr}</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.8125rem', color: '#e5e7eb' }}>
+                  <strong>Units Sold</strong> {chartRangeSum.unitsSold.toLocaleString()}
+                  <span style={{ marginLeft: '1rem' }}><strong>Potential Units Sold</strong> {chartRangeSum.unitsSmoothed.toLocaleString()}</span>
+                </span>
               </span>
               <button
                 type="button"
@@ -3220,7 +3237,8 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 Clear selection
               </button>
             </div>
-          )}
+            );
+          })()}
 
           {/* Legend at bottom - Enhanced style with gradients and colored backgrounds */}
           <div style={{ 
@@ -3257,7 +3275,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 transition: 'background-color 0.2s'
               }}>
                 <div style={{ width: '24px', height: '2px', backgroundColor: '#f97316', borderRadius: '1px', boxShadow: '0 1px 2px rgba(249, 115, 22, 0.3)' }}></div>
-                <span style={{ color: '#d1d5db', fontWeight: '500' }}>Units Sold Smoothed</span>
+                <span style={{ color: '#d1d5db', fontWeight: '500' }}>Potential Units Sold</span>
               </div>
               <div style={{ 
                 display: 'flex', 
