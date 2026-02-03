@@ -93,6 +93,55 @@ const LabelCheckTable = ({
   const [sortField, setSortField] = useState('');
   const [sortOrder, setSortOrder] = useState('');
 
+  const MAX_LABEL_CHECK_UNDO = 50;
+  const [labelCheckUndoStack, setLabelCheckUndoStack] = useState([]);
+  const [labelCheckRedoStack, setLabelCheckRedoStack] = useState([]);
+  const labelCheckCompletedRef = useRef(new Set());
+  const labelCheckConfirmedRef = useRef(new Set());
+
+  useEffect(() => {
+    labelCheckCompletedRef.current = completedRows;
+    labelCheckConfirmedRef.current = confirmedRows;
+  }, [completedRows, confirmedRows]);
+
+  const pushLabelCheckUndo = useCallback(() => {
+    const snapshot = {
+      completedIds: Array.from(labelCheckCompletedRef.current),
+      confirmedIds: Array.from(labelCheckConfirmedRef.current),
+    };
+    setLabelCheckUndoStack((prev) => [...prev.slice(-(MAX_LABEL_CHECK_UNDO - 1)), snapshot]);
+    setLabelCheckRedoStack([]);
+  }, []);
+
+  const applyLabelCheckSnapshot = useCallback((snapshot) => {
+    setCompletedRows(new Set(snapshot.completedIds || []));
+    setConfirmedRows(new Set(snapshot.confirmedIds || []));
+  }, []);
+
+  const handleLabelCheckUndo = useCallback(() => {
+    if (labelCheckUndoStack.length === 0) return;
+    const snapshot = labelCheckUndoStack[labelCheckUndoStack.length - 1];
+    const currentSnapshot = {
+      completedIds: Array.from(labelCheckCompletedRef.current),
+      confirmedIds: Array.from(labelCheckConfirmedRef.current),
+    };
+    setLabelCheckRedoStack((prev) => [...prev, currentSnapshot]);
+    setLabelCheckUndoStack((prev) => prev.slice(0, -1));
+    applyLabelCheckSnapshot(snapshot);
+  }, [labelCheckUndoStack, applyLabelCheckSnapshot]);
+
+  const handleLabelCheckRedo = useCallback(() => {
+    if (labelCheckRedoStack.length === 0) return;
+    const snapshot = labelCheckRedoStack[labelCheckRedoStack.length - 1];
+    const currentSnapshot = {
+      completedIds: Array.from(labelCheckCompletedRef.current),
+      confirmedIds: Array.from(labelCheckConfirmedRef.current),
+    };
+    setLabelCheckUndoStack((prev) => [...prev.slice(-(MAX_LABEL_CHECK_UNDO - 1)), currentSnapshot]);
+    setLabelCheckRedoStack((prev) => prev.slice(0, -1));
+    applyLabelCheckSnapshot(snapshot);
+  }, [labelCheckRedoStack, applyLabelCheckSnapshot]);
+
   // Fetch label formula when a row is selected for counting
   const fetchLabelFormula = useCallback(async (labelLocation) => {
     if (!labelLocation) {
@@ -634,6 +683,7 @@ const LabelCheckTable = ({
         handleCloseModal();
       } catch (error) {
         console.error('Error resetting label check:', error);
+        pushLabelCheckUndo();
         // Still update local state even if API fails
         setCompletedRows(prev => {
           const newSet = new Set(prev);
@@ -2309,6 +2359,7 @@ const LabelCheckTable = ({
                       handleCloseModal();
                       
                       if (rowId && shipmentId) {
+                        pushLabelCheckUndo();
                         try {
                           await updateShipmentProductLabelCheck(shipmentId, rowId, 'confirmed');
                           console.log(`Label check re-confirmed for product ${rowId}`);
@@ -2419,6 +2470,7 @@ const LabelCheckTable = ({
                       handleCloseModal();
                       
                       if (rowId && shipmentId) {
+                        pushLabelCheckUndo();
                         try {
                           // Save to database
                           await updateShipmentProductLabelCheck(shipmentId, rowId, 'confirmed');
@@ -2631,10 +2683,76 @@ const LabelCheckTable = ({
               </div>
             </div>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
+              {/* Undo/Redo - Label Check */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  borderRadius: '6px',
+                  border: `0.5px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
+                  backgroundColor: isDarkMode ? '#0F172A' : '#F9FAFB',
+                  overflow: 'hidden',
+                }}
+              >
+                <button
+                  type="button"
+                  title="Undo"
+                  disabled={labelCheckUndoStack.length === 0}
+                  style={{
+                    width: '29.5px',
+                    height: '29.5px',
+                    border: 'none',
+                    borderRight: `0.5px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
+                    backgroundColor: 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: labelCheckUndoStack.length === 0 ? 'not-allowed' : 'pointer',
+                    padding: '6px',
+                    transition: 'background-color 0.2s',
+                    opacity: labelCheckUndoStack.length === 0 ? 0.5 : 1,
+                  }}
+                  onClick={handleLabelCheckUndo}
+                  onMouseEnter={(e) => {
+                    if (labelCheckUndoStack.length > 0) e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+                  }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                >
+                  <img src="/assets/Vector (8).png" alt="Undo" style={{ width: '14.63px', height: '5.83px', display: 'block' }} />
+                </button>
+                <button
+                  type="button"
+                  title="Redo"
+                  disabled={labelCheckRedoStack.length === 0}
+                  style={{
+                    width: '29.5px',
+                    height: '29.5px',
+                    border: 'none',
+                    backgroundColor: 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: labelCheckRedoStack.length === 0 ? 'not-allowed' : 'pointer',
+                    padding: '6px',
+                    transition: 'background-color 0.2s',
+                    opacity: labelCheckRedoStack.length === 0 ? 0.5 : 1,
+                  }}
+                  onClick={handleLabelCheckRedo}
+                  onMouseEnter={(e) => {
+                    if (labelCheckRedoStack.length > 0) e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+                  }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                >
+                  <img src="/assets/Vector (9).png" alt="Redo" style={{ width: '14.63px', height: '5.83px', display: 'block' }} />
+                </button>
+              </div>
               {remainingCount > 0 && selectedRowsCount > 0 && onMarkAllLabelChecksAsDone && (
                 <button
                   type="button"
-                  onClick={onMarkAllLabelChecksAsDone}
+                  onClick={() => {
+                    pushLabelCheckUndo();
+                    onMarkAllLabelChecksAsDone();
+                  }}
                   style={{
                     height: '31px',
                     padding: '0 16px',

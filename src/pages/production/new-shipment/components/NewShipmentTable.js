@@ -64,6 +64,10 @@ const NewShipmentTable = ({
   onExport = null, // Callback for Export button
   totalWeightLbs = 0,
   totalFormulas = 0,
+  addProductsUndoStackLength = 0,
+  addProductsRedoStackLength = 0,
+  onAddProductsUndo = null,
+  onAddProductsRedo = null,
 }) => {
   // Account to Brand mapping (for checking if all brands are selected)
   const ACCOUNT_BRAND_MAPPING = {
@@ -3329,21 +3333,23 @@ const NewShipmentTable = ({
               const effectiveAddedRows = addedRows;
               const doiValue = row.doiTotal || row.daysOfInventory || 0;
               const isAdded = effectiveAddedRows.has(row.id);
-              // Average daily demand for DOI calculation (same as your code: QTY / demand => DOI)
+              // Average daily demand: used to project DOI from (total inventory + Units to Make)
               const sales7 = Number(row.sales7Day ?? row.sales_7_day ?? row.units_sold_7_days ?? 0) || 0;
               const sales30 = Number(row.sales30Day ?? row.sales_30_day ?? row.units_sold_30_days ?? 0) || 0;
               const avgDailyDemand = sales7 > 0 ? sales7 / 7 : (sales30 > 0 ? sales30 / 30 : 0);
+              const totalInventory = Number(row.totalInventory ?? row.total_inventory ?? 0) || 0;
               const currentQtyForDoi = (() => {
                 const q = effectiveQtyValues[index];
                 if (q === undefined || q === null || q === '') return 0;
                 return typeof q === 'number' ? q : (parseInt(q, 10) || 0);
               })();
-              // When added: DOI = QTY / demand (your formula) so DOI responds to QTY changes in real time.
-              // Use default demand (10) when no sales history so DOI still updates with QTY.
+              // When added: Units to Make is the suggested value from required DOI. Display DOI = projected
+              // days of inventory after adding that quantity: (total inventory + Units to Make) / daily demand.
               const effectiveDemand = avgDailyDemand > 0 ? avgDailyDemand : 10;
               const displayDoi = (() => {
                 if (!isAdded) return doiValue;
-                const calculatedDoi = Math.floor(currentQtyForDoi / effectiveDemand);
+                const projectedInventory = totalInventory + currentQtyForDoi;
+                const calculatedDoi = Math.floor(projectedInventory / effectiveDemand);
                 return Math.max(0, calculatedDoi);
               })();
               const doiColor = getDoiColor(displayDoi);
@@ -4669,7 +4675,7 @@ const NewShipmentTable = ({
             boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
           }}
         >
-          <div style={{ display: 'flex', gap: '48px', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: '48px', alignItems: 'center', flexShrink: 0 }}>
             {footerStatsVisibility.palettes && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
                 <span style={{ fontSize: '12px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#9CA3AF', textAlign: 'center' }}>PALETTES</span>
@@ -4713,8 +4719,77 @@ const NewShipmentTable = ({
               </div>
             )}
           </div>
-          {(onClear || onExport) && (
+          {(onClear || onExport || onAddProductsUndo) && (
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
+              {/* Undo/Redo - Add Products */}
+              {onAddProductsUndo && onAddProductsRedo && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    borderRadius: '6px',
+                    border: `0.5px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
+                    backgroundColor: isDarkMode ? '#0F172A' : '#F9FAFB',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <button
+                    type="button"
+                    title="Undo"
+                    disabled={addProductsUndoStackLength === 0}
+                    style={{
+                      width: '29.5px',
+                      height: '29.5px',
+                      border: 'none',
+                      borderRight: `0.5px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
+                      backgroundColor: 'transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: addProductsUndoStackLength === 0 ? 'not-allowed' : 'pointer',
+                      padding: '6px',
+                      transition: 'background-color 0.2s',
+                      opacity: addProductsUndoStackLength === 0 ? 0.5 : 1,
+                    }}
+                    onClick={onAddProductsUndo}
+                    onMouseEnter={(e) => {
+                      if (addProductsUndoStackLength > 0) e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    <img src="/assets/Vector (8).png" alt="Undo" style={{ width: '14.63px', height: '5.83px', display: 'block' }} />
+                  </button>
+                  <button
+                    type="button"
+                    title="Redo"
+                    disabled={addProductsRedoStackLength === 0}
+                    style={{
+                      width: '29.5px',
+                      height: '29.5px',
+                      border: 'none',
+                      backgroundColor: 'transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: addProductsRedoStackLength === 0 ? 'not-allowed' : 'pointer',
+                      padding: '6px',
+                      transition: 'background-color 0.2s',
+                      opacity: addProductsRedoStackLength === 0 ? 0.5 : 1,
+                    }}
+                    onClick={onAddProductsRedo}
+                    onMouseEnter={(e) => {
+                      if (addProductsRedoStackLength > 0) e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    <img src="/assets/Vector (9).png" alt="Redo" style={{ width: '14.63px', height: '5.83px', display: 'block' }} />
+                  </button>
+                </div>
+              )}
               {onClear && (
                 <button
                   type="button"
@@ -6478,6 +6553,7 @@ const NewShipmentTable = ({
           left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2)`,
           transform: 'translateX(-50%)',
           width: 'fit-content',
+          minWidth: '1014px',
           height: '65px',
           backgroundColor: isDarkMode ? 'rgba(31, 41, 55, 0.85)' : 'rgba(255, 255, 255, 0.85)',
           backdropFilter: 'blur(12px)',
@@ -6487,13 +6563,14 @@ const NewShipmentTable = ({
           padding: '16px 24px',
           display: 'flex',
           alignItems: 'center',
+          justifyContent: 'space-between',
           gap: '32px',
           zIndex: 1000,
           transition: 'left 300ms cubic-bezier(0.4, 0, 0.2, 1)',
           boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
         }}
       >
-        <div style={{ display: 'flex', gap: '48px', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: '48px', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
           {footerStatsVisibility.palettes && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
               <span style={{ fontSize: '12px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#9CA3AF', textAlign: 'center' }}>PALETTES</span>
@@ -6537,8 +6614,77 @@ const NewShipmentTable = ({
             </div>
           )}
         </div>
-        {(onClear || onExport) && (
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
+        {(onClear || onExport || onAddProductsUndo) && (
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            {/* Undo/Redo - Add Products (table mode) */}
+            {onAddProductsUndo && onAddProductsRedo && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  borderRadius: '6px',
+                  border: `0.5px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
+                  backgroundColor: isDarkMode ? '#0F172A' : '#F9FAFB',
+                  overflow: 'hidden',
+                }}
+              >
+                <button
+                  type="button"
+                  title="Undo"
+                  disabled={addProductsUndoStackLength === 0}
+                  style={{
+                    width: '29.5px',
+                    height: '29.5px',
+                    border: 'none',
+                    borderRight: `0.5px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
+                    backgroundColor: 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: addProductsUndoStackLength === 0 ? 'not-allowed' : 'pointer',
+                    padding: '6px',
+                    transition: 'background-color 0.2s',
+                    opacity: addProductsUndoStackLength === 0 ? 0.5 : 1,
+                  }}
+                  onClick={onAddProductsUndo}
+                  onMouseEnter={(e) => {
+                    if (addProductsUndoStackLength > 0) e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <img src="/assets/Vector (8).png" alt="Undo" style={{ width: '14.63px', height: '5.83px', display: 'block' }} />
+                </button>
+                <button
+                  type="button"
+                  title="Redo"
+                  disabled={addProductsRedoStackLength === 0}
+                  style={{
+                    width: '29.5px',
+                    height: '29.5px',
+                    border: 'none',
+                    backgroundColor: 'transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: addProductsRedoStackLength === 0 ? 'not-allowed' : 'pointer',
+                    padding: '6px',
+                    transition: 'background-color 0.2s',
+                    opacity: addProductsRedoStackLength === 0 ? 0.5 : 1,
+                  }}
+                  onClick={onAddProductsRedo}
+                  onMouseEnter={(e) => {
+                    if (addProductsRedoStackLength > 0) e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <img src="/assets/Vector (9).png" alt="Redo" style={{ width: '14.63px', height: '5.83px', display: 'block' }} />
+                </button>
+              </div>
+            )}
             {onClear && (
               <button
                 type="button"
@@ -6587,7 +6733,6 @@ const NewShipmentTable = ({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    whiteSpace: 'nowrap',
                   }}
                   onMouseEnter={(e) => {
                     if (addedRows && addedRows.size > 0) {

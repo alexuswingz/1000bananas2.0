@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useTheme } from '../../../context/ThemeContext';
 import { useSidebar } from '../../../context/SidebarContext';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -727,15 +727,6 @@ const NewShipment = () => {
         getLabelsAvailability(shipmentId) // Pass shipment ID to exclude current shipment
       ]);
       
-      // Create Railway labels map directly from forecast data (label_inventory is included in /forecast/ response)
-      const railwayLabelsMap = {};
-      (tpsForecastData.products || []).forEach(p => {
-        if (p.asin && p.label_inventory > 0) {
-          railwayLabelsMap[p.asin] = p.label_inventory;
-        }
-      });
-      console.log('Loaded Railway labels from forecast:', Object.keys(railwayLabelsMap).length, 'ASINs with labels');
-      
       // Map TPS forecast data to planning format - USE RAILWAY DATA AS SOURCE OF TRUTH
       const planningData = {
         products: (tpsForecastData.products || []).map(p => ({
@@ -780,16 +771,6 @@ const NewShipment = () => {
           forecastMap[item.asin] = item;
         }
       });
-      
-      // Create dedicated labels map from Railway data (backup for ASIN merge failures)
-      // This ensures labels ALWAYS come from Railway, even if main forecast merge fails
-      const railwayLabelsFromForecast = {};
-      (planningData.products || []).forEach(item => {
-        if (item.asin && item.label_inventory > 0) {
-          railwayLabelsFromForecast[item.asin] = item.label_inventory;
-        }
-      });
-      console.log('Created Railway labels map:', Object.keys(railwayLabelsFromForecast).length, 'ASINs with labels');
       
       console.log('Forecast map has', Object.keys(forecastMap).length, 'entries');
       
@@ -872,24 +853,7 @@ const NewShipment = () => {
         const railwayDoiTotal = forecast.doi_total || forecast.doi_total_days || 0;
         const railwayDoiFba = forecast.doi_fba || forecast.doi_fba_days || 0;
         const railwayUnitsToMake = forecast.units_to_make || 0;
-        // LABELS: Priority is Railway labels > AWS Lambda
-        // Try multiple ASIN variants to ensure Railway data is found
-        const asinVariants = [asinKey, item.child_asin, item.asin, item.childAsin].filter(Boolean);
-        let railwayLabelInventory = 0;
-        for (const asin of asinVariants) {
-          if (railwayLabelsMap[asin]) {
-            railwayLabelInventory = railwayLabelsMap[asin];
-            break;
-          }
-          if (railwayLabelsFromForecast[asin]) {
-            railwayLabelInventory = railwayLabelsFromForecast[asin];
-            break;
-          }
-        }
-        // Fallback to forecast merge, then AWS Lambda (last resort)
-        if (!railwayLabelInventory) {
-          railwayLabelInventory = forecast.label_inventory || 0;
-        }
+        const railwayLabelInventory = forecast.label_inventory || 0;
         
         // Use units_to_make from Railway API as the forecast value
         // Fallback to sales-based calculation only if API value is 0
@@ -1333,6 +1297,12 @@ const NewShipment = () => {
   }, []);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [qtyValues, setQtyValues] = useState({});
+  const MAX_ADD_PRODUCTS_UNDO = 50;
+  const [addProductsUndoStack, setAddProductsUndoStack] = useState([]);
+  const [addProductsRedoStack, setAddProductsRedoStack] = useState([]);
+  const addProductsQtyValuesRef = useRef({});
+  const addProductsAddedRowsRef = useRef(new Set());
+  const addProductsFilteredProductsRef = useRef([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBrands, setSelectedBrands] = useState(null); // Brand filter from products dropdown (Set of brands or null)
   const [lastAccount, setLastAccount] = useState(null); // Track account changes
@@ -1389,6 +1359,71 @@ const NewShipment = () => {
     }
     setLastAccount(shipmentData.account);
   }, [shipmentData.account, lastAccount]);
+
+  // Keep Add Products undo refs in sync (so undo/redo can read current state)
+  // Note: addProductsFilteredProductsRef is synced in render after filteredProducts is defined
+  useEffect(() => {
+    if (activeAction !== 'add-products') return;
+    addProductsQtyValuesRef.current = qtyValues;
+    addProductsAddedRowsRef.current = addedRows;
+  }, [activeAction, qtyValues, addedRows]);
+
+  const buildAddProductsSnapshot = useCallback((qtyVals, addedRowsSet, productsList) => {
+    const quantitiesByProductId = {};
+    (productsList || []).forEach((p, i) => {
+      if (p && p.id && qtyVals[i] !== undefined && qtyVals[i] !== '') {
+        quantitiesByProductId[p.id] = qtyVals[i];
+      }
+    });
+    return {
+      quantitiesByProductId,
+      addedIds: Array.from(addedRowsSet || []),
+    };
+  }, []);
+
+  const pushAddProductsUndo = useCallback((qtyVals, addedRowsSet, productsList) => {
+    if (!productsList || productsList.length === 0) return;
+    const snapshot = buildAddProductsSnapshot(qtyVals, addedRowsSet, productsList);
+    setAddProductsUndoStack((prev) => [...prev.slice(-(MAX_ADD_PRODUCTS_UNDO - 1)), snapshot]);
+    setAddProductsRedoStack([]);
+  }, [buildAddProductsSnapshot]);
+
+  const applyAddProductsSnapshot = useCallback((snapshot, productsList) => {
+    const newQtyValues = {};
+    (productsList || []).forEach((p, i) => {
+      if (p && p.id && snapshot.quantitiesByProductId[p.id] !== undefined) {
+        newQtyValues[i] = snapshot.quantitiesByProductId[p.id];
+      }
+    });
+    setQtyValues(newQtyValues);
+    setAddedRows(new Set(snapshot.addedIds || []));
+  }, []);
+
+  const handleAddProductsUndo = useCallback(() => {
+    if (addProductsUndoStack.length === 0) return;
+    const snapshot = addProductsUndoStack[addProductsUndoStack.length - 1];
+    const currentSnapshot = buildAddProductsSnapshot(
+      addProductsQtyValuesRef.current,
+      addProductsAddedRowsRef.current,
+      addProductsFilteredProductsRef.current
+    );
+    setAddProductsRedoStack((prev) => [...prev, currentSnapshot]);
+    setAddProductsUndoStack((prev) => prev.slice(0, -1));
+    applyAddProductsSnapshot(snapshot, addProductsFilteredProductsRef.current);
+  }, [addProductsUndoStack, buildAddProductsSnapshot, applyAddProductsSnapshot]);
+
+  const handleAddProductsRedo = useCallback(() => {
+    if (addProductsRedoStack.length === 0) return;
+    const snapshot = addProductsRedoStack[addProductsRedoStack.length - 1];
+    const currentSnapshot = buildAddProductsSnapshot(
+      addProductsQtyValuesRef.current,
+      addProductsAddedRowsRef.current,
+      addProductsFilteredProductsRef.current
+    );
+    setAddProductsUndoStack((prev) => [...prev.slice(-(MAX_ADD_PRODUCTS_UNDO - 1)), currentSnapshot]);
+    setAddProductsRedoStack((prev) => prev.slice(0, -1));
+    applyAddProductsSnapshot(snapshot, addProductsFilteredProductsRef.current);
+  }, [addProductsRedoStack, buildAddProductsSnapshot, applyAddProductsSnapshot]);
   
   // Re-filter products when account or shipment type changes (but NOT on initial load)
   useEffect(() => {
@@ -2614,28 +2649,20 @@ const NewShipment = () => {
     const searchWords = searchLower.split(/\s+/).filter(w => w.length > 0);
     
     // Filter products but preserve _originalIndex
+    // Search ONLY product titles so formula/bottle/label matches don't show unrelated products
     const filtered = productsWithIndex.filter(product => {
-      // Create a single searchable string from all relevant fields
-      const searchableText = [
-        product.brand || '',
-        product.product || '',
-        product.size || '',
-        product.asin || '',
-        product.childAsin || '',
-        product.childSku || '',
-        product.formula_name || '',
-        product.bottle_name || '',
-        product.label_location || '',
-      ].join(' ').toLowerCase();
-      
-      // ALL search words must be found somewhere in the product text
-      return searchWords.every(word => searchableText.includes(word));
+      const productTitle = (product.product || '').toLowerCase();
+      // ALL search words must be found in the product title only
+      return searchWords.every(word => productTitle.includes(word));
     });
     
     return filtered;
   };
   
   const filteredProducts = getFilteredProducts();
+  if (activeAction === 'add-products') {
+    addProductsFilteredProductsRef.current = filteredProducts;
+  }
 
   return (
     <div className={`min-h-screen ${themeClasses.pageBg}`} style={{ paddingBottom: (activeAction === 'add-products' || activeAction === 'formula-check' || activeAction === 'label-check' || activeAction === 'book-shipment' || activeAction === 'sort-products' || activeAction === 'sort-formulas') ? '100px' : '0px' }}>
@@ -2938,9 +2965,17 @@ const NewShipment = () => {
                     tableMode={tableMode}
                     onProductClick={handleProductClick}
                     qtyValues={qtyValues}
-                    onQtyChange={setQtyValues}
+                    onQtyChange={(updater) => {
+                      pushAddProductsUndo(addProductsQtyValuesRef.current, addProductsAddedRowsRef.current, addProductsFilteredProductsRef.current);
+                      setAddProductsRedoStack([]);
+                      setQtyValues(updater);
+                    }}
                     addedRows={addedRows}
-                    onAddedRowsChange={setAddedRows}
+                    onAddedRowsChange={(next) => {
+                      pushAddProductsUndo(addProductsQtyValuesRef.current, addProductsAddedRowsRef.current, addProductsFilteredProductsRef.current);
+                      setAddProductsRedoStack([]);
+                      setAddedRows(next);
+                    }}
                     labelsAvailabilityMap={labelsAvailabilityMap}
                     forecastRange={parseInt(forecastRange) || 120}
                     manuallyEditedIndicesRef={manuallyEditedIndicesRef}
@@ -2959,6 +2994,10 @@ const NewShipment = () => {
                       setQtyValues({});
                     }}
                     onExport={handleExport}
+                    addProductsUndoStackLength={addProductsUndoStack.length}
+                    addProductsRedoStackLength={addProductsRedoStack.length}
+                    onAddProductsUndo={handleAddProductsUndo}
+                    onAddProductsRedo={handleAddProductsRedo}
                   />
                 )}
               </>
@@ -3004,6 +3043,7 @@ const NewShipment = () => {
               shipmentProducts={productsForSortTabs}
               shipmentId={shipmentId}
               onCompleteClick={handleCompleteClick}
+              totalTimeHours={totalTimeHours}
             />
           </div>
         )}

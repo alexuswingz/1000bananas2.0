@@ -31,6 +31,62 @@ const FormulaCheckTable = ({
   const [dataLoaded, setDataLoaded] = useState(false); // Track if we've loaded from backend
   const [bulkSelectedRows, setBulkSelectedRows] = useState(new Set()); // Track rows selected for bulk actions
 
+  const MAX_FORMULA_CHECK_UNDO = 50;
+  const [formulaCheckUndoStack, setFormulaCheckUndoStack] = useState([]);
+  const [formulaCheckRedoStack, setFormulaCheckRedoStack] = useState([]);
+  const formulaCheckFormulasRef = useRef([]);
+  const formulaCheckNotesRef = useRef({});
+
+  useEffect(() => {
+    formulaCheckFormulasRef.current = formulas;
+    formulaCheckNotesRef.current = notes;
+  }, [formulas, notes]);
+
+  const buildFormulaCheckSnapshot = useCallback(() => {
+    const checkedById = {};
+    formulaCheckFormulasRef.current.forEach((f) => {
+      checkedById[f.id] = f.isChecked;
+    });
+    return {
+      checkedById,
+      notes: { ...formulaCheckNotesRef.current },
+    };
+  }, []);
+
+  const pushFormulaCheckUndo = useCallback(() => {
+    const snapshot = buildFormulaCheckSnapshot();
+    setFormulaCheckUndoStack((prev) => [...prev.slice(-(MAX_FORMULA_CHECK_UNDO - 1)), snapshot]);
+    setFormulaCheckRedoStack([]);
+  }, [buildFormulaCheckSnapshot]);
+
+  const applyFormulaCheckSnapshot = useCallback((snapshot) => {
+    setFormulas((prev) =>
+      prev.map((f) => ({
+        ...f,
+        isChecked: snapshot.checkedById[f.id] !== undefined ? snapshot.checkedById[f.id] : f.isChecked,
+      }))
+    );
+    setNotes(snapshot.notes || {});
+  }, []);
+
+  const handleFormulaCheckUndo = useCallback(() => {
+    if (formulaCheckUndoStack.length === 0) return;
+    const snapshot = formulaCheckUndoStack[formulaCheckUndoStack.length - 1];
+    const currentSnapshot = buildFormulaCheckSnapshot();
+    setFormulaCheckRedoStack((prev) => [...prev, currentSnapshot]);
+    setFormulaCheckUndoStack((prev) => prev.slice(0, -1));
+    applyFormulaCheckSnapshot(snapshot);
+  }, [formulaCheckUndoStack, buildFormulaCheckSnapshot, applyFormulaCheckSnapshot]);
+
+  const handleFormulaCheckRedo = useCallback(() => {
+    if (formulaCheckRedoStack.length === 0) return;
+    const snapshot = formulaCheckRedoStack[formulaCheckRedoStack.length - 1];
+    const currentSnapshot = buildFormulaCheckSnapshot();
+    setFormulaCheckUndoStack((prev) => [...prev.slice(-(MAX_FORMULA_CHECK_UNDO - 1)), currentSnapshot]);
+    setFormulaCheckRedoStack((prev) => prev.slice(0, -1));
+    applyFormulaCheckSnapshot(snapshot);
+  }, [formulaCheckRedoStack, buildFormulaCheckSnapshot, applyFormulaCheckSnapshot]);
+
   // Load formula data from API - reload when shipmentId OR refreshKey changes
   useEffect(() => {
     if (shipmentId) {
@@ -445,6 +501,7 @@ const FormulaCheckTable = ({
   // Handle individual "Complete" button click - marks item as done
   const handleCompleteClick = async (id) => {
     try {
+      pushFormulaCheckUndo();
       // Mark as done in backend
       await saveCheckedStatus(id, true);
       
@@ -543,6 +600,7 @@ const FormulaCheckTable = ({
     if (bulkSelectedRows.size === 0) return;
     
     try {
+      pushFormulaCheckUndo();
       setLoading(true);
       // Complete all selected formulas
       const promises = Array.from(bulkSelectedRows).map(id => 
@@ -570,6 +628,7 @@ const FormulaCheckTable = ({
 
   const handleNotesSave = (noteText) => {
     if (selectedFormulaForNotes) {
+      pushFormulaCheckUndo();
       saveNotes(selectedFormulaForNotes.id, noteText);
       setNotesModalOpen(false);
       setSelectedFormulaForNotes(null);
@@ -1353,10 +1412,76 @@ const FormulaCheckTable = ({
           </div>
         </div>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
+          {/* Undo/Redo - Formula Check */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              borderRadius: '6px',
+              border: `0.5px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
+              backgroundColor: isDarkMode ? '#0F172A' : '#F9FAFB',
+              overflow: 'hidden',
+            }}
+          >
+            <button
+              type="button"
+              title="Undo"
+              disabled={formulaCheckUndoStack.length === 0}
+              style={{
+                width: '29.5px',
+                height: '29.5px',
+                border: 'none',
+                borderRight: `0.5px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
+                backgroundColor: 'transparent',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: formulaCheckUndoStack.length === 0 ? 'not-allowed' : 'pointer',
+                padding: '6px',
+                transition: 'background-color 0.2s',
+                opacity: formulaCheckUndoStack.length === 0 ? 0.5 : 1,
+              }}
+              onClick={handleFormulaCheckUndo}
+              onMouseEnter={(e) => {
+                if (formulaCheckUndoStack.length > 0) e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+              }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+            >
+              <img src="/assets/Vector (8).png" alt="Undo" style={{ width: '14.63px', height: '5.83px', display: 'block' }} />
+            </button>
+            <button
+              type="button"
+              title="Redo"
+              disabled={formulaCheckRedoStack.length === 0}
+              style={{
+                width: '29.5px',
+                height: '29.5px',
+                border: 'none',
+                backgroundColor: 'transparent',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: formulaCheckRedoStack.length === 0 ? 'not-allowed' : 'pointer',
+                padding: '6px',
+                transition: 'background-color 0.2s',
+                opacity: formulaCheckRedoStack.length === 0 ? 0.5 : 1,
+              }}
+              onClick={handleFormulaCheckRedo}
+              onMouseEnter={(e) => {
+                if (formulaCheckRedoStack.length > 0) e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+              }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+            >
+              <img src="/assets/Vector (9).png" alt="Redo" style={{ width: '14.63px', height: '5.83px', display: 'block' }} />
+            </button>
+          </div>
           {selectedRows.size > 0 && onMarkAllAsCompleted && (
             <button
               type="button"
-              onClick={onMarkAllAsCompleted}
+              onClick={() => {
+                pushFormulaCheckUndo();
+                onMarkAllAsCompleted();
+              }}
               style={{
                 height: '31px',
                 padding: '0 16px',
