@@ -734,6 +734,16 @@ const NewShipmentTable = ({
   }, [filteredRows, selectionFilter, addedRows]);
 
   // Keep local addedRows/selectedRows in sync with parent state so toggling views preserves selections
+  // Use a stable key (sorted IDs string) so we don't re-run on every parent re-render when a new Set with same contents is passed (avoids React #185)
+  const externalAddedRowsKey = (() => {
+    if (externalAddedRows instanceof Set) {
+      return [...externalAddedRows].sort().join(',');
+    }
+    if (Array.isArray(externalAddedRows)) {
+      return [...externalAddedRows].sort().join(',');
+    }
+    return '';
+  })();
   useEffect(() => {
     if (externalAddedRows instanceof Set) {
       setAddedRows(new Set(externalAddedRows));
@@ -742,8 +752,11 @@ const NewShipmentTable = ({
       const synced = new Set(externalAddedRows);
       setAddedRows(synced);
       setSelectedRows(synced);
+    } else if (externalAddedRowsKey === '') {
+      setAddedRows(new Set());
+      setSelectedRows(new Set());
     }
-  }, [externalAddedRows]);
+  }, [externalAddedRowsKey]);
   
   // Handle filter apply
   const handleFilterApply = (filterSettings) => {
@@ -1947,7 +1960,6 @@ const NewShipmentTable = ({
   // Apply non-table mode filters
   const nonTableFilteredRows = useMemo(() => {
     const doiFilter = nonTableFilters.doiDays;
-    console.log('[Best Sellers Debug] tableMode:', tableMode, 'doiFilter:', doiFilter, 'popularFilter:', doiFilter?.popularFilter);
     // When in table mode, only apply Best Sellers sort if that filter is set (so sort works in both views)
     if (tableMode) {
       if (doiFilter?.popularFilter === 'bestSellers' && filteredRowsWithSelection.length > 0) {
