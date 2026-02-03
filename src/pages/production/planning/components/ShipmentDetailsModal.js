@@ -5,8 +5,19 @@ import { useTheme } from '../../../../context/ThemeContext';
 // Shipment type options (FBA, AWD, Hazmat)
 const TYPE_OPTIONS = ['FBA', 'AWD', 'Hazmat'];
 
-// Carrier options
-const CARRIER_OPTIONS = ['UPS', 'FedEx', 'USPS', 'DHL', 'Other'];
+// Account to Brand mapping based on Amazon Seller Account Structure
+const ACCOUNT_OPTIONS = [
+  {
+    name: 'The Plant Shoppe, LLC',
+    brands: ['TPS Nutrients', 'TPS Plant Foods', 'Bloom City'],
+    description: 'Plant nutrients and fertilizers',
+  },
+  {
+    name: 'Total Pest Supply',
+    brands: ['NatureStop', "Ms. Pixie's", "Burke's", 'Mint+'],
+    description: 'Pest control products',
+  },
+];
 
 const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
   const { isDarkMode } = useTheme();
@@ -17,17 +28,16 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
   // Initialize form state from row data
   const [shipmentName, setShipmentName] = useState(row?.shipment || '');
   const [type, setType] = useState(row?.shipmentType || row?.type || '');
-  const [amazonShipmentNumber, setAmazonShipmentNumber] = useState(row?.amazonShipmentNumber || row?.amazon_shipment_id || '');
-  const [amazonRefId, setAmazonRefId] = useState(row?.amazonRefId || row?.amazon_ref_id || '');
-  const [shipFrom, setShipFrom] = useState(row?.shipFrom || row?.ship_from || '');
-  const [shipTo, setShipTo] = useState(row?.shipTo || row?.ship_to || '');
-  const [carrier, setCarrier] = useState(row?.carrier || '');
+  const [marketplace, setMarketplace] = useState(row?.marketplace || 'Amazon');
+  const [account, setAccount] = useState(row?.account || '');
   
   // Dropdown states
   const [typeOpen, setTypeOpen] = useState(false);
-  const [carrierOpen, setCarrierOpen] = useState(false);
+  const [marketplaceOpen, setMarketplaceOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const typeRef = useRef(null);
-  const carrierRef = useRef(null);
+  const marketplaceRef = useRef(null);
+  const accountRef = useRef(null);
   
   // Focus states for blue border on focus
   const [focusedField, setFocusedField] = useState(null);
@@ -37,11 +47,8 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
     if (row) {
       setShipmentName(row.shipment || '');
       setType(row.shipmentType || row.type || '');
-      setAmazonShipmentNumber(row.amazonShipmentNumber || row.amazon_shipment_id || '');
-      setAmazonRefId(row.amazonRefId || row.amazon_ref_id || '');
-      setShipFrom(row.shipFrom || row.ship_from || '');
-      setShipTo(row.shipTo || row.ship_to || '');
-      setCarrier(row.carrier || '');
+      setMarketplace(row.marketplace || 'Amazon');
+      setAccount(row.account || '');
       setIsEditMode(false); // Reset edit mode when row changes
     }
   }, [row]);
@@ -60,19 +67,22 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
       if (typeRef.current && !typeRef.current.contains(event.target)) {
         setTypeOpen(false);
       }
-      if (carrierRef.current && !carrierRef.current.contains(event.target)) {
-        setCarrierOpen(false);
+      if (marketplaceRef.current && !marketplaceRef.current.contains(event.target)) {
+        setMarketplaceOpen(false);
+      }
+      if (accountRef.current && !accountRef.current.contains(event.target)) {
+        setAccountOpen(false);
       }
     };
 
-    if (typeOpen || carrierOpen) {
+    if (typeOpen || marketplaceOpen || accountOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [typeOpen, carrierOpen]);
+  }, [typeOpen, marketplaceOpen, accountOpen]);
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -95,11 +105,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
         const updates = {
           shipment_number: shipmentName,
           shipment_type: type || undefined,
-          amazon_shipment_id: amazonShipmentNumber || undefined,
-          amazon_ref_id: amazonRefId || undefined,
-          ship_from: shipFrom || undefined,
-          ship_to: shipTo || undefined,
-          carrier: carrier || undefined,
+          // Marketplace and account are not editable for existing shipments
         };
         onUpdate(row.id, updates);
       }
@@ -117,11 +123,8 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
       if (row) {
         setShipmentName(row.shipment || '');
         setType(row.shipmentType || row.type || '');
-        setAmazonShipmentNumber(row.amazonShipmentNumber || row.amazon_shipment_id || '');
-        setAmazonRefId(row.amazonRefId || row.amazon_ref_id || '');
-        setShipFrom(row.shipFrom || row.ship_from || '');
-        setShipTo(row.shipTo || row.ship_to || '');
-        setCarrier(row.carrier || '');
+        setMarketplace(row.marketplace || 'Amazon');
+        setAccount(row.account || '');
       }
       setIsEditMode(false);
     } else {
@@ -231,61 +234,63 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
             gap: '20px',
           }}
         >
-          {/* Row 1: Shipment Name + Shipment Type (two columns) */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div>
-              <label
-                style={{
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  display: 'block',
-                  marginBottom: '8px',
-                  color: isDarkMode ? '#E5E7EB' : '#374151',
-                }}
-              >
-                Shipment Name<span style={{ color: '#EF4444' }}>*</span>
-              </label>
-              <input
-                type="text"
-                value={shipmentName}
-                onChange={(e) => setShipmentName(e.target.value)}
-                placeholder="Enter shipment name"
-                disabled={!isEditMode}
-                readOnly={!isEditMode}
-                onFocus={() => isEditMode && setFocusedField('shipmentName')}
-                onBlur={() => setFocusedField(null)}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  border: isEditMode && focusedField === 'shipmentName'
-                    ? '1px solid #3B82F6'
-                    : isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  color: isEditMode
-                    ? (isDarkMode ? '#E5E7EB' : '#111827')
-                    : (isDarkMode ? '#9CA3AF' : '#6B7280'),
-                  backgroundColor: isEditMode
-                    ? (isDarkMode ? '#374151' : '#FFFFFF')
-                    : (isDarkMode ? '#111827' : '#F9FAFB'),
-                  outline: 'none',
-                  cursor: isEditMode ? 'text' : 'not-allowed',
-                  transition: 'border-color 0.2s ease',
-                }}
-              />
-            </div>
+          {/* Shipment Name */}
+          <div>
+            <label
+              style={{ 
+                fontSize: '13px', 
+                fontWeight: 500, 
+                display: 'block', 
+                marginBottom: '8px', 
+                color: isDarkMode ? '#E5E7EB' : '#374151' 
+              }}
+            >
+              Shipment Name<span style={{ color: '#EF4444' }}>*</span>
+            </label>
+            <input
+              type="text"
+              value={shipmentName}
+              onChange={(e) => setShipmentName(e.target.value)}
+              placeholder="Enter shipment name"
+              disabled={!isEditMode}
+              readOnly={!isEditMode}
+              onFocus={() => isEditMode && setFocusedField('shipmentName')}
+              onBlur={() => setFocusedField(null)}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                border: isEditMode && focusedField === 'shipmentName' 
+                  ? '1px solid #3B82F6' 
+                  : isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
+                borderRadius: '6px',
+                fontSize: '14px',
+                color: isEditMode 
+                  ? (isDarkMode ? '#E5E7EB' : '#111827')
+                  : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+                backgroundColor: isEditMode 
+                  ? (isDarkMode ? '#374151' : '#FFFFFF')
+                  : (isDarkMode ? '#111827' : '#F9FAFB'),
+                outline: 'none',
+                cursor: isEditMode ? 'text' : 'not-allowed',
+                transition: 'border-color 0.2s ease',
+              }}
+            />
+          </div>
+
+          {/* Type */}
+          <div>
+            <label
+              style={{ 
+                fontSize: '13px', 
+                fontWeight: 500, 
+                display: 'block', 
+                marginBottom: '8px', 
+                color: isDarkMode ? '#E5E7EB' : '#374151' 
+              }}
+            >
+              Type<span style={{ color: '#EF4444' }}>*</span>
+            </label>
             <div ref={typeRef} style={{ position: 'relative' }}>
-              <label
-                style={{
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  display: 'block',
-                  marginBottom: '8px',
-                  color: isDarkMode ? '#E5E7EB' : '#374151',
-                }}
-              >
-                Shipment Type<span style={{ color: '#EF4444' }}>*</span>
-              </label>
               <button
                 type="button"
                 disabled={!isEditMode}
@@ -314,7 +319,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
                   transition: 'border-color 0.2s ease',
                 }}
               >
-                <span>{type || 'Select Shipment Type'}</span>
+                <span>{type || 'Select Type'}</span>
                 <svg
                   style={{
                     width: '16px',
@@ -337,6 +342,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
                   />
                 </svg>
               </button>
+
               {typeOpen && isEditMode && (
                 <div
                   style={{
@@ -393,295 +399,232 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
             </div>
           </div>
 
-          {/* Row 2: Amazon Shipment # + Amazon Ref ID (two columns) */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div>
-              <label
-                style={{
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  display: 'block',
-                  marginBottom: '8px',
-                  color: isDarkMode ? '#E5E7EB' : '#374151',
-                }}
-              >
-                Amazon Shipment #<span style={{ color: '#EF4444' }}>*</span>
-              </label>
-              <input
-                type="text"
-                value={amazonShipmentNumber}
-                onChange={(e) => setAmazonShipmentNumber(e.target.value)}
-                placeholder="e.g. FBAXXXXXXXXX"
-                disabled={!isEditMode}
-                readOnly={!isEditMode}
-                onFocus={() => isEditMode && setFocusedField('amazonShipmentNumber')}
-                onBlur={() => setFocusedField(null)}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  border: isEditMode && focusedField === 'amazonShipmentNumber'
-                    ? '1px solid #3B82F6'
-                    : isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  color: isEditMode
-                    ? (isDarkMode ? '#E5E7EB' : '#111827')
-                    : (isDarkMode ? '#9CA3AF' : '#6B7280'),
-                  backgroundColor: isEditMode
-                    ? (isDarkMode ? '#374151' : '#FFFFFF')
-                    : (isDarkMode ? '#111827' : '#F9FAFB'),
-                  outline: 'none',
-                  cursor: isEditMode ? 'text' : 'not-allowed',
-                  transition: 'border-color 0.2s ease',
-                }}
-              />
-            </div>
-            <div>
-              <label
-                style={{
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  display: 'block',
-                  marginBottom: '8px',
-                  color: isDarkMode ? '#E5E7EB' : '#374151',
-                }}
-              >
-                Amazon Ref ID<span style={{ color: '#EF4444' }}>*</span>
-              </label>
-              <input
-                type="text"
-                value={amazonRefId}
-                onChange={(e) => setAmazonRefId(e.target.value)}
-                placeholder="e.g. XXXXXXXX"
-                disabled={!isEditMode}
-                readOnly={!isEditMode}
-                onFocus={() => isEditMode && setFocusedField('amazonRefId')}
-                onBlur={() => setFocusedField(null)}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  border: isEditMode && focusedField === 'amazonRefId'
-                    ? '1px solid #3B82F6'
-                    : isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  color: isEditMode
-                    ? (isDarkMode ? '#E5E7EB' : '#111827')
-                    : (isDarkMode ? '#9CA3AF' : '#6B7280'),
-                  backgroundColor: isEditMode
-                    ? (isDarkMode ? '#374151' : '#FFFFFF')
-                    : (isDarkMode ? '#111827' : '#F9FAFB'),
-                  outline: 'none',
-                  cursor: isEditMode ? 'text' : 'not-allowed',
-                  transition: 'border-color 0.2s ease',
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Ship From (full width) */}
+          {/* Marketplace */}
           <div>
             <label
-              style={{
-                fontSize: '13px',
-                fontWeight: 500,
-                display: 'block',
-                marginBottom: '8px',
-                color: isDarkMode ? '#E5E7EB' : '#374151',
+              style={{ 
+                fontSize: '13px', 
+                fontWeight: 500, 
+                display: 'block', 
+                marginBottom: '8px', 
+                color: isDarkMode ? '#E5E7EB' : '#374151' 
               }}
             >
-              Ship From
+              Marketplace<span style={{ color: '#EF4444' }}>*</span>
             </label>
-            <input
-              type="text"
-              value={shipFrom}
-              onChange={(e) => setShipFrom(e.target.value)}
-              placeholder="Enter Shipment Location..."
-              disabled={!isEditMode}
-              readOnly={!isEditMode}
-              onFocus={() => isEditMode && setFocusedField('shipFrom')}
-              onBlur={() => setFocusedField(null)}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: isEditMode && focusedField === 'shipFrom'
-                  ? '1px solid #3B82F6'
-                  : isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
-                borderRadius: '6px',
-                fontSize: '14px',
-                color: isEditMode
-                  ? (isDarkMode ? '#E5E7EB' : '#111827')
-                  : (isDarkMode ? '#9CA3AF' : '#6B7280'),
-                backgroundColor: isEditMode
-                  ? (isDarkMode ? '#374151' : '#FFFFFF')
-                  : (isDarkMode ? '#111827' : '#F9FAFB'),
-                outline: 'none',
-                cursor: isEditMode ? 'text' : 'not-allowed',
-                transition: 'border-color 0.2s ease',
-              }}
-            />
-          </div>
-
-          {/* Ship To (full width) */}
-          <div>
-            <label
-              style={{
-                fontSize: '13px',
-                fontWeight: 500,
-                display: 'block',
-                marginBottom: '8px',
-                color: isDarkMode ? '#E5E7EB' : '#374151',
-              }}
-            >
-              Ship To
-            </label>
-            <input
-              type="text"
-              value={shipTo}
-              onChange={(e) => setShipTo(e.target.value)}
-              placeholder="Enter Shipment Destination..."
-              disabled={!isEditMode}
-              readOnly={!isEditMode}
-              onFocus={() => isEditMode && setFocusedField('shipTo')}
-              onBlur={() => setFocusedField(null)}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: isEditMode && focusedField === 'shipTo'
-                  ? '1px solid #3B82F6'
-                  : isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
-                borderRadius: '6px',
-                fontSize: '14px',
-                color: isEditMode
-                  ? (isDarkMode ? '#E5E7EB' : '#111827')
-                  : (isDarkMode ? '#9CA3AF' : '#6B7280'),
-                backgroundColor: isEditMode
-                  ? (isDarkMode ? '#374151' : '#FFFFFF')
-                  : (isDarkMode ? '#111827' : '#F9FAFB'),
-                outline: 'none',
-                cursor: isEditMode ? 'text' : 'not-allowed',
-                transition: 'border-color 0.2s ease',
-              }}
-            />
-          </div>
-
-          {/* Carrier (full width dropdown) */}
-          <div ref={carrierRef} style={{ position: 'relative' }}>
-            <label
-              style={{
-                fontSize: '13px',
-                fontWeight: 500,
-                display: 'block',
-                marginBottom: '8px',
-                color: isDarkMode ? '#E5E7EB' : '#374151',
-              }}
-            >
-              Carrier
-            </label>
-            <button
-              type="button"
-              disabled={!isEditMode}
-              onClick={() => isEditMode && setCarrierOpen((prev) => !prev)}
-              onFocus={() => isEditMode && setFocusedField('carrier')}
-              onBlur={() => setFocusedField(null)}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '10px 12px',
-                border: isEditMode && (focusedField === 'carrier' || carrierOpen)
-                  ? '1px solid #3B82F6'
-                  : isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
-                borderRadius: '6px',
-                backgroundColor: isEditMode
-                  ? (isDarkMode ? '#374151' : '#FFFFFF')
-                  : (isDarkMode ? '#111827' : '#F9FAFB'),
-                cursor: isEditMode ? 'pointer' : 'not-allowed',
-                fontSize: '14px',
-                color: carrier
-                  ? (isEditMode ? (isDarkMode ? '#E5E7EB' : '#111827') : (isDarkMode ? '#9CA3AF' : '#6B7280'))
-                  : (isDarkMode ? '#6B7280' : '#9CA3AF'),
-                outline: 'none',
-                transition: 'border-color 0.2s ease',
-              }}
-            >
-              <span>{carrier || 'Select Carrier Name...'}</span>
-              <svg
+            <div ref={marketplaceRef} style={{ position: 'relative' }}>
+              <button
+                type="button"
+                disabled={true}
                 style={{
-                  width: '16px',
-                  height: '16px',
-                  color: '#9CA3AF',
-                  flexShrink: 0,
-                  transform: carrierOpen ? 'rotate(180deg)' : 'none',
-                  transition: 'transform 0.2s ease',
-                }}
-                viewBox="0 0 24 24"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  d="M19 9L12 16L5 9"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-            {carrierOpen && isEditMode && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  marginTop: '4px',
-                  backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 12px',
                   border: isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
                   borderRadius: '6px',
-                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-                  overflow: 'hidden',
-                  zIndex: 100,
+                  backgroundColor: isDarkMode ? '#111827' : '#F9FAFB',
+                  cursor: 'not-allowed',
+                  fontSize: '14px',
+                  color: marketplace 
+                    ? (isDarkMode ? '#9CA3AF' : '#6B7280')
+                    : (isDarkMode ? '#6B7280' : '#9CA3AF'),
+                  outline: 'none',
                 }}
               >
-                {CARRIER_OPTIONS.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => {
-                      setCarrier(option);
-                      setCarrierOpen(false);
-                      setFocusedField(null);
-                    }}
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '10px 12px',
-                      fontSize: '14px',
-                      color: isDarkMode ? '#E5E7EB' : '#111827',
-                      backgroundColor: carrier === option
+                <span>{marketplace || 'Select Marketplace'}</span>
+                <svg
+                  style={{ 
+                    width: '16px', 
+                    height: '16px', 
+                    color: '#9CA3AF',
+                    flexShrink: 0,
+                  }}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M19 9L12 16L5 9"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              
+              {false && marketplaceOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    marginTop: '4px',
+                    backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                    border: isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
+                    borderRadius: '6px',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                    overflow: 'hidden',
+                    zIndex: 100,
+                  }}
+                >
+                  {['Amazon'].map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => {
+                        setMarketplace(option);
+                        setMarketplaceOpen(false);
+                        setFocusedField(null);
+                      }}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '10px 12px',
+                        fontSize: '14px',
+                        color: isDarkMode ? '#E5E7EB' : '#111827',
+                        backgroundColor: marketplace === option 
+                          ? (isDarkMode ? '#374151' : '#F3F4F6')
+                          : (isDarkMode ? '#1F2937' : '#FFFFFF'),
+                        border: 'none',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = marketplace === option 
                         ? (isDarkMode ? '#374151' : '#F3F4F6')
-                        : (isDarkMode ? '#1F2937' : '#FFFFFF'),
-                      border: 'none',
-                      cursor: 'pointer',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = carrier === option
-                        ? (isDarkMode ? '#374151' : '#F3F4F6')
-                        : (isDarkMode ? '#374151' : '#F3F4F6');
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = carrier === option
-                        ? (isDarkMode ? '#374151' : '#F3F4F6')
-                        : (isDarkMode ? '#1F2937' : '#FFFFFF');
-                    }}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </div>
-            )}
+                        : (isDarkMode ? '#1F2937' : '#FFFFFF')}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Seller Account */}
+          <div>
+            <label
+              style={{ 
+                fontSize: '13px', 
+                fontWeight: 500, 
+                display: 'block', 
+                marginBottom: '8px', 
+                color: isDarkMode ? '#E5E7EB' : '#374151' 
+              }}
+            >
+              Seller Account<span style={{ color: '#EF4444' }}>*</span>
+            </label>
+            <div ref={accountRef} style={{ position: 'relative' }}>
+              <button
+                type="button"
+                disabled={true}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 12px',
+                  border: isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
+                  borderRadius: '6px',
+                  backgroundColor: isDarkMode ? '#111827' : '#F9FAFB',
+                  cursor: 'not-allowed',
+                  fontSize: '14px',
+                  color: account 
+                    ? (isDarkMode ? '#9CA3AF' : '#6B7280')
+                    : (isDarkMode ? '#6B7280' : '#9CA3AF'),
+                  outline: 'none',
+                }}
+              >
+                <span>{account || 'Select Account'}</span>
+                <svg
+                  style={{ 
+                    width: '16px', 
+                    height: '16px', 
+                    color: isDarkMode ? '#9CA3AF' : '#9CA3AF',
+                    flexShrink: 0,
+                  }}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M19 9L12 16L5 9"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              
+              {false && accountOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    marginTop: '4px',
+                    backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                    border: isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
+                    borderRadius: '6px',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                    overflow: 'hidden',
+                    zIndex: 100,
+                    maxHeight: '300px',
+                    overflowY: 'auto',
+                  }}
+                >
+                  {ACCOUNT_OPTIONS.map((option) => (
+                    <button
+                      key={option.name}
+                      type="button"
+                      onClick={() => {
+                        setAccount(option.name);
+                        setAccountOpen(false);
+                        setFocusedField(null);
+                      }}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '12px 14px',
+                        fontSize: '14px',
+                        color: isDarkMode ? '#E5E7EB' : '#111827',
+                        backgroundColor: account === option.name 
+                          ? (isDarkMode ? '#1E3A8A' : '#EBF5FF')
+                          : (isDarkMode ? '#1F2937' : '#FFFFFF'),
+                        border: 'none',
+                        borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #F3F4F6',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (account !== option.name) {
+                          e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F9FAFB';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (account !== option.name) {
+                          e.currentTarget.style.backgroundColor = isDarkMode ? '#1F2937' : '#FFFFFF';
+                        }
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontWeight: 500 }}>{option.name}</span>
+                        {account === option.name && (
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path d="M13.3332 4L5.99984 11.3333L2.6665 8" stroke={isDarkMode ? '#60A5FA' : '#3B82F6'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -691,17 +634,18 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
             padding: '16px 24px',
             borderTop: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
             display: 'flex',
-            justifyContent: 'flex-end',
-            alignItems: 'center',
-            gap: '12px',
+            justifyContent: 'space-between',
+            gap: '10px',
           }}
         >
           <button
             type="button"
             onClick={handleCancel}
             style={{
-              padding: '8px 16px',
-              borderRadius: '6px',
+              width: '72px',
+              height: '31px',
+              padding: '0',
+              borderRadius: '4px',
               border: isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
               backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
               fontSize: '14px',
@@ -713,56 +657,65 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
               justifyContent: 'center',
             }}
           >
-            Cancel
+            {isEditMode ? 'Cancel' : 'Close'}
           </button>
           <button
             type="button"
-            disabled={isEditMode && (!shipmentName || !amazonShipmentNumber || !amazonRefId)}
+            disabled={isEditMode && !shipmentName}
             onClick={handleEditInfo}
             style={{
-              padding: '8px 16px',
-              borderRadius: '6px',
+              width: isEditMode ? '115px' : 'fit-content',
+              height: isEditMode ? '31px' : 'fit-content',
+              minWidth: isEditMode ? '115px' : '72px',
+              minHeight: isEditMode ? '31px' : '16px',
+              padding: '0',
+              borderRadius: isEditMode ? '4px' : '6px',
               border: 'none',
               fontSize: '14px',
               fontWeight: 500,
-              backgroundColor: isEditMode && shipmentName && amazonShipmentNumber && amazonRefId
-                ? '#3B82F6'
+              backgroundColor: isEditMode 
+                ? (!shipmentName ? '#9CA3AF' : '#3B82F6')
                 : 'transparent',
-              color: isEditMode
-                ? (shipmentName && amazonShipmentNumber && amazonRefId ? '#FFFFFF' : '#9CA3AF')
-                : (isDarkMode ? '#60A5FA' : '#3B82F6'),
-              cursor: (isEditMode && (!shipmentName || !amazonShipmentNumber || !amazonRefId)) ? 'not-allowed' : 'pointer',
+              color: isEditMode ? '#FFFFFF' : (isDarkMode ? '#60A5FA' : '#3B82F6'),
+              cursor: (isEditMode && !shipmentName) ? 'not-allowed' : 'pointer',
               display: 'flex',
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '8px',
+              gap: isEditMode ? '0' : '8px',
+              boxShadow: isEditMode && shipmentName ? '0 1px 3px rgba(0, 0, 0, 0.1)' : 'none',
               transition: 'all 0.2s ease',
             }}
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
-                stroke={isEditMode && shipmentName && amazonShipmentNumber && amazonRefId ? '#FFFFFF' : (isDarkMode ? '#60A5FA' : '#3B82F6')}
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
-                stroke={isEditMode && shipmentName && amazonShipmentNumber && amazonRefId ? '#FFFFFF' : (isDarkMode ? '#60A5FA' : '#3B82F6')}
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            {isEditMode ? 'Save Changes' : 'Edit Info'}
+            {isEditMode ? (
+              'Save Changes'
+            ) : (
+              <>
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
+                    stroke={isDarkMode ? '#60A5FA' : '#3B82F6'}
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
+                    stroke={isDarkMode ? '#60A5FA' : '#3B82F6'}
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                Edit Info
+              </>
+            )}
           </button>
         </div>
       </div>

@@ -1303,6 +1303,7 @@ const NewShipment = () => {
   const addProductsQtyValuesRef = useRef({});
   const addProductsAddedRowsRef = useRef(new Set());
   const addProductsFilteredProductsRef = useRef([]);
+  const addProductsLastPushRef = useRef({ source: null, time: 0 }); // coalesce add + qty into one undo step
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBrands, setSelectedBrands] = useState(null); // Brand filter from products dropdown (Set of brands or null)
   const [lastAccount, setLastAccount] = useState(null); // Track account changes
@@ -2966,12 +2967,18 @@ const NewShipment = () => {
                     onProductClick={handleProductClick}
                     qtyValues={qtyValues}
                     onQtyChange={(updater) => {
+                      addProductsLastPushRef.current = { source: 'qty', time: Date.now() };
                       pushAddProductsUndo(addProductsQtyValuesRef.current, addProductsAddedRowsRef.current, addProductsFilteredProductsRef.current);
                       setAddProductsRedoStack([]);
                       setQtyValues(updater);
                     }}
                     addedRows={addedRows}
                     onAddedRowsChange={(next) => {
+                      const last = addProductsLastPushRef.current;
+                      if (last.source === 'qty' && Date.now() - last.time < 200) {
+                        setAddProductsUndoStack((prev) => prev.slice(0, -1));
+                      }
+                      addProductsLastPushRef.current = { source: 'added', time: Date.now() };
                       pushAddProductsUndo(addProductsQtyValuesRef.current, addProductsAddedRowsRef.current, addProductsFilteredProductsRef.current);
                       setAddProductsRedoStack([]);
                       setAddedRows(next);

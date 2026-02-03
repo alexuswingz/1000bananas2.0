@@ -594,27 +594,6 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                           </svg>
                         )}
                       </div>
-                      <div style={{ 
-                        display: 'flex', 
-                        flexWrap: 'wrap', 
-                        gap: '4px', 
-                        marginTop: '6px' 
-                      }}>
-                        {option.brands.map(brand => (
-                          <span
-                            key={brand}
-                            style={{
-                              fontSize: '11px',
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              backgroundColor: isDarkMode ? '#4B5563' : '#F3F4F6',
-                              color: isDarkMode ? '#D1D5DB' : '#6B7280',
-                            }}
-                          >
-                            {brand}
-                          </span>
-                        ))}
-                      </div>
                     </button>
                   ))}
                 </div>
