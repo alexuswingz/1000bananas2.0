@@ -727,6 +727,15 @@ const NewShipment = () => {
         getLabelsAvailability(shipmentId) // Pass shipment ID to exclude current shipment
       ]);
       
+      // Create Railway labels map directly from forecast data (label_inventory is included in /forecast/ response)
+      const railwayLabelsMap = {};
+      (tpsForecastData.products || []).forEach(p => {
+        if (p.asin && p.label_inventory > 0) {
+          railwayLabelsMap[p.asin] = p.label_inventory;
+        }
+      });
+      console.log('Loaded Railway labels from forecast:', Object.keys(railwayLabelsMap).length, 'ASINs with labels');
+      
       // Map TPS forecast data to planning format - USE RAILWAY DATA AS SOURCE OF TRUTH
       const planningData = {
         products: (tpsForecastData.products || []).map(p => ({
@@ -771,6 +780,16 @@ const NewShipment = () => {
           forecastMap[item.asin] = item;
         }
       });
+      
+      // Create dedicated labels map from Railway data (backup for ASIN merge failures)
+      // This ensures labels ALWAYS come from Railway, even if main forecast merge fails
+      const railwayLabelsFromForecast = {};
+      (planningData.products || []).forEach(item => {
+        if (item.asin && item.label_inventory > 0) {
+          railwayLabelsFromForecast[item.asin] = item.label_inventory;
+        }
+      });
+      console.log('Created Railway labels map:', Object.keys(railwayLabelsFromForecast).length, 'ASINs with labels');
       
       console.log('Forecast map has', Object.keys(forecastMap).length, 'entries');
       
@@ -853,7 +872,24 @@ const NewShipment = () => {
         const railwayDoiTotal = forecast.doi_total || forecast.doi_total_days || 0;
         const railwayDoiFba = forecast.doi_fba || forecast.doi_fba_days || 0;
         const railwayUnitsToMake = forecast.units_to_make || 0;
-        const railwayLabelInventory = forecast.label_inventory || 0;
+        // LABELS: Priority is Railway labels > AWS Lambda
+        // Try multiple ASIN variants to ensure Railway data is found
+        const asinVariants = [asinKey, item.child_asin, item.asin, item.childAsin].filter(Boolean);
+        let railwayLabelInventory = 0;
+        for (const asin of asinVariants) {
+          if (railwayLabelsMap[asin]) {
+            railwayLabelInventory = railwayLabelsMap[asin];
+            break;
+          }
+          if (railwayLabelsFromForecast[asin]) {
+            railwayLabelInventory = railwayLabelsFromForecast[asin];
+            break;
+          }
+        }
+        // Fallback to forecast merge, then AWS Lambda (last resort)
+        if (!railwayLabelInventory) {
+          railwayLabelInventory = forecast.label_inventory || 0;
+        }
         
         // Use units_to_make from Railway API as the forecast value
         // Fallback to sales-based calculation only if API value is 0
