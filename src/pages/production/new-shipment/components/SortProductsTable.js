@@ -3398,7 +3398,6 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
             left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2)`,
             transform: 'translateX(-50%)',
             width: 'fit-content',
-            minWidth: '1014px',
             height: '65px',
             // Match Book Shipment footer container styling
             backgroundColor: isDarkMode ? 'rgba(31, 41, 55, 0.85)' : 'rgba(255, 255, 255, 0.85)',
@@ -3409,7 +3408,6 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
             padding: '16px 24px',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
             gap: '32px',
             zIndex: 1000,
             transition: 'left 300ms cubic-bezier(0.4, 0, 0.2, 1)',
@@ -3422,6 +3420,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
               display: 'flex',
               alignItems: 'center',
               gap: '40px',
+              flexShrink: 0,
             }}
           >
             {[
@@ -3437,18 +3436,19 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '4px',
+                  gap: '2px',
                   alignItems: 'center',
-                  minWidth: '72px',
+                  minWidth: 0,
                 }}
               >
                 <span
                   style={{
-                    // Match Book Shipment metrics label style
                     fontSize: '12px',
                     fontWeight: 400,
                     color: '#9CA3AF',
                     textAlign: 'center',
+                    whiteSpace: 'nowrap',
+                    lineHeight: 1.2,
                   }}
                 >
                   {item.label}
@@ -3459,6 +3459,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                     fontWeight: 700,
                     color: isDarkMode ? '#FFFFFF' : '#000000',
                     textAlign: 'center',
+                    lineHeight: 1.2,
                   }}
                 >
                   {item.value}
@@ -3473,6 +3474,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
+              flexShrink: 0,
             }}
           >
             {/* Undo/Redo buttons - grouped together with shared divider */}

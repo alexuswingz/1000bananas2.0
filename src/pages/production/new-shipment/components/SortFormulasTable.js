@@ -1552,6 +1552,14 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
 
   const filteredFormulas = getFilteredAndSortedFormulas();
 
+  // Footer summary metrics (match Sort Products footer)
+  const totalProducts = formulas.length;
+  const totalUnits = (shipmentProducts || []).reduce((sum, p) => sum + (p.qty || 0), 0);
+  const totalFormulas = new Set(formulas.map((f) => f.formula)).length;
+  const totalSizeSwaps = 0;
+  const totalFormulaChanges = 0;
+  const totalTimeHours = 0;
+
   return (
     <div 
       ref={tableContainerRef}
@@ -2519,7 +2527,6 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
             left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2)`,
             transform: 'translateX(-50%)',
             width: 'fit-content',
-            minWidth: '1014px',
             height: '65px',
             backgroundColor: isDarkMode ? 'rgba(31, 41, 55, 0.85)' : 'rgba(255, 255, 255, 0.85)',
             backdropFilter: 'blur(12px)',
@@ -2529,14 +2536,66 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
             padding: '16px 24px',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
             gap: '32px',
             zIndex: 1000,
             transition: 'left 300ms cubic-bezier(0.4, 0, 0.2, 1)',
             boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
           }}
         >
-          <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
+          {/* Metrics */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '40px',
+              flexShrink: 0,
+            }}
+          >
+            {[
+              { label: 'PRODUCTS', value: totalProducts },
+              { label: 'UNITS', value: totalUnits.toLocaleString() },
+              { label: 'SIZE SWAPS', value: totalSizeSwaps },
+              { label: 'FORMULAS', value: totalFormulas },
+              { label: 'FORMULA CHANGES', value: totalFormulaChanges },
+              { label: 'TIME (HRS)', value: totalTimeHours.toFixed(1) },
+            ].map((item) => (
+              <div
+                key={item.label}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px',
+                  alignItems: 'center',
+                  minWidth: 0,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 400,
+                    color: '#9CA3AF',
+                    textAlign: 'center',
+                    whiteSpace: 'nowrap',
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {item.label}
+                </span>
+                <span
+                  style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: isDarkMode ? '#FFFFFF' : '#000000',
+                    textAlign: 'center',
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {item.value}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: '32px', alignItems: 'center', flexShrink: 0 }}>
             {/* Undo/Redo buttons */}
             <div
               style={{
@@ -2611,7 +2670,7 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
               </button>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
             <button
               type="button"
               onClick={onCompleteClick}

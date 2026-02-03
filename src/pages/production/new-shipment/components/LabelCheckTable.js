@@ -2562,7 +2562,6 @@ const LabelCheckTable = ({
               left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2)`,
               transform: 'translateX(-50%)',
               width: 'fit-content',
-              minWidth: '1014px',
               height: '65px',
               backgroundColor: isDarkMode ? 'rgba(31, 41, 55, 0.85)' : 'rgba(255, 255, 255, 0.85)',
               backdropFilter: 'blur(12px)',
@@ -2572,14 +2571,13 @@ const LabelCheckTable = ({
               padding: '16px 24px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
               gap: '32px',
               zIndex: 1000,
               transition: 'left 300ms cubic-bezier(0.4, 0, 0.2, 1)',
               boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
             }}
           >
-            <div style={{ display: 'flex', gap: '48px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '48px', alignItems: 'center', flexShrink: 0 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <span style={{
                   fontSize: '12px',
@@ -2632,7 +2630,7 @@ const LabelCheckTable = ({
                 </span>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
               {remainingCount > 0 && selectedRowsCount > 0 && onMarkAllLabelChecksAsDone && (
                 <button
                   type="button"

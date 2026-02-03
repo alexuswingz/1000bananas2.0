@@ -4654,7 +4654,6 @@ const NewShipmentTable = ({
             left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2)`,
             transform: 'translateX(-50%)',
             width: 'fit-content',
-            minWidth: '1014px',
             height: '65px',
             backgroundColor: isDarkMode ? 'rgba(31, 41, 55, 0.85)' : 'rgba(255, 255, 255, 0.85)',
             backdropFilter: 'blur(12px)',
@@ -4664,14 +4663,13 @@ const NewShipmentTable = ({
             padding: '16px 24px',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
             gap: '32px',
             zIndex: 1000,
             transition: 'left 300ms cubic-bezier(0.4, 0, 0.2, 1)',
             boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
           }}
         >
-          <div style={{ display: 'flex', gap: '48px', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+          <div style={{ display: 'flex', gap: '48px', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             {footerStatsVisibility.palettes && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
                 <span style={{ fontSize: '12px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#9CA3AF', textAlign: 'center' }}>PALETTES</span>
@@ -4716,7 +4714,7 @@ const NewShipmentTable = ({
             )}
           </div>
           {(onClear || onExport) && (
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
               {onClear && (
                 <button
                   type="button"
@@ -4765,6 +4763,7 @@ const NewShipmentTable = ({
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
+                      whiteSpace: 'nowrap',
                     }}
                     onMouseEnter={(e) => {
                       if (addedRows && addedRows.size > 0) {
@@ -6479,7 +6478,6 @@ const NewShipmentTable = ({
           left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2)`,
           transform: 'translateX(-50%)',
           width: 'fit-content',
-          minWidth: '1014px',
           height: '65px',
           backgroundColor: isDarkMode ? 'rgba(31, 41, 55, 0.85)' : 'rgba(255, 255, 255, 0.85)',
           backdropFilter: 'blur(12px)',
@@ -6489,14 +6487,13 @@ const NewShipmentTable = ({
           padding: '16px 24px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
           gap: '32px',
           zIndex: 1000,
           transition: 'left 300ms cubic-bezier(0.4, 0, 0.2, 1)',
           boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
         }}
       >
-        <div style={{ display: 'flex', gap: '48px', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+        <div style={{ display: 'flex', gap: '48px', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           {footerStatsVisibility.palettes && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
               <span style={{ fontSize: '12px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#9CA3AF', textAlign: 'center' }}>PALETTES</span>
@@ -6541,7 +6538,7 @@ const NewShipmentTable = ({
           )}
         </div>
         {(onClear || onExport) && (
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
             {onClear && (
               <button
                 type="button"
@@ -6590,6 +6587,7 @@ const NewShipmentTable = ({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    whiteSpace: 'nowrap',
                   }}
                   onMouseEnter={(e) => {
                     if (addedRows && addedRows.size > 0) {
