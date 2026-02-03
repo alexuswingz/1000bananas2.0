@@ -111,6 +111,10 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
   const splitsLoadedRef = useRef(null); // Track which shipmentId we've loaded splits for
   const orderLoadedRef = useRef(null); // Track which shipmentId we've loaded order for
   const isInitialOrderLoadRef = useRef(true); // Track if we're in initial order load phase
+  const historyPastRef = useRef([]);
+  const historyFutureRef = useRef([]);
+  const [undoStackSize, setUndoStackSize] = useState(0);
+  const [redoStackSize, setRedoStackSize] = useState(0);
 
   // Helper function to get a stable identifier for a formula
   // Uses formula name + splitTag (if exists) as unique identifier
@@ -148,6 +152,10 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
       setLockedFormulaIds(new Set());
       setSortConfig([]);
       setFilters({});
+      historyPastRef.current = [];
+      historyFutureRef.current = [];
+      setUndoStackSize(0);
+      setRedoStackSize(0);
     } else if (previousShipmentId === null && shipmentId !== null) {
       // Initial mount with shipmentId - mark order load as initial
       isInitialOrderLoadRef.current = true;
@@ -527,6 +535,63 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
     }
   }, [shipmentProducts, shipmentId]);
 
+  // Undo/Redo history: snapshot of order (identifiers) + locked ids (formula names)
+  const HISTORY_MAX = 50;
+
+  const pushHistory = () => {
+    const order = formulas.map(f => getFormulaIdentifier(f));
+    const lockedIds = Array.from(lockedFormulaIds);
+    historyPastRef.current.push({ order, lockedIds });
+    if (historyPastRef.current.length > HISTORY_MAX) historyPastRef.current.shift();
+    historyFutureRef.current = [];
+    setUndoStackSize(historyPastRef.current.length);
+    setRedoStackSize(0);
+  };
+
+  const handleUndo = () => {
+    if (historyPastRef.current.length === 0) return;
+    const currentOrder = formulas.map(f => getFormulaIdentifier(f));
+    const currentLockedIds = Array.from(lockedFormulaIds);
+    historyFutureRef.current.push({ order: currentOrder, lockedIds: currentLockedIds });
+    const prev = historyPastRef.current.pop();
+    setUndoStackSize(historyPastRef.current.length);
+    setRedoStackSize(historyFutureRef.current.length);
+    const idToFormula = new Map(formulas.map(f => [getFormulaIdentifier(f), f]));
+    const newFormulas = [];
+    prev.order.forEach(id => {
+      const f = idToFormula.get(id);
+      if (f) newFormulas.push(f);
+    });
+    formulas.forEach(f => {
+      if (!prev.order.includes(getFormulaIdentifier(f))) newFormulas.push(f);
+    });
+    setFormulas(newFormulas);
+    setLockedFormulaIds(new Set(prev.lockedIds));
+    saveFormulaOrder(newFormulas);
+  };
+
+  const handleRedo = () => {
+    if (historyFutureRef.current.length === 0) return;
+    const currentOrder = formulas.map(f => getFormulaIdentifier(f));
+    const currentLockedIds = Array.from(lockedFormulaIds);
+    historyPastRef.current.push({ order: currentOrder, lockedIds: currentLockedIds });
+    const next = historyFutureRef.current.pop();
+    setUndoStackSize(historyPastRef.current.length);
+    setRedoStackSize(historyFutureRef.current.length);
+    const idToFormula = new Map(formulas.map(f => [getFormulaIdentifier(f), f]));
+    const newFormulas = [];
+    next.order.forEach(id => {
+      const f = idToFormula.get(id);
+      if (f) newFormulas.push(f);
+    });
+    formulas.forEach(f => {
+      if (!next.order.includes(getFormulaIdentifier(f))) newFormulas.push(f);
+    });
+    setFormulas(newFormulas);
+    setLockedFormulaIds(new Set(next.lockedIds));
+    saveFormulaOrder(newFormulas);
+  };
+
   // Persist locked formula names to localStorage whenever they change
   useEffect(() => {
     if (!shipmentId) return;
@@ -653,6 +718,7 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
       return;
     }
 
+    pushHistory();
     // Work with filtered formulas for display, but update the original formulas array
     const filteredList = filteredFormulas;
     const dropItem = filteredList[dropIndex];
@@ -1207,6 +1273,7 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
   // Locking a formula means it will NOT be affected by filters
   // Use formula name as the identifier since it's stable
   const handleToggleLock = (formulaId) => {
+    pushHistory();
     // Find the formula name from the ID
     const formula = formulas.find(f => f.id === formulaId);
     const formulaName = formula?.formula;
@@ -2470,7 +2537,79 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
           }}
         >
           <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
-            {/* Empty left side */}
+            {/* Undo/Redo buttons */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                borderRadius: '6px',
+                border: `0.5px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
+                backgroundColor: isDarkMode ? '#0F172A' : '#F9FAFB',
+                overflow: 'hidden',
+              }}
+            >
+              <button
+                type="button"
+                disabled={undoStackSize === 0}
+                onClick={handleUndo}
+                style={{
+                  width: '29.5px',
+                  height: '29.5px',
+                  border: 'none',
+                  borderRight: `0.5px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
+                  backgroundColor: 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: undoStackSize === 0 ? 'not-allowed' : 'pointer',
+                  padding: '6px',
+                  transition: 'background-color 0.2s',
+                  opacity: undoStackSize === 0 ? 0.5 : 1,
+                }}
+                onMouseEnter={(e) => {
+                  if (undoStackSize > 0) e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                <img
+                  src="/assets/Vector (8).png"
+                  alt="Undo"
+                  style={{ width: '14.63px', height: '5.83px', display: 'block' }}
+                />
+              </button>
+              <button
+                type="button"
+                disabled={redoStackSize === 0}
+                onClick={handleRedo}
+                style={{
+                  width: '29.5px',
+                  height: '29.5px',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: redoStackSize === 0 ? 'not-allowed' : 'pointer',
+                  padding: '6px',
+                  transition: 'background-color 0.2s',
+                  opacity: redoStackSize === 0 ? 0.5 : 1,
+                }}
+                onMouseEnter={(e) => {
+                  if (redoStackSize > 0) e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                <img
+                  src="/assets/Vector (9).png"
+                  alt="Redo"
+                  style={{ width: '14.63px', height: '5.83px', display: 'block' }}
+                />
+              </button>
+            </div>
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <button

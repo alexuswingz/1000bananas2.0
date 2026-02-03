@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 import { useSidebar } from '../../../../context/SidebarContext';
 import SortProductsFilterDropdown from './SortProductsFilterDropdown';
@@ -86,6 +86,42 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     return 1;
   };
 
+  // Infer product type (Liquid vs Dry) when not provided - bag products are Dry
+  const getProductType = (product) => {
+    const explicit = product.type || product.productType || product.product_type;
+    if (explicit) return explicit;
+    const size = (product.size || '').toLowerCase();
+    const productName = (product.product || product.product_name || '').toLowerCase();
+    // Dry: "lb" in size (1/2lb, 1lb, 5lb, 25lb), "bag" in name, or 6oz (6oz is bag/dry in this catalog)
+    if (/lb/.test(size) || /bag/.test(productName) || /6\s*oz|6oz/.test(size)) return 'Dry';
+    return 'Liquid';
+  };
+
+  // Size order for auto-sort (smallest / bags first, then bottles, then large)
+  const getSizeSortIndex = (size) => {
+    const s = (size || '').toLowerCase();
+    const order = [
+      '6oz', '6 oz', '8oz', '8 oz', '16oz', '16 oz', 'pint',
+      '1/2lb', '1/2 lb', '1 lb', '1lb', 'quart', '32oz', '32 oz',
+      'gallon', '5 gallon', '5 lb', '5lb', '25 lb', '25lb',
+    ];
+    const idx = order.findIndex((key) => s.includes(key));
+    return idx >= 0 ? idx : order.length;
+  };
+
+  // Auto-sort products by formula then size (used when no saved order exists)
+  const sortByFormulaThenSize = (productList) => {
+    return [...productList].sort((a, b) => {
+      const formulaA = (a.formula || '').toLowerCase();
+      const formulaB = (b.formula || '').toLowerCase();
+      if (formulaA !== formulaB) return formulaA.localeCompare(formulaB);
+      const sizeA = getSizeSortIndex(a.size);
+      const sizeB = getSizeSortIndex(b.size);
+      if (sizeA !== sizeB) return sizeA - sizeB;
+      return (a.size || '').localeCompare(b.size || '');
+    });
+  };
+
   // Save product order to localStorage
   const saveProductOrder = (productsToSave) => {
     if (!shipmentId || isInitialOrderLoadRef.current) return;
@@ -111,6 +147,10 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
       splitsLoadedRef.current = null;
       isInitialOrderLoadRef.current = true;
       setLockedProductIds(new Set());
+      historyPastRef.current = [];
+      historyFutureRef.current = [];
+      setUndoStackSize(0);
+      setRedoStackSize(0);
     } else if (previousShipmentId === null && shipmentId !== null) {
       // Initial mount with shipmentId - mark order load as initial
       isInitialOrderLoadRef.current = true;
@@ -135,7 +175,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
         qty: product.qty || 0,
         formula: product.formula_name || product.formula || '',
         volume: product.volume || product.volume_gallons || '',
-        productType: 'Liquid', // Default to Liquid for fertilizers
+        productType: getProductType(product),
         // Optional visual/identifier data used only for table presentation
         imageUrl: product.image || product.image_url || product.imageUrl || '',
         identifier:
@@ -283,10 +323,13 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
           console.error('Error loading sort products splits from localStorage:', error);
         }
       }
-      
+
+      // Auto-sort by formula first, then by size (used when no saved order exists)
+      finalProducts = sortByFormulaThenSize(finalProducts);
+
       // Restore saved order if it exists
       // Always restore order when products are regenerated (on mount or when shipmentProducts changes)
-      // Use finalProducts (which includes splits) for order restoration
+      // Use finalProducts (which includes splits and default formula+size sort) for order restoration
       let orderedProducts = finalProducts;
       
       if (shipmentId) {
@@ -511,6 +554,67 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
   //   }
   // }, [products, shipmentId]); // Run when products or shipmentId changes
 
+  // Undo/Redo history: snapshot of order (identifiers) + locked ids
+  const HISTORY_MAX = 50;
+  const historyPastRef = useRef([]);
+  const historyFutureRef = useRef([]);
+  const [undoStackSize, setUndoStackSize] = useState(0);
+  const [redoStackSize, setRedoStackSize] = useState(0);
+
+  const pushHistory = () => {
+    const order = products.map(p => getProductIdentifier(p));
+    const lockedIds = Array.from(lockedProductIds);
+    historyPastRef.current.push({ order, lockedIds });
+    if (historyPastRef.current.length > HISTORY_MAX) historyPastRef.current.shift();
+    historyFutureRef.current = [];
+    setUndoStackSize(historyPastRef.current.length);
+    setRedoStackSize(0);
+  };
+
+  const handleUndo = () => {
+    if (historyPastRef.current.length === 0) return;
+    const currentOrder = products.map(p => getProductIdentifier(p));
+    const currentLockedIds = Array.from(lockedProductIds);
+    historyFutureRef.current.push({ order: currentOrder, lockedIds: currentLockedIds });
+    const prev = historyPastRef.current.pop();
+    setUndoStackSize(historyPastRef.current.length);
+    setRedoStackSize(historyFutureRef.current.length);
+    const idToProduct = new Map(products.map(p => [getProductIdentifier(p), p]));
+    const newProducts = [];
+    prev.order.forEach(id => {
+      const p = idToProduct.get(id);
+      if (p) newProducts.push(p);
+    });
+    products.forEach(p => {
+      if (!prev.order.includes(getProductIdentifier(p))) newProducts.push(p);
+    });
+    setProducts(newProducts);
+    setLockedProductIds(new Set(prev.lockedIds));
+    saveProductOrder(newProducts);
+  };
+
+  const handleRedo = () => {
+    if (historyFutureRef.current.length === 0) return;
+    const currentOrder = products.map(p => getProductIdentifier(p));
+    const currentLockedIds = Array.from(lockedProductIds);
+    historyPastRef.current.push({ order: currentOrder, lockedIds: currentLockedIds });
+    const next = historyFutureRef.current.pop();
+    setUndoStackSize(historyPastRef.current.length);
+    setRedoStackSize(historyFutureRef.current.length);
+    const idToProduct = new Map(products.map(p => [getProductIdentifier(p), p]));
+    const newProducts = [];
+    next.order.forEach(id => {
+      const p = idToProduct.get(id);
+      if (p) newProducts.push(p);
+    });
+    products.forEach(p => {
+      if (!next.order.includes(getProductIdentifier(p))) newProducts.push(p);
+    });
+    setProducts(newProducts);
+    setLockedProductIds(new Set(next.lockedIds));
+    saveProductOrder(newProducts);
+  };
+
   // Persist locked product IDs to localStorage whenever they change
   useEffect(() => {
     if (!shipmentId) return;
@@ -613,8 +717,6 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
 
   const columns = [
     { key: 'drag', label: '', width: '50px' },
-    { key: 'type', label: 'TYPE', width: '80px' },
-    { key: 'brand', label: 'BRAND', width: '150px' },
     { key: 'product', label: 'PRODUCT', width: '200px' },
     { key: 'size', label: 'SIZE', width: '100px' },
     { key: 'qty', label: 'QTY', width: '80px' },
@@ -722,6 +824,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
       return;
     }
 
+    pushHistory();
     // Work with filtered products for display, but update the original products array
     const filteredList = filteredProducts;
     const dropItem = filteredList[dropIndex];
@@ -1265,6 +1368,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
   // Locking a product means it will NOT be affected by filters,
   // but it can still be moved via drag & drop.
   const handleToggleLock = (productId) => {
+    pushHistory();
     setLockedProductIds((prev) => {
       const next = new Set(prev);
       if (next.has(productId)) {
@@ -1275,6 +1379,21 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
         console.log('Locked product:', productId);
       }
       console.log('Current locked IDs:', Array.from(next));
+      return next;
+    });
+  };
+
+  // Bulk lock/unlock: set lock state for multiple products at once (e.g. when multiple rows are selected).
+  const handleSetLockBulk = (productIds, locked) => {
+    if (!productIds || productIds.length === 0) return;
+    pushHistory();
+    setLockedProductIds((prev) => {
+      const next = new Set(prev);
+      productIds.forEach((id) => {
+        if (locked) next.add(id);
+        else next.delete(id);
+      });
+      console.log(locked ? 'Locked' : 'Unlocked', 'products (bulk):', productIds);
       return next;
     });
   };
@@ -1920,7 +2039,18 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     });
     return sortedValues;
   };
-  
+
+  const brandColumnValues = getColumnValues('brand');
+  const brandCounts = useMemo(() => {
+    const counts = {};
+    products.forEach(product => {
+      const brandName = product?.brand;
+      if (!brandName) return;
+      counts[brandName] = (counts[brandName] || 0) + 1;
+    });
+    return counts;
+  }, [products]);
+
   // Check if a column has active filters (excludes sort - only checks for Filter by Values and Filter by Conditions)
   const hasActiveFilter = (columnKey) => {
     const filter = filters[columnKey];
@@ -1929,6 +2059,17 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
     // Check for condition filter
     const hasCondition = filter.conditionType && filter.conditionType !== '';
     if (hasCondition) return true;
+
+    // Check for brand filters (only for product column)
+    if (columnKey === 'product' && brandColumnValues.length > 0 && filter.selectedBrands && filter.selectedBrands.size > 0) {
+      const selectedBrandsSet = filter.selectedBrands instanceof Set
+        ? filter.selectedBrands
+        : new Set(filter.selectedBrands);
+      const allBrandsSelected = brandColumnValues.every(brand => selectedBrandsSet.has(brand));
+      if (!allBrandsSelected) {
+        return true;
+      }
+    }
     
     // Check for value filters - only active if not all values are selected
     if (!filter.selectedValues || filter.selectedValues.size === 0) return false;
@@ -2050,6 +2191,17 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
         });
       }
       
+      // Apply brand filter (only for product column)
+      if (columnKey === 'product' && filter.selectedBrands && filter.selectedBrands.size > 0) {
+        const selectedBrandsSet = filter.selectedBrands instanceof Set
+          ? filter.selectedBrands
+          : new Set(filter.selectedBrands);
+        filteredUnlocked = filteredUnlocked.filter(product => {
+          const brandName = product.brand || '';
+          return selectedBrandsSet.has(brandName);
+        });
+      }
+
       // Apply condition filters
       if (filter.conditionType) {
         filteredUnlocked = filteredUnlocked.filter(product => {
@@ -2178,14 +2330,14 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '0.5rem',
+                        justifyContent: 'flex-start',
+                        gap: '6px',
                       }}
                     >
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         {column.label}
                         {(() => {
-                          if (isActiveOrOpen) {
+                          if (isActive) {
                             return (
                               <span style={{ 
                                 display: 'inline-block',
@@ -2213,6 +2365,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                           width: '12px', 
                           height: '12px', 
                           cursor: 'pointer',
+                          marginLeft: '3px',
                           filter: isActiveOrOpen ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
                         }}
                       />
@@ -2381,7 +2534,15 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                       onClick={(e) => {
                         e.stopPropagation();
                         e.preventDefault();
-                        handleToggleLock(product.id);
+                        // When multiple rows are selected (Shift+Click), lock/unlock all selected as a group
+                        const idsToToggle =
+                          selectedIndices.has(index) && selectedIndices.size > 1
+                            ? Array.from(selectedIndices)
+                                .map((i) => filteredProducts[i]?.id)
+                                .filter(Boolean)
+                            : [product.id];
+                        const newLockState = !lockedProductIds.has(product.id);
+                        handleSetLockBulk(idsToToggle, newLockState);
                       }}
                       onMouseDown={(e) => {
                         e.stopPropagation();
@@ -2420,26 +2581,6 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                 </td>
                   );
                 })()}
-                <td style={{
-                  padding: '0 16px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  color: isDarkMode ? '#E5E7EB' : '#111827',
-                  height: '66px',
-                  verticalAlign: 'middle',
-                }}>
-                  {product.type}
-                </td>
-                <td style={{
-                  padding: '0 16px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  color: isDarkMode ? '#E5E7EB' : '#111827',
-                  height: '66px',
-                  verticalAlign: 'middle',
-                }}>
-                  {product.brand}
-                </td>
                 <td style={{
                   padding: '8px 16px',
                   height: '66px',
@@ -2965,6 +3106,8 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
             filterIconRef={filterIconRefs.current[columnKey]}
             columnKey={columnKey}
             availableValues={getColumnValues(columnKey)}
+            availableBrands={columnKey === 'product' ? brandColumnValues : []}
+            brandCounts={columnKey === 'product' ? brandCounts : {}}
             currentFilter={filters[columnKey] || {}}
             currentSort={getSortOrder(columnKey)}
             onApply={(filterData) => handleApplyFilter(columnKey, filterData)}
@@ -3346,6 +3489,8 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
               {/* Undo */}
               <button
                 type="button"
+                disabled={undoStackSize === 0}
+                onClick={handleUndo}
                 style={{
                   width: '29.5px',
                   height: '29.5px',
@@ -3355,12 +3500,13 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  cursor: 'pointer',
+                  cursor: undoStackSize === 0 ? 'not-allowed' : 'pointer',
                   padding: '6px',
                   transition: 'background-color 0.2s',
+                  opacity: undoStackSize === 0 ? 0.5 : 1,
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                  if (undoStackSize > 0) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = 'transparent';
@@ -3380,6 +3526,8 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
               {/* Redo */}
               <button
                 type="button"
+                disabled={redoStackSize === 0}
+                onClick={handleRedo}
                 style={{
                   width: '29.5px',
                   height: '29.5px',
@@ -3388,12 +3536,13 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  cursor: 'pointer',
+                  cursor: redoStackSize === 0 ? 'not-allowed' : 'pointer',
                   padding: '6px',
                   transition: 'background-color 0.2s',
+                  opacity: redoStackSize === 0 ? 0.5 : 1,
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                  if (redoStackSize > 0) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = 'transparent';
