@@ -139,6 +139,7 @@ const VineTracker = () => {
       claimed: 0,
       enrolled: 0,
       imageUrl: null,
+      claimHistory: [],
       isNew: true,
     };
     

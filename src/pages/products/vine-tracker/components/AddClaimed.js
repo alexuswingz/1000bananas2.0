@@ -136,7 +136,7 @@ const CalendarDropdown = ({ value, onChange, onClose, inputRef }) => {
       data-date-picker-calendar
       style={{
         position: 'fixed',
-        bottom: (window.innerHeight - (inputRect?.top || 0)) + 4 + 'px',
+        top: (inputRect?.bottom || 0) + 4 + 'px',
         left: (inputRect?.left || 0) + 'px',
         width: '280px',
         backgroundColor: '#111827',
@@ -343,33 +343,162 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
   const [claimUnits, setClaimUnits] = useState('0');
   const [showClaimDatePicker, setShowClaimDatePicker] = useState(false);
   const [claimHistory, setClaimHistory] = useState([]);
+  const [showInputRow, setShowInputRow] = useState(false);
+  const [showActionsColumn, setShowActionsColumn] = useState(false);
+  const [actionMenuId, setActionMenuId] = useState(null);
+  const [actionMenuPosition, setActionMenuPosition] = useState({ top: 0, left: 0 });
+  const [editingDateId, setEditingDateId] = useState(null);
+  const [editingDateValue, setEditingDateValue] = useState('');
+  const [showDatePickerForEdit, setShowDatePickerForEdit] = useState(false);
+  const isCalendarInteractingRef = useRef(false);
   const claimDateInputRef = useRef(null);
+  const tableContainerRef = useRef(null);
+  const inputRowRef = useRef(null);
+  const editingDateInputRef = useRef(null);
 
-  // Format date for display (e.g., "Jan 15, 2026")
-  const formatDisplayDate = (dateString) => {
-    if (!dateString) return '';
+  // Convert display date format back to MM/DD/YYYY for editing
+  const convertDisplayDateToEditable = (dateInput) => {
+    if (!dateInput) return '';
     
-    // Try to parse as Date object first
-    const date = new Date(dateString);
-    if (!isNaN(date.getTime())) {
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return `${monthNames[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+    // If it's already in MM/DD/YYYY format, return as is
+    if (typeof dateInput === 'string' && dateInput.includes('/') && dateInput.length === 10) {
+      return dateInput;
     }
     
-    // Handle MM/DD/YYYY format
-    const parts = dateString.split('/');
-    if (parts.length === 3) {
-      const month = parseInt(parts[0]) - 1;
-      const day = parseInt(parts[1]);
-      const year = parseInt(parts[2]);
-      if (!isNaN(month) && !isNaN(day) && !isNaN(year)) {
-        const date = new Date(year, month, day);
-        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        return `${monthNames[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+    // Try to parse the date
+    let date = null;
+    
+    // Handle YYYY-MM-DD format
+    if (typeof dateInput === 'string' && dateInput.includes('-')) {
+      const parts = dateInput.split('-');
+      if (parts.length === 3) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const day = parseInt(parts[2], 10);
+        if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+          date = new Date(year, month, day);
+        }
       }
     }
     
-    return dateString;
+    // Handle "Jan 15, 2026" format
+    if (!date && typeof dateInput === 'string') {
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthIndex = monthNames.findIndex(month => dateInput.includes(month));
+      if (monthIndex !== -1) {
+        const parts = dateInput.replace(/,/g, '').split(' ');
+        if (parts.length === 3) {
+          const day = parseInt(parts[1], 10);
+          const year = parseInt(parts[2], 10);
+          if (!isNaN(day) && !isNaN(year)) {
+            date = new Date(year, monthIndex, day);
+          }
+        }
+      }
+    }
+    
+    // Try parsing as Date object
+    if (!date) {
+      date = new Date(dateInput);
+    }
+    
+    // Format as MM/DD/YYYY
+    if (date && !isNaN(date.getTime())) {
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${month}/${day}/${year}`;
+    }
+    
+    return '';
+  };
+
+  // Format date for display (Jan 15, 2026 format)
+  const formatDisplayDate = (dateInput) => {
+    if (!dateInput) return '';
+    
+    // If it's already a Date object, use it directly
+    let date = dateInput instanceof Date ? dateInput : null;
+    
+    // Convert to string if not already
+    const dateString = date ? null : String(dateInput).trim();
+    
+    // If it's already in the text format (contains month name), return as is
+    if (dateString) {
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const hasMonthName = monthNames.some(month => dateString.includes(month));
+      if (hasMonthName) {
+        return dateString;
+      }
+    }
+    
+    // If we don't have a date yet, parse from string
+    if (!date && dateString) {
+      // Handle MM/DD/YYYY format (from calendar input)
+      if (dateString.includes('/')) {
+        const parts = dateString.split('/');
+        if (parts.length === 3) {
+          const month = parseInt(parts[0], 10) - 1; // Month is 0-indexed
+          const day = parseInt(parts[1], 10);
+          const year = parseInt(parts[2], 10);
+          if (!isNaN(month) && !isNaN(day) && !isNaN(year) && month >= 0 && month < 12) {
+            date = new Date(year, month, day);
+          }
+        }
+      }
+      // Handle YYYY-MM-DD format (from database/double-click)
+      else if (dateString.includes('-')) {
+        // Handle YYYY-MM-DD format (e.g., "2026-01-15")
+        const parts = dateString.split('-');
+        if (parts.length === 3) {
+          const year = parseInt(parts[0], 10);
+          const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+          const day = parseInt(parts[2], 10);
+          if (!isNaN(year) && !isNaN(month) && !isNaN(day) && month >= 0 && month < 12 && day > 0 && day <= 31) {
+            date = new Date(year, month, day);
+            // Validate the date was created correctly
+            if (date.getFullYear() === year && date.getMonth() === month && date.getDate() === day) {
+              // Date is valid, use it
+            } else {
+              date = null; // Invalid date, try other methods
+            }
+          }
+        }
+        
+        // If YYYY-MM-DD parsing failed, try parsing as ISO string
+        if (!date || isNaN(date.getTime())) {
+          date = new Date(dateString);
+        }
+      }
+      // Try to parse as Date object for any other format
+      else {
+        date = new Date(dateString);
+      }
+    }
+    
+    // Format as "Jan 15, 2026"
+    if (date && !isNaN(date.getTime())) {
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const month = monthNames[date.getMonth()];
+      const day = date.getDate();
+      const year = date.getFullYear();
+      return `${month} ${day}, ${year}`;
+    }
+    
+    // If all parsing fails, try one more time with Date constructor
+    if (dateString) {
+      const fallbackDate = new Date(dateString);
+      if (!isNaN(fallbackDate.getTime())) {
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const month = monthNames[fallbackDate.getMonth()];
+        const day = fallbackDate.getDate();
+        const year = fallbackDate.getFullYear();
+        return `${month} ${day}, ${year}`;
+      }
+    }
+    
+    // If all parsing fails, return the original string (shouldn't happen for valid dates)
+    return dateString || String(dateInput);
   };
 
   // Format launch date
@@ -383,11 +512,43 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
     return dateString;
   };
 
+  // Parse date consistently (handles MM/DD/YYYY format)
+  const parseDateForSort = (dateString) => {
+    if (!dateString) return new Date(0);
+    
+    // Try parsing as Date object first
+    const date = new Date(dateString);
+    if (!isNaN(date.getTime())) {
+      return date;
+    }
+    
+    // Handle MM/DD/YYYY format
+    const parts = dateString.split('/');
+    if (parts.length === 3) {
+      const month = parseInt(parts[0]) - 1;
+      const day = parseInt(parts[1]);
+      const year = parseInt(parts[2]);
+      if (!isNaN(month) && !isNaN(day) && !isNaN(year)) {
+        return new Date(year, month, day);
+      }
+    }
+    
+    return new Date(0); // Return epoch date if parsing fails
+  };
+
   // Load claim history when modal opens
   useEffect(() => {
     if (isOpen && productData) {
       const history = productData.claimHistory || [];
-      setClaimHistory(history);
+      // Sort so oldest entries are at top, newest at bottom
+      const sortedHistory = [...history].sort((a, b) => {
+        const dateA = parseDateForSort(a.date);
+        const dateB = parseDateForSort(b.date);
+        return dateA - dateB; // Sort ascending (oldest first, newest last)
+      });
+      setClaimHistory(sortedHistory);
+      // Show ACTIONS column by default when there are entries
+      setShowActionsColumn(sortedHistory.length > 0);
     }
   }, [isOpen, productData]);
 
@@ -398,13 +559,48 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
       setClaimDate('');
       setClaimUnits('0');
       setShowClaimDatePicker(false);
+      setActionMenuId(null);
     } else {
       // Also reset when modal closes
       setClaimDate('');
       setClaimUnits('0');
       setShowClaimDatePicker(false);
+      setActionMenuId(null);
     }
   }, [isOpen]);
+
+  // Handle click outside to close action menu
+  useEffect(() => {
+    if (!actionMenuId) return;
+
+    const handleClickOutside = (event) => {
+      if (actionMenuId && !event.target.closest('[data-action-menu]') && !event.target.closest('[data-action-button]')) {
+        setActionMenuId(null);
+      }
+    };
+
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [actionMenuId]);
+
+  // Scroll to top when input row is shown (it's at the top, so just ensure it's visible)
+  useEffect(() => {
+    if (showInputRow && tableContainerRef.current) {
+      // Use setTimeout to ensure DOM has updated
+      setTimeout(() => {
+        if (tableContainerRef.current) {
+          // Scroll to top to show the input row
+          tableContainerRef.current.scrollTop = 0;
+        }
+      }, 100);
+    }
+  }, [showInputRow]);
 
   if (!isOpen || !productData) return null;
 
@@ -414,12 +610,13 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
         id: Date.now(),
         date: claimDate,
         units: parseInt(claimUnits),
+        brand: productData?.brand || '',
       };
 
       const updatedHistory = [...claimHistory, newClaim].sort((a, b) => {
-        const dateA = new Date(a.date);
-        const dateB = new Date(b.date);
-        return dateB - dateA; // Sort descending
+        const dateA = parseDateForSort(a.date);
+        const dateB = parseDateForSort(b.date);
+        return dateA - dateB; // Sort ascending (oldest first, newest at bottom)
       });
 
       setClaimHistory(updatedHistory);
@@ -439,141 +636,128 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
         onUpdateRow(updatedRow);
       }
 
-      // Show toast notification
-      const productDetails = [productData.size, productData.asin].filter(Boolean).join(' • ');
-      
-      const toastId = toast.success('', {
-        description: (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '24px',
-            minWidth: '400px',
-            width: 'fit-content',
-            maxWidth: '95vw',
-            height: '36px',
-            paddingTop: '8px',
-            paddingRight: '12px',
-            paddingBottom: '8px',
-            paddingLeft: '12px',
-            borderRadius: '12px',
-            backgroundColor: '#F0FDF4',
-            color: '#34C759',
-            margin: '0 auto',
-            overflow: 'visible',
-          }}>
-            {/* Check Icon */}
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#34C759"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ flexShrink: 0 }}
-            >
-              <path d="M20 6L9 17l-5-5" />
-            </svg>
-            {/* Product Name and Details */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              flexShrink: 0,
-              overflow: 'visible',
-            }}>
-              <span style={{
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                color: '#34C759',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-              }}>
-                Claim entry submitted for{' '}
-              </span>
-              {productData.productName && (
-                <span style={{
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                  color: '#34C759',
-                  whiteSpace: 'nowrap',
-                  overflow: 'visible',
-                  flexShrink: 0,
-                }}>
-                  {productData.productName}
-                </span>
-              )}
-              {productDetails && (
-                <span style={{
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                  color: '#34C759',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                }}>
-                  {' • ' + productDetails}
-                </span>
-              )}
-            </div>
-            {/* Close Button (X) */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                toast.dismiss(toastId);
-              }}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                color: '#34C759',
-              }}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
-          </div>
-        ),
-        duration: 4000,
-        icon: null,
-        closeButton: false,
-        style: {
-          background: 'transparent',
-          padding: 0,
-          border: 'none',
-          boxShadow: 'none',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-        },
-        className: 'claim-entry-submitted-toast',
-      });
-
-      // Close modal and reset form
+      // Reset form fields and hide input row after adding
       setClaimDate('');
       setClaimUnits('0');
       setShowClaimDatePicker(false);
-      if (onClose) {
-        onClose();
-      }
+      setShowInputRow(false);
+      // Keep ACTIONS column visible if there are entries
+      setShowActionsColumn(updatedHistory.length > 0);
+
+      // Scroll to bottom to show the new entry
+      setTimeout(() => {
+        if (tableContainerRef.current) {
+          tableContainerRef.current.scrollTop = tableContainerRef.current.scrollHeight;
+        }
+      }, 0);
     }
+  };
+
+  const handleDeleteClaim = (claimId) => {
+    const claim = claimHistory.find(c => c.id === claimId);
+    if (claim) {
+      const updatedHistory = claimHistory.filter(c => c.id !== claimId);
+      setClaimHistory(updatedHistory);
+
+      // Update the row's claimed count
+      if (onUpdateRow) {
+        const updatedRow = {
+          ...productData,
+          claimed: Math.max(0, (productData.claimed || 0) - claim.units),
+          claimHistory: updatedHistory,
+        };
+        onUpdateRow(updatedRow);
+      }
+      
+      // Hide ACTIONS column if no entries left
+      setShowActionsColumn(updatedHistory.length > 0);
+    }
+    setActionMenuId(null);
+  };
+
+  const handleActionButtonClick = (claimId, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Show action menu
+    const buttonRect = e.currentTarget.getBoundingClientRect();
+    const menuWidth = 150;
+    const menuHeight = 100;
+    
+    let top = buttonRect.bottom + 8;
+    let left = buttonRect.left;
+    
+    // Adjust if menu would go off screen
+    if (top + menuHeight > window.innerHeight) {
+      top = buttonRect.top - menuHeight - 8;
+    }
+    if (left + menuWidth > window.innerWidth) {
+      left = window.innerWidth - menuWidth - 16;
+    }
+    
+    setActionMenuPosition({ top, left });
+    setActionMenuId(actionMenuId === claimId ? null : claimId);
+  };
+
+  const handleDateDoubleClick = (claimId, currentDate) => {
+    const editableDate = convertDisplayDateToEditable(currentDate);
+    setEditingDateId(claimId);
+    setEditingDateValue(editableDate);
+    setShowDatePickerForEdit(false);
+    // Focus the input after a small delay
+    setTimeout(() => {
+      if (editingDateInputRef.current) {
+        editingDateInputRef.current.focus();
+        editingDateInputRef.current.select();
+      }
+    }, 100);
+  };
+
+  const handleSaveDateEdit = (claimId) => {
+    if (!editingDateValue.trim()) {
+      // If empty, cancel edit
+      setEditingDateId(null);
+      setEditingDateValue('');
+      setShowDatePickerForEdit(false);
+      return;
+    }
+
+    // Update the claim history
+    const updatedHistory = claimHistory.map(claim => {
+      if (claim.id === claimId) {
+        return { ...claim, date: editingDateValue };
+      }
+      return claim;
+    });
+
+    // Re-sort by date
+    const sortedHistory = [...updatedHistory].sort((a, b) => {
+      const dateA = parseDateForSort(a.date);
+      const dateB = parseDateForSort(b.date);
+      return dateA - dateB;
+    });
+
+    setClaimHistory(sortedHistory);
+
+    // Update the row if callback is provided
+    if (onUpdateRow) {
+      const updatedRow = {
+        ...productData,
+        claimHistory: sortedHistory,
+      };
+      onUpdateRow(updatedRow);
+    }
+
+    // Reset editing state
+    setEditingDateId(null);
+    setEditingDateValue('');
+    setShowDatePickerForEdit(false);
+  };
+
+  const handleCancelDateEdit = () => {
+    setEditingDateId(null);
+    setEditingDateValue('');
+    setShowDatePickerForEdit(false);
   };
 
   return createPortal(
@@ -634,7 +818,7 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
           {/* Header */}
           <div
             style={{
-              width: '100%',
+              width: '600px',
               height: '52px',
               padding: '16px',
               borderBottom: '1px solid #374151',
@@ -687,7 +871,7 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
 
           {/* Content */}
           <div style={{ 
-            padding: '1.5rem', 
+            padding: '1.5rem 1.5rem 0 1.5rem', 
             backgroundColor: '#111827', 
             display: 'flex', 
             flexDirection: 'column', 
@@ -728,10 +912,21 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
 
               {/* Product Details */}
               <div style={{ flex: 1 }}>
-                <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#FFFFFF', marginBottom: '0.5rem' }}>
+                {/* Product Title */}
+                <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#FFFFFF', margin: 0, marginBottom: '0.5rem' }}>
                   {productData.productName || 'N/A'}
                 </h3>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginBottom: '0.75rem', alignItems: 'center' }}>
+                {/* Size below title */}
+                {productData.size && (
+                  <div style={{ marginBottom: '0.5rem' }}>
+                    <span style={{ color: '#FFFFFF', fontSize: '1.125rem', fontWeight: 400 }}>
+                      {productData.size}
+                    </span>
+                  </div>
+                )}
+                
+                {/* Metadata below in smaller, lighter gray text */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem', alignItems: 'center' }}>
                   {productData.brand && (
                     <span style={{ color: '#9CA3AF', fontSize: '0.875rem' }}>{productData.brand}</span>
                   )}
@@ -868,37 +1063,50 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
               </div>
             </div>
 
-            {/* Add Claim Form */}
-            <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0, marginBottom: '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexShrink: 0 }}>
-                <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#FFFFFF', margin: 0 }}>Add Claimed Vine</h4>
-                <button
+            {/* Claim History Table with Input Row */}
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', marginTop: '24px' }}>
+                <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#FFFFFF', margin: 0 }}>Claim History</h4>
+                <span
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
+                    // Show input row and show the third column for the Add button
+                    // Set both at once to prevent column width shifts
+                    setShowActionsColumn(true);
+                    setShowInputRow(true);
+                    // Reset form fields
                     setClaimDate('');
                     setClaimUnits('0');
-                    setShowClaimDatePicker(false);
+                    // Focus on the date input after a small delay to ensure it's rendered
+                    setTimeout(() => {
+                      if (claimDateInputRef.current) {
+                        claimDateInputRef.current.focus();
+                      }
+                    }, 100);
                   }}
                   style={{
-                    background: 'none',
-                    border: 'none',
-                    padding: 0,
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: '#3B82F6',
                     cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    color: '#FFFFFF',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.25rem',
+                    textDecoration: 'none',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = '#2563EB';
+                    e.currentTarget.style.textDecoration = 'underline';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = '#3B82F6';
+                    e.currentTarget.style.textDecoration = 'none';
                   }}
                 >
-                  <span>Cancel</span>
-                </button>
+                  + Add Claim Entry
+                </span>
               </div>
-
-              {/* Input Table */}
+              
               <div
+                ref={tableContainerRef}
                 style={{
                   width: '100%',
                   border: '1px solid #374151',
@@ -907,14 +1115,13 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                   boxSizing: 'border-box',
                   overflow: 'visible',
                   backgroundColor: '#111827',
-                  flexShrink: 0,
                 }}
               >
                 <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed' }}>
                   <colgroup>
-                    <col style={{ width: '40%' }} />
-                    <col style={{ width: '20%' }} />
-                    <col style={{ width: '40%' }} />
+                    <col style={{ width: '45%' }} />
+                    <col style={{ width: '25%' }} />
+                    <col style={{ width: (showInputRow || showActionsColumn) ? '30%' : '0%' }} />
                   </colgroup>
                   <thead>
                     <tr style={{ 
@@ -947,13 +1154,14 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                           color: '#9CA3AF',
                           boxSizing: 'border-box',
                           borderBottom: '1px solid #374151',
+                          borderTopRightRadius: (showInputRow || showActionsColumn) ? '0' : '8px',
                         }}
                       >
                         UNITS
                       </th>
                       <th
                         style={{ 
-                          padding: '12px 16px', 
+                          padding: '12px 16px 12px 16px', 
                           textAlign: 'right',
                           fontSize: '0.75rem',
                           fontWeight: 600,
@@ -962,7 +1170,9 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                           color: '#9CA3AF',
                           boxSizing: 'border-box',
                           borderBottom: '1px solid #374151',
-                          borderTopRightRadius: '8px',
+                          borderTopRightRadius: (showInputRow || showActionsColumn) ? '8px' : '0',
+                          visibility: (showInputRow || showActionsColumn) ? 'visible' : 'hidden',
+                          width: (showInputRow || showActionsColumn) ? (showInputRow ? '43%' : '30%') : '0%',
                         }}
                       >
                         ACTIONS
@@ -970,17 +1180,17 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                     </tr>
                   </thead>
                   <tbody>
-                    {/* Input row for adding new claim */}
-                    <tr style={{ backgroundColor: '#111827' }}>
+                    {/* Input row for adding new claim - at the top */}
+                    {showInputRow && (
+                      <tr ref={inputRowRef} style={{ backgroundColor: '#111827', borderBottom: '1px solid #374151' }}>
                       <td
                         style={{ 
                           padding: '12px 16px', 
                           fontSize: '0.875rem',
                           color: '#FFFFFF',
                           textAlign: 'left',
-                          width: '40%',
                           boxSizing: 'border-box',
-                          borderBottomLeftRadius: '8px',
+                          width: '45%',
                         }}
                       >
                         <div style={{ position: 'relative' }}>
@@ -1021,9 +1231,7 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                               pointerEvents: 'none',
                             }}
                           >
-                            {/* Calendar body */}
                             <rect x="4" y="7" width="12" height="9" rx="1" fill="none" stroke="#9CA3AF" strokeWidth="1.5" opacity="0.7"/>
-                            {/* Top tabs */}
                             <rect x="5" y="3" width="2.5" height="4" rx="0.5" fill="#9CA3AF" opacity="0.7"/>
                             <rect x="12.5" y="3" width="2.5" height="4" rx="0.5" fill="#9CA3AF" opacity="0.7"/>
                           </svg>
@@ -1043,12 +1251,13 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                       </td>
                       <td
                         style={{ 
-                          padding: '12px 16px', 
+                          padding: '12px 8px 12px 16px', 
                           fontSize: '0.875rem',
                           color: '#FFFFFF',
                           textAlign: 'left',
-                          width: '20%',
                           boxSizing: 'border-box',
+                          width: '12%',
+                          whiteSpace: 'nowrap',
                         }}
                       >
                         <input
@@ -1057,7 +1266,7 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                           onChange={(e) => setClaimUnits(e.target.value)}
                           className="no-spinner"
                           style={{
-                            width: '91px',
+                            width: '70px',
                             height: '27px',
                             padding: '6px',
                             borderRadius: '4px',
@@ -1069,27 +1278,32 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                             fontSize: '14px',
                             textAlign: 'center',
                             boxSizing: 'border-box',
+                            flexShrink: 0,
                           }}
                           onWheel={(e) => e.target.blur()}
                           min="0"
                         />
                       </td>
-                      <td style={{ 
-                        padding: '12px 16px', 
-                        width: '40%',
-                        boxSizing: 'border-box',
-                        textAlign: 'right',
-                        borderBottomRightRadius: '8px',
-                      }}>
-                        <button
+                      <td
+                        style={{ 
+                          padding: '12px 16px', 
+                          fontSize: '0.875rem',
+                          color: '#FFFFFF',
+                          textAlign: 'right',
+                          boxSizing: 'border-box',
+                          width: '43%',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+                          <button
                             onClick={handleSubmit}
                             style={{
-                              width: '48px',
-                              height: '23px',
-                              paddingTop: '4px',
-                              paddingRight: '12px',
-                              paddingBottom: '4px',
-                              paddingLeft: '12px',
+                              minWidth: '48px',
+                              height: '28px',
+                              paddingTop: '6px',
+                              paddingRight: '16px',
+                              paddingBottom: '6px',
+                              paddingLeft: '16px',
                               borderRadius: '4px',
                               border: 'none',
                               backgroundColor: '#3B82F6',
@@ -1101,83 +1315,22 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                               display: 'inline-flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              marginLeft: 'auto',
+                              flexShrink: 0,
+                              transition: 'background-color 0.2s',
                             }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#2563EB';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = '#3B82F6';
-                          }}
-                        >
-                          Add
-                        </button>
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#2563EB';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = '#3B82F6';
+                            }}
+                          >
+                            Add
+                          </button>
+                        </div>
                       </td>
                     </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Claim History Table */}
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#FFFFFF', marginBottom: '24px', marginTop: '24px' }}>Claim History</h4>
-              
-              <div
-                style={{
-                  width: '100%',
-                  border: '1px solid #374151',
-                  borderRadius: '8px',
-                  padding: '0',
-                  boxSizing: 'border-box',
-                  overflow: 'visible',
-                  backgroundColor: '#111827',
-                }}
-              >
-                <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed' }}>
-                  <colgroup>
-                    <col style={{ width: '50%' }} />
-                    <col style={{ width: '50%' }} />
-                  </colgroup>
-                  <thead>
-                    <tr style={{ 
-                      backgroundColor: '#0F172A',
-                    }}>
-                      <th
-                        style={{ 
-                          padding: '12px 16px', 
-                          textAlign: 'left',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          color: '#9CA3AF',
-                          boxSizing: 'border-box',
-                          borderBottom: '1px solid #374151',
-                          borderTopLeftRadius: '8px',
-                        }}
-                      >
-                        DATE CLAIMED
-                      </th>
-                      <th
-                        style={{ 
-                          padding: '12px 16px', 
-                          textAlign: 'left',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          color: '#9CA3AF',
-                          boxSizing: 'border-box',
-                          borderBottom: '1px solid #374151',
-                          borderTopRightRadius: '8px',
-                        }}
-                      >
-                        UNITS
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                    )}
                     {/* Existing Claim History Entries */}
                     {claimHistory.length > 0 ? (
                       claimHistory.map((claim, index) => {
@@ -1185,7 +1338,7 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                         return (
                           <tr 
                             key={claim.id || index}
-                            style={{ 
+                            style={{
                               backgroundColor: '#111827',
                               borderBottom: index < claimHistory.length - 1 ? '1px solid #374151' : 'none',
                             }}
@@ -1199,8 +1352,119 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                                 boxSizing: 'border-box',
                                 borderBottomLeftRadius: isLastRow ? '8px' : '0',
                               }}
+                              onDoubleClick={() => handleDateDoubleClick(claim.id, claim.date)}
                             >
-                              {formatDisplayDate(claim.date)}
+                              {editingDateId === claim.id ? (
+                                <div style={{ position: 'relative' }}>
+                                  <input
+                                    ref={editingDateInputRef}
+                                    type="text"
+                                    placeholder="MM/DD/YYYY"
+                                    value={editingDateValue}
+                                    onChange={(e) => setEditingDateValue(e.target.value)}
+                                    onFocus={() => setShowDatePickerForEdit(true)}
+                                    onBlur={(e) => {
+                                      // Delay to allow calendar click to register
+                                      setTimeout(() => {
+                                        if (!isCalendarInteractingRef.current && !showDatePickerForEdit) {
+                                          handleSaveDateEdit(claim.id);
+                                        }
+                                        isCalendarInteractingRef.current = false;
+                                      }, 200);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleSaveDateEdit(claim.id);
+                                      } else if (e.key === 'Escape') {
+                                        e.preventDefault();
+                                        handleCancelDateEdit();
+                                      }
+                                    }}
+                                    style={{
+                                      width: '129px',
+                                      height: '28px',
+                                      paddingTop: '6px',
+                                      paddingRight: '12px',
+                                      paddingBottom: '6px',
+                                      paddingLeft: '32px',
+                                      borderRadius: '4px',
+                                      borderWidth: '1px',
+                                      borderStyle: 'solid',
+                                      borderColor: '#3B82F6',
+                                      backgroundColor: '#4B5563',
+                                      color: '#FFFFFF',
+                                      fontSize: '14px',
+                                      boxSizing: 'border-box',
+                                    }}
+                                  />
+                                  <svg
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 20 20"
+                                    fill="none"
+                                    style={{
+                                      position: 'absolute',
+                                      left: '12px',
+                                      top: '50%',
+                                      transform: 'translateY(-50%)',
+                                      pointerEvents: 'none',
+                                    }}
+                                  >
+                                    <rect x="4" y="7" width="12" height="9" rx="1" fill="none" stroke="#9CA3AF" strokeWidth="1.5" opacity="0.7"/>
+                                    <rect x="5" y="3" width="2.5" height="4" rx="0.5" fill="#9CA3AF" opacity="0.7"/>
+                                    <rect x="12.5" y="3" width="2.5" height="4" rx="0.5" fill="#9CA3AF" opacity="0.7"/>
+                                  </svg>
+                                  {/* Calendar Dropdown for editing */}
+                                  {showDatePickerForEdit && editingDateInputRef.current && (
+                                    <CalendarDropdown
+                                      value={editingDateValue}
+                                      onChange={(date) => {
+                                        isCalendarInteractingRef.current = true;
+                                        setEditingDateValue(date);
+                                        setShowDatePickerForEdit(false);
+                                        // Auto-save when date is selected from calendar
+                                        setTimeout(() => {
+                                          const updatedHistory = claimHistory.map(c => {
+                                            if (c.id === claim.id) {
+                                              return { ...c, date: date };
+                                            }
+                                            return c;
+                                          });
+                                          const sortedHistory = [...updatedHistory].sort((a, b) => {
+                                            const dateA = parseDateForSort(a.date);
+                                            const dateB = parseDateForSort(b.date);
+                                            return dateA - dateB;
+                                          });
+                                          setClaimHistory(sortedHistory);
+                                          if (onUpdateRow) {
+                                            const updatedRow = {
+                                              ...productData,
+                                              claimHistory: sortedHistory,
+                                            };
+                                            onUpdateRow(updatedRow);
+                                          }
+                                          setEditingDateId(null);
+                                          setEditingDateValue('');
+                                          isCalendarInteractingRef.current = false;
+                                        }, 100);
+                                      }}
+                                      onClose={() => {
+                                        setShowDatePickerForEdit(false);
+                                        // Reset flag after a delay to allow blur handler to check it
+                                        setTimeout(() => {
+                                          isCalendarInteractingRef.current = false;
+                                        }, 300);
+                                      }}
+                                      inputRef={editingDateInputRef.current}
+                                    />
+                                  )}
+                                </div>
+                              ) : (
+                                <span style={{ cursor: 'text', userSelect: 'none' }}>
+                                  {formatDisplayDate(claim.date)}
+                                </span>
+                              )}
                             </td>
                             <td
                               style={{ 
@@ -1209,38 +1473,141 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                                 color: '#FFFFFF',
                                 textAlign: 'left',
                                 boxSizing: 'border-box',
-                                borderBottomRightRadius: isLastRow ? '8px' : '0',
+                                borderBottomRightRadius: isLastRow && !showActionsColumn && !showInputRow ? '8px' : '0',
                               }}
                             >
                               {claim.units}
+                            </td>
+                            <td
+                              style={{ 
+                                padding: '12px 16px', 
+                                fontSize: '0.875rem',
+                                color: '#FFFFFF',
+                                textAlign: 'right',
+                                boxSizing: 'border-box',
+                                borderBottomRightRadius: isLastRow ? '8px' : '0',
+                                visibility: (showInputRow || showActionsColumn) ? 'visible' : 'hidden',
+                              }}
+                            >
+                              {showActionsColumn && (
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                  <button
+                                    data-action-button
+                                    onClick={(e) => handleActionButtonClick(claim.id, e)}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      padding: '4px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      color: '#9CA3AF',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.color = '#FFFFFF';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.color = '#9CA3AF';
+                                    }}
+                                  >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <circle cx="12" cy="5" r="1" />
+                                      <circle cx="12" cy="12" r="1" />
+                                      <circle cx="12" cy="19" r="1" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              )}
                             </td>
                           </tr>
                         );
                       })
                     ) : (
-                      <tr>
-                        <td 
-                          colSpan="2" 
-                          style={{ 
-                            padding: '2rem', 
-                            textAlign: 'center', 
-                            color: '#9CA3AF',
-                            fontSize: '0.875rem',
-                            borderBottomLeftRadius: '8px',
-                            borderBottomRightRadius: '8px',
-                          }}
-                        >
-                          No claim history yet
-                        </td>
-                      </tr>
+                      !showInputRow && (
+                        <tr>
+                          <td 
+                            colSpan={3} 
+                            style={{ 
+                              padding: '2rem', 
+                              textAlign: 'center', 
+                              color: '#9CA3AF',
+                              fontSize: '0.875rem',
+                              borderBottomLeftRadius: '8px',
+                              borderBottomRightRadius: '8px',
+                            }}
+                          >
+                            No claim history yet
+                          </td>
+                        </tr>
+                      )
                     )}
                   </tbody>
                 </table>
               </div>
             </div>
           </div>
+          <div style={{ height: '0.5rem' }}></div>
         </div>
       </div>
+
+      {/* Action Menu Popup */}
+      {actionMenuId && createPortal(
+        <div
+          data-action-menu
+          style={{
+            position: 'fixed',
+            top: `${actionMenuPosition.top}px`,
+            left: `${actionMenuPosition.left}px`,
+            zIndex: 1001,
+            minWidth: '150px',
+            padding: '8px',
+            backgroundColor: '#1F2937',
+            border: '1px solid #374151',
+            borderRadius: '8px',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2)',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div style={{ color: '#FFFFFF', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', padding: '8px 12px', borderBottom: '1px solid #374151', marginBottom: '4px' }}>
+            ACTIONS
+          </div>
+          <button
+            onClick={() => {
+              const claim = claimHistory.find(c => c.id === actionMenuId);
+              if (claim) {
+                handleDeleteClaim(actionMenuId);
+              }
+            }}
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              background: 'none',
+              border: 'none',
+              color: '#FFFFFF',
+              fontSize: '0.875rem',
+              textAlign: 'left',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#374151';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            <span>Delete</span>
+          </button>
+        </div>,
+        document.body
+      )}
     </>,
     document.body
   );

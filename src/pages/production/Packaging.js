@@ -185,18 +185,34 @@ const Packaging = () => {
   const handlePause = (isPaused) => {
     // Handle pause/resume logic
     if (selectedProduct) {
-      const newStatus = isPaused ? 'paused' : 'in_progress';
+      // If units have been produced and we're pausing, change status to 'in_progress' instead
+      const newStatus = isPaused && selectedProduct.unitsProduced 
+        ? 'in_progress' 
+        : isPaused 
+          ? 'paused' 
+          : 'in_progress';
+      
       setProducts(prevProducts => 
         prevProducts.map(product => 
           product.id === selectedProduct.id 
-            ? { ...product, status: newStatus }
+            ? { 
+                ...product, 
+                status: newStatus,
+                // Store quality check images when pausing so they're available when reopening
+                qualityCheckImages: isPaused && qualityCheckImages.length > 0 
+                  ? qualityCheckImages 
+                  : product.qualityCheckImages || []
+              }
             : product
         )
       );
       // Update selectedProduct state as well
       setSelectedProduct(prev => ({
         ...prev,
-        status: newStatus
+        status: newStatus,
+        qualityCheckImages: isPaused && qualityCheckImages.length > 0 
+          ? qualityCheckImages 
+          : prev.qualityCheckImages || []
       }));
     }
   };
@@ -467,6 +483,12 @@ const Packaging = () => {
     
     // Set selected product and open Production Started modal
     setSelectedProduct(row);
+    
+    // If product has quality check images stored, use them; otherwise use current state
+    if (row.qualityCheckImages && row.qualityCheckImages.length > 0) {
+      setQualityCheckImages(row.qualityCheckImages);
+    }
+    
     setShowProductionStartedModal(true);
   };
 

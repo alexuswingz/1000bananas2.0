@@ -1,9 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 import NgoosAPI from '../../../../services/ngoosApi';
 import { toast } from 'sonner';
 import AddClaimed from './AddClaimed';
+import VineDetailsModal from './VineDetailsModal';
+import ProductsFilterDropdown from '../../../production/new-shipment/components/ProductsFilterDropdown';
 
 // Calendar Dropdown Component
 const CalendarDropdown = ({ value, onChange, onClose, inputRef }) => {
@@ -56,9 +58,30 @@ const CalendarDropdown = ({ value, onChange, onClose, inputRef }) => {
     });
   };
 
+  // Check if a date is in the future
+  const isFutureDate = (day) => {
+    const dateToCheck = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    dateToCheck.setHours(0, 0, 0, 0);
+    return dateToCheck > today;
+  };
+
   // Handle date selection
   const handleDateSelect = (day) => {
     const newDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    newDate.setHours(0, 0, 0, 0);
+    
+    if (newDate > today) {
+      toast.error('Cannot select future dates', {
+        description: 'Please select today or a past date',
+        duration: 3000,
+      });
+      return;
+    }
+    
     onChange(formatDate(newDate));
   };
 
@@ -102,19 +125,33 @@ const CalendarDropdown = ({ value, onChange, onClose, inputRef }) => {
   const daysInMonth = getDaysInMonth(currentMonth);
   const firstDay = getFirstDayOfMonth(currentMonth);
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-  // Generate calendar days
-  const calendarDays = [];
-  // Add empty cells for days before the first day of the month
-  for (let i = 0; i < firstDay; i++) {
-    calendarDays.push(null);
-  }
-  // Add days of the month
-  for (let day = 1; day <= daysInMonth; day++) {
-    calendarDays.push(day);
-  }
+  // Get previous month days to fill the grid
+  const getPreviousMonthDays = () => {
+    const prevMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 0);
+    const daysInPrevMonth = prevMonth.getDate();
+    const days = [];
+    for (let i = firstDay - 1; i >= 0; i--) {
+      days.push(daysInPrevMonth - i);
+    }
+    return days;
+  };
 
+  // Get next month days to fill the grid
+  const getNextMonthDays = () => {
+    const totalCells = 42;
+    const currentMonthDays = daysInMonth + firstDay;
+    const remainingCells = totalCells - currentMonthDays;
+    const days = [];
+    for (let i = 1; i <= remainingCells; i++) {
+      days.push(i);
+    }
+    return days;
+  };
+
+  const previousDays = getPreviousMonthDays();
+  const nextDays = getNextMonthDays();
   const inputRect = inputRef?.getBoundingClientRect();
 
   return (
@@ -137,55 +174,62 @@ const CalendarDropdown = ({ value, onChange, onClose, inputRef }) => {
     >
       {/* Month Navigation */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-        <button
-          type="button"
-          onClick={() => navigateMonth(-1)}
-          style={{
-            width: '32px',
-            height: '32px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '4px',
-            border: '1px solid #374151',
-            backgroundColor: '#374151',
-            color: '#FFFFFF',
-            cursor: 'pointer',
-            outline: 'none',
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4B5563'}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#374151'}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M15 18l-6-6 6-6" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#FFFFFF' }}>
+            {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+          </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" style={{ cursor: 'pointer' }}>
+            <path d="M6 9l6 6 6-6" />
           </svg>
-        </button>
-        <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#FFFFFF' }}>
-          {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
         </div>
-        <button
-          type="button"
-          onClick={() => navigateMonth(1)}
-          style={{
-            width: '32px',
-            height: '32px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '4px',
-            border: '1px solid #374151',
-            backgroundColor: '#374151',
-            color: '#FFFFFF',
-            cursor: 'pointer',
-            outline: 'none',
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4B5563'}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#374151'}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M9 18l6-6-6-6" />
-          </svg>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <button
+            type="button"
+            onClick={() => navigateMonth(-1)}
+            style={{
+              width: '24px',
+              height: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '4px',
+              border: 'none',
+              backgroundColor: 'transparent',
+              color: '#9CA3AF',
+              cursor: 'pointer',
+              outline: 'none',
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'}
+            onMouseLeave={(e) => e.currentTarget.style.color = '#9CA3AF'}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={() => navigateMonth(1)}
+            style={{
+              width: '24px',
+              height: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '4px',
+              border: 'none',
+              backgroundColor: 'transparent',
+              color: '#9CA3AF',
+              cursor: 'pointer',
+              outline: 'none',
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = '#FFFFFF'}
+            onMouseLeave={(e) => e.currentTarget.style.color = '#9CA3AF'}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Day Names Header */}
@@ -208,19 +252,37 @@ const CalendarDropdown = ({ value, onChange, onClose, inputRef }) => {
 
       {/* Calendar Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
-        {calendarDays.map((day, index) => {
-          if (day === null) {
-            return <div key={`empty-${index}`} style={{ height: '32px' }} />;
-          }
-
+        {/* Previous month days */}
+        {previousDays.map((day) => (
+          <button
+            key={`prev-${day}`}
+            type="button"
+            disabled
+            style={{
+              width: '32px',
+              height: '32px',
+              color: '#6B7280',
+              fontSize: '0.875rem',
+              border: 'none',
+              backgroundColor: 'transparent',
+              cursor: 'default',
+            }}
+          >
+            {day}
+          </button>
+        ))}
+        {/* Current month days */}
+        {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
           const selected = isSelected(day);
           const today = isToday(day);
+          const isFuture = isFutureDate(day);
 
           return (
             <button
               key={day}
               type="button"
               onClick={() => handleDateSelect(day)}
+              disabled={isFuture}
               style={{
                 width: '32px',
                 height: '32px',
@@ -230,14 +292,15 @@ const CalendarDropdown = ({ value, onChange, onClose, inputRef }) => {
                 borderRadius: '4px',
                 border: selected ? '1px solid #3B82F6' : '1px solid transparent',
                 backgroundColor: selected ? '#3B82F6' : today ? '#1F2937' : 'transparent',
-                color: selected ? '#FFFFFF' : today ? '#3B82F6' : '#FFFFFF',
+                color: selected ? '#FFFFFF' : today ? '#3B82F6' : isFuture ? '#6B7280' : '#FFFFFF',
                 fontSize: '0.875rem',
-                cursor: 'pointer',
+                cursor: isFuture ? 'not-allowed' : 'pointer',
                 outline: 'none',
                 fontWeight: today ? 600 : 400,
+                opacity: isFuture ? 0.5 : 1,
               }}
               onMouseEnter={(e) => {
-                if (!selected) {
+                if (!selected && !isFuture) {
                   e.currentTarget.style.backgroundColor = '#1F2937';
                 }
               }}
@@ -251,31 +314,25 @@ const CalendarDropdown = ({ value, onChange, onClose, inputRef }) => {
             </button>
           );
         })}
-      </div>
-
-      {/* Today Button */}
-      <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'center' }}>
-        <button
-          type="button"
-          onClick={() => {
-            const today = new Date();
-            onChange(formatDate(today));
-          }}
-          style={{
-            padding: '6px 12px',
-            borderRadius: '4px',
-            border: '1px solid #374151',
-            backgroundColor: '#374151',
-            color: '#FFFFFF',
-            fontSize: '0.75rem',
-            cursor: 'pointer',
-            outline: 'none',
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4B5563'}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#374151'}
-        >
-          Today
-        </button>
+        {/* Next month days */}
+        {nextDays.map((day) => (
+          <button
+            key={`next-${day}`}
+            type="button"
+            disabled
+            style={{
+              width: '32px',
+              height: '32px',
+              color: '#6B7280',
+              fontSize: '0.875rem',
+              border: 'none',
+              backgroundColor: 'transparent',
+              cursor: 'default',
+            }}
+          >
+            {day}
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -289,6 +346,7 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
   const [filters, setFilters] = useState({});
   const [sortConfig, setSortConfig] = useState({ field: '', order: '' });
   const [sortedRowOrder, setSortedRowOrder] = useState(null);
+  const [currentFilter, setCurrentFilter] = useState({});
   const [productSearchValue, setProductSearchValue] = useState('');
   const [showProductDropdown, setShowProductDropdown] = useState(false);
   const [openProductDropdownId, setOpenProductDropdownId] = useState(null);
@@ -316,25 +374,11 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
   const handleOpenVineDetailsModal = (row, focusOnClaimEntry = false) => {
     console.log('🔵 handleOpenVineDetailsModal CALLED for:', row.productName);
     console.trace('Stack trace:');
-    // Load claim history from row data or use sample data for demo
+    // Load claim history from row data - use empty array if none exists
     const existingHistory = row.claimHistory || [];
-    // If no claim history exists, add sample data for demo purposes
-    const sampleHistory = existingHistory.length === 0 ? [
-      { date: 'Jan 15, 2026', units: 2 },
-      { date: 'Jan 18, 2026', units: 3 },
-      { date: 'Jan 21, 2026', units: 7 }
-    ] : existingHistory;
     
-    // Calculate claimed count from history
-    const calculatedClaimed = sampleHistory.reduce((sum, claim) => sum + (claim.units || 0), 0);
-    
-    // Update selected row with calculated claimed if using sample data
-    const updatedRow = existingHistory.length === 0 
-      ? { ...row, claimed: calculatedClaimed, claimHistory: sampleHistory }
-      : row;
-    
-    setSelectedVineRow(updatedRow);
-    setClaimHistory(sampleHistory);
+    setSelectedVineRow(row);
+    setClaimHistory(existingHistory);
     setClaimDate('');
     setClaimUnits('0');
     setShowClaimDatePicker(false);
@@ -376,10 +420,61 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
       if (openProductDropdownId && planningProducts.length === 0 && !loadingPlanningProducts) {
         setLoadingPlanningProducts(true);
         try {
-          const data = await NgoosAPI.getTpsPlanning();
-          if (data.success && data.products) {
-            setPlanningProducts(data.products);
-          }
+          // Use production inventory API (same as shipment feature) to get products with brand_name, size, and child_asin
+          const { getProductsInventory } = await import('../../../../services/productionApi');
+          const productionInventory = await getProductsInventory();
+          
+          // Also get TPS planning data for forecast information
+          const tpsData = await NgoosAPI.getTpsPlanning();
+          const tpsProducts = tpsData.success ? (tpsData.products || []) : [];
+          
+          // Create a map of TPS products by ASIN for merging
+          const tpsMap = {};
+          tpsProducts.forEach(p => {
+            const asin = p.asin || p.child_asin || '';
+            if (asin) {
+              tpsMap[asin] = p;
+            }
+          });
+          
+          // DEDUPLICATE products by child_asin to prevent duplicates (same as shipment feature)
+          // Keep the first occurrence of each ASIN (or use database ID for products without ASIN)
+          const seenAsins = new Set();
+          const uniqueProducts = productionInventory.filter(item => {
+            const key = item.child_asin || item.asin || `db-${item.id}`;
+            if (seenAsins.has(key)) {
+              console.log(`Duplicate product skipped: ${item.product_name} (${key})`);
+              return false;
+            }
+            seenAsins.add(key);
+            return true;
+          });
+          
+          console.log(`Deduplicated: ${productionInventory.length} → ${uniqueProducts.length} products`);
+          
+          // Merge production inventory (primary source) with TPS forecast data
+          const mergedProducts = uniqueProducts.map(item => {
+            const asin = item.child_asin || item.asin || '';
+            const tpsProduct = tpsMap[asin] || {};
+            
+            return {
+              // Primary fields from production inventory (has brand_name, size, child_asin)
+              product_name: item.product_name || tpsProduct.product_name || '',
+              brand_name: item.brand_name || tpsProduct.brand || tpsProduct.brand_name || '',
+              brand: item.brand_name || tpsProduct.brand || tpsProduct.brand_name || '',
+              size: item.size || tpsProduct.size || '',
+              child_asin: item.child_asin || '',
+              asin: item.child_asin || item.asin || tpsProduct.asin || '',
+              // Additional fields from TPS forecast
+              image_url: tpsProduct.image_url || item.product_image_url || null,
+              imageUrl: tpsProduct.image_url || item.product_image_url || null,
+              units_to_make: tpsProduct.units_to_make || 0,
+              algorithm: tpsProduct.algorithm || '',
+            };
+          });
+          
+          console.log(`Loaded ${mergedProducts.length} unique products for vine tracker`);
+          setPlanningProducts(mergedProducts);
         } catch (error) {
           console.error('Error fetching planning products:', error);
         } finally {
@@ -483,61 +578,167 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
   // Handle filter icon click
   const handleFilterClick = (columnKey, e) => {
     e.stopPropagation();
-    setOpenFilterColumn(openFilterColumn === columnKey ? null : columnKey);
+    const isOpening = openFilterColumn !== columnKey;
+    setOpenFilterColumn(isOpening ? columnKey : null);
+    
+    // Initialize currentFilter when opening
+    if (isOpening) {
+      const existingFilter = filters[columnKey] || {};
+      setCurrentFilter({
+        selectedValues: existingFilter.values ? new Set(existingFilter.values) : new Set(),
+        conditionType: existingFilter.condition || '',
+        conditionValue: existingFilter.conditionValue || '',
+      });
+    }
   };
 
-  // Handle filter apply
-  const handleApplyFilter = (filterConfig) => {
-    const filtersToUse = { ...filters };
-    if (filterConfig.filterField && filterConfig.filterCondition && filterConfig.filterValue) {
-      filtersToUse[filterConfig.filterField] = {
-        condition: filterConfig.filterCondition,
-        value: filterConfig.filterValue,
-      };
+  // Get available values for a column
+  // Format date for display (Feb 4, 2026 format)
+  const formatDisplayDate = (dateInput) => {
+    if (!dateInput) return '';
+    
+    // If it's already a Date object, use it directly
+    let date = dateInput instanceof Date ? dateInput : null;
+    
+    // Convert to string if not already
+    const dateString = date ? null : String(dateInput).trim();
+    
+    // If it's already in the text format (contains month name), return as is
+    if (dateString) {
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const hasMonthName = monthNames.some(month => dateString.includes(month));
+      if (hasMonthName) {
+        return dateString;
+      }
     }
     
-    if (filterConfig.sortField && filterConfig.sortOrder) {
-      setSortConfig({ field: filterConfig.sortField, order: filterConfig.sortOrder });
+    // If we don't have a date yet, parse from string
+    if (!date && dateString) {
+      // Handle MM/DD/YYYY format (from calendar input)
+      if (dateString.includes('/')) {
+        const parts = dateString.split('/');
+        if (parts.length === 3) {
+          const month = parseInt(parts[0], 10) - 1; // Month is 0-indexed
+          const day = parseInt(parts[1], 10);
+          const year = parseInt(parts[2], 10);
+          if (!isNaN(month) && !isNaN(day) && !isNaN(year) && month >= 0 && month < 12) {
+            date = new Date(year, month, day);
+          }
+        }
+      }
+      // Handle YYYY-MM-DD format (from database/double-click)
+      else if (dateString.includes('-')) {
+        // Handle YYYY-MM-DD format (e.g., "2026-01-15")
+        const parts = dateString.split('-');
+        if (parts.length === 3) {
+          const year = parseInt(parts[0], 10);
+          const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+          const day = parseInt(parts[2], 10);
+          if (!isNaN(year) && !isNaN(month) && !isNaN(day) && month >= 0 && month < 12 && day > 0 && day <= 31) {
+            date = new Date(year, month, day);
+            // Validate the date was created correctly
+            if (date.getFullYear() === year && date.getMonth() === month && date.getDate() === day) {
+              // Date is valid, use it
+            } else {
+              date = null; // Invalid date, try other methods
+            }
+          }
+        }
+        
+        // If YYYY-MM-DD parsing failed, try parsing as ISO string
+        if (!date || isNaN(date.getTime())) {
+          date = new Date(dateString);
+        }
+      }
+      // Try to parse as Date object for any other format
+      else {
+        date = new Date(dateString);
+      }
+    }
+    
+    // Format as "Feb 4, 2026"
+    if (date && !isNaN(date.getTime())) {
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const month = monthNames[date.getMonth()];
+      const day = date.getDate();
+      const year = date.getFullYear();
+      return `${month} ${day}, ${year}`;
+    }
+    
+    // If all parsing fails, try one more time with Date constructor
+    if (dateString) {
+      const fallbackDate = new Date(dateString);
+      if (!isNaN(fallbackDate.getTime())) {
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const month = monthNames[fallbackDate.getMonth()];
+        const day = fallbackDate.getDate();
+        const year = fallbackDate.getFullYear();
+        return `${month} ${day}, ${year}`;
+      }
+    }
+    
+    // If all parsing fails, return the original string (shouldn't happen for valid dates)
+    return dateString || String(dateInput);
+  };
+
+  const getAvailableValues = (columnKey) => {
+    const uniqueValues = new Set();
+    rows.forEach(row => {
+      const value = row[columnKey];
+      if (value !== null && value !== undefined && value !== '') {
+        // Format dates in "Feb 4, 2026" format for launchDate column
+        if (columnKey === 'launchDate') {
+          const formattedDate = formatDisplayDate(value);
+          uniqueValues.add(formattedDate);
+        } else {
+          uniqueValues.add(String(value));
+        }
+      }
+    });
+    return Array.from(uniqueValues).sort();
+  };
+
+  // Handle filter apply (ProductsFilterDropdown format)
+  const handleApplyFilter = (filterData) => {
+    if (!filterData) {
+      // Reset filter
+      const newFilters = { ...filters };
+      if (openFilterColumn) {
+        delete newFilters[openFilterColumn];
+      }
+      setFilters(newFilters);
+      setCurrentFilter({});
+      if (sortConfig.field === openFilterColumn) {
+        setSortConfig({ field: '', order: '' });
+        setSortedRowOrder(null);
+      }
+      setOpenFilterColumn(null);
+      return;
+    }
+
+    const columnKey = openFilterColumn;
+    const newFilters = { ...filters };
+    
+    // Handle sorting
+    if (filterData.sortOrder && filterData.__fromSortClick) {
+      setSortConfig({ field: columnKey, order: filterData.sortOrder });
       
       let rowsToSort = [...rows];
-      
-      Object.keys(filtersToUse).forEach(field => {
-        const filter = filtersToUse[field];
-        rowsToSort = rowsToSort.filter(row => {
-          const value = row[field];
-          const filterValue = filter.value.toLowerCase();
-          const rowValue = String(value || '').toLowerCase();
-
-          switch (filter.condition) {
-            case 'equals':
-              return rowValue === filterValue;
-            case 'contains':
-              return rowValue.includes(filterValue);
-            case 'startsWith':
-              return rowValue.startsWith(filterValue);
-            case 'endsWith':
-              return rowValue.endsWith(filterValue);
-            default:
-              return true;
-          }
-        });
-      });
-
-      const numeric = ['claimed', 'enrolled'].includes(filterConfig.sortField);
+      const numeric = ['claimed', 'enrolled'].includes(columnKey);
       
       rowsToSort.sort((a, b) => {
-        let aVal = a[filterConfig.sortField];
-        let bVal = b[filterConfig.sortField];
+        let aVal = a[columnKey];
+        let bVal = b[columnKey];
 
         if (numeric) {
           const aNum = Number(aVal) || 0;
           const bNum = Number(bVal) || 0;
-          return filterConfig.sortOrder === 'asc' ? aNum - bNum : bNum - aNum;
+          return filterData.sortOrder === 'asc' ? aNum - bNum : bNum - aNum;
         }
 
         const aStr = String(aVal ?? '').toLowerCase();
         const bStr = String(bVal ?? '').toLowerCase();
-        return filterConfig.sortOrder === 'asc'
+        return filterData.sortOrder === 'asc'
           ? aStr.localeCompare(bStr)
           : bStr.localeCompare(aStr);
       });
@@ -545,8 +746,29 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
       const sortedIds = rowsToSort.map(row => row.id);
       setSortedRowOrder(sortedIds);
     }
-    
-    setFilters(filtersToUse);
+
+    // Handle value filtering
+    if (filterData.selectedValues && filterData.selectedValues.size > 0) {
+      const selectedValuesArray = Array.from(filterData.selectedValues);
+      newFilters[columnKey] = {
+        type: 'values',
+        values: selectedValuesArray,
+      };
+    } else {
+      delete newFilters[columnKey];
+    }
+
+    // Handle condition filtering
+    if (filterData.conditionType && filterData.conditionValue) {
+      newFilters[columnKey] = {
+        ...newFilters[columnKey],
+        condition: filterData.conditionType,
+        conditionValue: filterData.conditionValue,
+      };
+    }
+
+    setFilters(newFilters);
+    setCurrentFilter(filterData);
     setOpenFilterColumn(null);
   };
 
@@ -583,22 +805,52 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
     Object.keys(filters).forEach(field => {
       const filter = filters[field];
       filteredRows = filteredRows.filter(row => {
-        const value = row[field];
-        const filterValue = filter.value.toLowerCase();
-        const rowValue = String(value || '').toLowerCase();
-
-        switch (filter.condition) {
-          case 'equals':
-            return rowValue === filterValue;
-          case 'contains':
-            return rowValue.includes(filterValue);
-          case 'startsWith':
-            return rowValue.startsWith(filterValue);
-          case 'endsWith':
-            return rowValue.endsWith(filterValue);
-          default:
-            return true;
+        let value = String(row[field] || '');
+        
+        // For date columns, format the value to match the filter format
+        if (field === 'launchDate') {
+          value = formatDisplayDate(value);
         }
+        
+        // Handle value filtering (selectedValues)
+        if (filter.values && filter.values.length > 0) {
+          if (!filter.values.includes(value)) {
+            return false;
+          }
+        }
+        
+        // Handle condition filtering
+        if (filter.condition && filter.conditionValue) {
+          const rowValue = field === 'claimed' || field === 'enrolled' 
+            ? Number(value) || 0 
+            : value.toLowerCase();
+          const filterValue = filter.conditionValue;
+          
+          switch (filter.condition) {
+            case 'equals':
+              return field === 'claimed' || field === 'enrolled'
+                ? rowValue === Number(filterValue)
+                : rowValue === filterValue.toLowerCase();
+            case 'greaterThan':
+              return rowValue > Number(filterValue);
+            case 'greaterOrEqual':
+              return rowValue >= Number(filterValue);
+            case 'lessThan':
+              return rowValue < Number(filterValue);
+            case 'lessOrEqual':
+              return rowValue <= Number(filterValue);
+            case 'notEquals':
+              return field === 'claimed' || field === 'enrolled'
+                ? rowValue !== Number(filterValue)
+                : rowValue !== filterValue.toLowerCase();
+            case 'contains':
+              return rowValue.includes(filterValue.toLowerCase());
+            default:
+              return true;
+          }
+        }
+        
+        return true;
       });
     });
 
@@ -671,8 +923,8 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
                         ? 'flex-end'
                         : col.align === 'center'
                         ? 'center'
-                        : 'space-between',
-                    gap: '0.5rem',
+                        : 'flex-start',
+                    gap: '6px',
                   }}
                 >
                   <span
@@ -693,14 +945,17 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
                           : 'opacity-0 group-hover:opacity-100'
                       }`}
                       onClick={(e) => handleFilterClick(col.key, e)}
-                      style={
-                        (isFilterActive(col.key) || openFilterColumn === col.key)
+                      style={{
+                        width: '12px',
+                        height: '12px',
+                        flexShrink: 0,
+                        ...((isFilterActive(col.key) || openFilterColumn === col.key)
                           ? {
                               filter:
                                 'invert(29%) sepia(94%) saturate(2576%) hue-rotate(199deg) brightness(102%) contrast(105%)',
                             }
-                          : undefined
-                      }
+                          : undefined)
+                      }}
                     />
                   )}
                 </div>
@@ -1254,14 +1509,43 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
                                       return (
                                       <div
                                         key={product.asin || index}
-                                        onClick={(e) => {
+                                        onClick={async (e) => {
                                           e.stopPropagation();
                                           if (isDisabled) return; // Don't allow selection if disabled
+                                          
+                                          // Get brand and size from multiple possible sources
+                                          let brand = product.brand || product.brand_name || product.product_info?.brand || '';
+                                          let size = product.size || '';
+                                          
+                                          // If brand or size is missing, try to fetch from catalog by ASIN
+                                          const asin = product.asin || product.child_asin;
+                                          if (asin && (!brand || !size)) {
+                                            try {
+                                              const catalogData = await NgoosAPI.getProductDetails(asin);
+                                              // Check multiple possible field names for brand
+                                              if (!brand) {
+                                                brand = catalogData?.brand_name || 
+                                                        catalogData?.brandName || 
+                                                        catalogData?.brand || 
+                                                        catalogData?.essentialInfo?.brandName || 
+                                                        '';
+                                              }
+                                              // Check multiple possible field names for size
+                                              if (!size) {
+                                                size = catalogData?.size || 
+                                                       catalogData?.essentialInfo?.size || 
+                                                       '';
+                                              }
+                                            } catch (error) {
+                                              console.error('Error fetching product details from catalog:', error);
+                                            }
+                                          }
+                                          
                                           const selectedProduct = {
                                             productName: product.product_name || '',
-                                            brand: product.brand || product.brand_name || '',
-                                            size: product.size || '',
-                                            asin: product.asin || product.child_asin || '',
+                                            brand: brand,
+                                            size: size,
+                                            asin: asin || '',
                                           };
                                           if (onUpdateRow) {
                                             onUpdateRow({ ...row, ...selectedProduct });
@@ -1351,7 +1635,7 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
                                             {(() => {
                                               const brand = product.brand || product.brand_name || '';
                                               const size = product.size || '';
-                                              const asin = product.asin || '';
+                                              const asin = product.asin || product.child_asin || '';
                                               const parts = [brand, size].filter(Boolean);
                                               
                                               return (
@@ -1705,10 +1989,37 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
                       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                         <input
                           type="number"
+                          min="0"
+                          max="30"
                           value={row.enrolled || 0}
                           onChange={(e) => {
                             if (onUpdateRow) {
-                              onUpdateRow({ ...row, enrolled: parseInt(e.target.value) || 0 });
+                              const inputValue = e.target.value === '' ? 0 : parseInt(e.target.value) || 0;
+                              let enrolledValue = Math.max(0, inputValue);
+                              
+                              // Enforce maximum of 30
+                              if (enrolledValue > 30) {
+                                enrolledValue = 30;
+                                toast.error('Enrolled units cannot exceed 30', {
+                                  description: 'The maximum allowed value is 30',
+                                  duration: 3000,
+                                });
+                              }
+                              
+                              onUpdateRow({ ...row, enrolled: enrolledValue });
+                            }
+                          }}
+                          onBlur={(e) => {
+                            // Ensure value is clamped on blur as well
+                            if (onUpdateRow) {
+                              const currentValue = parseInt(e.target.value) || 0;
+                              if (currentValue > 30) {
+                                onUpdateRow({ ...row, enrolled: 30 });
+                                toast.error('Enrolled units cannot exceed 30', {
+                                  description: 'The value has been set to 30',
+                                  duration: 3000,
+                                });
+                              }
                             }
                           }}
                           className="no-spinner"
@@ -1760,8 +2071,6 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
                             onUpdateRow(savedRow);
                             
                             // Show toast notification
-                            const productDetails = [row.size, row.asin].filter(Boolean).join(' • ');
-                            
                             const toastId = toast.success('', {
                               description: (
                                 <div style={{
@@ -1796,7 +2105,7 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
                                   >
                                     <path d="M20 6L9 17l-5-5" />
                                   </svg>
-                                  {/* Product Name and Details */}
+                                  {/* Vine Created Text */}
                                   <div style={{
                                     display: 'flex',
                                     alignItems: 'center',
@@ -1825,7 +2134,7 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
                                         {row.productName}
                                       </span>
                                     )}
-                                    {productDetails && (
+                                    {row.size && (
                                       <span style={{
                                         fontSize: '0.875rem',
                                         fontWeight: 500,
@@ -1833,7 +2142,18 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
                                         whiteSpace: 'nowrap',
                                         flexShrink: 0,
                                       }}>
-                                        {' • ' + productDetails}
+                                        {' • ' + row.size}
+                                      </span>
+                                    )}
+                                    {row.asin && (
+                                      <span style={{
+                                        fontSize: '0.875rem',
+                                        fontWeight: 500,
+                                        color: '#34C759',
+                                        whiteSpace: 'nowrap',
+                                        flexShrink: 0,
+                                      }}>
+                                        {' • ' + row.asin}
                                       </span>
                                     )}
                                   </div>
@@ -1883,7 +2203,7 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
                                 justifyContent: 'center',
                                 alignItems: 'center',
                               },
-                              className: 'vine-created-toast',
+                              className: 'claim-entry-submitted-toast',
                             });
                           }
                         }}
@@ -1922,12 +2242,8 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
                             e.preventDefault();
                             e.stopPropagation();
                             console.log('Plus button clicked for row:', row);
-                            // Open AddClaimed modal instead of VineDetailsModal
-                            // Make sure VineDetailsModal is closed
-                            setShowVineDetailsModal(false);
-                            setSelectedVineRow(null);
-                            setSelectedRowForAddClaim(row);
-                            setShowAddClaimedModal(true);
+                            // Open the same modal as double-click (VineDetailsModal)
+                            handleOpenVineDetailsModal(row);
                           }}
                           style={{
                             display: 'inline-flex',
@@ -2121,43 +2437,18 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
         </tbody>
       </table>
       
-      {/* Filter Dropdown - Simplified version */}
+      {/* Filter Dropdown */}
       {openFilterColumn && (
-        <div
+        <ProductsFilterDropdown
           ref={filterDropdownRef}
-          style={{
-            position: 'absolute',
-            top: '100%',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            marginTop: '8px',
-            backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-            border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
-            borderRadius: '8px',
-            padding: '12px',
-            minWidth: '200px',
-            zIndex: 1000,
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-          }}
-        >
-          <div style={{ fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '8px' }}>
-            Filter options coming soon
-          </div>
-          <button
-            onClick={() => setOpenFilterColumn(null)}
-            style={{
-              padding: '4px 8px',
-              fontSize: '12px',
-              backgroundColor: isDarkMode ? '#374151' : '#F3F4F6',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              color: isDarkMode ? '#F9FAFB' : '#111827',
-            }}
-          >
-            Close
-          </button>
-        </div>
+          columnKey={openFilterColumn}
+          filterIconRef={filterIconRefs.current[openFilterColumn]}
+          availableValues={getAvailableValues(openFilterColumn)}
+          currentFilter={currentFilter}
+          currentSort={sortConfig.field === openFilterColumn ? sortConfig.order : ''}
+          onApply={handleApplyFilter}
+          onClose={() => setOpenFilterColumn(null)}
+        />
       )}
 
       {/* CSS to hide number input spinners */}
@@ -2173,438 +2464,34 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
       `}</style>
 
       {/* Vine Details Modal */}
-      {showVineDetailsModal && selectedVineRow && createPortal(
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 99999,
-            padding: '16px',
-          }}
-          onClick={() => {
-            setShowVineDetailsModal(false);
-            setSelectedVineRow(null);
-            setClaimDate('');
-            setClaimUnits('0');
-            setShowClaimDatePicker(false);
-          }}
-        >
-          <div
-            style={{
-              width: '600px',
-              maxHeight: '90vh',
-              height: '650px',
-              backgroundColor: '#111827',
-              borderRadius: '12px',
-              border: '1px solid #374151',
-              borderWidth: '1px',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-              display: 'flex',
-              flexDirection: 'column',
-              overflow: 'hidden',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div
-              style={{
-                padding: '16px 20px',
-                borderBottom: '1px solid #374151',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                flexShrink: 0,
-                backgroundColor: '#111827',
-              }}
-            >
-              <h2 style={{ fontSize: '20px', fontWeight: '600', color: '#FFFFFF', margin: 0 }}>
-                Vine Details
-              </h2>
-              <button
-                onClick={() => {
-                  setShowVineDetailsModal(false);
-                  setSelectedVineRow(null);
-                  setClaimDate('');
-                  setClaimUnits('0');
-                  setShowClaimDatePicker(false);
-                  setIsOpenedFromPlusButton(false);
-                }}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#FFFFFF',
-                  cursor: 'pointer',
-                  padding: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '24px',
-                  height: '24px',
-                  borderRadius: '4px',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#374151';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </button>
-            </div>
-
-            {/* Content */}
-            <div style={{ padding: '16px 20px', overflow: 'visible', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-              {/* Product Information Section */}
-              <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', flexShrink: 0 }}>
-                {/* Product Image */}
-                <div
-                  style={{
-                    width: '106px',
-                    height: '106px',
-                    flexShrink: 0,
-                    backgroundColor: '#FFFFFF',
-                    borderRadius: '4px',
-                    border: '1px solid #E5E7EB',
-                    padding: '8px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {selectedVineRow.imageUrl || selectedVineRow.image ? (
-                    <img
-                      src={selectedVineRow.imageUrl || selectedVineRow.image}
-                      alt={selectedVineRow.productName}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'contain',
-                      }}
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                      }}
-                    />
-                  ) : (
-                    <div style={{ 
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: '100%',
-                      height: '100%',
-                      textAlign: 'center',
-                      color: '#9CA3AF',
-                      fontSize: '12px'
-                    }}>
-                      No Image
-                    </div>
-                  )}
-                </div>
-
-                {/* Product Details */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 }}>
-                  <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#FFFFFF', margin: 0, lineHeight: '1.3' }}>
-                    {selectedVineRow.productName || 'N/A'}
-                  </h3>
-                  <p style={{ fontSize: '12px', color: '#9CA3AF', margin: 0 }}>
-                    {selectedVineRow.brand || 'N/A'} • {selectedVineRow.size || 'N/A'} • {selectedVineRow.asin || 'N/A'} • Launched: {selectedVineRow.launchDate ? (() => {
-                      // Try to parse the date if it's in MM/DD/YYYY format
-                      if (selectedVineRow.launchDate.includes('/')) {
-                        const parts = selectedVineRow.launchDate.split('/');
-                        if (parts.length === 3) {
-                          const date = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
-                          return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                        }
-                      }
-                      // If it's already a date string or Date object
-                      const date = new Date(selectedVineRow.launchDate);
-                      if (!isNaN(date.getTime())) {
-                        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                      }
-                      return selectedVineRow.launchDate;
-                    })() : 'N/A'}
-                  </p>
-                  {/* Status Button */}
-                  <div style={{ marginTop: '2px' }}>
-                    <button
-                      style={{
-                        width: '63px',
-                        height: '19px',
-                        paddingTop: '6px',
-                        paddingRight: '16px',
-                        paddingBottom: '6px',
-                        paddingLeft: '16px',
-                        borderRadius: '4px',
-                        border: '1px solid transparent',
-                        borderWidth: '1px',
-                        backgroundColor: '#10B981',
-                        color: '#FFFFFF',
-                        fontSize: '12px',
-                        fontWeight: '500',
-                        cursor: 'default',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        boxSizing: 'border-box',
-                      }}
-                    >
-                      Active
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Summary Statistics */}
-              <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', flexShrink: 0 }}>
-                {/* Units Enrolled */}
-                <div
-                  style={{
-                    width: '276px',
-                    height: '87px',
-                    backgroundColor: '#1F2937',
-                    borderRadius: '8px',
-                    paddingTop: '12px',
-                    paddingRight: '16px',
-                    paddingBottom: '12px',
-                    paddingLeft: '16px',
-                    border: '1px solid #374151',
-                    borderWidth: '1px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <div style={{ fontSize: '13px', color: '#9CA3AF' }}>
-                    Units Enrolled
-                  </div>
-                  <div style={{ fontSize: '28px', fontWeight: '700', color: '#FFFFFF' }}>
-                    {selectedVineRow.enrolled || 0}
-                  </div>
-                </div>
-
-                {/* Claimed */}
-                <div
-                  style={{
-                    width: '276px',
-                    height: '87px',
-                    backgroundColor: '#1F2937',
-                    borderRadius: '8px',
-                    paddingTop: '12px',
-                    paddingRight: '16px',
-                    paddingBottom: '12px',
-                    paddingLeft: '16px',
-                    border: '1px solid #374151',
-                    borderWidth: '1px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <div style={{ fontSize: '13px', color: '#9CA3AF' }}>
-                    Claimed
-                  </div>
-                  <div style={{ fontSize: '28px', fontWeight: '700', color: '#3B82F6' }}>
-                    {selectedVineRow.claimed || 0}
-                  </div>
-                </div>
-              </div>
-
-              {/* Claim History Section */}
-              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexShrink: 0 }}>
-                  <h3 style={{ fontSize: '15px', fontWeight: '600', color: '#FFFFFF', margin: 0 }}>
-                    Claim History
-                  </h3>
-                  {!isOpenedFromPlusButton && (
-                    <span
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        // Close VineDetailsModal
-                        setShowVineDetailsModal(false);
-                        setSelectedVineRow(null);
-                        // Open AddClaimed modal
-                        setSelectedRowForAddClaim(selectedVineRow);
-                        setShowAddClaimedModal(true);
-                      }}
-                      style={{
-                        fontSize: '14px',
-                        fontWeight: '500',
-                        color: '#3B82F6',
-                        cursor: 'pointer',
-                        textDecoration: 'none',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.color = '#2563EB';
-                        e.currentTarget.style.textDecoration = 'underline';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.color = '#3B82F6';
-                        e.currentTarget.style.textDecoration = 'none';
-                      }}
-                    >
-                      + Add Claim Entry
-                    </span>
-                  )}
-                </div>
-
-                {/* Combined Claim History Table */}
-                <div style={{ 
-                  flex: 1, 
-                  minHeight: 0, 
-                  maxHeight: '250px',
-                  overflowY: 'auto',
-                  overflowX: 'hidden',
-                  paddingRight: '4px',
-                }}
-                className="custom-scrollbar"
-                >
-                  <style>{`
-                    .custom-scrollbar::-webkit-scrollbar {
-                      width: 8px;
-                    }
-                    .custom-scrollbar::-webkit-scrollbar-track {
-                      background: #1F2937;
-                      border-radius: 4px;
-                    }
-                    .custom-scrollbar::-webkit-scrollbar-thumb {
-                      background: #4B5563;
-                      border-radius: 4px;
-                    }
-                    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                      background: #6B7280;
-                    }
-                  `}</style>
-                  <table style={{ 
-                    width: '100%', 
-                    borderCollapse: 'separate', 
-                    borderSpacing: 0,
-                    borderRadius: '8px',
-                    overflow: 'hidden',
-                    border: '1px solid #374151',
-                  }}>
-                    <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                      <tr>
-                        <th style={{
-                          padding: '8px 12px',
-                          textAlign: 'left',
-                          fontSize: '12px',
-                          fontWeight: '600',
-                          color: '#9CA3AF',
-                          textTransform: 'uppercase',
-                          borderBottom: '1px solid #374151',
-                          backgroundColor: '#111827',
-                        }}>
-                          DATE CLAIMED
-                        </th>
-                        <th style={{
-                          padding: '8px 12px',
-                          textAlign: 'left',
-                          fontSize: '12px',
-                          fontWeight: '600',
-                          color: '#9CA3AF',
-                          textTransform: 'uppercase',
-                          borderBottom: '1px solid #374151',
-                          backgroundColor: '#111827',
-                        }}>
-                          UNITS
-                        </th>
-                        <th style={{
-                          padding: '8px 12px',
-                          textAlign: 'left',
-                          fontSize: '12px',
-                          fontWeight: '600',
-                          color: '#9CA3AF',
-                          textTransform: 'uppercase',
-                          borderBottom: '1px solid #374151',
-                          backgroundColor: '#111827',
-                        }}>
-                          ACTIONS
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {/* Existing Claim History Entries */}
-                      {claimHistory.map((claim, index) => (
-                        <tr key={index}>
-                          <td style={{
-                            padding: '8px 12px',
-                            fontSize: '13px',
-                            color: '#FFFFFF',
-                            borderBottom: index < claimHistory.length - 1 ? '1px solid #374151' : 'none',
-                            backgroundColor: '#111827',
-                          }}>
-                            {claim.date}
-                          </td>
-                          <td style={{
-                            padding: '8px 12px',
-                            fontSize: '13px',
-                            color: '#FFFFFF',
-                            borderBottom: index < claimHistory.length - 1 ? '1px solid #374151' : 'none',
-                            backgroundColor: '#111827',
-                          }}>
-                            {claim.units}
-                          </td>
-                          <td style={{
-                            padding: '8px 12px',
-                            fontSize: '13px',
-                            color: '#FFFFFF',
-                            borderBottom: index < claimHistory.length - 1 ? '1px solid #374151' : 'none',
-                            backgroundColor: '#111827',
-                            position: 'relative',
-                          }}>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                // Toggle action menu for this claim
-                                setOpenThreeDotsMenuId(openThreeDotsMenuId === `claim-${index}` ? null : `claim-${index}`);
-                              }}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                color: '#9CA3AF',
-                                padding: '0.25rem',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                              }}
-                            >
-                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <circle cx="12" cy="12" r="1"></circle>
-                                <circle cx="12" cy="5" r="1"></circle>
-                                <circle cx="12" cy="19" r="1"></circle>
-                              </svg>
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+      <VineDetailsModal
+        isOpen={showVineDetailsModal}
+        onClose={() => {
+          setShowVineDetailsModal(false);
+          setSelectedVineRow(null);
+          setClaimDate('');
+          setClaimUnits('0');
+          setShowClaimDatePicker(false);
+          setIsOpenedFromPlusButton(false);
+        }}
+        productData={selectedVineRow}
+        onUpdateProduct={(updatedProduct) => {
+          if (onUpdateRow) {
+            onUpdateRow(updatedProduct);
+          }
+        }}
+        onAddClaim={(newClaim) => {
+          // Update the row's claimed count
+          if (onUpdateRow && selectedVineRow) {
+            const updatedRow = {
+              ...selectedVineRow,
+              claimed: (selectedVineRow.claimed || 0) + (newClaim.units || 0),
+              claimHistory: [...(selectedVineRow.claimHistory || []), newClaim],
+            };
+            onUpdateRow(updatedRow);
+          }
+        }}
+      />
 
       {/* Add Claim Entry Modal */}
       {showAddClaimModal && selectedVineRow && createPortal(
@@ -2822,130 +2709,9 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
                     }
                     
                     // Show toast notification
-                    const productDetails = [selectedVineRow.size, selectedVineRow.asin].filter(Boolean).join(' • ');
-                    
-                    const toastId = toast.success('', {
-                      description: (
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '24px',
-                          minWidth: '400px',
-                          width: 'fit-content',
-                          maxWidth: '95vw',
-                          height: '36px',
-                          paddingTop: '8px',
-                          paddingRight: '12px',
-                          paddingBottom: '8px',
-                          paddingLeft: '12px',
-                          borderRadius: '12px',
-                          backgroundColor: '#F0FDF4',
-                          color: '#34C759',
-                          margin: '0 auto',
-                          overflow: 'visible',
-                        }}>
-                          {/* Check Icon */}
-                          <svg
-                            width="20"
-                            height="20"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="#34C759"
-                            strokeWidth="3"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            style={{ flexShrink: 0 }}
-                          >
-                            <path d="M20 6L9 17l-5-5" />
-                          </svg>
-                          {/* Product Name and Details */}
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            flexShrink: 0,
-                            overflow: 'visible',
-                          }}>
-                            <span style={{
-                              fontSize: '0.875rem',
-                              fontWeight: 500,
-                              color: '#34C759',
-                              whiteSpace: 'nowrap',
-                              flexShrink: 0,
-                            }}>
-                              Claim entry submitted for{' '}
-                            </span>
-                            {selectedVineRow.productName && (
-                              <span style={{
-                                fontSize: '0.875rem',
-                                fontWeight: 500,
-                                color: '#34C759',
-                                whiteSpace: 'nowrap',
-                                overflow: 'visible',
-                                flexShrink: 0,
-                              }}>
-                                {selectedVineRow.productName}
-                              </span>
-                            )}
-                            {productDetails && (
-                              <span style={{
-                                fontSize: '0.875rem',
-                                fontWeight: 500,
-                                color: '#34C759',
-                                whiteSpace: 'nowrap',
-                                flexShrink: 0,
-                              }}>
-                                {' • ' + productDetails}
-                              </span>
-                            )}
-                          </div>
-                          {/* Close Button (X) */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toast.dismiss(toastId);
-                            }}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              cursor: 'pointer',
-                              padding: '4px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              flexShrink: 0,
-                              color: '#34C759',
-                            }}
-                          >
-                            <svg
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <line x1="18" y1="6" x2="6" y2="18"></line>
-                              <line x1="6" y1="6" x2="18" y2="18"></line>
-                            </svg>
-                          </button>
-                        </div>
-                      ),
-                      duration: 4000,
-                      icon: null,
-                      closeButton: false,
-                      style: {
-                        background: 'transparent',
-                        padding: 0,
-                        border: 'none',
-                        boxShadow: 'none',
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                      },
-                      className: 'claim-entry-submitted-toast',
+                    toast.success('Claim entry submitted', {
+                      description: `${parseInt(claimUnits)} unit(s) claimed${selectedVineRow.productName ? ' for ' + selectedVineRow.productName : ''}`,
+                      duration: 3000,
                     });
                     
                     // Close modal and reset everything

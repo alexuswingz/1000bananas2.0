@@ -1,11 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
+import { useTheme } from '../../../../context/ThemeContext';
 
 const DailyClosingReportModal = ({ isOpen, onClose, productionData = [], viewOnly = false, initialDate = '', reportData = null }) => {
+  const { isDarkMode } = useTheme();
   const [selectedDate, setSelectedDate] = useState('');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [notes, setNotes] = useState('');
+
+  const theme = {
+    bg: isDarkMode ? '#111827' : '#FFFFFF',
+    headerBg: isDarkMode ? '#1F2937' : '#2C3544',
+    cardBg: isDarkMode ? '#1F2937' : '#F9FAFB',
+    border: isDarkMode ? '#374151' : '#E5E7EB',
+    textPrimary: isDarkMode ? '#E5E7EB' : '#111827',
+    textSecondary: isDarkMode ? '#9CA3AF' : '#6B7280',
+    inputBg: isDarkMode ? '#111827' : '#FFFFFF',
+    inputBorder: isDarkMode ? '#4B5563' : '#E5E7EB',
+    buttonCancelBg: isDarkMode ? '#1F2937' : '#FFFFFF',
+    buttonCancelBorder: isDarkMode ? '#4B5563' : '#D1D5DB',
+    buttonCancelText: isDarkMode ? '#E5E7EB' : '#374151',
+  };
 
   useEffect(() => {
     const handleResize = () => {
@@ -70,7 +86,7 @@ const DailyClosingReportModal = ({ isOpen, onClose, productionData = [], viewOnl
     >
       <div
         style={{
-          backgroundColor: '#FFFFFF',
+          backgroundColor: theme.bg,
           borderRadius: '12px',
           width: isMobile ? '100%' : '90%',
           maxWidth: isMobile ? '500px' : '1000px',
@@ -84,7 +100,7 @@ const DailyClosingReportModal = ({ isOpen, onClose, productionData = [], viewOnl
         {/* Header with Date Picker */}
         <div
           style={{
-            backgroundColor: '#2C3544',
+            backgroundColor: theme.headerBg,
             padding: isMobile ? '16px' : '16px 24px',
             display: 'flex',
             alignItems: 'center',
@@ -104,9 +120,9 @@ const DailyClosingReportModal = ({ isOpen, onClose, productionData = [], viewOnl
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                backgroundColor: '#FFFFFF',
+                backgroundColor: theme.inputBg,
                 borderRadius: '4px',
-                border: '1px solid #E5E7EB',
+                border: `1px solid ${theme.inputBorder}`,
                 padding: '6px 10px',
                 minWidth: isMobile ? 'auto' : 'auto',
                 height: 'auto',
@@ -114,13 +130,13 @@ const DailyClosingReportModal = ({ isOpen, onClose, productionData = [], viewOnl
                 cursor: 'pointer',
               }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={theme.textSecondary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
                 <line x1="16" y1="2" x2="16" y2="6"></line>
                 <line x1="8" y1="2" x2="8" y2="6"></line>
                 <line x1="3" y1="10" x2="21" y2="10"></line>
               </svg>
-              <span style={{ fontSize: '11px', color: '#374151', fontWeight: '500', whiteSpace: 'nowrap' }}>{selectedDate}</span>
+              <span style={{ fontSize: '11px', color: theme.textPrimary, fontWeight: '500', whiteSpace: 'nowrap' }}>{selectedDate}</span>
             </div>
           </div>
           {/* Close Button */}
@@ -163,16 +179,16 @@ const DailyClosingReportModal = ({ isOpen, onClose, productionData = [], viewOnl
             {/* PRODUCTION TODAY */}
             <div
               style={{
-                backgroundColor: '#F9FAFB',
+                backgroundColor: theme.cardBg,
                 padding: isMobile ? '12px' : '16px',
                 borderRadius: '8px',
-                border: '1px solid #E5E7EB',
+                border: `1px solid ${theme.border}`,
               }}
             >
-              <div style={{ fontSize: isMobile ? '10px' : '12px', color: '#6B7280', marginBottom: '8px', fontWeight: '500' }}>
+              <div style={{ fontSize: isMobile ? '10px' : '12px', color: theme.textSecondary, marginBottom: '8px', fontWeight: '500' }}>
                 PRODUCTION TODAY
               </div>
-              <div style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: '600', color: '#111827', marginBottom: '4px' }}>
+              <div style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: '600', color: theme.textPrimary, marginBottom: '4px' }}>
                 {reportData?.prodToday || '$107,699'}
               </div>
               <div style={{ fontSize: isMobile ? '10px' : '12px', color: '#EF4444', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -186,16 +202,16 @@ const DailyClosingReportModal = ({ isOpen, onClose, productionData = [], viewOnl
             {/* WTD PRODUCTION */}
             <div
               style={{
-                backgroundColor: '#F9FAFB',
+                backgroundColor: theme.cardBg,
                 padding: isMobile ? '12px' : '16px',
                 borderRadius: '8px',
-                border: '1px solid #E5E7EB',
+                border: `1px solid ${theme.border}`,
               }}
             >
-              <div style={{ fontSize: isMobile ? '10px' : '12px', color: '#6B7280', marginBottom: '8px', fontWeight: '500' }}>
+              <div style={{ fontSize: isMobile ? '10px' : '12px', color: theme.textSecondary, marginBottom: '8px', fontWeight: '500' }}>
                 WTD PRODUCTION
               </div>
-              <div style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: '600', color: '#111827', marginBottom: '4px' }}>
+              <div style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: '600', color: theme.textPrimary, marginBottom: '4px' }}>
                 {reportData?.wtdProd || '$410,962'}
               </div>
               <div style={{ fontSize: isMobile ? '10px' : '12px', color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -209,16 +225,16 @@ const DailyClosingReportModal = ({ isOpen, onClose, productionData = [], viewOnl
             {/* WTD GOAL */}
             <div
               style={{
-                backgroundColor: '#F9FAFB',
+                backgroundColor: theme.cardBg,
                 padding: isMobile ? '12px' : '16px',
                 borderRadius: '8px',
-                border: '1px solid #E5E7EB',
+                border: `1px solid ${theme.border}`,
               }}
             >
-              <div style={{ fontSize: isMobile ? '10px' : '12px', color: '#6B7280', marginBottom: '8px', fontWeight: '500' }}>
+              <div style={{ fontSize: isMobile ? '10px' : '12px', color: theme.textSecondary, marginBottom: '8px', fontWeight: '500' }}>
                 WTD GOAL
               </div>
-              <div style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: '600', color: '#111827', marginBottom: '4px' }}>
+              <div style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: '600', color: theme.textPrimary, marginBottom: '4px' }}>
                 {reportData?.wtdGoal || '$611,420'}
               </div>
               <div style={{ fontSize: isMobile ? '10px' : '12px', color: '#10B981', fontWeight: '500' }}>
@@ -229,16 +245,16 @@ const DailyClosingReportModal = ({ isOpen, onClose, productionData = [], viewOnl
             {/* YTD % */}
             <div
               style={{
-                backgroundColor: '#F9FAFB',
+                backgroundColor: theme.cardBg,
                 padding: isMobile ? '12px' : '16px',
                 borderRadius: '8px',
-                border: '1px solid #E5E7EB',
+                border: `1px solid ${theme.border}`,
               }}
             >
-              <div style={{ fontSize: isMobile ? '10px' : '12px', color: '#6B7280', marginBottom: '8px', fontWeight: '500' }}>
+              <div style={{ fontSize: isMobile ? '10px' : '12px', color: theme.textSecondary, marginBottom: '8px', fontWeight: '500' }}>
                 YTD %
               </div>
-              <div style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: '600', color: '#111827', marginBottom: '4px' }}>
+              <div style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: '600', color: theme.textPrimary, marginBottom: '4px' }}>
                 {reportData?.ytdPercent || '102%'}
               </div>
               <div style={{ fontSize: isMobile ? '10px' : '12px', color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -256,7 +272,7 @@ const DailyClosingReportModal = ({ isOpen, onClose, productionData = [], viewOnl
               style={{
                 fontSize: isMobile ? '14px' : '16px',
                 fontWeight: '600',
-                color: '#111827',
+                color: theme.textPrimary,
                 marginBottom: isMobile ? '8px' : '12px',
               }}
             >
@@ -264,41 +280,41 @@ const DailyClosingReportModal = ({ isOpen, onClose, productionData = [], viewOnl
             </h3>
             <div
               style={{
-                border: '1px solid #E5E7EB',
+                border: `1px solid ${theme.border}`,
                 borderRadius: '8px',
                 overflow: 'hidden',
               }}
             >
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ backgroundColor: '#F9FAFB' }}>
-                    <th style={{ padding: isMobile ? '8px' : '12px', textAlign: 'left', fontSize: isMobile ? '10px' : '12px', fontWeight: '600', color: '#6B7280', borderBottom: '1px solid #E5E7EB' }}>
+                  <tr style={{ backgroundColor: theme.cardBg }}>
+                    <th style={{ padding: isMobile ? '8px' : '12px', textAlign: 'left', fontSize: isMobile ? '10px' : '12px', fontWeight: '600', color: theme.textSecondary, borderBottom: `1px solid ${theme.border}` }}>
                       BRAND
                     </th>
-                    <th style={{ padding: isMobile ? '8px' : '12px', textAlign: 'left', fontSize: isMobile ? '10px' : '12px', fontWeight: '600', color: '#6B7280', borderBottom: '1px solid #E5E7EB' }}>
+                    <th style={{ padding: isMobile ? '8px' : '12px', textAlign: 'left', fontSize: isMobile ? '10px' : '12px', fontWeight: '600', color: theme.textSecondary, borderBottom: `1px solid ${theme.border}` }}>
                       PRODUCT
                     </th>
-                    <th style={{ padding: isMobile ? '8px' : '12px', textAlign: 'left', fontSize: isMobile ? '10px' : '12px', fontWeight: '600', color: '#6B7280', borderBottom: '1px solid #E5E7EB' }}>
+                    <th style={{ padding: isMobile ? '8px' : '12px', textAlign: 'left', fontSize: isMobile ? '10px' : '12px', fontWeight: '600', color: theme.textSecondary, borderBottom: `1px solid ${theme.border}` }}>
                       SIZE
                     </th>
-                    <th style={{ padding: isMobile ? '8px' : '12px', textAlign: 'right', fontSize: isMobile ? '10px' : '12px', fontWeight: '600', color: '#6B7280', borderBottom: '1px solid #E5E7EB' }}>
+                    <th style={{ padding: isMobile ? '8px' : '12px', textAlign: 'right', fontSize: isMobile ? '10px' : '12px', fontWeight: '600', color: theme.textSecondary, borderBottom: `1px solid ${theme.border}` }}>
                       QTY
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {displayData.slice(0, 4).map((item, index) => (
-                    <tr key={index} style={{ borderBottom: index < 3 ? '1px solid #E5E7EB' : 'none' }}>
-                      <td style={{ padding: isMobile ? '8px' : '12px', fontSize: isMobile ? '12px' : '14px', color: '#111827' }}>
+                    <tr key={index} style={{ borderBottom: index < 3 ? `1px solid ${theme.border}` : 'none' }}>
+                      <td style={{ padding: isMobile ? '8px' : '12px', fontSize: isMobile ? '12px' : '14px', color: theme.textPrimary }}>
                         {item.brand || '-'}
                       </td>
-                      <td style={{ padding: isMobile ? '8px' : '12px', fontSize: isMobile ? '12px' : '14px', color: '#111827' }}>
+                      <td style={{ padding: isMobile ? '8px' : '12px', fontSize: isMobile ? '12px' : '14px', color: theme.textPrimary }}>
                         {item.product || '-'}
                       </td>
-                      <td style={{ padding: isMobile ? '8px' : '12px', fontSize: isMobile ? '12px' : '14px', color: '#111827' }}>
+                      <td style={{ padding: isMobile ? '8px' : '12px', fontSize: isMobile ? '12px' : '14px', color: theme.textPrimary }}>
                         {item.size || '-'}
                       </td>
-                      <td style={{ padding: isMobile ? '8px' : '12px', fontSize: isMobile ? '12px' : '14px', color: '#111827', textAlign: 'right' }}>
+                      <td style={{ padding: isMobile ? '8px' : '12px', fontSize: isMobile ? '12px' : '14px', color: theme.textPrimary, textAlign: 'right' }}>
                         {item.quantity?.toLocaleString() || '0'}
                       </td>
                     </tr>
@@ -337,7 +353,7 @@ const DailyClosingReportModal = ({ isOpen, onClose, productionData = [], viewOnl
               style={{
                 fontSize: isMobile ? '14px' : '16px',
                 fontWeight: '600',
-                color: '#111827',
+                color: theme.textPrimary,
                 marginBottom: isMobile ? '8px' : '12px',
               }}
             >
@@ -352,9 +368,9 @@ const DailyClosingReportModal = ({ isOpen, onClose, productionData = [], viewOnl
                 minHeight: isMobile ? '80px' : '120px',
                 padding: isMobile ? '10px' : '12px',
                 fontSize: isMobile ? '12px' : '14px',
-                color: '#111827',
-                backgroundColor: '#FFFFFF',
-                border: '1px solid #E5E7EB',
+                color: theme.textPrimary,
+                backgroundColor: theme.inputBg,
+                border: `1px solid ${theme.inputBorder}`,
                 borderRadius: '8px',
                 resize: 'vertical',
                 fontFamily: 'inherit',
@@ -380,9 +396,9 @@ const DailyClosingReportModal = ({ isOpen, onClose, productionData = [], viewOnl
                   padding: isMobile ? '8px 16px' : '10px 20px',
                   fontSize: isMobile ? '12px' : '14px',
                   fontWeight: '500',
-                  color: '#374151',
-                  backgroundColor: '#FFFFFF',
-                  border: '1px solid #D1D5DB',
+                  color: theme.buttonCancelText,
+                  backgroundColor: theme.buttonCancelBg,
+                  border: `1px solid ${theme.buttonCancelBorder}`,
                   borderRadius: '6px',
                   cursor: 'pointer',
                 }}

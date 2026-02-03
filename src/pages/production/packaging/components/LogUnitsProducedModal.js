@@ -76,12 +76,13 @@ const LogUnitsProducedModal = ({ isOpen, onClose, productData, onConfirm }) => {
 
   if (!isOpen) return null;
 
+  // Always use dark mode styling for this modal
   const themeClasses = {
-    modalBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
-    textPrimary: isDarkMode ? 'text-dark-text-primary' : 'text-gray-900',
-    textSecondary: isDarkMode ? 'text-dark-text-secondary' : 'text-gray-600',
-    border: isDarkMode ? 'border-dark-border-primary' : 'border-gray-200',
-    inputBg: isDarkMode ? 'bg-dark-bg-tertiary' : 'bg-white',
+    modalBg: '#111827',
+    textPrimary: '#FFFFFF',
+    textSecondary: '#9CA3AF',
+    border: '#374151',
+    inputBg: '#1F2937',
   };
 
   const totalUnits = productData?.qty || 0;
@@ -106,12 +107,12 @@ const LogUnitsProducedModal = ({ isOpen, onClose, productData, onConfirm }) => {
       onClick={handleClose}
     >
       <div
-        className={themeClasses.modalBg}
         style={{
-            width: '200%',
+            width: '100%',
             maxWidth: '500px',
             borderRadius: '12px',
             overflow: 'hidden',
+            backgroundColor: themeClasses.modalBg,
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
         }}
         onClick={(e) => e.stopPropagation()}
@@ -119,7 +120,7 @@ const LogUnitsProducedModal = ({ isOpen, onClose, productData, onConfirm }) => {
         {/* Header */}
         <div
           style={{
-            backgroundColor: isDarkMode ? '#374151' : '#1F2937',
+            backgroundColor: '#1F2937',
             padding: '16px',
             display: 'flex',
             justifyContent: 'space-between',
@@ -139,7 +140,7 @@ const LogUnitsProducedModal = ({ isOpen, onClose, productData, onConfirm }) => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: themeClasses.textSecondary,
+              color: '#FFFFFF',
             }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -149,11 +150,11 @@ const LogUnitsProducedModal = ({ isOpen, onClose, productData, onConfirm }) => {
         </div>
 
         {/* Content */}
-        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div style={{ padding: '24px', backgroundColor: themeClasses.modalBg, display: 'flex', flexDirection: 'column', gap: '24px' }}>
           {/* Product Information Box */}
           <div
             style={{
-              backgroundColor: isDarkMode ? '#1F2937' : '#E9F4FF',
+              backgroundColor: '#1F2937',
               borderRadius: '8px',
               padding: '12px 16px',
               display: 'flex',
@@ -161,10 +162,10 @@ const LogUnitsProducedModal = ({ isOpen, onClose, productData, onConfirm }) => {
               alignItems: 'center',
             }}
           >
-            <span style={{ fontSize: '14px', color: themeClasses.textPrimary, fontWeight: '500' }}>
+            <span style={{ fontSize: '14px', color: '#FFFFFF', fontWeight: '500' }}>
               {productName} {productSize ? `(${productSize})` : ''}
             </span>
-            <span style={{ fontSize: '14px', color: '#2563EB', fontWeight: '600' }}>
+            <span style={{ fontSize: '14px', color: '#60A5FA', fontWeight: '600' }}>
               Total: {totalUnits.toLocaleString()} units
             </span>
           </div>
@@ -175,7 +176,7 @@ const LogUnitsProducedModal = ({ isOpen, onClose, productData, onConfirm }) => {
               style={{
                 fontSize: '14px',
                 fontWeight: '500',
-                color: themeClasses.textPrimary,
+                color: '#FFFFFF',
               }}
             >
               Units Produced (Units)
@@ -183,7 +184,7 @@ const LogUnitsProducedModal = ({ isOpen, onClose, productData, onConfirm }) => {
             <p
               style={{
                 fontSize: '12px',
-                color: themeClasses.textSecondary,
+                color: '#9CA3AF',
                 margin: 0,
               }}
             >
@@ -198,12 +199,18 @@ const LogUnitsProducedModal = ({ isOpen, onClose, productData, onConfirm }) => {
                 height: '40px',
                 padding: '0 12px',
                 borderRadius: '8px',
-                border: `1px solid #2563EB`,
-                backgroundColor: themeClasses.inputBg,
-                color: themeClasses.textPrimary,
+                border: `1px solid #374151`,
+                backgroundColor: '#1F2937',
+                color: '#FFFFFF',
                 fontSize: '14px',
                 outline: 'none',
                 boxSizing: 'border-box',
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#3B82F6';
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = '#374151';
               }}
               placeholder="0"
             />
@@ -215,7 +222,7 @@ const LogUnitsProducedModal = ({ isOpen, onClose, productData, onConfirm }) => {
               style={{
                 fontSize: '14px',
                 fontWeight: '500',
-                color: themeClasses.textPrimary,
+                color: '#FFFFFF',
               }}
             >
               Remaining Quantity (Units)
@@ -223,7 +230,7 @@ const LogUnitsProducedModal = ({ isOpen, onClose, productData, onConfirm }) => {
             <p
               style={{
                 fontSize: '12px',
-                color: themeClasses.textSecondary,
+                color: '#9CA3AF',
                 margin: 0,
               }}
             >
@@ -238,9 +245,9 @@ const LogUnitsProducedModal = ({ isOpen, onClose, productData, onConfirm }) => {
                 height: '40px',
                 padding: '0 12px',
                 borderRadius: '8px',
-                border: `1px solid ${themeClasses.border}`,
-                backgroundColor: isDarkMode ? '#1F2937' : '#F9FAFB',
-                color: themeClasses.textSecondary,
+                border: `1px solid #374151`,
+                backgroundColor: '#1F2937',
+                color: '#9CA3AF',
                 fontSize: '14px',
                 outline: 'none',
                 boxSizing: 'border-box',
@@ -254,7 +261,8 @@ const LogUnitsProducedModal = ({ isOpen, onClose, productData, onConfirm }) => {
         <div
           style={{
             padding: '24px',
-            borderTop: `1px solid ${themeClasses.border}`,
+            borderTop: `1px solid #374151`,
+            backgroundColor: themeClasses.modalBg,
             display: 'flex',
             justifyContent: 'space-between',
             gap: '12px',
@@ -267,9 +275,9 @@ const LogUnitsProducedModal = ({ isOpen, onClose, productData, onConfirm }) => {
               height: '40px',
               padding: '0 16px',
               borderRadius: '8px',
-              border: `1px solid ${themeClasses.border}`,
-              backgroundColor: themeClasses.modalBg,
-              color: themeClasses.textPrimary,
+              border: `1px solid #374151`,
+              backgroundColor: '#1F2937',
+              color: '#FFFFFF',
               fontSize: '14px',
               fontWeight: '600',
               cursor: 'pointer',

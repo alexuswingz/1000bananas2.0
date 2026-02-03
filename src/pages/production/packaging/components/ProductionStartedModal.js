@@ -63,11 +63,31 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
   // Sync isProductionPaused with productData status
   useEffect(() => {
     if (productData?.status === 'paused') {
-      setIsProductionPaused(true);
+      // Only show as paused if no units have been produced yet
+      setIsProductionPaused(!productData.unitsProduced);
     } else if (productData?.status === 'in_progress') {
       setIsProductionPaused(false);
     }
-  }, [productData?.status]);
+  }, [productData?.status, productData?.unitsProduced]);
+
+  // Initialize pause state from productData when modal opens
+  useEffect(() => {
+    if (isOpen && productData) {
+      // Don't show "Production is paused" if status is 'in_progress' or if units have been produced
+      setIsProductionPaused(productData.status === 'paused' && !productData.unitsProduced);
+    }
+  }, [isOpen, productData]);
+
+  // Load production notes from productData when modal opens
+  useEffect(() => {
+    if (isOpen && productData) {
+      if (productData?.productionNotes && productData.productionNotes.length > 0) {
+        // Use notes from productData (includes the units produced note)
+        setNotes(productData.productionNotes);
+      }
+      // Otherwise keep the default notes initialized in useState
+    }
+  }, [isOpen, productData?.productionNotes]);
 
   // Reset image index and selected tab when quality check images change
   useEffect(() => {
@@ -240,57 +260,6 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
 
           {/* Content - Scrollable */}
           <div className="production-modal-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {/* Production Status Section - Show when paused (Mobile) */}
-          {isProductionPaused && (
-            <div
-              style={{
-                backgroundColor: '#EFF6FF',
-                borderRadius: '8px',
-                padding: '12px 16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                border: '1px solid #BFDBFE',
-              }}
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#2563EB"
-                strokeWidth={2}
-              >
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 16v-4M12 8h.01" />
-              </svg>
-              <div style={{ flex: 1 }}>
-                <span style={{ fontSize: '14px', color: '#1E40AF', fontWeight: '500' }}>
-                  Production is paused.
-                </span>
-                {' '}
-                <button
-                  onClick={() => {
-                    if (onLogUnitsClick) {
-                      onLogUnitsClick();
-                    }
-                  }}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#2563EB',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    textDecoration: 'underline',
-                    cursor: 'pointer',
-                    padding: 0,
-                  }}
-                >
-                  Log units produced?
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* Product Information Card */}
           <div
@@ -370,6 +339,78 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
 
           {/* Quality Checks Section */}
           <div style={{ flexShrink: 0 }}>
+            {/* Production Status Section - Show when paused (at top of Quality Checks - Mobile) */}
+            {isProductionPaused && (
+              <div
+                style={{
+                  width: '100%',
+                  height: '32px',
+                  paddingTop: '8px',
+                  paddingRight: '16px',
+                  paddingBottom: '8px',
+                  paddingLeft: '16px',
+                  borderRadius: '12px',
+                  borderWidth: '1px',
+                  borderStyle: 'solid',
+                  borderColor: '#E5E7EB',
+                  backgroundColor: '#FFFFFF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginBottom: '8px',
+                  opacity: 1,
+                }}
+              >
+                <div style={{ 
+                  width: '16px', 
+                  height: '16px', 
+                  borderRadius: '50%', 
+                  backgroundColor: '#2563EB',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                  <svg
+                    width="8"
+                    height="8"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#FFFFFF"
+                    strokeWidth={2.5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="8" y1="6" x2="8" y2="18" />
+                    <line x1="16" y1="6" x2="16" y2="18" />
+                  </svg>
+                </div>
+                <span style={{ fontSize: '14px', color: '#1F2937', fontWeight: '500' }}>
+                  Production is paused. Log units produced? {' '}
+                  <button
+                    onClick={() => {
+                      if (onLogUnitsClick) {
+                        onLogUnitsClick();
+                      }
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#2563EB',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      textDecoration: 'underline',
+                      cursor: 'pointer',
+                      padding: 0,
+                      margin: 0,
+                    }}
+                  >
+                    Log units produced
+                  </button>
+                </span>
+              </div>
+            )}
+
             {/* Quality Checks Container */}
             <div 
               style={{ 
@@ -821,7 +862,7 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
                   </div>
                 </div>
 
-                {/* Units Produced Info - Mobile */}
+                {/* Units Produced Info - Separate informational box below production notes (Mobile) */}
                 {productData?.unitsProduced && (
                   <div
                     style={{
@@ -858,6 +899,7 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
                     </div>
                   </div>
                 )}
+
               </div>
             </div>
           </div>
@@ -1200,6 +1242,79 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
 
           {/* Quality Checks Section */}
           <div style={{ flexShrink: 0 }}>
+            {/* Production Status Section - Show when paused (at top of Quality Checks) */}
+            {/* Only show if status is paused AND no units have been produced yet */}
+            {isProductionPaused && !productData?.unitsProduced && (
+              <div
+                style={{
+                  width: '600px',
+                  height: '32px',
+                  paddingTop: '8px',
+                  paddingRight: '16px',
+                  paddingBottom: '8px',
+                  paddingLeft: '16px',
+                  borderRadius: '12px',
+                  borderWidth: '1px',
+                  borderStyle: 'solid',
+                  borderColor: isDarkMode ? '#374151' : '#E5E7EB',
+                  backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginBottom: '8px',
+                  opacity: 1,
+                }}
+              >
+                <div style={{ 
+                  width: '16px', 
+                  height: '16px', 
+                  borderRadius: '50%', 
+                  backgroundColor: '#2563EB',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                  <svg
+                    width="8"
+                    height="8"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#FFFFFF"
+                    strokeWidth={2.5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="8" y1="6" x2="8" y2="18" />
+                    <line x1="16" y1="6" x2="16" y2="18" />
+                  </svg>
+                </div>
+                <span style={{ fontSize: '14px', color: isDarkMode ? '#FFFFFF' : '#1F2937', fontWeight: '500' }}>
+                  Production is paused. Log units produced? {' '}
+                  <button
+                    onClick={() => {
+                      if (onLogUnitsClick) {
+                        onLogUnitsClick();
+                      }
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: isDarkMode ? '#60A5FA' : '#2563EB',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      textDecoration: 'underline',
+                      cursor: 'pointer',
+                      padding: 0,
+                      margin: 0,
+                    }}
+                  >
+                    Log units produced
+                  </button>
+                </span>
+              </div>
+            )}
+
             {/* Quality Checks Container */}
             <div 
               style={{ 
@@ -1438,61 +1553,6 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
             </div>
           </div>
 
-          {/* Production Status Section - Show when paused */}
-          {isProductionPaused && (
-            <div
-              style={{
-                backgroundColor: '#F9F9F9',
-                borderRadius: '8px',
-                padding: '12px 16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                marginBottom: '0.75rem',
-                border: '1px solid #EAEAEA',
-              }}
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#2563EB"
-                strokeWidth={2}
-              >
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 16v-4M12 8h.01" />
-              </svg>
-              <div style={{ flex: 1 }}>
-                <span style={{ fontSize: '14px', color: '#1F2937', fontWeight: '500' }}>
-                  Production is paused. 
-                  <span style={{ fontSize: '14px', color: '#1C2634', fontWeight: '500', padding: '3px' }}>
-                     Log units Produced?
-                  </span>
-                </span>
-                {' '}
-                <button
-                  onClick={() => {
-                    if (onLogUnitsClick) {
-                      onLogUnitsClick();
-                    }
-                  }}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#2563EB',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    textDecoration: 'underline',
-                    cursor: 'pointer',
-                    padding: 0,
-                  }}
-                >
-                  Log units produced
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* Separator Line */}
           <div
@@ -1632,8 +1692,8 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
                       </div>
                     </div>
                   ))}
-              
-                  {/* Units Produced Info */}
+
+                  {/* Units Produced Info - Separate informational box below production notes */}
                   {productData?.unitsProduced && (
                     <div
                       style={{
@@ -1644,6 +1704,7 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
                         display: 'flex',
                         alignItems: 'flex-start',
                         gap: '0.75rem',
+                        marginTop: '0.75rem',
                       }}
                     >
                       <div

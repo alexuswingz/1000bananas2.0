@@ -8,13 +8,6 @@ const EnterRemainingQuantityModal = ({ isOpen, onClose, onConfirm, productData }
 
   if (!isOpen) return null;
 
-  const themeClasses = {
-    modalBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
-    textPrimary: isDarkMode ? 'text-dark-text-primary' : 'text-gray-900',
-    textSecondary: isDarkMode ? 'text-dark-text-secondary' : 'text-gray-600',
-    border: isDarkMode ? 'border-dark-border-primary' : 'border-gray-200',
-  };
-
   const handleConfirm = () => {
     if (remainingQuantity.trim()) {
       onConfirm(remainingQuantity);
@@ -33,41 +26,51 @@ const EnterRemainingQuantityModal = ({ isOpen, onClose, onConfirm, productData }
     <div
       style={{
         position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
+        inset: 0,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 10003,
+        zIndex: 99999,
         padding: '16px',
       }}
       onClick={handleClose}
     >
       <div
-        className={themeClasses.modalBg}
         style={{
-          width: '200%',
-          maxWidth: '500px',
+          width: '600px',
+          maxHeight: '90vh',
+          backgroundColor: '#111827',
           borderRadius: '12px',
-          overflow: 'hidden',
+          borderWidth: '1px',
+          borderStyle: 'solid',
+          borderColor: '#374151',
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'visible',
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div
           style={{
-            backgroundColor: isDarkMode ? '#374151' : '#1F2937',
+            width: '100%',
+            height: '52px',
             padding: '16px',
+            borderBottom: '1px solid #374151',
             display: 'flex',
-            alignItems: 'center',
             justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '8px',
+            flexShrink: 0,
+            backgroundColor: '#111827',
+            boxSizing: 'border-box',
+            borderTopLeftRadius: '12px',
+            borderTopRightRadius: '12px',
           }}
         >
-          <h2 style={{ color: '#FFFFFF', fontSize: '18px', fontWeight: '600', margin: 0 }}>
+          <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#FFFFFF', margin: 0 }}>
             Enter Remaining Quantity
           </h2>
           <button
@@ -75,27 +78,44 @@ const EnterRemainingQuantityModal = ({ isOpen, onClose, onConfirm, productData }
             style={{
               background: 'none',
               border: 'none',
-              color: '#FFFFFF',
               cursor: 'pointer',
-              padding: '4px',
+              color: '#9CA3AF',
+              padding: '0.25rem',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              transition: 'color 0.2s',
             }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = '#FFFFFF';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = '#9CA3AF';
+            }}
+            aria-label="Close"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 6L6 18M6 6l12 12" />
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
           </button>
         </div>
 
         {/* Content */}
-        <div style={{ padding: '24px' }}>
+        <div style={{ 
+          padding: '1.5rem', 
+          backgroundColor: '#111827', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          overflow: 'visible',
+          borderBottomLeftRadius: '12px',
+          borderBottomRightRadius: '12px',
+        }}>
           <h3
             style={{
               fontSize: '16px',
               fontWeight: '600',
-              color: themeClasses.textPrimary,
+              color: '#FFFFFF',
               marginBottom: '8px',
             }}
           >
@@ -104,7 +124,7 @@ const EnterRemainingQuantityModal = ({ isOpen, onClose, onConfirm, productData }
           <p
             style={{
               fontSize: '14px',
-              color: themeClasses.textSecondary,
+              color: '#9CA3AF',
               marginBottom: '16px',
             }}
           >
@@ -117,21 +137,27 @@ const EnterRemainingQuantityModal = ({ isOpen, onClose, onConfirm, productData }
             onChange={(e) => setRemainingQuantity(e.target.value)}
             placeholder="Enter remaining quantity here..."
             style={{
-              width: '100%',
-              padding: '12px',
-              border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
+              width: '107px',
+              height: '34px',
+              paddingTop: '8px',
+              paddingRight: '6px',
+              paddingBottom: '8px',
+              paddingLeft: '6px',
+              border: '1px solid #374151',
               borderRadius: '8px',
               fontSize: '14px',
-              backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
-              color: themeClasses.textPrimary,
+              backgroundColor: '#4B5563',
+              color: '#FFFFFF',
               marginBottom: '16px',
               boxSizing: 'border-box',
+              opacity: 0.75,
             }}
           />
 
           <div
             style={{
-              backgroundColor: isDarkMode ? '#374151' : '#F3F4F6',
+              backgroundColor: '#0F172A',
+              border: '1px solid #374151',
               padding: '12px',
               borderRadius: '8px',
               display: 'flex',
@@ -161,7 +187,7 @@ const EnterRemainingQuantityModal = ({ isOpen, onClose, onConfirm, productData }
             <p
               style={{
                 fontSize: '14px',
-                color: themeClasses.textPrimary,
+                color: '#FFFFFF',
                 margin: 0,
                 flex: 1,
               }}
@@ -175,39 +201,56 @@ const EnterRemainingQuantityModal = ({ isOpen, onClose, onConfirm, productData }
         <div
           style={{
             padding: '16px 24px',
-            borderTop: `1px solid ${themeClasses.border}`,
+            borderTop: '1px solid #374151',
             display: 'flex',
             gap: '12px',
-            justifyContent: 'space-between',
+            justifyContent: 'flex-end',
+            backgroundColor: '#111827',
           }}
         >
           <button
             onClick={handleClose}
             style={{
               padding: '10px 20px',
-              border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
+              border: '1px solid #374151',
               borderRadius: '8px',
-              backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
-              color: themeClasses.textPrimary,
+              backgroundColor: '#374151',
+              color: '#FFFFFF',
               fontSize: '14px',
               fontWeight: '500',
               cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#4B5563';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#374151';
             }}
           >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
-            enabled={!remainingQuantity.trim()}
+            disabled={!remainingQuantity.trim()}
             style={{
               padding: '10px 20px',
               border: 'none',
               borderRadius: '8px',
-              backgroundColor: remainingQuantity.trim() ? '#3B82F6' : '#3B82F6',
+              backgroundColor: remainingQuantity.trim() ? '#3B82F6' : '#374151',
               color: '#FFFFFF',
               fontSize: '14px',
               fontWeight: '500',
-              cursor: remainingQuantity.trim() ? 'pointer' : 'allowed pointer',
+              cursor: remainingQuantity.trim() ? 'pointer' : 'not-allowed',
+            }}
+            onMouseEnter={(e) => {
+              if (remainingQuantity.trim()) {
+                e.currentTarget.style.backgroundColor = '#2563EB';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (remainingQuantity.trim()) {
+                e.currentTarget.style.backgroundColor = '#3B82F6';
+              }
             }}
           >
             Confirm

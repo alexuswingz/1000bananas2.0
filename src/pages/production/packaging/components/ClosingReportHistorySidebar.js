@@ -1,12 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useTheme } from '../../../../context/ThemeContext';
 
 const ClosingReportHistorySidebar = ({ isOpen, onClose, onViewReport }) => {
+  const { isDarkMode } = useTheme();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('Most Recent');
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [reports, setReports] = useState([]);
+
+  const theme = {
+    bg: isDarkMode ? '#111827' : '#FFFFFF',
+    headerBg: isDarkMode ? '#1F2937' : '#FFFFFF',
+    cardBg: isDarkMode ? '#1F2937' : '#FFFFFF',
+    cardBgHover: isDarkMode ? '#374151' : '#F9FAFB',
+    border: isDarkMode ? '#374151' : '#E5E7EB',
+    borderHover: isDarkMode ? '#4B5563' : '#D1D5DB',
+    textPrimary: isDarkMode ? '#E5E7EB' : '#111827',
+    textSecondary: isDarkMode ? '#9CA3AF' : '#6B7280',
+    inputBg: isDarkMode ? '#111827' : '#FFFFFF',
+    inputBorder: isDarkMode ? '#4B5563' : '#E5E7EB',
+    buttonBg: isDarkMode ? '#1F2937' : '#F9FAFB',
+    dropdownBg: isDarkMode ? '#1F2937' : '#FFFFFF',
+    dropdownItemHover: isDarkMode ? '#374151' : '#F9FAFB',
+  };
 
   useEffect(() => {
     const handleResize = () => {
@@ -131,7 +149,7 @@ const ClosingReportHistorySidebar = ({ isOpen, onClose, onViewReport }) => {
           right: 0,
           bottom: 0,
           width: isMobile ? '100%' : '520px',
-          backgroundColor: '#FFFFFF',
+          backgroundColor: theme.bg,
           boxShadow: '-4px 0 12px rgba(0, 0, 0, 0.1)',
           zIndex: 9999,
           display: 'flex',
@@ -143,13 +161,14 @@ const ClosingReportHistorySidebar = ({ isOpen, onClose, onViewReport }) => {
         <div
           style={{
             padding: '20px 24px',
-            borderBottom: '1px solid #E5E7EB',
+            borderBottom: `1px solid ${theme.border}`,
+            backgroundColor: theme.headerBg,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
           }}
         >
-          <h2 style={{ fontSize: '20px', fontWeight: '600', color: '#111827', margin: 0 }}>
+          <h2 style={{ fontSize: '20px', fontWeight: '600', color: theme.textPrimary, margin: 0 }}>
             Closing Report History
           </h2>
           <button
@@ -164,7 +183,7 @@ const ClosingReportHistorySidebar = ({ isOpen, onClose, onViewReport }) => {
               justifyContent: 'center',
             }}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={theme.textSecondary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
@@ -172,7 +191,7 @@ const ClosingReportHistorySidebar = ({ isOpen, onClose, onViewReport }) => {
         </div>
 
         {/* Search and Filter Section */}
-        <div style={{ padding: '16px 24px', borderBottom: '1px solid #E5E7EB' }}>
+        <div style={{ padding: '16px 24px', borderBottom: `1px solid ${theme.border}`, backgroundColor: theme.headerBg }}>
           {/* Search Bar */}
           <div
             style={{
@@ -185,7 +204,7 @@ const ClosingReportHistorySidebar = ({ isOpen, onClose, onViewReport }) => {
               height="16"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="#9CA3AF"
+              stroke={theme.textSecondary}
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -208,10 +227,12 @@ const ClosingReportHistorySidebar = ({ isOpen, onClose, onViewReport }) => {
                 width: '100%',
                 padding: '8px 12px 8px 36px',
                 fontSize: '14px',
-                border: '1px solid #E5E7EB',
+                border: `1px solid ${theme.inputBorder}`,
                 borderRadius: '6px',
                 outline: 'none',
                 boxSizing: 'border-box',
+                backgroundColor: theme.inputBg,
+                color: theme.textPrimary,
               }}
             />
           </div>
@@ -224,8 +245,8 @@ const ClosingReportHistorySidebar = ({ isOpen, onClose, onViewReport }) => {
               justifyContent: 'space-between',
             }}
           >
-            <span style={{ fontSize: '14px', color: '#6B7280' }}>
-              Showing <strong>{reports.length}</strong> reports
+            <span style={{ fontSize: '14px', color: theme.textSecondary }}>
+              Showing <strong style={{ color: theme.textPrimary }}>{reports.length}</strong> reports
             </span>
             <div style={{ position: 'relative' }}>
               <button
@@ -236,9 +257,9 @@ const ClosingReportHistorySidebar = ({ isOpen, onClose, onViewReport }) => {
                   gap: '6px',
                   padding: '6px 12px',
                   fontSize: '14px',
-                  color: '#374151',
-                  backgroundColor: '#F9FAFB',
-                  border: '1px solid #E5E7EB',
+                  color: theme.textPrimary,
+                  backgroundColor: theme.buttonBg,
+                  border: `1px solid ${theme.border}`,
                   borderRadius: '6px',
                   cursor: 'pointer',
                 }}
@@ -255,8 +276,8 @@ const ClosingReportHistorySidebar = ({ isOpen, onClose, onViewReport }) => {
                     top: '100%',
                     right: 0,
                     marginTop: '4px',
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid #E5E7EB',
+                    backgroundColor: theme.dropdownBg,
+                    border: `1px solid ${theme.border}`,
                     borderRadius: '6px',
                     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
                     zIndex: 10,
@@ -273,10 +294,16 @@ const ClosingReportHistorySidebar = ({ isOpen, onClose, onViewReport }) => {
                       padding: '8px 12px',
                       textAlign: 'left',
                       fontSize: '14px',
-                      color: '#374151',
+                      color: theme.textPrimary,
                       backgroundColor: 'transparent',
                       border: 'none',
                       cursor: 'pointer',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = theme.dropdownItemHover;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
                     }}
                   >
                     Most Recent
@@ -291,10 +318,16 @@ const ClosingReportHistorySidebar = ({ isOpen, onClose, onViewReport }) => {
                       padding: '8px 12px',
                       textAlign: 'left',
                       fontSize: '14px',
-                      color: '#374151',
+                      color: theme.textPrimary,
                       backgroundColor: 'transparent',
                       border: 'none',
                       cursor: 'pointer',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = theme.dropdownItemHover;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
                     }}
                   >
                     Oldest
@@ -324,19 +357,19 @@ const ClosingReportHistorySidebar = ({ isOpen, onClose, onViewReport }) => {
               style={{
                 marginBottom: '16px',
                 padding: '16px',
-                border: '1px solid #E5E7EB',
+                border: `1px solid ${theme.border}`,
                 borderRadius: '12px',
-                backgroundColor: '#FFFFFF',
+                backgroundColor: theme.cardBg,
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#F9FAFB';
-                e.currentTarget.style.borderColor = '#D1D5DB';
+                e.currentTarget.style.backgroundColor = theme.cardBgHover;
+                e.currentTarget.style.borderColor = theme.borderHover;
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#FFFFFF';
-                e.currentTarget.style.borderColor = '#E5E7EB';
+                e.currentTarget.style.backgroundColor = theme.cardBg;
+                e.currentTarget.style.borderColor = theme.border;
               }}
             >
               {/* Report Header */}
@@ -367,10 +400,10 @@ const ClosingReportHistorySidebar = ({ isOpen, onClose, onViewReport }) => {
                     CR
                   </div>
                   <div>
-                    <div style={{ fontSize: '16px', fontWeight: '600', color: '#111827' }}>
+                    <div style={{ fontSize: '16px', fontWeight: '600', color: theme.textPrimary }}>
                       {report.date}
                     </div>
-                    <div style={{ fontSize: '12px', color: '#6B7280' }}>
+                    <div style={{ fontSize: '12px', color: theme.textSecondary }}>
                       Generated by {report.generatedBy}
                     </div>
                   </div>
@@ -385,9 +418,9 @@ const ClosingReportHistorySidebar = ({ isOpen, onClose, onViewReport }) => {
                   }}
                 >
                   <svg width="4" height="16" viewBox="0 0 4 16" fill="none">
-                    <circle cx="2" cy="2" r="2" fill="#6B7280" />
-                    <circle cx="2" cy="8" r="2" fill="#6B7280" />
-                    <circle cx="2" cy="14" r="2" fill="#6B7280" />
+                    <circle cx="2" cy="2" r="2" fill={theme.textSecondary} />
+                    <circle cx="2" cy="8" r="2" fill={theme.textSecondary} />
+                    <circle cx="2" cy="14" r="2" fill={theme.textSecondary} />
                   </svg>
                 </button>
               </div>
@@ -402,7 +435,7 @@ const ClosingReportHistorySidebar = ({ isOpen, onClose, onViewReport }) => {
               >
                 {/* PROD. TODAY */}
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '10px', color: '#6B7280', marginBottom: '4px', fontWeight: '500' }}>
+                  <div style={{ fontSize: '10px', color: theme.textSecondary, marginBottom: '4px', fontWeight: '500' }}>
                     PROD. TODAY
                   </div>
                   <div style={{ fontSize: '16px', fontWeight: '600', color: '#F59E0B' }}>
@@ -412,7 +445,7 @@ const ClosingReportHistorySidebar = ({ isOpen, onClose, onViewReport }) => {
 
                 {/* WTD PROD. */}
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '10px', color: '#6B7280', marginBottom: '4px', fontWeight: '500' }}>
+                  <div style={{ fontSize: '10px', color: theme.textSecondary, marginBottom: '4px', fontWeight: '500' }}>
                     WTD PROD.
                   </div>
                   <div style={{ fontSize: '16px', fontWeight: '600', color: '#F59E0B' }}>
@@ -422,17 +455,17 @@ const ClosingReportHistorySidebar = ({ isOpen, onClose, onViewReport }) => {
 
                 {/* WTD GOAL */}
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '10px', color: '#6B7280', marginBottom: '4px', fontWeight: '500' }}>
+                  <div style={{ fontSize: '10px', color: theme.textSecondary, marginBottom: '4px', fontWeight: '500' }}>
                     WTD GOAL
                   </div>
-                  <div style={{ fontSize: '16px', fontWeight: '600', color: '#374151' }}>
+                  <div style={{ fontSize: '16px', fontWeight: '600', color: theme.textPrimary }}>
                     {report.wtdGoal}
                   </div>
                 </div>
 
                 {/* YTD % */}
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '10px', color: '#6B7280', marginBottom: '4px', fontWeight: '500' }}>
+                  <div style={{ fontSize: '10px', color: theme.textSecondary, marginBottom: '4px', fontWeight: '500' }}>
                     YTD %
                   </div>
                   <div style={{ fontSize: '16px', fontWeight: '600', color: '#10B981' }}>

@@ -6,8 +6,11 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
   const [searchQuery, setSearchQuery] = useState('');
   const [showShipmentDropdown, setShowShipmentDropdown] = useState(false);
   const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const settingsButtonRef = useRef(null);
   const settingsDropdownRef = useRef(null);
+  const filterButtonRef = useRef(null);
+  const filterDropdownRef = useRef(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -20,13 +23,22 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
           setShowSettingsDropdown(false);
         }
       }
+      
+      if (showFilterDropdown) {
+        const isOutsideButton = filterButtonRef.current && !filterButtonRef.current.contains(event.target);
+        const isOutsideDropdown = filterDropdownRef.current && !filterDropdownRef.current.contains(event.target);
+        
+        if (isOutsideButton && isOutsideDropdown) {
+          setShowFilterDropdown(false);
+        }
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showSettingsDropdown]);
+  }, [showSettingsDropdown, showFilterDropdown]);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [expandedSections, setExpandedSections] = useState({ shipment: true, formula: false, status: false });
   const [selectedFilters, setSelectedFilters] = useState({
@@ -391,6 +403,360 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
               Sort
             </span>
           </button>
+
+          {/* Filter Button */}
+          <div style={{ position: 'relative' }}>
+            <button
+              ref={filterButtonRef}
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowFilterDropdown(!showFilterDropdown);
+              }}
+              style={{
+                padding: '0.5rem',
+                borderRadius: '8px',
+                border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = isDarkMode ? '#1F2937' : '#FFFFFF';
+              }}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke={isDarkMode ? '#9CA3AF' : '#6B7280'}
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+              </svg>
+            </button>
+
+            {/* Filter Dropdown Menu */}
+            {showFilterDropdown && (
+              <div
+                ref={filterDropdownRef}
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '8px',
+                  backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                  border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  zIndex: 99999,
+                  minWidth: '280px',
+                  maxWidth: '320px',
+                  maxHeight: '500px',
+                  overflowY: 'auto',
+                  padding: '12px',
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '12px',
+                    paddingBottom: '12px',
+                    borderBottom: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                  }}
+                >
+                  <h3 style={{ fontSize: '14px', fontWeight: '600', color: isDarkMode ? '#FFFFFF' : '#111827', margin: 0 }}>
+                    Filter Options
+                  </h3>
+                  <button
+                    onClick={resetFilters}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#3B82F6',
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      padding: '4px 8px',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.textDecoration = 'underline';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.textDecoration = 'none';
+                    }}
+                  >
+                    Reset All
+                  </button>
+                </div>
+
+                {/* Shipment Section */}
+                <div style={{ marginBottom: '16px' }}>
+                  <button
+                    onClick={() => toggleSection('shipment')}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '8px 0',
+                      background: 'none',
+                      border: 'none',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      color: isDarkMode ? '#FFFFFF' : '#111827',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span>Shipment</span>
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke={isDarkMode ? '#9CA3AF' : '#6B7280'}
+                      strokeWidth="2"
+                      style={{
+                        transform: expandedSections.shipment ? 'rotate(180deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.2s',
+                      }}
+                    >
+                      <path d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {expandedSections.shipment && (
+                    <div style={{ paddingLeft: '8px', marginTop: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <button
+                          onClick={() => setSelectedFilters(prev => ({ ...prev, shipment: filterOptions.shipment }))}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#3B82F6',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            padding: '2px 4px',
+                          }}
+                        >
+                          Select all
+                        </button>
+                        <button
+                          onClick={() => setSelectedFilters(prev => ({ ...prev, shipment: [] }))}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            padding: '2px 4px',
+                          }}
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                      {filterOptions.shipment.map(option => (
+                        <label
+                          key={option}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '6px 0',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedFilters.shipment.includes(option)}
+                            onChange={() => toggleFilter('shipment', option)}
+                            style={{
+                              width: '16px',
+                              height: '16px',
+                              marginRight: '8px',
+                              cursor: 'pointer',
+                              accentColor: '#3B82F6',
+                            }}
+                          />
+                          <span style={{ fontSize: '13px', color: isDarkMode ? '#D1D5DB' : '#374151' }}>{option}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Formula Section */}
+                <div style={{ marginBottom: '16px', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`, paddingTop: '12px' }}>
+                  <button
+                    onClick={() => toggleSection('formula')}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '8px 0',
+                      background: 'none',
+                      border: 'none',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      color: isDarkMode ? '#FFFFFF' : '#111827',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span>Formula</span>
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke={isDarkMode ? '#9CA3AF' : '#6B7280'}
+                      strokeWidth="2"
+                      style={{
+                        transform: expandedSections.formula ? 'rotate(180deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.2s',
+                      }}
+                    >
+                      <path d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {expandedSections.formula && (
+                    <div style={{ paddingLeft: '8px', marginTop: '8px' }}>
+                      {filterOptions.formula.map(option => (
+                        <label
+                          key={option}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '6px 0',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedFilters.formula.includes(option)}
+                            onChange={() => toggleFilter('formula', option)}
+                            style={{
+                              width: '16px',
+                              height: '16px',
+                              marginRight: '8px',
+                              cursor: 'pointer',
+                              accentColor: '#3B82F6',
+                            }}
+                          />
+                          <span style={{ fontSize: '13px', color: isDarkMode ? '#D1D5DB' : '#374151' }}>{option}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Status Section */}
+                <div style={{ borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`, paddingTop: '12px' }}>
+                  <button
+                    onClick={() => toggleSection('status')}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '8px 0',
+                      background: 'none',
+                      border: 'none',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      color: isDarkMode ? '#FFFFFF' : '#111827',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span>Status</span>
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke={isDarkMode ? '#9CA3AF' : '#6B7280'}
+                      strokeWidth="2"
+                      style={{
+                        transform: expandedSections.status ? 'rotate(180deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.2s',
+                      }}
+                    >
+                      <path d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {expandedSections.status && (
+                    <div style={{ paddingLeft: '8px', marginTop: '8px' }}>
+                      {filterOptions.status.map(option => (
+                        <label
+                          key={option}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '6px 0',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedFilters.status.includes(option)}
+                            onChange={() => toggleFilter('status', option)}
+                            style={{
+                              width: '16px',
+                              height: '16px',
+                              marginRight: '8px',
+                              cursor: 'pointer',
+                              accentColor: '#3B82F6',
+                            }}
+                          />
+                          <span style={{ fontSize: '13px', color: isDarkMode ? '#D1D5DB' : '#374151' }}>{option}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Apply Button */}
+                <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}` }}>
+                  <button
+                    onClick={() => {
+                      applyFilters();
+                      setShowFilterDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 16px',
+                      backgroundColor: '#3B82F6',
+                      color: '#FFFFFF',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#2563EB';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#3B82F6';
+                    }}
+                  >
+                    Apply Filters
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Search */}
           <div style={{ position: 'relative', width: '200px' }}>
