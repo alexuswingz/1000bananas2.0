@@ -759,6 +759,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   const X_AXIS_MONTH_INDICES = [0, 3, 6, 9]; // Jan, Apr, Jul, Oct (1st of each)
 
   const [chartAxisWidth, setChartAxisWidth] = useState(null);
+  const [chartDeferredReady, setChartDeferredReady] = useState(false);
   useEffect(() => {
     const el = chartContainerRef.current;
     if (!el) return;
@@ -802,6 +803,19 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
       return t >= zoomMin && t <= zoomMax;
     });
   }, [chartDisplayData?.data, zoomDomain?.left, zoomDomain?.right]);
+
+  // Defer chart mount by one frame so container has layout; avoids Recharts width/height -1 warning
+  const hasChartData = (chartDataForDisplay?.length ?? 0) > 0;
+  useEffect(() => {
+    if (!hasChartData) {
+      setChartDeferredReady(false);
+      return;
+    }
+    const id = requestAnimationFrame(() => {
+      setChartDeferredReady(true);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [hasChartData]);
 
   // Sum of Units Sold and Potential Units Sold for the drag-selected range
   const chartRangeSum = useMemo(() => {
@@ -964,7 +978,12 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
 
   // Memoized chart cursor styles so Recharts don't see new object refs every render (avoids update loops)
   const chartContainerCursor = zKeyHeld ? 'zoom-in' : (zoomBox.startTimestamp != null ? 'zoom-in' : (chartRangeSelecting ? 'col-resize' : 'crosshair'));
-  const responsiveContainerStyle = useMemo(() => ({ cursor: zKeyHeld ? 'zoom-in' : 'inherit', outline: 'none' }), [zKeyHeld]);
+  const responsiveContainerStyle = useMemo(() => ({
+    cursor: zKeyHeld ? 'zoom-in' : 'inherit',
+    outline: 'none',
+    minWidth: 1,
+    minHeight: 1
+  }), [zKeyHeld]);
   const composedChartStyle = useMemo(() => ({ backgroundColor: 'transparent', cursor: zKeyHeld ? 'zoom-in' : 'inherit', outline: 'none' }), [zKeyHeld]);
 
   // Available metrics configuration
@@ -2825,6 +2844,8 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             style={{
               height: inventoryOnly ? 188 : 420,
               width: '100%',
+              minWidth: 1,
+              minHeight: inventoryOnly ? 188 : 420,
               marginTop: '0.25rem',
               position: 'relative',
               cursor: chartContainerCursor,
@@ -2843,8 +2864,12 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               Colored backgrounds and Today marker are now rendered inside the chart
             */}
             
-            {chartDataForDisplay.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%" style={responsiveContainerStyle}>
+            {chartDataForDisplay.length > 0 && chartDeferredReady ? (
+              <ResponsiveContainer
+                width="100%"
+                height={inventoryOnly ? 188 : 420}
+                style={responsiveContainerStyle}
+              >
                   <ComposedChart
                   data={chartDataForDisplay}
                   margin={{ top: 20, right: 20, left: 0, bottom: 20 }}

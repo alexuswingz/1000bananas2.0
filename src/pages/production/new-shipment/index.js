@@ -730,7 +730,8 @@ const NewShipment = () => {
       // Map TPS forecast data to planning format - USE RAILWAY DATA AS SOURCE OF TRUTH
       const planningData = {
         products: (tpsForecastData.products || []).map(p => ({
-            asin: p.asin,
+            asin: p.asin || p.child_asin,
+            child_asin: p.child_asin || p.asin,
             brand: p.brand || 'TPS Plant Foods',
             product: p.product_name || p.product,
             size: p.size || extractSizeFromProductName(p.product_name || p.product),
@@ -764,11 +765,15 @@ const NewShipment = () => {
         console.log('Sample production item:', productionInventory[0]);
       }
       
-      // Create lookup for forecast data by ASIN
+      // Create lookup for forecast data by ASIN (index by both asin and child_asin so production inventory lookup succeeds)
       const forecastMap = {};
       (planningData.products || []).forEach(item => {
-        if (item.asin) {
-          forecastMap[item.asin] = item;
+        const asin = item.asin || item.child_asin;
+        if (asin) {
+          forecastMap[asin] = item;
+          if (item.child_asin && item.child_asin !== asin) {
+            forecastMap[item.child_asin] = item;
+          }
         }
       });
       

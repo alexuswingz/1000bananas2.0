@@ -293,6 +293,8 @@ const NewShipmentTable = ({
 
   const effectiveQtyValues = qtyValues || internalQtyValues || {};
   const effectiveSetQtyValues = onQtyChange || setInternalQtyValues;
+  const effectiveSetQtyValuesRef = useRef(effectiveSetQtyValues);
+  effectiveSetQtyValuesRef.current = effectiveSetQtyValues;
 
   // Update qtyValues when rows change (only if using internal state)
   useEffect(() => {
@@ -305,20 +307,8 @@ const NewShipmentTable = ({
     }
   }, [rows.length]);
 
-  // Capture original row order on first load (for Reset functionality)
-  useEffect(() => {
-    if (rows.length > 0 && !originalRowOrder.current) {
-      originalRowOrder.current = rows.map(r => r.id);
-      console.log('[Original Row Order] Stored first', originalRowOrder.current.length, 'product IDs');
-    }
-  }, [rows]);
-
-  // Store original forecast values when rows change (for reset functionality)
-  // Store by product ID to survive filtering/sorting, and also by index for quick lookup
-  // Use a ref to track the previous rows signature to avoid unnecessary re-processing
+  // Create a stable signature for rows to detect actual changes (must be before any useEffect that uses it)
   const previousRowsSignatureRef = useRef('');
-  
-  // Create a stable signature for rows to detect actual changes
   const rowsSignature = useMemo(() => {
     if (!rows || rows.length === 0) return '';
     return rows.map(r => {
@@ -326,7 +316,17 @@ const NewShipmentTable = ({
       return id ? String(id) : '';
     }).filter(Boolean).sort().join('|');
   }, [rows]);
-  
+
+  // Capture original row order on first load (for Reset functionality)
+  // Use rowsSignature so dependency array size is always 1 (avoids React "dependency array changed size" error).
+  useEffect(() => {
+    if (rows.length > 0 && !originalRowOrder.current) {
+      originalRowOrder.current = rows.map(r => r.id);
+      console.log('[Original Row Order] Stored first', originalRowOrder.current.length, 'product IDs');
+    }
+  }, [rowsSignature]);
+
+  // Store original forecast values when rows change (for reset functionality)
   useEffect(() => {
     // Skip if signature hasn't changed
     if (previousRowsSignatureRef.current === rowsSignature) {
@@ -720,7 +720,7 @@ const NewShipmentTable = ({
     }
     
     return result;
-  }, [rows, activeFilters, columnFilters, sortedRowOrder, forecastRange]);
+  }, [rowsSignature, activeFilters, columnFilters, sortedRowOrder, forecastRange]);
 
   // Apply selection filter only in table mode
   const filteredRowsWithSelection = useMemo(() => {
@@ -1121,7 +1121,7 @@ const NewShipmentTable = ({
     });
     
     currentFilteredRowsRef.current = result;
-  }, [rows, activeFilters, columnFilters, forecastRange]);
+  }, [rowsSignature, activeFilters, columnFilters, forecastRange]);
 
   // Store current non-table filtered rows (without sorting) in ref for use in sort handler
   useEffect(() => {
@@ -2282,10 +2282,14 @@ const NewShipmentTable = ({
   // This runs for both table and non-table modes and initializes qtyValues
   // anywhere a product has a suggested forecast (suggestedQty / units_to_make)
   // but the qty entry is still blank.
+  // Use ref for setter and only depend on rowsSignature so we don't re-run when
+  // parent re-renders and passes a new rows array reference (which would cause an infinite loop).
   useEffect(() => {
-    if (!rows || rows.length === 0) return;
+    if (!rows || rows.length === 0 || !rowsSignature) return;
+    const setQty = effectiveSetQtyValuesRef.current;
+    if (!setQty) return;
 
-    effectiveSetQtyValues(prev => {
+    setQty(prev => {
       const baseValues = prev || {};
       const newValues = { ...baseValues };
       let changed = false;
@@ -2315,15 +2319,19 @@ const NewShipmentTable = ({
 
       return changed ? newValues : prev;
     });
-  }, [rows, effectiveSetQtyValues]);
+  }, [rowsSignature]);
 
   // Normalize existing qty values for case-based sizes (8oz, 6oz, 1/2 lb, 1 lb,
   // quarts, gallons, etc.), rounding *up* to the nearest increment, but only
   // for values the user has not manually edited.
+  // Use ref for setter and only depend on rowsSignature to avoid infinite loop
+  // when parent re-renders and passes a new rows array reference.
   useEffect(() => {
-    if (!rows || rows.length === 0) return;
+    if (!rows || rows.length === 0 || !rowsSignature) return;
+    const setQty = effectiveSetQtyValuesRef.current;
+    if (!setQty) return;
 
-    effectiveSetQtyValues(prev => {
+    setQty(prev => {
       const baseValues = prev || {};
       const newValues = { ...baseValues };
       let changed = false;
@@ -2352,7 +2360,7 @@ const NewShipmentTable = ({
 
       return changed ? newValues : prev;
     });
-  }, [rows, effectiveSetQtyValues]);
+  }, [rowsSignature]);
 
   // Helper: determine step size for qty increments
   const getQtyIncrement = (row) => {

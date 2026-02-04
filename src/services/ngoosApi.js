@@ -633,10 +633,15 @@ class NgoosAPI {
       }
 
       // Map our backend response format (forecasts array) to expected format (products array)
+      // Normalize ASIN: Railway may return asin or child_asin; production inventory uses child_asin for lookup
       return {
         success: true,
-        products: (data.forecasts || []).map(f => ({
-          asin: f.asin,
+        products: (data.forecasts || []).map(f => {
+          const asin = f.asin || f.child_asin;
+          const child_asin = f.child_asin || f.asin;
+          return {
+          asin,
+          child_asin,
           product_name: f.product_name,
           brand: f.brand || f.brand_name || null,
           brand_name: f.brand_name || f.brand || null,
@@ -652,7 +657,8 @@ class NgoosAPI {
           label_inventory: f.label_inventory || 0,  // Labels from Railway database
           status: f.status,
           peak: f.peak,
-        })),
+        };
+        }),
         total_products: data.total_products || 0,
         source: source,
         count: data.total_products || 0,
