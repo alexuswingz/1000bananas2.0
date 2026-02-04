@@ -178,7 +178,7 @@ const ProductInfoModal = ({ isOpen, onClose, onBeginQC, productData }) => {
               gap: '12px 16px',
               alignContent: 'start',
               padding: isMobile ? '12px' : '16px',
-              backgroundColor: !isMobile ? '#1F2937' : (isDarkMode ? '#111827' : '#F3F4F6'),
+              backgroundColor: '#141C2D',
               borderRadius: '8px',
               border: `1px solid ${!isMobile ? '#374151' : (isDarkMode ? '#2d2d2d' : '#E5E7EB')}`,
             }}

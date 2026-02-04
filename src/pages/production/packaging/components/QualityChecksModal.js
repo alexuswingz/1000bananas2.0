@@ -8,7 +8,9 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
   const [qualityCheckImages, setQualityCheckImages] = useState([]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const uploadAreaRef = useRef(null);
+  const dropdownRef = useRef(null);
 
   // Detect mobile view
   useEffect(() => {
@@ -26,6 +28,7 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
       setCurrentStepIndex(0);
       setUploadedFile(null);
       setQualityCheckImages([]);
+      setIsDropdownOpen(false);
       if (uploadedFileUrl) {
         URL.revokeObjectURL(uploadedFileUrl);
         setUploadedFileUrl(null);
@@ -41,6 +44,22 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
       }
     };
   }, [uploadedFileUrl]);
+
+  // Handle click outside dropdown to close it
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [isDropdownOpen]);
 
   if (!isOpen) return null;
 
@@ -386,7 +405,7 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
           >
             <div
               style={{
-                width: `${((currentStepIndex + 1) / allSteps.length) * 100}%`,
+                width: `${(currentStepIndex / allSteps.length) * 100}%`,
                 height: '100%',
                 backgroundColor: '#3B82F6',
                 transition: 'width 0.3s ease',
@@ -632,59 +651,13 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
 
         {/* Content */}
         <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', flex: 1, overflow: 'auto', backgroundColor: '#111827' }}>
-          {/* Step Header with Dropdown */}
-          <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          {/* Step Header */}
+          <div style={{ marginBottom: '0' }}>
             {/* Step Counter */}
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+            <div style={{ marginBottom: '0' }}>
               <span style={{ fontSize: '12px', fontWeight: '600', color: '#3B82F6', letterSpacing: '0.05em' }}>
                 STEP {currentStepIndex + 1} OF {allSteps.length}:
               </span>
-            </div>
-            
-            {/* Step Dropdown */}
-            <div style={{ position: 'relative', minWidth: '240px' }}>
-              <select
-                value={currentStepIndex}
-                onChange={(e) => {
-                  setCurrentStepIndex(Number(e.target.value));
-                  setUploadedFile(null);
-                }}
-                style={{
-                  width: '100%',
-                  padding: '8px 32px 8px 12px',
-                  fontSize: '13px',
-                  fontWeight: '500',
-                  color: '#FFFFFF',
-                  backgroundColor: '#1F2937',
-                  border: '1px solid #374151',
-                  borderRadius: '6px',
-                  appearance: 'none',
-                  cursor: 'pointer',
-                  outline: 'none',
-                }}
-              >
-                {allSteps.map((step, index) => (
-                  <option key={step.id} value={index}>
-                    {index + 1}. {step.label}
-                  </option>
-                ))}
-              </select>
-              {/* Dropdown Arrow */}
-              <svg
-                style={{
-                  position: 'absolute',
-                  right: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  pointerEvents: 'none',
-                  width: '12px',
-                  height: '12px',
-                }}
-                viewBox="0 0 12 12"
-                fill="none"
-              >
-                <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
             </div>
           </div>
 
@@ -791,34 +764,165 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
             </div>
           </div>
 
-          {/* Step Confirmation */}
-          <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <p style={{ fontSize: '14px', fontWeight: '400', margin: 0, color: '#FFFFFF' }}>
-              {currentStep.id === 'formula' && productData?.formula 
-                ? (
-                  <>
-                    Confirm Correct Formula: <span style={{ color: '#3B82F6', fontWeight: '600' }}>{productData.formula}</span>
-                  </>
-                )
-                : currentStep.confirmationText
-              }
-            </p>
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              style={{ flexShrink: 0 }}
-            >
-              <circle cx="8" cy="8" r="7" fill="#6B7280" />
-              <path
-                d="M8 4.5V8.5M8 11.5H8.01"
-                stroke="white"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+          {/* Step Confirmation with Dropdown */}
+          <div style={{ marginTop: '8px', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <p style={{ fontSize: '14px', fontWeight: '400', margin: 0, color: '#FFFFFF' }}>
+                {currentStep.id === 'formula' && productData?.formula 
+                  ? (
+                    <>
+                      Confirm Correct Formula: <span style={{ color: '#3B82F6', fontWeight: '600' }}>{productData.formula}</span>
+                    </>
+                  )
+                  : currentStep.confirmationText
+                }
+              </p>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                fill="none"
+                style={{ flexShrink: 0 }}
+              >
+                <circle cx="8" cy="8" r="7" fill="#6B7280" />
+                <path
+                  d="M8 4.5V8.5M8 11.5H8.01"
+                  stroke="white"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+            
+            {/* Step Dropdown */}
+            <div ref={dropdownRef} style={{ position: 'relative', width: '187px' }}>
+              <button
+                type="button"
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                style={{
+                  width: '187px',
+                  height: '24px',
+                  paddingTop: '4px',
+                  paddingRight: '32px',
+                  paddingBottom: '4px',
+                  paddingLeft: '12px',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  color: '#FFFFFF',
+                  backgroundColor: '#1F2937',
+                  border: '1px solid #374151',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  textAlign: 'left',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                {currentStepIndex + 1}. {allSteps[currentStepIndex].label}
+              </button>
+              {/* Dropdown Arrow */}
+              <svg
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: isDropdownOpen ? 'translateY(-50%) rotate(180deg)' : 'translateY(-50%)',
+                  pointerEvents: 'none',
+                  width: '12px',
+                  height: '12px',
+                  transition: 'transform 0.2s ease',
+                }}
+                viewBox="0 0 12 12"
+                fill="none"
+              >
+                <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              
+              {/* Dropdown Menu */}
+              {isDropdownOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '28px',
+                    left: 0,
+                    right: 0,
+                    backgroundColor: '#1F2937',
+                    border: '1px solid #374151',
+                    borderRadius: '6px',
+                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2)',
+                    zIndex: 1000,
+                    overflow: 'hidden',
+                  }}
+                >
+                  {allSteps.map((step, index) => (
+                    <button
+                      key={step.id}
+                      type="button"
+                      onClick={() => {
+                        setCurrentStepIndex(index);
+                        setUploadedFile(null);
+                        setIsDropdownOpen(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        color: index === currentStepIndex ? '#FFFFFF' : '#FFFFFF',
+                        backgroundColor: index === currentStepIndex ? '#3B82F6' : 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'background-color 0.2s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (index !== currentStepIndex) {
+                          e.currentTarget.style.backgroundColor = '#374151';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (index !== currentStepIndex) {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }
+                      }}
+                    >
+                      {index + 1}. {step.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Progress Bar */}
+          <div
+            style={{
+              width: '100%',
+              height: '4px',
+              backgroundColor: '#374151',
+              borderRadius: '2px',
+              marginBottom: '6px',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                width: `${(currentStepIndex / allSteps.length) * 100}%`,
+                height: '100%',
+                backgroundColor: '#3B82F6',
+                transition: 'width 0.3s ease',
+              }}
+            />
+          </div>
+
+          {/* Completion Indicator */}
+          <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
+            <span style={{ fontSize: '12px', fontWeight: '400', color: '#FFFFFF' }}>
+              {currentStepIndex + 1} of {allSteps.length} completed
+            </span>
           </div>
 
           {/* File Upload Area */}

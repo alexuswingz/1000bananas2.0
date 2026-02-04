@@ -959,7 +959,7 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
               </>
             ) : (
               <>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth={2}>
                   <line x1="8" y1="6" x2="8" y2="18" />
                   <line x1="16" y1="6" x2="16" y2="18" />
                 </svg>
@@ -979,7 +979,7 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
               width: '111px',
               height: '24px',
               borderRadius: '4px',
-              backgroundColor: '#10B981',
+              backgroundColor: '#34C759',
               color: '#FFFFFF',
               fontSize: '12px',
               fontWeight: '500',
@@ -1639,9 +1639,11 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
                   {/* Separator Line Below Header */}
                   <div
                     style={{
-                      width: '100%',
+                      width: 'calc(100% + 32px)',
                       height: '1px',
                       backgroundColor: '#374151',
+                      marginLeft: '-16px',
+                      marginRight: '-16px',
                       marginBottom: '0.75rem',
                     }}
                   />
@@ -1902,14 +1904,14 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
                     width: '20px',
                     height: '20px',
                     borderRadius: '50%',
-                    backgroundColor: '#000000',
+                    backgroundColor: '#F59E0B',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     flexShrink: 0,
                   }}
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={3} strokeLinecap="round">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth={3} strokeLinecap="round">
                     <line x1="8" y1="6" x2="8" y2="18" />
                     <line x1="16" y1="6" x2="16" y2="18" />
                   </svg>
@@ -1930,7 +1932,7 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
               width: '119px',
               height: '32px',
               borderRadius: '4px',
-              backgroundColor: '#10B981',
+              backgroundColor: '#34C759',
               color: 'white',
               fontSize: '14px',
               fontWeight: '500',
@@ -1944,10 +1946,10 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
               boxSizing: 'border-box',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#059669';
+              e.currentTarget.style.backgroundColor = '#30B350';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#10B981';
+              e.currentTarget.style.backgroundColor = '#34C759';
             }}
           >
             <div
@@ -1955,14 +1957,15 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
                 width: '16px',
                 height: '16px',
                 borderRadius: '50%',
-                backgroundColor: 'white',
+                backgroundColor: 'transparent',
+                border: '1px solid white',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
               }}
             >
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 6L9 17l-5-5" />
               </svg>
             </div>
