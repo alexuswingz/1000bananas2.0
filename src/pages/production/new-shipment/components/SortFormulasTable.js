@@ -1,8 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 import { useSidebar } from '../../../../context/SidebarContext';
 import SortFormulasFilterDropdown from './SortFormulasFilterDropdown';
 import { showInfoToast } from '../../../../utils/notifications';
+
+const MENU_DROPDOWN_WIDTH = 160;
 
 // Helper: Convert product size to gallons per unit
 const sizeToGallons = (size) => {
@@ -37,6 +40,8 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
   const [dropPosition, setDropPosition] = useState(null); // { index: number, position: 'above' | 'below' }
   const [openMenuIndex, setOpenMenuIndex] = useState(null);
   const menuRefs = useRef({});
+  const menuButtonRefs = useRef({});
+  const [menuPosition, setMenuPosition] = useState(null); // { top, left } for portal dropdown
   const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
   const [selectedFormula, setSelectedFormula] = useState(null);
   const [firstBatchQty, setFirstBatchQty] = useState(1);
@@ -892,14 +897,34 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
     // Don't clear selection here - let handleDrop handle it
   };
 
-  // Close menu when clicking outside
+  // Position menu dropdown when it opens (for portal - avoid overflow:hidden clipping)
+  useEffect(() => {
+    if (openMenuIndex === null) {
+      setMenuPosition(null);
+      return;
+    }
+    const run = () => {
+      const btn = menuButtonRefs.current[openMenuIndex];
+      if (!btn) return;
+      const rect = btn.getBoundingClientRect();
+      setMenuPosition({
+        top: rect.top + rect.height / 2,
+        left: rect.left - MENU_DROPDOWN_WIDTH,
+      });
+    };
+    const t = requestAnimationFrame ? requestAnimationFrame(run) : setTimeout(run, 0);
+    return () => (requestAnimationFrame ? cancelAnimationFrame(t) : clearTimeout(t));
+  }, [openMenuIndex]);
+
+  // Close menu when clicking outside (menu is in portal, so check menu and button refs)
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (openMenuIndex !== null) {
         const menuRef = menuRefs.current[openMenuIndex];
-        const tdElement = menuRef?.parentElement;
-        // Check if click is outside both the menu and its parent td
-        if (tdElement && !tdElement.contains(event.target)) {
+        const buttonEl = menuButtonRefs.current[openMenuIndex];
+        const inMenu = menuRef && menuRef.contains(event.target);
+        const inButton = buttonEl && buttonEl.contains(event.target);
+        if (!inMenu && !inButton) {
           setOpenMenuIndex(null);
         }
       }
@@ -1590,68 +1615,78 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
   const filteredFormulas = getFilteredAndSortedFormulas();
 
   // Footer summary metrics (match Sort Products footer)
-  const totalProducts = formulas.length;
+  const totalProducts = filteredFormulas.length;
   const totalUnits = (shipmentProducts || []).reduce((sum, p) => sum + (p.qty || 0), 0);
-  const totalFormulas = new Set(formulas.map((f) => f.formula)).length;
+  const totalFormulas = new Set(filteredFormulas.map((f) => f.formula)).length;
   const totalSizeSwaps = 0;
   const totalFormulaChanges = 0;
   const totalTimeHours = 0;
 
   return (
-    <div 
-      ref={tableContainerRef}
-      style={{
-        backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-        borderRadius: '12px',
-        border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
-        overflow: 'hidden',
-      }}
-    >
+    <>
+      <style>{`
+        @keyframes dropLineFadeIn {
+          from {
+            opacity: 0;
+            transform: scaleX(0);
+          }
+          to {
+            opacity: 1;
+            transform: scaleX(1);
+          }
+        }
+      `}</style>
+      <div 
+        ref={tableContainerRef}
+        style={{
+          backgroundColor: isDarkMode ? '#0B1220' : '#FFFFFF',
+          borderRadius: '12px',
+          border: 'none',
+          overflow: 'hidden',
+        }}
+      >
       {/* Table Container */}
       <div style={{ overflowX: 'auto' }}>
+        <div
+          style={{
+            border: '1px solid #334155',
+            borderRadius: '12px',
+            overflow: 'hidden',
+          }}
+        >
         <table style={{
           width: '100%',
           borderCollapse: 'collapse',
+          backgroundColor: isDarkMode ? '#1A2235' : '#FFFFFF',
         }}>
           {/* Header */}
           <thead>
-            <tr
-              style={{
-                backgroundColor: '#1C2634',
-                borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
-                height: '40px',
-              }}
-            >
+            <tr style={{
+              backgroundColor: '#1A2235',
+              borderBottom: 'none',
+              height: '56px',
+            }}>
               {columns.map((column) => {
                 const isActive = hasActiveFilter(column.key);
+                const isDropdownOpen = openFilterColumns.has(column.key);
+                const isActiveOrOpen = isActive || isDropdownOpen;
                 return (
                 <th
                   key={column.key}
-                  className={
-                    column.key === 'drag' || column.key === 'menu'
-                      ? undefined
-                      : 'group'
-                  }
+                  className={column.key === 'drag' || column.key === 'menu' ? undefined : 'group'}
                   style={{
-                    padding:
-                      column.key === 'drag' || column.key === 'menu' ? '0 8px' : '12px 16px',
-                    textAlign:
-                      column.key === 'drag' || column.key === 'menu' ? 'center' : 'center',
+                    padding: column.key === 'drag' || column.key === 'menu' ? '0 8px' : '12px 16px',
+                    textAlign: column.key === 'drag' || column.key === 'menu' ? 'center' : 'center',
                     fontSize: '11px',
                     fontWeight: 600,
-                    color: isActive ? '#3B82F6' : '#9CA3AF',
+                    color: isActiveOrOpen ? '#3B82F6' : '#9CA3AF',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
                     width: column.width,
                     whiteSpace: 'nowrap',
-                    borderRight:
-                      column.key === 'drag' || column.key === 'menu'
-                        ? 'none'
-                        : '1px solid #FFFFFF',
-                    height: '40px',
-                    position:
-                      column.key === 'drag' || column.key === 'menu' ? 'static' : 'relative',
-                    backgroundColor: isActive ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                    borderRight: 'none',
+                    height: '56px',
+                    position: column.key === 'drag' || column.key === 'menu' ? 'static' : 'relative',
                   }}
                 >
                   {column.key === 'drag' || column.key === 'menu' ? (
@@ -1661,26 +1696,31 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '0.5rem',
+                        justifyContent: 'flex-start',
+                        gap: '6px',
                       }}
                     >
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         {column.label}
-                        {isActive && (
-                          <span style={{ 
-                            display: 'inline-block',
-                            width: '6px', 
-                            height: '6px', 
-                            borderRadius: '50%', 
-                            backgroundColor: '#10B981',
-                          }} />
-                        )}
+                        {(() => {
+                          if (isActive) {
+                            return (
+                              <span style={{ 
+                                display: 'inline-block',
+                                width: '6px', 
+                                height: '6px', 
+                                borderRadius: '50%', 
+                                backgroundColor: '#10B981',
+                              }} />
+                            );
+                          }
+                          return null;
+                        })()}
                       </span>
                       <img
                         src="/assets/Vector (1).png"
                         alt="Filter"
-                        className={`w-3 h-3 transition-opacity ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                        className={`w-3 h-3 transition-opacity ${isActiveOrOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                         ref={(el) => {
                           if (el) {
                             filterIconRefs.current[column.key] = el;
@@ -1691,7 +1731,8 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                           width: '12px', 
                           height: '12px', 
                           cursor: 'pointer',
-                          filter: isActive ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
+                          marginLeft: '3px',
+                          filter: isActiveOrOpen ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
                         }}
                       />
                     </div>
@@ -1700,10 +1741,29 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                 );
               })}
             </tr>
+            {/* Inset separator line under header, 16px from both ends */}
+            <tr>
+              <th
+                colSpan={columns.length}
+                style={{
+                  padding: 0,
+                  border: 'none',
+                  height: '1px',
+                  backgroundColor: '#1A2235',
+                }}
+              >
+                <div
+                  style={{
+                    margin: '0 16px',
+                    borderBottom: '1px solid #334155',
+                  }}
+                />
+              </th>
+            </tr>
           </thead>
 
           {/* Body */}
-          <tbody>
+          <tbody style={{ position: 'relative' }}>
             {filteredFormulas.length === 0 ? (
               <tr>
                 <td 
@@ -1767,13 +1827,11 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                       ? (isDarkMode ? '#4B5563' : '#E5E7EB')
                       : isSelected
                       ? (isDarkMode ? '#1E3A5F' : '#DBEAFE')
-                      : index % 2 === 0
-                      ? (isDarkMode ? '#1F2937' : '#FFFFFF')
-                      : (isDarkMode ? '#1A1F2E' : '#F9FAFB'),
-                    borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                      : (isDarkMode ? '#1A2235' : '#FFFFFF'),
+                    borderBottom: 'none',
                     borderLeft: isSelected ? '3px solid #3B82F6' : 'none',
                     transition: isDragging ? 'none' : 'background-color 0.2s',
-                    height: '40px',
+                    height: '66px',
                     opacity: isDragging ? 0.5 : 1,
                     cursor: isDragging ? 'grabbing' : 'grab',
                     boxShadow: isDragging ? '0 4px 12px rgba(0, 0, 0, 0.15)' : 'none',
@@ -1784,23 +1842,22 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                     if (!isDragging && draggedIndex === null) {
                       e.currentTarget.style.backgroundColor = isSelected
                         ? (isDarkMode ? '#1E3A5F' : '#DBEAFE')
-                        : (isDarkMode ? '#374151' : '#F3F4F6');
+                        : (isDarkMode ? '#232c41' : '#F3F4F6');
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!isDragging && draggedIndex === null) {
                       e.currentTarget.style.backgroundColor = isSelected
                         ? (isDarkMode ? '#1E3A5F' : '#DBEAFE')
-                        : index % 2 === 0
-                        ? (isDarkMode ? '#1F2937' : '#FFFFFF')
-                        : (isDarkMode ? '#1A1F2E' : '#F9FAFB');
+                        : (isDarkMode ? '#1A2235' : '#FFFFFF');
                     }
                   }}
                 >
                 <td style={{
                   padding: '0 8px',
                   textAlign: 'center',
-                  height: '40px',
+                  height: '66px',
+                  verticalAlign: 'middle',
                 }}>
                   <div
                     style={{
@@ -1879,11 +1936,12 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                   </div>
                 </td>
                 <td style={{
-                  padding: '0 16px',
+                  padding: '8px 16px',
                   fontSize: '14px',
                   fontWeight: 400,
                   color: isDarkMode ? '#E5E7EB' : '#374151',
-                  height: '40px',
+                  height: '66px',
+                  verticalAlign: 'middle',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
@@ -1902,79 +1960,87 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                   )}
                 </td>
                 <td style={{
-                  padding: '0 16px',
+                  padding: '8px 16px',
                   fontSize: '14px',
                   fontWeight: 400,
                   color: isDarkMode ? '#E5E7EB' : '#374151',
-                  height: '40px',
+                  height: '66px',
+                  verticalAlign: 'middle',
                 }}>
                   {formula.size}
                 </td>
                 <td style={{
-                  padding: '0 16px',
+                  padding: '8px 16px',
                   fontSize: '14px',
                   fontWeight: 400,
                   color: isDarkMode ? '#E5E7EB' : '#374151',
-                  height: '40px',
+                  height: '66px',
+                  verticalAlign: 'middle',
                 }}>
                   {formula.qty}
                 </td>
                 <td style={{
-                  padding: '0 16px',
+                  padding: '8px 16px',
                   fontSize: '14px',
                   fontWeight: 400,
                   color: isDarkMode ? '#E5E7EB' : '#374151',
-                  height: '40px',
+                  height: '66px',
+                  verticalAlign: 'middle',
                 }}>
                   {formula.tote}
                 </td>
                 <td style={{
                   padding: '0 16px',
-                  height: '40px',
+                  height: '66px',
+                  verticalAlign: 'middle',
+                  textAlign: 'center',
                 }}>
-                  <input
-                    type="text"
-                    value={formula.volume}
-                    readOnly
+                  <div
                     style={{
-                      width: '107px',
-                      height: '24px',
-                      padding: '0 10px',
-                      borderRadius: '6px',
-                      border: '1px solid #D1D5DB',
-                      backgroundColor: isDarkMode ? '#374151' : '#F9FAFB',
-                      color: isDarkMode ? '#E5E7EB' : '#374151',
-                      fontSize: '14px',
-                      fontWeight: 400,
-                      textAlign: 'center',
-                      outline: 'none',
-                      cursor: 'default',
-                      boxSizing: 'border-box',
+                      width: '96px',
+                      height: '34px',
+                      borderRadius: '8px',
+                      border: '1px solid #334155',
+                      backgroundColor: '#020617',
+                      color: '#F9FAFB',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      letterSpacing: '0.04em',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 0 0 1px rgba(15,23,42,0.85), 0 10px 25px rgba(15,23,42,0.55)',
+                      transform: 'translateX(-30px)',
                     }}
-                  />
+                  >
+                    {Number(formula.volume || 0).toLocaleString()}
+                  </div>
                 </td>
                 <td style={{
-                  padding: '0 16px',
+                  padding: '8px 16px',
                   fontSize: '14px',
                   fontWeight: 400,
                   color: isDarkMode ? '#E5E7EB' : '#374151',
-                  height: '40px',
+                  height: '66px',
+                  verticalAlign: 'middle',
                 }}>
                   {formula.measure}
                 </td>
                 <td style={{
-                  padding: '0 16px',
+                  padding: '8px 16px',
                   fontSize: '14px',
                   fontWeight: 400,
                   color: isDarkMode ? '#E5E7EB' : '#374151',
-                  height: '40px',
+                  height: '66px',
+                  verticalAlign: 'middle',
                 }}>
                   {formula.type}
                 </td>
                 <td style={{
-                  padding: '0 16px',
+                  padding: '8px 16px',
                   textAlign: 'center',
-                  height: '40px',
+                  height: '66px',
+                  verticalAlign: 'middle',
                 }}>
                   <button
                     type="button"
@@ -2000,11 +2066,13 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                 <td style={{
                   padding: '0 8px',
                   textAlign: 'center',
-                  height: '40px',
+                  height: '66px',
+                  verticalAlign: 'middle',
                   position: 'relative',
                 }}>
                   <button
                     type="button"
+                    ref={(el) => { if (el) menuButtonRefs.current[index] = el; }}
                     onClick={(e) => handleMenuClick(e, index)}
                     style={{
                       background: 'transparent',
@@ -2031,102 +2099,99 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                     </svg>
                   </button>
                   
-                  {/* Dropdown Menu */}
-                  {openMenuIndex === index && (
+                  {/* Dropdown Menu - rendered in portal so it is not clipped by table overflow:hidden */}
+                  {openMenuIndex === index && menuPosition && ReactDOM.createPortal(
                     <div
-                      ref={(el) => { menuRefs.current[index] = el; }}
+                      ref={(el) => { if (el) menuRefs.current[index] = el; }}
                       style={{
-                        position: 'absolute',
-                        top: '50%',
-                        right: '100%',
+                        position: 'fixed',
+                        top: menuPosition.top,
+                        left: menuPosition.left,
                         transform: 'translateY(-50%)',
-                        marginRight: '-4px',
                         backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
                         border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
                         borderRadius: '8px',
                         boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                        minWidth: '160px',
-                        zIndex: 1000,
+                        minWidth: `${MENU_DROPDOWN_WIDTH}px`,
+                        zIndex: 10000,
                         overflow: 'hidden',
                       }}
                     >
-                      {/* Show Split Formula option for all formulas (parent and split items) */}
-                      {formula.qty > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleMenuAction('split', formula)}
-                          style={{
-                            width: '100%',
-                            padding: '10px 16px',
-                            textAlign: 'left',
-                            background: 'transparent',
-                            border: 'none',
-                            color: isDarkMode ? '#E5E7EB' : '#374151',
-                            fontSize: '14px',
-                            fontWeight: 400,
-                            cursor: 'pointer',
-                            transition: 'background-color 0.2s',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '12px',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }}
+                      {/* Split Formula - show for all formulas */}
+                      <button
+                        type="button"
+                        onClick={() => handleMenuAction('split', formula)}
+                        style={{
+                          width: '100%',
+                          padding: '10px 16px',
+                          textAlign: 'left',
+                          background: 'transparent',
+                          border: 'none',
+                          color: isDarkMode ? '#E5E7EB' : '#374151',
+                          fontSize: '14px',
+                          fontWeight: 400,
+                          cursor: 'pointer',
+                          transition: 'background-color 0.2s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                      >
+                        <svg 
+                          width="16" 
+                          height="16" 
+                          viewBox="0 0 16 16" 
+                          fill="none" 
+                          xmlns="http://www.w3.org/2000/svg"
+                          style={{ flexShrink: 0 }}
                         >
-                          <svg 
-                            width="16" 
-                            height="16" 
-                            viewBox="0 0 16 16" 
-                            fill="none" 
-                            xmlns="http://www.w3.org/2000/svg"
-                            style={{ flexShrink: 0 }}
-                          >
-                            {/* Vertical line */}
-                            <line 
-                              x1="8" 
-                              y1="10" 
-                              x2="8" 
-                              y2="14" 
-                              stroke="currentColor" 
-                              strokeWidth="1.5" 
-                              strokeLinecap="round"
-                            />
-                            {/* Left branch pointing up and left */}
-                            <line 
-                              x1="8" 
-                              y1="10" 
-                              x2="4.5" 
-                              y2="6.5" 
-                              stroke="currentColor" 
-                              strokeWidth="1.5" 
-                              strokeLinecap="round"
-                            />
-                            <polygon 
-                              points="4.5,6.5 4,6 3.5,6.5" 
-                              fill="currentColor"
-                            />
-                            {/* Right branch pointing up and right */}
-                            <line 
-                              x1="8" 
-                              y1="10" 
-                              x2="11.5" 
-                              y2="6.5" 
-                              stroke="currentColor" 
-                              strokeWidth="1.5" 
-                              strokeLinecap="round"
-                            />
-                            <polygon 
-                              points="11.5,6.5 12,6 12.5,6.5" 
-                              fill="currentColor"
-                            />
-                          </svg>
-                          <span>Split Formula</span>
-                        </button>
-                      )}
+                          {/* Vertical line */}
+                          <line 
+                            x1="8" 
+                            y1="10" 
+                            x2="8" 
+                            y2="14" 
+                            stroke="currentColor" 
+                            strokeWidth="1.5" 
+                            strokeLinecap="round"
+                          />
+                          {/* Left branch pointing up and left */}
+                          <line 
+                            x1="8" 
+                            y1="10" 
+                            x2="4.5" 
+                            y2="6.5" 
+                            stroke="currentColor" 
+                            strokeWidth="1.5" 
+                            strokeLinecap="round"
+                          />
+                          <polygon 
+                            points="4.5,6.5 4,6 3.5,6.5" 
+                            fill="currentColor"
+                          />
+                          {/* Right branch pointing up and right */}
+                          <line 
+                            x1="8" 
+                            y1="10" 
+                            x2="11.5" 
+                            y2="6.5" 
+                            stroke="currentColor" 
+                            strokeWidth="1.5" 
+                            strokeLinecap="round"
+                          />
+                          <polygon 
+                            points="11.5,6.5 12,6 12.5,6.5" 
+                            fill="currentColor"
+                          />
+                        </svg>
+                        <span>Split Formula</span>
+                      </button>
                       
                       {/* Show Undo All Splits option for split items */}
                       {formula.splitTag && (
@@ -2184,8 +2249,28 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                           <span>Undo All Splits</span>
                         </button>
                       )}
-                    </div>
+                    </div>,
+                    document.body
                   )}
+                </td>
+              </tr>
+              {/* Inset separator line under this row, 16px from both ends */}
+              <tr>
+                <td
+                  colSpan={columns.length}
+                  style={{
+                    padding: 0,
+                    border: 'none',
+                    height: '1px',
+                    backgroundColor: isDarkMode ? '#1A2235' : '#FFFFFF',
+                  }}
+                >
+                  <div
+                    style={{
+                      margin: '0 16px',
+                      borderBottom: '1px solid #334155',
+                    }}
+                  />
                 </td>
               </tr>
               {/* Drop line below the row */}
@@ -2220,6 +2305,7 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
             })}
           </tbody>
         </table>
+      </div>
       </div>
 
       {/* Column Filter Dropdowns - Multiple can be open at once */}
@@ -2267,12 +2353,12 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
             {/* Modal */}
             <div
               style={{
-                backgroundColor: '#FFFFFF',
+                backgroundColor: isDarkMode ? '#1A2235' : '#FFFFFF',
                 borderRadius: '12px',
                 width: '500px',
                 maxWidth: '90vw',
-                border: '1px solid #E5E7EB',
-                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                border: isDarkMode ? '1px solid #334155' : '1px solid #E5E7EB',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
                 zIndex: 10001,
                 position: 'relative',
                 display: 'flex',
@@ -2285,13 +2371,13 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
               {/* Header */}
               <div style={{ 
                 padding: '16px 24px',
-                borderBottom: '1px solid #E5E7EB',
+                borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E5E7EB',
                 borderTopLeftRadius: '12px',
                 borderTopRightRadius: '12px',
                 display: 'flex', 
                 justifyContent: 'space-between', 
                 alignItems: 'center',
-                backgroundColor: '#1C2634',
+                backgroundColor: isDarkMode ? '#0F172A' : '#1C2634',
               }}>
                 <h2 style={{
                   fontSize: '18px',
@@ -2329,19 +2415,21 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                 minHeight: 0,
                 overflowY: 'auto',
                 padding: '24px',
+                backgroundColor: isDarkMode ? '#1A2235' : undefined,
               }}>
                 {/* Formula Info */}
                 {selectedFormula && (
                   <div style={{
-                    backgroundColor: '#F3F4F6',
+                    backgroundColor: isDarkMode ? '#0F172A' : '#F3F4F6',
                     borderRadius: '8px',
                     padding: '12px 16px',
                     marginBottom: '20px',
+                    border: isDarkMode ? '1px solid #334155' : undefined,
                   }}>
-                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827', marginBottom: '4px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: isDarkMode ? '#F9FAFB' : '#111827', marginBottom: '4px' }}>
                       {selectedFormula.formula}
                     </div>
-                    <div style={{ fontSize: '13px', color: '#6B7280' }}>
+                    <div style={{ fontSize: '13px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
                       Total: {selectedFormula.qty} tote{selectedFormula.qty > 1 ? 's' : ''} • {selectedFormula.volume} gallons
                     </div>
                   </div>
@@ -2353,21 +2441,21 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                     display: 'block',
                     fontSize: '14px',
                     fontWeight: 600,
-                    color: '#374151',
+                    color: isDarkMode ? '#E5E7EB' : '#374151',
                     marginBottom: '8px',
                   }}>
                     First Batch
                   </label>
                   <p style={{
                     fontSize: '12px',
-                    color: '#6B7280',
+                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
                     margin: '0 0 12px 0',
                   }}>
                     The first batch is always 1 tote.
                   </p>
                   <div style={{ display: 'flex', gap: '12px' }}>
                     <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: '11px', color: '#6B7280', marginBottom: '4px', display: 'block' }}>
+                      <label style={{ fontSize: '11px', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '4px', display: 'block' }}>
                         Totes
                       </label>
                       <input
@@ -2379,9 +2467,9 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                           height: '40px',
                           padding: '0 12px',
                           borderRadius: '6px',
-                          border: '1px solid #D1D5DB',
-                          backgroundColor: '#F9FAFB',
-                          color: '#6B7280',
+                          border: isDarkMode ? '1px solid #334155' : '1px solid #D1D5DB',
+                          backgroundColor: isDarkMode ? '#0F172A' : '#F9FAFB',
+                          color: isDarkMode ? '#E5E7EB' : '#6B7280',
                           fontSize: '14px',
                           fontWeight: 400,
                           outline: 'none',
@@ -2391,7 +2479,7 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                       />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: '11px', color: '#6B7280', marginBottom: '4px', display: 'block' }}>
+                      <label style={{ fontSize: '11px', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '4px', display: 'block' }}>
                         Volume (Gallons)
                       </label>
                       <input
@@ -2403,9 +2491,9 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                           height: '40px',
                           padding: '0 12px',
                           borderRadius: '6px',
-                          border: '1px solid #D1D5DB',
-                          backgroundColor: '#F9FAFB',
-                          color: '#6B7280',
+                          border: isDarkMode ? '1px solid #334155' : '1px solid #D1D5DB',
+                          backgroundColor: isDarkMode ? '#0F172A' : '#F9FAFB',
+                          color: isDarkMode ? '#E5E7EB' : '#6B7280',
                           fontSize: '14px',
                           fontWeight: 400,
                           outline: 'none',
@@ -2423,21 +2511,21 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                     display: 'block',
                     fontSize: '14px',
                     fontWeight: 600,
-                    color: '#374151',
+                    color: isDarkMode ? '#E5E7EB' : '#374151',
                     marginBottom: '8px',
                   }}>
                     Second Batch
                   </label>
                   <p style={{
                     fontSize: '12px',
-                    color: '#6B7280',
+                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
                     margin: '0 0 12px 0',
                   }}>
                     The remaining totes after the split.
                   </p>
                   <div style={{ display: 'flex', gap: '12px' }}>
                     <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: '11px', color: '#6B7280', marginBottom: '4px', display: 'block' }}>
+                      <label style={{ fontSize: '11px', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '4px', display: 'block' }}>
                         Totes
                       </label>
                       <input
@@ -2449,9 +2537,9 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                           height: '40px',
                           padding: '0 12px',
                           borderRadius: '6px',
-                          border: '1px solid #D1D5DB',
-                          backgroundColor: '#F9FAFB',
-                          color: '#6B7280',
+                          border: isDarkMode ? '1px solid #334155' : '1px solid #D1D5DB',
+                          backgroundColor: isDarkMode ? '#0F172A' : '#F9FAFB',
+                          color: isDarkMode ? '#E5E7EB' : '#6B7280',
                           fontSize: '14px',
                           fontWeight: 400,
                           outline: 'none',
@@ -2461,7 +2549,7 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                       />
                     </div>
                     <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: '11px', color: '#6B7280', marginBottom: '4px', display: 'block' }}>
+                      <label style={{ fontSize: '11px', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '4px', display: 'block' }}>
                         Volume (Gallons)
                       </label>
                       <input
@@ -2473,9 +2561,9 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                           height: '40px',
                           padding: '0 12px',
                           borderRadius: '6px',
-                          border: '1px solid #D1D5DB',
-                          backgroundColor: '#F9FAFB',
-                          color: '#6B7280',
+                          border: isDarkMode ? '1px solid #334155' : '1px solid #D1D5DB',
+                          backgroundColor: isDarkMode ? '#0F172A' : '#F9FAFB',
+                          color: isDarkMode ? '#E5E7EB' : '#6B7280',
                           fontSize: '14px',
                           fontWeight: 400,
                           outline: 'none',
@@ -2491,12 +2579,12 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
               {/* Footer */}
               <div style={{ 
                 padding: '16px 24px',
-                borderTop: '1px solid #E5E7EB',
+                borderTop: isDarkMode ? '1px solid #334155' : '1px solid #E5E7EB',
                 display: 'flex', 
                 justifyContent: 'flex-end',
                 alignItems: 'center',
                 gap: '12px',
-                backgroundColor: '#FFFFFF',
+                backgroundColor: isDarkMode ? '#1A2235' : '#FFFFFF',
               }}>
                 <button
                   type="button"
@@ -2504,19 +2592,19 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                   style={{
                     padding: '8px 16px',
                     borderRadius: '6px',
-                    border: '1px solid #D1D5DB',
-                    backgroundColor: '#FFFFFF',
-                    color: '#374151',
+                    border: isDarkMode ? '1px solid #475569' : '1px solid #D1D5DB',
+                    backgroundColor: isDarkMode ? '#334155' : '#FFFFFF',
+                    color: isDarkMode ? '#E5E7EB' : '#374151',
                     fontSize: '14px',
                     fontWeight: 500,
                     cursor: 'pointer',
                     transition: 'all 0.2s',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#F9FAFB';
+                    e.currentTarget.style.backgroundColor = isDarkMode ? '#475569' : '#F9FAFB';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#FFFFFF';
+                    e.currentTarget.style.backgroundColor = isDarkMode ? '#334155' : '#FFFFFF';
                   }}
                 >
                   Cancel
@@ -2529,7 +2617,7 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                     padding: '8px 16px',
                     borderRadius: '6px',
                     border: 'none',
-                    backgroundColor: (!selectedFormula || (selectedFormula?.qty || 1) <= 1) ? '#9CA3AF' : '#3B82F6',
+                    backgroundColor: (!selectedFormula || (selectedFormula?.qty || 1) <= 1) ? (isDarkMode ? '#4B5563' : '#9CA3AF') : '#3B82F6',
                     color: '#FFFFFF',
                     fontSize: '14px',
                     fontWeight: 500,
@@ -2632,30 +2720,43 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
               </div>
             ))}
           </div>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
+
+          {/* Actions */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              flexShrink: 0,
+            }}
+          >
             <button
               type="button"
               onClick={onCompleteClick}
               style={{
-                height: '38px',
+                height: '36px',
                 padding: '0 24px',
-                borderRadius: '8px',
+                borderRadius: '999px',
                 border: 'none',
-                backgroundColor: '#007AFF',
+                backgroundImage: 'linear-gradient(90deg, #2563EB 0%, #3B82F6 50%, #38BDF8 100%)',
                 color: '#FFFFFF',
                 fontSize: '14px',
-                fontWeight: 500,
+                fontWeight: 600,
                 cursor: 'pointer',
-                transition: 'all 0.2s',
+                transition: 'background-color 0.2s, transform 0.1s',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#0056CC';
+                e.currentTarget.style.backgroundImage =
+                  'linear-gradient(90deg, #1D4ED8 0%, #2563EB 50%, #0EA5E9 100%)';
+                e.currentTarget.style.transform = 'translateY(-1px)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#007AFF';
+                e.currentTarget.style.backgroundImage =
+                  'linear-gradient(90deg, #2563EB 0%, #3B82F6 50%, #38BDF8 100%)';
+                e.currentTarget.style.transform = 'translateY(0)';
               }}
             >
               Complete
@@ -2663,7 +2764,8 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 };
 

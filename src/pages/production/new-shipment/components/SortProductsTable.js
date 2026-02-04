@@ -3181,12 +3181,12 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
             {/* Modal */}
             <div
               style={{
-                backgroundColor: '#FFFFFF',
+                backgroundColor: isDarkMode ? '#1A2235' : '#FFFFFF',
                 borderRadius: '12px',
                 width: '500px',
                 maxWidth: '90vw',
-                border: '1px solid #E5E7EB',
-                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                border: isDarkMode ? '1px solid #334155' : '1px solid #E5E7EB',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
                 zIndex: 10001,
                 position: 'relative',
                 display: 'flex',
@@ -3199,13 +3199,13 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
               {/* Header */}
               <div style={{ 
                 padding: '16px 24px',
-                borderBottom: '1px solid #E5E7EB',
+                borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E5E7EB',
                 borderTopLeftRadius: '12px',
                 borderTopRightRadius: '12px',
                 display: 'flex', 
                 justifyContent: 'space-between', 
                 alignItems: 'center',
-                backgroundColor: '#1C2634',
+                backgroundColor: isDarkMode ? '#0F172A' : '#1C2634',
               }}>
                 <h2 style={{
                   fontSize: '18px',
@@ -3243,19 +3243,21 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                 minHeight: 0,
                 overflowY: 'auto',
                 padding: '24px',
+                backgroundColor: isDarkMode ? '#1A2235' : undefined,
               }}>
                 {/* Product Info */}
                 {selectedProduct && (
                   <div style={{
-                    backgroundColor: '#F3F4F6',
+                    backgroundColor: isDarkMode ? '#0F172A' : '#F3F4F6',
                     borderRadius: '8px',
                     padding: '12px 16px',
                     marginBottom: '20px',
+                    border: isDarkMode ? '1px solid #334155' : undefined,
                   }}>
-                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827', marginBottom: '4px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: isDarkMode ? '#F9FAFB' : '#111827', marginBottom: '4px' }}>
                       {selectedProduct.brand} - {selectedProduct.product} ({selectedProduct.size})
                     </div>
-                    <div style={{ fontSize: '13px', color: '#6B7280' }}>
+                    <div style={{ fontSize: '13px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
                       Total: {selectedProduct.qty} unit{selectedProduct.qty > 1 ? 's' : ''}
                     </div>
                   </div>
@@ -3267,14 +3269,14 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                     display: 'block',
                     fontSize: '14px',
                     fontWeight: 600,
-                    color: '#374151',
+                    color: isDarkMode ? '#E5E7EB' : '#374151',
                     marginBottom: '8px',
                   }}>
                     First Batch
                   </label>
                   <p style={{
                     fontSize: '12px',
-                    color: '#6B7280',
+                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
                     margin: '0 0 12px 0',
                   }}>
                     {selectedProduct && incrementStep > 1 
@@ -3283,7 +3285,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                   </p>
                   <div style={{ display: 'flex', gap: '12px' }}>
                     <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: '11px', color: '#6B7280', marginBottom: '4px', display: 'block' }}>
+                      <label style={{ fontSize: '11px', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '4px', display: 'block' }}>
                         Quantity
                       </label>
                       <input
@@ -3298,9 +3300,9 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                           height: '40px',
                           padding: '0 12px',
                           borderRadius: '6px',
-                          border: '1px solid #D1D5DB',
-                          backgroundColor: '#FFFFFF',
-                          color: '#374151',
+                          border: isDarkMode ? '1px solid #334155' : '1px solid #D1D5DB',
+                          backgroundColor: isDarkMode ? '#0F172A' : '#FFFFFF',
+                          color: isDarkMode ? '#E5E7EB' : '#374151',
                           fontSize: '14px',
                           fontWeight: 400,
                           outline: 'none',
@@ -3318,21 +3320,21 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                     display: 'block',
                     fontSize: '14px',
                     fontWeight: 600,
-                    color: '#374151',
+                    color: isDarkMode ? '#E5E7EB' : '#374151',
                     marginBottom: '8px',
                   }}>
                     Second Batch
                   </label>
                   <p style={{
                     fontSize: '12px',
-                    color: '#6B7280',
+                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
                     margin: '0 0 12px 0',
                   }}>
                     The remaining units after the split.
                   </p>
                   <div style={{ display: 'flex', gap: '12px' }}>
                     <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: '11px', color: '#6B7280', marginBottom: '4px', display: 'block' }}>
+                      <label style={{ fontSize: '11px', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '4px', display: 'block' }}>
                         Quantity
                       </label>
                       <input
@@ -3344,9 +3346,9 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                           height: '40px',
                           padding: '0 12px',
                           borderRadius: '6px',
-                          border: '1px solid #D1D5DB',
-                          backgroundColor: '#F9FAFB',
-                          color: '#6B7280',
+                          border: isDarkMode ? '1px solid #334155' : '1px solid #D1D5DB',
+                          backgroundColor: isDarkMode ? '#0F172A' : '#F9FAFB',
+                          color: isDarkMode ? '#E5E7EB' : '#6B7280',
                           fontSize: '14px',
                           fontWeight: 400,
                           outline: 'none',
@@ -3362,12 +3364,12 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
               {/* Footer */}
               <div style={{ 
                 padding: '16px 24px',
-                borderTop: '1px solid #E5E7EB',
+                borderTop: isDarkMode ? '1px solid #334155' : '1px solid #E5E7EB',
                 display: 'flex', 
                 justifyContent: 'flex-end',
                 alignItems: 'center',
                 gap: '12px',
-                backgroundColor: '#FFFFFF',
+                backgroundColor: isDarkMode ? '#1A2235' : '#FFFFFF',
               }}>
                 <button
                   type="button"
@@ -3375,19 +3377,19 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                   style={{
                     padding: '8px 16px',
                     borderRadius: '6px',
-                    border: '1px solid #D1D5DB',
-                    backgroundColor: '#FFFFFF',
-                    color: '#374151',
+                    border: isDarkMode ? '1px solid #475569' : '1px solid #D1D5DB',
+                    backgroundColor: isDarkMode ? '#334155' : '#FFFFFF',
+                    color: isDarkMode ? '#E5E7EB' : '#374151',
                     fontSize: '14px',
                     fontWeight: 500,
                     cursor: 'pointer',
                     transition: 'all 0.2s',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#F9FAFB';
+                    e.currentTarget.style.backgroundColor = isDarkMode ? '#475569' : '#F9FAFB';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#FFFFFF';
+                    e.currentTarget.style.backgroundColor = isDarkMode ? '#334155' : '#FFFFFF';
                   }}
                 >
                   Cancel
@@ -3400,7 +3402,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                     padding: '8px 16px',
                     borderRadius: '6px',
                     border: 'none',
-                    backgroundColor: (!selectedProduct || (selectedProduct?.qty || 1) <= incrementStep || firstBatchQty <= 0 || firstBatchQty >= (selectedProduct?.qty || 1)) ? '#9CA3AF' : '#3B82F6',
+                    backgroundColor: (!selectedProduct || (selectedProduct?.qty || 1) <= incrementStep || firstBatchQty <= 0 || firstBatchQty >= (selectedProduct?.qty || 1)) ? (isDarkMode ? '#4B5563' : '#9CA3AF') : '#3B82F6',
                     color: '#FFFFFF',
                     fontSize: '14px',
                     fontWeight: 500,
