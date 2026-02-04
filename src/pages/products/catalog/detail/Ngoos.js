@@ -83,7 +83,7 @@ const getQtyIncrementForSize = (sizeRaw) => {
 
 const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = null, overrideUnitsToMake = null, onAddUnits = null, labelsAvailable = null, openDoiSettings = false, openForecastSettings = false, onDoiSettingsChange = null, onForecastSettingsChange = null, hasActiveForecastSettings = false, isAlreadyAdded = false }) => {
   const { isDarkMode } = useTheme();
-  const [selectedView, setSelectedView] = useState('30 Day');
+  const [selectedView, setSelectedView] = useState('All Time');
   const [loading, setLoading] = useState(true);
   const [productDetails, setProductDetails] = useState(null);
   const [forecastData, setForecastData] = useState(null);
