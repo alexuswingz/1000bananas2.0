@@ -432,13 +432,16 @@ const NewShipment = () => {
     setDoiSettingsValues(newSettings);
     setForecastRange(String(totalDoi));
     
-    // Trigger reload if settings actually changed (but not on initial mount)
-    if (doiSettingsInitialized.current && 
+    const settingsActuallyChanged = doiSettingsInitialized.current &&
         (prevSettings.amazonDoiGoal !== newSettings.amazonDoiGoal ||
          prevSettings.inboundLeadTime !== newSettings.inboundLeadTime ||
-         prevSettings.manufactureLeadTime !== newSettings.manufactureLeadTime)) {
-      console.log('DOI settings changed, will reload products with new settings:', newSettings);
-      setDoiSettingsChangeCount(c => c + 1);
+         prevSettings.manufactureLeadTime !== newSettings.manufactureLeadTime);
+
+    if (settingsActuallyChanged) {
+      // Call loadProducts with newSettings directly so Units to Make is recalculated
+      // with the new DOI (avoids stale closure in the useEffect)
+      console.log('DOI settings changed, reloading products with new settings:', newSettings);
+      loadProducts(newSettings);
     }
     doiSettingsInitialized.current = true;
   };
