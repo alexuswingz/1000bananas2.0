@@ -3564,16 +3564,16 @@ const NewShipment = () => {
           setOpenForecastSettings(false);
         }}
         selectedRow={selectedRow}
-        isAlreadyAdded={(() => {
+        isAlreadyAdded={useMemo(() => {
           if (!selectedRow || !addedRows || !(addedRows instanceof Set)) return false;
           return addedRows.has(selectedRow.id);
-        })()}
+        }, [selectedRow, addedRows])}
         forecastRange={parseInt(forecastRange) || 150}
-        doiSettings={(() => {
+        doiSettings={useMemo(() => {
           // Use product-specific DOI settings if available, otherwise use general settings
           const asin = selectedRow?.child_asin || selectedRow?.childAsin || selectedRow?.asin;
           return asin && productDoiSettings[asin] ? productDoiSettings[asin] : doiSettingsValues;
-        })()}
+        }, [selectedRow?.child_asin, selectedRow?.childAsin, selectedRow?.asin, productDoiSettings, doiSettingsValues])}
         openDoiSettings={openDoiSettings}
         openForecastSettings={openForecastSettings}
         onDoiSettingsChange={(newSettings) => handleProductDoiSettingsChange(selectedRow, newSettings)}
@@ -3596,7 +3596,7 @@ const NewShipment = () => {
           
           setSelectedRow(filteredProducts[newIndex]);
         }}
-        labelsAvailable={(() => {
+        labelsAvailable={useMemo(() => {
           if (!selectedRow?.label_location) return null;
           const labelLoc = selectedRow.label_location;
           // PRIORITY: Use Railway API label_inventory first, fall back to AWS Lambda
@@ -3611,11 +3611,11 @@ const NewShipment = () => {
           }, 0);
           
           return Math.max(0, baseAvailable - usedInCurrentShipment);
-        })()}
-        currentQty={(() => {
+        }, [selectedRow, products, qtyValues, labelsAvailabilityMap])}
+        currentQty={useMemo(() => {
           const productIndex = products.findIndex(p => p.id === selectedRow?.id);
           return productIndex >= 0 ? (qtyValues[productIndex] || 0) : 0;
-        })()}
+        }, [selectedRow, products, qtyValues])}
         onAddUnits={(row, unitsToAdd) => {
           const productIndex = products.findIndex(p => p.id === row.id);
           if (productIndex >= 0) {

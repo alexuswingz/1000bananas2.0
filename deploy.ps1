@@ -50,6 +50,14 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "✓ Build successful!" -ForegroundColor Green
 
+# Verify static assets exist (otherwise S3 404 + error document = HTML served as JS = "You need to enable JavaScript")
+$mainJs = Get-ChildItem -Path "build/static/js/main.*.js" -ErrorAction SilentlyContinue | Select-Object -First 1
+if (-not $mainJs) {
+    Write-Host "✗ Build missing static/js/main.*.js - cannot deploy." -ForegroundColor Red
+    exit 1
+}
+Write-Host "✓ Static assets present (e.g. $($mainJs.Name))" -ForegroundColor Green
+
 # Confirm deployment
 Write-Host ""
 Write-Host "Ready to deploy to S3 bucket: 1000bananasv2" -ForegroundColor Yellow

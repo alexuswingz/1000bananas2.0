@@ -141,6 +141,8 @@ Or in **AWS Console**: S3 → bucket `1000bananasv2` → **Properties** → **St
 
 After this, direct links and refresh on any route will work.
 
+**Important:** With `Error document` set to `index.html`, any **missing** file (e.g. `/static/js/main.xxx.js`) also gets `index.html`. The browser then receives HTML instead of JavaScript, the app doesn’t run, and you see *"You need to enable JavaScript to run this app."* So always deploy the full build (including `static/js/` and `static/css/`) after enabling the error document. Run `.\deploy.ps1` or `aws s3 sync build/ s3://1000bananasv2 --delete` so all assets are uploaded.
+
 ## Troubleshooting
 
 ### "AWS CLI not found"
@@ -156,6 +158,11 @@ After this, direct links and refresh on any route will work.
 - Check that your AWS credentials have write permissions to the S3 bucket
 - Verify bucket name is correct: `1000bananasv2`
 - Contact AWS administrator for proper IAM permissions
+
+### "You need to enable JavaScript to run this app" (including in incognito)
+- This usually means the **main JS bundle failed to load**. With S3 error document set to `index.html`, a 404 for `/static/js/main.xxx.js` returns HTML, so the browser never runs your app.
+- **Fix:** Re-deploy so all build assets are on S3: run `.\deploy.ps1` or `npm run build` then `aws s3 sync build/ s3://1000bananasv2 --delete`.
+- **Verify:** In S3, confirm `static/js/main.*.js` and `static/css/main.*.css` exist, or run: `aws s3 ls s3://1000bananasv2/static/js/`
 
 ### Changes not appearing on live site
 - Clear browser cache (Ctrl+Shift+R or Ctrl+F5)
