@@ -2470,6 +2470,49 @@ const NewShipmentTable = ({
     };
   }, [tableMode, nonTableSelectedIndices, currentRows.length, effectiveSetQtyValues]);
 
+  // Ctrl+Z (undo) and Ctrl+Y / Ctrl+Shift+Z (redo) for Add Products
+  useEffect(() => {
+    if (!onAddProductsUndo && !onAddProductsRedo) return;
+
+    const handleKeyDown = (e) => {
+      // Don't steal shortcuts when user is typing in an input/textarea
+      const tag = e.target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return;
+
+      const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+      if (!isCtrlOrCmd) return;
+
+      const k = e.key?.toLowerCase();
+      if (k === 'z') {
+        if (e.shiftKey) {
+          // Ctrl+Shift+Z → Redo
+          if (onAddProductsRedo && addProductsRedoStackLength > 0) {
+            e.preventDefault();
+            e.stopPropagation();
+            onAddProductsRedo();
+          }
+        } else {
+          // Ctrl+Z → Undo
+          if (onAddProductsUndo && addProductsUndoStackLength > 0) {
+            e.preventDefault();
+            e.stopPropagation();
+            onAddProductsUndo();
+          }
+        }
+      } else if (k === 'y' && !e.shiftKey) {
+        // Ctrl+Y → Redo
+        if (onAddProductsRedo && addProductsRedoStackLength > 0) {
+          e.preventDefault();
+          e.stopPropagation();
+          onAddProductsRedo();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [onAddProductsUndo, onAddProductsRedo, addProductsUndoStackLength, addProductsRedoStackLength]);
+
   // Handle clicks outside the product list to deselect products (non-table mode)
   useEffect(() => {
     if (tableMode || nonTableSelectedIndices.size === 0) {
@@ -4739,77 +4782,8 @@ const NewShipmentTable = ({
               </div>
             )}
           </div>
-          {(onClear || onExport || onAddProductsUndo) && (
+          {(onClear || onExport) && (
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
-              {/* Undo/Redo - Add Products */}
-              {onAddProductsUndo && onAddProductsRedo && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    borderRadius: '6px',
-                    border: `0.5px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
-                    backgroundColor: isDarkMode ? '#0F172A' : '#F9FAFB',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <button
-                    type="button"
-                    title="Undo"
-                    disabled={addProductsUndoStackLength === 0}
-                    style={{
-                      width: '29.5px',
-                      height: '29.5px',
-                      border: 'none',
-                      borderRight: `0.5px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
-                      backgroundColor: 'transparent',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: addProductsUndoStackLength === 0 ? 'not-allowed' : 'pointer',
-                      padding: '6px',
-                      transition: 'background-color 0.2s',
-                      opacity: addProductsUndoStackLength === 0 ? 0.5 : 1,
-                    }}
-                    onClick={onAddProductsUndo}
-                    onMouseEnter={(e) => {
-                      if (addProductsUndoStackLength > 0) e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }}
-                  >
-                    <img src="/assets/Vector (8).png" alt="Undo" style={{ width: '14.63px', height: '5.83px', display: 'block' }} />
-                  </button>
-                  <button
-                    type="button"
-                    title="Redo"
-                    disabled={addProductsRedoStackLength === 0}
-                    style={{
-                      width: '29.5px',
-                      height: '29.5px',
-                      border: 'none',
-                      backgroundColor: 'transparent',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: addProductsRedoStackLength === 0 ? 'not-allowed' : 'pointer',
-                      padding: '6px',
-                      transition: 'background-color 0.2s',
-                      opacity: addProductsRedoStackLength === 0 ? 0.5 : 1,
-                    }}
-                    onClick={onAddProductsRedo}
-                    onMouseEnter={(e) => {
-                      if (addProductsRedoStackLength > 0) e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }}
-                  >
-                    <img src="/assets/Vector (9).png" alt="Redo" style={{ width: '14.63px', height: '5.83px', display: 'block' }} />
-                  </button>
-                </div>
-              )}
               {onClear && (
                 <button
                   type="button"
@@ -6634,77 +6608,8 @@ const NewShipmentTable = ({
             </div>
           )}
         </div>
-        {(onClear || onExport || onAddProductsUndo) && (
+        {(onClear || onExport) && (
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            {/* Undo/Redo - Add Products (table mode) */}
-            {onAddProductsUndo && onAddProductsRedo && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  borderRadius: '6px',
-                  border: `0.5px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
-                  backgroundColor: isDarkMode ? '#0F172A' : '#F9FAFB',
-                  overflow: 'hidden',
-                }}
-              >
-                <button
-                  type="button"
-                  title="Undo"
-                  disabled={addProductsUndoStackLength === 0}
-                  style={{
-                    width: '29.5px',
-                    height: '29.5px',
-                    border: 'none',
-                    borderRight: `0.5px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
-                    backgroundColor: 'transparent',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: addProductsUndoStackLength === 0 ? 'not-allowed' : 'pointer',
-                    padding: '6px',
-                    transition: 'background-color 0.2s',
-                    opacity: addProductsUndoStackLength === 0 ? 0.5 : 1,
-                  }}
-                  onClick={onAddProductsUndo}
-                  onMouseEnter={(e) => {
-                    if (addProductsUndoStackLength > 0) e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <img src="/assets/Vector (8).png" alt="Undo" style={{ width: '14.63px', height: '5.83px', display: 'block' }} />
-                </button>
-                <button
-                  type="button"
-                  title="Redo"
-                  disabled={addProductsRedoStackLength === 0}
-                  style={{
-                    width: '29.5px',
-                    height: '29.5px',
-                    border: 'none',
-                    backgroundColor: 'transparent',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: addProductsRedoStackLength === 0 ? 'not-allowed' : 'pointer',
-                    padding: '6px',
-                    transition: 'background-color 0.2s',
-                    opacity: addProductsRedoStackLength === 0 ? 0.5 : 1,
-                  }}
-                  onClick={onAddProductsRedo}
-                  onMouseEnter={(e) => {
-                    if (addProductsRedoStackLength > 0) e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <img src="/assets/Vector (9).png" alt="Redo" style={{ width: '14.63px', height: '5.83px', display: 'block' }} />
-                </button>
-              </div>
-            )}
             {onClear && (
               <button
                 type="button"

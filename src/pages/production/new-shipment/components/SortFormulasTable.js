@@ -592,6 +592,43 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
     saveFormulaOrder(newFormulas);
   };
 
+  // Ctrl+Z (undo) and Ctrl+Y / Ctrl+Shift+Z (redo) for Sort Formulas
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const tag = e.target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return;
+
+      const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+      if (!isCtrlOrCmd) return;
+
+      const k = e.key?.toLowerCase();
+      if (k === 'z') {
+        if (e.shiftKey) {
+          if (redoStackSize > 0) {
+            e.preventDefault();
+            e.stopPropagation();
+            handleRedo();
+          }
+        } else {
+          if (undoStackSize > 0) {
+            e.preventDefault();
+            e.stopPropagation();
+            handleUndo();
+          }
+        }
+      } else if (k === 'y' && !e.shiftKey) {
+        if (redoStackSize > 0) {
+          e.preventDefault();
+          e.stopPropagation();
+          handleRedo();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [handleUndo, handleRedo, undoStackSize, redoStackSize]);
+
   // Persist locked formula names to localStorage whenever they change
   useEffect(() => {
     if (!shipmentId) return;
@@ -2594,81 +2631,6 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                 </span>
               </div>
             ))}
-          </div>
-          <div style={{ display: 'flex', gap: '32px', alignItems: 'center', flexShrink: 0 }}>
-            {/* Undo/Redo buttons */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                borderRadius: '6px',
-                border: `0.5px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
-                backgroundColor: isDarkMode ? '#0F172A' : '#F9FAFB',
-                overflow: 'hidden',
-              }}
-            >
-              <button
-                type="button"
-                disabled={undoStackSize === 0}
-                onClick={handleUndo}
-                style={{
-                  width: '29.5px',
-                  height: '29.5px',
-                  border: 'none',
-                  borderRight: `0.5px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
-                  backgroundColor: 'transparent',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: undoStackSize === 0 ? 'not-allowed' : 'pointer',
-                  padding: '6px',
-                  transition: 'background-color 0.2s',
-                  opacity: undoStackSize === 0 ? 0.5 : 1,
-                }}
-                onMouseEnter={(e) => {
-                  if (undoStackSize > 0) e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
-                <img
-                  src="/assets/Vector (8).png"
-                  alt="Undo"
-                  style={{ width: '14.63px', height: '5.83px', display: 'block' }}
-                />
-              </button>
-              <button
-                type="button"
-                disabled={redoStackSize === 0}
-                onClick={handleRedo}
-                style={{
-                  width: '29.5px',
-                  height: '29.5px',
-                  border: 'none',
-                  backgroundColor: 'transparent',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: redoStackSize === 0 ? 'not-allowed' : 'pointer',
-                  padding: '6px',
-                  transition: 'background-color 0.2s',
-                  opacity: redoStackSize === 0 ? 0.5 : 1,
-                }}
-                onMouseEnter={(e) => {
-                  if (redoStackSize > 0) e.currentTarget.style.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
-                <img
-                  src="/assets/Vector (9).png"
-                  alt="Redo"
-                  style={{ width: '14.63px', height: '5.83px', display: 'block' }}
-                />
-              </button>
-            </div>
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
             <button
