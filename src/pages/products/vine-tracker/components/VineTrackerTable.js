@@ -1947,6 +1947,8 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
                             }
                           }}
                           className="no-spinner"
+                          disabled
+                          readOnly
                           style={{
                             width: '72px',
                             height: '27px',
@@ -1961,6 +1963,8 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
                             outline: 'none',
                             boxSizing: 'border-box',
                             textAlign: 'center',
+                            cursor: 'not-allowed',
+                            opacity: 0.7,
                           }}
                           onWheel={(e) => e.target.blur()}
                         />

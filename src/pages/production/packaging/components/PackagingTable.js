@@ -210,6 +210,101 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
     setShowConfirmModal(false);
     // TODO: Save to backend API here
     console.log('Saving order:', localTableData);
+    
+    // Show success toast notification
+    const toastId = toast.success(
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '24px',
+        width: '100%',
+        height: '100%',
+        opacity: 1,
+        boxSizing: 'border-box',
+        overflow: 'hidden',
+      }}>
+        {/* Green checkmark icon */}
+        <div
+          style={{
+            width: '12px',
+            height: '12px',
+            borderRadius: '10.67px',
+            backgroundColor: '#10B981',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            opacity: 1,
+          }}
+        >
+          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </div>
+        
+        {/* Message text */}
+        <span style={{ 
+          fontSize: '14px', 
+          color: '#FFFFFF', 
+          fontWeight: '500',
+          flex: 1,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}>
+          Product Sorting ({unsavedChangesCount}) complete
+        </span>
+        
+        {/* Close button */}
+        <button
+          onClick={() => toast.dismiss(toastId)}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '0',
+            margin: '0',
+            width: '16px',
+            height: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            color: '#FFFFFF',
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>,
+      {
+        style: {
+          width: '288px',
+          height: '36px',
+          backgroundColor: '#1B3221',
+          border: 'none',
+          borderRadius: '12px',
+          paddingTop: '8px',
+          paddingRight: '12px',
+          paddingBottom: '8px',
+          paddingLeft: '12px',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+          opacity: 1,
+          boxSizing: 'border-box',
+          overflow: 'hidden',
+        },
+        duration: 5000,
+        icon: null,
+        closeButton: false,
+      }
+    );
+    
+    // Exit sort mode after saving
+    if (onExitSortMode) {
+      onExitSortMode();
+    }
   };
 
   // Handle cancel confirmation
@@ -609,25 +704,25 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   backgroundColor: row.status === 'moved_s' || row.status === 'moved_fg'
                     ? '#F3F4F6'
                     : justMovedRowId && (justMovedRowId === row.id || justMovedRowId === row.key || justMovedRowId === `row-${index}`)
-                      ? '#BFDBFE' 
+                      ? 'rgba(249, 115, 22, 0.2)' 
                       : draggedOverRowIndex === index && isSortMode 
-                        ? '#E0F2FE' 
+                        ? 'rgba(249, 115, 22, 0.2)' 
                         : justMovedRowIndex === index
-                          ? '#BFDBFE'
+                          ? 'rgba(249, 115, 22, 0.2)'
                           : '#111827',
                   border: draggedRowIndex === index 
-                    ? '2px dashed #3B82F6' 
+                    ? '2px dashed #F97316' 
                     : draggedOverRowIndex === index && isSortMode 
-                      ? '2px solid #3B82F6' 
+                      ? '2px solid #F97316' 
                       : justMovedRowId && (justMovedRowId === row.id || justMovedRowId === row.key || justMovedRowId === `row-${index}`)
-                        ? '2px solid #3B82F6'
+                        ? '2px solid #F97316'
                         : 'none',
                   boxShadow: draggedRowIndex === index 
-                    ? '0 4px 12px rgba(59, 130, 246, 0.3)' 
+                    ? '0 4px 12px rgba(249, 115, 22, 0.3)' 
                     : draggedOverRowIndex === index && isSortMode 
-                      ? '0 2px 8px rgba(59, 130, 246, 0.2)' 
+                      ? '0 2px 8px rgba(249, 115, 22, 0.2)' 
                       : justMovedRowId && (justMovedRowId === row.id || justMovedRowId === row.key || justMovedRowId === `row-${index}`)
-                        ? '0 2px 8px rgba(59, 130, 246, 0.3)'
+                        ? '0 2px 8px rgba(249, 115, 22, 0.3)'
                         : 'none',
                   transform: draggedRowIndex === index ? 'scale(0.98)' : 'scale(1)',
                   transition: draggedRowIndex === index || draggedOverRowIndex === index || (justMovedRowId && (justMovedRowId === row.id || justMovedRowId === row.key || justMovedRowId === `row-${index}`)) ? 'all 0.2s ease' : 'none',
@@ -1150,13 +1245,13 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                     style={{
                       width: '100%',
                       maxWidth: '100px',
-                      backgroundColor: '#F9FAFB',
-                      border: '1px solid #E5E7EB',
+                      backgroundColor: '#111827',
+                      border: '1px solid #374151',
                       borderRadius: '6px',
                       textAlign: 'center',
                       fontSize: '12px',
                       padding: '4px 6px',
-                      color: '#000000',
+                      color: '#FFFFFF',
                     }}
                   />
                 </div>
@@ -2010,28 +2105,39 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 10000,
-            backgroundColor: '#2C3544',
-            borderRadius: '12px',
-            padding: isMobile ? '12px 16px' : '12px 20px',
+            backgroundColor: '#1A2235',
+            width: '435px',
+            height: '45.5px',
+            borderRadius: '8px',
+            paddingTop: '8px',
+            paddingRight: '12px',
+            paddingBottom: '8px',
+            paddingLeft: '12px',
+            borderWidth: '1px',
+            borderStyle: 'solid',
+            borderColor: '#374151',
             display: 'flex',
             alignItems: 'center',
-            gap: isMobile ? '12px' : '16px',
+            gap: '32px',
             boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2)',
-            minWidth: isMobile ? 'auto' : '320px',
-            flexWrap: isMobile ? 'wrap' : 'nowrap',
+            flexWrap: 'nowrap',
+            opacity: 1,
+            boxSizing: 'border-box',
           }}
         >
           {/* Pencil Icon */}
           <div
             style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
+              width: '20px',
+              height: '20px',
+              borderRadius: '32px',
               backgroundColor: '#3B82F6',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
+              opacity: 1,
+              gap: '10px',
             }}
           >
             <svg
@@ -2055,19 +2161,21 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
               color: '#FFFFFF',
               fontSize: '14px',
               fontWeight: 500,
-              flex: 1,
+              whiteSpace: 'nowrap',
             }}
           >
             {unsavedChangesCount} Unsaved Change{unsavedChangesCount !== 1 ? 's' : ''}
           </span>
 
           {/* Undo/Redo Buttons */}
-          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '0px', alignItems: 'center', flexShrink: 0 }}>
             <button
               onClick={handleUndo}
               disabled={undoHistory.length === 0}
               style={{
-                padding: '6px 12px',
+                width: '29.5px',
+                height: '29.5px',
+                padding: '6px',
                 borderRadius: '6px',
                 border: 'none',
                 backgroundColor: 'transparent',
@@ -2079,6 +2187,8 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                opacity: 1,
+                boxSizing: 'border-box',
               }}
               onMouseEnter={(e) => {
                 if (undoHistory.length > 0) {
@@ -2107,9 +2217,14 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
               onClick={handleRedo}
               disabled={redoHistory.length === 0}
               style={{
-                padding: '6px 12px',
+                width: '29.5px',
+                height: '29.5px',
+                padding: '6px',
                 borderRadius: '6px',
                 border: 'none',
+                borderLeftWidth: '0.5px',
+                borderLeftStyle: 'solid',
+                borderLeftColor: '#374151',
                 backgroundColor: 'transparent',
                 color: redoHistory.length === 0 ? '#6B7280' : '#FFFFFF',
                 fontSize: '13px',
@@ -2119,6 +2234,8 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                opacity: 1,
+                boxSizing: 'border-box',
               }}
               onMouseEnter={(e) => {
                 if (redoHistory.length > 0) {
@@ -2146,12 +2263,13 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
           </div>
 
           {/* Action Buttons */}
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginLeft: 'auto' }}>
             <button
               onClick={handleCancelChanges}
               style={{
-                padding: '6px 16px',
-                borderRadius: '6px',
+                width: '52px',
+                height: '23px',
+                borderRadius: '4px',
                 border: 'none',
                 backgroundColor: '#374151',
                 color: '#FFFFFF',
@@ -2159,6 +2277,11 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                 fontWeight: 500,
                 cursor: 'pointer',
                 transition: 'background-color 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: 1,
+                boxSizing: 'border-box',
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = '#4B5563';
@@ -2172,8 +2295,9 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
             <button
               onClick={handleSaveChanges}
               style={{
-                padding: '6px 16px',
-                borderRadius: '6px',
+                width: '52px',
+                height: '23px',
+                borderRadius: '4px',
                 border: 'none',
                 backgroundColor: '#3B82F6',
                 color: '#FFFFFF',
@@ -2181,6 +2305,11 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                 fontWeight: 500,
                 cursor: 'pointer',
                 transition: 'background-color 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: 1,
+                boxSizing: 'border-box',
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = '#2563EB';
@@ -2407,22 +2536,101 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
         >
           <div
             style={{
-              backgroundColor: '#FFFFFF',
+              width: '299px',
+              height: '202px',
+              backgroundColor: '#111827',
               borderRadius: '12px',
               padding: '24px',
-              minWidth: '400px',
-              maxWidth: '500px',
+              borderWidth: '1px',
+              borderStyle: 'solid',
+              borderColor: '#374151',
               boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '24px',
+              opacity: 1,
+              boxSizing: 'border-box',
+              position: 'relative',
             }}
             onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
+            <button
+              onClick={handleCancelConfirm}
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#FFFFFF',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'color 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = '#9CA3AF';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = '#FFFFFF';
+              }}
+              aria-label="Close"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+
+            {/* Warning Icon */}
+            <div style={{ display: 'flex', justifyContent: 'center', flexShrink: 0, gap: '10px' }}>
+              <div
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '32px',
+                  backgroundColor: '#F97316',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  padding: '8px',
+                  opacity: 1,
+                  boxSizing: 'border-box',
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Text Container */}
+            <div
+              style={{
+                width: '251px',
+                height: '51px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                opacity: 1,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
           >
             {/* Title */}
             <h2
               style={{
                 fontSize: '18px',
                 fontWeight: 700,
-                color: '#111827',
-                margin: '0 0 12px 0',
+                  color: '#FFFFFF',
+                  margin: 0,
+                  textAlign: 'center',
               }}
             >
               Are you sure?
@@ -2432,40 +2640,49 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
             <p
               style={{
                 fontSize: '14px',
-                color: '#6B7280',
-                margin: '0 0 24px 0',
+                  color: '#FFFFFF',
+                  margin: 0,
                 lineHeight: '1.5',
+                  textAlign: 'center',
               }}
             >
-              Your changes will applied to the active queue.
+                This is where the body copy will exist.
             </p>
+            </div>
 
             {/* Buttons */}
             <div
               style={{
                 display: 'flex',
-                gap: '12px',
-                justifyContent: 'flex-end',
+                gap: '10px',
+                justifyContent: 'center',
+                marginTop: 'auto',
               }}
             >
               <button
                 onClick={handleCancelConfirm}
                 style={{
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  border: '1px solid #D1D5DB',
-                  backgroundColor: '#FFFFFF',
-                  color: '#374151',
+                  width: '80px',
+                  height: '31px',
+                  borderRadius: '4px',
+                  border: 'none',
+                  backgroundColor: '#252F42',
+                  color: '#FFFFFF',
                   fontSize: '14px',
                   fontWeight: 500,
                   cursor: 'pointer',
-                  transition: 'all 0.2s',
+                  transition: 'background-color 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: 1,
+                  boxSizing: 'border-box',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#F9FAFB';
+                  e.currentTarget.style.backgroundColor = '#374151';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  e.currentTarget.style.backgroundColor = '#252F42';
                 }}
               >
                 Go back
@@ -2473,21 +2690,29 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
               <button
                 onClick={handleConfirmSave}
                 style={{
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  backgroundColor: '#3B82F6',
+                  width: '80px',
+                  height: '31px',
+                  borderRadius: '4px',
+                  borderWidth: '1px',
+                  borderStyle: 'solid',
+                  borderColor: 'transparent',
+                  background: 'linear-gradient(90deg, #007AFF 0%, #004999 100%)',
                   color: '#FFFFFF',
                   fontSize: '14px',
                   fontWeight: 500,
                   cursor: 'pointer',
-                  transition: 'background-color 0.2s',
+                  transition: 'opacity 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: 1,
+                  boxSizing: 'border-box',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#2563EB';
+                  e.currentTarget.style.opacity = '0.9';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#3B82F6';
+                  e.currentTarget.style.opacity = '1';
                 }}
               >
                 Confirm ({unsavedChangesCount})
