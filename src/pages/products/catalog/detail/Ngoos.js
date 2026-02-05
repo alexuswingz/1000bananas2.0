@@ -93,6 +93,9 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   const [adsChartData, setAdsChartData] = useState(null);
   const [zoomDomain, setZoomDomain] = useState({ left: null, right: null });
   const [zoomHistory, setZoomHistory] = useState([]); // stack of previous zoom levels for "reset to previous"
+  const [zoomToolActive, setZoomToolActive] = useState(false); // zoom icon on: click two points to zoom
+  const [zoomFirstClickTimestamp, setZoomFirstClickTimestamp] = useState(null); // first click timestamp for two-point zoom
+  const [zoomPreviewTimestamp, setZoomPreviewTimestamp] = useState(null); // current mouse position (timestamp) to show grab preview
   const [zKeyHeld, setZKeyHeld] = useState(false);
   const [zoomBox, setZoomBox] = useState({ startTimestamp: null, endTimestamp: null }); // Z-drag zoom selection
   const [isZooming, setIsZooming] = useState(false);
@@ -339,11 +342,16 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           available: inv.awd_available || 0,
           reserved: inv.awd_reserved || 0,
           inbound: inv.awd_inbound || 0
-        }
+        },
+        fbaAge: inv.fba_age ? {
+          oldest_days: inv.fba_age.oldest_days,
+          newest_days: inv.fba_age.newest_days,
+          avg_days: inv.fba_age.avg_days
+        } : null
       };
     }
     // Fallback to productDetails (AWS Lambda API)
-    return productDetails?.inventory || {
+    const base = productDetails?.inventory || {
       fba: {
         total: 0,
         available: 0,
@@ -356,6 +364,14 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         available: 0,
         reserved: 0
       }
+    };
+    return {
+      ...base,
+      fbaAge: base.fbaAge || (forecastData?.inventory?.fba_age ? {
+        oldest_days: forecastData.inventory.fba_age.oldest_days,
+        newest_days: forecastData.inventory.fba_age.newest_days,
+        avg_days: forecastData.inventory.fba_age.avg_days
+      } : null)
     };
   }, [forecastData, productDetails]);
 
@@ -720,6 +736,10 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
 
   // Handle zoom reset: return to previous zoom level (or full view if no history)
   const handleZoomReset = () => {
+    setZoomToolActive(false);
+    setZoomFirstClickTimestamp(null);
+    setZoomPreviewTimestamp(null);
+    setChartRangeSelection({ startTimestamp: null, endTimestamp: null }); // reset range selection too
     if (zoomHistory.length === 0) {
       setZoomDomain({ left: null, right: null });
       return;
@@ -871,6 +891,27 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     const t = getTimestampFromClientX(e.clientX);
     if (t == null) return;
     e.preventDefault(); // prevent text/element selection when dragging on chart
+    // Zoom tool: two clicks to set zoom range, then return to Off state
+    if (zoomToolActive) {
+      if (zoomFirstClickTimestamp == null) {
+        setZoomFirstClickTimestamp(t);
+        return;
+      }
+      const lo = Math.min(zoomFirstClickTimestamp, t);
+      const hi = Math.max(zoomFirstClickTimestamp, t);
+      if (hi > lo) {
+        const toLocalDateStr = (ts) => {
+          const d = new Date(ts);
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        };
+        setZoomHistory((hist) => [...hist, zoomDomain]);
+        setZoomDomain({ left: toLocalDateStr(lo), right: toLocalDateStr(hi) });
+      }
+      setZoomToolActive(false);
+      setZoomFirstClickTimestamp(null);
+      setZoomPreviewTimestamp(null);
+      return;
+    }
     if (zKeyHeld) {
       zoomBoxDragRef.current = { startTimestamp: t, endTimestamp: t };
       setZoomBox({ startTimestamp: t, endTimestamp: t });
@@ -883,6 +924,11 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   };
 
   const handleChartRangeMouseMove = (e) => {
+    // Zoom tool: show preview band from first click to current mouse position
+    if (zoomToolActive && zoomFirstClickTimestamp != null) {
+      const t = getTimestampFromClientX(e.clientX);
+      setZoomPreviewTimestamp(t != null ? t : null);
+    }
     const isZoomDragging = zoomBoxDragRef.current.startTimestamp != null;
     const isRangeSelecting = rangeSelectingRef.current;
     if (isZoomDragging || isRangeSelecting) {
@@ -912,7 +958,17 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   };
 
   const handleChartRangeMouseUp = () => {
+    const wasRangeSelecting = rangeSelectingRef.current;
     rangeSelectingRef.current = false;
+    // Single click (no drag) clears range selection — use updater to read latest state
+    if (wasRangeSelecting) {
+      setChartRangeSelection((prev) => {
+        if (prev.startTimestamp != null && prev.startTimestamp === prev.endTimestamp) {
+          return { startTimestamp: null, endTimestamp: null };
+        }
+        return prev;
+      });
+    }
     if (zoomBoxDragRef.current.startTimestamp != null) {
       const { startTimestamp: s, endTimestamp: endTs } = zoomBoxDragRef.current;
       const data = chartDisplayData?.data;
@@ -977,7 +1033,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   }, []);
 
   // Memoized chart cursor styles so Recharts don't see new object refs every render (avoids update loops)
-  const chartContainerCursor = zKeyHeld ? 'zoom-in' : (zoomBox.startTimestamp != null ? 'zoom-in' : (chartRangeSelecting ? 'col-resize' : 'crosshair'));
+  const chartContainerCursor = zoomToolActive ? 'zoom-in' : (zKeyHeld ? 'zoom-in' : (zoomBox.startTimestamp != null ? 'zoom-in' : (chartRangeSelecting ? 'col-resize' : 'crosshair')));
   const responsiveContainerStyle = useMemo(() => ({
     cursor: zKeyHeld ? 'zoom-in' : 'inherit',
     outline: 'none',
@@ -1650,7 +1706,8 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,
-        outline: 'none'
+        outline: 'none',
+        paddingBottom: '1rem'
       }}
     >
       {/* Tab Navigation - Hidden when inventoryOnly is true */}
@@ -2080,13 +2137,14 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           </div>
         )}
         
-        {/* Main Grid - Horizontal layout when inventoryOnly */}
-        <div style={{ 
+        {/* Main Grid - Horizontal layout when inventoryOnly; buckets scroll so they don't shrink (scrollbar hidden) */}
+        <div className="scrollbar-hide" style={{ 
           display: 'flex', 
           gap: inventoryOnly ? '1rem' : '1.5rem', 
           marginBottom: inventoryOnly ? '0.75rem' : '2rem',
-          justifyContent: 'space-between',
-          flexWrap: inventoryOnly ? 'nowrap' : 'wrap'
+          alignItems: 'stretch',
+          overflowX: 'auto',
+          minWidth: 0
         }}>
           {/* Left: Product Info */}
           <div className={themeClasses.cardBg} style={{ 
@@ -2096,6 +2154,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             flex: inventoryOnly ? '1 1 48%' : '1',
             maxWidth: inventoryOnly ? '488px' : 'auto',
             height: inventoryOnly ? '160px' : 'auto',
+            flexShrink: 0,
             border: '1px solid #334155',
             display: 'flex',
             flexDirection: 'column'
@@ -2204,13 +2263,14 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           <div className={themeClasses.cardBg} style={{ 
             borderRadius: '0.5rem', 
             padding: '1rem', 
-            minWidth: inventoryOnly ? '180px' : 'auto',
-            flex: inventoryOnly ? '1 1 22%' : '1',
-            maxWidth: inventoryOnly ? '220px' : 'auto',
+            width: inventoryOnly ? '200px' : 'auto',
+            minWidth: inventoryOnly ? '200px' : 'auto',
+            flex: inventoryOnly ? '0 0 200px' : '1',
             height: inventoryOnly ? '160px' : 'auto',
             border: '1px solid #334155',
             display: 'flex',
-            flexDirection: 'column'
+            flexDirection: 'column',
+            flexShrink: 0
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.25rem' }}>
               <div style={{
@@ -2252,13 +2312,14 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           <div className={themeClasses.cardBg} style={{ 
             borderRadius: '0.5rem', 
             padding: '1rem', 
-            minWidth: inventoryOnly ? '180px' : 'auto',
-            flex: inventoryOnly ? '1 1 22%' : '1',
-            maxWidth: inventoryOnly ? '220px' : 'auto',
+            width: inventoryOnly ? '200px' : 'auto',
+            minWidth: inventoryOnly ? '200px' : 'auto',
+            flex: inventoryOnly ? '0 0 200px' : '1',
             height: inventoryOnly ? '160px' : 'auto',
             border: '1px solid #334155',
             display: 'flex',
-            flexDirection: 'column'
+            flexDirection: 'column',
+            flexShrink: 0
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.25rem' }}>
               <div style={{
@@ -2298,7 +2359,52 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.awd.outbound_to_fba || 0}</span>
               </div>
             </div>
+          </div>
+
+          {/* FBA Age Card */}
+          <div className={themeClasses.cardBg} style={{ 
+            borderRadius: '0.5rem', 
+            padding: '1rem', 
+            width: inventoryOnly ? '200px' : 'auto',
+            minWidth: inventoryOnly ? '200px' : 'auto',
+            flex: inventoryOnly ? '0 0 200px' : '1',
+            height: inventoryOnly ? '160px' : 'auto',
+            border: '1px solid #334155',
+            display: 'flex',
+            flexDirection: 'column',
+            flexShrink: 0
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.25rem' }}>
+              <div style={{
+                width: inventoryOnly ? '24px' : '32px',
+                height: inventoryOnly ? '24px' : '32px',
+                borderRadius: '50%',
+                backgroundColor: '#f59e0b',
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center' 
+              }}>
+                <svg style={{ width: inventoryOnly ? '14px' : '18px', height: inventoryOnly ? '14px' : '18px', color: '#fff' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>FBA Age</span>
             </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Oldest:</span>
+                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fbaAge?.oldest_days != null ? `${inventoryData.fbaAge.oldest_days} days` : '—'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Newest:</span>
+                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fbaAge?.newest_days != null ? `${inventoryData.fbaAge.newest_days} days` : '—'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Avg age:</span>
+                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fbaAge?.avg_days != null ? `${inventoryData.fbaAge.avg_days} days` : '—'}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Three Metric Cards - FBA Available, Total Inventory, Forecast */}
@@ -2313,7 +2419,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             borderRadius: '0.5rem', 
             padding: inventoryOnly ? '0.75rem 1rem' : '1rem 1.25rem',
             backgroundColor: '#0f172a',
-            borderTop: '3px solid #a855f7',
+            borderTop: '3px solid #A855F7',
             position: 'relative',
             boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
           }}>
@@ -2336,20 +2442,26 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               </span>
             </div>
             <div style={{ 
-              fontSize: inventoryOnly ? '1.75rem' : '2rem', 
-              fontWeight: '700', 
-              color: '#fff',
-              lineHeight: 1,
-              marginBottom: inventoryOnly ? '0.15rem' : '0.25rem'
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: '0.35rem',
+              flexWrap: 'wrap'
             }}>
-              {timeline.fbaAvailable}
-            </div>
-            <div style={{ 
-              fontSize: inventoryOnly ? '0.75rem' : '0.85rem', 
-              color: '#94a3b8',
-              fontWeight: 500
-            }}>
-              days
+              <span style={{ 
+                fontSize: inventoryOnly ? '1.75rem' : '2rem', 
+                fontWeight: '700', 
+                color: '#fff',
+                lineHeight: 1
+              }}>
+                {timeline.fbaAvailable}
+              </span>
+              <span style={{ 
+                fontSize: inventoryOnly ? '0.75rem' : '0.85rem', 
+                color: '#94a3b8',
+                fontWeight: 500
+              }}>
+                days
+              </span>
             </div>
           </div>
 
@@ -2358,13 +2470,13 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             borderRadius: '0.5rem', 
             padding: inventoryOnly ? '0.75rem 1rem' : '1rem 1.25rem',
             backgroundColor: '#0f172a',
-            borderTop: '3px solid #22c55e',
+            borderTop: '3px solid #45CE18',
             position: 'relative',
             boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
           }}>
             <div style={{ 
               fontSize: inventoryOnly ? '0.75rem' : '0.85rem', 
-              color: '#22c55e', 
+              color: '#45CE18', 
               marginBottom: inventoryOnly ? '0.25rem' : '0.35rem',
               fontWeight: 600,
               display: 'flex',
@@ -2381,20 +2493,26 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               </span>
             </div>
             <div style={{ 
-              fontSize: inventoryOnly ? '1.75rem' : '2rem', 
-              fontWeight: '700', 
-              color: '#fff',
-              lineHeight: 1,
-              marginBottom: inventoryOnly ? '0.15rem' : '0.25rem'
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: '0.35rem',
+              flexWrap: 'wrap'
             }}>
-              {timeline.totalDays}
-            </div>
-            <div style={{ 
-              fontSize: inventoryOnly ? '0.75rem' : '0.85rem', 
-              color: '#94a3b8',
-              fontWeight: 500
-            }}>
-              days
+              <span style={{ 
+                fontSize: inventoryOnly ? '1.75rem' : '2rem', 
+                fontWeight: '700', 
+                color: '#fff',
+                lineHeight: 1
+              }}>
+                {timeline.totalDays}
+              </span>
+              <span style={{ 
+                fontSize: inventoryOnly ? '0.75rem' : '0.85rem', 
+                color: '#94a3b8',
+                fontWeight: 500
+              }}>
+                days
+              </span>
             </div>
           </div>
 
@@ -2403,13 +2521,13 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             borderRadius: '0.5rem', 
             padding: inventoryOnly ? '0.75rem 1rem' : '1rem 1.25rem',
             backgroundColor: '#0f172a',
-            borderTop: '3px solid #3b82f6',
+            borderTop: '3px solid #007AFF',
             position: 'relative',
             boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
           }}>
             <div style={{ 
               fontSize: inventoryOnly ? '0.75rem' : '0.85rem', 
-              color: '#3b82f6', 
+              color: '#007AFF', 
               marginBottom: inventoryOnly ? '0.25rem' : '0.35rem',
               fontWeight: 600,
               display: 'flex',
@@ -2426,25 +2544,31 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               </span>
             </div>
             <div style={{ 
-              fontSize: inventoryOnly ? '1.75rem' : '2rem', 
-              fontWeight: '700', 
-              color: '#fff',
-              lineHeight: 1,
-              marginBottom: inventoryOnly ? '0.15rem' : '0.25rem'
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: '0.35rem',
+              flexWrap: 'wrap'
             }}>
-              {(() => {
-                const totalDoiDays = doiGoalDays || (doiSettings ? 
-                  (doiSettings.amazonDoiGoal + doiSettings.inboundLeadTime + doiSettings.manufactureLeadTime) : 
-                  130);
-                return totalDoiDays;
-              })()}
-            </div>
-            <div style={{ 
-              fontSize: inventoryOnly ? '0.75rem' : '0.85rem', 
-              color: '#94a3b8',
-              fontWeight: 500
-            }}>
-              days
+              <span style={{ 
+                fontSize: inventoryOnly ? '1.75rem' : '2rem', 
+                fontWeight: '700', 
+                color: '#fff',
+                lineHeight: 1
+              }}>
+                {(() => {
+                  const totalDoiDays = doiGoalDays || (doiSettings ? 
+                    (doiSettings.amazonDoiGoal + doiSettings.inboundLeadTime + doiSettings.manufactureLeadTime) : 
+                    130);
+                  return totalDoiDays;
+                })()}
+              </span>
+              <span style={{ 
+                fontSize: inventoryOnly ? '0.75rem' : '0.85rem', 
+                color: '#94a3b8',
+                fontWeight: 500
+              }}>
+                days
+              </span>
             </div>
           </div>
         </div>
@@ -2460,14 +2584,70 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           flex: 1,
           minHeight: 0
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div>
               <h3 style={{ fontSize: inventoryOnly ? '0.85rem' : '1rem', fontWeight: '600', color: '#fff', marginBottom: '0.25rem' }}>Unit Forecast</h3>
               <p style={{ fontSize: inventoryOnly ? '0.75rem' : '0.875rem', color: '#94a3b8' }}>
                 {productDetails?.product?.size || data?.size || data?.variations?.[0] || '8oz'} Forecast
               </p>
             </div>
+            {/* Range selection stats - same row as Unit Forecast (no Reset; click chart to clear) */}
+            {chartRangeSum != null && (() => {
+              const unitCost = Number(
+                productDetails?.product?.cost ??
+                productDetails?.product?.price ??
+                productDetails?.price ??
+                data?.cost ??
+                data?.price ??
+                metrics?.current?.price ??
+                0
+              ) || 0;
+              const unitsDiff = chartRangeSum.unitsSmoothed - chartRangeSum.unitsSold;
+              const revenueGap = unitsDiff * unitCost;
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap', fontSize: inventoryOnly ? '0.75rem' : '0.8125rem' }}>
+                  <span style={{ color: '#94a3b8' }}>
+                    UNITS SOLD: <strong style={{ color: '#e2e8f0', fontWeight: 600 }}>{chartRangeSum.unitsSold.toLocaleString()}</strong>
+                  </span>
+                  <span style={{ color: '#94a3b8' }}>
+                    POT. UNITS SOLD: <strong style={{ color: '#22c55e', fontWeight: 600 }}>{chartRangeSum.unitsSmoothed.toLocaleString()}</strong>
+                  </span>
+                  <span style={{ color: '#94a3b8' }}>
+                    REVENUE GAP: <strong style={{ color: '#22c55e', fontWeight: 600 }}>{revenueGap.toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                  </span>
+                </div>
+              );
+            })()}
             <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+              {/* Zoom tool: click to turn On (blue), then click two points on chart to zoom; Reset appears when zoomed */}
+              <button
+                type="button"
+                title={zoomToolActive ? 'Click two points on the chart to zoom into that period' : 'Zoom: click to enable, then click two points on the chart'}
+                onClick={() => {
+                  if (zoomToolActive) {
+                    setZoomFirstClickTimestamp(null);
+                    setZoomPreviewTimestamp(null);
+                  }
+                  setZoomToolActive((prev) => !prev);
+                }}
+                style={{
+                  padding: '0.5rem',
+                  color: zoomToolActive ? '#007AFF' : '#94a3b8',
+                  backgroundColor: zoomToolActive ? 'rgba(0, 122, 255, 0.15)' : 'transparent',
+                  border: 'none',
+                  borderRadius: '0.375rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+                  <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M10 7V13M7 10H13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
               <div 
                 style={{ 
                   position: 'relative',
@@ -2856,8 +3036,46 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             onMouseDown={handleChartRangeMouseDown}
             onMouseMove={handleChartRangeMouseMove}
             onMouseUp={handleChartRangeMouseUp}
-            onMouseLeave={(e) => { chartCursorRef.current = null; handleChartRangeMouseUp(e); }}
+            onMouseLeave={(e) => {
+              chartCursorRef.current = null;
+              if (zoomToolActive && zoomFirstClickTimestamp != null) setZoomPreviewTimestamp(null);
+              handleChartRangeMouseUp(e);
+            }}
           >
+            {/* Zoom tool: show date range when first point is set */}
+            {zoomToolActive && zoomFirstClickTimestamp != null && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '8px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  zIndex: 10,
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                  border: '1px solid #334155',
+                  color: '#e2e8f0',
+                  fontSize: '0.8125rem',
+                  fontWeight: 500,
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                }}
+              >
+                <span style={{ color: '#94a3b8' }}>Zoom: </span>
+                <span style={{ color: '#007AFF' }}>
+                  {new Date(zoomFirstClickTimestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </span>
+                <span style={{ color: '#94a3b8', margin: '0 4px' }}>→</span>
+                {zoomPreviewTimestamp != null ? (
+                  <span style={{ color: '#007AFF' }}>
+                    {new Date(zoomPreviewTimestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </span>
+                ) : (
+                  <span style={{ color: '#64748b' }}>move or click to set end</span>
+                )}
+              </div>
+            )}
             {/* 
               ENHANCED CHART RENDERING
               Using Recharts ReferenceArea and ReferenceLine for better integration
@@ -3222,6 +3440,20 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                       strokeOpacity={0.5}
                     />
                   )}
+                  {/* Zoom tool: grab preview from first click to current mouse (or second click) */}
+                  {zoomFirstClickTimestamp != null && zoomPreviewTimestamp != null && (
+                    <ReferenceArea
+                      x1={Math.min(zoomFirstClickTimestamp, zoomPreviewTimestamp)}
+                      x2={Math.max(zoomFirstClickTimestamp, zoomPreviewTimestamp)}
+                      fill="#007AFF"
+                      fillOpacity={0.2}
+                      yAxisId="left"
+                      stroke="#007AFF"
+                      strokeWidth={2}
+                      strokeOpacity={0.8}
+                      strokeDasharray="4 2"
+                    />
+                  )}
                   
                   {/* Units Sold Area (Historical) */}
                   <Area 
@@ -3279,63 +3511,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             )}
           </div>
 
-          {/* Range selection sum - show when user has dragged a range */}
-          {chartRangeSum != null && (() => {
-            const lo = Math.min(chartRangeSelection.startTimestamp, chartRangeSelection.endTimestamp);
-            const hi = Math.max(chartRangeSelection.startTimestamp, chartRangeSelection.endTimestamp);
-            const startStr = new Date(lo).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            const endStr = new Date(hi).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            // Unit cost for Potential Revenue: prefer cost, fallback to price
-            const unitCost = Number(
-              productDetails?.product?.cost ??
-              productDetails?.product?.price ??
-              productDetails?.price ??
-              data?.cost ??
-              data?.price ??
-              metrics?.current?.price ??
-              0
-            ) || 0;
-            const unitsDiff = chartRangeSum.unitsSmoothed - chartRangeSum.unitsSold;
-            const potentialRevenue = unitsDiff * unitCost;
-            return (
-            <div style={{
-              marginTop: '0.5rem',
-              padding: '0.5rem 0.75rem',
-              borderRadius: '0.5rem',
-              backgroundColor: 'rgba(59, 130, 246, 0.1)',
-              border: '1px solid rgba(59, 130, 246, 0.3)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '0.5rem'
-            }}>
-              <span style={{ fontSize: '0.8125rem', color: '#ffffff' }}>Selected Dates: {startStr} to {endStr}</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.8125rem', color: '#e5e7eb' }}>
-                  <strong>Units Sold</strong> {chartRangeSum.unitsSold.toLocaleString()}
-                  <span style={{ marginLeft: '1rem' }}><strong>Potential Units Sold</strong> {chartRangeSum.unitsSmoothed.toLocaleString()}</span>
-                  <span style={{ marginLeft: '1rem' }}><strong>Potential Revenue</strong> {potentialRevenue.toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
-                </span>
-              </span>
-              <button
-                type="button"
-                onClick={() => setChartRangeSelection({ startTimestamp: null, endTimestamp: null })}
-                style={{
-                  fontSize: '0.75rem',
-                  color: '#3b82f6',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  textDecoration: 'underline'
-                }}
-              >
-                Clear selection
-              </button>
-            </div>
-            );
-          })()}
-
           {/* Legend at bottom - Enhanced style with gradients and colored backgrounds */}
           <div style={{ 
             display: 'flex', 
@@ -3358,7 +3533,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 backgroundColor: 'rgba(17, 24, 39, 0.5)',
                 transition: 'background-color 0.2s'
               }}>
-                <div style={{ width: '20px', height: '12px', backgroundColor: 'rgba(107, 114, 128, 0.5)', borderRadius: '2px', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }}></div>
+                <div style={{ width: '24px', height: '3px', backgroundColor: 'rgba(107, 114, 128, 0.5)', borderRadius: '2px', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }}></div>
                 <span style={{ color: '#d1d5db', fontWeight: '500' }}>Units Sold</span>
               </div>
               <div style={{ 
@@ -3387,73 +3562,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                   height: '2px', 
                   backgroundImage: 'repeating-linear-gradient(90deg, #f97316 0, #f97316 3px, transparent 3px, transparent 6px)',
                   borderRadius: '1px'
-                }}></div>
-                <span style={{ color: '#d1d5db', fontWeight: '500' }}>Forecast</span>
-              </div>
-            </div>
-            
-            {/* DOI Segment Legend with Gradients */}
-            <div style={{ 
-              display: 'flex', 
-              gap: inventoryOnly ? '0.75rem' : '1.25rem', 
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexWrap: 'wrap',
-              paddingLeft: inventoryOnly ? '0' : '1rem',
-              marginLeft: inventoryOnly ? '0' : '1rem',
-              borderLeft: inventoryOnly ? 'none' : '1px solid #1f2937'
-            }}>
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '0.5rem',
-                padding: '0.375rem 0.75rem',
-                borderRadius: '0.5rem',
-                backgroundColor: 'rgba(17, 24, 39, 0.5)',
-                transition: 'background-color 0.2s'
-              }}>
-                <div style={{ 
-                  width: '16px', 
-                  height: '16px', 
-                  background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
-                  borderRadius: '4px',
-                  boxShadow: '0 1px 3px rgba(124, 58, 237, 0.3)'
-                }}></div>
-                <span style={{ color: '#d1d5db', fontWeight: '500' }}>FBA Available</span>
-              </div>
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '0.5rem',
-                padding: '0.375rem 0.75rem',
-                borderRadius: '0.5rem',
-                backgroundColor: 'rgba(17, 24, 39, 0.5)',
-                transition: 'background-color 0.2s'
-              }}>
-                <div style={{ 
-                  width: '16px', 
-                  height: '16px', 
-                  background: 'linear-gradient(135deg, #22c55e, #4ade80)',
-                  borderRadius: '4px',
-                  boxShadow: '0 1px 3px rgba(34, 197, 94, 0.3)'
-                }}></div>
-                <span style={{ color: '#d1d5db', fontWeight: '500' }}>Total Inv.</span>
-              </div>
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '0.5rem',
-                padding: '0.375rem 0.75rem',
-                borderRadius: '0.5rem',
-                backgroundColor: 'rgba(17, 24, 39, 0.5)',
-                transition: 'background-color 0.2s'
-              }}>
-                <div style={{ 
-                  width: '16px', 
-                  height: '16px', 
-                  background: 'linear-gradient(135deg, #3b82f6, #60a5fa)',
-                  borderRadius: '4px',
-                  boxShadow: '0 1px 3px rgba(59, 130, 246, 0.3)'
                 }}></div>
                 <span style={{ color: '#d1d5db', fontWeight: '500' }}>Forecast</span>
               </div>

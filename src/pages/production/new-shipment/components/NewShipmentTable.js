@@ -44,6 +44,7 @@ const BarFill = React.memo(function BarFill({ widthPct, backgroundColor }) {
 const NewShipmentTable = ({
   rows,
   tableMode,
+  hideFooter = false, // Hide footer when e.g. N-GOOS modal is open
   onProductClick,
   qtyValues,
   onQtyChange,
@@ -4715,12 +4716,14 @@ const NewShipmentTable = ({
           )
         )}
 
+        {!hideFooter && (
+        <>
         {/* Footer */}
         <div
           style={{
             position: 'fixed',
             bottom: '16px',
-            left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2)`,
+            left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2 - 125px)`,
             transform: 'translateX(-50%)',
             width: 'fit-content',
             height: '65px',
@@ -4739,16 +4742,16 @@ const NewShipmentTable = ({
           }}
         >
           <div style={{ display: 'flex', gap: '48px', alignItems: 'center', flexShrink: 0 }}>
-            {footerStatsVisibility.palettes && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                <span style={{ fontSize: '12px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#9CA3AF', textAlign: 'center' }}>PALETTES</span>
-                <span style={{ fontSize: '18px', fontWeight: 700, color: isDarkMode ? '#FFFFFF' : '#000000', textAlign: 'center' }}>{totalPalettes.toFixed(2)}</span>
-              </div>
-            )}
             {footerStatsVisibility.products && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
                 <span style={{ fontSize: '12px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#9CA3AF', textAlign: 'center' }}>PRODUCTS</span>
                 <span style={{ fontSize: '18px', fontWeight: 700, color: isDarkMode ? '#FFFFFF' : '#000000', textAlign: 'center' }}>{totalProducts}</span>
+              </div>
+            )}
+            {footerStatsVisibility.palettes && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#9CA3AF', textAlign: 'center' }}>PALETTES</span>
+                <span style={{ fontSize: '18px', fontWeight: 700, color: isDarkMode ? '#FFFFFF' : '#000000', textAlign: 'center' }}>{totalPalettes.toFixed(2)}</span>
               </div>
             )}
             {footerStatsVisibility.boxes && (
@@ -4889,7 +4892,7 @@ const NewShipmentTable = ({
             style={{
               position: 'fixed',
               bottom: '96px',
-              left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2 + 350px)`,
+              left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2 - 125px + 350px)`,
               transform: 'translateX(-50%)',
               width: '204px',
               minHeight: '264px',
@@ -4963,11 +4966,13 @@ const NewShipmentTable = ({
                       )}
                     </span>
                   </label>
-                  <span style={{ flex: 1, fontSize: '13px', color: '#FFFFFF' }}>{label}</span>
+                    <span style={{ flex: 1, fontSize: '13px', color: '#FFFFFF' }}>{label}</span>
                 </div>
               ))}
             </div>
           </div>
+        )}
+        </>
         )}
       </>
     );
@@ -6539,12 +6544,14 @@ const NewShipmentTable = ({
       );
     })}
 
+      {!hideFooter && (
+      <>
       {/* Footer */}
       <div
         style={{
           position: 'fixed',
           bottom: '16px',
-          left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2)`,
+          left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2 - 125px)`,
           transform: 'translateX(-50%)',
           width: 'fit-content',
           minWidth: '1014px',
@@ -6565,16 +6572,16 @@ const NewShipmentTable = ({
         }}
       >
         <div style={{ display: 'flex', gap: '48px', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-          {footerStatsVisibility.palettes && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-              <span style={{ fontSize: '12px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#9CA3AF', textAlign: 'center' }}>PALETTES</span>
-              <span style={{ fontSize: '18px', fontWeight: 700, color: isDarkMode ? '#FFFFFF' : '#000000', textAlign: 'center' }}>{totalPalettes.toFixed(2)}</span>
-            </div>
-          )}
           {footerStatsVisibility.products && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
               <span style={{ fontSize: '12px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#9CA3AF', textAlign: 'center' }}>PRODUCTS</span>
               <span style={{ fontSize: '18px', fontWeight: 700, color: isDarkMode ? '#FFFFFF' : '#000000', textAlign: 'center' }}>{totalProducts}</span>
+            </div>
+          )}
+          {footerStatsVisibility.palettes && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', fontWeight: 400, color: isDarkMode ? '#9CA3AF' : '#9CA3AF', textAlign: 'center' }}>PALETTES</span>
+              <span style={{ fontSize: '18px', fontWeight: 700, color: isDarkMode ? '#FFFFFF' : '#000000', textAlign: 'center' }}>{totalPalettes.toFixed(2)}</span>
             </div>
           )}
           {footerStatsVisibility.boxes && (
@@ -6714,7 +6721,7 @@ const NewShipmentTable = ({
           style={{
             position: 'fixed',
             bottom: '96px',
-            left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2 + 350px)`,
+            left: `calc(${sidebarWidth}px + (100vw - ${sidebarWidth}px) / 2 - 125px + 350px)`,
             transform: 'translateX(-50%)',
             width: '204px',
             minHeight: '264px',
@@ -6793,6 +6800,8 @@ const NewShipmentTable = ({
             ))}
           </div>
         </div>
+      )}
+      </>
       )}
     </>
   );

@@ -51,8 +51,9 @@ const Landing = () => {
         {/* Sidebar */}
         <Sidebar />
 
-        {/* Main Content Area */}
-        <div className="flex-1 md:pt-0 pt-14" style={{ overflow: 'auto', height: '100vh' }}>
+        {/* Main Content Area - flex column so route content can fill and scroll without footer overlap */}
+        <div className="flex-1 md:pt-0 pt-14" style={{ height: '100vh', minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
           <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/products/selection" element={<Selection />} />
@@ -91,6 +92,7 @@ const Landing = () => {
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/settings" element={<Settings />} />
           </Routes>
+          </div>
         </div>
       </div>
     </SidebarProvider>

@@ -553,7 +553,8 @@ const ProductDetail = () => {
     <div 
       className={themeClasses.bg}
       style={{
-        height: '100vh',
+        height: '100%',
+        minHeight: 0,
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden'
@@ -811,13 +812,16 @@ const ProductDetail = () => {
         </div>
       </div>
 
-      {/* Tab Content */}
+      {/* Tab Content - minHeight: 0 so flex can shrink on small screens; extra paddingBottom so footer/content doesn't overlap */}
       <div 
         className="custom-scrollbar scrollbar-hide"
         style={{
           flex: 1,
+          minHeight: 0,
           overflowY: 'auto',
-          padding: '2rem'
+          overflowX: 'hidden',
+          padding: '2rem',
+          paddingBottom: '3rem'
         }}
       >
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>

@@ -2972,6 +2972,7 @@ const NewShipment = () => {
                   <NewShipmentTable
                     rows={filteredProducts}
                     tableMode={tableMode}
+                    hideFooter={isNgoosOpen}
                     onProductClick={handleProductClick}
                     qtyValues={qtyValues}
                     onQtyChange={(updater) => {
