@@ -100,25 +100,27 @@ const SplitProductModal = ({ isOpen, onClose, product, onConfirm }) => {
           style={{
             width: '90%',
             maxWidth: '500px',
-            backgroundColor: '#FFFFFF',
+            backgroundColor: '#1F2937',
             borderRadius: '12px',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3)',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
+            border: '1px solid #334155',
           }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
           <div
             style={{
-              backgroundColor: '#1C2634',
+              backgroundColor: '#111827',
               padding: '1rem 1.5rem',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               borderTopLeftRadius: '12px',
               borderTopRightRadius: '12px',
+              borderBottom: '1px solid #334155',
             }}
           >
             <h2
@@ -180,7 +182,7 @@ const SplitProductModal = ({ isOpen, onClose, product, onConfirm }) => {
                   fontWeight: 500,
                   display: 'block',
                   marginBottom: '8px',
-                  color: '#111827',
+                  color: '#FFFFFF',
                 }}
               >
                 First Batch Quantity (Units)
@@ -188,7 +190,7 @@ const SplitProductModal = ({ isOpen, onClose, product, onConfirm }) => {
               <p
                 style={{
                   fontSize: '12px',
-                  color: '#6B7280',
+                  color: '#9CA3AF',
                   margin: '0 0 8px 0',
                 }}
               >
@@ -202,19 +204,19 @@ const SplitProductModal = ({ isOpen, onClose, product, onConfirm }) => {
                 style={{
                   width: '100%',
                   padding: '10px 12px',
-                  border: '1px solid #D1D5DB',
+                  border: '1px solid #334155',
                   borderRadius: '6px',
                   fontSize: '14px',
-                  color: '#111827',
-                  backgroundColor: '#FFFFFF',
+                  color: '#FFFFFF',
+                  backgroundColor: '#4B5563',
                   outline: 'none',
                 }}
                 onFocus={(e) => {
                   e.target.style.borderColor = '#3B82F6';
-                  e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                  e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.2)';
                 }}
                 onBlur={(e) => {
-                  e.target.style.borderColor = '#D1D5DB';
+                  e.target.style.borderColor = '#334155';
                   e.target.style.boxShadow = 'none';
                 }}
               />
@@ -228,7 +230,7 @@ const SplitProductModal = ({ isOpen, onClose, product, onConfirm }) => {
                   fontWeight: 500,
                   display: 'block',
                   marginBottom: '8px',
-                  color: '#111827',
+                  color: '#FFFFFF',
                 }}
               >
                 Second Batch Quantity (Units)
@@ -236,7 +238,7 @@ const SplitProductModal = ({ isOpen, onClose, product, onConfirm }) => {
               <p
                 style={{
                   fontSize: '12px',
-                  color: '#6B7280',
+                  color: '#9CA3AF',
                   margin: '0 0 8px 0',
                 }}
               >
@@ -250,11 +252,11 @@ const SplitProductModal = ({ isOpen, onClose, product, onConfirm }) => {
                 style={{
                   width: '100%',
                   padding: '10px 12px',
-                  border: '1px solid #D1D5DB',
+                  border: '1px solid #334155',
                   borderRadius: '6px',
                   fontSize: '14px',
-                  color: '#6B7280',
-                  backgroundColor: '#F9FAFB',
+                  color: '#9CA3AF',
+                  backgroundColor: '#4B5563',
                   outline: 'none',
                   cursor: 'not-allowed',
                 }}
@@ -265,32 +267,46 @@ const SplitProductModal = ({ isOpen, onClose, product, onConfirm }) => {
           {/* Footer */}
           <div
             style={{
+              backgroundColor: '#111827',
               padding: '16px 24px',
-              borderTop: '1px solid #E5E7EB',
+              borderTop: '1px solid #334155',
               display: 'flex',
-              justifyContent: 'flex-end',
-              gap: '12px',
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              borderBottomLeftRadius: '12px',
+              borderBottomRightRadius: '12px',
             }}
           >
             <button
               type="button"
               onClick={handleClose}
               style={{
-                padding: '10px 20px',
+                width: '72px',
+                height: '31px',
+                paddingTop: '8px',
+                paddingRight: '16px',
+                paddingBottom: '8px',
+                paddingLeft: '16px',
                 borderRadius: '6px',
-                border: '1px solid #D1D5DB',
-                backgroundColor: '#FFFFFF',
+                border: '1px solid #334155',
+                backgroundColor: '#374151',
                 fontSize: '14px',
                 fontWeight: 500,
-                color: '#374151',
+                color: '#FFFFFF',
                 cursor: 'pointer',
                 transition: 'background-color 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxSizing: 'border-box',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#F9FAFB';
+                e.currentTarget.style.backgroundColor = '#4B5563';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#FFFFFF';
+                e.currentTarget.style.backgroundColor = '#374151';
               }}
             >
               Cancel
@@ -300,24 +316,30 @@ const SplitProductModal = ({ isOpen, onClose, product, onConfirm }) => {
               onClick={handleConfirm}
               disabled={!isValid}
               style={{
-                padding: '10px 20px',
-                borderRadius: '6px',
+                width: '107px',
+                height: '31px',
+                padding: '0',
+                borderRadius: '4px',
                 border: 'none',
                 fontSize: '14px',
                 fontWeight: 500,
-                backgroundColor: isValid ? '#3B82F6' : '#9CA3AF',
+                backgroundColor: isValid ? '#007AFF' : '#4B5563',
                 color: '#FFFFFF',
                 cursor: isValid ? 'pointer' : 'not-allowed',
                 transition: 'background-color 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px',
               }}
               onMouseEnter={(e) => {
                 if (isValid) {
-                  e.currentTarget.style.backgroundColor = '#2563EB';
+                  e.currentTarget.style.backgroundColor = '#0056CC';
                 }
               }}
               onMouseLeave={(e) => {
                 if (isValid) {
-                  e.currentTarget.style.backgroundColor = '#3B82F6';
+                  e.currentTarget.style.backgroundColor = '#007AFF';
                 }
               }}
             >

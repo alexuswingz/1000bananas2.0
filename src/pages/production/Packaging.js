@@ -182,31 +182,41 @@ const Packaging = () => {
     setSelectedProduct(null);
   };
 
-  const handlePause = (isPaused) => {
-    // Handle pause/resume logic
-    if (selectedProduct) {
-      // If units have been produced and we're pausing, change status to 'in_progress' instead
-      const newStatus = isPaused && selectedProduct.unitsProduced 
-        ? 'in_progress' 
-        : isPaused 
-          ? 'paused' 
-          : 'in_progress';
-      
-      setProducts(prevProducts => 
-        prevProducts.map(product => 
-          product.id === selectedProduct.id 
-            ? { 
-                ...product, 
-                status: newStatus,
-                // Store quality check images when pausing so they're available when reopening
-                qualityCheckImages: isPaused && qualityCheckImages.length > 0 
-                  ? qualityCheckImages 
-                  : product.qualityCheckImages || []
-              }
-            : product
-        )
-      );
-      // Update selectedProduct state as well
+  const handlePause = (isPaused, productDataFromModal = null) => {
+    // Use productData from modal if provided, otherwise use selectedProduct
+    let productToUpdate = productDataFromModal || selectedProduct;
+    
+    if (!productToUpdate || !productToUpdate.id) {
+      // Fallback: find product that's in progress
+      const inProgressProduct = products.find(p => p.status === 'in_progress' || p.status === 'paused');
+      if (!inProgressProduct) {
+        console.error('No product to pause/resume');
+        return;
+      }
+      productToUpdate = inProgressProduct;
+    }
+
+    const productId = productToUpdate.id;
+    // When pausing, set status to 'paused'. When resuming, set to 'in_progress'
+    const newStatus = isPaused ? 'paused' : 'in_progress';
+    
+    setProducts(prevProducts => 
+      prevProducts.map(product => 
+        product.id === productId
+          ? { 
+              ...product, 
+              status: newStatus,
+              // Store quality check images when pausing so they're available when reopening
+              qualityCheckImages: isPaused && qualityCheckImages.length > 0 
+                ? qualityCheckImages 
+                : product.qualityCheckImages || []
+            }
+          : product
+      )
+    );
+    
+    // Update selectedProduct if it matches
+    if (selectedProduct && selectedProduct.id === productId) {
       setSelectedProduct(prev => ({
         ...prev,
         status: newStatus,
@@ -410,28 +420,51 @@ const Packaging = () => {
     }
   };
 
-  const handleMarkDone = () => {
-    // Handle mark done logic
-    console.log('=== Mark Done Clicked ===');
-    console.log('Selected Product:', selectedProduct);
+  const handleMarkDone = (productDataFromModal = null) => {
+    // Try to get product ID from modal data, selectedProduct, or find from products array
+    let productId = null;
     
-    if (!selectedProduct) {
-      console.error('No product selected!');
+    if (productDataFromModal && productDataFromModal.id) {
+      productId = productDataFromModal.id;
+    } else if (selectedProduct && selectedProduct.id) {
+      productId = selectedProduct.id;
+    } else {
+      // If both are null, try to find the product that's currently "in_progress"
+      // This is a fallback in case state got out of sync
+      const inProgressProduct = products.find(p => p.status === 'in_progress' || p.status === 'paused');
+      if (inProgressProduct) {
+        productId = inProgressProduct.id;
+        console.log('Found in-progress product as fallback:', productId);
+      }
+    }
+    
+    if (!productId) {
+      console.error('❌ No product ID found!', { 
+        productDataFromModal, 
+        selectedProduct, 
+        products: products.map(p => ({ id: p.id, status: p.status }))
+      });
       return;
     }
+
+    console.log('Updating product ID:', productId);
 
     // Update the product status to 'done'
     setProducts(prevProducts => {
       const updated = prevProducts.map(product => {
-        if (product.id === selectedProduct.id) {
-          console.log(`Updating product ${product.id} from ${product.status} to done`);
+        if (product.id === productId) {
+          console.log(`✅ Found product ${product.id}, updating status from ${product.status} to done`);
           return { ...product, status: 'done' };
         }
         return product;
       });
-      console.log('Products after update:', updated);
       return updated;
     });
+
+    // Update selectedProduct if it matches
+    if (selectedProduct && selectedProduct.id === productId) {
+      setSelectedProduct(prev => prev ? { ...prev, status: 'done' } : null);
+    }
 
     // Close modal after a brief delay to ensure state update
     setTimeout(() => {

@@ -118,36 +118,46 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
 
   return (
     <div
-      className={`w-full ${themeClasses.cardBg}`}
+      className="border rounded-xl"
       style={{
-        borderRadius: '8px',
-        border: '1px solid #E5E7EB',
-        overflow: 'hidden',
+        overflowX: 'hidden',
+        overflowY: 'visible',
+        position: 'relative',
+        backgroundColor: '#111827',
+        borderColor: '#111827',
+        borderWidth: '1px',
+        borderStyle: 'solid',
+        minHeight: 'auto',
+        width: '100%',
+        maxWidth: '100%',
+        boxSizing: 'border-box',
       }}
     >
       {/* Table header */}
       <div
-        className="bg-[#2C3544] border-b border-[#3C4656] w-full"
-        style={{ height: '40px', borderRadius: '8px 8px 0 0' }}
+        style={{ 
+          backgroundColor: '#111827',
+          width: '100%',
+        }}
       >
         <div
           className="grid h-full"
           style={{
             gridTemplateColumns: columns.slice(0, -1).map((col) => col.width).join(' ') + ' 1fr',
             gap: '0',
+            width: '100%',
+            minWidth: '0',
           }}
         >
           {columns.map((column, idx) => (
             <div
               key={column.key}
-              className="h-full text-xs font-bold text-white uppercase tracking-wider flex items-center justify-center"
+              className="h-full text-xs font-bold uppercase tracking-wider flex items-center justify-center"
               style={{
-                paddingLeft: '16px',
-                paddingRight: '16px',
-                paddingTop: '12px',
-                paddingBottom: '12px',
+                padding: '0.75rem 1.25rem',
                 position: 'relative',
-                borderRight: idx < columns.length - 1 && column.key !== 'actions' ? '1px solid rgba(255, 255, 255, 0.15)' : 'none',
+                borderRight: 'none',
+                boxSizing: 'border-box',
               }}
             >
               {column.key === 'actions' ? (
@@ -155,10 +165,11 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
               ) : (
                 <span
                   style={{
-                    color: '#FFFFFF',
-                    fontSize: '11px',
-                    fontWeight: 700,
+                    color: '#9CA3AF',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
                     letterSpacing: '0.05em',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {column.label}
@@ -173,33 +184,45 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
       <div className="w-full">
         {filteredData.length === 0 ? (
           <div
-            className={`px-6 py-6 text-center text-sm ${themeClasses.textSecondary}`}
+            style={{
+              padding: '1.5rem',
+              textAlign: 'center',
+              fontSize: '0.875rem',
+              color: '#9CA3AF',
+            }}
           >
             No archived data available.
           </div>
         ) : (
           filteredData.map((row, index) => (
-            <div
-              key={row.id || index}
-              className={`grid text-sm ${themeClasses.cardBg} ${themeClasses.rowHover}`}
-              style={{
-                gridTemplateColumns: columns.slice(0, -1).map((col) => col.width).join(' ') + ' 1fr',
-                gap: '0',
-                borderBottom:
-                  index === filteredData.length - 1
-                    ? 'none'
-                    : '1px solid #e5e7eb',
-                minHeight: '40px',
-              }}
-            >
+            <React.Fragment key={row.id || index}>
+              {/* Separator line above each row */}
+              <div
+                style={{
+                  marginLeft: '1.25rem',
+                  marginRight: '1.25rem',
+                  height: '1px',
+                  backgroundColor: '#374151',
+                }}
+              />
+              <div
+                className="grid hover:bg-gray-800 transition-colors"
+                style={{
+                  gridTemplateColumns: columns.slice(0, -1).map((col) => col.width).join(' ') + ' 1fr',
+                  gap: '0',
+                  borderBottom: 'none',
+                  minHeight: '60px',
+                  backgroundColor: '#111827',
+                  width: '100%',
+                  minWidth: '0',
+                  fontSize: '12px',
+                }}
+              >
               {/* STATUS */}
               <div
                 className="flex items-center justify-center"
                 style={{ 
-                  paddingLeft: '16px',
-                  paddingRight: '16px',
-                  paddingTop: '12px',
-                  paddingBottom: '12px',
+                  padding: '0.75rem 1.25rem',
                 }}
               >
                 <span
@@ -217,12 +240,10 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
 
               {/* DATE COMPLETE */}
               <div
-                className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                className="flex items-center justify-center"
                 style={{ 
-                  paddingLeft: '16px',
-                  paddingRight: '16px',
-                  paddingTop: '12px',
-                  paddingBottom: '12px',
+                  padding: '0.75rem 1.25rem',
+                  color: '#FFFFFF',
                 }}
               >
                 {row.dateComplete || '10-03-2025'}
@@ -230,12 +251,10 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
 
               {/* TPS SHIP # */}
               <div
-                className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                className="flex items-center justify-center"
                 style={{ 
-                  paddingLeft: '16px',
-                  paddingRight: '16px',
-                  paddingTop: '12px',
-                  paddingBottom: '12px',
+                  padding: '0.75rem 1.25rem',
+                  color: '#FFFFFF',
                 }}
               >
                 {row.tpsShipNumber || '10-01-2025'}
@@ -243,12 +262,10 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
 
               {/* TYPE */}
               <div
-                className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                className="flex items-center justify-center"
                 style={{ 
-                  paddingLeft: '16px',
-                  paddingRight: '16px',
-                  paddingTop: '12px',
-                  paddingBottom: '12px',
+                  padding: '0.75rem 1.25rem',
+                  color: '#FFFFFF',
                 }}
               >
                 {row.type || 'AWD'}
@@ -256,12 +273,10 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
 
               {/* BRAND */}
               <div
-                className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                className="flex items-center justify-center"
                 style={{ 
-                  paddingLeft: '16px',
-                  paddingRight: '16px',
-                  paddingTop: '12px',
-                  paddingBottom: '12px',
+                  padding: '0.75rem 1.25rem',
+                  color: '#FFFFFF',
                 }}
               >
                 {row.brand || 'TPS Plant Foods'}
@@ -269,12 +284,10 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
 
               {/* PRODUCT */}
               <div
-                className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                className="flex items-center justify-center"
                 style={{ 
-                  paddingLeft: '16px',
-                  paddingRight: '16px',
-                  paddingTop: '12px',
-                  paddingBottom: '12px',
+                  padding: '0.75rem 1.25rem',
+                  color: '#FFFFFF',
                 }}
               >
                 {row.product || 'Cherry Tree Fertilizer'}
@@ -282,12 +295,10 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
 
               {/* SIZE */}
               <div
-                className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                className="flex items-center justify-center"
                 style={{ 
-                  paddingLeft: '16px',
-                  paddingRight: '16px',
-                  paddingTop: '12px',
-                  paddingBottom: '12px',
+                  padding: '0.75rem 1.25rem',
+                  color: '#FFFFFF',
                 }}
               >
                 {row.size || '1 Gallon'}
@@ -295,25 +306,24 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
 
               {/* QTY */}
               <div
-                className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                className="flex items-center justify-center"
                 style={{ 
-                  paddingLeft: '16px',
-                  paddingRight: '16px',
-                  paddingTop: '12px',
-                  paddingBottom: '12px',
+                  padding: '0.75rem 1.25rem',
                 }}
               >
                 <input
                   type="text"
                   defaultValue={row.qty?.toLocaleString() || '72,000'}
-                  className={`${themeClasses.inputBg} border border-gray-300 rounded px-2 py-1 text-sm`}
                   style={{
                     width: '100%',
                     maxWidth: '120px',
-                    backgroundColor: '#F9FAFB',
-                    border: '1px solid #E5E7EB',
+                    backgroundColor: '#1F2937',
+                    border: '1px solid #374151',
                     borderRadius: '8px',
                     textAlign: 'center',
+                    color: '#FFFFFF',
+                    padding: '0.5rem',
+                    fontSize: '12px',
                   }}
                   readOnly
                 />
@@ -321,12 +331,10 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
 
               {/* CASE # */}
               <div
-                className={`flex items-center justify-center ${themeClasses.textPrimary}`}
+                className="flex items-center justify-center"
                 style={{ 
-                  paddingLeft: '16px',
-                  paddingRight: '16px',
-                  paddingTop: '12px',
-                  paddingBottom: '12px',
+                  padding: '0.75rem 1.25rem',
+                  color: '#FFFFFF',
                 }}
               >
                 {row.caseNumber || 488}
@@ -336,19 +344,16 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
               <div
                 className="flex items-center justify-end relative action-menu-container"
                 style={{ 
-                  paddingTop: '12px',
-                  paddingBottom: '12px',
-                  paddingLeft: '4px',
-                  paddingRight: '16px',
+                  padding: '0.75rem 1.25rem',
                 }}
               >
                 <button
                   onClick={() => setActionMenuId(actionMenuId === row.id ? null : row.id)}
                   className="rounded transition-colors"
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F3F4F6'}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#374151'}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                   style={{
-                    color: '#6B7280',
+                    color: '#9CA3AF',
                     padding: '4px 8px',
                     display: 'flex',
                     flexDirection: 'column',
@@ -366,18 +371,18 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
                 </button>
                 {actionMenuId === row.id && (
                   <div
-                    className={`absolute right-4 top-9 z-20 w-32 ${themeClasses.cardBg} border ${themeClasses.border} rounded-md shadow-lg text-xs`}
+                    className="absolute right-4 top-9 z-20 w-32 bg-gray-800 border border-gray-700 rounded-md shadow-lg text-xs"
                   >
                     <button
                       type="button"
-                      className={`w-full text-left px-3 py-2 hover:bg-gray-50 ${themeClasses.textPrimary}`}
+                      className="w-full text-left px-3 py-2 hover:bg-gray-700 text-white"
                       onClick={() => setActionMenuId(null)}
                     >
                       Edit
                     </button>
                     <button
                       type="button"
-                      className={`w-full text-left px-3 py-2 hover:bg-gray-50 text-red-600`}
+                      className="w-full text-left px-3 py-2 hover:bg-gray-700 text-red-400"
                       onClick={() => setActionMenuId(null)}
                     >
                       Delete
@@ -386,6 +391,7 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
                 )}
               </div>
             </div>
+            </React.Fragment>
           ))
         )}
       </div>

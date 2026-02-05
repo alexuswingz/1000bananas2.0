@@ -968,11 +968,16 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
             )}
           </button>
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
-              console.log('Mark Done clicked (mobile)');
-              if (onMarkDone) {
-                onMarkDone();
+              e.preventDefault();
+              
+              if (typeof onMarkDone === 'function') {
+                // Pass productData to the handler so it has the product info
+                onMarkDone(productData);
+              } else {
+                console.error('❌ onMarkDone is not a function!', onMarkDone);
               }
             }}
             style={{
@@ -1643,7 +1648,6 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
                       height: '1px',
                       backgroundColor: '#374151',
                       marginLeft: '-16px',
-                      marginRight: '-16px',
                       marginBottom: '0.75rem',
                     }}
                   />
@@ -1850,19 +1854,22 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
             display: 'flex',
             justifyContent: 'space-between',
             gap: '0.75rem',
+            position: 'relative',
+            zIndex: 10,
           }}
         >
           <button
+            type="button"
             onClick={() => {
               if (isProductionPaused) {
                 setIsProductionPaused(false);
                 if (onPause) {
-                  onPause(false); // Resume
+                  onPause(false, productData); // Resume - pass productData
                 }
               } else {
                 setIsProductionPaused(true);
                 if (onPause) {
-                  onPause(true); // Pause
+                  onPause(true, productData); // Pause - pass productData
                 }
               }
             }}
@@ -1921,11 +1928,16 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
             )}
           </button>
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
-              console.log('Mark Done clicked (desktop)');
-              if (onMarkDone) {
-                onMarkDone();
+              e.preventDefault();
+              
+              if (typeof onMarkDone === 'function') {
+                // Pass productData to the handler - it has fallback logic if null
+                onMarkDone(productData);
+              } else {
+                console.error('❌ onMarkDone is not a function!', onMarkDone);
               }
             }}
             style={{
@@ -1963,13 +1975,14 @@ const ProductionStartedModal = ({ isOpen, onClose, productData, onPause, onMarkD
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
+                pointerEvents: 'none',
               }}
             >
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 6L9 17l-5-5" />
               </svg>
             </div>
-            Mark Done
+            <span style={{ pointerEvents: 'none' }}>Mark Done</span>
           </button>
         </div>
         </div>

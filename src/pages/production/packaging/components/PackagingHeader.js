@@ -238,10 +238,12 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
                     : '100%',
                   right: window.innerWidth < 768 ? '16px' : '0',
                   marginTop: window.innerWidth < 768 ? '0' : '8px',
-                  backgroundColor: '#FFFFFF',
-                  border: '1px solid #E5E7EB',
+                  backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                  border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
                   borderRadius: '8px',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  boxShadow: isDarkMode 
+                    ? '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)'
+                    : '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
                   zIndex: 99999,
                   minWidth: '200px',
                   overflow: 'visible',
@@ -264,10 +266,10 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
                     alignItems: 'center',
                     gap: '12px',
                     fontSize: '14px',
-                    color: '#374151',
+                    color: isDarkMode ? '#F9FAFB' : '#374151',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#F3F4F6';
+                    e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.backgroundColor = 'transparent';
@@ -282,7 +284,7 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
                 </button>
 
                 {/* Separator */}
-                <div style={{ height: '1px', backgroundColor: '#E5E7EB', margin: '0' }} />
+                <div style={{ height: '1px', backgroundColor: isDarkMode ? '#374151' : '#E5E7EB', margin: '0' }} />
 
                 <button
                   onClick={() => {
@@ -303,10 +305,10 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
                     alignItems: 'center',
                     gap: '12px',
                     fontSize: '14px',
-                    color: '#374151',
+                    color: isDarkMode ? '#F9FAFB' : '#374151',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#F3F4F6';
+                    e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.backgroundColor = 'transparent';
@@ -341,10 +343,10 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
                     alignItems: 'center',
                     gap: '12px',
                     fontSize: '14px',
-                    color: '#374151',
+                    color: isDarkMode ? '#F9FAFB' : '#374151',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#F3F4F6';
+                    e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.backgroundColor = 'transparent';

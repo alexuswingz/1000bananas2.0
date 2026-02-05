@@ -38,6 +38,8 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
   const [selectedProductForLogUnits, setSelectedProductForLogUnits] = useState(null);
   const [showMarkAsFinishedGoodsModal, setShowMarkAsFinishedGoodsModal] = useState(false);
   const [selectedProductForMarkFinishedGoods, setSelectedProductForMarkFinishedGoods] = useState(null);
+  const [showMoveConfirmModal, setShowMoveConfirmModal] = useState(false);
+  const [pendingMoveProduct, setPendingMoveProduct] = useState(null);
 
   // Handle window resize for mobile detection
   useEffect(() => {
@@ -686,7 +688,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                     marginLeft: '1.25rem',
                     marginRight: '1.25rem',
                     height: '1px',
-                    backgroundColor: '#374151',
+                    backgroundColor: row.isSplit ? 'rgba(59, 130, 246, 0.2)' : '#374151',
                   }}
                 />
                 <div
@@ -709,14 +711,18 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                         ? 'rgba(249, 115, 22, 0.2)' 
                         : justMovedRowIndex === index
                           ? 'rgba(249, 115, 22, 0.2)'
-                          : '#111827',
+                          : row.isSplit
+                            ? 'rgba(59, 130, 246, 0.1)'
+                            : '#111827',
                   border: draggedRowIndex === index 
                     ? '2px dashed #F97316' 
                     : draggedOverRowIndex === index && isSortMode 
                       ? '2px solid #F97316' 
                       : justMovedRowId && (justMovedRowId === row.id || justMovedRowId === row.key || justMovedRowId === `row-${index}`)
                         ? '2px solid #F97316'
-                        : 'none',
+                        : row.isSplit
+                          ? '1px solid rgba(59, 130, 246, 0.3)'
+                          : 'none',
                   boxShadow: draggedRowIndex === index 
                     ? '0 4px 12px rgba(249, 115, 22, 0.3)' 
                     : draggedOverRowIndex === index && isSortMode 
@@ -777,7 +783,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                         whiteSpace: 'nowrap',
                         borderRadius: '4px',
                         cursor: 'default',
-                        backgroundColor: '#10B981',
+                        backgroundColor: '#34C759',
                         padding: '6px 10px',
                         fontSize: '11px',
                         fontWeight: 600,
@@ -857,15 +863,17 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                     </button>
                   ) : row.status === 'paused' ? (
                     <button
-                      className="text-gray-800 text-xs font-semibold px-2.5 py-1 rounded"
+                      className="text-white text-xs font-semibold px-2.5 py-1 rounded"
                       style={{ 
                         whiteSpace: 'nowrap',
                         borderRadius: '4px',
                         cursor: 'pointer',
-                        backgroundColor: '#FFFFFF',
-                        color: '#374151',
-                        boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                        border: '1px solid #E5E7EB',
+                        backgroundColor: 'transparent',
+                        color: '#3B82F6',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
                         padding: '6px 10px',
                         fontSize: '11px',
                         fontWeight: 600,
@@ -873,6 +881,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         transition: 'all 0.2s ease',
+                        border: '1px solid #3B82F6',
                       }}
                       onClick={() => {
                         if (onInProgressClick) {
@@ -880,14 +889,29 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                         }
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#F9FAFB';
-                        e.currentTarget.style.borderColor = '#D1D5DB';
+                        e.currentTarget.style.opacity = '0.9';
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#FFFFFF';
-                        e.currentTarget.style.borderColor = '#E5E7EB';
+                        e.currentTarget.style.opacity = '1';
                       }}
                     >
+                      <div
+                        style={{
+                          width: '12px',
+                          height: '12px',
+                          borderRadius: '50%',
+                          backgroundColor: '#F97316',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={3} strokeLinecap="round">
+                          <line x1="8" y1="6" x2="8" y2="18" />
+                          <line x1="16" y1="6" x2="16" y2="18" />
+                        </svg>
+                      </div>
                       Paused
                     </button>
                   ) : row.status === 'in_progress' ? (
@@ -1469,7 +1493,12 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
                   backgroundColor: row.status === 'moved_s' || row.status === 'moved_fg'
                     ? '#F3F4F6'
-                    : isDarkMode ? '#1F2937' : '#FFFFFF',
+                    : row.isSplit
+                      ? isDarkMode ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.08)'
+                      : isDarkMode ? '#1F2937' : '#FFFFFF',
+                  border: row.isSplit 
+                    ? `1px solid ${isDarkMode ? 'rgba(59, 130, 246, 0.4)' : 'rgba(59, 130, 246, 0.3)'}`
+                    : '1px solid #E5E7EB',
                   display: 'flex',
                   flexDirection: 'column',
                   position: 'relative',
@@ -1728,11 +1757,13 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                     border: 'none',
                     backgroundColor: row.status === 'moved_s' || row.status === 'moved_fg' ? '#F3F4F6' :
                                     row.isShiners && row.status === 'paused' ? '#F97316' :
-                                    row.status === 'paused' ? '#F3F4F6' :
+                                    row.status === 'paused' ? 'transparent' :
                                     row.status === 'in_progress' ? '#3B82F6' :
-                                    row.status === 'done' ? '#10B981' :
+                                    row.status === 'done' ? '#34C759' :
                                     row.isShiners ? '#F97316' : '#3B82F6',
-                    color: (row.status === 'moved_s' || row.status === 'moved_fg' || row.status === 'paused') ? '#6B7280' : '#FFFFFF',
+                    color: (row.status === 'moved_s' || row.status === 'moved_fg') ? '#6B7280' : 
+                            row.status === 'paused' ? '#3B82F6' : '#FFFFFF',
+                    border: row.status === 'paused' ? '1px solid #3B82F6' : 'none',
                     fontSize: '14px',
                     fontWeight: 600,
                     cursor: (row.status === 'done' || row.status === 'moved_s' || row.status === 'moved_fg') ? 'default' : 'pointer',
@@ -1755,7 +1786,28 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   {row.status === 'moved_s' ? 'Moved (Shiners)' :
                    row.status === 'moved_fg' ? 'Moved (FG)' :
                    row.isShiners && row.status === 'paused' ? 'Start' :
-                   row.status === 'paused' ? 'Paused' :
+                   row.status === 'paused' ? (
+                     <>
+                       <div
+                         style={{
+                           width: '12px',
+                           height: '12px',
+                           borderRadius: '50%',
+                           backgroundColor: '#F97316',
+                           display: 'flex',
+                           alignItems: 'center',
+                           justifyContent: 'center',
+                           flexShrink: 0,
+                         }}
+                       >
+                         <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={3} strokeLinecap="round">
+                           <line x1="8" y1="6" x2="8" y2="18" />
+                           <line x1="16" y1="6" x2="16" y2="18" />
+                         </svg>
+                       </div>
+                       Paused
+                     </>
+                   ) :
                    row.status === 'in_progress' ? 'In Progress' :
                    row.status === 'done' ? 'Done' :
                    row.isShiners ? 'Start' : 'Start'}
@@ -2446,7 +2498,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
               const firstRow = {
                 ...product,
                 id: product.id, // Keep original ID for first batch
-                status: isDoneStatus ? 'done' : 'paused', // Keep "Done" if original was done
+                status: originalStatus, // Preserve original status
                 qty: firstBatchQty,
                 isSplit: true, // Mark as split product
                 splitGroupId: splitGroupId, // Link to second batch
@@ -2457,7 +2509,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
               const secondRow = {
                 ...product,
                 id: maxId + 1, // New ID for second batch
-                status: isDoneStatus ? 'done' : 'pending', // Keep "Done" if original was done
+                status: originalStatus, // Preserve original status
                 qty: secondBatchQty,
                 isSplit: true, // Mark as split product
                 splitGroupId: splitGroupId, // Link to first batch
@@ -2728,7 +2780,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -2740,54 +2792,102 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
           <div
             style={{
               width: isMobile ? '343px' : '683px',
-              minHeight: isMobile ? '212px' : '260px',
-              backgroundColor: '#FFFFFF',
+              minHeight: isMobile ? '212px' : '225px',
+              backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
               borderRadius: '12px',
-              border: '1px solid #E5E7EB',
+              border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
               borderWidth: '1px',
               overflow: 'visible',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              boxShadow: isDarkMode 
+                ? '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)'
+                : '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
               display: 'flex',
               flexDirection: 'column',
-              padding: isMobile ? '16px' : '28px 24px 24px 24px',
+              padding: isMobile ? '16px' : '24px',
+              gap: '24px',
+              opacity: 1,
+              boxSizing: 'border-box',
             }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Content Section */}
-            <div style={{ padding: 0, display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '14px', alignItems: 'center', textAlign: 'center', flexShrink: 1, minHeight: 0 }}>
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: isMobile ? '12px' : '14px', 
+              alignItems: 'center', 
+              textAlign: 'center', 
+              flex: '1 1 auto',
+              minHeight: 0,
+              justifyContent: 'flex-start',
+            }}>
               {/* Warning Icon */}
               <div style={{ display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
                 <div
                   style={{
-                    width: isMobile ? '32px' : '48px',
-                    height: isMobile ? '32px' : '48px',
-                    borderRadius: '50%',
+                    width: isMobile ? '32px' : '32px',
+                    height: isMobile ? '32px' : '32px',
+                    borderRadius: '16px',
                     backgroundColor: '#F97316',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     flexShrink: 0,
+                    padding: '8px',
+                    gap: '5px',
                   }}
                 >
-                  <svg width={isMobile ? '16' : '24'} height={isMobile ? '16' : '24'} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="8" x2="12" y2="12" />
-                    <line x1="12" y1="16" x2="12.01" y2="16" />
-                  </svg>
+                  <img
+                    src="/assets/In1.png"
+                    alt="Warning icon"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'contain',
+                    }}
+                  />
                 </div>
               </div>
 
               {/* Title */}
-              <h2 style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: '700', color: '#111827', margin: 0, lineHeight: '1.3', flexShrink: 0 }}>
+              <h2 style={{ 
+                fontSize: isMobile ? '16px' : '20px', 
+                fontWeight: '700', 
+                color: isDarkMode ? '#F9FAFB' : '#111827', 
+                margin: 0, 
+                lineHeight: '1.3', 
+                flexShrink: 0 
+              }}>
                 Are you sure?
               </h2>
 
               {/* Body Text */}
-              <div style={{ maxWidth: isMobile ? '100%' : '580px', textAlign: 'center', width: '100%', flexShrink: 1, minHeight: 0 }}>
-                <p style={{ fontSize: isMobile ? '13px' : '15px', color: '#111827', margin: 0, lineHeight: '1.4', marginBottom: isMobile ? '6px' : '8px', textAlign: 'center' }}>
+              <div style={{ 
+                maxWidth: isMobile ? '100%' : '580px', 
+                textAlign: 'center', 
+                width: '100%', 
+                flexShrink: 1, 
+                minHeight: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px',
+              }}>
+                <p style={{ 
+                  fontSize: isMobile ? '13px' : '15px', 
+                  color: isDarkMode ? '#D1D5DB' : '#111827', 
+                  margin: 0, 
+                  lineHeight: '1.4', 
+                  textAlign: 'center' 
+                }}>
                   These units will no longer be included in this shipment and moved to floor inventory.
                 </p>
-                <p style={{ fontSize: isMobile ? '13px' : '15px', color: '#111827', margin: 0, lineHeight: '1.4', textAlign: 'center' }}>
+                <p style={{ 
+                  fontSize: isMobile ? '13px' : '15px', 
+                  color: isDarkMode ? '#D1D5DB' : '#111827', 
+                  margin: 0, 
+                  lineHeight: '1.4', 
+                  textAlign: 'center' 
+                }}>
                   Amazon will treat them as false inbound inventory for this shipment type.
                 </p>
               </div>
@@ -2797,10 +2897,9 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
             <div
               style={{
                 padding: 0,
-                marginTop: isMobile ? '12px' : '16px',
                 display: 'flex',
-                gap: isMobile ? '8px' : '12px',
-                justifyContent: 'center',
+                gap: isMobile ? '8px' : '8px',
+                justifyContent: 'space-between',
                 flexShrink: 0,
               }}
             >
@@ -2808,26 +2907,31 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                 onClick={() => setSelectedShinersProductToMove(null)}
                 style={{
                   width: isMobile ? '147.5px' : '309.5px',
-                  height: isMobile ? '23px' : '40px',
-                  padding: isMobile ? '4px 12px' : '0',
-                  borderRadius: isMobile ? '4px' : '8px',
-                  border: '1px solid #D1D5DB',
-                  backgroundColor: '#FFFFFF',
-                  color: '#111827',
-                  fontSize: isMobile ? '14px' : '15px',
+                  height: isMobile ? '23px' : '31px',
+                  paddingTop: isMobile ? '4px' : '8px',
+                  paddingRight: isMobile ? '12px' : '16px',
+                  paddingBottom: isMobile ? '4px' : '8px',
+                  paddingLeft: isMobile ? '12px' : '16px',
+                  borderRadius: isMobile ? '4px' : '6px',
+                  border: '1px solid',
+                  borderColor: isDarkMode ? '#4B5563' : '#D1D5DB',
+                  backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                  color: isDarkMode ? '#F9FAFB' : '#111827',
+                  fontSize: isMobile ? '14px' : '14px',
                   fontWeight: '600',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   transition: 'all 0.2s ease',
+                  boxSizing: 'border-box',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#F9FAFB';
+                  e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F9FAFB';
                   e.currentTarget.style.transform = 'translateY(-1px)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  e.currentTarget.style.backgroundColor = isDarkMode ? '#1F2937' : '#FFFFFF';
                   e.currentTarget.style.transform = 'translateY(0)';
                 }}
               >
@@ -2849,19 +2953,23 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                 }}
                 style={{
                   width: isMobile ? '147.5px' : '309.5px',
-                  height: isMobile ? '23px' : '40px',
-                  padding: isMobile ? '4px 12px' : '0',
-                  borderRadius: isMobile ? '4px' : '8px',
+                  height: isMobile ? '23px' : '31px',
+                  paddingTop: isMobile ? '4px' : '8px',
+                  paddingRight: isMobile ? '12px' : '16px',
+                  paddingBottom: isMobile ? '4px' : '8px',
+                  paddingLeft: isMobile ? '12px' : '16px',
+                  borderRadius: isMobile ? '4px' : '6px',
                   border: 'none',
                   backgroundColor: '#2563EB',
                   color: '#FFFFFF',
-                  fontSize: isMobile ? '14px' : '15px',
+                  fontSize: isMobile ? '14px' : '14px',
                   fontWeight: '600',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   transition: 'all 0.2s ease',
+                  boxSizing: 'border-box',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = '#1D4ED8';
@@ -3050,50 +3158,94 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
             style={{
               width: isMobile ? '343px' : '480px',
               minHeight: isMobile ? '159px' : '260px',
-              backgroundColor: '#FFFFFF',
+              backgroundColor: '#1A2235',
               borderRadius: '12px',
-              border: '1px solid #E5E7EB',
+              border: '1px solid #334155',
               borderWidth: '1px',
               overflow: 'visible',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3)',
               display: 'flex',
               flexDirection: 'column',
               padding: isMobile ? '16px' : '32px',
+              position: 'relative',
             }}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Close Button */}
+            <button
+              onClick={() => {
+                setShowMarkAsShinersModal(false);
+                setSelectedProductForMarkShiners(null);
+              }}
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                width: '24px',
+                height: '24px',
+                border: 'none',
+                backgroundColor: 'transparent',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                padding: 0,
+              }}
+            >
+              <svg
+                style={{ width: '16px', height: '16px' }}
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M6 6L18 18M18 6L6 18"
+                  stroke="#FFFFFF"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
             {/* Icon and Title Section */}
             <div style={{ padding: 0, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: isMobile ? '12px' : '20px', flexShrink: 0 }}>
-              {/* Warning Icon */}
+              {/* Warning Icon - Centered */}
               <div style={{ display: 'flex', justifyContent: 'center' }}>
                 <div
                   style={{
-                    width: isMobile ? '40px' : '56px',
-                    height: isMobile ? '40px' : '56px',
+                    width: isMobile ? '40px' : '48px',
+                    height: isMobile ? '40px' : '48px',
                     borderRadius: '50%',
-                    backgroundColor: '#F97316',
+                    backgroundColor: '#FF9500',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     flexShrink: 0,
                   }}
                 >
-                  <svg width={isMobile ? '20' : '28'} height={isMobile ? '20' : '28'} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="8" x2="12" y2="12" />
-                    <line x1="12" y1="16" x2="12.01" y2="16" />
-                  </svg>
+                  <img 
+                    src="/assets/In1.png" 
+                    alt="Warning" 
+                    style={{
+                      width: isMobile ? '20px' : '24px',
+                      height: isMobile ? '20px' : '24px',
+                      objectFit: 'contain',
+                    }}
+                  />
                 </div>
               </div>
 
               {/* Title */}
-              <h2 style={{ fontSize: isMobile ? '16px' : '22px', fontWeight: '700', color: '#111827', margin: 0, lineHeight: '1.3', textAlign: 'center' }}>
-                Mark and Move to Shiner Inventory?
+              <h2 style={{ fontSize: isMobile ? '16px' : '22px', fontWeight: '700', color: '#FFFFFF', margin: 0, lineHeight: '1.3', textAlign: 'center' }}>
+                Mark Units as Shiners?
               </h2>
 
               {/* Body Text */}
-              <div style={{ textAlign: 'left', paddingLeft: 0 }}>
-                <p style={{ fontSize: isMobile ? '14px' : '16px', color: '#111827', fontWeight: '400', margin: 0, lineHeight: '1.4', textAlign: 'left' }}>
+              <div style={{ textAlign: 'center', paddingLeft: 0 }}>
+                <p style={{ fontSize: isMobile ? '14px' : '16px', color: '#FFFFFF', fontWeight: '400', margin: 0, lineHeight: '1.4', textAlign: 'center' }}>
+                  You're marking the following units as shiners:
+                </p>
+                <p style={{ fontSize: isMobile ? '14px' : '16px', color: '#FFFFFF', fontWeight: '400', margin: '4px 0 0 0', lineHeight: '1.4', textAlign: 'center' }}>
                   {selectedProductForMarkShiners?.product} ({selectedProductForMarkShiners?.size}) • {selectedProductForMarkShiners?.qty?.toLocaleString()} Units
                 </p>
               </div>
@@ -3103,10 +3255,9 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
             <div
               style={{
                 padding: 0,
-                marginTop: isMobile ? '16px' : '16px',
+                marginTop: isMobile ? '16px' : '24px',
                 display: 'flex',
-                gap: '12px',
-                justifyContent: 'center',
+                justifyContent: 'space-between',
                 flexShrink: 0,
               }}
             >
@@ -3125,13 +3276,11 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   setSelectedProductForMarkShiners(null);
                 }}
                 style={{
-                  width: isMobile ? '147.5px' : '200px',
-                  height: isMobile ? '40px' : '40px',
-                  padding: 0,
+                  padding: '10px 20px',
                   borderRadius: '8px',
-                  border: '1px solid #2563EB',
-                  backgroundColor: '#FFFFFF',
-                  color: '#2563EB',
+                  border: '1px solid #3B82F6',
+                  backgroundColor: 'transparent',
+                  color: '#3B82F6',
                   fontSize: isMobile ? '14px' : '15px',
                   fontWeight: '600',
                   cursor: 'pointer',
@@ -3141,15 +3290,13 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   transition: 'all 0.2s ease',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#EFF6FF';
-                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#FFFFFF';
-                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.backgroundColor = 'transparent';
                 }}
               >
-                Confirm
+                Mark as Shiners
               </button>
               <button
                 onClick={() => {
@@ -3160,12 +3307,10 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   setSelectedProductForMarkShiners(null);
                 }}
                 style={{
-                  width: isMobile ? '147.5px' : '200px',
-                  height: isMobile ? '40px' : '40px',
-                  padding: 0,
+                  padding: '10px 20px',
                   borderRadius: '8px',
                   border: 'none',
-                  backgroundColor: '#2563EB',
+                  background: 'linear-gradient(90deg, #007AFF 0%, #004999 100%)',
                   color: '#FFFFFF',
                   fontSize: isMobile ? '14px' : '15px',
                   fontWeight: '600',
@@ -3176,15 +3321,13 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   transition: 'all 0.2s ease',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#1D4ED8';
-                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.background = 'linear-gradient(90deg, #0056CC 0%, #003366 100%)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#2563EB';
-                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.background = 'linear-gradient(90deg, #007AFF 0%, #004999 100%)';
                 }}
               >
-                Confirm & Move
+                Mark as Shiners & Move
               </button>
             </div>
           </div>
@@ -3201,7 +3344,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -3215,79 +3358,102 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
         >
           <div
             style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: isMobile ? '12px' : '12px',
-              width: isMobile ? '343px' : '90%',
-              maxWidth: isMobile ? '343px' : '440px',
-              height: isMobile ? '186px' : 'auto',
-              padding: isMobile ? '16px' : '0',
-              border: isMobile ? '1px solid #E5E7EB' : 'none',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-              overflow: 'hidden',
-              display: isMobile ? 'flex' : 'block',
-              flexDirection: isMobile ? 'column' : 'row',
-              gap: isMobile ? '24px' : '0',
+              backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+              borderRadius: '12px',
+              width: '496px',
+              height: '227px',
+              padding: '24px',
+              border: '1px solid',
+              borderColor: isDarkMode ? '#374151' : '#E5E7EB',
+              boxShadow: isDarkMode 
+                ? '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)'
+                : '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              overflow: 'visible',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px',
+              opacity: 1,
+              boxSizing: 'border-box',
             }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Icon and Title */}
-            <div style={{ padding: isMobile ? '0' : '32px 24px 24px', textAlign: 'center' }}>
+            <div style={{ 
+              textAlign: 'center', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center', 
+              gap: '10px',
+              flex: '1 1 auto',
+              minHeight: 0,
+              justifyContent: 'flex-start',
+            }}>
               <div
                 style={{
-                  width: '64px',
-                  height: '64px',
-                  borderRadius: '50%',
-                  backgroundColor: '#FEF3C7',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '16px',
+                  backgroundColor: '#F97316',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  margin: '0 auto 16px',
+                  flexShrink: 0,
+                  padding: '8px',
+                  gap: '5px',
                 }}
               >
-                <svg
-                  width="32"
-                  height="32"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#F59E0B"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="M12 16v-4M12 8h.01" />
-                </svg>
+                <img
+                  src="/assets/In1.png"
+                  alt="Warning icon"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                  }}
+                />
               </div>
-              <h2
-                style={{
-                  fontSize: '20px',
-                  fontWeight: 600,
-                  color: '#111827',
-                  margin: '0 0 12px 0',
-                }}
-              >
-                Mark Units as Finished Goods & Move?
-              </h2>
-              <p
-                style={{
-                  fontSize: '14px',
-                  color: '#6B7280',
-                  margin: 0,
-                  lineHeight: '1.5',
-                }}
-              >
-                You're marking the following units as finished goods: {selectedProductForMarkFinishedGoods?.product} ({selectedProductForMarkFinishedGoods?.size}) • {selectedProductForMarkFinishedGoods?.qty?.toLocaleString()} Units
-              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 1, minHeight: 0 }}>
+                <h2
+                  style={{
+                    fontSize: '20px',
+                    fontWeight: 700,
+                    color: isDarkMode ? '#F9FAFB' : '#111827',
+                    margin: 0,
+                    lineHeight: '1.3',
+                  }}
+                >
+                  Mark Units as Finished Goods & Move?
+                </h2>
+                <p
+                  style={{
+                    fontSize: '15px',
+                    color: isDarkMode ? '#D1D5DB' : '#111827',
+                    margin: 0,
+                    lineHeight: '1.4',
+                  }}
+                >
+                  You're marking the following units as finished goods:
+                </p>
+                <p
+                  style={{
+                    fontSize: '15px',
+                    color: isDarkMode ? '#D1D5DB' : '#111827',
+                    margin: 0,
+                    lineHeight: '1.4',
+                  }}
+                >
+                  {selectedProductForMarkFinishedGoods?.product} ({selectedProductForMarkFinishedGoods?.size}) • {selectedProductForMarkFinishedGoods?.qty?.toLocaleString()} Units
+                </p>
+              </div>
             </div>
 
             {/* Buttons */}
             <div
               style={{
-                padding: isMobile ? '0' : '24px',
                 display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '12px',
-                borderTop: isMobile ? 'none' : '1px solid #E5E7EB',
+                justifyContent: 'space-between',
+                gap: '8px',
+                flexShrink: 0,
               }}
             >
               <button
@@ -3296,38 +3462,252 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   setSelectedProductForMarkFinishedGoods(null);
                 }}
                 style={{
-                  padding: '10px 20px',
+                  width: '216px',
+                  height: '31px',
                   borderRadius: '6px',
-                  border: '1px solid #D1D5DB',
-                  backgroundColor: '#FFFFFF',
-                  color: '#374151',
+                  paddingTop: '8px',
+                  paddingRight: '16px',
+                  paddingBottom: '8px',
+                  paddingLeft: '16px',
+                  border: '1px solid',
+                  borderColor: isDarkMode ? '#4B5563' : '#D1D5DB',
+                  backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                  color: isDarkMode ? '#F9FAFB' : '#374151',
                   fontSize: '14px',
                   fontWeight: 500,
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxSizing: 'border-box',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#F9FAFB';
+                  e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F9FAFB';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  e.currentTarget.style.backgroundColor = isDarkMode ? '#1F2937' : '#FFFFFF';
                 }}
               >
                 Cancel
               </button>
               <button
                 onClick={() => {
-                  console.log('Mark as Finished Goods & Move confirmed for:', selectedProductForMarkFinishedGoods);
+                  // Close the first modal and show the confirmation modal
+                  setShowMarkAsFinishedGoodsModal(false);
+                  setPendingMoveProduct(selectedProductForMarkFinishedGoods);
+                  setShowMoveConfirmModal(true);
+                }}
+                style={{
+                  width: '216px',
+                  height: '31px',
+                  borderRadius: '6px',
+                  paddingTop: '8px',
+                  paddingRight: '16px',
+                  paddingBottom: '8px',
+                  paddingLeft: '16px',
+                  border: 'none',
+                  backgroundColor: '#2563EB',
+                  color: '#FFFFFF',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxSizing: 'border-box',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#1D4ED8';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#2563EB';
+                }}
+              >
+                Mark as Finished Goods & Move
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Move Confirmation Modal */}
+      {showMoveConfirmModal && pendingMoveProduct && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10002,
+            padding: '16px',
+          }}
+          onClick={() => {
+            setShowMoveConfirmModal(false);
+            setPendingMoveProduct(null);
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+              borderRadius: '12px',
+              width: '683px',
+              height: '225px',
+              padding: '24px',
+              border: '1px solid',
+              borderColor: isDarkMode ? '#374151' : '#E5E7EB',
+              boxShadow: isDarkMode 
+                ? '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)'
+                : '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              overflow: 'visible',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '24px',
+              opacity: 1,
+              boxSizing: 'border-box',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Icon and Title */}
+            <div style={{ 
+              textAlign: 'center', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center', 
+              gap: '10px',
+              flex: '1 1 auto',
+              minHeight: 0,
+              justifyContent: 'flex-start',
+            }}>
+              <div
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '16px',
+                  backgroundColor: '#F97316',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  padding: '8px',
+                  gap: '5px',
+                }}
+              >
+                <img
+                  src="/assets/In1.png"
+                  alt="Warning icon"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 1, minHeight: 0 }}>
+                <h2
+                  style={{
+                    fontSize: '20px',
+                    fontWeight: 700,
+                    color: isDarkMode ? '#F9FAFB' : '#111827',
+                    margin: 0,
+                    lineHeight: '1.3',
+                  }}
+                >
+                  Are you sure you want to move?
+                </h2>
+                <p
+                  style={{
+                    fontSize: '15px',
+                    color: isDarkMode ? '#D1D5DB' : '#111827',
+                    margin: 0,
+                    lineHeight: '1.4',
+                  }}
+                >
+                  These units will no longer be included in this shipment and moved to floor inventory.
+                </p>
+                <p
+                  style={{
+                    fontSize: '15px',
+                    color: isDarkMode ? '#D1D5DB' : '#111827',
+                    margin: 0,
+                    lineHeight: '1.4',
+                  }}
+                >
+                  Amazon will treat them as false inbound inventory for this shipment type.
+                </p>
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: '8px',
+                flexShrink: 0,
+              }}
+            >
+              <button
+                onClick={() => {
+                  setShowMoveConfirmModal(false);
+                  setPendingMoveProduct(null);
+                }}
+                style={{
+                  width: '309.5px',
+                  height: '31px',
+                  borderRadius: '6px',
+                  paddingTop: '8px',
+                  paddingRight: '16px',
+                  paddingBottom: '8px',
+                  paddingLeft: '16px',
+                  border: '1px solid',
+                  borderColor: isDarkMode ? '#4B5563' : '#D1D5DB',
+                  backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                  color: isDarkMode ? '#F9FAFB' : '#374151',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxSizing: 'border-box',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F9FAFB';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = isDarkMode ? '#1F2937' : '#FFFFFF';
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  console.log('Confirm move for:', pendingMoveProduct);
                   
                   // Check if this is a split product (has splitGroupId)
-                  const isSplitProduct = selectedProductForMarkFinishedGoods?.splitGroupId;
+                  const isSplitProduct = pendingMoveProduct?.splitGroupId;
                   const currentData = localTableData.length > 0 ? localTableData : (data.length > 0 ? data : sampleData);
                   
                   let updatedData = [...currentData];
                   
                   if (isSplitProduct) {
                     // Find all products in the split group
-                    const splitGroupId = selectedProductForMarkFinishedGoods.splitGroupId;
+                    const splitGroupId = pendingMoveProduct.splitGroupId;
                     const splitProducts = updatedData.filter(r => r.splitGroupId === splitGroupId);
                     
                     if (splitProducts.length === 2) {
@@ -3338,7 +3718,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                       
                       const firstIndex = splitIndices[0];
                       const secondIndex = splitIndices[1];
-                      const clickedProductIndex = updatedData.findIndex(r => r.id === selectedProductForMarkFinishedGoods.id);
+                      const clickedProductIndex = updatedData.findIndex(r => r.id === pendingMoveProduct.id);
                       
                       // Update all split products
                       updatedData = updatedData.map((r, index) => {
@@ -3360,7 +3740,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   } else {
                     // Not a split product - just mark as moved_fg
                     updatedData = updatedData.map(r =>
-                      r.id === selectedProductForMarkFinishedGoods.id
+                      r.id === pendingMoveProduct.id
                         ? { ...r, status: 'moved_fg' }
                         : r
                     );
@@ -3370,12 +3750,18 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   setLocalTableData(updatedData);
                   setOriginalTableData(updatedData);
                   
-                  setShowMarkAsFinishedGoodsModal(false);
+                  setShowMoveConfirmModal(false);
+                  setPendingMoveProduct(null);
                   setSelectedProductForMarkFinishedGoods(null);
                 }}
                 style={{
-                  padding: '10px 20px',
+                  width: '309.5px',
+                  height: '31px',
                   borderRadius: '6px',
+                  paddingTop: '8px',
+                  paddingRight: '16px',
+                  paddingBottom: '8px',
+                  paddingLeft: '16px',
                   border: 'none',
                   backgroundColor: '#2563EB',
                   color: '#FFFFFF',
@@ -3383,6 +3769,12 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   fontWeight: 500,
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxSizing: 'border-box',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = '#1D4ED8';
@@ -3391,7 +3783,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   e.currentTarget.style.backgroundColor = '#2563EB';
                 }}
               >
-                Mark as Finished Goods & Move
+                Confirm
               </button>
             </div>
           </div>

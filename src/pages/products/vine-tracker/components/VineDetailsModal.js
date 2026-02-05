@@ -985,6 +985,24 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
           color: #9CA3AF;
           opacity: 1;
         }
+        .vine-details-modal-content {
+          overflow-y: auto;
+          overflow-x: hidden;
+        }
+        .vine-details-modal-content::-webkit-scrollbar {
+          width: 8px;
+        }
+        .vine-details-modal-content::-webkit-scrollbar-track {
+          background: #1F2937;
+          border-radius: 4px;
+        }
+        .vine-details-modal-content::-webkit-scrollbar-thumb {
+          background: #4B5563;
+          border-radius: 4px;
+        }
+        .vine-details-modal-content::-webkit-scrollbar-thumb:hover {
+          background: #6B7280;
+        }
       `}</style>
     <div
       style={{
@@ -1015,7 +1033,7 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'visible',
+          overflow: 'hidden',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -1069,15 +1087,20 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
         </div>
 
         {/* Content */}
-        <div style={{ 
-          padding: '1.5rem 1.5rem 0 1.5rem', 
-          backgroundColor: '#111827', 
-          display: 'flex', 
-          flexDirection: 'column', 
-          overflow: 'visible',
-          borderBottomLeftRadius: '12px',
-          borderBottomRightRadius: '12px',
-        }}>
+        <div 
+          className="vine-details-modal-content"
+          style={{ 
+            padding: '1.5rem 1.5rem 1.5rem 1.5rem', 
+            backgroundColor: '#111827', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            flex: 1,
+            minHeight: 0,
+            borderBottomLeftRadius: '12px',
+            borderBottomRightRadius: '12px',
+          }}>
           {/* Product Info */}
           <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '2rem', flexShrink: 0 }}>
             {/* Product Image */}
@@ -1327,11 +1350,19 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
                 maxHeight: '260px',
                 display: 'flex',
                 flexDirection: 'column',
-                overflowY: 'auto',
-                overflowX: 'hidden',
+                overflow: 'hidden',
               }}
-              className="claim-history-scrollbar"
             >
+              <div
+                style={{
+                  width: '100%',
+                  flex: 1,
+                  minHeight: 0,
+                  overflowY: 'auto',
+                  overflowX: 'hidden',
+                }}
+                className="claim-history-scrollbar"
+              >
               <style>{`
                 .claim-history-scrollbar {
                   overflow-y: auto;
@@ -1352,7 +1383,7 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
                   background: #6B7280;
                 }
               `}</style>
-              <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed' }}>
+              <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', backgroundColor: '#111827' }}>
                 <colgroup>
                   <col style={{ width: '45%' }} />
                   <col style={{ width: '15%' }} />
@@ -1637,6 +1668,8 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
                           textAlign: 'left',
                           boxSizing: 'border-box',
                           borderBottom: isLastRow ? 'none' : '1px solid #374151',
+                          borderBottomLeftRadius: isLastRow ? '8px' : '0',
+                          backgroundColor: '#111827',
                         }}
                       >
                             {formatDisplayDate(claim.date)}
@@ -1649,6 +1682,7 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
                           textAlign: 'center',
                           boxSizing: 'border-box',
                           borderBottom: isLastRow ? 'none' : '1px solid #374151',
+                          backgroundColor: '#111827',
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
@@ -1663,6 +1697,8 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
                               textAlign: 'right',
                               boxSizing: 'border-box',
                               borderBottom: isLastRow ? 'none' : '1px solid #374151',
+                              borderBottomRightRadius: isLastRow ? '8px' : '0',
+                              backgroundColor: '#111827',
                               display: (showInputRow || showActionsColumn) ? 'table-cell' : 'none',
                             }}
                           >
@@ -1701,7 +1737,7 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
                       );
                     })
                   ) : (
-                    <tr>
+                    <tr style={{ backgroundColor: '#111827' }}>
                       <td 
                         colSpan={3} 
                         style={{ 
@@ -1711,6 +1747,7 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
                           fontSize: '0.875rem',
                           borderBottomLeftRadius: '8px',
                           borderBottomRightRadius: '8px',
+                          backgroundColor: '#111827',
                         }}
                       >
                         No claim history yet
@@ -1719,9 +1756,9 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
                   )}
                 </tbody>
               </table>
+              </div>
             </div>
           </div>
-          <div style={{ height: '0.5rem' }}></div>
         </div>
       </div>
 

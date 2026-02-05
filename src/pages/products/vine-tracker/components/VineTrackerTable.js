@@ -2480,6 +2480,8 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
         }}
         productData={selectedVineRow}
         onUpdateProduct={(updatedProduct) => {
+          // Update the local state so the modal reflects the changes immediately
+          setSelectedVineRow(updatedProduct);
           if (onUpdateRow) {
             onUpdateRow(updatedProduct);
           }
@@ -2492,6 +2494,8 @@ const VineTrackerTable = ({ rows, searchValue, onUpdateRow, onAddNewRow, onDelet
               claimed: (selectedVineRow.claimed || 0) + (newClaim.units || 0),
               claimHistory: [...(selectedVineRow.claimHistory || []), newClaim],
             };
+            // Update the local state so the modal reflects the changes immediately
+            setSelectedVineRow(updatedRow);
             onUpdateRow(updatedRow);
           }
         }}
