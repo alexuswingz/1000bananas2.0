@@ -8,7 +8,6 @@ const NewShipmentHeader = ({
   onReviewShipmentClick,
   onCompleteClick,
   shipmentData,
-  dataAsOfDate,
   totalUnits = 0,
   totalBoxes = 0,
   activeAction = 'add-products',
@@ -94,25 +93,29 @@ const NewShipmentHeader = ({
   const navigate = useNavigate();
   const { isDarkMode } = useTheme();
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showTypeDropdown, setShowTypeDropdown] = useState(false);
   const dropdownRef = useRef(null);
   const buttonRef = useRef(null);
+  const typeDropdownRef = useRef(null);
+  const typeButtonRef = useRef(null);
   
   // Default values if shipmentData is not provided
   const shipmentNumber = shipmentData?.shipmentName || shipmentData?.shipmentNumber || '2025.11.18';
   const shipmentType = shipmentData?.shipmentType || ''; // Only show type if it's been selected
   const marketplace = shipmentData?.marketplace || 'Amazon';
   const account = shipmentData?.account || 'TPS Nutrients';
-  
-  // Format data freshness
-  const formatDataFreshness = () => {
-    if (!dataAsOfDate) return '';
-    const now = new Date();
-    const diff = Math.floor((now - dataAsOfDate) / 1000); // seconds
-    if (diff < 60) return 'Just now';
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    return dataAsOfDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-  };
+
+  // Format shipment creation date as YYYY.MM.DD — use today when creating new shipment
+  const createdDateRaw = shipmentData?.shipmentDate || shipmentData?.shipment_date;
+  const dateToShow = createdDateRaw || new Date().toISOString().split('T')[0];
+  const createdDateFormatted = (() => {
+    const d = new Date(dateToShow + 'T00:00:00');
+    if (Number.isNaN(d.getTime())) return '';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}.${m}.${day}`;
+  })();
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -132,15 +135,23 @@ const NewShipmentHeader = ({
       ) {
         setShowDropdown(false);
       }
+      if (
+        typeDropdownRef.current &&
+        !typeDropdownRef.current.contains(event.target) &&
+        typeButtonRef.current &&
+        !typeButtonRef.current.contains(event.target)
+      ) {
+        setShowTypeDropdown(false);
+      }
     };
 
-    if (showDropdown) {
+    if (showDropdown || showTypeDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => {
         document.removeEventListener('mousedown', handleClickOutside);
       };
     }
-  }, [showDropdown]);
+  }, [showDropdown, showTypeDropdown]);
 
   // Ensure dropdown is closed when it is hidden by parent
   useEffect(() => {
@@ -155,6 +166,7 @@ const NewShipmentHeader = ({
 
   const handleShipmentDetailsClick = () => {
     setShowDropdown(false);
+    setShowTypeDropdown(false);
     if (onReviewShipmentClick) {
       onReviewShipmentClick();
     }
@@ -162,7 +174,7 @@ const NewShipmentHeader = ({
 
   return (
     <div style={{ 
-      backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+      backgroundColor: isDarkMode ? '#1A2235' : '#FFFFFF',
       padding: '16px 24px 0 24px',
       borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
     }}>
@@ -188,23 +200,28 @@ const NewShipmentHeader = ({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
-              backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
-              border: isDarkMode ? '1px solid #4B5563' : '1px solid #E5E7EB',
+              justifyContent: 'center',
+              width: '30px',
+              height: '30px',
+              minWidth: '30px',
+              minHeight: '30px',
+              backgroundColor: isDarkMode ? '#252F42' : '#FFFFFF',
+              border: isDarkMode ? '1px solid #334155' : '1px solid #E5E7EB',
               borderRadius: '8px',
               cursor: 'pointer',
               transition: 'all 0.2s',
-              padding: '8px 16px',
+              padding: '6px',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = isDarkMode ? '#4B5563' : '#F9FAFB';
+              e.currentTarget.style.backgroundColor = isDarkMode ? '#2D3A52' : '#F9FAFB';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#FFFFFF';
+              e.currentTarget.style.backgroundColor = isDarkMode ? '#252F42' : '#FFFFFF';
             }}
+            aria-label="Back"
           >
             <svg 
-              style={{ width: '16px', height: '16px' }} 
+              style={{ width: '16px', height: '16px', flexShrink: 0 }} 
               className={isDarkMode ? 'text-white' : 'text-gray-900'}
               fill="none" 
               stroke="currentColor" 
@@ -212,116 +229,113 @@ const NewShipmentHeader = ({
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
-            <span style={{ 
-              fontSize: '14px', 
-              fontWeight: 400,
-              color: isDarkMode ? '#FFFFFF' : '#000000',
-            }}>
-              Back
-            </span>
           </button>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <div style={{ 
-                fontSize: '10px', 
-                fontWeight: 400,
-                letterSpacing: '0.05em',
-                color: isDarkMode ? '#9CA3AF' : '#6B7280',
-              }}>
-                SHIPMENT
-              </div>
-              <div style={{ 
-                fontSize: '16px', 
-                fontWeight: 400,
-                color: isDarkMode ? '#FFFFFF' : '#000000',
-              }}>
-                {shipmentNumber}
-              </div>
+          {createdDateFormatted && (
+            <div style={{
+              fontSize: '16px',
+              fontWeight: 400,
+              color: isDarkMode ? '#FFFFFF' : '#111827',
+              fontFamily: 'Inter, system-ui, sans-serif',
+            }}>
+              {createdDateFormatted}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <div style={{ 
-                fontSize: '10px', 
-                fontWeight: 400,
-                letterSpacing: '0.05em',
-                color: isDarkMode ? '#9CA3AF' : '#6B7280',
-              }}>
-                TYPE
-              </div>
-              <div style={{ 
-                fontSize: '16px', 
-                fontWeight: 400,
-                color: isDarkMode ? '#FFFFFF' : '#000000',
-              }}>
-                {shipmentType || '—'}
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <div style={{ 
-                fontSize: '10px', 
-                fontWeight: 400,
-                letterSpacing: '0.05em',
-                color: isDarkMode ? '#9CA3AF' : '#6B7280',
-              }}>
-                MARKETPLACE
-              </div>
-              <div style={{ 
-                fontSize: '16px', 
-                fontWeight: 400,
-                color: isDarkMode ? '#FFFFFF' : '#000000',
-              }}>
-                {marketplace}
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <div style={{ 
-                fontSize: '10px', 
-                fontWeight: 400,
-                letterSpacing: '0.05em',
-                color: isDarkMode ? '#9CA3AF' : '#6B7280',
-              }}>
-                ACCOUNT
-              </div>
-              <div style={{ 
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}>
-              <div style={{ 
-                fontSize: '16px', 
-                fontWeight: 400,
-                color: isDarkMode ? '#FFFFFF' : '#000000',
-              }}>
-                {account}
-                </div>
-            </div>
-            </div>
-            {dataAsOfDate && activeAction === 'add-products' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <div style={{ 
-                  fontSize: '10px', 
-                  fontWeight: 400,
-                  letterSpacing: '0.05em',
-                  color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                }}>
-                  DATA AS OF
-                </div>
-                <div style={{ 
-                  fontSize: '14px', 
-                  fontWeight: 400,
-                  color: isDarkMode ? '#10B981' : '#059669',
-                  display: 'flex',
+          )}
+          {shipmentType && (
+            <>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  flexDirection: 'row',
                   alignItems: 'center',
-                  gap: '4px',
-                }}>
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
-                    <circle cx="6" cy="6" r="6"/>
+                  justifyContent: 'center',
+                  padding: '4px 8px',
+                  minHeight: '23px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  fontFamily: 'Inter, system-ui, sans-serif',
+                  color: '#60A5FA',
+                  backgroundColor: isDarkMode ? '#1E3A5F' : '#1E40AF',
+                  border: '2px solid #334155',
+                  borderRadius: '4px',
+                  letterSpacing: '0.02em',
+                  textTransform: 'uppercase',
+                  boxSizing: 'border-box',
+                }}
+              >
+                {shipmentType}
+              </span>
+              <div style={{ position: 'relative' }}>
+                <button
+                  ref={typeButtonRef}
+                  type="button"
+                  onClick={() => setShowTypeDropdown((prev) => !prev)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '24px',
+                    height: '24px',
+                    padding: 0,
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                  }}
+                  aria-label="More options"
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="12" cy="5" r="1.5" />
+                    <circle cx="12" cy="12" r="1.5" />
+                    <circle cx="12" cy="19" r="1.5" />
                   </svg>
-                  {formatDataFreshness()}
-                </div>
+                </button>
+                {showTypeDropdown && (
+                  <div
+                    ref={typeDropdownRef}
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      marginTop: '8px',
+                      backgroundColor: isDarkMode ? '#1A2235' : '#FFFFFF',
+                      border: isDarkMode ? '1px solid #334155' : '1px solid #E5E7EB',
+                      borderRadius: '8px',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                      minWidth: '160px',
+                      zIndex: 1000,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={handleShipmentDetailsClick}
+                      style={{
+                        width: '100%',
+                        padding: '10px 16px',
+                        textAlign: 'left',
+                        background: 'transparent',
+                        border: 'none',
+                        color: isDarkMode ? '#E5E7EB' : '#374151',
+                        fontSize: '14px',
+                        fontWeight: 400,
+                        cursor: 'pointer',
+                        transition: 'background-color 0.2s',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = isDarkMode ? '#334155' : '#F3F4F6';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      Shipment Details
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
 
         {/* Right side - Different controls based on active tab */}
@@ -341,27 +355,31 @@ const NewShipmentHeader = ({
               type="button"
               onClick={onTableModeToggle}
               style={{
-                width: '48px',
-                height: '28px',
-                borderRadius: '14px',
+                width: '33.33px',
+                height: '20px',
+                borderRadius: '10px',
                 backgroundColor: tableMode ? '#3B82F6' : (isDarkMode ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.1)'),
                 border: 'none',
                 cursor: 'pointer',
                 position: 'relative',
                 transition: 'background-color 0.2s',
                 padding: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
               aria-label="Toggle Table Mode"
             >
               <div
                 style={{
-                  width: '24px',
-                  height: '24px',
+                  width: '16px',
+                  height: '16px',
                   borderRadius: '50%',
                   backgroundColor: '#FFFFFF',
                   position: 'absolute',
                   top: '2px',
-                  left: tableMode ? '22px' : '2px',
+                  left: tableMode ? '15.33px' : '2px',
                   transition: 'left 0.2s',
                   boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
                 }}
@@ -373,8 +391,8 @@ const NewShipmentHeader = ({
           <button
             type="button"
             style={{
-              width: '32px',
-              height: '32px',
+              width: '24px',
+              height: '24px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -388,12 +406,7 @@ const NewShipmentHeader = ({
             <img
               src="/assets/Icon Button.png"
               alt="Settings"
-              style={{
-                width: '19.45px',
-                height: '20px',
-                marginTop: '2px',
-                marginLeft: '2.27px',
-              }}
+              style={{ width: '24px', height: '24px', objectFit: 'contain' }}
             />
           </button>
 
@@ -476,8 +489,8 @@ const NewShipmentHeader = ({
               <button
                 type="button"
                 style={{
-                  width: '32px',
-                  height: '32px',
+                  width: '24px',
+                  height: '24px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -491,12 +504,7 @@ const NewShipmentHeader = ({
                 <img
                   src="/assets/Icon Button.png"
                   alt="Settings"
-                  style={{
-                    width: '19.45px',
-                    height: '20px',
-                    marginTop: '2px',
-                    marginLeft: '2.27px',
-                  }}
+                  style={{ width: '24px', height: '24px', objectFit: 'contain' }}
                 />
               </button>
 
@@ -579,8 +587,8 @@ const NewShipmentHeader = ({
               <button
                 type="button"
                 style={{
-                  width: '32px',
-                  height: '32px',
+                  width: '24px',
+                  height: '24px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -594,7 +602,7 @@ const NewShipmentHeader = ({
                 <img 
                   src="/assets/Icon Button.png" 
                   alt="Settings"
-                  style={{ width: '19.45px', height: '20px' }}
+                  style={{ width: '24px', height: '24px', objectFit: 'contain' }}
                 />
               </button>
 
@@ -677,8 +685,8 @@ const NewShipmentHeader = ({
               <button
                 type="button"
                 style={{
-                  width: '32px',
-                  height: '32px',
+                  width: '24px',
+                  height: '24px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -692,7 +700,7 @@ const NewShipmentHeader = ({
                 <img 
                   src="/assets/Icon Button.png" 
                   alt="Settings"
-                  style={{ width: '19.45px', height: '20px' }}
+                  style={{ width: '24px', height: '24px', objectFit: 'contain' }}
                 />
               </button>
 
@@ -775,8 +783,8 @@ const NewShipmentHeader = ({
               <button
                 type="button"
                 style={{
-                  width: '32px',
-                  height: '32px',
+                  width: '24px',
+                  height: '24px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -790,7 +798,7 @@ const NewShipmentHeader = ({
                 <img 
                   src="/assets/Icon Button.png" 
                   alt="Settings"
-                  style={{ width: '19.45px', height: '20px', marginTop: '2px', marginLeft: '2.27px' }}
+                  style={{ width: '24px', height: '24px', objectFit: 'contain' }}
                 />
               </button>
 
@@ -873,8 +881,8 @@ const NewShipmentHeader = ({
               <button
                 type="button"
                 style={{
-                  width: '32px',
-                  height: '32px',
+                  width: '24px',
+                  height: '24px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -888,7 +896,7 @@ const NewShipmentHeader = ({
                 <img 
                   src="/assets/Icon Button.png" 
                   alt="Settings"
-                  style={{ width: '19.45px', height: '20px', marginTop: '2px', marginLeft: '2.27px' }}
+                  style={{ width: '24px', height: '24px', objectFit: 'contain' }}
                 />
               </button>
 

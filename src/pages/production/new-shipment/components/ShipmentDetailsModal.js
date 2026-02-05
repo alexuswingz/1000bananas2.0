@@ -4,6 +4,33 @@ import { useTheme } from '../../../../context/ThemeContext';
 
 const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, totalBoxes = 0, onSave, onBookAndProceed }) => {
   const { isDarkMode } = useTheme();
+
+  const theme = {
+    modalBg: isDarkMode ? '#1A2235' : '#FFFFFF',
+    modalBorder: isDarkMode ? '#334155' : '#E5E7EB',
+    headerBorder: isDarkMode ? '#334155' : '#E5E7EB',
+    titleColor: isDarkMode ? '#FFFFFF' : '#111827',
+    closeBtnColor: isDarkMode ? '#9CA3AF' : '#6B7280',
+    labelColor: isDarkMode ? '#E5E7EB' : '#374151',
+    inputBg: isDarkMode ? '#252F42' : '#FFFFFF',
+    inputBorder: isDarkMode ? '#334155' : '#D1D5DB',
+    inputText: isDarkMode ? '#FFFFFF' : '#111827',
+    inputPlaceholder: isDarkMode ? '#6B7280' : '#9CA3AF',
+    focusBorder: '#3B82F6',
+    dropdownBg: isDarkMode ? '#252F42' : '#FFFFFF',
+    dropdownBorder: isDarkMode ? '#334155' : '#E5E7EB',
+    dropdownText: isDarkMode ? '#E5E7EB' : '#111827',
+    dropdownMuted: isDarkMode ? '#9CA3AF' : '#6B7280',
+    dropdownHover: isDarkMode ? '#334155' : '#F3F4F6',
+    cancelBg: isDarkMode ? '#252F42' : '#FFFFFF',
+    cancelBorder: isDarkMode ? '#334155' : '#D1D5DB',
+    cancelText: isDarkMode ? '#E5E7EB' : '#374151',
+    cancelHover: isDarkMode ? '#334155' : '#F9FAFB',
+    saveBg: '#3B82F6',
+    saveHover: '#2563EB',
+    carrierArrow: isDarkMode ? '#9CA3AF' : '#374151',
+  };
+
   const [editableData, setEditableData] = useState({
     shipmentName: '',
     shipmentType: '',
@@ -181,11 +208,11 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
         {/* Modal */}
       <div
         style={{
-            backgroundColor: '#FFFFFF',
+            backgroundColor: theme.modalBg,
             borderRadius: '8px',
           width: '520px',
             height: 'auto',
-            border: '1px solid #E5E7EB',
+            border: `1px solid ${theme.modalBorder}`,
           display: 'flex',
           flexDirection: 'column',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
@@ -200,7 +227,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
         <div
           style={{
               padding: '16px 20px',
-              borderBottom: '1px solid #E5E7EB',
+              borderBottom: `1px solid ${theme.headerBorder}`,
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -209,7 +236,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
             <h2 style={{
               fontSize: '18px',
               fontWeight: 600,
-              color: '#111827',
+              color: theme.titleColor,
               margin: 0,
             }}>
             Shipment Details
@@ -225,7 +252,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-                color: '#6B7280',
+                color: theme.closeBtnColor,
             }}
           >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -252,7 +279,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     display: 'block',
                     fontSize: '12px',
                     fontWeight: 500,
-                    color: '#374151',
+                    color: theme.labelColor,
                     marginBottom: '4px',
               }}
             >
@@ -266,18 +293,18 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     width: '100%',
                     padding: '6px 10px',
                     borderRadius: '6px',
-                    border: '1px solid #D1D5DB',
-                    backgroundColor: '#FFFFFF',
-                    color: '#111827',
+                    border: `1px solid ${theme.inputBorder}`,
+                    backgroundColor: theme.inputBg,
+                    color: theme.inputText,
                     fontSize: '13px',
                     outline: 'none',
                     boxSizing: 'border-box',
                 }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = '#3B82F6';
+                    e.target.style.borderColor = theme.focusBorder;
                   }}
                   onBlur={(e) => {
-                    e.target.style.borderColor = '#D1D5DB';
+                    e.target.style.borderColor = theme.inputBorder;
                   }}
                 />
             </div>
@@ -289,7 +316,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     display: 'block',
                     fontSize: '12px',
                     fontWeight: 500,
-                    color: '#374151',
+                    color: theme.labelColor,
                     marginBottom: '4px',
                   }}
                 >
@@ -302,24 +329,24 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     width: '100%',
                     padding: '6px 10px',
                     borderRadius: '6px',
-                    border: '1px solid #D1D5DB',
-                    backgroundColor: '#FFFFFF',
-                    color: editableData.shipmentType ? '#111827' : '#9CA3AF',
+                    border: `1px solid ${theme.inputBorder}`,
+                    backgroundColor: theme.inputBg,
+                    color: editableData.shipmentType ? theme.inputText : theme.inputPlaceholder,
                     fontSize: '13px',
                     outline: 'none',
                           cursor: 'pointer',
                     boxSizing: 'border-box',
                     appearance: 'none',
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%23374151' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='${encodeURIComponent(theme.carrierArrow)}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
                     backgroundRepeat: 'no-repeat',
                     backgroundPosition: 'right 10px center',
                     paddingRight: '32px',
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = '#3B82F6';
+                    e.target.style.borderColor = theme.focusBorder;
                   }}
                   onBlur={(e) => {
-                    e.target.style.borderColor = '#D1D5DB';
+                    e.target.style.borderColor = theme.inputBorder;
                   }}
                 >
                   <option value="">Select Shipment Type</option>
@@ -337,7 +364,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     display: 'block',
                     fontSize: '12px',
                     fontWeight: 500,
-                    color: '#374151',
+                    color: theme.labelColor,
                     marginBottom: '4px',
                   }}
                 >
@@ -352,18 +379,18 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     width: '100%',
                     padding: '6px 10px',
                     borderRadius: '6px',
-                    border: '1px solid #D1D5DB',
-                    backgroundColor: '#FFFFFF',
-                    color: '#111827',
+                    border: `1px solid ${theme.inputBorder}`,
+                    backgroundColor: theme.inputBg,
+                    color: theme.inputText,
                     fontSize: '13px',
                     outline: 'none',
                     boxSizing: 'border-box',
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = '#3B82F6';
+                    e.target.style.borderColor = theme.focusBorder;
                   }}
                   onBlur={(e) => {
-                    e.target.style.borderColor = '#D1D5DB';
+                    e.target.style.borderColor = theme.inputBorder;
                     }}
                   />
                 </div>
@@ -375,7 +402,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     display: 'block',
                     fontSize: '12px',
                       fontWeight: 500,
-                    color: '#374151',
+                    color: theme.labelColor,
                     marginBottom: '4px',
                     }}
                   >
@@ -389,18 +416,18 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     width: '100%',
                     padding: '6px 10px',
                     borderRadius: '6px',
-                    border: '1px solid #D1D5DB',
-                    backgroundColor: '#FFFFFF',
-                    color: '#111827',
+                    border: `1px solid ${theme.inputBorder}`,
+                    backgroundColor: theme.inputBg,
+                    color: theme.inputText,
                     fontSize: '13px',
                     outline: 'none',
                     boxSizing: 'border-box',
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = '#3B82F6';
+                    e.target.style.borderColor = theme.focusBorder;
                   }}
                   onBlur={(e) => {
-                    e.target.style.borderColor = '#D1D5DB';
+                    e.target.style.borderColor = theme.inputBorder;
                   }}
                 />
                   </div>
@@ -412,7 +439,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     display: 'block',
                     fontSize: '12px',
                       fontWeight: 500,
-                    color: '#374151',
+                    color: theme.labelColor,
                     marginBottom: '4px',
                     }}
                   >
@@ -425,24 +452,24 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     width: '100%',
                     padding: '6px 10px',
                     borderRadius: '6px',
-                    border: '1px solid #D1D5DB',
-                    backgroundColor: '#FFFFFF',
-                    color: '#111827',
+                    border: `1px solid ${theme.inputBorder}`,
+                    backgroundColor: theme.inputBg,
+                    color: theme.inputText,
                     fontSize: '13px',
                     outline: 'none',
                     cursor: 'pointer',
                     boxSizing: 'border-box',
                     appearance: 'none',
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%23374151' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='${encodeURIComponent(theme.carrierArrow)}' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
                     backgroundRepeat: 'no-repeat',
                     backgroundPosition: 'right 10px center',
                     paddingRight: '32px',
                         }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = '#3B82F6';
+                    e.target.style.borderColor = theme.focusBorder;
                   }}
                   onBlur={(e) => {
-                    e.target.style.borderColor = '#D1D5DB';
+                    e.target.style.borderColor = theme.inputBorder;
                   }}
                       >
                   <option value="UPS">UPS</option>
@@ -460,7 +487,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     display: 'block',
                     fontSize: '12px',
                     fontWeight: 500,
-                    color: '#374151',
+                    color: theme.labelColor,
                     marginBottom: '4px',
               }}
             >
@@ -475,18 +502,18 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     width: '100%',
                     padding: '6px 10px',
                     borderRadius: '6px',
-                    border: '1px solid #D1D5DB',
-                    backgroundColor: '#FFFFFF',
-                    color: '#111827',
+                    border: `1px solid ${theme.inputBorder}`,
+                    backgroundColor: theme.inputBg,
+                    color: theme.inputText,
                     fontSize: '13px',
                     outline: 'none',
                     boxSizing: 'border-box',
                 }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = '#3B82F6';
+                    e.target.style.borderColor = theme.focusBorder;
                   }}
                   onBlur={(e) => {
-                    e.target.style.borderColor = '#D1D5DB';
+                    e.target.style.borderColor = theme.inputBorder;
                   }}
                 />
             </div>
@@ -498,7 +525,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     display: 'block',
                     fontSize: '12px',
                     fontWeight: 500,
-                    color: '#374151',
+                    color: theme.labelColor,
                     marginBottom: '4px',
                   }}
                 >
@@ -513,18 +540,18 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     width: '100%',
                     padding: '6px 10px',
                     borderRadius: '6px',
-                    border: '1px solid #D1D5DB',
-                    backgroundColor: '#FFFFFF',
-                    color: '#111827',
+                    border: `1px solid ${theme.inputBorder}`,
+                    backgroundColor: theme.inputBg,
+                    color: theme.inputText,
                     fontSize: '13px',
                     outline: 'none',
                     boxSizing: 'border-box',
                 }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = '#3B82F6';
+                    e.target.style.borderColor = theme.focusBorder;
                   }}
                   onBlur={(e) => {
-                    e.target.style.borderColor = '#D1D5DB';
+                    e.target.style.borderColor = theme.inputBorder;
                   }}
                 />
                 </div>
@@ -536,7 +563,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     display: 'block',
                     fontSize: '12px',
                     fontWeight: 500,
-                    color: '#374151',
+                    color: theme.labelColor,
                     marginBottom: '4px',
                   }}
                 >
@@ -549,9 +576,9 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     width: '100%',
                     padding: '6px 10px',
                     borderRadius: '6px',
-                    border: '1px solid #D1D5DB',
-                    backgroundColor: '#FFFFFF',
-                    color: editableData.carrier ? '#111827' : '#9CA3AF',
+                    border: `1px solid ${theme.inputBorder}`,
+                    backgroundColor: theme.inputBg,
+                    color: editableData.carrier ? theme.inputText : theme.inputPlaceholder,
                     fontSize: '13px',
                     cursor: 'pointer',
                     boxSizing: 'border-box',
@@ -563,7 +590,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                 >
                   <span>{editableData.carrier || 'Select Carrier'}</span>
                   <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M1 1L6 6L11 1" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M1 1L6 6L11 1" stroke={theme.carrierArrow} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </div>
                 
@@ -575,8 +602,8 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                       top: `${dropdownPosition.top}px`,
                       left: `${dropdownPosition.left}px`,
                       width: `${dropdownPosition.width}px`,
-                      backgroundColor: '#FFFFFF',
-                      border: '1px solid #E5E7EB',
+                      backgroundColor: theme.dropdownBg,
+                      border: `1px solid ${theme.dropdownBorder}`,
                       borderRadius: '6px',
                       boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
                       zIndex: 10000,
@@ -584,11 +611,11 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     }}
                   >
                     {/* Known Carriers */}
-                    <div style={{ padding: '8px 10px', borderBottom: '1px solid #E5E7EB' }}>
+                    <div style={{ padding: '8px 10px', borderBottom: `1px solid ${theme.dropdownBorder}` }}>
                       <div style={{
                         fontSize: '11px',
                         fontWeight: 500,
-                        color: '#6B7280',
+                        color: theme.dropdownMuted,
                         marginBottom: '6px',
                       }}>
                         Known Carriers:
@@ -602,12 +629,12 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                               padding: '4px 6px',
                               cursor: 'pointer',
                               borderRadius: '4px',
-                              color: '#111827',
+                              color: theme.dropdownText,
                               fontSize: '12px',
                               transition: 'background-color 0.2s',
                             }}
                             onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#F3F4F6';
+                              e.currentTarget.style.backgroundColor = theme.dropdownHover;
                             }}
                             onMouseLeave={(e) => {
                               e.currentTarget.style.backgroundColor = 'transparent';
@@ -620,11 +647,11 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                     </div>
 
                     {/* Custom Entry */}
-                    <div style={{ padding: '8px 10px', borderBottom: '1px solid #E5E7EB' }}>
+                    <div style={{ padding: '8px 10px', borderBottom: `1px solid ${theme.dropdownBorder}` }}>
                       <div style={{
                         fontSize: '11px',
                         fontWeight: 500,
-                        color: '#6B7280',
+                        color: theme.dropdownMuted,
                         marginBottom: '6px',
                       }}>
                         Custom Entry:
@@ -639,18 +666,18 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                             flex: 1,
                             padding: '4px 8px',
                             borderRadius: '4px',
-                            border: '1px solid #D1D5DB',
-                            backgroundColor: '#FFFFFF',
-                            color: '#111827',
+                            border: `1px solid ${theme.inputBorder}`,
+                            backgroundColor: theme.inputBg,
+                            color: theme.inputText,
                             fontSize: '12px',
                             outline: 'none',
                             boxSizing: 'border-box',
                           }}
                           onFocus={(e) => {
-                            e.target.style.borderColor = '#3B82F6';
+                            e.target.style.borderColor = theme.focusBorder;
                           }}
                           onBlur={(e) => {
-                            e.target.style.borderColor = '#D1D5DB';
+                            e.target.style.borderColor = theme.inputBorder;
                           }}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
@@ -689,7 +716,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                       <div style={{
                         fontSize: '11px',
                         fontWeight: 500,
-                        color: '#6B7280',
+                        color: theme.dropdownMuted,
                         marginBottom: '6px',
                       }}>
                         Create a Carrier:
@@ -729,7 +756,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
         <div
           style={{
               padding: '12px 20px',
-              borderTop: '1px solid #E5E7EB',
+              borderTop: `1px solid ${theme.headerBorder}`,
             display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
@@ -742,19 +769,19 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
             style={{
                 padding: '6px 16px',
                 borderRadius: '6px',
-                border: '1px solid #D1D5DB',
-                backgroundColor: '#FFFFFF',
-                color: '#374151',
+                border: `1px solid ${theme.cancelBorder}`,
+                backgroundColor: theme.cancelBg,
+                color: theme.cancelText,
                 fontSize: '13px',
                 fontWeight: 500,
                 cursor: 'pointer',
                 transition: 'all 0.2s',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#F9FAFB';
+                e.currentTarget.style.backgroundColor = theme.cancelHover;
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#FFFFFF';
+                e.currentTarget.style.backgroundColor = theme.cancelBg;
               }}
             >
               Cancel
@@ -767,7 +794,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                   padding: '6px 16px',
                   borderRadius: '6px',
               border: 'none',
-                  backgroundColor: '#3B82F6',
+                  backgroundColor: theme.saveBg,
               color: '#FFFFFF',
                   fontSize: '13px',
               fontWeight: 500,
@@ -775,10 +802,10 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                   transition: 'background-color 0.2s',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#2563EB';
+                  e.currentTarget.style.backgroundColor = theme.saveHover;
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#3B82F6';
+                  e.currentTarget.style.backgroundColor = theme.saveBg;
             }}
           >
                 Save Changes
