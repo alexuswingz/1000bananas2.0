@@ -3312,80 +3312,58 @@ const NewShipmentTable = ({
                   }}
                 />
               </div>
-              {/* Legend: FBA AVAILABLE (green) + toggle, TOTAL INVENTORY / DOI (blue) + toggle */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '10px', fontWeight: 500, textTransform: 'uppercase', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginLeft: '-160px' }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: '#22C55E', flexShrink: 0 }} />
+              {/* Legend: FBA AVAILABLE and TOTAL INVENTORY as buttons; both can be active to show 2 rows */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '10px', fontWeight: 500, textTransform: 'uppercase', marginLeft: '-160px', marginTop: '-3px' }}>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setShowFbaBar((prev) => !prev); }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '4px 8px',
+                    minHeight: '18px',
+                    height: '18px',
+                    boxSizing: 'border-box',
+                    borderRadius: '4px',
+                    border: '1px solid',
+                    borderColor: showFbaBar ? '#1A5DA7' : (isDarkMode ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.12)'),
+                    cursor: 'pointer',
+                    background: showFbaBar ? 'linear-gradient(to right, #1A5DA7, #007AFF)' : (isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)'),
+                    color: showFbaBar ? '#FFFFFF' : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+                    transition: 'background 0.2s, color 0.2s, border-color 0.2s',
+                  }}
+                  aria-label="Show FBA Available"
+                >
+                  <span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: showFbaBar ? '#22C55E' : '#64758B', flexShrink: 0 }} />
                   FBA AVAILABLE
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setShowFbaBar((prev) => !prev); }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    style={{
-                      width: '28px',
-                      height: '16px',
-                      borderRadius: '8px',
-                      backgroundColor: showFbaBar ? '#3B82F6' : (isDarkMode ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.1)'),
-                      border: 'none',
-                      cursor: 'pointer',
-                      position: 'relative',
-                      transition: 'background-color 0.2s',
-                      padding: 0,
-                      flexShrink: 0,
-                    }}
-                    aria-label="Show FBA bar"
-                  >
-                    <div
-                      style={{
-                        width: '12px',
-                        height: '12px',
-                        borderRadius: '50%',
-                        backgroundColor: '#FFFFFF',
-                        position: 'absolute',
-                        top: '2px',
-                        left: showFbaBar ? '14px' : '2px',
-                        transition: 'left 0.2s',
-                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.2)',
-                      }}
-                    />
-                  </button>
-                </span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: '#3B82F6', flexShrink: 0 }} />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setShowDoiBar((prev) => !prev); }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '4px 8px',
+                    minHeight: '18px',
+                    height: '18px',
+                    boxSizing: 'border-box',
+                    borderRadius: '4px',
+                    border: '1px solid',
+                    borderColor: showDoiBar ? '#1A5DA7' : (isDarkMode ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.12)'),
+                    cursor: 'pointer',
+                    background: showDoiBar ? 'linear-gradient(to right, #1A5DA7, #007AFF)' : (isDarkMode ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)'),
+                    color: showDoiBar ? '#FFFFFF' : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+                    transition: 'background 0.2s, color 0.2s, border-color 0.2s',
+                  }}
+                  aria-label="Show Total Inventory"
+                >
+                  <span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: showDoiBar ? '#3B82F6' : '#64758B', flexShrink: 0 }} />
                   TOTAL INVENTORY
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setShowDoiBar((prev) => !prev); }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    style={{
-                      width: '28px',
-                      height: '16px',
-                      borderRadius: '8px',
-                      backgroundColor: showDoiBar ? '#3B82F6' : (isDarkMode ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.1)'),
-                      border: 'none',
-                      cursor: 'pointer',
-                      position: 'relative',
-                      transition: 'background-color 0.2s',
-                      padding: 0,
-                      flexShrink: 0,
-                    }}
-                    aria-label="Show DOI bar"
-                  >
-                    <div
-                      style={{
-                        width: '12px',
-                        height: '12px',
-                        borderRadius: '50%',
-                        backgroundColor: '#FFFFFF',
-                        position: 'absolute',
-                        top: '2px',
-                        left: showDoiBar ? '14px' : '2px',
-                        transition: 'left 0.2s',
-                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.2)',
-                      }}
-                    />
-                  </button>
-                </span>
+                </button>
               </div>
             </div>
           </div>
@@ -4214,12 +4192,40 @@ const NewShipmentTable = ({
                     )}
                   </div>
 
-                  {/* DOI (DAYS) Column - fixed height so FBA bar doesn't move row; no overflow hidden so bars aren't cut */}
+                  {/* DOI (DAYS) Column - fixed height so FBA bar doesn't move row; no overflow hidden so bars aren't cut; clickable to open row */}
                   <div 
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingLeft: '16px', marginLeft: '-275px', marginRight: '20px', position: 'relative', height: '100%', minHeight: 0 }}
                   >
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: (showFbaBar && showDoiBar) ? '1px' : 0, position: 'relative', minHeight: 0 }}>
-                      {/* FBA Available bar - shown when toggle is on; shows FBA vs needed to reach 30-day DOI goal */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onProductClick && arrayIndex < currentRows.length) {
+                          const clickedRow = currentRows[arrayIndex];
+                          onProductClick(clickedRow, false);
+                        }
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      style={{
+                        flex: 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: (showFbaBar && showDoiBar) ? '1px' : 0,
+                        position: 'relative',
+                        minHeight: 0,
+                        border: 'none',
+                        background: 'none',
+                        padding: 0,
+                        cursor: 'pointer',
+                        font: 'inherit',
+                        textAlign: 'inherit',
+                      }}
+                      aria-label={`Open ${row.title || row.product_name || 'product'} details`}
+                    >
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: (showFbaBar && showDoiBar) ? '1px' : 0, position: 'relative', minHeight: 0, width: '100%' }}>
+                      {/* FBA Available bar - shown when FBA button is selected; shows FBA vs needed to reach 30-day DOI goal */}
                       {showFbaBar && (() => {
                         const fbaDays = Number(row.doiFba ?? row.doi_fba ?? 0);
                         const baseWidth = 100;
@@ -4278,7 +4284,7 @@ const NewShipmentTable = ({
                       })()}
                       {/* When both toggles off: show only DOI number centered in column */}
                       {!showFbaBar && !showDoiBar && (
-                        <span style={{ fontSize: '20px', fontWeight: 500, color: getDoiColor(displayDoi), height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 'fit-content' }}>
+                        <span style={{ fontSize: '20px', fontWeight: 500, color: getDoiColor(displayDoi), height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 'fit-content', marginLeft: '-60px' }}>
                           {displayDoi}
                         </span>
                       )}
@@ -4374,6 +4380,7 @@ const NewShipmentTable = ({
                       </div>
                       )}
                     </div>
+                    </button>
                     {/* Icon group: pencil + analyze, aligned at right and vertically centered (aligns with ngoos when FBA bar shown) */}
                     <div
                       style={{
