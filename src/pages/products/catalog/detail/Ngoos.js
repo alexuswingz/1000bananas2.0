@@ -951,8 +951,10 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
       chartCursorRef.current = { clientX: e.clientX, clientY: e.clientY };
       const wrapper = chartTooltipWrapperRef.current;
       if (wrapper) {
+        const container = chartContainerRef.current;
+        const topBelowAxis = container ? container.getBoundingClientRect().bottom - 12 : e.clientY - 4;
         wrapper.style.left = `${e.clientX}px`;
-        wrapper.style.top = `${e.clientY - 250}px`;
+        wrapper.style.top = `${topBelowAxis}px`;
       }
     }
   };
@@ -1576,54 +1578,19 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     setLastClickTime(currentTime);
   };
 
-  // Custom tooltip: date, DOI zone name, days from today, and metric values (for turning-point read)
+  // Custom tooltip: date, units sold, and potential units sold only; shown below x-axis
   const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload || !payload.length) return null;
     const date = new Date(label);
-    const todayTs = new Date().setHours(0, 0, 0, 0);
-    const labelTs = new Date(label).setHours(0, 0, 0, 0);
-    const daysFromToday = Math.round((labelTs - todayTs) / (1000 * 60 * 60 * 24));
-
-    let zoneName = '';
-    let zoneColor = '#94a3b8';
-    let zoneIcon = '';
-
-    if (forecastData) {
-      const fbaD = forecastData?.doi_fba ?? forecastData?.fba_days ?? 0;
-      const totalD = forecastData?.doi_total ?? forecastData?.total_days ?? 0;
-      const dailyVel = forecastData?.daily_velocity ?? forecastData?.velocity_daily ?? 1;
-      const unitsToMake = forecastData?.units_to_make ?? 0;
-      const forecastDays = dailyVel > 0 ? Math.round(unitsToMake / dailyVel) : 0;
-      const forecastD = totalD + forecastDays;
-
-      if (daysFromToday < 0) {
-        zoneName = 'Historical';
-        zoneColor = '#6b7280';
-        zoneIcon = '📊';
-      } else if (daysFromToday <= fbaD) {
-        zoneName = 'FBA Available';
-        zoneColor = '#a855f7';
-        zoneIcon = '🟣';
-      } else if (daysFromToday <= totalD) {
-        zoneName = 'Total Inventory';
-        zoneColor = '#10b981';
-        zoneIcon = '🟢';
-      } else if (daysFromToday <= forecastD) {
-        zoneName = 'Forecast Period';
-        zoneColor = '#3b82f6';
-        zoneIcon = '🔵';
-      } else {
-        zoneName = 'Beyond Forecast';
-        zoneColor = '#64748b';
-        zoneIcon = '⚪';
-      }
-    }
-
-    const daysLabel = daysFromToday < 0
-      ? `${Math.abs(daysFromToday)} days ago`
-      : daysFromToday === 0
-        ? 'Today'
-        : `${daysFromToday} days from today`;
+    const unitsSoldEntry = payload.find((e) => e.dataKey === 'unitsSold' || e.name === 'Units Sold');
+    const potentialEntry = payload.find((e) => e.dataKey === 'forecastBase' || e.name === 'Potential Units Sold')
+      || payload.find((e) => e.dataKey === 'forecastAdjusted' || e.name === 'Forecast');
+    const unitsSold = unitsSoldEntry?.value != null && unitsSoldEntry.value !== ''
+      ? (typeof unitsSoldEntry.value === 'number' ? Math.round(unitsSoldEntry.value).toLocaleString() : String(unitsSoldEntry.value))
+      : '—';
+    const potentialUnitsSold = potentialEntry?.value != null && potentialEntry.value !== ''
+      ? (typeof potentialEntry.value === 'number' ? Math.round(potentialEntry.value).toLocaleString() : String(potentialEntry.value))
+      : '—';
 
     return (
       <div style={{
@@ -1633,29 +1600,17 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         border: '1px solid #334155',
         fontSize: '0.875rem',
         boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-        minWidth: '180px'
+        minWidth: '160px'
       }}>
-        <p style={{ color: '#fff', fontWeight: '600', marginBottom: '0.25rem', fontSize: '0.875rem' }}>
+        <p style={{ color: '#fff', fontWeight: '600', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
           {date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
         </p>
-        {zoneName && (
-          <p style={{ color: zoneColor, fontWeight: '600', marginBottom: '0.25rem', fontSize: '0.8rem' }}>
-            {zoneIcon} {zoneName}
-          </p>
-        )}
-        <p style={{ color: '#94a3b8', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
-          {daysLabel}
+        <p style={{ color: '#94a3b8', margin: '0.2rem 0', fontSize: '0.75rem', fontWeight: '500' }}>
+          Units Sold: <span style={{ color: '#fff', fontWeight: '600' }}>{unitsSold}</span>
         </p>
-        <div style={{ borderTop: '1px solid #334155', paddingTop: '0.5rem', marginTop: '0.25rem' }} />
-        {payload.map((entry, index) => {
-          if (entry.value == null || entry.value === '') return null;
-          const display = typeof entry.value === 'number' ? Math.round(entry.value).toLocaleString() : String(entry.value);
-          return (
-            <p key={index} style={{ color: entry.color || '#fff', margin: '0.2rem 0', fontSize: '0.75rem', fontWeight: '500' }}>
-              {entry.name}: <span style={{ color: '#fff', fontWeight: '600' }}>{display}</span>
-            </p>
-          );
-        })}
+        <p style={{ color: '#94a3b8', margin: '0.2rem 0', fontSize: '0.75rem', fontWeight: '500' }}>
+          Potential Units Sold: <span style={{ color: '#fff', fontWeight: '600' }}>{potentialUnitsSold}</span>
+        </p>
       </div>
     );
   };
@@ -3155,13 +3110,15 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                       if (!props.active || !props.payload?.length) return null;
                       const inner = <CustomTooltip {...props} />;
                       const pos = chartCursorRef.current;
+                      const container = chartContainerRef.current;
+                      const topBelowAxis = container ? container.getBoundingClientRect().bottom - 12 : (pos ? pos.clientY - 4 : 0);
                       return (
                         <div
                           ref={chartTooltipWrapperRef}
                           style={{
                             position: 'fixed',
                             left: pos ? `${pos.clientX}px` : 0,
-                            top: pos ? `${pos.clientY - 250}px` : 0,
+                            top: pos ? topBelowAxis : 0,
                             transform: 'translate(-50%, 0)',
                             zIndex: 10,
                             pointerEvents: 'none'
