@@ -955,7 +955,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         wrapper.style.left = `${e.clientX}px`;
         if (container) {
           const rect = container.getBoundingClientRect();
-          wrapper.style.top = `${rect.bottom - 12}px`;
+          wrapper.style.top = `${rect.bottom - 22}px`;
         } else {
           wrapper.style.top = `${e.clientY - 250}px`;
         }
@@ -1596,20 +1596,23 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     return (
       <div style={{
         backgroundColor: '#1e293b',
-        padding: '0.75rem',
-        borderRadius: '0.5rem',
+        padding: '12px',
+        borderRadius: '8px',
         border: '1px solid #334155',
         fontSize: '0.875rem',
         boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-        minWidth: '180px'
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+        width: 'fit-content'
       }}>
-        <p style={{ color: '#fff', fontWeight: '600', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
+        <p style={{ color: '#fff', fontWeight: '600', margin: 0, fontSize: '0.875rem' }}>
           {date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
         </p>
-        <p style={{ color: '#6b7280', margin: '0.2rem 0', fontSize: '0.75rem', fontWeight: '500' }}>
+        <p style={{ color: '#6b7280', margin: 0, fontSize: '0.75rem', fontWeight: '500' }}>
           Units Sold: <span style={{ color: '#fff', fontWeight: '600' }}>{formatVal(unitsSoldEntry?.value)}</span>
         </p>
-        <p style={{ color: '#f97316', margin: '0.2rem 0', fontSize: '0.75rem', fontWeight: '500' }}>
+        <p style={{ color: '#f97316', margin: 0, fontSize: '0.75rem', fontWeight: '500' }}>
           Potential Units Sold: <span style={{ color: '#fff', fontWeight: '600' }}>{formatVal(potentialEntry?.value)}</span>
         </p>
       </div>
@@ -3112,7 +3115,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                       const inner = <CustomTooltip {...props} />;
                       const pos = chartCursorRef.current;
                       const container = chartContainerRef.current;
-                      const top = container ? container.getBoundingClientRect().bottom - 12 : (pos ? pos.clientY - 250 : 0);
+                      const top = container ? container.getBoundingClientRect().bottom - 22 : (pos ? pos.clientY - 250 : 0);
                       return (
                         <div
                           ref={chartTooltipWrapperRef}
