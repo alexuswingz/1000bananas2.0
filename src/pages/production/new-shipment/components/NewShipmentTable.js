@@ -3871,15 +3871,18 @@ const NewShipmentTable = ({
                             gap: '4px',
                             backgroundColor: '#F5D7D7',
                             borderRadius: '24px',
-                            padding: '4px 8px',
+                            padding: '0 8px',
                             border: 'none',
-                            height: 'fit-content',
+                            height: '20px',
+                            minHeight: '20px',
+                            maxHeight: '20px',
+                            boxSizing: 'border-box',
                             width: 'fit-content',
                             marginLeft: '-25px'
                           }}>
                             <svg
-                              width="16"
-                              height="16"
+                              width="12"
+                              height="12"
                               viewBox="0 0 24 24"
                               fill="none"
                               xmlns="http://www.w3.org/2000/svg"
@@ -3894,7 +3897,7 @@ const NewShipmentTable = ({
                                 fill="#EF4444"
                               />
                             </svg>
-                            <span style={{ color: '#EF4444', fontWeight: 700, fontSize: '13px' }}>
+                            <span style={{ color: '#EF4444', fontWeight: 700, fontSize: '12px', lineHeight: 1 }}>
                               Out of Stock
                             </span>
                           </div>
@@ -3906,15 +3909,18 @@ const NewShipmentTable = ({
                             gap: '4px',
                             backgroundColor: '#FFF4E6',
                             borderRadius: '24px',
-                            padding: '4px 8px',
+                            padding: '0 8px',
                             border: 'none',
-                            height: 'fit-content',
+                            height: '20px',
+                            minHeight: '20px',
+                            maxHeight: '20px',
+                            boxSizing: 'border-box',
                             width: 'fit-content',
                             marginLeft: '-15px'
                           }}>
                             <span style={{
-                              width: '16px',
-                              height: '16px',
+                              width: '12px',
+                              height: '12px',
                               borderRadius: '50%',
                               backgroundColor: '#F97316',
                               display: 'flex',
@@ -3922,9 +3928,9 @@ const NewShipmentTable = ({
                               justifyContent: 'center',
                               flexShrink: 0
                             }}>
-                              <span style={{ color: '#FFFFFF', fontWeight: 700, fontSize: '12px', lineHeight: 1 }}>!</span>
+                              <span style={{ color: '#FFFFFF', fontWeight: 700, fontSize: '10px', lineHeight: 1 }}>!</span>
                             </span>
-                            <span style={{ color: '#F97316', fontWeight: 700, fontSize: '13px' }}>
+                            <span style={{ color: '#F97316', fontWeight: 700, fontSize: '12px', lineHeight: 1 }}>
                               No Sales
                             </span>
                           </div>
@@ -4298,6 +4304,9 @@ const NewShipmentTable = ({
                       style={{ 
                         width: '64px',
                         height: '24px',
+                        minHeight: '24px',
+                        maxHeight: '24px',
+                        boxSizing: 'border-box',
                         borderRadius: '4px', 
                         border: 'none', 
                         backgroundColor: effectiveAddedRows.has(row.id) ? '#10B981' : '#2563EB', 
