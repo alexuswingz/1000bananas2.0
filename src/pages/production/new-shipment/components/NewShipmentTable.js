@@ -1717,16 +1717,23 @@ const NewShipmentTable = ({
         return next;
       });
       
-      // Clear sort only if the current sort is for this column (e.g. DOI sort or FBA sort on DOI column)
-      setNonTableSortField(prev => {
-        const sortIsForThisColumn = prev === columnKey || (columnKey === 'doiDays' && prev === 'fbaAvailable');
-        if (sortIsForThisColumn) {
-          setNonTableSortOrder('');
-          setNonTableSortedRowOrder(null);
-          return '';
-        }
-        return prev;
-      });
+      // When resetting DOI column (e.g. after Sold Out / No Sales History), clear sort and row order
+      // at top level so the table fully resets to show all products in original order
+      if (columnKey === 'doiDays') {
+        setNonTableSortOrder('');
+        setNonTableSortedRowOrder(null);
+        setNonTableSortField(prev => (prev === 'doiDays' || prev === 'fbaAvailable' ? '' : prev));
+      } else {
+        setNonTableSortField(prev => {
+          const sortIsForThisColumn = prev === columnKey || (columnKey === 'doiDays' && prev === 'fbaAvailable');
+          if (sortIsForThisColumn) {
+            setNonTableSortOrder('');
+            setNonTableSortedRowOrder(null);
+            return '';
+          }
+          return prev;
+        });
+      }
       
       // Clear brand filter in parent only when resetting the product column
       if (columnKey === 'product' && onBrandFilterChange) {
