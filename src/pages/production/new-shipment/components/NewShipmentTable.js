@@ -28,14 +28,14 @@ const getSuggestedQtyFromRow = (row) => {
 };
 
 // Memoized bar fill so adding/updating other rows doesn't re-render this bar and interrupt its transition
-const BarFill = React.memo(function BarFill({ widthPct, backgroundColor }) {
+const BarFill = React.memo(function BarFill({ widthPct, backgroundColor, durationSec = 1.2 }) {
   return (
     <div
       style={{
         width: `${widthPct}%`,
         height: '100%',
         backgroundColor,
-        transition: 'width 1.2s ease-in-out',
+        transition: `width ${durationSec}s ease-in-out`,
       }}
     />
   );
@@ -718,6 +718,15 @@ const NewShipmentTable = ({
       });
       
       result = orderedResult;
+    } else {
+      // Default: put "No Sales History" items at the bottom (no sales 7-day and 30-day)
+      const hasSales = (row) => (Number(row.sales30Day) || Number(row.sales7Day) || 0) > 0;
+      result = [...result].sort((a, b) => {
+        const aHasSales = hasSales(a);
+        const bHasSales = hasSales(b);
+        if (aHasSales === bHasSales) return 0;
+        return aHasSales ? -1 : 1; // has sales first (before no sales)
+      });
     }
     
     return result;
@@ -3682,12 +3691,82 @@ const NewShipmentTable = ({
                     </div>
                   </div>
 
-                  {/* INVENTORY Column (number in white; SOLD OUT / NO SALES HISTORY shown in DOI bar) */}
+                  {/* INVENTORY Column (number in white; Out of Stock / No Sales tags when applicable) */}
                   {(() => {
                     const totalInv = Number(row.totalInventory) || 0;
+                    const hasSalesHistory = (Number(row.sales30Day) || Number(row.sales7Day) || 0) > 0;
+                    const isOutOfStock = totalInv === 0;
+                    const isNoSales = !hasSalesHistory;
                     return (
-                      <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '6px', fontSize: '14px', fontWeight: 500, color: isDarkMode ? '#FFFFFF' : '#111827', paddingLeft: '16px', marginLeft: '-240px', marginRight: '20px', minWidth: '140px' }}>
-                        {totalInv.toLocaleString()}
+                      <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '6px', fontSize: '14px', fontWeight: 500, color: isDarkMode ? '#FFFFFF' : '#111827', paddingLeft: '16px', marginLeft: '-255px', marginRight: '20px', minWidth: '140px', height: '23px' }}>
+                        {isOutOfStock ? (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'flex-start',
+                            gap: '4px',
+                            backgroundColor: '#F5D7D7',
+                            borderRadius: '24px',
+                            padding: '4px 8px',
+                            border: 'none',
+                            height: 'fit-content',
+                            width: 'fit-content',
+                            marginLeft: '-25px'
+                          }}>
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
+                              style={{ flexShrink: 0 }}
+                            >
+                              <path
+                                d="M12 9V13M12 17H12.01M10.29 3.86L1.82 18C1.64547 18.3024 1.55297 18.6453 1.55197 18.9945C1.55097 19.3437 1.64148 19.6871 1.81442 19.9905C1.98737 20.2939 2.23675 20.5467 2.53773 20.7239C2.83871 20.901 3.18082 20.9962 3.53 21H20.47C20.8192 20.9962 21.1613 20.901 21.4623 20.7239C21.7633 20.5467 22.0126 20.2939 22.1856 19.9905C22.3585 19.6871 22.449 19.3437 22.448 18.9945C22.447 18.6453 22.3545 18.3024 22.18 18L13.71 3.86C13.5318 3.56631 13.2807 3.32311 12.9812 3.15447C12.6817 2.98584 12.3438 2.89725 12 2.89725C11.6562 2.89725 11.3183 2.98584 11.0188 3.15447C10.7193 3.32311 10.4682 3.56631 10.29 3.86Z"
+                                stroke="#EF4444"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                fill="#EF4444"
+                              />
+                            </svg>
+                            <span style={{ color: '#EF4444', fontWeight: 700, fontSize: '13px' }}>
+                              Out of Stock
+                            </span>
+                          </div>
+                        ) : isNoSales ? (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'flex-start',
+                            gap: '4px',
+                            backgroundColor: '#FFF4E6',
+                            borderRadius: '24px',
+                            padding: '4px 8px',
+                            border: 'none',
+                            height: 'fit-content',
+                            width: 'fit-content',
+                            marginLeft: '-15px'
+                          }}>
+                            <span style={{
+                              width: '16px',
+                              height: '16px',
+                              borderRadius: '50%',
+                              backgroundColor: '#F97316',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              <span style={{ color: '#FFFFFF', fontWeight: 700, fontSize: '12px', lineHeight: 1 }}>!</span>
+                            </span>
+                            <span style={{ color: '#F97316', fontWeight: 700, fontSize: '13px' }}>
+                              No Sales
+                            </span>
+                          </div>
+                        ) : (
+                          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', height: '100%', width: 'fit-content', marginLeft: '20px' }}>{totalInv.toLocaleString()}</span>
+                        )}
                       </div>
                     );
                   })()}
@@ -4251,7 +4330,7 @@ const NewShipmentTable = ({
                               }}
                             >
                               <div style={{ display: 'flex', width: '100%', height: '100%', borderRadius: '6px', overflow: 'hidden' }}>
-                                <BarFill widthPct={fbaPct} backgroundColor="#22C55E" />
+                                <BarFill widthPct={fbaPct} backgroundColor="#22C55E" durationSec={0.6} />
                                 <div style={{ flex: 1, height: '100%', backgroundColor: '#DCE8DA', minWidth: 0 }} />
                               </div>
                               {showFbaWarning && (
@@ -4310,6 +4389,7 @@ const NewShipmentTable = ({
                           <BarFill
                             widthPct={Math.min(100, (Number(displayDoi) / 100) * 100)}
                             backgroundColor="#3399FF"
+                            durationSec={0.6}
                           />
                           <div
                             style={{
@@ -4320,37 +4400,6 @@ const NewShipmentTable = ({
                             }}
                           />
                         </div>
-                        {(() => {
-                          const totalInv = Number(row.totalInventory) || 0;
-                          const hasSalesHistory = (Number(row.sales30Day) || Number(row.sales7Day) || 0) > 0;
-                          const showSoldOutInBar = totalInv === 0 && hasSalesHistory;
-                          const showNoSalesHistoryInBar = totalInv === 0 && !hasSalesHistory;
-                          const barLabel = showSoldOutInBar ? 'SOLD OUT' : showNoSalesHistoryInBar ? 'NO SALES HISTORY' : null;
-                          return barLabel ? (
-                            <span
-                              style={{
-                                position: 'absolute',
-                                left: 0,
-                                right: 0,
-                                top: 0,
-                                bottom: 0,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: showNoSalesHistoryInBar ? '9px' : '11px',
-                                fontWeight: 700,
-                                color: '#EF4444',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.02em',
-                                pointerEvents: 'none',
-                                zIndex: 3,
-                                textShadow: '0 1px 2px rgba(0,0,0,0.2)',
-                              }}
-                            >
-                              {barLabel}
-                            </span>
-                          ) : null;
-                        })()}
                         {Number(doiValue) < 30 && (
                           <img
                             src="/assets/zxcvb.png"
