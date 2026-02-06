@@ -14,6 +14,9 @@ const LogUnitsProducedModal = ({ isOpen, onClose, productData, onConfirm }) => {
       const existingUnits = productData.unitsProduced || 0;
       setUnitsProduced(existingUnits.toString());
       calculateRemaining(existingUnits);
+      // Debug: log productData to verify structure
+      console.log('LogUnitsProducedModal - productData received:', productData);
+      console.log('LogUnitsProducedModal - product field:', productData.product);
     }
   }, [isOpen, productData]);
 
@@ -48,14 +51,7 @@ const LogUnitsProducedModal = ({ isOpen, onClose, productData, onConfirm }) => {
     // Show toast notification
     const productDisplayName = `${productName}${productSize ? ` (${productSize})` : ''}`;
     toast.success(
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2">
-          <path d="M20 6L9 17l-5-5" />
-        </svg>
-        <span style={{ fontSize: '14px', color: '#111827', fontWeight: '500' }}>
-          Units Produced logged for {productDisplayName}
-        </span>
-      </div>,
+      `Units Produced logged for ${productDisplayName}`,
       {
         style: {
           width: '473px',
@@ -63,9 +59,12 @@ const LogUnitsProducedModal = ({ isOpen, onClose, productData, onConfirm }) => {
           borderRadius: '12px',
           padding: '8px 12px',
           gap: '24px',
-          backgroundColor: '#FFFFFF',
-          border: '1px solid #E5E7EB',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+          backgroundColor: '#111827',
+          border: '1px solid #374151',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)',
+          color: '#FFFFFF',
+          fontSize: '14px',
+          fontWeight: '500',
         },
         duration: 3000,
       }
@@ -86,17 +85,16 @@ const LogUnitsProducedModal = ({ isOpen, onClose, productData, onConfirm }) => {
   };
 
   const totalUnits = productData?.qty || 0;
-  const productName = productData?.product || 'Product';
+  // Get product name from table - check multiple possible field names
+  // The table uses 'product' field, so prioritize that
+  const productName = (productData && (productData.product || productData.product_name || productData.productName)) || 'Product';
   const productSize = productData?.size || '';
 
   return createPortal(
     <div
       style={{
         position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
+        inset: 0,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
         display: 'flex',
         alignItems: 'center',
@@ -108,182 +106,221 @@ const LogUnitsProducedModal = ({ isOpen, onClose, productData, onConfirm }) => {
     >
       <div
         style={{
-            width: '100%',
-            maxWidth: '500px',
-            borderRadius: '12px',
-            overflow: 'hidden',
-            backgroundColor: themeClasses.modalBg,
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+          width: '424px',
+          height: '340px',
+          backgroundColor: '#111827',
+          borderRadius: '12px',
+          borderWidth: '1px',
+          borderStyle: 'solid',
+          borderColor: '#374151',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'visible',
+          opacity: 1,
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div
           style={{
-            backgroundColor: '#1F2937',
+            width: '100%',
+            height: '52px',
             padding: '16px',
+            borderBottom: '1px solid #374151',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            gap: '8px',
+            flexShrink: 0,
+            backgroundColor: '#111827',
+            boxSizing: 'border-box',
+            borderTopLeftRadius: '12px',
+            borderTopRightRadius: '12px',
           }}
         >
-          <h2 style={{ color: '#FFFFFF', fontSize: '18px', fontWeight: '600', margin: 0 }}>
+          <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#FFFFFF', margin: 0 }}>
             Log Units Produced
           </h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             style={{
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              padding: '4px',
+              color: '#9CA3AF',
+              padding: '0.25rem',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#FFFFFF',
+              transition: 'color 0.2s',
             }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = '#FFFFFF';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = '#9CA3AF';
+            }}
+            aria-label="Close"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path d="M18 6L6 18M6 6l12 12" />
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
           </button>
         </div>
 
         {/* Content */}
-        <div style={{ padding: '24px', backgroundColor: themeClasses.modalBg, display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {/* Product Information Box */}
-          <div
+        <div style={{ 
+          padding: '1.5rem', 
+          backgroundColor: '#111827', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          overflow: 'visible',
+          borderBottom: 'none',
+          marginBottom: '0',
+        }}>
+          <h3
             style={{
-              backgroundColor: '#1F2937',
-              borderRadius: '8px',
-              padding: '12px 16px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
+              fontSize: '16px',
+              fontWeight: '600',
+              color: '#FFFFFF',
+              marginBottom: '8px',
             }}
           >
-            <span style={{ fontSize: '14px', color: '#FFFFFF', fontWeight: '500' }}>
-              {productName} {productSize ? `(${productSize})` : ''}
-            </span>
-            <span style={{ fontSize: '14px', color: '#60A5FA', fontWeight: '600' }}>
-              Total: {totalUnits.toLocaleString()} units
-            </span>
-          </div>
+            Units Produced (Units)
+          </h3>
+          <p
+            style={{
+              fontSize: '14px',
+              color: '#9CA3AF',
+              marginBottom: '16px',
+            }}
+          >
+            Enter the quantity of units produced so far.
+          </p>
 
-          {/* Units Produced Input */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label
+          <input
+            type="text"
+            value={unitsProduced}
+            onChange={handleUnitsProducedChange}
+            placeholder="Enter units produced here..."
+            style={{
+              width: '376px',
+              height: '41px',
+              paddingTop: '12px',
+              paddingRight: '16px',
+              paddingBottom: '12px',
+              paddingLeft: '16px',
+              borderWidth: '1px',
+              borderStyle: 'solid',
+              borderColor: '#374151',
+              borderRadius: '8px',
+              fontSize: '14px',
+              backgroundColor: '#4B5563',
+              color: '#FFFFFF',
+              marginBottom: '16px',
+              boxSizing: 'border-box',
+              outline: 'none',
+              display: 'block',
+              opacity: 1,
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = '#3B82F6';
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = '#374151';
+            }}
+          />
+
+          <div
+            style={{
+              backgroundColor: '#0F172A',
+              border: '1px solid #374151',
+              padding: '12px',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '12px',
+            }}
+          >
+            <div
               style={{
-                fontSize: '14px',
-                fontWeight: '500',
-                color: '#FFFFFF',
+                width: '20px',
+                height: '20px',
+                borderRadius: '50%',
+                backgroundColor: '#3B82F6',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                marginTop: '2px',
               }}
             >
-              Units Produced (Units)
-            </label>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
+              </svg>
+            </div>
             <p
               style={{
-                fontSize: '12px',
-                color: '#9CA3AF',
-                margin: 0,
-              }}
-            >
-              Enter the quantity of units produced so far.
-            </p>
-            <input
-              type="text"
-              value={unitsProduced}
-              onChange={handleUnitsProducedChange}
-              style={{
-                width: '100%',
-                height: '40px',
-                padding: '0 12px',
-                borderRadius: '8px',
-                border: `1px solid #374151`,
-                backgroundColor: '#1F2937',
+                fontSize: '14px',
                 color: '#FFFFFF',
-                fontSize: '14px',
-                outline: 'none',
-                boxSizing: 'border-box',
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = '#3B82F6';
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = '#374151';
-              }}
-              placeholder="0"
-            />
-          </div>
-
-          {/* Remaining Quantity Display */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label
-              style={{
-                fontSize: '14px',
-                fontWeight: '500',
-                color: '#FFFFFF',
-              }}
-            >
-              Remaining Quantity (Units)
-            </label>
-            <p
-              style={{
-                fontSize: '12px',
-                color: '#9CA3AF',
                 margin: 0,
+                flex: 1,
               }}
             >
-              Auto-calculated from the units produced.
+              Remaining Quantity: <b>{remainingQuantity.toLocaleString()} units</b> (Auto-calculated from the units produced)
             </p>
-            <input
-              type="text"
-              value={remainingQuantity.toLocaleString()}
-              readOnly
-              style={{
-                width: '100%',
-                height: '40px',
-                padding: '0 12px',
-                borderRadius: '8px',
-                border: `1px solid #374151`,
-                backgroundColor: '#1F2937',
-                color: '#9CA3AF',
-                fontSize: '14px',
-                outline: 'none',
-                boxSizing: 'border-box',
-                cursor: 'not-allowed',
-              }}
-            />
           </div>
         </div>
 
-        {/* Footer Buttons */}
+        {/* Footer */}
         <div
           style={{
-            padding: '24px',
-            borderTop: `1px solid #374151`,
-            backgroundColor: themeClasses.modalBg,
+            paddingTop: '16px',
+            paddingRight: '24px',
+            paddingBottom: '16px',
+            paddingLeft: '24px',
             display: 'flex',
-            justifyContent: 'space-between',
             gap: '12px',
+            justifyContent: 'flex-end',
+            backgroundColor: '#111827',
+            borderBottomLeftRadius: '12px',
+            borderBottomRightRadius: '12px',
+            borderTop: 'none',
+            borderBottom: 'none',
+            marginTop: '0',
           }}
         >
           <button
-            onClick={onClose}
+            onClick={handleClose}
             style={{
-              flex: 1,
-              height: '40px',
-              padding: '0 16px',
-              borderRadius: '8px',
-              border: `1px solid #374151`,
-              backgroundColor: '#1F2937',
+              width: '72px',
+              height: '31px',
+              borderRadius: '4px',
+              gap: '10px',
+              opacity: 1,
+              borderWidth: '1px',
+              borderStyle: 'solid',
+              borderColor: '#374151',
+              backgroundColor: '#374151',
               color: '#FFFFFF',
               fontSize: '14px',
-              fontWeight: '600',
+              fontWeight: '500',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              boxSizing: 'border-box',
+              padding: 0,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#4B5563';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#374151';
             }}
           >
             Cancel
@@ -291,10 +328,14 @@ const LogUnitsProducedModal = ({ isOpen, onClose, productData, onConfirm }) => {
           <button
             onClick={handleConfirm}
             style={{
-              flex: 1,
-              height: '40px',
-              padding: '0 16px',
-              borderRadius: '8px',
+              width: '107px',
+              height: '31px',
+              borderRadius: '6px',
+              gap: '8px',
+              paddingTop: '8px',
+              paddingRight: '16px',
+              paddingBottom: '8px',
+              paddingLeft: '16px',
               border: 'none',
               backgroundColor: '#2563EB',
               color: '#FFFFFF',
@@ -304,6 +345,9 @@ const LogUnitsProducedModal = ({ isOpen, onClose, productData, onConfirm }) => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              boxSizing: 'border-box',
+              opacity: 1,
+              whiteSpace: 'nowrap',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = '#1D4ED8';
