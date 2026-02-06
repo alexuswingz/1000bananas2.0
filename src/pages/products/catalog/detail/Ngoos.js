@@ -139,6 +139,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   const [chartLoadError, setChartLoadError] = useState(null); // e.g. CORS / network when chart fails on live
   const [visibleSalesMetrics, setVisibleSalesMetrics] = useState(['units_sold', 'sales']);
   const [visibleAdsMetrics, setVisibleAdsMetrics] = useState(['total_sales', 'tacos']);
+  const [hoveredSegment, setHoveredSegment] = useState(null); // 'fba', 'total', 'forecast', or null
   const [selectedMetrics, setSelectedMetrics] = useState({
     sales: [
       'units_sold',
@@ -2374,14 +2375,24 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           marginBottom: inventoryOnly ? '0.75rem' : '2rem' 
         }}>
           {/* FBA Available Card */}
-          <div style={{ 
-            borderRadius: '0.5rem', 
-            padding: inventoryOnly ? '0.75rem 1rem' : '1rem 1.25rem',
-            backgroundColor: '#0f172a',
-            borderTop: '3px solid #A855F7',
-            position: 'relative',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-          }}>
+          <div 
+            onMouseEnter={() => {
+              console.log('Hovering FBA Available');
+              setHoveredSegment('fba');
+            }}
+            onMouseLeave={() => {
+              console.log('Leaving FBA Available');
+              setHoveredSegment(null);
+            }}
+            style={{ 
+              borderRadius: '0.5rem', 
+              padding: inventoryOnly ? '0.75rem 1rem' : '1rem 1.25rem',
+              backgroundColor: '#0f172a',
+              borderTop: '3px solid #A855F7',
+              position: 'relative',
+              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+            }}
+          >
             <div style={{ 
               fontSize: inventoryOnly ? '0.75rem' : '0.85rem', 
               color: '#a855f7', 
@@ -2425,14 +2436,24 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           </div>
 
           {/* Total Inventory Card */}
-          <div style={{ 
-            borderRadius: '0.5rem', 
-            padding: inventoryOnly ? '0.75rem 1rem' : '1rem 1.25rem',
-            backgroundColor: '#0f172a',
-            borderTop: '3px solid #45CE18',
-            position: 'relative',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-          }}>
+          <div 
+            onMouseEnter={() => {
+              console.log('Hovering Total Inventory');
+              setHoveredSegment('total');
+            }}
+            onMouseLeave={() => {
+              console.log('Leaving Total Inventory');
+              setHoveredSegment(null);
+            }}
+            style={{ 
+              borderRadius: '0.5rem', 
+              padding: inventoryOnly ? '0.75rem 1rem' : '1rem 1.25rem',
+              backgroundColor: '#0f172a',
+              borderTop: '3px solid #45CE18',
+              position: 'relative',
+              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+            }}
+          >
             <div style={{ 
               fontSize: inventoryOnly ? '0.75rem' : '0.85rem', 
               color: '#45CE18', 
@@ -2476,14 +2497,24 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           </div>
 
           {/* Forecast Card */}
-          <div style={{ 
-            borderRadius: '0.5rem', 
-            padding: inventoryOnly ? '0.75rem 1rem' : '1rem 1.25rem',
-            backgroundColor: '#0f172a',
-            borderTop: '3px solid #007AFF',
-            position: 'relative',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-          }}>
+          <div 
+            onMouseEnter={() => {
+              console.log('Hovering Forecast');
+              setHoveredSegment('forecast');
+            }}
+            onMouseLeave={() => {
+              console.log('Leaving Forecast');
+              setHoveredSegment(null);
+            }}
+            style={{ 
+              borderRadius: '0.5rem', 
+              padding: inventoryOnly ? '0.75rem 1rem' : '1rem 1.25rem',
+              backgroundColor: '#0f172a',
+              borderTop: '3px solid #007AFF',
+              position: 'relative',
+              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+            }}
+          >
             <div style={{ 
               fontSize: inventoryOnly ? '0.75rem' : '0.85rem', 
               color: '#007AFF', 
@@ -3111,6 +3142,8 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                   />
                   <Tooltip 
                     content={(props) => {
+                      // Hide tooltip when zooming (zoom tool active or zoomed in)
+                      if (zoomToolActive || zoomDomain.left != null || zoomDomain.right != null) return null;
                       if (!props.active || !props.payload?.length) return null;
                       const inner = <CustomTooltip {...props} />;
                       const pos = chartCursorRef.current;
@@ -3176,14 +3209,30 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                             const startTs = new Date(period.start_date).getTime();
                             const endTs = new Date(period.end_date).getTime();
                             const mappedColor = colorMap[period.color] || period.color;
+                            const originalColor = period.color;
+                            // Cumulative highlighting: fba highlights idx 0, total highlights idx 0+1, forecast highlights all
+                            let isHovered = false;
+                            if (hoveredSegment === 'fba' && idx === 0) isHovered = true;
+                            else if (hoveredSegment === 'total' && idx <= 1) isHovered = true;
+                            else if (hoveredSegment === 'forecast' && idx <= 2) isHovered = true;
+                            // Also check by color as fallback (cumulative)
+                            if (!isHovered && hoveredSegment) {
+                              if (hoveredSegment === 'fba' && (mappedColor === '#a855f7' || originalColor === '#a855f7')) isHovered = true;
+                              else if (hoveredSegment === 'total' && ((mappedColor === '#a855f7' || originalColor === '#a855f7') || (mappedColor === '#10b981' || originalColor === '#10b981' || originalColor === '#15803d'))) isHovered = true;
+                              else if (hoveredSegment === 'forecast') isHovered = true; // Forecast highlights all segments
+                            }
                             // Use exact timestamps so zones strike at the right dates
+                            const opacity = isHovered ? 0.6 : 0.2;
+                            if (hoveredSegment) {
+                              console.log(`Period ${idx}: color=${originalColor}, mapped=${mappedColor}, hoveredSegment=${hoveredSegment}, isHovered=${isHovered}, opacity=${opacity}`);
+                            }
                             return (
                               <ReferenceArea
                                 key={`period-${idx}`}
                                 x1={startTs}
                                 x2={endTs}
                                 fill={mappedColor}
-                                fillOpacity={0.2}
+                                fillOpacity={opacity}
                                 yAxisId="left"
                               />
                             );
@@ -3300,45 +3349,49 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                     return (
                       <>
                         {/* Violet: FBA Available (Today → FBA boundary) */}
+                        {/* Highlighted when hovering fba, total, or forecast (cumulative) */}
                         {hasVioletSpan && (
                           <ReferenceArea
                             x1={todayDataPoint.timestamp}
                             x2={fbaPoint.timestamp}
                             fill="#a855f7"
-                            fillOpacity={segmentOpacity}
+                            fillOpacity={(hoveredSegment === 'fba' || hoveredSegment === 'total' || hoveredSegment === 'forecast') ? 0.6 : segmentOpacity}
                             yAxisId="left"
                           />
                         )}
                         
                         {/* Green: Total Inventory (FBA → Total boundary); visible even when Total days = FBA days */}
+                        {/* Highlighted when hovering total or forecast (cumulative) */}
                         {hasGreenSpan && (
                           <ReferenceArea
                             x1={fbaPoint.timestamp}
                             x2={greenEndTimestamp}
                             fill="#10b981"
-                            fillOpacity={segmentOpacity}
+                            fillOpacity={(hoveredSegment === 'total' || hoveredSegment === 'forecast') ? 0.6 : segmentOpacity}
                             yAxisId="left"
                           />
                         )}
                         
                         {/* Blue: Forecast Period (Total → Forecast end, matches DOI forecast) */}
+                        {/* Highlighted only when hovering forecast */}
                         {hasBlueSpan && (
                           <ReferenceArea
                             x1={blueStartTimestamp}
                             x2={forecastPoint.timestamp}
                             fill="#3b82f6"
-                            fillOpacity={segmentOpacity}
+                            fillOpacity={hoveredSegment === 'forecast' ? 0.6 : segmentOpacity}
                             yAxisId="left"
                           />
                         )}
                         
                         {/* Fallback: single blue band when we only have today + forecast end (e.g. no FBA/Total breakdown) */}
+                        {/* Highlighted only when hovering forecast */}
                         {todayDataPoint && forecastPoint && forecastPoint.timestamp > todayDataPoint.timestamp && !hasVioletSpan && !hasGreenSpan && !hasBlueSpan && (
                           <ReferenceArea
                             x1={todayDataPoint.timestamp}
                             x2={forecastPoint.timestamp}
                             fill="#3b82f6"
-                            fillOpacity={segmentOpacity}
+                            fillOpacity={hoveredSegment === 'forecast' ? 0.6 : segmentOpacity}
                             yAxisId="left"
                           />
                         )}

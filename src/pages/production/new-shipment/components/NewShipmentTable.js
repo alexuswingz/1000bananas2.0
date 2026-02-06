@@ -773,7 +773,7 @@ const NewShipmentTable = ({
     setActiveFilters(filterSettings);
   };
   
-  // Handle filter reset – clear both timeline filters and non-table column filters (e.g. DOI Sold Out / Best Sellers)
+  // Handle filter reset – clear both timeline filters and non-table column filters (e.g. Inventory Out of Stock / Best Sellers)
   const handleFilterReset = () => {
     console.log('[handleFilterReset] Resetting all filters and sorts');
     setActiveFilters({
@@ -1149,8 +1149,8 @@ const NewShipmentTable = ({
 
       const numeric = isNonTableNumericColumn(columnKey);
 
-      // Popular filters (Days of Inventory only) – when set, only apply this (skip value/condition for this column)
-      if (columnKey === 'doiDays' && filter.popularFilter) {
+      // Popular filters (Inventory column) – when set, only apply this (skip value/condition for this column)
+      if (columnKey === 'fbaAvailable' && filter.popularFilter) {
         if (filter.popularFilter === 'soldOut') {
           result = result.filter((row) => {
             const totalInv = Number(row.totalInventory ?? row.total_inventory) || 0;
@@ -1164,7 +1164,7 @@ const NewShipmentTable = ({
         }
         // bestSellers: no row filter, sort is applied via sortOrder/sortField
       } else {
-      // Value filters (skip for doiDays when popularFilter is set – already handled above)
+      // Value filters (skip for fbaAvailable when popularFilter is set – already handled above)
       if (filter.selectedValues && filter.selectedValues.size > 0) {
         result = result.filter((row, idx) => {
           if (columnKey === 'product') {
@@ -1195,7 +1195,7 @@ const NewShipmentTable = ({
         });
       }
 
-      // Condition filters (same else: skip for doiDays when popularFilter is set)
+      // Condition filters (same else: skip for fbaAvailable when popularFilter is set)
       if (filter.conditionType) {
         result = result.filter((row, idx) => {
           if (columnKey === 'product') {
@@ -1603,12 +1603,16 @@ const NewShipmentTable = ({
     return Number.isFinite(n) ? n : 0;
   };
 
-  // True only when row would show the "NO SALES HISTORY" badge: zero inventory + no sales (matches UI badge logic)
+  // True when row would show the "NO SALES" badge: NOT out of stock AND no sales history (matches UI badge logic exactly)
   const hasNoSalesHistory = (row) => {
     const totalInv = parseSalesValue(row.totalInventory ?? row.total_inventory);
     const s30 = parseSalesValue(row.sales30Day ?? row.sales_30_day ?? row.units_sold_30_days);
     const s7 = parseSalesValue(row.sales7Day ?? row.sales_7_day ?? row.units_sold_7_days);
-    return totalInv === 0 && s30 === 0 && s7 === 0;
+    // Match UI logic: "No Sales" tag shows when NOT out of stock (totalInv > 0) AND no sales history
+    // UI checks: isOutOfStock ? "Out of Stock" : isNoSales ? "No Sales" : inventory number
+    const isOutOfStock = totalInv === 0;
+    const hasSalesHistory = s30 > 0 || s7 > 0;
+    return !isOutOfStock && !hasSalesHistory;
   };
 
   const hasNonTableActiveFilter = (columnKey) => {
@@ -1623,8 +1627,8 @@ const NewShipmentTable = ({
       return true; // Brand filter is active
     }
     
-    // Check for popular filter (Days of Inventory only)
-    if (columnKey === 'doiDays' && filter.popularFilter) return true;
+    // Check for popular filter (Inventory column only)
+    if (columnKey === 'fbaAvailable' && filter.popularFilter) return true;
     
     // Check for condition filter
     const hasCondition = filter.conditionType && filter.conditionType !== '';
@@ -1717,9 +1721,9 @@ const NewShipmentTable = ({
         return next;
       });
       
-      // When resetting DOI column (e.g. after Sold Out / No Sales History), clear sort and row order
+      // When resetting Inventory column (e.g. after Out of Stock / No Sales History), clear sort and row order
       // at top level so the table fully resets to show all products in original order
-      if (columnKey === 'doiDays') {
+      if (columnKey === 'fbaAvailable') {
         setNonTableSortOrder('');
         setNonTableSortedRowOrder(null);
         setNonTableSortField(prev => (prev === 'doiDays' || prev === 'fbaAvailable' ? '' : prev));
@@ -1761,8 +1765,12 @@ const NewShipmentTable = ({
       }
     }
     
-    // When applying a DOI Popular Filter, commit state synchronously so the list updates before the dropdown closes
-    const isDoiPopularFilter = columnKey === 'doiDays' && (filterData.popularFilter === 'soldOut' || filterData.popularFilter === 'noSalesHistory' || filterData.popularFilter === 'bestSellers');
+    // When applying an Inventory Popular Filter, commit state synchronously so the list updates before the dropdown closes
+    const isInventoryPopularFilter = columnKey === 'fbaAvailable' && 
+      (filterData.popularFilter === 'soldOut' || 
+       filterData.popularFilter === 'noSalesHistory' || 
+       filterData.popularFilter === 'bestSellers');
+    
     const applyFilter = () => {
       setNonTableFilters(prev => ({
         ...prev,
@@ -1771,17 +1779,18 @@ const NewShipmentTable = ({
           conditionType: filterData.conditionType || '',
           conditionValue: filterData.conditionValue || '',
           selectedBrands: brandFilterToApply,
-          ...(columnKey === 'doiDays' ? { popularFilter: filterData.popularFilter ?? null } : {}),
+          ...(columnKey === 'fbaAvailable' ? { popularFilter: filterData.popularFilter ?? null } : {}),
         },
       }));
-      // Clear sort only when applying Sold Out/No Sales History *without* an explicit sort (dropdown now sends sort for these)
-      if (columnKey === 'doiDays' && (filterData.popularFilter === 'soldOut' || filterData.popularFilter === 'noSalesHistory') && !filterData.sortOrder) {
+      // Clear sort only when applying Out of Stock/No Sales History *without* an explicit sort (dropdown now sends sort for these)
+      if (columnKey === 'fbaAvailable' && (filterData.popularFilter === 'soldOut' || filterData.popularFilter === 'noSalesHistory') && !filterData.sortOrder) {
         setNonTableSortField('');
         setNonTableSortOrder('');
         setNonTableSortedRowOrder(null);
       }
     };
-    if (isDoiPopularFilter) {
+    
+    if (isInventoryPopularFilter) {
       try {
         flushSync(applyFilter);
       } catch (e) {
@@ -1816,7 +1825,7 @@ const NewShipmentTable = ({
       setNonTableSortOrder(filterData.sortOrder);
       
       // Best Sellers: sort the full list (not the ref) and commit order immediately so list updates
-      const isBestSellersSort = columnKey === 'doiDays' && filterData.popularFilter === 'bestSellers';
+      const isBestSellersSort = columnKey === 'fbaAvailable' && filterData.popularFilter === 'bestSellers';
       const runSort = () => {
         const rowsToSort = isBestSellersSort
           ? [...filteredRowsWithSelection]
@@ -1976,10 +1985,10 @@ const NewShipmentTable = ({
 
   // Apply non-table mode filters
   const nonTableFilteredRows = useMemo(() => {
-    const doiFilter = nonTableFilters.doiDays;
+    const inventoryFilter = nonTableFilters.fbaAvailable;
     // When in table mode, only apply Best Sellers sort if that filter is set (so sort works in both views)
     if (tableMode) {
-      if (doiFilter?.popularFilter === 'bestSellers' && filteredRowsWithSelection.length > 0) {
+      if (inventoryFilter?.popularFilter === 'bestSellers' && filteredRowsWithSelection.length > 0) {
         console.log('[Best Sellers Filter - TABLE MODE] Starting filter...');
         
         // Helper functions to match product names and sizes
@@ -2032,15 +2041,15 @@ const NewShipmentTable = ({
     
     let result = [...filteredRowsWithSelection];
 
-    // Apply DOI Popular Filter first: show only the chosen subset (Sold Out = 0 inventory + has sales; No Sales History = all with zero sales only)
-    if (doiFilter?.popularFilter === 'soldOut') {
+    // Apply Inventory Popular Filter first: show only the chosen subset (Out of Stock = 0 inventory + has sales; No Sales History = all with zero sales only)
+    if (inventoryFilter?.popularFilter === 'soldOut') {
       result = result.filter((row) => {
         const totalInv = Number(row.totalInventory ?? row.total_inventory) || 0;
         const s30 = parseSalesValue(row.sales30Day ?? row.sales_30_day ?? row.units_sold_30_days);
         const s7 = parseSalesValue(row.sales7Day ?? row.sales_7_day ?? row.units_sold_7_days);
         return totalInv === 0 && (s30 > 0 || s7 > 0);
       });
-    } else if (doiFilter?.popularFilter === 'noSalesHistory') {
+    } else if (inventoryFilter?.popularFilter === 'noSalesHistory') {
       // Show only products with no sales history (all such rows from the current list)
       result = result.filter((row) => hasNoSalesHistory(row));
     }
@@ -2053,8 +2062,8 @@ const NewShipmentTable = ({
 
       const numeric = isNonTableNumericColumn(columnKey);
 
-      // Skip value/condition for doiDays when Popular Filter is set (applied at end of useMemo)
-      if (columnKey === 'doiDays' && filter.popularFilter) return;
+      // Skip value/condition for fbaAvailable when Popular Filter is set (applied at end of useMemo)
+      if (columnKey === 'fbaAvailable' && filter.popularFilter) return;
 
       // Brand filter/sort (for product column)
       if (columnKey === 'product' && filter.selectedBrands && filter.selectedBrands instanceof Set && filter.selectedBrands.size > 0) {
@@ -2184,7 +2193,7 @@ const NewShipmentTable = ({
     });
 
     // Apply non-table sorting - use stored order if available (one-time sort)
-    if (nonTableSortedRowOrder && nonTableSortedRowOrder.length > 0 && doiFilter?.popularFilter !== 'bestSellers') {
+    if (nonTableSortedRowOrder && nonTableSortedRowOrder.length > 0 && inventoryFilter?.popularFilter !== 'bestSellers') {
       // Create a map of row ID to row for quick lookup
       const rowMap = new Map(result.map(row => [row.id, row]));
       
@@ -2208,10 +2217,36 @@ const NewShipmentTable = ({
       });
       
       result = orderedResult;
+    } else if (!tableMode && nonTableSortField === '' && !inventoryFilter?.popularFilter) {
+      // Default view for non-table mode when no sort/filter is applied:
+      // 1. Out of Stock products (DOI = 0) at the top
+      // 2. Other products sorted by DOI ascending (low DOI first)
+      // 3. No Sales History products at the bottom
+      result = [...result].sort((a, b) => {
+        const aDOI = a.doiTotal || a.daysOfInventory || 0;
+        const bDOI = b.doiTotal || b.daysOfInventory || 0;
+        const aTotalInv = Number(a.totalInventory ?? a.total_inventory) || 0;
+        const bTotalInv = Number(b.totalInventory ?? b.total_inventory) || 0;
+        const aIsOutOfStock = aTotalInv === 0;
+        const bIsOutOfStock = bTotalInv === 0;
+        const aIsNoSales = hasNoSalesHistory(a);
+        const bIsNoSales = hasNoSalesHistory(b);
+        
+        // Out of Stock products (DOI = 0) at the top
+        if (aIsOutOfStock && !bIsOutOfStock) return -1;
+        if (!aIsOutOfStock && bIsOutOfStock) return 1;
+        
+        // No Sales History products at the bottom (but after Out of Stock)
+        if (aIsNoSales && !bIsNoSales) return 1;
+        if (!aIsNoSales && bIsNoSales) return -1;
+        
+        // Sort by DOI ascending (low DOI first) for remaining products
+        return aDOI - bDOI;
+      });
     }
 
     // Best Sellers: show ONLY the specific top 10 products from last week's report
-    if (doiFilter?.popularFilter === 'bestSellers' && result.length > 0) {
+    if (inventoryFilter?.popularFilter === 'bestSellers' && result.length > 0) {
       console.log('[Best Sellers Filter] Total rows before filter:', result.length);
       
       // Helper functions to match product names and sizes
@@ -2264,7 +2299,7 @@ const NewShipmentTable = ({
   }, [filteredRowsWithSelection, nonTableFilters, nonTableSortedRowOrder, tableMode, account, addedRows]);
 
   // When Best Sellers is active, always use nonTableFilteredRows (sorted); otherwise table mode uses filteredRowsWithSelection
-  const currentRows = (tableMode && nonTableFilters.doiDays?.popularFilter !== 'bestSellers')
+  const currentRows = (tableMode && nonTableFilters.fbaAvailable?.popularFilter !== 'bestSellers')
     ? filteredRowsWithSelection
     : nonTableFilteredRows;
 
@@ -2900,7 +2935,12 @@ const NewShipmentTable = ({
   // Handle row mousedown to prevent text selection on Shift+Click
   const handleNonTableRowMouseDown = (e, arrayIndex, originalIndex) => {
     // Don't prevent if clicking on interactive elements
-    if (e.target.closest('button') || e.target.closest('input')) {
+    // Exclude checkboxes specifically to allow checkbox selection
+    if (
+      e.target.closest('button') || 
+      (e.target.closest('input') && e.target.type !== 'checkbox') ||
+      e.target.type === 'checkbox'
+    ) {
       return;
     }
 
@@ -2918,7 +2958,12 @@ const NewShipmentTable = ({
   // arrayIndex is the position in currentRows (0, 1, 2...), originalIndex is row._originalIndex for qty operations
   const handleNonTableRowClick = (e, arrayIndex, originalIndex) => {
     // Don't handle selection if clicking on interactive elements
-    if (e.target.closest('button') || e.target.closest('input')) {
+    // Exclude checkboxes specifically to allow checkbox selection
+    if (
+      e.target.closest('button') || 
+      (e.target.closest('input') && e.target.type !== 'checkbox') ||
+      e.target.type === 'checkbox'
+    ) {
       return;
     }
 
@@ -2963,6 +3008,63 @@ const NewShipmentTable = ({
     } else {
       // Regular click: Select only this item (modal opens on double-click)
       setNonTableSelectedIndices(new Set([originalIndex]));
+      setNonTableLastSelectedIndex(arrayIndex);
+    }
+  };
+
+  // Handle checkbox click for multi-select (non-table mode)
+  // Supports Shift+Click and Cmd+Click for bulk selection
+  const handleNonTableCheckboxClick = (e, arrayIndex, originalIndex) => {
+    e.stopPropagation(); // Prevent triggering row click handler
+    
+    const isShiftClick = e.shiftKey;
+    const isCmdClick = e.metaKey || e.ctrlKey;
+    const wasChecked = nonTableSelectedIndices.has(originalIndex);
+    const willBeChecked = e.target.checked;
+
+    // Prevent text selection on Shift+Click
+    if (isShiftClick) {
+      e.preventDefault();
+      // Clear any existing text selection
+      if (window.getSelection) {
+        window.getSelection().removeAllRanges();
+      }
+    }
+
+    if (isShiftClick && nonTableLastSelectedIndex !== null) {
+      // Shift + Click: Select range between lastSelectedIndex and current arrayIndex
+      // Always select the entire range (standard Shift+Click behavior)
+      const start = Math.min(nonTableLastSelectedIndex, arrayIndex);
+      const end = Math.max(nonTableLastSelectedIndex, arrayIndex);
+      const newSelected = new Set(nonTableSelectedIndices);
+      
+      // Add all rows in the range by their array positions
+      for (let i = start; i <= end; i++) {
+        if (i < currentRows.length) {
+          const rowAtPosition = currentRows[i];
+          newSelected.add(rowAtPosition._originalIndex);
+        }
+      }
+      
+      setNonTableSelectedIndices(newSelected);
+      setNonTableLastSelectedIndex(arrayIndex);
+    } else if (isCmdClick) {
+      // Cmd/Ctrl + Click: Toggle selection of this item
+      const newSelected = new Set(nonTableSelectedIndices);
+      if (willBeChecked) {
+        newSelected.add(originalIndex);
+      } else {
+        newSelected.delete(originalIndex);
+      }
+      setNonTableSelectedIndices(newSelected);
+      setNonTableLastSelectedIndex(arrayIndex);
+    } else {
+      // Regular click: Select/deselect only this item
+      if (willBeChecked) {
+        setNonTableSelectedIndices(new Set([originalIndex]));
+      } else {
+        setNonTableSelectedIndices(new Set());
+      }
       setNonTableLastSelectedIndex(arrayIndex);
     }
   };
@@ -3447,8 +3549,10 @@ const NewShipmentTable = ({
                   key={`${row.id}-${index}`}
                   onMouseDown={(e) => {
                     // Only handle mousedown if not clicking on interactive elements
+                    // Exclude checkboxes specifically to allow checkbox selection
                     if (
-                      !e.target.closest('input') &&
+                      e.target.type !== 'checkbox' &&
+                      !e.target.closest('input[type="checkbox"]') &&
                       !e.target.closest('button') &&
                       !e.target.closest('img[alt="Copy"]')
                     ) {
@@ -3457,8 +3561,10 @@ const NewShipmentTable = ({
                   }}
                   onClick={(e) => {
                     // Only handle selection if not clicking on interactive elements
+                    // Exclude checkboxes specifically to allow checkbox selection
                     if (
-                      !e.target.closest('input') &&
+                      e.target.type !== 'checkbox' &&
+                      !e.target.closest('input[type="checkbox"]') &&
                       !e.target.closest('button') &&
                       !e.target.closest('img[alt="Copy"]')
                     ) {
@@ -3549,8 +3655,59 @@ const NewShipmentTable = ({
                   />
                   {/* PRODUCTS Column */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {/* Checkbox for bulk selection */}
+                    <label
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        marginLeft: '20px',
+                        flexShrink: 0
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={(e) => handleNonTableCheckboxClick(e, arrayIndex, index)}
+                        style={{
+                          position: 'absolute',
+                          opacity: 0,
+                          width: 0,
+                          height: 0,
+                          margin: 0,
+                          pointerEvents: 'none'
+                        }}
+                      />
+                      <span
+                        style={{
+                          width: '16px',
+                          height: '16px',
+                          borderRadius: '4px',
+                          border: '1px solid',
+                          borderColor: isSelected
+                            ? (isDarkMode ? '#3B82F6' : '#3B82F6')
+                            : (isDarkMode ? '#64748B' : '#94A3B8'),
+                          backgroundColor: isSelected 
+                            ? (isDarkMode ? '#3B82F6' : '#3B82F6')
+                            : (isDarkMode ? '#1A2235' : '#F9FAFB'),
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          transition: 'background-color 0.2s, border-color 0.2s'
+                        }}
+                      >
+                        {isSelected && (
+                          <svg width="10" height="8" viewBox="0 0 10 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M1 4L4 7L9 1" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </span>
+                    </label>
                     {/* Product Icon - Alternating placeholder images */}
-                    <div style={{ width: '36px', height: '36px', minWidth: '36px', borderRadius: '3px', overflow: 'hidden', backgroundColor: isDarkMode ? '#374151' : '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginLeft: '20px' }}>
+                    <div style={{ width: '36px', height: '36px', minWidth: '36px', borderRadius: '3px', overflow: 'hidden', backgroundColor: isDarkMode ? '#374151' : '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <img 
                         src={index % 2 === 0 
                           ? "https://scontent.fcrk1-4.fna.fbcdn.net/v/t39.30808-6/324020813_5698060603642883_3730941176199502248_n.jpg?_nc_cat=109&ccb=1-7&_nc_sid=6ee11a&_nc_ohc=GGxaVG4-pVgQ7kNvwEPLk1T&_nc_oc=AdnEjj3CW2ATnumPvOuJ-FMNwcmhl9bJtNYRiqBX0KP8pIFYhMc84O-nNOk6kE4dvDA&_nc_zt=23&_nc_ht=scontent.fcrk1-4.fna&_nc_gid=9BGxqtl66s2GX15r0D2jdA&oh=00_Afowix4xzmWR-0krARMs91-l_crfPVOv-mYZt6pCBxQvqg&oe=697DA3B3"

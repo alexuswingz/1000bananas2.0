@@ -52,7 +52,7 @@ const ProductsFilterDropdown = forwardRef(({
   const [isPositioned, setIsPositioned] = useState(false);
   const [sortOrder, setSortOrder] = useState('');
   const [filterConditionExpanded, setFilterConditionExpanded] = useState(false);
-  const [filterValuesExpanded, setFilterValuesExpanded] = useState(true); // Start open by default
+  const [filterValuesExpanded, setFilterValuesExpanded] = useState(false); // Collapsed by default to save space
   const [brandFilterExpanded, setBrandFilterExpanded] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [brandSearchTerm, setBrandSearchTerm] = useState('');
@@ -353,7 +353,7 @@ const ProductsFilterDropdown = forwardRef(({
           boxShadow: theme.shadow,
           border: `1px solid ${theme.border}`,
           zIndex: 10000,
-          overflow: 'hidden',
+          overflow: 'visible',
           opacity: isPositioned ? 1 : 0,
           transition: 'opacity 0.15s ease-in',
         }}
@@ -369,8 +369,8 @@ const ProductsFilterDropdown = forwardRef(({
           display: none; /* Chrome, Safari */
         }
       `}</style>
-      {/* Popular Filters (Days of Inventory only) – dropdown like Filter by condition */}
-      {columnKey === 'doiDays' && (
+      {/* Popular Filters (Inventory column) – dropdown like Filter by condition */}
+      {columnKey === 'fbaAvailable' && (
         <div style={{ borderBottom: `1px solid ${theme.border}` }}>
           <div
             onClick={() => setPopularFilterExpanded(!popularFilterExpanded)}
@@ -430,7 +430,7 @@ const ProductsFilterDropdown = forwardRef(({
                 >
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {currentFilter.popularFilter === 'soldOut'
-                      ? 'Sold Out'
+                      ? 'Out of Stock'
                       : currentFilter.popularFilter === 'noSalesHistory'
                         ? 'No Sales History'
                         : currentFilter.popularFilter === 'bestSellers'
@@ -471,13 +471,13 @@ const ProductsFilterDropdown = forwardRef(({
                       border: `1px solid ${theme.border}`,
                       boxShadow: theme.shadow,
                       padding: '4px 0',
-                      zIndex: 50,
+                      zIndex: 10001,
                     }}
                     onClick={(e) => e.stopPropagation()}
                   >
                     {[
                       { id: null, label: 'None' },
-                      { id: 'soldOut', label: 'Sold Out' },
+                      { id: 'soldOut', label: 'Out of Stock' },
                       { id: 'noSalesHistory', label: 'No Sales History' },
                       { id: 'bestSellers', label: 'Best Sellers' },
                     ].map(({ id, label }) => {
@@ -544,6 +544,11 @@ const ProductsFilterDropdown = forwardRef(({
       )}
       {/* Sort Options */}
       <div style={{ padding: '8px 12px', borderBottom: `1px solid ${theme.border}` }}>
+        {columnKey === 'doiDays' && (
+          <div style={{ fontSize: '10px', fontWeight: 600, color: theme.subtleText, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+            Sort by Total Inventory
+          </div>
+        )}
         {/* Sort Ascending */}
         <div
           onClick={(e) => {
@@ -599,11 +604,13 @@ const ProductsFilterDropdown = forwardRef(({
               flexShrink: 0,
             }}
           >
-            AZ
+            <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M6 2L10 8H2L6 2Z" fill="currentColor"/>
+              <path d="M6 10L2 4H10L6 10Z" fill="currentColor" opacity="0.3"/>
+            </svg>
           </div>
           <div style={{ fontSize: '12px', color: theme.headerText, fontWeight: 400, lineHeight: '1.3' }}>
-            Sort ascending<br/>
-            <span style={{ color: theme.subtleText, fontSize: '11px' }}>(A to Z)</span>
+            Low to High
           </div>
         </div>
 
@@ -661,11 +668,13 @@ const ProductsFilterDropdown = forwardRef(({
               flexShrink: 0,
             }}
           >
-            ZA
+            <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M6 2L10 8H2L6 2Z" fill="currentColor" opacity="0.3"/>
+              <path d="M6 10L2 4H10L6 10Z" fill="currentColor"/>
+            </svg>
           </div>
           <div style={{ fontSize: '12px', color: theme.headerText, fontWeight: 400, lineHeight: '1.3' }}>
-            Sort descending<br/>
-            <span style={{ color: theme.subtleText, fontSize: '11px' }}>(Z to A)</span>
+            High to Low
           </div>
         </div>
 
@@ -722,10 +731,13 @@ const ProductsFilterDropdown = forwardRef(({
                   flexShrink: 0,
                 }}
               >
-                AZ
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M6 2L10 8H2L6 2Z" fill="currentColor"/>
+                  <path d="M6 10L2 4H10L6 10Z" fill="currentColor" opacity="0.3"/>
+                </svg>
               </div>
               <div style={{ fontSize: '12px', color: theme.headerText, fontWeight: 400, lineHeight: '1.3' }}>
-                FBA A-Z
+                FBA Low to High
               </div>
             </div>
             <div
@@ -774,10 +786,13 @@ const ProductsFilterDropdown = forwardRef(({
                   flexShrink: 0,
                 }}
               >
-                ZA
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M6 2L10 8H2L6 2Z" fill="currentColor" opacity="0.3"/>
+                  <path d="M6 10L2 4H10L6 10Z" fill="currentColor"/>
+                </svg>
               </div>
               <div style={{ fontSize: '12px', color: theme.headerText, fontWeight: 400, lineHeight: '1.3' }}>
-                FBA Z-A
+                FBA High to Low
               </div>
             </div>
           </>
@@ -880,7 +895,7 @@ const ProductsFilterDropdown = forwardRef(({
                     border: `1px solid ${theme.border}`,
                     boxShadow: theme.shadow,
                     padding: '4px 0',
-                    zIndex: 50,
+                    zIndex: 10001,
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
