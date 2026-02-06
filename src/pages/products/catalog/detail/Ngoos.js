@@ -347,7 +347,15 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         fbaAge: inv.fba_age ? {
           oldest_days: inv.fba_age.oldest_days,
           newest_days: inv.fba_age.newest_days,
-          avg_days: inv.fba_age.avg_days
+          avg_days: inv.fba_age.avg_days,
+          // Age buckets (days): 0-90, 91-180, 181-270, 271-365, 365+
+          buckets: {
+            '0-90': inv.fba_age['0-90'] ?? inv.fba_age.range_0_90 ?? inv.fba_age.buckets?.['0-90'] ?? 0,
+            '91-180': inv.fba_age['91-180'] ?? inv.fba_age.range_91_180 ?? inv.fba_age.buckets?.['91-180'] ?? 0,
+            '181-270': inv.fba_age['181-270'] ?? inv.fba_age.range_181_270 ?? inv.fba_age.buckets?.['181-270'] ?? 0,
+            '271-365': inv.fba_age['271-365'] ?? inv.fba_age.range_271_365 ?? inv.fba_age.buckets?.['271-365'] ?? 0,
+            '365+': inv.fba_age['365+'] ?? inv.fba_age.range_365_plus ?? inv.fba_age.buckets?.['365+'] ?? 0
+          }
         } : null
       };
     }
@@ -366,12 +374,20 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         reserved: 0
       }
     };
+    const fallbackFbaAge = forecastData?.inventory?.fba_age;
     return {
       ...base,
-      fbaAge: base.fbaAge || (forecastData?.inventory?.fba_age ? {
-        oldest_days: forecastData.inventory.fba_age.oldest_days,
-        newest_days: forecastData.inventory.fba_age.newest_days,
-        avg_days: forecastData.inventory.fba_age.avg_days
+      fbaAge: base.fbaAge || (fallbackFbaAge ? {
+        oldest_days: fallbackFbaAge.oldest_days,
+        newest_days: fallbackFbaAge.newest_days,
+        avg_days: fallbackFbaAge.avg_days,
+        buckets: {
+          '0-90': fallbackFbaAge['0-90'] ?? fallbackFbaAge.range_0_90 ?? fallbackFbaAge.buckets?.['0-90'] ?? 0,
+          '91-180': fallbackFbaAge['91-180'] ?? fallbackFbaAge.range_91_180 ?? fallbackFbaAge.buckets?.['91-180'] ?? 0,
+          '181-270': fallbackFbaAge['181-270'] ?? fallbackFbaAge.range_181_270 ?? fallbackFbaAge.buckets?.['181-270'] ?? 0,
+          '271-365': fallbackFbaAge['271-365'] ?? fallbackFbaAge.range_271_365 ?? fallbackFbaAge.buckets?.['271-365'] ?? 0,
+          '365+': fallbackFbaAge['365+'] ?? fallbackFbaAge.range_365_plus ?? fallbackFbaAge.buckets?.['365+'] ?? 0
+        }
       } : null)
     };
   }, [forecastData, productDetails]);
@@ -2106,18 +2122,26 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           overflowX: 'auto',
           minWidth: 0
         }}>
-          {/* Left: Product Info */}
+          {/* Left: Product Info - sticky left so it stays visible when scrolling buckets horizontally */}
           <div className={themeClasses.cardBg} style={{ 
             borderRadius: '0.5rem', 
             padding: inventoryOnly ? '1rem 3rem 1rem 1rem' : '1.5rem',
             minWidth: inventoryOnly ? '300px' : 'auto',
             flex: inventoryOnly ? '1 1 48%' : '1',
             maxWidth: inventoryOnly ? '488px' : 'auto',
+            width: inventoryOnly ? '300px' : 'auto',
             height: inventoryOnly ? '160px' : 'auto',
             flexShrink: 0,
             border: '1px solid #334155',
             display: 'flex',
-            flexDirection: 'column'
+            flexDirection: 'column',
+            position: 'sticky',
+            left: 0,
+            top: 0,
+            alignSelf: 'flex-start',
+            zIndex: 10,
+            backgroundColor: '#0f172a',
+            boxShadow: '4px 0 8px rgba(0,0,0,0.2)'
           }}>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
               <div style={{ 
@@ -2223,47 +2247,35 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           <div className={themeClasses.cardBg} style={{ 
             borderRadius: '0.5rem', 
             padding: '1rem', 
-            width: inventoryOnly ? '200px' : 'auto',
-            minWidth: inventoryOnly ? '200px' : 'auto',
-            flex: inventoryOnly ? '0 0 200px' : '1',
+            width: 'auto',
+            minWidth: 'auto',
+            flex: '0 0 auto',
             height: inventoryOnly ? '160px' : 'auto',
             border: '1px solid #334155',
             display: 'flex',
             flexDirection: 'column',
-            flexShrink: 0
+            flexShrink: 0,
+            minHeight: 0
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.25rem' }}>
-              <div style={{
-                width: inventoryOnly ? '24px' : '32px',
-                height: inventoryOnly ? '24px' : '32px',
-                borderRadius: '50%',
-                backgroundColor: '#22c55e',
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center' 
-              }}>
-                <svg style={{ width: inventoryOnly ? '14px' : '18px', height: inventoryOnly ? '14px' : '18px', color: '#fff' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                </svg>
-              </div>
-              <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>FBA</span>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.25rem', flexShrink: 0 }}>
+              <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>FBA Inventory</span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Total FBA:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fba.total}</span>
+            <div className="scrollbar-hide" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#A8B3C2', fontWeight: 400 }}>Total FBA</span>
+                <span style={{ fontSize: inventoryOnly ? '1rem' : '1.125rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fba.total}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Available:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fba.available}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#A8B3C2', fontWeight: 400 }}>Available</span>
+                <span style={{ fontSize: inventoryOnly ? '1rem' : '1.125rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fba.available}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Inbound:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fba.inbound}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#A8B3C2', fontWeight: 400 }}>Inbound</span>
+                <span style={{ fontSize: inventoryOnly ? '1rem' : '1.125rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fba.inbound}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Reserved:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fba.reserved}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#A8B3C2', fontWeight: 400 }}>Reserved</span>
+                <span style={{ fontSize: inventoryOnly ? '1rem' : '1.125rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fba.reserved}</span>
               </div>
             </div>
           </div>
@@ -2272,51 +2284,39 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           <div className={themeClasses.cardBg} style={{ 
             borderRadius: '0.5rem', 
             padding: '1rem', 
-            width: inventoryOnly ? '200px' : 'auto',
-            minWidth: inventoryOnly ? '200px' : 'auto',
-            flex: inventoryOnly ? '0 0 200px' : '1',
+            width: 'auto',
+            minWidth: 'auto',
+            flex: '0 0 auto',
             height: inventoryOnly ? '160px' : 'auto',
             border: '1px solid #334155',
             display: 'flex',
             flexDirection: 'column',
-            flexShrink: 0
+            flexShrink: 0,
+            minHeight: 0
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.25rem' }}>
-              <div style={{
-                width: inventoryOnly ? '24px' : '32px',
-                height: inventoryOnly ? '24px' : '32px',
-                borderRadius: '50%',
-                backgroundColor: '#3b82f6',
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center' 
-              }}>
-                <svg style={{ width: inventoryOnly ? '14px' : '18px', height: inventoryOnly ? '14px' : '18px', color: '#fff' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                </svg>
-              </div>
-              <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>AWD</span>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.25rem', flexShrink: 0 }}>
+              <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>AWD Inventory</span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Total AWD:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.awd.total}</span>
+            <div className="scrollbar-hide" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#A8B3C2', fontWeight: 400 }}>Total AWD</span>
+                <span style={{ fontSize: inventoryOnly ? '1rem' : '1.125rem', fontWeight: '600', color: '#fff' }}>{inventoryData.awd.total}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Available:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.awd.available}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#A8B3C2', fontWeight: 400 }}>Available</span>
+                <span style={{ fontSize: inventoryOnly ? '1rem' : '1.125rem', fontWeight: '600', color: '#fff' }}>{inventoryData.awd.available}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Inbound:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.awd.inbound || 0}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#A8B3C2', fontWeight: 400 }}>Inbound</span>
+                <span style={{ fontSize: inventoryOnly ? '1rem' : '1.125rem', fontWeight: '600', color: '#fff' }}>{inventoryData.awd.inbound || 0}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Reserved:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.awd.reserved}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#A8B3C2', fontWeight: 400 }}>Reserved</span>
+                <span style={{ fontSize: inventoryOnly ? '1rem' : '1.125rem', fontWeight: '600', color: '#fff' }}>{inventoryData.awd.reserved}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Outbound:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.awd.outbound_to_fba || 0}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#A8B3C2', fontWeight: 400 }}>Outbound</span>
+                <span style={{ fontSize: inventoryOnly ? '1rem' : '1.125rem', fontWeight: '600', color: '#fff' }}>{inventoryData.awd.outbound_to_fba || 0}</span>
               </div>
             </div>
           </div>
@@ -2325,43 +2325,94 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           <div className={themeClasses.cardBg} style={{ 
             borderRadius: '0.5rem', 
             padding: '1rem', 
-            width: inventoryOnly ? '200px' : 'auto',
-            minWidth: inventoryOnly ? '200px' : 'auto',
-            flex: inventoryOnly ? '0 0 200px' : '1',
+            width: 'auto',
+            minWidth: 'auto',
+            flex: '0 0 auto',
             height: inventoryOnly ? '160px' : 'auto',
             border: '1px solid #334155',
             display: 'flex',
             flexDirection: 'column',
-            flexShrink: 0
+            flexShrink: 0,
+            minHeight: 0
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.25rem' }}>
-              <div style={{
-                width: inventoryOnly ? '24px' : '32px',
-                height: inventoryOnly ? '24px' : '32px',
-                borderRadius: '50%',
-                backgroundColor: '#f59e0b',
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center' 
-              }}>
-                <svg style={{ width: inventoryOnly ? '14px' : '18px', height: inventoryOnly ? '14px' : '18px', color: '#fff' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.25rem', flexShrink: 0 }}>
               <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>FBA Age</span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Oldest:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fbaAge?.oldest_days != null ? `${inventoryData.fbaAge.oldest_days} days` : '—'}</span>
+            <div className="scrollbar-hide" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              {['0-90', '91-180', '181-270', '271-365', '365+'].map((label) => {
+                const value = inventoryData.fbaAge?.buckets?.[label] ?? inventoryData.fbaAge?.[label] ?? 0;
+                return (
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#A8B3C2', fontWeight: 400 }}>{label}</span>
+                    <span style={{ fontSize: inventoryOnly ? '1rem' : '1.125rem', fontWeight: '600', color: '#fff' }}>{typeof value === 'number' ? value : (value ?? '—')}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Placeholder Bucket 1 */}
+          <div className={themeClasses.cardBg} style={{ 
+            borderRadius: '0.5rem', 
+            padding: '1rem', 
+            width: 'auto',
+            minWidth: 'auto',
+            flex: '0 0 auto',
+            height: inventoryOnly ? '160px' : 'auto',
+            border: '1px solid #334155',
+            display: 'flex',
+            flexDirection: 'column',
+            flexShrink: 0,
+            minHeight: 0
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.25rem', flexShrink: 0 }}>
+              <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>Placeholder</span>
+            </div>
+            <div className="scrollbar-hide" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#A8B3C2', fontWeight: 400 }}>Metric 1</span>
+                <span style={{ fontSize: inventoryOnly ? '1rem' : '1.125rem', fontWeight: '600', color: '#fff' }}>—</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Newest:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fbaAge?.newest_days != null ? `${inventoryData.fbaAge.newest_days} days` : '—'}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#A8B3C2', fontWeight: 400 }}>Metric 2</span>
+                <span style={{ fontSize: inventoryOnly ? '1rem' : '1.125rem', fontWeight: '600', color: '#fff' }}>—</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Avg age:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fbaAge?.avg_days != null ? `${inventoryData.fbaAge.avg_days} days` : '—'}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#A8B3C2', fontWeight: 400 }}>Metric 3</span>
+                <span style={{ fontSize: inventoryOnly ? '1rem' : '1.125rem', fontWeight: '600', color: '#fff' }}>—</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Placeholder Bucket 2 */}
+          <div className={themeClasses.cardBg} style={{ 
+            borderRadius: '0.5rem', 
+            padding: '1rem', 
+            width: 'auto',
+            minWidth: 'auto',
+            flex: '0 0 auto',
+            height: inventoryOnly ? '160px' : 'auto',
+            border: '1px solid #334155',
+            display: 'flex',
+            flexDirection: 'column',
+            flexShrink: 0,
+            minHeight: 0
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.25rem', flexShrink: 0 }}>
+              <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>Placeholder</span>
+            </div>
+            <div className="scrollbar-hide" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#A8B3C2', fontWeight: 400 }}>Metric 1</span>
+                <span style={{ fontSize: inventoryOnly ? '1rem' : '1.125rem', fontWeight: '600', color: '#fff' }}>—</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#A8B3C2', fontWeight: 400 }}>Metric 2</span>
+                <span style={{ fontSize: inventoryOnly ? '1rem' : '1.125rem', fontWeight: '600', color: '#fff' }}>—</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#A8B3C2', fontWeight: 400 }}>Metric 3</span>
+                <span style={{ fontSize: inventoryOnly ? '1rem' : '1.125rem', fontWeight: '600', color: '#fff' }}>—</span>
               </div>
             </div>
           </div>
