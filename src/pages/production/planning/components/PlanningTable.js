@@ -2250,8 +2250,8 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
             width: '20px',
             height: '20px',
             borderRadius: '20px',
-            backgroundColor: '#FFFFFF',
-            border: '1px solid #D1D5DB',
+            backgroundColor: '#9CA3AF',
+            border: 'none',
             display: 'inline-block',
           }}
         />
