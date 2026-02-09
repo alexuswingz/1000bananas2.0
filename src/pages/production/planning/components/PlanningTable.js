@@ -2231,7 +2231,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
     <div
       style={{
         position: 'fixed',
-        right: '2rem',
+        right: 'calc(2rem + 14px)',
         bottom: '2rem',
         zIndex: 50,
         display: 'flex',
@@ -2244,15 +2244,6 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
       }}
     >
-      <span
-        style={{
-          fontSize: '14px',
-          fontWeight: 500,
-          color: isDarkMode ? '#E5E7EB' : '#374151',
-        }}
-      >
-        Key:
-      </span>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <div
           style={{

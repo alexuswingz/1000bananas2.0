@@ -3992,25 +3992,20 @@ const NewShipmentTable = ({
                             maxHeight: '20px',
                             boxSizing: 'border-box',
                             width: 'fit-content',
-                            marginLeft: '-25px'
+                            marginLeft: '-15px'
                           }}>
-                            <svg
-                              width="12"
-                              height="12"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              xmlns="http://www.w3.org/2000/svg"
-                              style={{ flexShrink: 0 }}
-                            >
-                              <path
-                                d="M12 9V13M12 17H12.01M10.29 3.86L1.82 18C1.64547 18.3024 1.55297 18.6453 1.55197 18.9945C1.55097 19.3437 1.64148 19.6871 1.81442 19.9905C1.98737 20.2939 2.23675 20.5467 2.53773 20.7239C2.83871 20.901 3.18082 20.9962 3.53 21H20.47C20.8192 20.9962 21.1613 20.901 21.4623 20.7239C21.7633 20.5467 22.0126 20.2939 22.1856 19.9905C22.3585 19.6871 22.449 19.3437 22.448 18.9945C22.447 18.6453 22.3545 18.3024 22.18 18L13.71 3.86C13.5318 3.56631 13.2807 3.32311 12.9812 3.15447C12.6817 2.98584 12.3438 2.89725 12 2.89725C11.6562 2.89725 11.3183 2.98584 11.0188 3.15447C10.7193 3.32311 10.4682 3.56631 10.29 3.86Z"
-                                stroke="#EF4444"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                fill="#EF4444"
-                              />
-                            </svg>
+                            <span style={{
+                              width: '12px',
+                              height: '12px',
+                              borderRadius: '50%',
+                              backgroundColor: '#EF4444',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              <span style={{ color: '#FFFFFF', fontWeight: 700, fontSize: '10px', lineHeight: 1 }}>!</span>
+                            </span>
                             <span style={{ color: '#EF4444', fontWeight: 700, fontSize: '12px', lineHeight: 1 }}>
                               Sold Out
                             </span>
