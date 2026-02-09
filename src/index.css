@@ -104,20 +104,12 @@ code {
   margin-right: 12px;
 }
 
-/* Animation improvements */
-@keyframes slideInFromRight {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
+/* Enter: Dissolve In (opacity only). Exit: keep slide upwards. */
 [data-sonner-toast] {
-  animation: slideInFromRight 0.3s ease-out;
+  transition: transform 0s, opacity 0.5s cubic-bezier(0.33, 0, 0.2, 1), height 400ms, box-shadow 200ms !important;
+}
+[data-sonner-toast][data-removed='true'] {
+  transition: transform 400ms ease, opacity 400ms ease, height 400ms, box-shadow 200ms !important;
 }
 
 /* Hide number input spinner arrows */

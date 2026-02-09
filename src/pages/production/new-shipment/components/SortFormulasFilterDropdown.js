@@ -333,6 +333,7 @@ const SortFormulasFilterDropdown = forwardRef(({
             if (onApply) {
               onApply({
                 sortOrder: newOrder,
+                sortField: columnKey,
                 selectedValues,
                 conditionType,
                 conditionValue,
@@ -393,6 +394,7 @@ const SortFormulasFilterDropdown = forwardRef(({
             if (onApply) {
               onApply({
                 sortOrder: newOrder,
+                sortField: columnKey,
                 selectedValues,
                 conditionType,
                 conditionValue,

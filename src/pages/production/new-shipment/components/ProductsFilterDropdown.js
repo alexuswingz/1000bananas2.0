@@ -430,7 +430,7 @@ const ProductsFilterDropdown = forwardRef(({
                 >
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {currentFilter.popularFilter === 'soldOut'
-                      ? 'Out of Stock'
+                      ? 'Sold Out'
                       : currentFilter.popularFilter === 'noSalesHistory'
                         ? 'No Sales History'
                         : currentFilter.popularFilter === 'bestSellers'
@@ -477,7 +477,7 @@ const ProductsFilterDropdown = forwardRef(({
                   >
                     {[
                       { id: null, label: 'None' },
-                      { id: 'soldOut', label: 'Out of Stock' },
+                      { id: 'soldOut', label: 'Sold Out' },
                       { id: 'noSalesHistory', label: 'No Sales History' },
                       { id: 'bestSellers', label: 'Best Sellers' },
                     ].map(({ id, label }) => {
@@ -557,6 +557,7 @@ const ProductsFilterDropdown = forwardRef(({
             if (onApply) {
               const sortData = {
                 sortOrder: newOrder,
+                sortField: columnKey,
                 selectedValues,
                 conditionType,
                 conditionValue,
@@ -591,23 +592,16 @@ const ProductsFilterDropdown = forwardRef(({
         >
           <div
             style={{
-              width: '20px',
-              height: '20px',
-              backgroundColor: sortOrder === 'asc' ? theme.chipBgActive : theme.chipBg,
+              width: '17px',
+              height: '17px',
               borderRadius: '3px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '9px',
-              fontWeight: 700,
-              color: sortOrder === 'asc' ? theme.chipTextActive : theme.chipText,
               flexShrink: 0,
             }}
           >
-            <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M6 2L10 8H2L6 2Z" fill="currentColor"/>
-              <path d="M6 10L2 4H10L6 10Z" fill="currentColor" opacity="0.3"/>
-            </svg>
+            <img src="/assets/High to Low.png" alt="Low to High" style={{ width: '17px', height: '17px', objectFit: 'contain', imageRendering: 'crisp-edges', ...(isDarkMode ? { filter: 'invert(1) brightness(1.05)' } : {}) }} />
           </div>
           <div style={{ fontSize: '12px', color: theme.headerText, fontWeight: 400, lineHeight: '1.3' }}>
             Low to High
@@ -622,6 +616,7 @@ const ProductsFilterDropdown = forwardRef(({
             if (onApply) {
               const sortData = {
                 sortOrder: newOrder,
+                sortField: columnKey,
                 selectedValues,
                 conditionType,
                 conditionValue,
@@ -655,23 +650,16 @@ const ProductsFilterDropdown = forwardRef(({
         >
           <div
             style={{
-              width: '20px',
-              height: '20px',
-              backgroundColor: sortOrder === 'desc' ? theme.chipBgActive : theme.chipBg,
+              width: '17px',
+              height: '17px',
               borderRadius: '3px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '9px',
-              fontWeight: 700,
-              color: sortOrder === 'desc' ? theme.chipTextActive : theme.chipText,
               flexShrink: 0,
             }}
           >
-            <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M6 2L10 8H2L6 2Z" fill="currentColor" opacity="0.3"/>
-              <path d="M6 10L2 4H10L6 10Z" fill="currentColor"/>
-            </svg>
+            <img src="/assets/Low to High.png" alt="High to Low" style={{ width: '17px', height: '17px', objectFit: 'contain', imageRendering: 'crisp-edges', ...(isDarkMode ? { filter: 'invert(1) brightness(1.05)' } : {}) }} />
           </div>
           <div style={{ fontSize: '12px', color: theme.headerText, fontWeight: 400, lineHeight: '1.3' }}>
             High to Low
@@ -682,7 +670,7 @@ const ProductsFilterDropdown = forwardRef(({
         {columnKey === 'doiDays' && (
           <>
             <div style={{ borderTop: `1px solid ${theme.sectionBorder}`, marginTop: '6px', paddingTop: '6px' }}>
-              <span style={{ fontSize: '10px', fontWeight: 600, color: theme.subtleText, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sort by FBA</span>
+              <span style={{ fontSize: '10px', fontWeight: 600, color: theme.subtleText, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sort by FBA Inventory</span>
             </div>
             <div
               onClick={(e) => {
@@ -718,23 +706,16 @@ const ProductsFilterDropdown = forwardRef(({
             >
               <div
                 style={{
-                  width: '20px',
-                  height: '20px',
-                  backgroundColor: currentSortByFba === 'asc' ? theme.chipBgActive : theme.chipBg,
+                  width: '17px',
+                  height: '17px',
                   borderRadius: '3px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '9px',
-                  fontWeight: 700,
-                  color: currentSortByFba === 'asc' ? theme.chipTextActive : theme.chipText,
                   flexShrink: 0,
                 }}
               >
-                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M6 2L10 8H2L6 2Z" fill="currentColor"/>
-                  <path d="M6 10L2 4H10L6 10Z" fill="currentColor" opacity="0.3"/>
-                </svg>
+                <img src="/assets/High to Low.png" alt="FBA Low to High" style={{ width: '17px', height: '17px', objectFit: 'contain', imageRendering: 'crisp-edges', ...(isDarkMode ? { filter: 'invert(1) brightness(1.05)' } : {}) }} />
               </div>
               <div style={{ fontSize: '12px', color: theme.headerText, fontWeight: 400, lineHeight: '1.3' }}>
                 FBA Low to High
@@ -773,23 +754,16 @@ const ProductsFilterDropdown = forwardRef(({
             >
               <div
                 style={{
-                  width: '20px',
-                  height: '20px',
-                  backgroundColor: currentSortByFba === 'desc' ? theme.chipBgActive : theme.chipBg,
+                  width: '17px',
+                  height: '17px',
                   borderRadius: '3px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '9px',
-                  fontWeight: 700,
-                  color: currentSortByFba === 'desc' ? theme.chipTextActive : theme.chipText,
                   flexShrink: 0,
                 }}
               >
-                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M6 2L10 8H2L6 2Z" fill="currentColor" opacity="0.3"/>
-                  <path d="M6 10L2 4H10L6 10Z" fill="currentColor"/>
-                </svg>
+                <img src="/assets/Low to High.png" alt="FBA High to Low" style={{ width: '17px', height: '17px', objectFit: 'contain', imageRendering: 'crisp-edges', ...(isDarkMode ? { filter: 'invert(1) brightness(1.05)' } : {}) }} />
               </div>
               <div style={{ fontSize: '12px', color: theme.headerText, fontWeight: 400, lineHeight: '1.3' }}>
                 FBA High to Low

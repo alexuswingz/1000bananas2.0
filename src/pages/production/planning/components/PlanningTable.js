@@ -2227,15 +2227,21 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
       onUpdate={onUpdateShipment}
     />
     
-    {/* Key/Legend - Outside table container */}
+    {/* Key/Legend - Floating fixed on the right */}
     <div
       style={{
+        position: 'fixed',
+        right: '2rem',
+        bottom: '2rem',
+        zIndex: 50,
         display: 'flex',
         alignItems: 'center',
         gap: '24px',
-        marginTop: '24px',
-        justifyContent: 'flex-end',
-        width: '100%',
+        padding: '12px 20px',
+        borderRadius: '8px',
+        backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+        border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
       }}
     >
       <span

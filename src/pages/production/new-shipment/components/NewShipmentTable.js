@@ -1247,6 +1247,64 @@ const NewShipmentTable = ({
     currentNonTableFilteredRowsRef.current = result;
   }, [filteredRowsWithSelection, nonTableFilters, tableMode, effectiveQtyValues, account]);
 
+  // When user clicks Low/High to Low in non-table dropdown, apply sort after ref has been updated
+  useEffect(() => {
+    if (tableMode || !nonTableSortField || !nonTableSortOrder) return;
+    const rowsToSort = [...currentNonTableFilteredRowsRef.current];
+    if (rowsToSort.length === 0) return;
+    const sortField = nonTableSortField;
+    const sortOrder = nonTableSortOrder;
+    const numeric = isNonTableNumericColumn(sortField);
+    const originalRows = filteredRowsWithSelection;
+    rowsToSort.sort((a, b) => {
+      let aVal, bVal;
+      if (sortField === 'product') { aVal = a.product; bVal = b.product; }
+      else if (sortField === 'brand') { aVal = a.brand; bVal = b.brand; }
+      else if (sortField === 'size') { aVal = a.size; bVal = b.size; }
+      else if (sortField === 'fbaAvailable') {
+        // Inventory column displays totalInventory, so sort by that to match what user sees
+        aVal = Number(a.totalInventory ?? a.total_inventory) || 0;
+        bVal = Number(b.totalInventory ?? b.total_inventory) || 0;
+      }
+      else if (sortField === 'unitsToMake') {
+        const aIndex = a._originalIndex !== undefined ? a._originalIndex : originalRows.findIndex(r => r.id === a.id);
+        const bIndex = b._originalIndex !== undefined ? b._originalIndex : originalRows.findIndex(r => r.id === b.id);
+        const aQty = effectiveQtyValues[aIndex];
+        const bQty = effectiveQtyValues[bIndex];
+        const parseNumericValue = (val) => {
+          if (typeof val === 'number') return val;
+          if (val === '' || val === null || val === undefined) return 0;
+          const parsed = Number(String(val).replace(/,/g, ''));
+          return isNaN(parsed) ? 0 : parsed;
+        };
+        aVal = parseNumericValue(aQty);
+        bVal = parseNumericValue(bQty);
+      }
+      else if (sortField === 'doiDays') { aVal = a.doiTotal || a.daysOfInventory || 0; bVal = b.doiTotal || b.daysOfInventory || 0; }
+      else if (sortField === 'sales7Day') { aVal = a.sales7Day ?? a.sales_7_day ?? 0; bVal = b.sales7Day ?? b.sales_7_day ?? 0; }
+      if (numeric) {
+        const aNum = Number(aVal) || 0;
+        const bNum = Number(bVal) || 0;
+        if (sortField === 'fbaAvailable' && sortOrder === 'asc') {
+          if (aNum === 0 && bNum !== 0) return -1;
+          if (aNum !== 0 && bNum === 0) return 1;
+          return aNum - bNum;
+        }
+        if (sortField === 'unitsToMake' && sortOrder === 'asc') {
+          if (aNum === 0 && bNum !== 0) return -1;
+          if (aNum !== 0 && bNum === 0) return 1;
+          return aNum - bNum;
+        }
+        return sortOrder === 'asc' ? aNum - bNum : bNum - aNum;
+      }
+      const aStr = String(aVal ?? '').toLowerCase();
+      const bStr = String(bVal ?? '').toLowerCase();
+      return sortOrder === 'asc' ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
+    });
+    const sortedIds = rowsToSort.map(row => row.id);
+    setNonTableSortedRowOrder(sortedIds);
+  }, [tableMode, nonTableSortField, nonTableSortOrder, filteredRowsWithSelection, nonTableFilters, effectiveQtyValues]);
+
   const handleApplyColumnFilter = (columnKey, filterData) => {
     // If filterData is null, remove the filter (Reset was clicked)
     if (filterData === null) {
@@ -1265,17 +1323,18 @@ const NewShipmentTable = ({
     
     // If sortOrder is provided, apply one-time sort directly (like SortProductsTable)
     if (filterData.sortOrder) {
+      const sortField = filterData.sortField || columnKey;
       // Get current filtered rows from ref (updated by useEffect)
       // Use setTimeout to ensure filters are applied and ref is updated
       setTimeout(() => {
         const rowsToSort = [...currentFilteredRowsRef.current];
         
-        // Sort the rows
+        // Sort the rows (use sortField so dropdown can pass explicit field)
         rowsToSort.sort((a, b) => {
         let aVal, bVal;
         
-        // Get the field value based on columnKey
-        switch(columnKey) {
+        // Get the field value based on sortField
+        switch(sortField) {
           case 'bottles':
             aVal = a.bottleInventory || a.bottle_inventory || 0;
             bVal = b.bottleInventory || b.bottle_inventory || 0;
@@ -1293,14 +1352,21 @@ const NewShipmentTable = ({
             bVal = b.labelsAvailable || b.label_inventory || b.labels_available || 0;
             break;
           case 'normal-4':
-          case 'qty': {
-            // Qty values are stored in effectiveQtyValues, indexed by original row index
+          case 'qty':
+          case 'unitsToMake': {
+            // Units to Make / Qty: values in effectiveQtyValues, indexed by original row index
             const aIndex = a._originalIndex !== undefined ? a._originalIndex : rows.indexOf(a);
             const bIndex = b._originalIndex !== undefined ? b._originalIndex : rows.indexOf(b);
             const aQty = effectiveQtyValues[aIndex];
             const bQty = effectiveQtyValues[bIndex];
-            aVal = typeof aQty === 'number' ? aQty : (aQty === '' || aQty === null || aQty === undefined ? 0 : parseInt(aQty, 10) || 0);
-            bVal = typeof bQty === 'number' ? bQty : (bQty === '' || bQty === null || bQty === undefined ? 0 : parseInt(bQty, 10) || 0);
+            const parseQty = (val) => {
+              if (typeof val === 'number') return val;
+              if (val === '' || val === null || val === undefined) return 0;
+              const parsed = Number(String(val).replace(/,/g, ''));
+              return isNaN(parsed) ? 0 : parsed;
+            };
+            aVal = parseQty(aQty);
+            bVal = parseQty(bQty);
             break;
           }
           case 'brand':
@@ -1316,10 +1382,12 @@ const NewShipmentTable = ({
             bVal = b.size || '';
             break;
           case 'fbaAvailable':
-            aVal = a.doiFba || a.doiTotal || 0;
-            bVal = b.doiFba || b.doiTotal || 0;
+            // Inventory column displays total inventory, sort by that
+            aVal = Number(a.totalInventory ?? a.total_inventory) || 0;
+            bVal = Number(b.totalInventory ?? b.total_inventory) || 0;
             break;
           case 'totalInventory':
+          case 'doiDays':
             aVal = a.doiTotal || a.daysOfInventory || 0;
             bVal = b.doiTotal || b.daysOfInventory || 0;
             break;
@@ -1344,7 +1412,7 @@ const NewShipmentTable = ({
             bVal = b.formula_name || '';
             break;
           default: {
-            const field = getFieldForHeaderFilter(columnKey);
+            const field = getFieldForHeaderFilter(sortField);
             aVal = a[field];
             bVal = b[field];
             break;
@@ -1819,88 +1887,32 @@ const NewShipmentTable = ({
       onBrandFilterChange(brandFilterToApply);
     }
 
-    // If sortOrder is provided, apply one-time sort directly (snapshot the order)
+    // If sortOrder is provided, set sort state; useEffect will apply sort after ref is updated (except Best Sellers)
     if (filterData.sortOrder) {
       const sortField = filterData.sortField || columnKey;
       setNonTableSortField(sortField);
       setNonTableSortOrder(filterData.sortOrder);
       
-      // Best Sellers: sort the full list (not the ref) and commit order immediately so list updates
+      // Best Sellers: sort the full list and commit order immediately so list updates
       const isBestSellersSort = columnKey === 'fbaAvailable' && filterData.popularFilter === 'bestSellers';
-      const runSort = () => {
-        const rowsToSort = isBestSellersSort
-          ? [...filteredRowsWithSelection]
-          : [...currentNonTableFilteredRowsRef.current];
-        const numeric = isNonTableNumericColumn(sortField);
-        
-        // Get reference to original rows array for finding original indices
-        const originalRows = filteredRowsWithSelection;
-        
-        // Sort the rows (use sortField so DOI dropdown can sort by FBA)
-        rowsToSort.sort((a, b) => {
-          let aVal, bVal;
-          if (sortField === 'product') { aVal = a.product; bVal = b.product; }
-          else if (sortField === 'brand') { aVal = a.brand; bVal = b.brand; }
-          else if (sortField === 'size') { aVal = a.size; bVal = b.size; }
-          else if (sortField === 'fbaAvailable') { aVal = a.doiFba ?? a.fbaAvailable ?? 0; bVal = b.doiFba ?? b.fbaAvailable ?? 0; }
-          else if (sortField === 'unitsToMake') {
-            // Use _originalIndex if available, otherwise find in original rows array
-            const aIndex = a._originalIndex !== undefined ? a._originalIndex : originalRows.findIndex(r => r.id === a.id);
-            const bIndex = b._originalIndex !== undefined ? b._originalIndex : originalRows.findIndex(r => r.id === b.id);
-            const aQty = effectiveQtyValues[aIndex];
-            const bQty = effectiveQtyValues[bIndex];
-            
-            // Helper function to convert value to number, handling commas and strings
-            const parseNumericValue = (val) => {
-              if (typeof val === 'number') return val;
-              if (val === '' || val === null || val === undefined) return 0;
-              // Remove commas and parse as number
-              const cleaned = String(val).replace(/,/g, '');
-              const parsed = Number(cleaned);
-              return isNaN(parsed) ? 0 : parsed;
-            };
-            
-            aVal = parseNumericValue(aQty);
-            bVal = parseNumericValue(bQty);
-          }
-          else if (sortField === 'doiDays') { aVal = a.doiTotal || a.daysOfInventory || 0; bVal = b.doiTotal || b.daysOfInventory || 0; }
-          else if (sortField === 'sales7Day') { aVal = a.sales7Day ?? a.sales_7_day ?? 0; bVal = b.sales7Day ?? b.sales_7_day ?? 0; }
-
-          if (numeric) {
-            const aNum = Number(aVal) || 0;
-            const bNum = Number(bVal) || 0;
-            // FBA A-Z: put zero inventory (0 FBA) first, then ascending by FBA
-            if (sortField === 'fbaAvailable' && filterData.sortOrder === 'asc') {
-              if (aNum === 0 && bNum !== 0) return -1;
-              if (aNum !== 0 && bNum === 0) return 1;
-              return aNum - bNum;
-            }
-            return filterData.sortOrder === 'asc' ? aNum - bNum : bNum - aNum;
-          }
-
-          const aStr = String(aVal ?? '').toLowerCase();
-          const bStr = String(bVal ?? '').toLowerCase();
-          return filterData.sortOrder === 'asc'
-            ? aStr.localeCompare(bStr)
-            : bStr.localeCompare(aStr);
-        });
-        
-        // Store the sorted order (array of row IDs)
-        const sortedIds = rowsToSort.map(row => row.id);
-        setNonTableSortedRowOrder(sortedIds);
-      };
-      // Best Sellers: run sort synchronously and flush so the list reorders immediately
       if (isBestSellersSort) {
+        const runSort = () => {
+          const rowsToSort = [...filteredRowsWithSelection];
+          const sortFieldInner = filterData.sortField || 'sales7Day';
+          rowsToSort.sort((a, b) => {
+            const aVal = a.sales7Day ?? a.sales_7_day ?? 0;
+            const bVal = b.sales7Day ?? b.sales_7_day ?? 0;
+            return (bVal - aVal);
+          });
+          setNonTableSortedRowOrder(rowsToSort.map(row => row.id));
+        };
         try {
           flushSync(runSort);
         } catch (e) {
           runSort();
         }
-      } else {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(runSort);
-        });
       }
+      // Other columns: sort is applied in useEffect when nonTableSortField/nonTableSortOrder are set
     } else if (nonTableSortField === columnKey) {
       // If sortOrder is empty/cleared, remove sort and clear stored order
       setNonTableSortField('');
@@ -2193,8 +2205,55 @@ const NewShipmentTable = ({
       }
     });
 
-    // Apply non-table sorting - use stored order if available (one-time sort)
-    if (nonTableSortedRowOrder && nonTableSortedRowOrder.length > 0 && inventoryFilter?.popularFilter !== 'bestSellers') {
+    // Apply non-table sorting: when user set sort field/order, sort inline so it works immediately (no effect timing)
+    if (!tableMode && nonTableSortField && nonTableSortOrder && inventoryFilter?.popularFilter !== 'bestSellers') {
+      const sortField = nonTableSortField;
+      const sortOrder = nonTableSortOrder;
+      const numeric = isNonTableNumericColumn(sortField);
+      const parseNumericVal = (val) => {
+        if (typeof val === 'number') return val;
+        if (val === '' || val === null || val === undefined) return 0;
+        const parsed = Number(String(val).replace(/,/g, ''));
+        return isNaN(parsed) ? 0 : parsed;
+      };
+      result = [...result].sort((a, b) => {
+        let aVal, bVal;
+        if (sortField === 'product') { aVal = a.product; bVal = b.product; }
+        else if (sortField === 'brand') { aVal = a.brand; bVal = b.brand; }
+        else if (sortField === 'size') { aVal = a.size; bVal = b.size; }
+        else if (sortField === 'fbaAvailable') {
+          aVal = Number(a.totalInventory ?? a.total_inventory) || 0;
+          bVal = Number(b.totalInventory ?? b.total_inventory) || 0;
+        }
+        else if (sortField === 'unitsToMake') {
+          const aIdx = a._originalIndex ?? 0;
+          const bIdx = b._originalIndex ?? 0;
+          aVal = parseNumericVal(effectiveQtyValues[aIdx]);
+          bVal = parseNumericVal(effectiveQtyValues[bIdx]);
+        }
+        else if (sortField === 'doiDays') { aVal = a.doiTotal || a.daysOfInventory || 0; bVal = b.doiTotal || b.daysOfInventory || 0; }
+        else if (sortField === 'sales7Day') { aVal = a.sales7Day ?? a.sales_7_day ?? 0; bVal = b.sales7Day ?? b.sales_7_day ?? 0; }
+        if (numeric) {
+          const aNum = Number(aVal) || 0;
+          const bNum = Number(bVal) || 0;
+          if (sortField === 'fbaAvailable' && sortOrder === 'asc') {
+            if (aNum === 0 && bNum !== 0) return -1;
+            if (aNum !== 0 && bNum === 0) return 1;
+            return aNum - bNum;
+          }
+          if (sortField === 'unitsToMake' && sortOrder === 'asc') {
+            if (aNum === 0 && bNum !== 0) return -1;
+            if (aNum !== 0 && bNum === 0) return 1;
+            return aNum - bNum;
+          }
+          return sortOrder === 'asc' ? aNum - bNum : bNum - aNum;
+        }
+        const aStr = String(aVal ?? '').toLowerCase();
+        const bStr = String(bVal ?? '').toLowerCase();
+        return sortOrder === 'asc' ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
+      });
+    }
+    else if (nonTableSortedRowOrder && nonTableSortedRowOrder.length > 0 && inventoryFilter?.popularFilter !== 'bestSellers') {
       // Create a map of row ID to row for quick lookup
       const rowMap = new Map(result.map(row => [row.id, row]));
       
@@ -2297,7 +2356,7 @@ const NewShipmentTable = ({
     }
 
     return result;
-  }, [filteredRowsWithSelection, nonTableFilters, nonTableSortedRowOrder, tableMode, account, addedRows]);
+  }, [filteredRowsWithSelection, nonTableFilters, nonTableSortedRowOrder, nonTableSortField, nonTableSortOrder, tableMode, account, addedRows, effectiveQtyValues]);
 
   // When Best Sellers is active, always use nonTableFilteredRows (sorted); otherwise table mode uses filteredRowsWithSelection
   const currentRows = (tableMode && nonTableFilters.fbaAvailable?.popularFilter !== 'bestSellers')
@@ -3953,7 +4012,7 @@ const NewShipmentTable = ({
                               />
                             </svg>
                             <span style={{ color: '#EF4444', fontWeight: 700, fontSize: '12px', lineHeight: 1 }}>
-                              Out of Stock
+                              Sold Out
                             </span>
                           </div>
                         ) : isNoSales ? (
@@ -4651,7 +4710,7 @@ const NewShipmentTable = ({
                     <div
                       style={{
                         position: 'absolute',
-                        right: 0,
+                        right: '-5px',
                         top: '50%',
                         transform: 'translateY(-50%)',
                         display: 'flex',
@@ -7191,7 +7250,7 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
     { value: 'fastestMovers', label: 'Fastest Movers (Highest Unit Velocity)' },
     { value: 'topProfit', label: 'Top Profit Products' },
     { value: 'topTraffic', label: 'Top Traffic Drivers (Sessions/CTR)' },
-    { value: 'outOfStock', label: 'Out of Stock' },
+    { value: 'outOfStock', label: 'Sold Out' },
     { value: 'overstock', label: 'Overstock' },
   ];
 
