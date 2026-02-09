@@ -20,45 +20,42 @@ const PlanningHeader = ({ activeTab, onTabChange, onNewShipmentClick, onSearch }
 
   return (
     <div
-      className={`${themeClasses.cardBg} ${themeClasses.border} border-b`}
       style={{
         padding: '1rem 2rem',
+        paddingTop: '1.625rem',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: '1rem',
       }}
     >
-      {/* Left: icon + title + tabs */}
+      {/* Left: icon + tabs (header title removed) */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-        {/* Icon + title */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div
-            style={{
-              width: '40px',
-              height: '40px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: '9999px',
-              backgroundColor: '#111827',
-            }}
+        {/* Icon only */}
+        <div
+          style={{
+            width: '40px',
+            height: '40px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '9999px',
+            backgroundColor: '#111827',
+          }}
+        >
+          <svg
+            style={{ width: '22px', height: '22px', color: 'white' }}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
           >
-            <svg
-              style={{ width: '22px', height: '22px', color: 'white' }}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 7l9-4 9 4-9 4-9-4zm0 6l9 4 9-4"
-              />
-            </svg>
-          </div>
-          <h1 className={`text-xl font-semibold ${themeClasses.text}`}>Planning</h1>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 7l9-4 9 4-9 4-9-4zm0 6l9 4 9-4"
+            />
+          </svg>
         </div>
 
         {/* Tabs */}
@@ -209,7 +206,7 @@ const PlanningHeader = ({ activeTab, onTabChange, onNewShipmentClick, onSearch }
 
         {/* New Shipment button */}
         <button
-          className="bg-[#111827] text-white text-sm font-medium hover:bg-black transition-colors"
+          className="bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
           style={{ padding: '0.55rem 1.25rem', whiteSpace: 'nowrap', borderRadius: '8px' }}
           onClick={onNewShipmentClick}
         >

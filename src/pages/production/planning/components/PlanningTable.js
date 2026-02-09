@@ -385,15 +385,15 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         return; // Don't navigate if there's a comment to show
       }
       
-      // If status is completed and no comment, navigate to that section
-      if (normalizedStatus === 'completed' && onStatusClick && rowId && statusFieldName && row) {
+      // If status is completed or in progress, and no comment, navigate to that section
+      if ((normalizedStatus === 'completed' || normalizedStatus === 'in progress') && onStatusClick && rowId && statusFieldName && row) {
         onStatusClick(row, statusFieldName);
         return;
       }
     };
 
-    // Determine if circle should be clickable (completed status, incomplete status, or has comment)
-    const isClickable = normalizedStatus === 'completed' || normalizedStatus === 'incomplete' || (shouldShowComment && commentText);
+    // Determine if circle should be clickable (completed, in progress, incomplete, or has comment)
+    const isClickable = normalizedStatus === 'completed' || normalizedStatus === 'in progress' || normalizedStatus === 'incomplete' || (shouldShowComment && commentText);
     
     const handleIconHover = (e) => {
       // Show tooltip on hover if there's a comment

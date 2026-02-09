@@ -1064,16 +1064,20 @@ const NewShipment = () => {
           // Mark this index as manually edited in the new product list
           newManuallyEditedIndices.add(index);
         }
-        // Otherwise auto-populate qty with suggested qty if product needs restocking
-        else if (product.suggestedQty > 0) {
-          const increment = getSuggestedQtyIncrement(product);
-          const suggested = product.suggestedQty;
-          const roundedSuggested =
-            increment && increment > 1
-              ? Math.ceil(suggested / increment) * increment
-              : suggested;
-
-          initialQtyValues[index] = roundedSuggested;
+        // Otherwise auto-populate qty with suggested qty (or 0 when DOI is already at goal)
+        else {
+          const suggested = product.suggestedQty ?? product.unitsToMake ?? product.units_to_make ?? 0;
+          if (suggested > 0) {
+            const increment = getSuggestedQtyIncrement(product);
+            const roundedSuggested =
+              increment && increment > 1
+                ? Math.ceil(suggested / increment) * increment
+                : suggested;
+            initialQtyValues[index] = roundedSuggested;
+          } else {
+            // DOI at goal (green): show 0 instead of blank
+            initialQtyValues[index] = 0;
+          }
         }
       });
 
@@ -1629,11 +1633,8 @@ const NewShipment = () => {
             recalculatedQty = Math.ceil(rawUnitsNeeded);
           }
           
-          // Only overwrite when we have a positive recalculated value.
-          // If recalculatedQty is 0, keep whatever value we had before.
-          if (recalculatedQty > 0) {
-            newQtyValues[index] = recalculatedQty;
-          }
+          // Set qty to recalculated value (or 0 when DOI is at goal so it shows 0, not blank)
+          newQtyValues[index] = recalculatedQty;
           
           // Debug logging for products that should update
           if (isMothRepellent || hasValue2163) {

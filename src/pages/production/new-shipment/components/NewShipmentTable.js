@@ -82,6 +82,7 @@ const NewShipmentTable = ({
   const [addedRows, setAddedRows] = useState(new Set());
   const [selectionFilter, setSelectionFilter] = useState('all'); // all | checked | unchecked
   const selectAllCheckboxRef = useRef(null);
+  const nonTableSelectAllCheckboxRef = useRef(null);
   const [clickedQtyIndex, setClickedQtyIndex] = useState(null);
   const [hoveredQtyIndex, setHoveredQtyIndex] = useState(null);
   const [hoveredAddIndex, setHoveredAddIndex] = useState(null);
@@ -2358,13 +2359,17 @@ const NewShipmentTable = ({
         if (hasExisting) return;
 
         const suggested =
-          row.suggestedQty ||
-          row.units_to_make ||
-          row.unitsToMake ||
+          row.suggestedQty ??
+          row.units_to_make ??
+          row.unitsToMake ??
           0;
 
         if (suggested > 0) {
           newValues[index] = suggested;
+          changed = true;
+        } else {
+          // DOI at goal (green): show 0 instead of blank
+          newValues[index] = 0;
           changed = true;
         }
       });
@@ -2612,12 +2617,38 @@ const NewShipmentTable = ({
     return selectedRows.size > 0 && selectedRows.size < currentRows.length;
   }, [selectedRows.size, currentRows.length]);
 
-  // Set indeterminate state for select all checkbox
+  // Non-table mode: all visible products selected (for select-all checkbox in PRODUCTS column)
+  const nonTableAllSelected = useMemo(() => {
+    if (tableMode || currentRows.length === 0) return false;
+    return currentRows.every(row => {
+      const idx = row._originalIndex !== undefined ? row._originalIndex : currentRows.indexOf(row);
+      return nonTableSelectedIndices.has(idx);
+    });
+  }, [tableMode, currentRows, nonTableSelectedIndices]);
+
+  // Non-table mode: some but not all selected (for indeterminate)
+  const nonTableSomeSelected = useMemo(() => {
+    if (tableMode || currentRows.length === 0) return false;
+    const selectedCount = currentRows.filter(row => {
+      const idx = row._originalIndex !== undefined ? row._originalIndex : currentRows.indexOf(row);
+      return nonTableSelectedIndices.has(idx);
+    }).length;
+    return selectedCount > 0 && selectedCount < currentRows.length;
+  }, [tableMode, currentRows, nonTableSelectedIndices]);
+
+  // Set indeterminate state for select all checkbox (table mode)
   useEffect(() => {
     if (selectAllCheckboxRef.current) {
       selectAllCheckboxRef.current.indeterminate = someSelected;
     }
   }, [someSelected]);
+
+  // Set indeterminate state for select all checkbox (non-table mode, PRODUCTS column)
+  useEffect(() => {
+    if (nonTableSelectAllCheckboxRef.current) {
+      nonTableSelectAllCheckboxRef.current.indeterminate = nonTableSomeSelected;
+    }
+  }, [nonTableSomeSelected]);
 
   // Function to position the popup - instant updates, no lag
   const positionPopup = useCallback(() => {
@@ -3069,6 +3100,20 @@ const NewShipmentTable = ({
     }
   };
 
+  // Handle select all checkbox (non-table mode, PRODUCTS column) – for multi-selection and bulk actions
+  const handleNonTableSelectAll = (e) => {
+    if (e.target.checked) {
+      const indices = new Set(currentRows.map(row => row._originalIndex !== undefined ? row._originalIndex : currentRows.indexOf(row)));
+      setNonTableSelectedIndices(indices);
+      if (nonTableSelectAllCheckboxRef.current && indices.size < currentRows.length) {
+        nonTableSelectAllCheckboxRef.current.indeterminate = indices.size > 0;
+        nonTableSelectAllCheckboxRef.current.checked = false;
+      }
+    } else {
+      setNonTableSelectedIndices(new Set());
+    }
+  };
+
   // Handle Add button click (with bulk support)
   const handleAddClick = (row, index) => {
     const newAdded = new Set(addedRows);
@@ -3221,10 +3266,20 @@ const NewShipmentTable = ({
                 marginLeft: '20px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
+                gap: '12px',
                 position: 'relative'
               }}
             >
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="checkbox"
+                  ref={nonTableSelectAllCheckboxRef}
+                  checked={nonTableAllSelected}
+                  onChange={handleNonTableSelectAll}
+                  style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                  aria-label="Select all products"
+                />
+              </label>
               <span>PRODUCTS</span>
               {hasNonTableActiveFilter('product') && (
                 <span style={{ 
@@ -4115,9 +4170,13 @@ const NewShipmentTable = ({
                         type="text" 
                         value={(() => {
                           const qty = effectiveQtyValues[index];
-                          if (qty === undefined || qty === null || qty === '') return '';
+                          const atDoiGoal = (row.suggestedQty ?? row.units_to_make ?? row.unitsToMake ?? -1) === 0 ||
+                            (row.doiTotal || row.daysOfInventory || 0) >= (forecastRange || 120);
+                          if (qty === undefined || qty === null || qty === '') {
+                            return atDoiGoal ? '0' : '';
+                          }
                           const numQty = typeof qty === 'number' ? qty : parseInt(qty, 10);
-                          return isNaN(numQty) ? '' : numQty.toLocaleString();
+                          return isNaN(numQty) ? (atDoiGoal ? '0' : '') : numQty.toLocaleString();
                         })()}
                         onChange={(e) => { 
                           const inputValue = e.target.value.replace(/,/g, ''); 
@@ -4158,142 +4217,127 @@ const NewShipmentTable = ({
                         }}
                         onWheel={(e) => e.target.blur()}
                       />
-                      {/* Decrement arrow button - inside container on the right (bottom) */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          
-                          // Bulk decrease if multiple products are selected
-                          if (nonTableSelectedIndices.size > 1 && nonTableSelectedIndices.has(index)) {
-                            effectiveSetQtyValues(prev => {
-                              const newValues = { ...prev };
-                              nonTableSelectedIndices.forEach(selectedIndex => {
-                                const selectedRow = currentRows.find(r => r._originalIndex === selectedIndex);
-                                if (selectedRow) {
-                                  const currentQty = newValues[selectedIndex] ?? 0;
-                                  const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
-                                  if (numQty <= 0) return;
-                                  
-                                  // Use size-based increment (e.g. 60 units for 8oz)
-                                  const increment = getQtyIncrement(selectedRow);
-                                  
-                                  newValues[selectedIndex] = Math.max(0, numQty - increment);
-                                  manuallyEditedIndices.current.add(selectedIndex);
-                                }
-                              });
-                              return newValues;
-                            });
-                          } else {
-                            // Single product decrease
-                            const currentQty = effectiveQtyValues[index] ?? 0;
-                            const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
-                            if (numQty <= 0) return;
-                            // Use size-based increment (e.g. 60 units for 8oz)
-                            const increment = getQtyIncrement(row);
-                            const newQty = Math.max(0, numQty - increment);
-                            manuallyEditedIndices.current.add(index);
-                            effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty }));
-                            setQtyInputUpdateTrigger(prev => prev + 1);
-                          }
-                        }}
+                      {/* Arrow buttons wrapper - tight gap between up/down */}
+                      <div
                         style={{
                           position: 'absolute',
                           right: '4px',
-                          bottom: '2px',
-                          width: '20px',
-                          height: '10px',
-                          borderRadius: '4px',
-                          border: 'none',
-                          backgroundColor: 'transparent',
-                          color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                          cursor: 'pointer',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
                           display: hoveredQtyIndex === index ? 'flex' : 'none',
+                          flexDirection: 'column',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          padding: 0,
-                          outline: 'none',
+                          gap: '0px',
                           zIndex: 1,
-                          transition: 'color 0.2s',
                         }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.color = isDarkMode ? '#D1D5DB' : '#374151';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.color = isDarkMode ? '#9CA3AF' : '#6B7280';
-                        }}
-                        title="Decrease quantity"
                       >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M3 8L6 11L9 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                      {/* Increment arrow button - inside container on the right (top) */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          
-                          // Bulk increase if multiple products are selected
-                          if (nonTableSelectedIndices.size > 1 && nonTableSelectedIndices.has(index)) {
-                            effectiveSetQtyValues(prev => {
-                              const newValues = { ...prev };
-                              nonTableSelectedIndices.forEach(selectedIndex => {
-                                const selectedRow = currentRows.find(r => r._originalIndex === selectedIndex);
-                                if (selectedRow) {
-                                  const currentQty = newValues[selectedIndex] ?? 0;
-                                  const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
-                                  
-                                  // Use size-based increment (e.g. 60 units for 8oz)
-                                  const increment = getQtyIncrement(selectedRow);
-                                  
-                                  newValues[selectedIndex] = numQty + increment;
-                                  manuallyEditedIndices.current.add(selectedIndex);
-                                }
+                        {/* Increment arrow (top) */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (nonTableSelectedIndices.size > 1 && nonTableSelectedIndices.has(index)) {
+                              effectiveSetQtyValues(prev => {
+                                const newValues = { ...prev };
+                                nonTableSelectedIndices.forEach(selectedIndex => {
+                                  const selectedRow = currentRows.find(r => r._originalIndex === selectedIndex);
+                                  if (selectedRow) {
+                                    const currentQty = newValues[selectedIndex] ?? 0;
+                                    const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
+                                    const increment = getQtyIncrement(selectedRow);
+                                    newValues[selectedIndex] = numQty + increment;
+                                    manuallyEditedIndices.current.add(selectedIndex);
+                                  }
+                                });
+                                return newValues;
                               });
-                              return newValues;
-                            });
-                          } else {
-                            // Single product increase
-                            const currentQty = effectiveQtyValues[index] ?? 0;
-                            const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
-                            // Use size-based increment (e.g. 60 units for 8oz)
-                            const increment = getQtyIncrement(row);
-                            const newQty = numQty + increment;
-                            manuallyEditedIndices.current.add(index);
-                            effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty }));
-                            setQtyInputUpdateTrigger(prev => prev + 1);
-                          }
-                        }}
-                        style={{
-                          position: 'absolute',
-                          right: '4px',
-                          top: '2px',
-                          width: '20px',
-                          height: '10px',
-                          borderRadius: '4px',
-                          border: 'none',
-                          backgroundColor: 'transparent',
-                          color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                          cursor: 'pointer',
-                          display: hoveredQtyIndex === index ? 'flex' : 'none',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          padding: 0,
-                          outline: 'none',
-                          zIndex: 1,
-                          transition: 'color 0.2s',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.color = isDarkMode ? '#D1D5DB' : '#374151';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.color = isDarkMode ? '#9CA3AF' : '#6B7280';
-                        }}
-                        title="Increase quantity"
-                      >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M3 4L6 1L9 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
+                            } else {
+                              const currentQty = effectiveQtyValues[index] ?? 0;
+                              const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
+                              const increment = getQtyIncrement(row);
+                              const newQty = numQty + increment;
+                              manuallyEditedIndices.current.add(index);
+                              effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty }));
+                              setQtyInputUpdateTrigger(prev => prev + 1);
+                            }
+                          }}
+                          style={{
+                            width: '20px',
+                            height: '10px',
+                            border: 'none',
+                            borderRadius: '2px',
+                            backgroundColor: 'transparent',
+                            color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: 0,
+                            outline: 'none',
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.color = isDarkMode ? '#D1D5DB' : '#374151'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.color = isDarkMode ? '#9CA3AF' : '#6B7280'; }}
+                          title="Increase quantity"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M3 4L6 1L9 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </button>
+                        {/* Decrement arrow (bottom) - negative margin pulls it closer to top arrow */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (nonTableSelectedIndices.size > 1 && nonTableSelectedIndices.has(index)) {
+                              effectiveSetQtyValues(prev => {
+                                const newValues = { ...prev };
+                                nonTableSelectedIndices.forEach(selectedIndex => {
+                                  const selectedRow = currentRows.find(r => r._originalIndex === selectedIndex);
+                                  if (selectedRow) {
+                                    const currentQty = newValues[selectedIndex] ?? 0;
+                                    const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
+                                    if (numQty <= 0) return;
+                                    const increment = getQtyIncrement(selectedRow);
+                                    newValues[selectedIndex] = Math.max(0, numQty - increment);
+                                    manuallyEditedIndices.current.add(selectedIndex);
+                                  }
+                                });
+                                return newValues;
+                              });
+                            } else {
+                              const currentQty = effectiveQtyValues[index] ?? 0;
+                              const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
+                              if (numQty <= 0) return;
+                              const increment = getQtyIncrement(row);
+                              const newQty = Math.max(0, numQty - increment);
+                              manuallyEditedIndices.current.add(index);
+                              effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty }));
+                              setQtyInputUpdateTrigger(prev => prev + 1);
+                            }
+                          }}
+                          style={{
+                            width: '20px',
+                            height: '10px',
+                            marginTop: '-3px',
+                            border: 'none',
+                            borderRadius: '2px',
+                            backgroundColor: 'transparent',
+                            color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: 0,
+                            outline: 'none',
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.color = isDarkMode ? '#D1D5DB' : '#374151'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.color = isDarkMode ? '#9CA3AF' : '#6B7280'; }}
+                          title="Decrease quantity"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M3 8L6 11L9 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                     {/* Add button */}
                     <button 
