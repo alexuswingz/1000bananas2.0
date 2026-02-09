@@ -11,7 +11,7 @@ import React, { useState, useEffect, useRef } from 'react';
  * 
  * Save modes:
  * - "Save as Default" → persists to backend API database
- * - "Apply" → session only (temporary, not saved to database)
+ * - "Apply" → applies for this shipment (persisted per shipment; survives navigation)
  */
 
 // Toggle to switch between local and production API
@@ -30,13 +30,44 @@ const DEFAULT_SETTINGS = {
 
 const STORAGE_KEY = 'doi_default_settings'; // Fallback for localStorage if API fails
 
+/** Load default DOI settings from API or localStorage. Exported for parent revert-to-default. */
+export const getDefaultDoiSettings = async () => {
+  try {
+    const response = await fetch(`${FORECAST_API_URL}/settings/doi`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        amazonDoiGoal: data.amazon_doi_goal || DEFAULT_SETTINGS.amazonDoiGoal,
+        inboundLeadTime: data.inbound_lead_time || DEFAULT_SETTINGS.inboundLeadTime,
+        manufactureLeadTime: data.manufacture_lead_time || DEFAULT_SETTINGS.manufactureLeadTime,
+      };
+    }
+  } catch (e) {
+    console.warn('Failed to load DOI settings from API, using fallback:', e);
+  }
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch (e) {
+    console.error('Error loading DOI settings from localStorage:', e);
+  }
+  return DEFAULT_SETTINGS;
+};
+
 const DOISettingsPopover = ({ 
   onSettingsChange, 
   isDarkMode = true,
   initialSettings = null,
-  openByDefault = false 
+  openByDefault = false,
+  showCustomDoiBadge = false,
+  onRevertDoi = null,
 }) => {
   const [isOpen, setIsOpen] = useState(openByDefault);
+  const [badgeHover, setBadgeHover] = useState(false);
+  const tooltipCloseTimeoutRef = useRef(null);
   const popoverRef = useRef(null);
   const buttonRef = useRef(null);
   
@@ -89,11 +120,25 @@ const DOISettingsPopover = ({
   // Popover form values (editable)
   const [formValues, setFormValues] = useState(sessionSettings);
   
-  // Load settings from API on mount
+  // When parent passes initialSettings (e.g. restored applied DOI for this shipment), sync into session
+  useEffect(() => {
+    if (initialSettings && typeof initialSettings === 'object') {
+      setSessionSettings(initialSettings);
+      setFormValues(initialSettings);
+    }
+  }, [initialSettings]);
+
+  // Clear tooltip close timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (tooltipCloseTimeoutRef.current) clearTimeout(tooltipCloseTimeoutRef.current);
+    };
+  }, []);
+
+  // Load settings from API on mount (or use initialSettings if provided)
   useEffect(() => {
     const fetchSettings = async () => {
-      if (initialSettings) {
-        // If initial settings provided, use them
+      if (initialSettings && typeof initialSettings === 'object') {
         setSessionSettings(initialSettings);
         setFormValues(initialSettings);
         return;
@@ -104,9 +149,9 @@ const DOISettingsPopover = ({
         const settings = await loadDefaultSettings();
         setSessionSettings(settings);
         setFormValues(settings);
-        // Notify parent of loaded settings
+        // Notify parent of loaded settings (initial load – parent should not persist as "applied")
         if (onSettingsChange) {
-          onSettingsChange(settings, calculateTotal(settings));
+          onSettingsChange(settings, calculateTotal(settings), { source: 'initialLoad' });
         }
       } catch (err) {
         console.error('Error loading DOI settings:', err);
@@ -173,9 +218,9 @@ const DOISettingsPopover = ({
     
     setSessionSettings(newSettings);
     
-    // Notify parent of change
+    // Notify parent of change (Apply = persist for this shipment)
     if (onSettingsChange) {
-      onSettingsChange(newSettings, calculateTotal(newSettings));
+      onSettingsChange(newSettings, calculateTotal(newSettings), { source: 'apply' });
     }
     
     setIsOpen(false);
@@ -221,9 +266,9 @@ const DOISettingsPopover = ({
       
       setSessionSettings(newSettings);
       
-      // Notify parent of change
+      // Notify parent of change (Save as Default = also persist for this shipment)
       if (onSettingsChange) {
-        onSettingsChange(newSettings, calculateTotal(newSettings));
+        onSettingsChange(newSettings, calculateTotal(newSettings), { source: 'saveAsDefault' });
       }
       
       setIsOpen(false);
@@ -278,51 +323,185 @@ const DOISettingsPopover = ({
         Required DOI
       </span>
       
-      {/* DOI Value Button (opens popover) */}
-      <button
-        ref={buttonRef}
-        onClick={() => {
-          setFormValues(sessionSettings); // Reset form to current session values
-          setIsOpen(!isOpen);
-        }}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '6px 12px',
-          borderRadius: '6px',
-          border: `1px solid ${isOpen ? theme.inputBorderFocus : theme.inputBorder}`,
-          backgroundColor: theme.inputBg,
-          color: theme.inputText,
-          fontSize: '14px',
-          fontWeight: 500,
-          cursor: 'pointer',
-          minWidth: '80px',
-          justifyContent: 'center',
-          transition: 'border-color 0.15s ease',
-        }}
-      >
-        <span>{totalRequiredDOI}</span>
-        {/* Dropdown arrow */}
-        <svg 
-          width="12" 
-          height="12" 
-          viewBox="0 0 12 12" 
-          fill="none"
+      {/* DOI Value Button (opens popover) – badge on top-right when custom DOI applied */}
+      <div style={{ position: 'relative', display: 'inline-flex' }}>
+        <button
+          ref={buttonRef}
+          onClick={() => {
+            setFormValues(sessionSettings); // Reset form to current session values
+            setIsOpen(!isOpen);
+          }}
           style={{
-            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-            transition: 'transform 0.15s ease',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '6px 12px',
+            borderRadius: '6px',
+            border: `1px solid ${isOpen ? theme.inputBorderFocus : theme.inputBorder}`,
+            backgroundColor: theme.inputBg,
+            color: theme.inputText,
+            fontSize: '14px',
+            fontWeight: 500,
+            cursor: 'pointer',
+            minWidth: '80px',
+            justifyContent: 'center',
+            transition: 'border-color 0.15s ease',
           }}
         >
-          <path 
-            d="M2.5 4.5L6 8L9.5 4.5" 
-            stroke={theme.textSecondary} 
-            strokeWidth="1.5" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
-          />
-        </svg>
-      </button>
+          <span>{totalRequiredDOI}</span>
+          {/* Dropdown arrow */}
+          <svg 
+            width="12" 
+            height="12" 
+            viewBox="0 0 12 12" 
+            fill="none"
+            style={{
+              transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.15s ease',
+            }}
+          >
+            <path 
+              d="M2.5 4.5L6 8L9.5 4.5" 
+              stroke={theme.textSecondary} 
+              strokeWidth="1.5" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+        {showCustomDoiBadge && onRevertDoi && (
+          <span
+            style={{ position: 'absolute', top: '-6px', right: '-6px', zIndex: 2 }}
+            onMouseEnter={() => {
+              if (tooltipCloseTimeoutRef.current) {
+                clearTimeout(tooltipCloseTimeoutRef.current);
+                tooltipCloseTimeoutRef.current = null;
+              }
+              setBadgeHover(true);
+            }}
+            onMouseLeave={() => {
+              tooltipCloseTimeoutRef.current = setTimeout(() => setBadgeHover(false), 200);
+            }}
+          >
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRevertDoi();
+              }}
+              style={{
+                width: '20px',
+                height: '20px',
+                borderRadius: '50%',
+                border: 'none',
+                backgroundColor: '#3B82F6',
+                color: '#FFFFFF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                padding: 0,
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                fontSize: '12px',
+                fontWeight: 700,
+                lineHeight: 1,
+                transition: 'background-color 0.15s ease, transform 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#2563EB';
+                e.currentTarget.style.transform = 'scale(1.08)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#3B82F6';
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              !
+            </button>
+            {badgeHover && (
+              <div
+                role="tooltip"
+                style={{
+                  position: 'absolute',
+                  bottom: 'calc(100% + 10px)',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: '200px',
+                  height: '92px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  padding: '10px 12px',
+                  backgroundColor: theme.popoverBg,
+                  border: `1px solid ${theme.popoverBorder}`,
+                  borderRadius: '10px',
+                  boxShadow: isDarkMode ? '0 10px 40px rgba(0,0,0,0.5)' : '0 10px 30px rgba(0,0,0,0.15)',
+                  zIndex: 10001,
+                  pointerEvents: 'auto',
+                  boxSizing: 'border-box',
+                }}
+                onMouseEnter={() => {
+                  if (tooltipCloseTimeoutRef.current) {
+                    clearTimeout(tooltipCloseTimeoutRef.current);
+                    tooltipCloseTimeoutRef.current = null;
+                  }
+                  setBadgeHover(true);
+                }}
+                onMouseLeave={() => setBadgeHover(false)}
+              >
+                <p style={{ margin: 0, marginBottom: '10px', fontSize: '12px', color: theme.textPrimary, lineHeight: 1.4, flex: 1 }}>
+                  This value differs from the global settings for all products.
+                </p>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRevertDoi();
+                    setBadgeHover(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    width: '100%',
+                    padding: '6px 10px',
+                    border: 'none',
+                    borderRadius: '6px',
+                    backgroundColor: '#3B82F6',
+                    color: '#FFFFFF',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#2563EB'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#3B82F6'; }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                    <path d="M3 3v5h5" />
+                  </svg>
+                  Revert to Global DOI
+                </button>
+                {/* Tooltip tail (downward-pointing triangle) */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: '50%',
+                    bottom: '-6px',
+                    transform: 'translateX(-50%)',
+                    width: 0,
+                    height: 0,
+                    borderLeft: '6px solid transparent',
+                    borderRight: '6px solid transparent',
+                    borderTop: `6px solid ${theme.popoverBg}`,
+                  }}
+                />
+              </div>
+            )}
+          </span>
+        )}
+      </div>
       
       {/* Days label */}
       <span style={{ 

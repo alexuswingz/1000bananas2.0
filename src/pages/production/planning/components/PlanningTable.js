@@ -385,15 +385,15 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         return; // Don't navigate if there's a comment to show
       }
       
-      // If status is completed and no comment, navigate to that section
-      if (normalizedStatus === 'completed' && onStatusClick && rowId && statusFieldName && row) {
+      // If status is completed or in progress, and no comment, navigate to that section
+      if ((normalizedStatus === 'completed' || normalizedStatus === 'in progress') && onStatusClick && rowId && statusFieldName && row) {
         onStatusClick(row, statusFieldName);
         return;
       }
     };
 
-    // Determine if circle should be clickable (completed status, incomplete status, or has comment)
-    const isClickable = normalizedStatus === 'completed' || normalizedStatus === 'incomplete' || (shouldShowComment && commentText);
+    // Determine if circle should be clickable (completed, in progress, incomplete, or has comment)
+    const isClickable = normalizedStatus === 'completed' || normalizedStatus === 'in progress' || normalizedStatus === 'incomplete' || (shouldShowComment && commentText);
     
     const handleIconHover = (e) => {
       // Show tooltip on hover if there's a comment
@@ -2227,34 +2227,31 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
       onUpdate={onUpdateShipment}
     />
     
-    {/* Key/Legend - Outside table container */}
+    {/* Key/Legend - Floating fixed on the right */}
     <div
       style={{
+        position: 'fixed',
+        right: 'calc(2rem + 14px)',
+        bottom: '2rem',
+        zIndex: 50,
         display: 'flex',
         alignItems: 'center',
         gap: '24px',
-        marginTop: '24px',
-        justifyContent: 'flex-end',
-        width: '100%',
+        padding: '12px 20px',
+        borderRadius: '8px',
+        backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+        border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
       }}
     >
-      <span
-        style={{
-          fontSize: '14px',
-          fontWeight: 500,
-          color: isDarkMode ? '#E5E7EB' : '#374151',
-        }}
-      >
-        Key:
-      </span>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <div
           style={{
             width: '20px',
             height: '20px',
             borderRadius: '20px',
-            backgroundColor: '#FFFFFF',
-            border: '1px solid #D1D5DB',
+            backgroundColor: '#9CA3AF',
+            border: 'none',
             display: 'inline-block',
           }}
         />

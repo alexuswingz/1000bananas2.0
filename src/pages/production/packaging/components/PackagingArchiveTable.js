@@ -1,10 +1,24 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
 const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
   const { isDarkMode } = useTheme();
   const [actionMenuId, setActionMenuId] = useState(null);
+  const [actionMenuPosition, setActionMenuPosition] = useState({ top: 0, right: 0 });
   const actionMenuRef = useRef(null);
+  const actionButtonRefs = useRef({});
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+
+  // Detect mobile view
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -25,9 +39,11 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
       type: 'AWD',
       brand: 'TPS Plant Foods',
       product: 'Cherry Tree Fertilizer',
-      size: '1 Gallon',
+      size: '8oz',
       qty: 72000,
       caseNumber: 488,
+      formula: 'F.Ultra Grow',
+      labelLocation: 'LBL-PLANT-218',
     },
     {
       id: 2,
@@ -37,9 +53,11 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
       type: 'AWD',
       brand: 'TPS Plant Foods',
       product: 'Cherry Tree Fertilizer',
-      size: '1 Gallon',
+      size: 'Quart',
       qty: 72000,
       caseNumber: 488,
+      formula: 'F.Ultra Grow',
+      labelLocation: 'LBL-PLANT-218',
     },
     {
       id: 3,
@@ -52,6 +70,8 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
       size: '1 Gallon',
       qty: 72000,
       caseNumber: 488,
+      formula: 'F.Ultra Grow',
+      labelLocation: 'LBL-PLANT-218',
     },
     {
       id: 4,
@@ -64,6 +84,8 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
       size: '1 Gallon',
       qty: 72000,
       caseNumber: 488,
+      formula: 'F.Ultra Grow',
+      labelLocation: 'LBL-PLANT-218',
     },
     {
       id: 5,
@@ -76,6 +98,8 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
       size: '1 Gallon',
       qty: 72000,
       caseNumber: 488,
+      formula: 'F.Ultra Grow',
+      labelLocation: 'LBL-PLANT-218',
     },
   ];
 
@@ -84,7 +108,13 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
   useEffect(() => {
     if (actionMenuId === null) return;
     const handleClickOutside = (event) => {
-      if (!event.target.closest('.action-menu-container')) {
+      const menuElement = document.querySelector('[data-action-menu-portal]');
+      const buttonElement = actionButtonRefs.current[actionMenuId];
+      
+      if (
+        menuElement && !menuElement.contains(event.target) &&
+        buttonElement && !buttonElement.contains(event.target)
+      ) {
         setActionMenuId(null);
       }
     };
@@ -116,6 +146,383 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
     { key: 'actions', label: '', width: '60px' },
   ];
 
+  // Mobile Card Layout
+  if (isMobile) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '16px',
+          padding: '0 16px',
+          paddingLeft: '16px',
+          paddingRight: '16px',
+          alignItems: 'stretch',
+          backgroundColor: isDarkMode ? '#000000' : '#F3F4F6',
+          minHeight: '100vh',
+        }}
+      >
+        {filteredData.length === 0 ? (
+          <div
+            className={`px-6 py-6 text-center text-sm ${themeClasses.textSecondary}`}
+          >
+            No archived data available.
+          </div>
+        ) : (
+          filteredData.map((row, index) => (
+            <div
+              key={row.id || index}
+              data-mobile-card
+              style={{
+                width: '100%',
+                minHeight: 'auto',
+                padding: '16px',
+                gap: '16px',
+                borderRadius: '12px',
+                border: row.isSplit 
+                  ? `1px solid ${isDarkMode ? 'rgba(59, 130, 246, 0.4)' : 'rgba(59, 130, 246, 0.3)'}`
+                  : isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                backgroundColor: row.status === 'moved_s' || row.status === 'moved_fg'
+                  ? '#F3F4F6'
+                  : row.isSplit
+                    ? isDarkMode ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.08)'
+                    : isDarkMode ? '#1F2937' : '#FFFFFF',
+                display: 'flex',
+                flexDirection: 'column',
+                position: 'relative',
+                opacity: (row.status === 'moved_s' || row.status === 'moved_fg') ? 0.6 : 1,
+                boxSizing: 'border-box',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Three-dot menu button */}
+              <button
+                ref={(el) => {
+                  if (el) actionButtonRefs.current[row.id] = el;
+                }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  
+                  const buttonRect = e.currentTarget.getBoundingClientRect();
+                  const cardElement = e.currentTarget.closest('[data-mobile-card]');
+                  const cardRect = cardElement?.getBoundingClientRect();
+                  
+                  const menuWidth = 200;
+                  const menuHeight = 120;
+                  
+                  let menuTop = buttonRect.bottom + 8;
+                  let menuLeft = cardRect ? cardRect.left + 16 : 16;
+                  
+                  const maxTop = window.innerHeight - menuHeight - 16;
+                  if (menuTop > maxTop) {
+                    menuTop = Math.max(buttonRect.top - menuHeight - 8, 60);
+                  }
+                  
+                  const maxLeft = window.innerWidth - menuWidth - 16;
+                  if (menuLeft > maxLeft) {
+                    menuLeft = maxLeft;
+                  }
+                  
+                  menuTop = Math.max(menuTop, 60);
+                  menuLeft = Math.max(menuLeft, 16);
+                  
+                  const menuRight = window.innerWidth - (menuLeft + menuWidth);
+                  
+                  setActionMenuPosition({ top: menuTop, right: menuRight });
+                  setActionMenuId(actionMenuId === row.id ? null : row.id);
+                }}
+                style={{
+                  position: 'absolute',
+                  top: '16px',
+                  right: '16px',
+                  width: '24px',
+                  height: '24px',
+                  padding: '0',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 1,
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <circle cx="10" cy="4" r="1.5" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
+                  <circle cx="10" cy="10" r="1.5" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
+                  <circle cx="10" cy="16" r="1.5" fill={isDarkMode ? '#9CA3AF' : '#6B7280'} />
+                </svg>
+              </button>
+
+              {/* Card Content - Image + Details */}
+              <div style={{ display: 'flex', gap: '12px', flex: 1, alignItems: 'flex-start' }}>
+                {/* Product Image Container */}
+                <div 
+                  style={{ 
+                    flexShrink: 0,
+                    position: 'relative',
+                    width: '120px',
+                    height: '160px',
+                    borderRadius: '8px',
+                    backgroundColor: '#1F2937',
+                    border: '1px solid #374151',
+                    padding: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {/* Product Image */}
+                  <img
+                    src="/assets/TPS_Cherry Tree_8oz_Wrap (1).png"
+                    alt={row.product || 'Cherry Tree Fertilizer'}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'contain',
+                    }}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                  {/* Expand Icon */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Handle expand action if needed
+                    }}
+                    style={{
+                      position: 'absolute',
+                      top: '8px',
+                      right: '8px',
+                      width: '24px',
+                      height: '24px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      padding: 0,
+                      zIndex: 2,
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2">
+                      <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Product Info */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px', minWidth: 0, padding: 0, margin: 0 }}>
+                  {/* Title and Subtitle */}
+                  <div style={{ display: 'block', position: 'relative', paddingRight: '32px', paddingLeft: 0, paddingTop: 0, paddingBottom: 0, margin: 0, width: '100%' }}>
+                    <h3
+                      style={{
+                        fontSize: '16px',
+                        fontWeight: 700,
+                        color: isDarkMode ? '#F9FAFB' : '#111827',
+                        margin: 0,
+                        padding: 0,
+                        marginBottom: '4px',
+                        lineHeight: '1.3',
+                        textAlign: 'left',
+                        fontFamily: 'system-ui, -apple-system, sans-serif',
+                        width: '100%',
+                        wordBreak: 'break-word',
+                      }}
+                    >
+                      {row.product || 'Cherry Tree Fertilizer'}
+                    </h3>
+                    <p
+                      style={{
+                        fontSize: '14px',
+                        fontWeight: 400,
+                        color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                        margin: 0,
+                        padding: 0,
+                        textAlign: 'left',
+                        fontFamily: 'system-ui, -apple-system, sans-serif',
+                        width: '100%',
+                      }}
+                    >
+                      {row.brand || 'TPS Plant Foods'} • {row.size || '1 Gallon'}
+                    </p>
+                  </div>
+
+                  {/* Product Details List */}
+                  <div
+                    style={{
+                      display: 'block',
+                      fontSize: '14px',
+                      fontFamily: 'system-ui, -apple-system, sans-serif',
+                      width: '100%',
+                      padding: 0,
+                      margin: 0,
+                    }}
+                  >
+                    <div style={{ textAlign: 'left', lineHeight: '1.5', width: '100%', display: 'block', marginBottom: '12px', padding: 0, marginLeft: 0, marginRight: 0, marginTop: 0 }}>
+                      <span style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: 400, display: 'inline' }}>Formula: </span>
+                      <span style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 700, display: 'inline' }}>{row.formula || 'F.Ultra Grow'}</span>
+                    </div>
+                    <div style={{ textAlign: 'left', lineHeight: '1.5', width: '100%', display: 'block', marginBottom: '12px', padding: 0, marginLeft: 0, marginRight: 0 }}>
+                      <span style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: 400, display: 'inline' }}>TPS Ship #: </span>
+                      <span style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 700, display: 'inline' }}>{row.tpsShipNumber || '10-01-2025'}</span>
+                    </div>
+                    {row.labelLocation && (
+                      <div style={{ textAlign: 'left', lineHeight: '1.5', width: '100%', display: 'block', marginBottom: '12px', padding: 0, marginLeft: 0, marginRight: 0 }}>
+                        <span style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: 400, display: 'inline' }}>Label Location: </span>
+                        <span style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 700, display: 'inline' }}>{row.labelLocation || 'LBL-PLANT-218'}</span>
+                      </div>
+                    )}
+                    <div style={{ textAlign: 'left', lineHeight: '1.5', width: '100%', display: 'block', marginBottom: '12px', padding: 0, marginLeft: 0, marginRight: 0 }}>
+                      <span style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: 400, display: 'inline' }}>QTY: </span>
+                      <span style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 700, display: 'inline' }}>{row.qty ? row.qty.toLocaleString() : '72,000'}</span>
+                    </div>
+                    {row.caseNumber && (
+                      <div style={{ textAlign: 'left', lineHeight: '1.5', width: '100%', display: 'block', marginBottom: '0', padding: 0, marginLeft: 0, marginRight: 0 }}>
+                        <span style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: 400, display: 'inline' }}>Case #: </span>
+                        <span style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 700, display: 'inline' }}>{row.caseNumber || 488}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Done Button */}
+              <button
+                style={{
+                  width: '100%',
+                  height: '40px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: '#10B981',
+                  color: '#FFFFFF',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  padding: '0',
+                  margin: '0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.opacity = '0.9';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.opacity = '1';
+                }}
+              >
+                Done
+              </button>
+            </div>
+          ))
+        )}
+
+        {/* Action Menu Portal - Mobile */}
+        {actionMenuId && isMobile && (() => {
+          const selectedRow = filteredData.find(r => r.id === actionMenuId);
+          if (!selectedRow) return null;
+
+          return createPortal(
+            <div
+              data-action-menu-portal
+              style={{
+                position: 'fixed',
+                top: `${actionMenuPosition.top}px`,
+                right: `${actionMenuPosition.right}px`,
+                zIndex: 10000,
+                minWidth: '200px',
+                maxWidth: 'calc(100vw - 32px)',
+                padding: '6px',
+                backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                borderRadius: '8px',
+                boxShadow: isDarkMode 
+                  ? '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2)'
+                  : '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.06)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => setActionMenuId(null)}
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '10px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  fontSize: '14px',
+                  fontWeight: 400,
+                  color: isDarkMode ? '#FFFFFF' : '#111827',
+                  borderRadius: '6px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={isDarkMode ? '#9CA3AF' : '#6B7280'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+                <span>Edit</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActionMenuId(null)}
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '10px 12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  fontSize: '14px',
+                  fontWeight: 400,
+                  color: '#EF4444',
+                  borderRadius: '6px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+                <span>Delete</span>
+              </button>
+            </div>,
+            document.body
+          );
+        })()}
+      </div>
+    );
+  }
+
+  // Desktop Table Layout
   return (
     <div
       className="border rounded-xl"
@@ -361,6 +768,8 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
                     justifyContent: 'center',
                     gap: '3px',
                     backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
                   }}
                 >
                   <svg width="4" height="14" viewBox="0 0 4 14" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -371,19 +780,59 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
                 </button>
                 {actionMenuId === row.id && (
                   <div
-                    className="absolute right-4 top-9 z-20 w-32 bg-gray-800 border border-gray-700 rounded-md shadow-lg text-xs"
+                    style={{
+                      position: 'absolute',
+                      right: '16px',
+                      top: '36px',
+                      zIndex: 20,
+                      width: '128px',
+                      backgroundColor: '#1F2937',
+                      border: '1px solid #374151',
+                      borderRadius: '6px',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2)',
+                      fontSize: '12px',
+                      overflow: 'hidden',
+                    }}
                   >
                     <button
                       type="button"
-                      className="w-full text-left px-3 py-2 hover:bg-gray-700 text-white"
                       onClick={() => setActionMenuId(null)}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '8px 12px',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        color: '#FFFFFF',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#374151';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
                     >
                       Edit
                     </button>
                     <button
                       type="button"
-                      className="w-full text-left px-3 py-2 hover:bg-gray-700 text-red-400"
                       onClick={() => setActionMenuId(null)}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '8px 12px',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        color: '#EF4444',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#374151';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
                     >
                       Delete
                     </button>

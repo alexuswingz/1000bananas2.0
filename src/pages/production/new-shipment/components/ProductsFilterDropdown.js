@@ -52,7 +52,7 @@ const ProductsFilterDropdown = forwardRef(({
   const [isPositioned, setIsPositioned] = useState(false);
   const [sortOrder, setSortOrder] = useState('');
   const [filterConditionExpanded, setFilterConditionExpanded] = useState(false);
-  const [filterValuesExpanded, setFilterValuesExpanded] = useState(true); // Start open by default
+  const [filterValuesExpanded, setFilterValuesExpanded] = useState(false); // Collapsed by default to save space
   const [brandFilterExpanded, setBrandFilterExpanded] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [brandSearchTerm, setBrandSearchTerm] = useState('');
@@ -353,7 +353,7 @@ const ProductsFilterDropdown = forwardRef(({
           boxShadow: theme.shadow,
           border: `1px solid ${theme.border}`,
           zIndex: 10000,
-          overflow: 'hidden',
+          overflow: 'visible',
           opacity: isPositioned ? 1 : 0,
           transition: 'opacity 0.15s ease-in',
         }}
@@ -369,8 +369,8 @@ const ProductsFilterDropdown = forwardRef(({
           display: none; /* Chrome, Safari */
         }
       `}</style>
-      {/* Popular Filters (Days of Inventory only) – dropdown like Filter by condition */}
-      {columnKey === 'doiDays' && (
+      {/* Popular Filters (Inventory column) – dropdown like Filter by condition */}
+      {columnKey === 'fbaAvailable' && (
         <div style={{ borderBottom: `1px solid ${theme.border}` }}>
           <div
             onClick={() => setPopularFilterExpanded(!popularFilterExpanded)}
@@ -471,7 +471,7 @@ const ProductsFilterDropdown = forwardRef(({
                       border: `1px solid ${theme.border}`,
                       boxShadow: theme.shadow,
                       padding: '4px 0',
-                      zIndex: 50,
+                      zIndex: 10001,
                     }}
                     onClick={(e) => e.stopPropagation()}
                   >
@@ -544,6 +544,11 @@ const ProductsFilterDropdown = forwardRef(({
       )}
       {/* Sort Options */}
       <div style={{ padding: '8px 12px', borderBottom: `1px solid ${theme.border}` }}>
+        {columnKey === 'doiDays' && (
+          <div style={{ fontSize: '10px', fontWeight: 600, color: theme.subtleText, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>
+            Sort by Total Inventory
+          </div>
+        )}
         {/* Sort Ascending */}
         <div
           onClick={(e) => {
@@ -552,6 +557,7 @@ const ProductsFilterDropdown = forwardRef(({
             if (onApply) {
               const sortData = {
                 sortOrder: newOrder,
+                sortField: columnKey,
                 selectedValues,
                 conditionType,
                 conditionValue,
@@ -586,24 +592,19 @@ const ProductsFilterDropdown = forwardRef(({
         >
           <div
             style={{
-              width: '20px',
-              height: '20px',
-              backgroundColor: sortOrder === 'asc' ? theme.chipBgActive : theme.chipBg,
+              width: '17px',
+              height: '17px',
               borderRadius: '3px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '9px',
-              fontWeight: 700,
-              color: sortOrder === 'asc' ? theme.chipTextActive : theme.chipText,
               flexShrink: 0,
             }}
           >
-            AZ
+            <img src="/assets/High to Low.png" alt="Low to High" style={{ width: '17px', height: '17px', objectFit: 'contain', imageRendering: 'crisp-edges', ...(isDarkMode ? { filter: 'invert(1) brightness(1.05)' } : {}) }} />
           </div>
           <div style={{ fontSize: '12px', color: theme.headerText, fontWeight: 400, lineHeight: '1.3' }}>
-            Sort ascending<br/>
-            <span style={{ color: theme.subtleText, fontSize: '11px' }}>(A to Z)</span>
+            Low to High
           </div>
         </div>
 
@@ -615,6 +616,7 @@ const ProductsFilterDropdown = forwardRef(({
             if (onApply) {
               const sortData = {
                 sortOrder: newOrder,
+                sortField: columnKey,
                 selectedValues,
                 conditionType,
                 conditionValue,
@@ -648,24 +650,19 @@ const ProductsFilterDropdown = forwardRef(({
         >
           <div
             style={{
-              width: '20px',
-              height: '20px',
-              backgroundColor: sortOrder === 'desc' ? theme.chipBgActive : theme.chipBg,
+              width: '17px',
+              height: '17px',
               borderRadius: '3px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '9px',
-              fontWeight: 700,
-              color: sortOrder === 'desc' ? theme.chipTextActive : theme.chipText,
               flexShrink: 0,
             }}
           >
-            ZA
+            <img src="/assets/Low to High.png" alt="High to Low" style={{ width: '17px', height: '17px', objectFit: 'contain', imageRendering: 'crisp-edges', ...(isDarkMode ? { filter: 'invert(1) brightness(1.05)' } : {}) }} />
           </div>
           <div style={{ fontSize: '12px', color: theme.headerText, fontWeight: 400, lineHeight: '1.3' }}>
-            Sort descending<br/>
-            <span style={{ color: theme.subtleText, fontSize: '11px' }}>(Z to A)</span>
+            High to Low
           </div>
         </div>
 
@@ -673,7 +670,7 @@ const ProductsFilterDropdown = forwardRef(({
         {columnKey === 'doiDays' && (
           <>
             <div style={{ borderTop: `1px solid ${theme.sectionBorder}`, marginTop: '6px', paddingTop: '6px' }}>
-              <span style={{ fontSize: '10px', fontWeight: 600, color: theme.subtleText, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sort by FBA</span>
+              <span style={{ fontSize: '10px', fontWeight: 600, color: theme.subtleText, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sort by FBA Inventory</span>
             </div>
             <div
               onClick={(e) => {
@@ -709,23 +706,19 @@ const ProductsFilterDropdown = forwardRef(({
             >
               <div
                 style={{
-                  width: '20px',
-                  height: '20px',
-                  backgroundColor: currentSortByFba === 'asc' ? theme.chipBgActive : theme.chipBg,
+                  width: '17px',
+                  height: '17px',
                   borderRadius: '3px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '9px',
-                  fontWeight: 700,
-                  color: currentSortByFba === 'asc' ? theme.chipTextActive : theme.chipText,
                   flexShrink: 0,
                 }}
               >
-                AZ
+                <img src="/assets/High to Low.png" alt="FBA Low to High" style={{ width: '17px', height: '17px', objectFit: 'contain', imageRendering: 'crisp-edges', ...(isDarkMode ? { filter: 'invert(1) brightness(1.05)' } : {}) }} />
               </div>
               <div style={{ fontSize: '12px', color: theme.headerText, fontWeight: 400, lineHeight: '1.3' }}>
-                FBA A-Z
+                FBA Low to High
               </div>
             </div>
             <div
@@ -761,23 +754,19 @@ const ProductsFilterDropdown = forwardRef(({
             >
               <div
                 style={{
-                  width: '20px',
-                  height: '20px',
-                  backgroundColor: currentSortByFba === 'desc' ? theme.chipBgActive : theme.chipBg,
+                  width: '17px',
+                  height: '17px',
                   borderRadius: '3px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '9px',
-                  fontWeight: 700,
-                  color: currentSortByFba === 'desc' ? theme.chipTextActive : theme.chipText,
                   flexShrink: 0,
                 }}
               >
-                ZA
+                <img src="/assets/Low to High.png" alt="FBA High to Low" style={{ width: '17px', height: '17px', objectFit: 'contain', imageRendering: 'crisp-edges', ...(isDarkMode ? { filter: 'invert(1) brightness(1.05)' } : {}) }} />
               </div>
               <div style={{ fontSize: '12px', color: theme.headerText, fontWeight: 400, lineHeight: '1.3' }}>
-                FBA Z-A
+                FBA High to Low
               </div>
             </div>
           </>
@@ -880,7 +869,7 @@ const ProductsFilterDropdown = forwardRef(({
                     border: `1px solid ${theme.border}`,
                     boxShadow: theme.shadow,
                     padding: '4px 0',
-                    zIndex: 50,
+                    zIndex: 10001,
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >

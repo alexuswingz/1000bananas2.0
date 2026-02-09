@@ -1545,6 +1545,7 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
   const [filterField, setFilterField] = useState(existingFilter ? existingFilter[0] : '');
   const [filterCondition, setFilterCondition] = useState(existingFilter ? existingFilter[1].condition : '');
   const [filterValue, setFilterValue] = useState(existingFilter ? existingFilter[1].value : '');
+  const [conditionMenuOpen, setConditionMenuOpen] = useState(false);
 
   useEffect(() => {
     if (filterIconRef) {
@@ -1652,6 +1653,7 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
         boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
         border: '1px solid #E5E7EB',
         zIndex: 10000,
+        overflow: 'visible',
         padding: '16px',
       }}
       onClick={(e) => e.stopPropagation()}
@@ -1753,26 +1755,103 @@ const FilterDropdown = React.forwardRef(({ columnKey, filterIconRef, onClose, on
             ))}
           </select>
           
-          <select
-            value={filterCondition}
-            onChange={(e) => setFilterCondition(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              border: '1px solid #D1D5DB',
-              borderRadius: '6px',
-              fontSize: '0.875rem',
-              color: filterCondition ? '#374151' : '#9CA3AF',
-              backgroundColor: '#FFFFFF',
-              cursor: 'pointer',
-            }}
-          >
-            {filterConditions.map((condition) => (
-              <option key={condition.value} value={condition.value}>
-                {condition.label}
-              </option>
-            ))}
-          </select>
+          <div style={{ position: 'relative', width: '100%' }}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setConditionMenuOpen(!conditionMenuOpen);
+              }}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                border: '1px solid #D1D5DB',
+                backgroundColor: '#FFFFFF',
+                color: filterCondition ? '#374151' : '#9CA3AF',
+                fontSize: '0.875rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+            >
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {filterConditions.find(c => c.value === filterCondition)?.label || 'Select condition'}
+              </span>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 12 12"
+                fill="none"
+                style={{
+                  flexShrink: 0,
+                  transform: conditionMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.15s ease-out',
+                }}
+              >
+                <path
+                  d="M3 4.5L6 7.5L9 4.5"
+                  stroke="#6B7280"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+
+            {conditionMenuOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  marginTop: '4px',
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: '10px',
+                  border: '1px solid #E5E7EB',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  padding: '4px 0',
+                  zIndex: 10001,
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {filterConditions.map((condition) => {
+                  const selected = condition.value === filterCondition || (!filterCondition && condition.value === '');
+                  return (
+                    <button
+                      key={condition.value}
+                      type="button"
+                      onClick={() => {
+                        setFilterCondition(condition.value);
+                        setConditionMenuOpen(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '6px 10px',
+                        backgroundColor: selected ? 'rgba(59,130,246,0.15)' : 'transparent',
+                        color: selected ? '#FFFFFF' : '#374151',
+                        fontSize: '0.875rem',
+                        border: 'none',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!selected) e.currentTarget.style.backgroundColor = '#F9FAFB';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!selected) e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      {condition.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           
           <input
             type="text"

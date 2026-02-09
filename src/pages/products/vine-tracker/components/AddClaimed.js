@@ -780,6 +780,13 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
           color: #9CA3AF;
           opacity: 1;
         }
+        table[data-claim-history-table] th:nth-child(3),
+        table[data-claim-history-table] td:nth-child(3) {
+          display: table-cell !important;
+          visibility: visible !important;
+          width: 30% !important;
+          min-width: 150px !important;
+        }
       `}</style>
       <div
         style={{
@@ -801,7 +808,7 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
       >
         <div
           style={{
-            width: '600px',
+            width: '700px',
             maxHeight: '90vh',
             backgroundColor: '#111827',
             borderRadius: '12px',
@@ -818,7 +825,7 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
           {/* Header */}
           <div
             style={{
-              width: '600px',
+              width: '700px',
               height: '52px',
               padding: '16px',
               borderBottom: '1px solid #374151',
@@ -1117,11 +1124,11 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                   backgroundColor: '#111827',
                 }}
               >
-                <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed' }}>
+                <table data-claim-history-table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'auto' }}>
                   <colgroup>
-                    <col style={{ width: '45%' }} />
-                    <col style={{ width: '25%' }} />
-                    <col style={{ width: (showInputRow || showActionsColumn) ? '30%' : '0%' }} />
+                    <col style={{ width: '40%', minWidth: '200px' }} />
+                    <col style={{ width: '30%', minWidth: '150px' }} />
+                    <col style={{ width: '30%', minWidth: '150px' }} />
                   </colgroup>
                   <thead>
                     <tr style={{ 
@@ -1139,6 +1146,7 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                           boxSizing: 'border-box',
                           borderBottom: '1px solid #374151',
                           borderTopLeftRadius: '8px',
+                          width: '40%',
                         }}
                       >
                         DATE CLAIMED
@@ -1154,14 +1162,15 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                           color: '#9CA3AF',
                           boxSizing: 'border-box',
                           borderBottom: '1px solid #374151',
-                          borderTopRightRadius: (showInputRow || showActionsColumn) ? '0' : '8px',
+                          borderTopRightRadius: '0',
+                          width: '30%',
                         }}
                       >
                         UNITS
                       </th>
                       <th
                         style={{ 
-                          padding: '12px 16px 12px 16px', 
+                          padding: '12px 16px', 
                           textAlign: 'right',
                           fontSize: '0.75rem',
                           fontWeight: 600,
@@ -1170,9 +1179,17 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                           color: '#9CA3AF',
                           boxSizing: 'border-box',
                           borderBottom: '1px solid #374151',
-                          borderTopRightRadius: (showInputRow || showActionsColumn) ? '8px' : '0',
-                          visibility: (showInputRow || showActionsColumn) ? 'visible' : 'hidden',
-                          width: (showInputRow || showActionsColumn) ? (showInputRow ? '43%' : '30%') : '0%',
+                          borderTopRightRadius: '8px',
+                          width: '30%',
+                          minWidth: '150px',
+                          maxWidth: 'none',
+                          backgroundColor: '#0F172A',
+                          position: 'relative',
+                          zIndex: 1,
+                          whiteSpace: 'nowrap',
+                          visibility: 'visible',
+                          display: 'table-cell',
+                          opacity: 1,
                         }}
                       >
                         ACTIONS
@@ -1190,7 +1207,7 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                           color: '#FFFFFF',
                           textAlign: 'left',
                           boxSizing: 'border-box',
-                          width: '45%',
+                          width: '40%',
                         }}
                       >
                         <div style={{ position: 'relative' }}>
@@ -1256,7 +1273,7 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                           color: '#FFFFFF',
                           textAlign: 'left',
                           boxSizing: 'border-box',
-                          width: '12%',
+                          width: '30%',
                           whiteSpace: 'nowrap',
                         }}
                       >
@@ -1291,7 +1308,7 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                           color: '#FFFFFF',
                           textAlign: 'right',
                           boxSizing: 'border-box',
-                          width: '43%',
+                          width: '30%',
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
@@ -1486,7 +1503,7 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                                 textAlign: 'right',
                                 boxSizing: 'border-box',
                                 borderBottomRightRadius: isLastRow ? '8px' : '0',
-                                visibility: (showInputRow || showActionsColumn) ? 'visible' : 'hidden',
+                                display: (showInputRow || showActionsColumn) ? 'table-cell' : 'none',
                               }}
                             >
                               {showActionsColumn && (
@@ -1527,17 +1544,39 @@ const AddClaimed = ({ isOpen, onClose, productData, onAddClaim, onUpdateRow }) =
                       !showInputRow && (
                         <tr>
                           <td 
-                            colSpan={3} 
                             style={{ 
                               padding: '2rem', 
                               textAlign: 'center', 
                               color: '#9CA3AF',
                               fontSize: '0.875rem',
                               borderBottomLeftRadius: '8px',
-                              borderBottomRightRadius: '8px',
+                              width: '40%',
                             }}
                           >
                             No claim history yet
+                          </td>
+                          <td 
+                            style={{ 
+                              padding: '2rem', 
+                              textAlign: 'center', 
+                              color: '#9CA3AF',
+                              fontSize: '0.875rem',
+                              width: '30%',
+                            }}
+                          >
+                            &nbsp;
+                          </td>
+                          <td 
+                            style={{ 
+                              padding: '2rem', 
+                              textAlign: 'center', 
+                              color: '#9CA3AF',
+                              fontSize: '0.875rem',
+                              borderBottomRightRadius: '8px',
+                              width: '30%',
+                            }}
+                          >
+                            &nbsp;
                           </td>
                         </tr>
                       )

@@ -1003,6 +1003,11 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
         .vine-details-modal-content::-webkit-scrollbar-thumb:hover {
           background: #6B7280;
         }
+        table[data-vine-claim-history-table] th:nth-child(3),
+        table[data-vine-claim-history-table] td:nth-child(3) {
+          display: table-cell !important;
+          visibility: visible !important;
+        }
       `}</style>
     <div
       style={{
@@ -1383,7 +1388,7 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
                   background: #6B7280;
                 }
               `}</style>
-              <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', backgroundColor: '#111827' }}>
+              <table data-vine-claim-history-table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', backgroundColor: '#111827' }}>
                 <colgroup>
                   <col style={{ width: '45%' }} />
                   <col style={{ width: '15%' }} />
@@ -1420,7 +1425,7 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
                         color: '#9CA3AF',
                         boxSizing: 'border-box',
                         borderBottom: '1px solid #374151',
-                        borderTopRightRadius: (showInputRow || showActionsColumn) ? '0' : '8px',
+                        borderTopRightRadius: '0',
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
@@ -1439,7 +1444,8 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
                         boxSizing: 'border-box',
                         borderBottom: '1px solid #374151',
                         borderTopRightRadius: '8px',
-                        display: (showInputRow || showActionsColumn) ? 'table-cell' : 'none',
+                        display: 'table-cell',
+                        visibility: 'visible',
                       }}
                     >
                       ACTIONS
@@ -1699,7 +1705,8 @@ const VineDetailsModal = ({ isOpen, onClose, productData, onUpdateProduct, onAdd
                               borderBottom: isLastRow ? 'none' : '1px solid #374151',
                               borderBottomRightRadius: isLastRow ? '8px' : '0',
                               backgroundColor: '#111827',
-                              display: (showInputRow || showActionsColumn) ? 'table-cell' : 'none',
+                              display: 'table-cell',
+                              visibility: 'visible',
                             }}
                           >
                             {showActionsColumn && (

@@ -263,7 +263,7 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: '#F3F4F6',
+          backgroundColor: isDarkMode ? '#111827' : '#F3F4F6',
           zIndex: 1000,
           display: 'flex',
           flexDirection: 'column',
@@ -273,9 +273,9 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
         {/* Mobile Header */}
         <div
           style={{
-            backgroundColor: '#F9FAFB',
+            backgroundColor: isDarkMode ? '#1F2937' : '#F9FAFB',
             padding: '12px 16px',
-            borderBottom: '1px solid #E5E7EB',
+            borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -294,11 +294,11 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
               justifyContent: 'center',
             }}
           >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth={2}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={isDarkMode ? '#FFFFFF' : '#374151'} strokeWidth={2}>
               <path d="M19 12H5M12 19l-7-7 7-7" />
             </svg>
           </button>
-          <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', margin: 0 }}>
+          <h2 style={{ fontSize: '18px', fontWeight: '600', color: isDarkMode ? '#FFFFFF' : '#111827', margin: 0 }}>
             Quality Check
           </h2>
           <div style={{ position: 'relative', minWidth: '120px' }}>
@@ -313,9 +313,9 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
                 padding: '6px 24px 6px 8px',
                 fontSize: '12px',
                 fontWeight: '500',
-                color: '#374151',
-                backgroundColor: '#FFFFFF',
-                border: '1px solid #D1D5DB',
+                color: isDarkMode ? '#FFFFFF' : '#374151',
+                backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                border: isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
                 borderRadius: '6px',
                 appearance: 'none',
                 cursor: 'pointer',
@@ -348,7 +348,7 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
               viewBox="0 0 12 12"
               fill="none"
             >
-              <path d="M2.5 4.5L6 8L9.5 4.5" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M2.5 4.5L6 8L9.5 4.5" stroke={isDarkMode ? '#9CA3AF' : '#6B7280'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
         </div>
@@ -364,7 +364,7 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
 
           {/* Instruction with Formula */}
           <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <p style={{ fontSize: '14px', fontWeight: '400', margin: 0, color: '#374151' }}>
+            <p style={{ fontSize: '14px', fontWeight: '400', margin: 0, color: isDarkMode ? '#D1D5DB' : '#374151' }}>
               {currentStep.id === 'formula' && productData?.formula 
                 ? (
                   <>
@@ -381,7 +381,7 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
               fill="none"
               style={{ flexShrink: 0 }}
             >
-              <circle cx="8" cy="8" r="7" fill="#9CA3AF" />
+              <circle cx="8" cy="8" r="7" fill={isDarkMode ? '#6B7280' : '#9CA3AF'} />
               <path
                 d="M8 4.5V8.5M8 11.5H8.01"
                 stroke="white"
@@ -397,7 +397,7 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
             style={{
               width: '100%',
               height: '4px',
-              backgroundColor: '#E5E7EB',
+              backgroundColor: isDarkMode ? '#374151' : '#E5E7EB',
               borderRadius: '2px',
               marginBottom: '24px',
               overflow: 'hidden',
@@ -416,9 +416,9 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
           {/* White Card */}
           <div
             style={{
-              backgroundColor: '#FFFFFF',
+              backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
               borderRadius: '12px',
-              border: '2px dashed #D1D5DB',
+              border: isDarkMode ? '2px dashed #4B5563' : '2px dashed #D1D5DB',
               padding: '32px 16px',
               display: 'flex',
               flexDirection: 'column',
@@ -440,7 +440,7 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
                     maxHeight: '300px',
                     objectFit: 'contain',
                     borderRadius: '8px',
-                    border: '1px solid #E5E7EB',
+                    border: isDarkMode ? '1px solid #4B5563' : '1px solid #E5E7EB',
                   }}
                 />
                 <p style={{ fontSize: '14px', color: '#22C55E', fontWeight: '500', margin: 0 }}>
@@ -461,12 +461,12 @@ const QualityChecksModal = ({ isOpen, onClose, productData, onStartProduction })
                 />
 
                 {/* Title */}
-                <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#111827', margin: 0, textAlign: 'center' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: '700', color: isDarkMode ? '#FFFFFF' : '#111827', margin: 0, textAlign: 'center' }}>
                   {currentStep.confirmationText}
                 </h3>
 
                 {/* Description */}
-                <p style={{ fontSize: '14px', color: '#6B7280', margin: 0, textAlign: 'center', maxWidth: '280px' }}>
+                <p style={{ fontSize: '14px', color: isDarkMode ? '#9CA3AF' : '#6B7280', margin: 0, textAlign: 'center', maxWidth: '280px' }}>
                   {currentStep.description}
                 </p>
 

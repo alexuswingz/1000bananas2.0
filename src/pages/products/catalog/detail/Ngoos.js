@@ -139,6 +139,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   const [chartLoadError, setChartLoadError] = useState(null); // e.g. CORS / network when chart fails on live
   const [visibleSalesMetrics, setVisibleSalesMetrics] = useState(['units_sold', 'sales']);
   const [visibleAdsMetrics, setVisibleAdsMetrics] = useState(['total_sales', 'tacos']);
+  const [hoveredSegment, setHoveredSegment] = useState(null); // 'fba', 'total', 'forecast', or null
   const [selectedMetrics, setSelectedMetrics] = useState({
     sales: [
       'units_sold',
@@ -346,7 +347,15 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         fbaAge: inv.fba_age ? {
           oldest_days: inv.fba_age.oldest_days,
           newest_days: inv.fba_age.newest_days,
-          avg_days: inv.fba_age.avg_days
+          avg_days: inv.fba_age.avg_days,
+          // Age buckets (days): 0-90, 91-180, 181-270, 271-365, 365+
+          buckets: {
+            '0-90': inv.fba_age['0-90'] ?? inv.fba_age.range_0_90 ?? inv.fba_age.buckets?.['0-90'] ?? 0,
+            '91-180': inv.fba_age['91-180'] ?? inv.fba_age.range_91_180 ?? inv.fba_age.buckets?.['91-180'] ?? 0,
+            '181-270': inv.fba_age['181-270'] ?? inv.fba_age.range_181_270 ?? inv.fba_age.buckets?.['181-270'] ?? 0,
+            '271-365': inv.fba_age['271-365'] ?? inv.fba_age.range_271_365 ?? inv.fba_age.buckets?.['271-365'] ?? 0,
+            '365+': inv.fba_age['365+'] ?? inv.fba_age.range_365_plus ?? inv.fba_age.buckets?.['365+'] ?? 0
+          }
         } : null
       };
     }
@@ -365,12 +374,20 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         reserved: 0
       }
     };
+    const fallbackFbaAge = forecastData?.inventory?.fba_age;
     return {
       ...base,
-      fbaAge: base.fbaAge || (forecastData?.inventory?.fba_age ? {
-        oldest_days: forecastData.inventory.fba_age.oldest_days,
-        newest_days: forecastData.inventory.fba_age.newest_days,
-        avg_days: forecastData.inventory.fba_age.avg_days
+      fbaAge: base.fbaAge || (fallbackFbaAge ? {
+        oldest_days: fallbackFbaAge.oldest_days,
+        newest_days: fallbackFbaAge.newest_days,
+        avg_days: fallbackFbaAge.avg_days,
+        buckets: {
+          '0-90': fallbackFbaAge['0-90'] ?? fallbackFbaAge.range_0_90 ?? fallbackFbaAge.buckets?.['0-90'] ?? 0,
+          '91-180': fallbackFbaAge['91-180'] ?? fallbackFbaAge.range_91_180 ?? fallbackFbaAge.buckets?.['91-180'] ?? 0,
+          '181-270': fallbackFbaAge['181-270'] ?? fallbackFbaAge.range_181_270 ?? fallbackFbaAge.buckets?.['181-270'] ?? 0,
+          '271-365': fallbackFbaAge['271-365'] ?? fallbackFbaAge.range_271_365 ?? fallbackFbaAge.buckets?.['271-365'] ?? 0,
+          '365+': fallbackFbaAge['365+'] ?? fallbackFbaAge.range_365_plus ?? fallbackFbaAge.buckets?.['365+'] ?? 0
+        }
       } : null)
     };
   }, [forecastData, productDetails]);
@@ -2105,26 +2122,35 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           overflowX: 'auto',
           minWidth: 0
         }}>
-          {/* Left: Product Info */}
+          {/* Left: Product Info - sticky left so it stays visible when scrolling buckets horizontally */}
           <div className={themeClasses.cardBg} style={{ 
-            borderRadius: '0.5rem', 
-            padding: inventoryOnly ? '1rem 3rem 1rem 1rem' : '1.5rem',
-            minWidth: inventoryOnly ? '300px' : 'auto',
-            flex: inventoryOnly ? '1 1 48%' : '1',
-            maxWidth: inventoryOnly ? '488px' : 'auto',
-            height: inventoryOnly ? '160px' : 'auto',
-            flexShrink: 0,
+            width: '488px',
+            height: '136px',
+            borderRadius: '8px',
             border: '1px solid #334155',
+            padding: '16px 48px 16px 16px',
             display: 'flex',
-            flexDirection: 'column'
+            flexDirection: 'row',
+            gap: '16px',
+            flexShrink: 0,
+            position: 'sticky',
+            left: 0,
+            top: 0,
+            alignSelf: 'flex-start',
+            zIndex: 10,
+            backgroundColor: '#0f172a',
+            boxShadow: '4px 0 8px rgba(0,0,0,0.2)'
           }}>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', flex: 1, minWidth: 0 }}>
               <div style={{ 
-                width: inventoryOnly ? '128px' : '80px', 
-                height: inventoryOnly ? '128px' : '120px', 
+                width: '104px',
+                height: '104px',
+                borderRadius: '10.21px',
+                padding: '6.8px',
+                boxSizing: 'border-box',
                 backgroundColor: '#fff', 
-                borderRadius: '0.5rem', 
                 display: 'flex', 
+                flexDirection: 'column',
                 alignItems: 'center', 
                 justifyContent: 'center', 
                 overflow: 'hidden',
@@ -2142,28 +2168,30 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                   </svg>
                 )}
               </div>
-              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <h3 style={{ 
-                  fontSize: inventoryOnly ? '1.125rem' : '1.125rem', 
+                  fontSize: '20px', 
                   fontWeight: '600', 
                   color: '#fff', 
-                  lineHeight: 1.3,
-                  overflow: 'hidden',
+                  height: '22px',
+                  lineHeight: '22px',
+                  overflow: 'visible',
                   textOverflow: 'ellipsis',
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  margin: 0
+                  whiteSpace: 'nowrap',
+                  margin: 0,
+                  marginTop: '-4px',
+                  paddingBottom: '4px',
+                  boxSizing: 'content-box'
                 }}>
                   {productDetails?.product?.name || data?.product || 'Product Name'}
                 </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                  <div style={{ fontSize: inventoryOnly ? '0.875rem' : '0.875rem', color: '#94a3b8' }}>
-                    <span style={{ fontWeight: 500 }}>SIZE:</span> <span style={{ color: '#fff' }}>{productDetails?.product?.size || data?.size || data?.variations?.[0] || 'N/A'}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
+                  <div style={{ fontSize: '0.6875rem', color: '#64758B', lineHeight: 1.2, minHeight: '14px', display: 'flex', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 500 }}>SIZE:</span> <span style={{ color: '#64758B' }}>{productDetails?.product?.size || data?.size || data?.variations?.[0] || 'N/A'}</span>
                   </div>
-                  <div style={{ fontSize: inventoryOnly ? '0.875rem' : '0.875rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ fontSize: '0.6875rem', color: '#64758B', display: 'flex', alignItems: 'center', gap: '6px', lineHeight: 1.2, minHeight: '14px' }}>
                     <span style={{ fontWeight: 500 }}>ASIN:</span> 
-                    <span style={{ color: '#fff' }}>{productDetails?.product?.asin || data?.child_asin || data?.childAsin || 'N/A'}</span>
+                    <span style={{ color: '#64758B' }}>{productDetails?.product?.asin || data?.child_asin || data?.childAsin || 'N/A'}</span>
                     {(productDetails?.product?.asin || data?.child_asin || data?.childAsin) && (
                       <img 
                         src="/assets/copyy.png" 
@@ -2207,11 +2235,11 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                       />
                     )}
                   </div>
-                  <div style={{ fontSize: inventoryOnly ? '0.875rem' : '0.875rem', color: '#94a3b8' }}>
-                    <span style={{ fontWeight: 500 }}>BRAND:</span> <span style={{ color: '#fff' }}>{productDetails?.product?.brand || data?.brand || 'N/A'}</span>
+                  <div style={{ fontSize: '0.6875rem', color: '#64758B', lineHeight: 1.2, minHeight: '14px', display: 'flex', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 500 }}>BRAND:</span> <span style={{ color: '#64758B' }}>{productDetails?.product?.brand || data?.brand || 'N/A'}</span>
                   </div>
-                  <div style={{ fontSize: inventoryOnly ? '0.875rem' : '0.875rem', color: '#94a3b8' }}>
-                    <span style={{ fontWeight: 500 }}>SKU:</span> <span style={{ color: '#fff' }}>{productDetails?.product?.sku || data?.childSku || data?.sku || data?.sku_id || data?.skuId || data?.catalog_sku || data?.child_sku || data?.child_sku_final || 'N/A'}</span>
+                  <div style={{ fontSize: '0.6875rem', color: '#64758B', lineHeight: 1.2, minHeight: '14px', display: 'flex', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 500 }}>SKU:</span> <span style={{ color: '#64758B' }}>{productDetails?.product?.sku || data?.childSku || data?.sku || data?.sku_id || data?.skuId || data?.catalog_sku || data?.child_sku || data?.child_sku_final || 'N/A'}</span>
                   </div>
                 </div>
               </div>
@@ -2220,147 +2248,93 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
 
           {/* FBA Card */}
           <div className={themeClasses.cardBg} style={{ 
-            borderRadius: '0.5rem', 
-            padding: '1rem', 
-            width: inventoryOnly ? '200px' : 'auto',
-            minWidth: inventoryOnly ? '200px' : 'auto',
-            flex: inventoryOnly ? '0 0 200px' : '1',
-            height: inventoryOnly ? '160px' : 'auto',
+            width: '159px',
+            height: '136px',
+            borderRadius: '8px',
             border: '1px solid #334155',
+            padding: '16px',
             display: 'flex',
             flexDirection: 'column',
+            gap: '8px',
             flexShrink: 0
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.25rem' }}>
-              <div style={{
-                width: inventoryOnly ? '24px' : '32px',
-                height: inventoryOnly ? '24px' : '32px',
-                borderRadius: '50%',
-                backgroundColor: '#22c55e',
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center' 
-              }}>
-                <svg style={{ width: inventoryOnly ? '14px' : '18px', height: inventoryOnly ? '14px' : '18px', color: '#fff' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                </svg>
-              </div>
-              <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>FBA</span>
+            <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+              <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>FBA Inventory</span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Total FBA:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fba.total}</span>
+            <div className="scrollbar-hide" style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>Total FBA:</span>
+                <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.fba?.total ?? 0).toLocaleString()}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Available:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fba.available}</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>Available:</span>
+                <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.fba?.available ?? 0).toLocaleString()}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Inbound:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fba.inbound}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Reserved:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fba.reserved}</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>Inbound:</span>
+                <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.fba?.inbound ?? 0).toLocaleString()}</span>
               </div>
             </div>
           </div>
 
           {/* AWD Card */}
           <div className={themeClasses.cardBg} style={{ 
-            borderRadius: '0.5rem', 
-            padding: '1rem', 
-            width: inventoryOnly ? '200px' : 'auto',
-            minWidth: inventoryOnly ? '200px' : 'auto',
-            flex: inventoryOnly ? '0 0 200px' : '1',
-            height: inventoryOnly ? '160px' : 'auto',
+            width: '159px',
+            height: '136px',
+            borderRadius: '8px',
             border: '1px solid #334155',
+            padding: '16px',
             display: 'flex',
             flexDirection: 'column',
+            gap: '8px',
             flexShrink: 0
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.25rem' }}>
-              <div style={{
-                width: inventoryOnly ? '24px' : '32px',
-                height: inventoryOnly ? '24px' : '32px',
-                borderRadius: '50%',
-                backgroundColor: '#3b82f6',
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center' 
-              }}>
-                <svg style={{ width: inventoryOnly ? '14px' : '18px', height: inventoryOnly ? '14px' : '18px', color: '#fff' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                </svg>
-              </div>
-              <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>AWD</span>
+            <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+              <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>AWD Inventory</span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Total AWD:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.awd.total}</span>
+            <div className="scrollbar-hide" style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>Total AWD:</span>
+                <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.awd?.total ?? 0).toLocaleString()}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Available:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.awd.available}</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>Available:</span>
+                <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.awd?.available ?? 0).toLocaleString()}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Inbound:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.awd.inbound || 0}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Reserved:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.awd.reserved}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Outbound:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.awd.outbound_to_fba || 0}</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>Inbound:</span>
+                <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.awd?.inbound ?? 0).toLocaleString()}</span>
               </div>
             </div>
           </div>
 
           {/* FBA Age Card */}
           <div className={themeClasses.cardBg} style={{ 
-            borderRadius: '0.5rem', 
-            padding: '1rem', 
-            width: inventoryOnly ? '200px' : 'auto',
-            minWidth: inventoryOnly ? '200px' : 'auto',
-            flex: inventoryOnly ? '0 0 200px' : '1',
-            height: inventoryOnly ? '160px' : 'auto',
+            width: '159px',
+            height: '136px',
+            borderRadius: '8px',
             border: '1px solid #334155',
+            padding: '16px',
             display: 'flex',
             flexDirection: 'column',
+            gap: '8px',
             flexShrink: 0
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', marginBottom: '0.25rem' }}>
-              <div style={{
-                width: inventoryOnly ? '24px' : '32px',
-                height: inventoryOnly ? '24px' : '32px',
-                borderRadius: '50%',
-                backgroundColor: '#f59e0b',
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center' 
-              }}>
-                <svg style={{ width: inventoryOnly ? '14px' : '18px', height: inventoryOnly ? '14px' : '18px', color: '#fff' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
               <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>FBA Age</span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Oldest:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fbaAge?.oldest_days != null ? `${inventoryData.fbaAge.oldest_days} days` : '—'}</span>
+            <div className="scrollbar-hide" style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>0-90:</span>
+                <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.fbaAge?.buckets?.['0-90'] ?? 0).toLocaleString()}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Newest:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fbaAge?.newest_days != null ? `${inventoryData.fbaAge.newest_days} days` : '—'}</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>91-180:</span>
+                <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.fbaAge?.buckets?.['91-180'] ?? 0).toLocaleString()}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', color: '#94a3b8' }}>Avg age:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.7rem' : '0.875rem', fontWeight: '600', color: '#fff' }}>{inventoryData.fbaAge?.avg_days != null ? `${inventoryData.fbaAge.avg_days} days` : '—'}</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>181-270:</span>
+                <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.fbaAge?.buckets?.['181-270'] ?? 0).toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -2374,14 +2348,24 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           marginBottom: inventoryOnly ? '0.75rem' : '2rem' 
         }}>
           {/* FBA Available Card */}
-          <div style={{ 
-            borderRadius: '0.5rem', 
-            padding: inventoryOnly ? '0.75rem 1rem' : '1rem 1.25rem',
-            backgroundColor: '#0f172a',
-            borderTop: '3px solid #A855F7',
-            position: 'relative',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-          }}>
+          <div 
+            onMouseEnter={() => {
+              console.log('Hovering FBA Available');
+              setHoveredSegment('fba');
+            }}
+            onMouseLeave={() => {
+              console.log('Leaving FBA Available');
+              setHoveredSegment(null);
+            }}
+            style={{ 
+              borderRadius: '0.5rem', 
+              padding: inventoryOnly ? '0.75rem 1rem' : '1rem 1.25rem',
+              backgroundColor: '#0f172a',
+              borderTop: '3px solid #A855F7',
+              position: 'relative',
+              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+            }}
+          >
             <div style={{ 
               fontSize: inventoryOnly ? '0.75rem' : '0.85rem', 
               color: '#a855f7', 
@@ -2425,14 +2409,24 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           </div>
 
           {/* Total Inventory Card */}
-          <div style={{ 
-            borderRadius: '0.5rem', 
-            padding: inventoryOnly ? '0.75rem 1rem' : '1rem 1.25rem',
-            backgroundColor: '#0f172a',
-            borderTop: '3px solid #45CE18',
-            position: 'relative',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-          }}>
+          <div 
+            onMouseEnter={() => {
+              console.log('Hovering Total Inventory');
+              setHoveredSegment('total');
+            }}
+            onMouseLeave={() => {
+              console.log('Leaving Total Inventory');
+              setHoveredSegment(null);
+            }}
+            style={{ 
+              borderRadius: '0.5rem', 
+              padding: inventoryOnly ? '0.75rem 1rem' : '1rem 1.25rem',
+              backgroundColor: '#0f172a',
+              borderTop: '3px solid #45CE18',
+              position: 'relative',
+              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+            }}
+          >
             <div style={{ 
               fontSize: inventoryOnly ? '0.75rem' : '0.85rem', 
               color: '#45CE18', 
@@ -2476,14 +2470,24 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           </div>
 
           {/* Forecast Card */}
-          <div style={{ 
-            borderRadius: '0.5rem', 
-            padding: inventoryOnly ? '0.75rem 1rem' : '1rem 1.25rem',
-            backgroundColor: '#0f172a',
-            borderTop: '3px solid #007AFF',
-            position: 'relative',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-          }}>
+          <div 
+            onMouseEnter={() => {
+              console.log('Hovering Forecast');
+              setHoveredSegment('forecast');
+            }}
+            onMouseLeave={() => {
+              console.log('Leaving Forecast');
+              setHoveredSegment(null);
+            }}
+            style={{ 
+              borderRadius: '0.5rem', 
+              padding: inventoryOnly ? '0.75rem 1rem' : '1rem 1.25rem',
+              backgroundColor: '#0f172a',
+              borderTop: '3px solid #007AFF',
+              position: 'relative',
+              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+            }}
+          >
             <div style={{ 
               fontSize: inventoryOnly ? '0.75rem' : '0.85rem', 
               color: '#007AFF', 
@@ -3111,6 +3115,8 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                   />
                   <Tooltip 
                     content={(props) => {
+                      // Hide tooltip when zooming (zoom tool active or zoomed in)
+                      if (zoomToolActive || zoomDomain.left != null || zoomDomain.right != null) return null;
                       if (!props.active || !props.payload?.length) return null;
                       const inner = <CustomTooltip {...props} />;
                       const pos = chartCursorRef.current;
@@ -3176,14 +3182,30 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                             const startTs = new Date(period.start_date).getTime();
                             const endTs = new Date(period.end_date).getTime();
                             const mappedColor = colorMap[period.color] || period.color;
+                            const originalColor = period.color;
+                            // Cumulative highlighting: fba highlights idx 0, total highlights idx 0+1, forecast highlights all
+                            let isHovered = false;
+                            if (hoveredSegment === 'fba' && idx === 0) isHovered = true;
+                            else if (hoveredSegment === 'total' && idx <= 1) isHovered = true;
+                            else if (hoveredSegment === 'forecast' && idx <= 2) isHovered = true;
+                            // Also check by color as fallback (cumulative)
+                            if (!isHovered && hoveredSegment) {
+                              if (hoveredSegment === 'fba' && (mappedColor === '#a855f7' || originalColor === '#a855f7')) isHovered = true;
+                              else if (hoveredSegment === 'total' && ((mappedColor === '#a855f7' || originalColor === '#a855f7') || (mappedColor === '#10b981' || originalColor === '#10b981' || originalColor === '#15803d'))) isHovered = true;
+                              else if (hoveredSegment === 'forecast') isHovered = true; // Forecast highlights all segments
+                            }
                             // Use exact timestamps so zones strike at the right dates
+                            const opacity = isHovered ? 0.6 : 0.2;
+                            if (hoveredSegment) {
+                              console.log(`Period ${idx}: color=${originalColor}, mapped=${mappedColor}, hoveredSegment=${hoveredSegment}, isHovered=${isHovered}, opacity=${opacity}`);
+                            }
                             return (
                               <ReferenceArea
                                 key={`period-${idx}`}
                                 x1={startTs}
                                 x2={endTs}
                                 fill={mappedColor}
-                                fillOpacity={0.2}
+                                fillOpacity={opacity}
                                 yAxisId="left"
                               />
                             );
@@ -3300,45 +3322,49 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                     return (
                       <>
                         {/* Violet: FBA Available (Today → FBA boundary) */}
+                        {/* Highlighted when hovering fba, total, or forecast (cumulative) */}
                         {hasVioletSpan && (
                           <ReferenceArea
                             x1={todayDataPoint.timestamp}
                             x2={fbaPoint.timestamp}
                             fill="#a855f7"
-                            fillOpacity={segmentOpacity}
+                            fillOpacity={(hoveredSegment === 'fba' || hoveredSegment === 'total' || hoveredSegment === 'forecast') ? 0.6 : segmentOpacity}
                             yAxisId="left"
                           />
                         )}
                         
                         {/* Green: Total Inventory (FBA → Total boundary); visible even when Total days = FBA days */}
+                        {/* Highlighted when hovering total or forecast (cumulative) */}
                         {hasGreenSpan && (
                           <ReferenceArea
                             x1={fbaPoint.timestamp}
                             x2={greenEndTimestamp}
                             fill="#10b981"
-                            fillOpacity={segmentOpacity}
+                            fillOpacity={(hoveredSegment === 'total' || hoveredSegment === 'forecast') ? 0.6 : segmentOpacity}
                             yAxisId="left"
                           />
                         )}
                         
                         {/* Blue: Forecast Period (Total → Forecast end, matches DOI forecast) */}
+                        {/* Highlighted only when hovering forecast */}
                         {hasBlueSpan && (
                           <ReferenceArea
                             x1={blueStartTimestamp}
                             x2={forecastPoint.timestamp}
                             fill="#3b82f6"
-                            fillOpacity={segmentOpacity}
+                            fillOpacity={hoveredSegment === 'forecast' ? 0.6 : segmentOpacity}
                             yAxisId="left"
                           />
                         )}
                         
                         {/* Fallback: single blue band when we only have today + forecast end (e.g. no FBA/Total breakdown) */}
+                        {/* Highlighted only when hovering forecast */}
                         {todayDataPoint && forecastPoint && forecastPoint.timestamp > todayDataPoint.timestamp && !hasVioletSpan && !hasGreenSpan && !hasBlueSpan && (
                           <ReferenceArea
                             x1={todayDataPoint.timestamp}
                             x2={forecastPoint.timestamp}
                             fill="#3b82f6"
-                            fillOpacity={segmentOpacity}
+                            fillOpacity={hoveredSegment === 'forecast' ? 0.6 : segmentOpacity}
                             yAxisId="left"
                           />
                         )}

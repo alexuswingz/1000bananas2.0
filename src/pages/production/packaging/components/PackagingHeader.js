@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
 const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, selectedShipment, onShipmentChange, onGenerateClosingReport, onViewReportHistory }) => {
@@ -7,10 +8,21 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
   const [showShipmentDropdown, setShowShipmentDropdown] = useState(false);
   const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const settingsButtonRef = useRef(null);
   const settingsDropdownRef = useRef(null);
   const filterButtonRef = useRef(null);
   const filterDropdownRef = useRef(null);
+
+  // Detect mobile view
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -149,7 +161,8 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
               gap: '8px',
               borderRadius: '8px',
               padding: '4px',
-              border: '1px solid #EAEAEA',
+              border: isDarkMode ? '1px solid #374151' : '1px solid #EAEAEA',
+              backgroundColor: isDarkMode ? '#1F2937' : 'transparent',
             }}
           >
             {desktopTabs.map((tab) => {
@@ -163,10 +176,10 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
                     fontSize: '14px',
                     fontWeight: 400,
                     borderRadius: '4px',
-                    border: isActive ? '1px solid #EAEAEA' : 'none',
+                    border: isActive ? (isDarkMode ? '1px solid #374151' : '1px solid #EAEAEA') : 'none',
                     transition: 'all 0.2s ease',
                     backgroundColor: isActive
-                      ? (isDarkMode ? '#1F2937' : '#FFFFFF')
+                      ? (isDarkMode ? '#374151' : '#FFFFFF')
                       : 'transparent',
                     color: isActive
                       ? (isDarkMode ? '#FFFFFF' : '#111827')
@@ -227,17 +240,17 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
               />
             </button>
 
-            {/* Settings Dropdown Menu */}
-            {showSettingsDropdown && (
+            {/* Settings Dropdown Menu - Desktop Only */}
+            {showSettingsDropdown && !isMobile && (
               <div
                 ref={settingsDropdownRef}
                 style={{
-                  position: window.innerWidth < 768 ? 'fixed' : 'absolute',
-                  top: window.innerWidth < 768 
+                  position: isMobile ? 'fixed' : 'absolute',
+                  top: isMobile 
                     ? (settingsButtonRef.current?.getBoundingClientRect()?.bottom || 60) + 8
                     : '100%',
-                  right: window.innerWidth < 768 ? '16px' : '0',
-                  marginTop: window.innerWidth < 768 ? '0' : '8px',
+                  right: isMobile ? '16px' : '0',
+                  marginTop: isMobile ? '0' : '8px',
                   backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
                   border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
                   borderRadius: '8px',
@@ -250,38 +263,131 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
                 }}
                 onClick={(e) => e.stopPropagation()}
               >
-                <button
-                  onClick={() => {
-                    console.log('Export Page clicked');
-                    setShowSettingsDropdown(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '12px 16px',
-                    textAlign: 'left',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    fontSize: '14px',
-                    color: isDarkMode ? '#F9FAFB' : '#374151',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="7 10 12 15 17 10"></polyline>
-                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                  </svg>
-                  Export Page
-                </button>
+                {/* Mobile options - Only show on mobile */}
+                {isMobile && (
+                  <>
+                    <button
+                      onClick={() => {
+                        console.log('Sort clicked');
+                        if (onSortClick) {
+                          onSortClick();
+                        }
+                        setShowSettingsDropdown(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        textAlign: 'left',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        fontSize: '14px',
+                        color: isDarkMode ? '#F9FAFB' : '#374151',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 20 12"
+                        fill="none"
+                        stroke={isDarkMode ? '#F9FAFB' : '#374151'}
+                        strokeWidth={2.5}
+                        strokeLinecap="round"
+                      >
+                        {/* Top bar - longest */}
+                        <line x1="2" y1="2" x2="14" y2="2" />
+                        {/* Middle bar - shorter */}
+                        <line x1="2" y1="6" x2="10" y2="6" />
+                        {/* Bottom bar - shortest */}
+                        <line x1="2" y1="10" x2="7" y2="10" />
+                      </svg>
+                      Sort
+                    </button>
+
+                    {/* Separator - Only show on mobile */}
+                    <div style={{ height: '1px', backgroundColor: isDarkMode ? '#374151' : '#E5E7EB', margin: '0' }} />
+
+                    <button
+                      onClick={() => {
+                        console.log('Export Page clicked');
+                        setShowSettingsDropdown(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        textAlign: 'left',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        fontSize: '14px',
+                        color: isDarkMode ? '#F9FAFB' : '#374151',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                      </svg>
+                      Export
+                    </button>
+                  </>
+                )}
+
+                {/* Desktop options - Only show on desktop */}
+                {!isMobile && (
+                  <>
+                    <button
+                      onClick={() => {
+                        console.log('Export Page clicked');
+                        setShowSettingsDropdown(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        textAlign: 'left',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        fontSize: '14px',
+                        color: isDarkMode ? '#F9FAFB' : '#374151',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                      </svg>
+                      Export Page
+                    </button>
+                  </>
+                )}
 
                 {/* Separator */}
                 <div style={{ height: '1px', backgroundColor: isDarkMode ? '#374151' : '#E5E7EB', margin: '0' }} />
@@ -857,34 +963,148 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
             </h1>
 
             {/* Settings Icon - immediately after Packaging text */}
-            <button
-              style={{
-                padding: '0.4rem',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                backgroundColor: 'transparent',
-                border: 'none',
-                flexShrink: 0,
-                minWidth: '28px',
-                minHeight: '28px',
-              }}
-              onClick={() => setShowSettingsDropdown(!showSettingsDropdown)}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
-            >
-              <img
-                src="/assets/Vector (2).png"
-                alt="Settings"
-                style={{ width: '1rem', height: '1rem', display: 'block' }}
-              />
-            </button>
+            <div style={{ position: 'relative' }}>
+              <button
+                ref={settingsButtonRef}
+                style={{
+                  padding: '0.4rem',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  flexShrink: 0,
+                  minWidth: '28px',
+                  minHeight: '28px',
+                }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowSettingsDropdown(!showSettingsDropdown);
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                <img
+                  src="/assets/Vector (2).png"
+                  alt="Settings"
+                  style={{ width: '1rem', height: '1rem', display: 'block' }}
+                />
+              </button>
+              
+              {/* Mobile Settings Dropdown */}
+              {showSettingsDropdown && isMobile && createPortal(
+                <div
+                  ref={settingsDropdownRef}
+                  style={{
+                    position: 'fixed',
+                    top: (settingsButtonRef.current?.getBoundingClientRect()?.bottom || 60) + 8,
+                    left: settingsButtonRef.current?.getBoundingClientRect()?.left || 0,
+                    backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                    border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                    borderRadius: '8px',
+                    boxShadow: isDarkMode 
+                      ? '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)'
+                      : '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                    zIndex: 99999,
+                    minWidth: '200px',
+                    overflow: 'visible',
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Sort Option */}
+                  <button
+                    onClick={() => {
+                      console.log('Sort clicked');
+                      if (onSortClick) {
+                        onSortClick();
+                      }
+                      setShowSettingsDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      textAlign: 'left',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      fontSize: '14px',
+                      color: isDarkMode ? '#F9FAFB' : '#374151',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 20 12"
+                      fill="none"
+                      stroke={isDarkMode ? '#F9FAFB' : '#374151'}
+                      strokeWidth={2.5}
+                      strokeLinecap="round"
+                    >
+                      {/* Top bar - longest */}
+                      <line x1="2" y1="2" x2="14" y2="2" />
+                      {/* Middle bar - shorter */}
+                      <line x1="2" y1="6" x2="10" y2="6" />
+                      {/* Bottom bar - shortest */}
+                      <line x1="2" y1="10" x2="7" y2="10" />
+                    </svg>
+                    Sort
+                  </button>
+
+                  {/* Separator */}
+                  <div style={{ height: '1px', backgroundColor: isDarkMode ? '#374151' : '#E5E7EB', margin: '0' }} />
+
+                  <button
+                    onClick={() => {
+                      console.log('Export Page clicked');
+                      setShowSettingsDropdown(false);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      textAlign: 'left',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      fontSize: '14px',
+                      color: isDarkMode ? '#F9FAFB' : '#374151',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                      <polyline points="7 10 12 15 17 10"></polyline>
+                      <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Export
+                  </button>
+                </div>,
+                document.body
+              )}
+            </div>
           </div>
 
           {/* Right: Active Queue and Archive Tabs */}
@@ -897,7 +1117,7 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
               borderRadius: '24px',
               padding: '3px',
               border: 'none',
-              backgroundColor: '#E0E0E0',
+              backgroundColor: isDarkMode ? '#374151' : '#E0E0E0',
               opacity: 1,
               flexShrink: 0,
             }}
@@ -916,14 +1136,14 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
                     borderRadius: '20px',
                     border: 'none',
                     transition: 'all 0.2s ease',
-                    backgroundColor: isActive ? '#FFFFFF' : 'transparent',
-                    color: isActive ? '#007AFF' : '#6B7280',
+                    backgroundColor: isActive ? (isDarkMode ? '#1F2937' : '#FFFFFF') : 'transparent',
+                    color: isActive ? (isDarkMode ? '#3B82F6' : '#007AFF') : (isDarkMode ? '#9CA3AF' : '#6B7280'),
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    boxShadow: isActive ? '0 1px 2px 0 rgba(0, 0, 0, 0.1)' : 'none',
+                    boxShadow: isActive ? (isDarkMode ? '0 1px 2px 0 rgba(0, 0, 0, 0.3)' : '0 1px 2px 0 rgba(0, 0, 0, 0.1)') : 'none',
                     height: '100%',
                     flex: 1,
                     minWidth: 0,
@@ -1028,7 +1248,7 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
               left: 0,
               right: 0,
               bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)',
               zIndex: 9998,
             }}
           />
@@ -1039,14 +1259,16 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
               left: 0,
               right: 0,
               bottom: 0,
-              backgroundColor: '#FFFFFF',
+              backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
               zIndex: 9999,
               display: 'flex',
               flexDirection: 'column',
               maxHeight: '85vh',
               borderTopLeftRadius: '16px',
               borderTopRightRadius: '16px',
-              boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1)',
+              boxShadow: isDarkMode 
+                ? '0 -4px 6px -1px rgba(0, 0, 0, 0.3)' 
+                : '0 -4px 6px -1px rgba(0, 0, 0, 0.1)',
             }}
           >
             {/* Drag Handle */}
@@ -1062,7 +1284,7 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
                 style={{
                   width: '40px',
                   height: '4px',
-                  backgroundColor: '#D1D5DB',
+                  backgroundColor: isDarkMode ? '#4B5563' : '#D1D5DB',
                   borderRadius: '2px',
                 }}
               />
@@ -1071,13 +1293,13 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
             <div
               style={{
                 padding: '16px',
-                borderBottom: '1px solid #E5E7EB',
+                borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
               }}
             >
-            <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#111827' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: '600', color: isDarkMode ? '#FFFFFF' : '#111827' }}>
               Filter Options
             </h2>
             <button
@@ -1096,7 +1318,7 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
           </div>
 
           {/* Content */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '16px', backgroundColor: isDarkMode ? '#1F2937' : 'transparent' }}>
             {/* Shipment Section */}
             <div style={{ marginBottom: '16px' }}>
               <button
@@ -1111,7 +1333,7 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
                   border: 'none',
                   fontSize: '16px',
                   fontWeight: '500',
-                  color: '#111827',
+                  color: isDarkMode ? '#FFFFFF' : '#111827',
                   cursor: 'pointer',
                 }}
               >
@@ -1121,7 +1343,7 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
                   height="20"
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke="#6B7280"
+                  stroke={isDarkMode ? '#9CA3AF' : '#6B7280'}
                   strokeWidth="2"
                   style={{
                     transform: expandedSections.shipment ? 'rotate(180deg)' : 'rotate(0deg)',
@@ -1152,14 +1374,14 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
                         style={{
                           background: 'none',
                           border: 'none',
-                          color: '#6B7280',
+                          color: isDarkMode ? '#9CA3AF' : '#6B7280',
                           fontSize: '12px',
                           cursor: 'pointer',
                         }}
                       >
                         Clear all
                       </button>
-                      <span style={{ color: '#9CA3AF', fontSize: '12px' }}>323 results</span>
+                      <span style={{ color: isDarkMode ? '#6B7280' : '#9CA3AF', fontSize: '12px' }}>323 results</span>
                     </div>
                   </div>
                   <div style={{ marginBottom: '12px' }}>
@@ -1169,10 +1391,11 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
                       style={{
                         width: '100%',
                         padding: '8px 12px',
-                        border: '1px solid #E5E7EB',
+                        border: isDarkMode ? '1px solid #4B5563' : '1px solid #E5E7EB',
                         borderRadius: '6px',
                         fontSize: '14px',
-                        backgroundColor: '#FFFFFF',
+                        backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
+                        color: isDarkMode ? '#FFFFFF' : '#111827',
                       }}
                     />
                   </div>
@@ -1198,7 +1421,7 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
                           accentColor: '#3B82F6',
                         }}
                       />
-                      <span style={{ fontSize: '14px', color: '#374151' }}>{option}</span>
+                      <span style={{ fontSize: '14px', color: isDarkMode ? '#D1D5DB' : '#374151' }}>{option}</span>
                     </label>
                   ))}
                 </div>
@@ -1206,7 +1429,7 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
             </div>
 
             {/* Formula Section */}
-            <div style={{ marginBottom: '16px', borderTop: '1px solid #E5E7EB', paddingTop: '16px' }}>
+            <div style={{ marginBottom: '16px', borderTop: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB', paddingTop: '16px' }}>
               <button
                 onClick={() => toggleSection('formula')}
                 style={{
@@ -1219,7 +1442,7 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
                   border: 'none',
                   fontSize: '16px',
                   fontWeight: '500',
-                  color: '#111827',
+                  color: isDarkMode ? '#FFFFFF' : '#111827',
                   cursor: 'pointer',
                 }}
               >
@@ -1229,7 +1452,7 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
                   height="20"
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke="#6B7280"
+                  stroke={isDarkMode ? '#9CA3AF' : '#6B7280'}
                   strokeWidth="2"
                   style={{
                     transform: expandedSections.formula ? 'rotate(180deg)' : 'rotate(0deg)',
@@ -1263,7 +1486,7 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
                           accentColor: '#3B82F6',
                         }}
                       />
-                      <span style={{ fontSize: '14px', color: '#374151' }}>{option}</span>
+                      <span style={{ fontSize: '14px', color: isDarkMode ? '#D1D5DB' : '#374151' }}>{option}</span>
                     </label>
                   ))}
                 </div>
@@ -1271,7 +1494,7 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
             </div>
 
             {/* Status Section */}
-            <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: '16px' }}>
+            <div style={{ borderTop: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB', paddingTop: '16px' }}>
               <button
                 onClick={() => toggleSection('status')}
                 style={{
@@ -1284,7 +1507,7 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
                   border: 'none',
                   fontSize: '16px',
                   fontWeight: '500',
-                  color: '#111827',
+                  color: isDarkMode ? '#FFFFFF' : '#111827',
                   cursor: 'pointer',
                 }}
               >
@@ -1294,7 +1517,7 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
                   height="20"
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke="#6B7280"
+                  stroke={isDarkMode ? '#9CA3AF' : '#6B7280'}
                   strokeWidth="2"
                   style={{
                     transform: expandedSections.status ? 'rotate(180deg)' : 'rotate(0deg)',
@@ -1328,7 +1551,7 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
                           accentColor: '#3B82F6',
                         }}
                       />
-                      <span style={{ fontSize: '14px', color: '#374151' }}>{option}</span>
+                      <span style={{ fontSize: '14px', color: isDarkMode ? '#D1D5DB' : '#374151' }}>{option}</span>
                     </label>
                   ))}
                 </div>
@@ -1340,7 +1563,8 @@ const PackagingHeader = ({ activeTab, onTabChange, onSearch, onSortClick, select
           <div
             style={{
               padding: '16px',
-              borderTop: '1px solid #E5E7EB',
+              borderTop: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+              backgroundColor: isDarkMode ? '#1F2937' : 'transparent',
             }}
           >
             <button

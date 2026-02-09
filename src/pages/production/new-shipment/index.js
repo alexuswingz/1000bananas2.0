@@ -28,7 +28,11 @@ import FormulaCheckCommentModal from './components/FormulaCheckCommentModal';
 import LabelCheckCommentModal from './components/LabelCheckCommentModal';
 import LabelCheckCompleteModal from './components/LabelCheckCompleteModal';
 import FormulaCheckCompleteModal from './components/FormulaCheckCompleteModal';
-import DOISettingsPopover from './components/DOISettingsPopover';
+import DOISettingsPopover, { getDefaultDoiSettings } from './components/DOISettingsPopover';
+
+// Per-shipment applied DOI persistence (Apply = for this shipment only; survives navigation)
+const SHIPMENT_DOI_STORAGE_PREFIX = 'shipment_doi_applied_';
+const getShipmentDoiStorageKey = (shipmentId) => SHIPMENT_DOI_STORAGE_PREFIX + (shipmentId || 'new');
 
 // Utility function to extract size from product name
 const extractSizeFromProductName = (productName) => {
@@ -247,10 +251,45 @@ const NewShipment = () => {
     inboundLeadTime: 30,
     manufactureLeadTime: 7
   });
-  
+  // Applied DOI for this shipment (persisted; null = using default)
+  const [appliedDoiForShipment, setAppliedDoiForShipment] = useState(null);
+
   // Track DOI settings change counter to trigger reload
   const [doiSettingsChangeCount, setDoiSettingsChangeCount] = useState(0);
   const doiSettingsInitialized = useRef(false);
+
+  // Load persisted applied DOI when shipmentId is set (and migrate 'new' -> id when shipment is created)
+  useEffect(() => {
+    const key = getShipmentDoiStorageKey(shipmentId);
+    if (shipmentId) {
+      const fromNew = localStorage.getItem(getShipmentDoiStorageKey(null));
+      if (fromNew) {
+        try {
+          localStorage.setItem(key, fromNew);
+          localStorage.removeItem(getShipmentDoiStorageKey(null));
+        } catch (e) {
+          console.warn('Failed to migrate applied DOI from new to shipment:', e);
+        }
+      }
+    }
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const stored = JSON.parse(raw);
+        if (stored && typeof stored.totalDoi !== 'undefined' && stored.settings) {
+          setForecastRange(String(stored.totalDoi));
+          setDoiSettingsValues(stored.settings);
+          setAppliedDoiForShipment(stored.settings);
+          doiSettingsInitialized.current = true;
+          loadProducts(stored.settings); // reload with restored DOI so Units to Make match
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load applied DOI from storage:', e);
+    }
+    setAppliedDoiForShipment(null);
+  }, [shipmentId]);
   
   // Track manually edited quantity indices (from NewShipmentTable)
   const manuallyEditedIndicesRef = useRef(new Set());
@@ -426,25 +465,58 @@ const NewShipment = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeAction, shipmentId, exportCompleted]);
   
-  // Callback when DOI settings change from the popover
-  const handleDoiSettingsChange = (newSettings, totalDoi) => {
+  // Callback when DOI settings change from the popover (Apply / Save as Default / initial load)
+  const handleDoiSettingsChange = (newSettings, totalDoi, options = {}) => {
+    const source = options?.source;
     const prevSettings = doiSettingsValues;
     setDoiSettingsValues(newSettings);
     setForecastRange(String(totalDoi));
-    
+    // Only persist and show "custom DOI" when user explicitly clicked Apply or Save as Default
+    if (source === 'apply' || source === 'saveAsDefault') {
+      setAppliedDoiForShipment(newSettings);
+      try {
+        const key = getShipmentDoiStorageKey(shipmentId);
+        localStorage.setItem(key, JSON.stringify({
+          totalDoi: totalDoi,
+          settings: newSettings,
+        }));
+      } catch (e) {
+        console.warn('Failed to persist applied DOI:', e);
+      }
+    }
+
     const settingsActuallyChanged = doiSettingsInitialized.current &&
         (prevSettings.amazonDoiGoal !== newSettings.amazonDoiGoal ||
          prevSettings.inboundLeadTime !== newSettings.inboundLeadTime ||
          prevSettings.manufactureLeadTime !== newSettings.manufactureLeadTime);
 
     if (settingsActuallyChanged) {
-      // Call loadProducts with newSettings directly so Units to Make is recalculated
-      // with the new DOI (avoids stale closure in the useEffect)
       console.log('DOI settings changed, reloading products with new settings:', newSettings);
       loadProducts(newSettings);
     }
     doiSettingsInitialized.current = true;
   };
+
+  // Revert to default DOI for this shipment (clear applied; use API default)
+  const handleRevertDoiToDefault = useCallback(async () => {
+    try {
+      const key = getShipmentDoiStorageKey(shipmentId);
+      localStorage.removeItem(key);
+      setAppliedDoiForShipment(null);
+      const defaultSettings = await getDefaultDoiSettings();
+      const totalDoi = (parseInt(defaultSettings.amazonDoiGoal) || 0) +
+        (parseInt(defaultSettings.inboundLeadTime) || 0) +
+        (parseInt(defaultSettings.manufactureLeadTime) || 0);
+      setDoiSettingsValues(defaultSettings);
+      setForecastRange(String(totalDoi));
+      loadProducts(defaultSettings);
+      setDoiSettingsChangeCount(c => c + 1);
+      toast.success('DOI reverted to default settings for this shipment.');
+    } catch (e) {
+      console.error('Failed to revert DOI to default:', e);
+      toast.error('Could not revert to default DOI settings.');
+    }
+  }, [shipmentId]);
   
   // Legacy state for tooltip (keeping for backward compatibility)
   const [showDOITooltip, setShowDOITooltip] = useState(false);
@@ -1064,16 +1136,20 @@ const NewShipment = () => {
           // Mark this index as manually edited in the new product list
           newManuallyEditedIndices.add(index);
         }
-        // Otherwise auto-populate qty with suggested qty if product needs restocking
-        else if (product.suggestedQty > 0) {
-          const increment = getSuggestedQtyIncrement(product);
-          const suggested = product.suggestedQty;
-          const roundedSuggested =
-            increment && increment > 1
-              ? Math.ceil(suggested / increment) * increment
-              : suggested;
-
-          initialQtyValues[index] = roundedSuggested;
+        // Otherwise auto-populate qty with suggested qty (or 0 when DOI is already at goal)
+        else {
+          const suggested = product.suggestedQty ?? product.unitsToMake ?? product.units_to_make ?? 0;
+          if (suggested > 0) {
+            const increment = getSuggestedQtyIncrement(product);
+            const roundedSuggested =
+              increment && increment > 1
+                ? Math.ceil(suggested / increment) * increment
+                : suggested;
+            initialQtyValues[index] = roundedSuggested;
+          } else {
+            // DOI at goal (green): show 0 instead of blank
+            initialQtyValues[index] = 0;
+          }
         }
       });
 
@@ -1629,11 +1705,8 @@ const NewShipment = () => {
             recalculatedQty = Math.ceil(rawUnitsNeeded);
           }
           
-          // Only overwrite when we have a positive recalculated value.
-          // If recalculatedQty is 0, keep whatever value we had before.
-          if (recalculatedQty > 0) {
-            newQtyValues[index] = recalculatedQty;
-          }
+          // Set qty to recalculated value (or 0 when DOI is at goal so it shows 0, not blank)
+          newQtyValues[index] = recalculatedQty;
           
           // Debug logging for products that should update
           if (isMothRepellent || hasValue2163) {
@@ -2852,10 +2925,13 @@ const NewShipment = () => {
 
               {/* Right: DOI Settings, Sort, and Search Input */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-                {/* DOI Settings Popover */}
+                {/* DOI Settings Popover (blue exclamation badge on button when custom DOI applied) */}
                 <DOISettingsPopover
                   isDarkMode={isDarkMode}
+                  initialSettings={appliedDoiForShipment ?? doiSettingsValues}
                   onSettingsChange={handleDoiSettingsChange}
+                  showCustomDoiBadge={appliedDoiForShipment != null}
+                  onRevertDoi={handleRevertDoiToDefault}
                 />
 
 

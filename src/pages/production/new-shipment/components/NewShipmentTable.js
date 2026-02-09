@@ -82,6 +82,7 @@ const NewShipmentTable = ({
   const [addedRows, setAddedRows] = useState(new Set());
   const [selectionFilter, setSelectionFilter] = useState('all'); // all | checked | unchecked
   const selectAllCheckboxRef = useRef(null);
+  const nonTableSelectAllCheckboxRef = useRef(null);
   const [clickedQtyIndex, setClickedQtyIndex] = useState(null);
   const [hoveredQtyIndex, setHoveredQtyIndex] = useState(null);
   const [hoveredAddIndex, setHoveredAddIndex] = useState(null);
@@ -773,7 +774,7 @@ const NewShipmentTable = ({
     setActiveFilters(filterSettings);
   };
   
-  // Handle filter reset – clear both timeline filters and non-table column filters (e.g. DOI Sold Out / Best Sellers)
+  // Handle filter reset – clear both timeline filters and non-table column filters (e.g. Inventory Out of Stock / Best Sellers)
   const handleFilterReset = () => {
     console.log('[handleFilterReset] Resetting all filters and sorts');
     setActiveFilters({
@@ -1149,8 +1150,8 @@ const NewShipmentTable = ({
 
       const numeric = isNonTableNumericColumn(columnKey);
 
-      // Popular filters (Days of Inventory only) – when set, only apply this (skip value/condition for this column)
-      if (columnKey === 'doiDays' && filter.popularFilter) {
+      // Popular filters (Inventory column) – when set, only apply this (skip value/condition for this column)
+      if (columnKey === 'fbaAvailable' && filter.popularFilter) {
         if (filter.popularFilter === 'soldOut') {
           result = result.filter((row) => {
             const totalInv = Number(row.totalInventory ?? row.total_inventory) || 0;
@@ -1164,7 +1165,7 @@ const NewShipmentTable = ({
         }
         // bestSellers: no row filter, sort is applied via sortOrder/sortField
       } else {
-      // Value filters (skip for doiDays when popularFilter is set – already handled above)
+      // Value filters (skip for fbaAvailable when popularFilter is set – already handled above)
       if (filter.selectedValues && filter.selectedValues.size > 0) {
         result = result.filter((row, idx) => {
           if (columnKey === 'product') {
@@ -1195,7 +1196,7 @@ const NewShipmentTable = ({
         });
       }
 
-      // Condition filters (same else: skip for doiDays when popularFilter is set)
+      // Condition filters (same else: skip for fbaAvailable when popularFilter is set)
       if (filter.conditionType) {
         result = result.filter((row, idx) => {
           if (columnKey === 'product') {
@@ -1246,6 +1247,64 @@ const NewShipmentTable = ({
     currentNonTableFilteredRowsRef.current = result;
   }, [filteredRowsWithSelection, nonTableFilters, tableMode, effectiveQtyValues, account]);
 
+  // When user clicks Low/High to Low in non-table dropdown, apply sort after ref has been updated
+  useEffect(() => {
+    if (tableMode || !nonTableSortField || !nonTableSortOrder) return;
+    const rowsToSort = [...currentNonTableFilteredRowsRef.current];
+    if (rowsToSort.length === 0) return;
+    const sortField = nonTableSortField;
+    const sortOrder = nonTableSortOrder;
+    const numeric = isNonTableNumericColumn(sortField);
+    const originalRows = filteredRowsWithSelection;
+    rowsToSort.sort((a, b) => {
+      let aVal, bVal;
+      if (sortField === 'product') { aVal = a.product; bVal = b.product; }
+      else if (sortField === 'brand') { aVal = a.brand; bVal = b.brand; }
+      else if (sortField === 'size') { aVal = a.size; bVal = b.size; }
+      else if (sortField === 'fbaAvailable') {
+        // Inventory column displays totalInventory, so sort by that to match what user sees
+        aVal = Number(a.totalInventory ?? a.total_inventory) || 0;
+        bVal = Number(b.totalInventory ?? b.total_inventory) || 0;
+      }
+      else if (sortField === 'unitsToMake') {
+        const aIndex = a._originalIndex !== undefined ? a._originalIndex : originalRows.findIndex(r => r.id === a.id);
+        const bIndex = b._originalIndex !== undefined ? b._originalIndex : originalRows.findIndex(r => r.id === b.id);
+        const aQty = effectiveQtyValues[aIndex];
+        const bQty = effectiveQtyValues[bIndex];
+        const parseNumericValue = (val) => {
+          if (typeof val === 'number') return val;
+          if (val === '' || val === null || val === undefined) return 0;
+          const parsed = Number(String(val).replace(/,/g, ''));
+          return isNaN(parsed) ? 0 : parsed;
+        };
+        aVal = parseNumericValue(aQty);
+        bVal = parseNumericValue(bQty);
+      }
+      else if (sortField === 'doiDays') { aVal = a.doiTotal || a.daysOfInventory || 0; bVal = b.doiTotal || b.daysOfInventory || 0; }
+      else if (sortField === 'sales7Day') { aVal = a.sales7Day ?? a.sales_7_day ?? 0; bVal = b.sales7Day ?? b.sales_7_day ?? 0; }
+      if (numeric) {
+        const aNum = Number(aVal) || 0;
+        const bNum = Number(bVal) || 0;
+        if (sortField === 'fbaAvailable' && sortOrder === 'asc') {
+          if (aNum === 0 && bNum !== 0) return -1;
+          if (aNum !== 0 && bNum === 0) return 1;
+          return aNum - bNum;
+        }
+        if (sortField === 'unitsToMake' && sortOrder === 'asc') {
+          if (aNum === 0 && bNum !== 0) return -1;
+          if (aNum !== 0 && bNum === 0) return 1;
+          return aNum - bNum;
+        }
+        return sortOrder === 'asc' ? aNum - bNum : bNum - aNum;
+      }
+      const aStr = String(aVal ?? '').toLowerCase();
+      const bStr = String(bVal ?? '').toLowerCase();
+      return sortOrder === 'asc' ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
+    });
+    const sortedIds = rowsToSort.map(row => row.id);
+    setNonTableSortedRowOrder(sortedIds);
+  }, [tableMode, nonTableSortField, nonTableSortOrder, filteredRowsWithSelection, nonTableFilters, effectiveQtyValues]);
+
   const handleApplyColumnFilter = (columnKey, filterData) => {
     // If filterData is null, remove the filter (Reset was clicked)
     if (filterData === null) {
@@ -1264,17 +1323,18 @@ const NewShipmentTable = ({
     
     // If sortOrder is provided, apply one-time sort directly (like SortProductsTable)
     if (filterData.sortOrder) {
+      const sortField = filterData.sortField || columnKey;
       // Get current filtered rows from ref (updated by useEffect)
       // Use setTimeout to ensure filters are applied and ref is updated
       setTimeout(() => {
         const rowsToSort = [...currentFilteredRowsRef.current];
         
-        // Sort the rows
+        // Sort the rows (use sortField so dropdown can pass explicit field)
         rowsToSort.sort((a, b) => {
         let aVal, bVal;
         
-        // Get the field value based on columnKey
-        switch(columnKey) {
+        // Get the field value based on sortField
+        switch(sortField) {
           case 'bottles':
             aVal = a.bottleInventory || a.bottle_inventory || 0;
             bVal = b.bottleInventory || b.bottle_inventory || 0;
@@ -1292,14 +1352,21 @@ const NewShipmentTable = ({
             bVal = b.labelsAvailable || b.label_inventory || b.labels_available || 0;
             break;
           case 'normal-4':
-          case 'qty': {
-            // Qty values are stored in effectiveQtyValues, indexed by original row index
+          case 'qty':
+          case 'unitsToMake': {
+            // Units to Make / Qty: values in effectiveQtyValues, indexed by original row index
             const aIndex = a._originalIndex !== undefined ? a._originalIndex : rows.indexOf(a);
             const bIndex = b._originalIndex !== undefined ? b._originalIndex : rows.indexOf(b);
             const aQty = effectiveQtyValues[aIndex];
             const bQty = effectiveQtyValues[bIndex];
-            aVal = typeof aQty === 'number' ? aQty : (aQty === '' || aQty === null || aQty === undefined ? 0 : parseInt(aQty, 10) || 0);
-            bVal = typeof bQty === 'number' ? bQty : (bQty === '' || bQty === null || bQty === undefined ? 0 : parseInt(bQty, 10) || 0);
+            const parseQty = (val) => {
+              if (typeof val === 'number') return val;
+              if (val === '' || val === null || val === undefined) return 0;
+              const parsed = Number(String(val).replace(/,/g, ''));
+              return isNaN(parsed) ? 0 : parsed;
+            };
+            aVal = parseQty(aQty);
+            bVal = parseQty(bQty);
             break;
           }
           case 'brand':
@@ -1315,10 +1382,12 @@ const NewShipmentTable = ({
             bVal = b.size || '';
             break;
           case 'fbaAvailable':
-            aVal = a.doiFba || a.doiTotal || 0;
-            bVal = b.doiFba || b.doiTotal || 0;
+            // Inventory column displays total inventory, sort by that
+            aVal = Number(a.totalInventory ?? a.total_inventory) || 0;
+            bVal = Number(b.totalInventory ?? b.total_inventory) || 0;
             break;
           case 'totalInventory':
+          case 'doiDays':
             aVal = a.doiTotal || a.daysOfInventory || 0;
             bVal = b.doiTotal || b.daysOfInventory || 0;
             break;
@@ -1343,7 +1412,7 @@ const NewShipmentTable = ({
             bVal = b.formula_name || '';
             break;
           default: {
-            const field = getFieldForHeaderFilter(columnKey);
+            const field = getFieldForHeaderFilter(sortField);
             aVal = a[field];
             bVal = b[field];
             break;
@@ -1603,12 +1672,16 @@ const NewShipmentTable = ({
     return Number.isFinite(n) ? n : 0;
   };
 
-  // True only when row would show the "NO SALES HISTORY" badge: zero inventory + no sales (matches UI badge logic)
+  // True when row would show the "NO SALES" badge: NOT out of stock AND no sales history (matches UI badge logic exactly)
   const hasNoSalesHistory = (row) => {
     const totalInv = parseSalesValue(row.totalInventory ?? row.total_inventory);
     const s30 = parseSalesValue(row.sales30Day ?? row.sales_30_day ?? row.units_sold_30_days);
     const s7 = parseSalesValue(row.sales7Day ?? row.sales_7_day ?? row.units_sold_7_days);
-    return totalInv === 0 && s30 === 0 && s7 === 0;
+    // Match UI logic: "No Sales" tag shows when NOT out of stock (totalInv > 0) AND no sales history
+    // UI checks: isOutOfStock ? "Out of Stock" : isNoSales ? "No Sales" : inventory number
+    const isOutOfStock = totalInv === 0;
+    const hasSalesHistory = s30 > 0 || s7 > 0;
+    return !isOutOfStock && !hasSalesHistory;
   };
 
   const hasNonTableActiveFilter = (columnKey) => {
@@ -1623,8 +1696,8 @@ const NewShipmentTable = ({
       return true; // Brand filter is active
     }
     
-    // Check for popular filter (Days of Inventory only)
-    if (columnKey === 'doiDays' && filter.popularFilter) return true;
+    // Check for popular filter (Inventory column only)
+    if (columnKey === 'fbaAvailable' && filter.popularFilter) return true;
     
     // Check for condition filter
     const hasCondition = filter.conditionType && filter.conditionType !== '';
@@ -1717,9 +1790,9 @@ const NewShipmentTable = ({
         return next;
       });
       
-      // When resetting DOI column (e.g. after Sold Out / No Sales History), clear sort and row order
+      // When resetting Inventory column (e.g. after Out of Stock / No Sales History), clear sort and row order
       // at top level so the table fully resets to show all products in original order
-      if (columnKey === 'doiDays') {
+      if (columnKey === 'fbaAvailable') {
         setNonTableSortOrder('');
         setNonTableSortedRowOrder(null);
         setNonTableSortField(prev => (prev === 'doiDays' || prev === 'fbaAvailable' ? '' : prev));
@@ -1761,8 +1834,12 @@ const NewShipmentTable = ({
       }
     }
     
-    // When applying a DOI Popular Filter, commit state synchronously so the list updates before the dropdown closes
-    const isDoiPopularFilter = columnKey === 'doiDays' && (filterData.popularFilter === 'soldOut' || filterData.popularFilter === 'noSalesHistory' || filterData.popularFilter === 'bestSellers');
+    // When applying an Inventory Popular Filter, commit state synchronously so the list updates before the dropdown closes
+    const isInventoryPopularFilter = columnKey === 'fbaAvailable' && 
+      (filterData.popularFilter === 'soldOut' || 
+       filterData.popularFilter === 'noSalesHistory' || 
+       filterData.popularFilter === 'bestSellers');
+    
     const applyFilter = () => {
       setNonTableFilters(prev => ({
         ...prev,
@@ -1771,17 +1848,18 @@ const NewShipmentTable = ({
           conditionType: filterData.conditionType || '',
           conditionValue: filterData.conditionValue || '',
           selectedBrands: brandFilterToApply,
-          ...(columnKey === 'doiDays' ? { popularFilter: filterData.popularFilter ?? null } : {}),
+          ...(columnKey === 'fbaAvailable' ? { popularFilter: filterData.popularFilter ?? null } : {}),
         },
       }));
-      // Clear sort only when applying Sold Out/No Sales History *without* an explicit sort (dropdown now sends sort for these)
-      if (columnKey === 'doiDays' && (filterData.popularFilter === 'soldOut' || filterData.popularFilter === 'noSalesHistory') && !filterData.sortOrder) {
+      // Clear sort only when applying Out of Stock/No Sales History *without* an explicit sort (dropdown now sends sort for these)
+      if (columnKey === 'fbaAvailable' && (filterData.popularFilter === 'soldOut' || filterData.popularFilter === 'noSalesHistory') && !filterData.sortOrder) {
         setNonTableSortField('');
         setNonTableSortOrder('');
         setNonTableSortedRowOrder(null);
       }
     };
-    if (isDoiPopularFilter) {
+    
+    if (isInventoryPopularFilter) {
       try {
         flushSync(applyFilter);
       } catch (e) {
@@ -1809,88 +1887,32 @@ const NewShipmentTable = ({
       onBrandFilterChange(brandFilterToApply);
     }
 
-    // If sortOrder is provided, apply one-time sort directly (snapshot the order)
+    // If sortOrder is provided, set sort state; useEffect will apply sort after ref is updated (except Best Sellers)
     if (filterData.sortOrder) {
       const sortField = filterData.sortField || columnKey;
       setNonTableSortField(sortField);
       setNonTableSortOrder(filterData.sortOrder);
       
-      // Best Sellers: sort the full list (not the ref) and commit order immediately so list updates
-      const isBestSellersSort = columnKey === 'doiDays' && filterData.popularFilter === 'bestSellers';
-      const runSort = () => {
-        const rowsToSort = isBestSellersSort
-          ? [...filteredRowsWithSelection]
-          : [...currentNonTableFilteredRowsRef.current];
-        const numeric = isNonTableNumericColumn(sortField);
-        
-        // Get reference to original rows array for finding original indices
-        const originalRows = filteredRowsWithSelection;
-        
-        // Sort the rows (use sortField so DOI dropdown can sort by FBA)
-        rowsToSort.sort((a, b) => {
-          let aVal, bVal;
-          if (sortField === 'product') { aVal = a.product; bVal = b.product; }
-          else if (sortField === 'brand') { aVal = a.brand; bVal = b.brand; }
-          else if (sortField === 'size') { aVal = a.size; bVal = b.size; }
-          else if (sortField === 'fbaAvailable') { aVal = a.doiFba ?? a.fbaAvailable ?? 0; bVal = b.doiFba ?? b.fbaAvailable ?? 0; }
-          else if (sortField === 'unitsToMake') {
-            // Use _originalIndex if available, otherwise find in original rows array
-            const aIndex = a._originalIndex !== undefined ? a._originalIndex : originalRows.findIndex(r => r.id === a.id);
-            const bIndex = b._originalIndex !== undefined ? b._originalIndex : originalRows.findIndex(r => r.id === b.id);
-            const aQty = effectiveQtyValues[aIndex];
-            const bQty = effectiveQtyValues[bIndex];
-            
-            // Helper function to convert value to number, handling commas and strings
-            const parseNumericValue = (val) => {
-              if (typeof val === 'number') return val;
-              if (val === '' || val === null || val === undefined) return 0;
-              // Remove commas and parse as number
-              const cleaned = String(val).replace(/,/g, '');
-              const parsed = Number(cleaned);
-              return isNaN(parsed) ? 0 : parsed;
-            };
-            
-            aVal = parseNumericValue(aQty);
-            bVal = parseNumericValue(bQty);
-          }
-          else if (sortField === 'doiDays') { aVal = a.doiTotal || a.daysOfInventory || 0; bVal = b.doiTotal || b.daysOfInventory || 0; }
-          else if (sortField === 'sales7Day') { aVal = a.sales7Day ?? a.sales_7_day ?? 0; bVal = b.sales7Day ?? b.sales_7_day ?? 0; }
-
-          if (numeric) {
-            const aNum = Number(aVal) || 0;
-            const bNum = Number(bVal) || 0;
-            // FBA A-Z: put zero inventory (0 FBA) first, then ascending by FBA
-            if (sortField === 'fbaAvailable' && filterData.sortOrder === 'asc') {
-              if (aNum === 0 && bNum !== 0) return -1;
-              if (aNum !== 0 && bNum === 0) return 1;
-              return aNum - bNum;
-            }
-            return filterData.sortOrder === 'asc' ? aNum - bNum : bNum - aNum;
-          }
-
-          const aStr = String(aVal ?? '').toLowerCase();
-          const bStr = String(bVal ?? '').toLowerCase();
-          return filterData.sortOrder === 'asc'
-            ? aStr.localeCompare(bStr)
-            : bStr.localeCompare(aStr);
-        });
-        
-        // Store the sorted order (array of row IDs)
-        const sortedIds = rowsToSort.map(row => row.id);
-        setNonTableSortedRowOrder(sortedIds);
-      };
-      // Best Sellers: run sort synchronously and flush so the list reorders immediately
+      // Best Sellers: sort the full list and commit order immediately so list updates
+      const isBestSellersSort = columnKey === 'fbaAvailable' && filterData.popularFilter === 'bestSellers';
       if (isBestSellersSort) {
+        const runSort = () => {
+          const rowsToSort = [...filteredRowsWithSelection];
+          const sortFieldInner = filterData.sortField || 'sales7Day';
+          rowsToSort.sort((a, b) => {
+            const aVal = a.sales7Day ?? a.sales_7_day ?? 0;
+            const bVal = b.sales7Day ?? b.sales_7_day ?? 0;
+            return (bVal - aVal);
+          });
+          setNonTableSortedRowOrder(rowsToSort.map(row => row.id));
+        };
         try {
           flushSync(runSort);
         } catch (e) {
           runSort();
         }
-      } else {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(runSort);
-        });
       }
+      // Other columns: sort is applied in useEffect when nonTableSortField/nonTableSortOrder are set
     } else if (nonTableSortField === columnKey) {
       // If sortOrder is empty/cleared, remove sort and clear stored order
       setNonTableSortField('');
@@ -1976,10 +1998,10 @@ const NewShipmentTable = ({
 
   // Apply non-table mode filters
   const nonTableFilteredRows = useMemo(() => {
-    const doiFilter = nonTableFilters.doiDays;
+    const inventoryFilter = nonTableFilters.fbaAvailable;
     // When in table mode, only apply Best Sellers sort if that filter is set (so sort works in both views)
     if (tableMode) {
-      if (doiFilter?.popularFilter === 'bestSellers' && filteredRowsWithSelection.length > 0) {
+      if (inventoryFilter?.popularFilter === 'bestSellers' && filteredRowsWithSelection.length > 0) {
         console.log('[Best Sellers Filter - TABLE MODE] Starting filter...');
         
         // Helper functions to match product names and sizes
@@ -2032,15 +2054,15 @@ const NewShipmentTable = ({
     
     let result = [...filteredRowsWithSelection];
 
-    // Apply DOI Popular Filter first: show only the chosen subset (Sold Out = 0 inventory + has sales; No Sales History = all with zero sales only)
-    if (doiFilter?.popularFilter === 'soldOut') {
+    // Apply Inventory Popular Filter first: show only the chosen subset (Out of Stock = 0 inventory + has sales; No Sales History = all with zero sales only)
+    if (inventoryFilter?.popularFilter === 'soldOut') {
       result = result.filter((row) => {
         const totalInv = Number(row.totalInventory ?? row.total_inventory) || 0;
         const s30 = parseSalesValue(row.sales30Day ?? row.sales_30_day ?? row.units_sold_30_days);
         const s7 = parseSalesValue(row.sales7Day ?? row.sales_7_day ?? row.units_sold_7_days);
         return totalInv === 0 && (s30 > 0 || s7 > 0);
       });
-    } else if (doiFilter?.popularFilter === 'noSalesHistory') {
+    } else if (inventoryFilter?.popularFilter === 'noSalesHistory') {
       // Show only products with no sales history (all such rows from the current list)
       result = result.filter((row) => hasNoSalesHistory(row));
     }
@@ -2053,8 +2075,8 @@ const NewShipmentTable = ({
 
       const numeric = isNonTableNumericColumn(columnKey);
 
-      // Skip value/condition for doiDays when Popular Filter is set (applied at end of useMemo)
-      if (columnKey === 'doiDays' && filter.popularFilter) return;
+      // Skip value/condition for fbaAvailable when Popular Filter is set (applied at end of useMemo)
+      if (columnKey === 'fbaAvailable' && filter.popularFilter) return;
 
       // Brand filter/sort (for product column)
       if (columnKey === 'product' && filter.selectedBrands && filter.selectedBrands instanceof Set && filter.selectedBrands.size > 0) {
@@ -2183,8 +2205,55 @@ const NewShipmentTable = ({
       }
     });
 
-    // Apply non-table sorting - use stored order if available (one-time sort)
-    if (nonTableSortedRowOrder && nonTableSortedRowOrder.length > 0 && doiFilter?.popularFilter !== 'bestSellers') {
+    // Apply non-table sorting: when user set sort field/order, sort inline so it works immediately (no effect timing)
+    if (!tableMode && nonTableSortField && nonTableSortOrder && inventoryFilter?.popularFilter !== 'bestSellers') {
+      const sortField = nonTableSortField;
+      const sortOrder = nonTableSortOrder;
+      const numeric = isNonTableNumericColumn(sortField);
+      const parseNumericVal = (val) => {
+        if (typeof val === 'number') return val;
+        if (val === '' || val === null || val === undefined) return 0;
+        const parsed = Number(String(val).replace(/,/g, ''));
+        return isNaN(parsed) ? 0 : parsed;
+      };
+      result = [...result].sort((a, b) => {
+        let aVal, bVal;
+        if (sortField === 'product') { aVal = a.product; bVal = b.product; }
+        else if (sortField === 'brand') { aVal = a.brand; bVal = b.brand; }
+        else if (sortField === 'size') { aVal = a.size; bVal = b.size; }
+        else if (sortField === 'fbaAvailable') {
+          aVal = Number(a.totalInventory ?? a.total_inventory) || 0;
+          bVal = Number(b.totalInventory ?? b.total_inventory) || 0;
+        }
+        else if (sortField === 'unitsToMake') {
+          const aIdx = a._originalIndex ?? 0;
+          const bIdx = b._originalIndex ?? 0;
+          aVal = parseNumericVal(effectiveQtyValues[aIdx]);
+          bVal = parseNumericVal(effectiveQtyValues[bIdx]);
+        }
+        else if (sortField === 'doiDays') { aVal = a.doiTotal || a.daysOfInventory || 0; bVal = b.doiTotal || b.daysOfInventory || 0; }
+        else if (sortField === 'sales7Day') { aVal = a.sales7Day ?? a.sales_7_day ?? 0; bVal = b.sales7Day ?? b.sales_7_day ?? 0; }
+        if (numeric) {
+          const aNum = Number(aVal) || 0;
+          const bNum = Number(bVal) || 0;
+          if (sortField === 'fbaAvailable' && sortOrder === 'asc') {
+            if (aNum === 0 && bNum !== 0) return -1;
+            if (aNum !== 0 && bNum === 0) return 1;
+            return aNum - bNum;
+          }
+          if (sortField === 'unitsToMake' && sortOrder === 'asc') {
+            if (aNum === 0 && bNum !== 0) return -1;
+            if (aNum !== 0 && bNum === 0) return 1;
+            return aNum - bNum;
+          }
+          return sortOrder === 'asc' ? aNum - bNum : bNum - aNum;
+        }
+        const aStr = String(aVal ?? '').toLowerCase();
+        const bStr = String(bVal ?? '').toLowerCase();
+        return sortOrder === 'asc' ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
+      });
+    }
+    else if (nonTableSortedRowOrder && nonTableSortedRowOrder.length > 0 && inventoryFilter?.popularFilter !== 'bestSellers') {
       // Create a map of row ID to row for quick lookup
       const rowMap = new Map(result.map(row => [row.id, row]));
       
@@ -2208,10 +2277,36 @@ const NewShipmentTable = ({
       });
       
       result = orderedResult;
+    } else if (!tableMode && nonTableSortField === '' && !inventoryFilter?.popularFilter) {
+      // Default view for non-table mode when no sort/filter is applied:
+      // 1. Out of Stock products (DOI = 0) at the top
+      // 2. Other products sorted by DOI ascending (low DOI first)
+      // 3. No Sales History products at the bottom
+      result = [...result].sort((a, b) => {
+        const aDOI = a.doiTotal || a.daysOfInventory || 0;
+        const bDOI = b.doiTotal || b.daysOfInventory || 0;
+        const aTotalInv = Number(a.totalInventory ?? a.total_inventory) || 0;
+        const bTotalInv = Number(b.totalInventory ?? b.total_inventory) || 0;
+        const aIsOutOfStock = aTotalInv === 0;
+        const bIsOutOfStock = bTotalInv === 0;
+        const aIsNoSales = hasNoSalesHistory(a);
+        const bIsNoSales = hasNoSalesHistory(b);
+        
+        // Out of Stock products (DOI = 0) at the top
+        if (aIsOutOfStock && !bIsOutOfStock) return -1;
+        if (!aIsOutOfStock && bIsOutOfStock) return 1;
+        
+        // No Sales History products at the bottom (but after Out of Stock)
+        if (aIsNoSales && !bIsNoSales) return 1;
+        if (!aIsNoSales && bIsNoSales) return -1;
+        
+        // Sort by DOI ascending (low DOI first) for remaining products
+        return aDOI - bDOI;
+      });
     }
 
     // Best Sellers: show ONLY the specific top 10 products from last week's report
-    if (doiFilter?.popularFilter === 'bestSellers' && result.length > 0) {
+    if (inventoryFilter?.popularFilter === 'bestSellers' && result.length > 0) {
       console.log('[Best Sellers Filter] Total rows before filter:', result.length);
       
       // Helper functions to match product names and sizes
@@ -2261,10 +2356,10 @@ const NewShipmentTable = ({
     }
 
     return result;
-  }, [filteredRowsWithSelection, nonTableFilters, nonTableSortedRowOrder, tableMode, account, addedRows]);
+  }, [filteredRowsWithSelection, nonTableFilters, nonTableSortedRowOrder, nonTableSortField, nonTableSortOrder, tableMode, account, addedRows, effectiveQtyValues]);
 
   // When Best Sellers is active, always use nonTableFilteredRows (sorted); otherwise table mode uses filteredRowsWithSelection
-  const currentRows = (tableMode && nonTableFilters.doiDays?.popularFilter !== 'bestSellers')
+  const currentRows = (tableMode && nonTableFilters.fbaAvailable?.popularFilter !== 'bestSellers')
     ? filteredRowsWithSelection
     : nonTableFilteredRows;
 
@@ -2323,13 +2418,17 @@ const NewShipmentTable = ({
         if (hasExisting) return;
 
         const suggested =
-          row.suggestedQty ||
-          row.units_to_make ||
-          row.unitsToMake ||
+          row.suggestedQty ??
+          row.units_to_make ??
+          row.unitsToMake ??
           0;
 
         if (suggested > 0) {
           newValues[index] = suggested;
+          changed = true;
+        } else {
+          // DOI at goal (green): show 0 instead of blank
+          newValues[index] = 0;
           changed = true;
         }
       });
@@ -2577,12 +2676,38 @@ const NewShipmentTable = ({
     return selectedRows.size > 0 && selectedRows.size < currentRows.length;
   }, [selectedRows.size, currentRows.length]);
 
-  // Set indeterminate state for select all checkbox
+  // Non-table mode: all visible products selected (for select-all checkbox in PRODUCTS column)
+  const nonTableAllSelected = useMemo(() => {
+    if (tableMode || currentRows.length === 0) return false;
+    return currentRows.every(row => {
+      const idx = row._originalIndex !== undefined ? row._originalIndex : currentRows.indexOf(row);
+      return nonTableSelectedIndices.has(idx);
+    });
+  }, [tableMode, currentRows, nonTableSelectedIndices]);
+
+  // Non-table mode: some but not all selected (for indeterminate)
+  const nonTableSomeSelected = useMemo(() => {
+    if (tableMode || currentRows.length === 0) return false;
+    const selectedCount = currentRows.filter(row => {
+      const idx = row._originalIndex !== undefined ? row._originalIndex : currentRows.indexOf(row);
+      return nonTableSelectedIndices.has(idx);
+    }).length;
+    return selectedCount > 0 && selectedCount < currentRows.length;
+  }, [tableMode, currentRows, nonTableSelectedIndices]);
+
+  // Set indeterminate state for select all checkbox (table mode)
   useEffect(() => {
     if (selectAllCheckboxRef.current) {
       selectAllCheckboxRef.current.indeterminate = someSelected;
     }
   }, [someSelected]);
+
+  // Set indeterminate state for select all checkbox (non-table mode, PRODUCTS column)
+  useEffect(() => {
+    if (nonTableSelectAllCheckboxRef.current) {
+      nonTableSelectAllCheckboxRef.current.indeterminate = nonTableSomeSelected;
+    }
+  }, [nonTableSomeSelected]);
 
   // Function to position the popup - instant updates, no lag
   const positionPopup = useCallback(() => {
@@ -2900,7 +3025,12 @@ const NewShipmentTable = ({
   // Handle row mousedown to prevent text selection on Shift+Click
   const handleNonTableRowMouseDown = (e, arrayIndex, originalIndex) => {
     // Don't prevent if clicking on interactive elements
-    if (e.target.closest('button') || e.target.closest('input')) {
+    // Exclude checkboxes specifically to allow checkbox selection
+    if (
+      e.target.closest('button') || 
+      (e.target.closest('input') && e.target.type !== 'checkbox') ||
+      e.target.type === 'checkbox'
+    ) {
       return;
     }
 
@@ -2918,7 +3048,12 @@ const NewShipmentTable = ({
   // arrayIndex is the position in currentRows (0, 1, 2...), originalIndex is row._originalIndex for qty operations
   const handleNonTableRowClick = (e, arrayIndex, originalIndex) => {
     // Don't handle selection if clicking on interactive elements
-    if (e.target.closest('button') || e.target.closest('input')) {
+    // Exclude checkboxes specifically to allow checkbox selection
+    if (
+      e.target.closest('button') || 
+      (e.target.closest('input') && e.target.type !== 'checkbox') ||
+      e.target.type === 'checkbox'
+    ) {
       return;
     }
 
@@ -2964,6 +3099,77 @@ const NewShipmentTable = ({
       // Regular click: Select only this item (modal opens on double-click)
       setNonTableSelectedIndices(new Set([originalIndex]));
       setNonTableLastSelectedIndex(arrayIndex);
+    }
+  };
+
+  // Handle checkbox click for multi-select (non-table mode)
+  // Supports Shift+Click and Cmd+Click for bulk selection
+  const handleNonTableCheckboxClick = (e, arrayIndex, originalIndex) => {
+    e.stopPropagation(); // Prevent triggering row click handler
+    
+    const isShiftClick = e.shiftKey;
+    const isCmdClick = e.metaKey || e.ctrlKey;
+    const wasChecked = nonTableSelectedIndices.has(originalIndex);
+    const willBeChecked = e.target.checked;
+
+    // Prevent text selection on Shift+Click
+    if (isShiftClick) {
+      e.preventDefault();
+      // Clear any existing text selection
+      if (window.getSelection) {
+        window.getSelection().removeAllRanges();
+      }
+    }
+
+    if (isShiftClick && nonTableLastSelectedIndex !== null) {
+      // Shift + Click: Select range between lastSelectedIndex and current arrayIndex
+      // Always select the entire range (standard Shift+Click behavior)
+      const start = Math.min(nonTableLastSelectedIndex, arrayIndex);
+      const end = Math.max(nonTableLastSelectedIndex, arrayIndex);
+      const newSelected = new Set(nonTableSelectedIndices);
+      
+      // Add all rows in the range by their array positions
+      for (let i = start; i <= end; i++) {
+        if (i < currentRows.length) {
+          const rowAtPosition = currentRows[i];
+          newSelected.add(rowAtPosition._originalIndex);
+        }
+      }
+      
+      setNonTableSelectedIndices(newSelected);
+      setNonTableLastSelectedIndex(arrayIndex);
+    } else if (isCmdClick) {
+      // Cmd/Ctrl + Click: Toggle selection of this item
+      const newSelected = new Set(nonTableSelectedIndices);
+      if (willBeChecked) {
+        newSelected.add(originalIndex);
+      } else {
+        newSelected.delete(originalIndex);
+      }
+      setNonTableSelectedIndices(newSelected);
+      setNonTableLastSelectedIndex(arrayIndex);
+    } else {
+      // Regular click: Select/deselect only this item
+      if (willBeChecked) {
+        setNonTableSelectedIndices(new Set([originalIndex]));
+      } else {
+        setNonTableSelectedIndices(new Set());
+      }
+      setNonTableLastSelectedIndex(arrayIndex);
+    }
+  };
+
+  // Handle select all checkbox (non-table mode, PRODUCTS column) – for multi-selection and bulk actions
+  const handleNonTableSelectAll = (e) => {
+    if (e.target.checked) {
+      const indices = new Set(currentRows.map(row => row._originalIndex !== undefined ? row._originalIndex : currentRows.indexOf(row)));
+      setNonTableSelectedIndices(indices);
+      if (nonTableSelectAllCheckboxRef.current && indices.size < currentRows.length) {
+        nonTableSelectAllCheckboxRef.current.indeterminate = indices.size > 0;
+        nonTableSelectAllCheckboxRef.current.checked = false;
+      }
+    } else {
+      setNonTableSelectedIndices(new Set());
     }
   };
 
@@ -3119,10 +3325,20 @@ const NewShipmentTable = ({
                 marginLeft: '20px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
+                gap: '12px',
                 position: 'relative'
               }}
             >
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="checkbox"
+                  ref={nonTableSelectAllCheckboxRef}
+                  checked={nonTableAllSelected}
+                  onChange={handleNonTableSelectAll}
+                  style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                  aria-label="Select all products"
+                />
+              </label>
               <span>PRODUCTS</span>
               {hasNonTableActiveFilter('product') && (
                 <span style={{ 
@@ -3447,8 +3663,10 @@ const NewShipmentTable = ({
                   key={`${row.id}-${index}`}
                   onMouseDown={(e) => {
                     // Only handle mousedown if not clicking on interactive elements
+                    // Exclude checkboxes specifically to allow checkbox selection
                     if (
-                      !e.target.closest('input') &&
+                      e.target.type !== 'checkbox' &&
+                      !e.target.closest('input[type="checkbox"]') &&
                       !e.target.closest('button') &&
                       !e.target.closest('img[alt="Copy"]')
                     ) {
@@ -3457,8 +3675,10 @@ const NewShipmentTable = ({
                   }}
                   onClick={(e) => {
                     // Only handle selection if not clicking on interactive elements
+                    // Exclude checkboxes specifically to allow checkbox selection
                     if (
-                      !e.target.closest('input') &&
+                      e.target.type !== 'checkbox' &&
+                      !e.target.closest('input[type="checkbox"]') &&
                       !e.target.closest('button') &&
                       !e.target.closest('img[alt="Copy"]')
                     ) {
@@ -3549,8 +3769,59 @@ const NewShipmentTable = ({
                   />
                   {/* PRODUCTS Column */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {/* Checkbox for bulk selection */}
+                    <label
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        marginLeft: '20px',
+                        flexShrink: 0
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={(e) => handleNonTableCheckboxClick(e, arrayIndex, index)}
+                        style={{
+                          position: 'absolute',
+                          opacity: 0,
+                          width: 0,
+                          height: 0,
+                          margin: 0,
+                          pointerEvents: 'none'
+                        }}
+                      />
+                      <span
+                        style={{
+                          width: '16px',
+                          height: '16px',
+                          borderRadius: '4px',
+                          border: '1px solid',
+                          borderColor: isSelected
+                            ? (isDarkMode ? '#3B82F6' : '#3B82F6')
+                            : (isDarkMode ? '#64748B' : '#94A3B8'),
+                          backgroundColor: isSelected 
+                            ? (isDarkMode ? '#3B82F6' : '#3B82F6')
+                            : (isDarkMode ? '#1A2235' : '#F9FAFB'),
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          transition: 'background-color 0.2s, border-color 0.2s'
+                        }}
+                      >
+                        {isSelected && (
+                          <svg width="10" height="8" viewBox="0 0 10 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M1 4L4 7L9 1" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </span>
+                    </label>
                     {/* Product Icon - Alternating placeholder images */}
-                    <div style={{ width: '36px', height: '36px', minWidth: '36px', borderRadius: '3px', overflow: 'hidden', backgroundColor: isDarkMode ? '#374151' : '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginLeft: '20px' }}>
+                    <div style={{ width: '36px', height: '36px', minWidth: '36px', borderRadius: '3px', overflow: 'hidden', backgroundColor: isDarkMode ? '#374151' : '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <img 
                         src={index % 2 === 0 
                           ? "https://scontent.fcrk1-4.fna.fbcdn.net/v/t39.30808-6/324020813_5698060603642883_3730941176199502248_n.jpg?_nc_cat=109&ccb=1-7&_nc_sid=6ee11a&_nc_ohc=GGxaVG4-pVgQ7kNvwEPLk1T&_nc_oc=AdnEjj3CW2ATnumPvOuJ-FMNwcmhl9bJtNYRiqBX0KP8pIFYhMc84O-nNOk6kE4dvDA&_nc_zt=23&_nc_ht=scontent.fcrk1-4.fna&_nc_gid=9BGxqtl66s2GX15r0D2jdA&oh=00_Afowix4xzmWR-0krARMs91-l_crfPVOv-mYZt6pCBxQvqg&oe=697DA3B3"
@@ -3714,31 +3985,29 @@ const NewShipmentTable = ({
                             gap: '4px',
                             backgroundColor: '#F5D7D7',
                             borderRadius: '24px',
-                            padding: '4px 8px',
+                            padding: '0 8px',
                             border: 'none',
-                            height: 'fit-content',
+                            height: '20px',
+                            minHeight: '20px',
+                            maxHeight: '20px',
+                            boxSizing: 'border-box',
                             width: 'fit-content',
-                            marginLeft: '-25px'
+                            marginLeft: '-15px'
                           }}>
-                            <svg
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              xmlns="http://www.w3.org/2000/svg"
-                              style={{ flexShrink: 0 }}
-                            >
-                              <path
-                                d="M12 9V13M12 17H12.01M10.29 3.86L1.82 18C1.64547 18.3024 1.55297 18.6453 1.55197 18.9945C1.55097 19.3437 1.64148 19.6871 1.81442 19.9905C1.98737 20.2939 2.23675 20.5467 2.53773 20.7239C2.83871 20.901 3.18082 20.9962 3.53 21H20.47C20.8192 20.9962 21.1613 20.901 21.4623 20.7239C21.7633 20.5467 22.0126 20.2939 22.1856 19.9905C22.3585 19.6871 22.449 19.3437 22.448 18.9945C22.447 18.6453 22.3545 18.3024 22.18 18L13.71 3.86C13.5318 3.56631 13.2807 3.32311 12.9812 3.15447C12.6817 2.98584 12.3438 2.89725 12 2.89725C11.6562 2.89725 11.3183 2.98584 11.0188 3.15447C10.7193 3.32311 10.4682 3.56631 10.29 3.86Z"
-                                stroke="#EF4444"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                fill="#EF4444"
-                              />
-                            </svg>
-                            <span style={{ color: '#EF4444', fontWeight: 700, fontSize: '13px' }}>
-                              Out of Stock
+                            <span style={{
+                              width: '12px',
+                              height: '12px',
+                              borderRadius: '50%',
+                              backgroundColor: '#EF4444',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              <span style={{ color: '#FFFFFF', fontWeight: 700, fontSize: '10px', lineHeight: 1 }}>!</span>
+                            </span>
+                            <span style={{ color: '#EF4444', fontWeight: 700, fontSize: '12px', lineHeight: 1 }}>
+                              Sold Out
                             </span>
                           </div>
                         ) : isNoSales ? (
@@ -3749,15 +4018,18 @@ const NewShipmentTable = ({
                             gap: '4px',
                             backgroundColor: '#FFF4E6',
                             borderRadius: '24px',
-                            padding: '4px 8px',
+                            padding: '0 8px',
                             border: 'none',
-                            height: 'fit-content',
+                            height: '20px',
+                            minHeight: '20px',
+                            maxHeight: '20px',
+                            boxSizing: 'border-box',
                             width: 'fit-content',
                             marginLeft: '-15px'
                           }}>
                             <span style={{
-                              width: '16px',
-                              height: '16px',
+                              width: '12px',
+                              height: '12px',
                               borderRadius: '50%',
                               backgroundColor: '#F97316',
                               display: 'flex',
@@ -3765,9 +4037,9 @@ const NewShipmentTable = ({
                               justifyContent: 'center',
                               flexShrink: 0
                             }}>
-                              <span style={{ color: '#FFFFFF', fontWeight: 700, fontSize: '12px', lineHeight: 1 }}>!</span>
+                              <span style={{ color: '#FFFFFF', fontWeight: 700, fontSize: '10px', lineHeight: 1 }}>!</span>
                             </span>
-                            <span style={{ color: '#F97316', fontWeight: 700, fontSize: '13px' }}>
+                            <span style={{ color: '#F97316', fontWeight: 700, fontSize: '12px', lineHeight: 1 }}>
                               No Sales
                             </span>
                           </div>
@@ -3952,9 +4224,13 @@ const NewShipmentTable = ({
                         type="text" 
                         value={(() => {
                           const qty = effectiveQtyValues[index];
-                          if (qty === undefined || qty === null || qty === '') return '';
+                          const atDoiGoal = (row.suggestedQty ?? row.units_to_make ?? row.unitsToMake ?? -1) === 0 ||
+                            (row.doiTotal || row.daysOfInventory || 0) >= (forecastRange || 120);
+                          if (qty === undefined || qty === null || qty === '') {
+                            return atDoiGoal ? '0' : '';
+                          }
                           const numQty = typeof qty === 'number' ? qty : parseInt(qty, 10);
-                          return isNaN(numQty) ? '' : numQty.toLocaleString();
+                          return isNaN(numQty) ? (atDoiGoal ? '0' : '') : numQty.toLocaleString();
                         })()}
                         onChange={(e) => { 
                           const inputValue = e.target.value.replace(/,/g, ''); 
@@ -3995,142 +4271,127 @@ const NewShipmentTable = ({
                         }}
                         onWheel={(e) => e.target.blur()}
                       />
-                      {/* Decrement arrow button - inside container on the right (bottom) */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          
-                          // Bulk decrease if multiple products are selected
-                          if (nonTableSelectedIndices.size > 1 && nonTableSelectedIndices.has(index)) {
-                            effectiveSetQtyValues(prev => {
-                              const newValues = { ...prev };
-                              nonTableSelectedIndices.forEach(selectedIndex => {
-                                const selectedRow = currentRows.find(r => r._originalIndex === selectedIndex);
-                                if (selectedRow) {
-                                  const currentQty = newValues[selectedIndex] ?? 0;
-                                  const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
-                                  if (numQty <= 0) return;
-                                  
-                                  // Use size-based increment (e.g. 60 units for 8oz)
-                                  const increment = getQtyIncrement(selectedRow);
-                                  
-                                  newValues[selectedIndex] = Math.max(0, numQty - increment);
-                                  manuallyEditedIndices.current.add(selectedIndex);
-                                }
-                              });
-                              return newValues;
-                            });
-                          } else {
-                            // Single product decrease
-                            const currentQty = effectiveQtyValues[index] ?? 0;
-                            const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
-                            if (numQty <= 0) return;
-                            // Use size-based increment (e.g. 60 units for 8oz)
-                            const increment = getQtyIncrement(row);
-                            const newQty = Math.max(0, numQty - increment);
-                            manuallyEditedIndices.current.add(index);
-                            effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty }));
-                            setQtyInputUpdateTrigger(prev => prev + 1);
-                          }
-                        }}
+                      {/* Arrow buttons wrapper - tight gap between up/down */}
+                      <div
                         style={{
                           position: 'absolute',
                           right: '4px',
-                          bottom: '2px',
-                          width: '20px',
-                          height: '10px',
-                          borderRadius: '4px',
-                          border: 'none',
-                          backgroundColor: 'transparent',
-                          color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                          cursor: 'pointer',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
                           display: hoveredQtyIndex === index ? 'flex' : 'none',
+                          flexDirection: 'column',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          padding: 0,
-                          outline: 'none',
+                          gap: '0px',
                           zIndex: 1,
-                          transition: 'color 0.2s',
                         }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.color = isDarkMode ? '#D1D5DB' : '#374151';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.color = isDarkMode ? '#9CA3AF' : '#6B7280';
-                        }}
-                        title="Decrease quantity"
                       >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M3 8L6 11L9 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                      {/* Increment arrow button - inside container on the right (top) */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          
-                          // Bulk increase if multiple products are selected
-                          if (nonTableSelectedIndices.size > 1 && nonTableSelectedIndices.has(index)) {
-                            effectiveSetQtyValues(prev => {
-                              const newValues = { ...prev };
-                              nonTableSelectedIndices.forEach(selectedIndex => {
-                                const selectedRow = currentRows.find(r => r._originalIndex === selectedIndex);
-                                if (selectedRow) {
-                                  const currentQty = newValues[selectedIndex] ?? 0;
-                                  const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
-                                  
-                                  // Use size-based increment (e.g. 60 units for 8oz)
-                                  const increment = getQtyIncrement(selectedRow);
-                                  
-                                  newValues[selectedIndex] = numQty + increment;
-                                  manuallyEditedIndices.current.add(selectedIndex);
-                                }
+                        {/* Increment arrow (top) */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (nonTableSelectedIndices.size > 1 && nonTableSelectedIndices.has(index)) {
+                              effectiveSetQtyValues(prev => {
+                                const newValues = { ...prev };
+                                nonTableSelectedIndices.forEach(selectedIndex => {
+                                  const selectedRow = currentRows.find(r => r._originalIndex === selectedIndex);
+                                  if (selectedRow) {
+                                    const currentQty = newValues[selectedIndex] ?? 0;
+                                    const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
+                                    const increment = getQtyIncrement(selectedRow);
+                                    newValues[selectedIndex] = numQty + increment;
+                                    manuallyEditedIndices.current.add(selectedIndex);
+                                  }
+                                });
+                                return newValues;
                               });
-                              return newValues;
-                            });
-                          } else {
-                            // Single product increase
-                            const currentQty = effectiveQtyValues[index] ?? 0;
-                            const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
-                            // Use size-based increment (e.g. 60 units for 8oz)
-                            const increment = getQtyIncrement(row);
-                            const newQty = numQty + increment;
-                            manuallyEditedIndices.current.add(index);
-                            effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty }));
-                            setQtyInputUpdateTrigger(prev => prev + 1);
-                          }
-                        }}
-                        style={{
-                          position: 'absolute',
-                          right: '4px',
-                          top: '2px',
-                          width: '20px',
-                          height: '10px',
-                          borderRadius: '4px',
-                          border: 'none',
-                          backgroundColor: 'transparent',
-                          color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                          cursor: 'pointer',
-                          display: hoveredQtyIndex === index ? 'flex' : 'none',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          padding: 0,
-                          outline: 'none',
-                          zIndex: 1,
-                          transition: 'color 0.2s',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.color = isDarkMode ? '#D1D5DB' : '#374151';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.color = isDarkMode ? '#9CA3AF' : '#6B7280';
-                        }}
-                        title="Increase quantity"
-                      >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M3 4L6 1L9 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
+                            } else {
+                              const currentQty = effectiveQtyValues[index] ?? 0;
+                              const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
+                              const increment = getQtyIncrement(row);
+                              const newQty = numQty + increment;
+                              manuallyEditedIndices.current.add(index);
+                              effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty }));
+                              setQtyInputUpdateTrigger(prev => prev + 1);
+                            }
+                          }}
+                          style={{
+                            width: '20px',
+                            height: '10px',
+                            border: 'none',
+                            borderRadius: '2px',
+                            backgroundColor: 'transparent',
+                            color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: 0,
+                            outline: 'none',
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.color = isDarkMode ? '#D1D5DB' : '#374151'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.color = isDarkMode ? '#9CA3AF' : '#6B7280'; }}
+                          title="Increase quantity"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M3 4L6 1L9 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </button>
+                        {/* Decrement arrow (bottom) - negative margin pulls it closer to top arrow */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (nonTableSelectedIndices.size > 1 && nonTableSelectedIndices.has(index)) {
+                              effectiveSetQtyValues(prev => {
+                                const newValues = { ...prev };
+                                nonTableSelectedIndices.forEach(selectedIndex => {
+                                  const selectedRow = currentRows.find(r => r._originalIndex === selectedIndex);
+                                  if (selectedRow) {
+                                    const currentQty = newValues[selectedIndex] ?? 0;
+                                    const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
+                                    if (numQty <= 0) return;
+                                    const increment = getQtyIncrement(selectedRow);
+                                    newValues[selectedIndex] = Math.max(0, numQty - increment);
+                                    manuallyEditedIndices.current.add(selectedIndex);
+                                  }
+                                });
+                                return newValues;
+                              });
+                            } else {
+                              const currentQty = effectiveQtyValues[index] ?? 0;
+                              const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
+                              if (numQty <= 0) return;
+                              const increment = getQtyIncrement(row);
+                              const newQty = Math.max(0, numQty - increment);
+                              manuallyEditedIndices.current.add(index);
+                              effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty }));
+                              setQtyInputUpdateTrigger(prev => prev + 1);
+                            }
+                          }}
+                          style={{
+                            width: '20px',
+                            height: '10px',
+                            marginTop: '-3px',
+                            border: 'none',
+                            borderRadius: '2px',
+                            backgroundColor: 'transparent',
+                            color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: 0,
+                            outline: 'none',
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.color = isDarkMode ? '#D1D5DB' : '#374151'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.color = isDarkMode ? '#9CA3AF' : '#6B7280'; }}
+                          title="Decrease quantity"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M3 8L6 11L9 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                     {/* Add button */}
                     <button 
@@ -4141,6 +4402,9 @@ const NewShipmentTable = ({
                       style={{ 
                         width: '64px',
                         height: '24px',
+                        minHeight: '24px',
+                        maxHeight: '24px',
+                        boxSizing: 'border-box',
                         borderRadius: '4px', 
                         border: 'none', 
                         backgroundColor: effectiveAddedRows.has(row.id) ? '#10B981' : '#2563EB', 
@@ -4441,7 +4705,7 @@ const NewShipmentTable = ({
                     <div
                       style={{
                         position: 'absolute',
-                        right: 0,
+                        right: '-5px',
                         top: '50%',
                         transform: 'translateY(-50%)',
                         display: 'flex',
@@ -6981,7 +7245,7 @@ const TimelineFilterDropdown = React.forwardRef(({ filterIconRef, onClose, onApp
     { value: 'fastestMovers', label: 'Fastest Movers (Highest Unit Velocity)' },
     { value: 'topProfit', label: 'Top Profit Products' },
     { value: 'topTraffic', label: 'Top Traffic Drivers (Sessions/CTR)' },
-    { value: 'outOfStock', label: 'Out of Stock' },
+    { value: 'outOfStock', label: 'Sold Out' },
     { value: 'overstock', label: 'Overstock' },
   ];
 

@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 import { toast } from 'sonner';
@@ -31,6 +31,10 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
   const [recentlyMovedRowId, setRecentlyMovedRowId] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [selectedShinersProductToMove, setSelectedShinersProductToMove] = useState(null);
+  const [activeArrowIndex, setActiveArrowIndex] = useState(null);
+  const [touchStartY, setTouchStartY] = useState(null);
+  const [touchStartIndex, setTouchStartIndex] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
   const [selectedShinersProductToStart, setSelectedShinersProductToStart] = useState(null);
   const [isFromUnmarkShiners, setIsFromUnmarkShiners] = useState(false);
   const [showMarkAsShinersModal, setShowMarkAsShinersModal] = useState(false);
@@ -415,6 +419,144 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
     rowElement.style.cursor = 'grab';
     setDraggedRowIndex(null);
     setDraggedOverRowIndex(null);
+  };
+
+  // Touch-based drag handlers for mobile
+  const handleTouchStart = (e, index) => {
+    if (!isSortMode) return;
+    // Don't start drag if clicking on interactive elements
+    if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) {
+      return;
+    }
+    const touch = e.touches[0];
+    setTouchStartY(touch.clientY);
+    setTouchStartIndex(index);
+    setIsDragging(false);
+  };
+
+  const handleTouchMove = (e, index) => {
+    if (!isSortMode || touchStartIndex === null) return;
+    const touch = e.touches[0];
+    const deltaY = Math.abs(touch.clientY - touchStartY);
+    
+    // Start dragging after 10px movement
+    if (deltaY > 10 && !isDragging) {
+      setIsDragging(true);
+      setDraggedRowIndex(touchStartIndex);
+      e.preventDefault();
+    }
+    
+    if (isDragging) {
+      e.preventDefault();
+      // Find which card we're over
+      const cards = document.querySelectorAll('[data-mobile-card]');
+      let newOverIndex = null;
+      cards.forEach((card) => {
+        const rect = card.getBoundingClientRect();
+        if (touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+          const cardIndex = parseInt(card.getAttribute('data-card-index'));
+          if (cardIndex !== draggedOverRowIndex) {
+            newOverIndex = cardIndex;
+          }
+        }
+      });
+      if (newOverIndex !== null) {
+        setDraggedOverRowIndex(newOverIndex);
+      }
+    }
+  };
+
+  const handleTouchEnd = (e, index) => {
+    if (!isSortMode || touchStartIndex === null) return;
+    
+    if (isDragging && draggedRowIndex !== null) {
+      const touch = e.changedTouches[0];
+      const cards = document.querySelectorAll('[data-mobile-card]');
+      let dropIndex = null;
+      
+      cards.forEach((card) => {
+        const rect = card.getBoundingClientRect();
+        if (touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+          dropIndex = parseInt(card.getAttribute('data-card-index'));
+        }
+      });
+      
+      if (dropIndex !== null && dropIndex !== draggedRowIndex) {
+        const newData = [...localTableData];
+        const draggedItem = newData[draggedRowIndex];
+        newData.splice(draggedRowIndex, 1);
+        newData.splice(dropIndex, 0, draggedItem);
+        
+        // Save current state to undo history
+        setUndoHistory([...undoHistory, [...localTableData]]);
+        // Clear redo history when new action is performed
+        setRedoHistory([]);
+        
+        setLocalTableData(newData);
+        
+        // Highlight the row that was just moved
+        const rowIdToHighlight = draggedItem.id;
+        if (rowIdToHighlight) {
+          setJustMovedRowId(rowIdToHighlight);
+        }
+        setJustMovedRowIndex(dropIndex);
+        
+        // Clear the highlight after 2 seconds
+        setTimeout(() => {
+          setJustMovedRowId(null);
+          setJustMovedRowIndex(null);
+        }, 2000);
+      }
+    }
+    
+    setTouchStartY(null);
+    setTouchStartIndex(null);
+    setIsDragging(false);
+    setDraggedRowIndex(null);
+    setDraggedOverRowIndex(null);
+    setActiveArrowIndex(null);
+  };
+
+  // Handle arrow button clicks for moving items
+  const handleArrowClick = (direction, filteredIndex) => {
+    if (!isSortMode) return;
+    
+    // Get the row from filteredData
+    const row = filteredData[filteredIndex];
+    if (!row) return;
+    
+    // Find the actual index in localTableData
+    const actualIndex = localTableData.findIndex(r => r.id === row.id);
+    if (actualIndex === -1) return;
+    
+    const newData = [...localTableData];
+    const targetIndex = direction === 'up' ? actualIndex - 1 : actualIndex + 1;
+    
+    if (targetIndex < 0 || targetIndex >= newData.length) return;
+    
+    // Swap items
+    [newData[actualIndex], newData[targetIndex]] = [newData[targetIndex], newData[actualIndex]];
+    
+    // Save current state to undo history
+    setUndoHistory([...undoHistory, [...localTableData]]);
+    // Clear redo history when new action is performed
+    setRedoHistory([]);
+    
+    setLocalTableData(newData);
+    
+    // Highlight the row that was just moved
+    const movedItem = newData[targetIndex];
+    const rowIdToHighlight = movedItem.id;
+    if (rowIdToHighlight) {
+      setJustMovedRowId(rowIdToHighlight);
+    }
+    setJustMovedRowIndex(targetIndex);
+    
+    // Clear the highlight after 2 seconds
+    setTimeout(() => {
+      setJustMovedRowId(null);
+      setJustMovedRowIndex(null);
+    }, 2000);
   };
 
   useEffect(() => {
@@ -838,10 +980,16 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                     >
                       Moved (Finished Goods)
                     </button>
-                  ) : row.isShiners && row.status === 'paused' ? (
+                  ) : row.status === 'paused' ? (
                     <button
                       onClick={() => {
-                        setSelectedShinersProductToStart(row);
+                        if (row.isShiners) {
+                          setSelectedShinersProductToStart(row);
+                        } else {
+                          if (onInProgressClick) {
+                            onInProgressClick(row);
+                          }
+                        }
                       }}
                       className="text-white text-xs font-semibold px-2.5 py-1 rounded"
                       style={{ 
@@ -860,59 +1008,6 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                       }}
                     >
                       Start
-                    </button>
-                  ) : row.status === 'paused' ? (
-                    <button
-                      className="text-white text-xs font-semibold px-2.5 py-1 rounded"
-                      style={{ 
-                        whiteSpace: 'nowrap',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        backgroundColor: 'transparent',
-                        color: '#3B82F6',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        padding: '6px 10px',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        maxWidth: '100%',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        transition: 'all 0.2s ease',
-                        border: '1px solid #3B82F6',
-                      }}
-                      onClick={() => {
-                        if (onInProgressClick) {
-                          onInProgressClick(row);
-                        }
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.opacity = '0.9';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.opacity = '1';
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: '12px',
-                          height: '12px',
-                          borderRadius: '50%',
-                          backgroundColor: '#F97316',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                        }}
-                      >
-                        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={3} strokeLinecap="round">
-                          <line x1="8" y1="6" x2="8" y2="18" />
-                          <line x1="16" y1="6" x2="16" y2="18" />
-                        </svg>
-                      </div>
-                      Paused
                     </button>
                   ) : row.status === 'in_progress' ? (
                     <div
@@ -1465,11 +1560,13 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
           style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '16px',
+            gap: '12px',
             padding: '0 16px',
             paddingLeft: '16px',
             paddingRight: '16px',
-            alignItems: 'stretch',
+            alignItems: 'center',
+            backgroundColor: isDarkMode ? '#000000' : '#F3F4F6',
+            minHeight: '100vh',
           }}
         >
           {filteredData.length === 0 ? (
@@ -1483,27 +1580,50 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
               <div
                 key={row.id || index}
                 data-mobile-card
+                data-card-index={index}
                 style={{
-                  width: '100%',
-                  minHeight: 'auto',
-                  padding: '16px',
-                  gap: '16px',
+                  width: '343px',
+                  height: '196px',
+                  padding: '12px',
+                  gap: '12px',
                   borderRadius: '12px',
-                  border: '1px solid #E5E7EB',
-                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                  border: draggedRowIndex === index 
+                    ? '2px dashed #F97316' 
+                    : draggedOverRowIndex === index && isSortMode 
+                      ? '2px solid #F97316' 
+                      : justMovedRowId && (justMovedRowId === row.id || justMovedRowId === row.key || justMovedRowId === `row-${index}`)
+                        ? '2px solid #F97316'
+                        : row.isSplit 
+                          ? `1px solid ${isDarkMode ? 'rgba(59, 130, 246, 0.4)' : 'rgba(59, 130, 246, 0.3)'}`
+                          : isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                  boxShadow: draggedRowIndex === index 
+                    ? '0 4px 12px rgba(249, 115, 22, 0.3)' 
+                    : draggedOverRowIndex === index && isSortMode 
+                      ? '0 2px 8px rgba(249, 115, 22, 0.2)' 
+                      : justMovedRowId && (justMovedRowId === row.id || justMovedRowId === row.key || justMovedRowId === `row-${index}`)
+                        ? '0 2px 8px rgba(249, 115, 22, 0.3)'
+                        : '0 1px 3px rgba(0, 0, 0, 0.1)',
                   backgroundColor: row.status === 'moved_s' || row.status === 'moved_fg'
                     ? '#F3F4F6'
-                    : row.isSplit
-                      ? isDarkMode ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.08)'
-                      : isDarkMode ? '#1F2937' : '#FFFFFF',
-                  border: row.isSplit 
-                    ? `1px solid ${isDarkMode ? 'rgba(59, 130, 246, 0.4)' : 'rgba(59, 130, 246, 0.3)'}`
-                    : '1px solid #E5E7EB',
+                    : draggedOverRowIndex === index && isSortMode
+                      ? 'rgba(249, 115, 22, 0.2)'
+                      : justMovedRowId && (justMovedRowId === row.id || justMovedRowId === row.key || justMovedRowId === `row-${index}`)
+                        ? 'rgba(249, 115, 22, 0.2)'
+                        : row.isSplit
+                          ? isDarkMode ? 'rgba(59, 130, 246, 0.15)' : 'rgba(59, 130, 246, 0.08)'
+                          : isDarkMode ? '#1F2937' : '#FFFFFF',
                   display: 'flex',
                   flexDirection: 'column',
                   position: 'relative',
-                  opacity: (row.status === 'moved_s' || row.status === 'moved_fg') ? 0.6 : 1,
+                  opacity: draggedRowIndex === index ? 0.4 : (row.status === 'moved_s' || row.status === 'moved_fg') ? 0.6 : 1,
+                  boxSizing: 'border-box',
+                  overflow: 'hidden',
+                  transform: draggedRowIndex === index ? 'scale(0.98)' : 'scale(1)',
+                  transition: draggedRowIndex === index || draggedOverRowIndex === index || (justMovedRowId && (justMovedRowId === row.id || justMovedRowId === row.key || justMovedRowId === `row-${index}`)) ? 'all 0.2s ease' : 'none',
                 }}
+                onTouchStart={(e) => handleTouchStart(e, index)}
+                onTouchMove={(e) => handleTouchMove(e, index)}
+                onTouchEnd={(e) => handleTouchEnd(e, index)}
               >
                 {/* Three-dot menu button */}
                 <button
@@ -1544,8 +1664,8 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   }}
                   style={{
                     position: 'absolute',
-                    top: '16px',
-                    right: '16px',
+                    top: '12px',
+                    right: '12px',
                     width: '24px',
                     height: '24px',
                     padding: '0',
@@ -1566,7 +1686,156 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                 </button>
 
                 {/* Card Content - Image + Details */}
-                <div style={{ display: 'flex', gap: '12px', flex: 1, alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', minHeight: 0, marginBottom: '12px' }}>
+                  {/* Sort Mode Arrows - Left side of image */}
+                  {isSortMode && (
+                    <div style={{ 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      gap: '4px', 
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      paddingRight: '4px',
+                    }}>
+                      {/* Up Arrow */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleArrowClick('up', index);
+                        }}
+                        onTouchStart={(e) => {
+                          e.stopPropagation();
+                          setActiveArrowIndex(`${index}-up`);
+                        }}
+                        onTouchEnd={(e) => {
+                          e.stopPropagation();
+                          setActiveArrowIndex(null);
+                        }}
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          setActiveArrowIndex(`${index}-up`);
+                        }}
+                        onMouseUp={(e) => {
+                          e.stopPropagation();
+                          setActiveArrowIndex(null);
+                        }}
+                        onMouseLeave={(e) => {
+                          e.stopPropagation();
+                          setActiveArrowIndex(null);
+                        }}
+                        disabled={index === 0}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: index === 0 ? 'not-allowed' : 'pointer',
+                          padding: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          opacity: index === 0 ? 0.3 : 1,
+                        }}
+                      >
+                        <svg 
+                          width="16" 
+                          height="16" 
+                          viewBox="0 0 24 24" 
+                          fill="none" 
+                          stroke={activeArrowIndex === `${index}-up` ? '#F97316' : '#9CA3AF'} 
+                          strokeWidth="2" 
+                          strokeLinecap="round" 
+                          strokeLinejoin="round"
+                          style={{
+                            transition: 'stroke 0.2s ease',
+                          }}
+                        >
+                          <path d="M18 15l-6-6-6 6" />
+                        </svg>
+                      </button>
+                      
+                      {/* Grid dots */}
+                      <div style={{ 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: '2px',
+                        padding: '2px 0',
+                      }}>
+                        <div style={{ 
+                          width: '4px', 
+                          height: '4px', 
+                          borderRadius: '50%', 
+                          backgroundColor: '#9CA3AF' 
+                        }} />
+                        <div style={{ 
+                          width: '4px', 
+                          height: '4px', 
+                          borderRadius: '50%', 
+                          backgroundColor: '#9CA3AF' 
+                        }} />
+                        <div style={{ 
+                          width: '4px', 
+                          height: '4px', 
+                          borderRadius: '50%', 
+                          backgroundColor: '#9CA3AF' 
+                        }} />
+                      </div>
+                      
+                      {/* Down Arrow */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleArrowClick('down', index);
+                        }}
+                        onTouchStart={(e) => {
+                          e.stopPropagation();
+                          setActiveArrowIndex(`${index}-down`);
+                        }}
+                        onTouchEnd={(e) => {
+                          e.stopPropagation();
+                          setActiveArrowIndex(null);
+                        }}
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          setActiveArrowIndex(`${index}-down`);
+                        }}
+                        onMouseUp={(e) => {
+                          e.stopPropagation();
+                          setActiveArrowIndex(null);
+                        }}
+                        onMouseLeave={(e) => {
+                          e.stopPropagation();
+                          setActiveArrowIndex(null);
+                        }}
+                        disabled={index === filteredData.length - 1}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: index === filteredData.length - 1 ? 'not-allowed' : 'pointer',
+                          padding: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          opacity: index === filteredData.length - 1 ? 0.3 : 1,
+                        }}
+                      >
+                        <svg 
+                          width="16" 
+                          height="16" 
+                          viewBox="0 0 24 24" 
+                          fill="none" 
+                          stroke={activeArrowIndex === `${index}-down` ? '#F97316' : '#9CA3AF'} 
+                          strokeWidth="2" 
+                          strokeLinecap="round" 
+                          strokeLinejoin="round"
+                          style={{
+                            transition: 'stroke 0.2s ease',
+                          }}
+                        >
+                          <path d="M6 9l6 6 6-6" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                  
                   {/* Product Image Container */}
                   {row.productImage && (
                     <div 
@@ -1574,10 +1843,10 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                         flexShrink: 0,
                         position: 'relative',
                         width: '120px',
-                        height: '160px',
+                        height: '137px',
                         borderRadius: '8px',
-                        backgroundColor: '#FFFFFF',
-                        border: '1px solid #E5E7EB',
+                        backgroundColor: '#1F2937',
+                        border: '1px solid #374151',
                         padding: '8px',
                         display: 'flex',
                         alignItems: 'center',
@@ -1654,9 +1923,9 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   )}
 
                   {/* Product Info */}
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px', minWidth: 0, padding: 0, margin: 0 }}>
+                  <div style={{ width: '203px', height: '137px', display: 'flex', flexDirection: 'column', gap: '8px', padding: 0, margin: 0, opacity: 1, overflow: 'hidden' }}>
                     {/* Title and Subtitle */}
-                    <div style={{ display: 'block', position: 'relative', paddingRight: '32px', paddingLeft: 0, paddingTop: 0, paddingBottom: 0, margin: 0, width: '100%' }}>
+                    <div style={{ display: 'block', position: 'relative', paddingRight: '32px', paddingLeft: 0, paddingTop: 0, paddingBottom: 0, margin: 0, width: '100%', flexShrink: 0 }}>
                       <h3
                         style={{
                           fontSize: '16px',
@@ -1664,19 +1933,22 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                           color: isDarkMode ? '#F9FAFB' : '#111827',
                           margin: 0,
                           padding: 0,
-                          marginBottom: '4px',
-                          lineHeight: '1.3',
+                          marginBottom: '2px',
+                          lineHeight: '1.2',
                           textAlign: 'left',
                           fontFamily: 'system-ui, -apple-system, sans-serif',
                           width: '100%',
                           wordBreak: 'break-word',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
                         }}
                       >
                         {row.product || 'N/A'}
                       </h3>
                       <p
                         style={{
-                          fontSize: '14px',
+                          fontSize: '12px',
                           fontWeight: 400,
                           color: isDarkMode ? '#9CA3AF' : '#6B7280',
                           margin: 0,
@@ -1684,46 +1956,157 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                           textAlign: 'left',
                           fontFamily: 'system-ui, -apple-system, sans-serif',
                           width: '100%',
+                          lineHeight: '1.2',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
                         }}
                       >
                         {row.brand || 'N/A'} • {row.size || 'N/A'}
                       </p>
                     </div>
 
-                    {/* Product Details List */}
+                    {/* Product Details List - Two Column Grid */}
                     <div
                       style={{
-                        display: 'block',
-                        fontSize: '14px',
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: '4px 12px',
+                        fontSize: '12px',
                         fontFamily: 'system-ui, -apple-system, sans-serif',
                         width: '100%',
                         padding: 0,
                         margin: 0,
+                        flex: 1,
+                        minHeight: 0,
                       }}
                     >
-                      <div style={{ textAlign: 'left', lineHeight: '1.5', width: '100%', display: 'block', marginBottom: '12px', padding: 0, marginLeft: 0, marginRight: 0, marginTop: 0 }}>
-                        <span style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: 400, display: 'inline' }}>Formula: </span>
-                        <span style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 700, display: 'inline' }}>{row.formula || 'N/A'}</span>
+                      {/* Formula */}
+                      <div style={{ 
+                        textAlign: 'left', 
+                        lineHeight: '1.3', 
+                        color: isDarkMode ? '#9CA3AF' : '#6B7280', 
+                        fontWeight: 400,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        Formula:
                       </div>
-                      <div style={{ textAlign: 'left', lineHeight: '1.5', width: '100%', display: 'block', marginBottom: '12px', padding: 0, marginLeft: 0, marginRight: 0 }}>
-                        <span style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: 400, display: 'inline' }}>TPS Ship #: </span>
-                        <span style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 700, display: 'inline' }}>{row.tpsShipNumber || 'N/A'}</span>
+                      <div style={{ 
+                        textAlign: 'right', 
+                        lineHeight: '1.3', 
+                        color: isDarkMode ? '#F9FAFB' : '#111827', 
+                        fontWeight: 700,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {row.formula || 'N/A'}
                       </div>
+
+                      {/* TPS Ship # */}
+                      <div style={{ 
+                        textAlign: 'left', 
+                        lineHeight: '1.3', 
+                        color: isDarkMode ? '#9CA3AF' : '#6B7280', 
+                        fontWeight: 400,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        TPS Ship #:
+                      </div>
+                      <div style={{ 
+                        textAlign: 'right', 
+                        lineHeight: '1.3', 
+                        color: isDarkMode ? '#F9FAFB' : '#111827', 
+                        fontWeight: 700,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {row.tpsShipNumber || 'N/A'}
+                      </div>
+
+                      {/* Label Location */}
                       {row.labelLocation && (
-                        <div style={{ textAlign: 'left', lineHeight: '1.5', width: '100%', display: 'block', marginBottom: '12px', padding: 0, marginLeft: 0, marginRight: 0 }}>
-                          <span style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: 400, display: 'inline' }}>Label Location: </span>
-                          <span style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 700, display: 'inline' }}>{row.labelLocation}</span>
-                        </div>
+                        <>
+                          <div style={{ 
+                            textAlign: 'left', 
+                            lineHeight: '1.3', 
+                            color: isDarkMode ? '#9CA3AF' : '#6B7280', 
+                            fontWeight: 400,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}>
+                            Label Location:
+                          </div>
+                          <div style={{ 
+                            textAlign: 'right', 
+                            lineHeight: '1.3', 
+                            color: isDarkMode ? '#F9FAFB' : '#111827', 
+                            fontWeight: 700,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}>
+                            {row.labelLocation}
+                          </div>
+                        </>
                       )}
-                      <div style={{ textAlign: 'left', lineHeight: '1.5', width: '100%', display: 'block', marginBottom: '12px', padding: 0, marginLeft: 0, marginRight: 0 }}>
-                        <span style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: 400, display: 'inline' }}>QTY: </span>
-                        <span style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 700, display: 'inline' }}>{row.qty ? row.qty.toLocaleString() : 'N/A'}</span>
+
+                      {/* QTY */}
+                      <div style={{ 
+                        textAlign: 'left', 
+                        lineHeight: '1.3', 
+                        color: isDarkMode ? '#9CA3AF' : '#6B7280', 
+                        fontWeight: 400,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        QTY:
                       </div>
+                      <div style={{ 
+                        textAlign: 'right', 
+                        lineHeight: '1.3', 
+                        color: isDarkMode ? '#F9FAFB' : '#111827', 
+                        fontWeight: 700,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {row.qty ? row.qty.toLocaleString() : 'N/A'}
+                      </div>
+
+                      {/* Case # */}
                       {row.caseNumber && (
-                        <div style={{ textAlign: 'left', lineHeight: '1.5', width: '100%', display: 'block', marginBottom: '0', padding: 0, marginLeft: 0, marginRight: 0 }}>
-                          <span style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: 400, display: 'inline' }}>Case #: </span>
-                          <span style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 700, display: 'inline' }}>{row.caseNumber}</span>
-                        </div>
+                        <>
+                          <div style={{ 
+                            textAlign: 'left', 
+                            lineHeight: '1.3', 
+                            color: isDarkMode ? '#9CA3AF' : '#6B7280', 
+                            fontWeight: 400,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}>
+                            Case #:
+                          </div>
+                          <div style={{ 
+                            textAlign: 'right', 
+                            lineHeight: '1.3', 
+                            color: isDarkMode ? '#F9FAFB' : '#111827', 
+                            fontWeight: 700,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}>
+                            {row.caseNumber}
+                          </div>
+                        </>
                       )}
                     </div>
                   </div>
@@ -1751,19 +2134,18 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   }}
                   disabled={row.status === 'done' || row.status === 'moved_s' || row.status === 'moved_fg'}
                   style={{
-                    width: '100%',
-                    height: '40px',
+                    width: '319px',
+                    height: '23px',
                     borderRadius: '8px',
                     border: 'none',
                     backgroundColor: row.status === 'moved_s' || row.status === 'moved_fg' ? '#F3F4F6' :
-                                    row.isShiners && row.status === 'paused' ? '#F97316' :
-                                    row.status === 'paused' ? 'transparent' :
+                                    row.status === 'paused' ? '#F97316' :
                                     row.status === 'in_progress' ? '#3B82F6' :
                                     row.status === 'done' ? '#34C759' :
                                     row.isShiners ? '#F97316' : '#3B82F6',
                     color: (row.status === 'moved_s' || row.status === 'moved_fg') ? '#6B7280' : 
-                            row.status === 'paused' ? '#3B82F6' : '#FFFFFF',
-                    border: row.status === 'paused' ? '1px solid #3B82F6' : 'none',
+                            row.status === 'paused' ? '#FFFFFF' : '#FFFFFF',
+                    border: 'none',
                     fontSize: '14px',
                     fontWeight: 600,
                     cursor: (row.status === 'done' || row.status === 'moved_s' || row.status === 'moved_fg') ? 'default' : 'pointer',
@@ -1772,6 +2154,8 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    gap: '10px',
+                    opacity: 1,
                     transition: 'all 0.2s ease',
                   }}
                   onMouseEnter={(e) => {
@@ -1785,29 +2169,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                 >
                   {row.status === 'moved_s' ? 'Moved (Shiners)' :
                    row.status === 'moved_fg' ? 'Moved (FG)' :
-                   row.isShiners && row.status === 'paused' ? 'Start' :
-                   row.status === 'paused' ? (
-                     <>
-                       <div
-                         style={{
-                           width: '12px',
-                           height: '12px',
-                           borderRadius: '50%',
-                           backgroundColor: '#F97316',
-                           display: 'flex',
-                           alignItems: 'center',
-                           justifyContent: 'center',
-                           flexShrink: 0,
-                         }}
-                       >
-                         <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={3} strokeLinecap="round">
-                           <line x1="8" y1="6" x2="8" y2="18" />
-                           <line x1="16" y1="6" x2="16" y2="18" />
-                         </svg>
-                       </div>
-                       Paused
-                     </>
-                   ) :
+                   row.status === 'paused' ? 'Start' :
                    row.status === 'in_progress' ? 'In Progress' :
                    row.status === 'done' ? 'Done' :
                    row.isShiners ? 'Start' : 'Start'}
@@ -1834,10 +2196,10 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
               minWidth: '264px',
               maxWidth: 'calc(100vw - 32px)',
               padding: '6px',
-              backgroundColor: '#FFFFFF',
-              border: '1px solid #E5E7EB',
+              backgroundColor: '#1F2937',
+              border: '1px solid #374151',
               borderRadius: '8px',
-              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2)',
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1852,7 +2214,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                 gap: '12px',
                 fontSize: '14px',
                 fontWeight: 400,
-                color: '#111827',
+                color: '#FFFFFF',
                 borderRadius: '6px',
                 backgroundColor: 'transparent',
                 border: 'none',
@@ -1860,7 +2222,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                 transition: 'background-color 0.15s ease',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#F3F4F6';
+                e.currentTarget.style.backgroundColor = '#374151';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = 'transparent';
@@ -1878,7 +2240,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                 e.stopPropagation();
               }}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 3v8" />
                 <path d="M8 11l4 4 4-4" />
                 <path d="M8 11h8" />
@@ -1897,7 +2259,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                 gap: '12px',
                 fontSize: '14px',
                 fontWeight: 400,
-                color: '#111827',
+                color: '#FFFFFF',
                 borderRadius: '6px',
                 backgroundColor: 'transparent',
                 border: 'none',
@@ -1905,7 +2267,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                 transition: 'background-color 0.15s ease',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#F3F4F6';
+                e.currentTarget.style.backgroundColor = '#374151';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = 'transparent';
@@ -1919,7 +2281,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   console.log('Unmark as Shiners clicked for:', selectedRow);
                   const updatedData = localTableData.map(r => 
                     r.id === selectedRow.id 
-                      ? { ...r, isShiners: false, status: r.status === 'paused' ? 'pending' : r.status }
+                      ? { ...r, isShiners: false }
                       : r
                   );
                   setLocalTableData(updatedData);
@@ -1940,7 +2302,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                 e.stopPropagation();
               }}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 {selectedRow.isShiners ? (
                   <>
                     <path d="M20 6L9 17l-5-5" />
@@ -1966,7 +2328,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                 gap: '12px',
                 fontSize: '14px',
                 fontWeight: 400,
-                color: '#111827',
+                color: '#FFFFFF',
                 borderRadius: '6px',
                 backgroundColor: 'transparent',
                 border: 'none',
@@ -1974,7 +2336,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                 transition: 'background-color 0.15s ease',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#F3F4F6';
+                e.currentTarget.style.backgroundColor = '#374151';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = 'transparent';
@@ -1994,7 +2356,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                 e.stopPropagation();
               }}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="#111827" stroke="#111827" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="#9CA3AF" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="6" y="4" width="12" height="16" rx="1" />
                 <path d="M9 4v4M15 4v4" />
                 <line x1="9" y1="12" x2="15" y2="12" />
@@ -2015,7 +2377,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   gap: '12px',
                   fontSize: '14px',
                   fontWeight: 400,
-                  color: '#111827',
+                  color: '#FFFFFF',
                   borderRadius: '6px',
                   backgroundColor: 'transparent',
                   border: 'none',
@@ -2023,7 +2385,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   transition: 'background-color 0.15s ease',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#F3F4F6';
+                  e.currentTarget.style.backgroundColor = '#374151';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = 'transparent';
@@ -2043,7 +2405,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   e.stopPropagation();
                 }}
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111827" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                   <polyline points="14 2 14 8 20 8" />
                   <line x1="16" y1="13" x2="8" y2="13" />
@@ -2068,7 +2430,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                     gap: '12px',
                     fontSize: '14px',
                     fontWeight: 400,
-                    color: '#111827',
+                    color: '#FFFFFF',
                     borderRadius: '6px',
                     backgroundColor: 'transparent',
                     border: 'none',
@@ -2076,7 +2438,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                     transition: 'background-color 0.15s ease',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#F3F4F6';
+                    e.currentTarget.style.backgroundColor = '#374151';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.backgroundColor = 'transparent';
@@ -2092,7 +2454,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                     setActionMenuId(null);
                   }}
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                     <polyline points="14 2 14 8 20 8" />
                     <line x1="16" y1="13" x2="8" y2="13" />
@@ -2113,7 +2475,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                     gap: '12px',
                     fontSize: '14px',
                     fontWeight: 400,
-                    color: '#111827',
+                    color: '#FFFFFF',
                     borderRadius: '6px',
                     backgroundColor: 'transparent',
                     border: 'none',
@@ -2121,7 +2483,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                     transition: 'background-color 0.15s ease',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#F3F4F6';
+                    e.currentTarget.style.backgroundColor = '#374151';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.backgroundColor = 'transparent';
@@ -2134,7 +2496,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                     setActionMenuId(null);
                   }}
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="10" />
                     <line x1="12" y1="16" x2="12" y2="12" />
                     <line x1="12" y1="8" x2="12.01" y2="8" />
@@ -3258,6 +3620,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                 marginTop: isMobile ? '16px' : '24px',
                 display: 'flex',
                 justifyContent: 'space-between',
+                gap: isMobile ? '8px' : '10px',
                 flexShrink: 0,
               }}
             >
@@ -3276,18 +3639,27 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   setSelectedProductForMarkShiners(null);
                 }}
                 style={{
-                  padding: '10px 20px',
-                  borderRadius: '8px',
+                  width: isMobile ? '147.5px' : 'auto',
+                  height: isMobile ? '23px' : 'auto',
+                  paddingTop: isMobile ? '4px' : '10px',
+                  paddingRight: isMobile ? '12px' : '20px',
+                  paddingBottom: isMobile ? '4px' : '10px',
+                  paddingLeft: isMobile ? '12px' : '20px',
+                  borderRadius: isMobile ? '4px' : '8px',
                   border: '1px solid #3B82F6',
                   backgroundColor: 'transparent',
                   color: '#3B82F6',
-                  fontSize: isMobile ? '14px' : '15px',
+                  fontSize: isMobile ? '11px' : '15px',
                   fontWeight: '600',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   transition: 'all 0.2s ease',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  boxSizing: 'border-box',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
@@ -3307,18 +3679,27 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
                   setSelectedProductForMarkShiners(null);
                 }}
                 style={{
-                  padding: '10px 20px',
-                  borderRadius: '8px',
+                  width: isMobile ? '147.5px' : 'auto',
+                  height: isMobile ? '23px' : 'auto',
+                  paddingTop: isMobile ? '4px' : '10px',
+                  paddingRight: isMobile ? '12px' : '20px',
+                  paddingBottom: isMobile ? '4px' : '10px',
+                  paddingLeft: isMobile ? '12px' : '20px',
+                  borderRadius: isMobile ? '4px' : '8px',
                   border: 'none',
                   background: 'linear-gradient(90deg, #007AFF 0%, #004999 100%)',
                   color: '#FFFFFF',
-                  fontSize: isMobile ? '14px' : '15px',
+                  fontSize: isMobile ? '11px' : '15px',
                   fontWeight: '600',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   transition: 'all 0.2s ease',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  boxSizing: 'border-box',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = 'linear-gradient(90deg, #0056CC 0%, #003366 100%)';

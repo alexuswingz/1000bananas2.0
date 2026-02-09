@@ -101,6 +101,7 @@ const SortFormulasFilterDropdown = forwardRef(({
   // Condition filter state
   const [conditionType, setConditionType] = useState(currentFilter.conditionType || '');
   const [conditionValue, setConditionValue] = useState(currentFilter.conditionValue || '');
+  const [conditionMenuOpen, setConditionMenuOpen] = useState(false);
   
   // Brand filter state (only for product column)
   const [brandFilterExpanded, setBrandFilterExpanded] = useState(false);
@@ -315,7 +316,7 @@ const SortFormulasFilterDropdown = forwardRef(({
         boxShadow: theme.shadow,
         border: `1px solid ${theme.border}`,
         zIndex: 10000,
-        overflow: 'hidden',
+        overflow: 'visible',
         opacity: isPositioned ? 1 : 0,
         transition: 'opacity 0.15s ease-in',
       }}
@@ -332,6 +333,7 @@ const SortFormulasFilterDropdown = forwardRef(({
             if (onApply) {
               onApply({
                 sortOrder: newOrder,
+                sortField: columnKey,
                 selectedValues,
                 conditionType,
                 conditionValue,
@@ -392,6 +394,7 @@ const SortFormulasFilterDropdown = forwardRef(({
             if (onApply) {
               onApply({
                 sortOrder: newOrder,
+                sortField: columnKey,
                 selectedValues,
                 conditionType,
                 conditionValue,
@@ -481,30 +484,103 @@ const SortFormulasFilterDropdown = forwardRef(({
         </div>
         {filterConditionExpanded && (
           <div style={{ padding: '0 12px 8px 12px' }}>
-            {/* Condition type selector */}
-            <select
-              value={conditionType}
-              onChange={(e) => setConditionType(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '6px 8px',
-                border: `1px solid ${theme.inputBorder}`,
-                borderRadius: '4px',
-                fontSize: '12px',
-                outline: 'none',
-                marginBottom: '8px',
-                backgroundColor: theme.inputBg,
-                color: theme.inputText,
-                cursor: 'pointer',
-              }}
-              onFocus={(e) => { e.target.style.borderColor = '#3B82F6'; }}
-              onBlur={(e) => { e.target.style.borderColor = theme.inputBorder; }}
-            >
-              <option value="">Select condition...</option>
-              {conditions.map(c => (
-                <option key={c.value} value={c.value}>{c.label}</option>
-              ))}
-            </select>
+            {/* Custom styled condition dropdown */}
+            <div style={{ position: 'relative', marginBottom: '8px' }}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setConditionMenuOpen(!conditionMenuOpen);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '6px 10px',
+                  borderRadius: '6px',
+                  border: `1px solid ${theme.inputBorder}`,
+                  backgroundColor: theme.inputBg,
+                  color: theme.inputText,
+                  fontSize: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  cursor: 'pointer',
+                }}
+              >
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {conditions.find(c => c.value === conditionType)?.label || 'None'}
+                </span>
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 12 12"
+                  fill="none"
+                  style={{
+                    flexShrink: 0,
+                    transform: conditionMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.15s ease-out',
+                  }}
+                >
+                  <path
+                    d="M3 4.5L6 7.5L9 4.5"
+                    stroke={theme.subtleText}
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+
+              {conditionMenuOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    marginTop: '4px',
+                    backgroundColor: theme.bg,
+                    borderRadius: '10px',
+                    border: `1px solid ${theme.border}`,
+                    boxShadow: theme.shadow,
+                    padding: '4px 0',
+                    zIndex: 10001,
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {conditions.map((c) => {
+                    const selected = c.value === conditionType || (!conditionType && c.value === '');
+                    return (
+                      <button
+                        key={c.value}
+                        type="button"
+                        onClick={() => {
+                          setConditionType(c.value);
+                          setConditionMenuOpen(false);
+                        }}
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '6px 10px',
+                          backgroundColor: selected ? 'rgba(59,130,246,0.15)' : 'transparent',
+                          color: selected ? '#FFFFFF' : theme.valueText,
+                          fontSize: '12px',
+                          border: 'none',
+                          cursor: 'pointer',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!selected) e.currentTarget.style.backgroundColor = theme.hoverRow;
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!selected) e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                      >
+                        {c.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
             
             {/* Condition value input - show for most conditions except isEmpty/isNotEmpty */}
             {conditionType && conditionType !== 'isEmpty' && conditionType !== 'isNotEmpty' && (
