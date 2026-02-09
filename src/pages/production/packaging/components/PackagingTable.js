@@ -2520,8 +2520,8 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
             transform: 'translateX(-50%)',
             zIndex: 10000,
             backgroundColor: '#1A2235',
-            width: '435px',
-            height: '45.5px',
+            width: isMobile ? '304px' : '435px',
+            height: isMobile ? '39px' : '45.5px',
             borderRadius: '8px',
             paddingTop: '8px',
             paddingRight: '12px',
@@ -2532,7 +2532,7 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
             borderColor: '#374151',
             display: 'flex',
             alignItems: 'center',
-            gap: '32px',
+            gap: isMobile ? '12px' : '32px',
             boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2)',
             flexWrap: 'nowrap',
             opacity: 1,
@@ -2542,8 +2542,8 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
           {/* Pencil Icon */}
           <div
             style={{
-              width: '20px',
-              height: '20px',
+              width: isMobile ? '18px' : '20px',
+              height: isMobile ? '18px' : '20px',
               borderRadius: '32px',
               backgroundColor: '#3B82F6',
               display: 'flex',
@@ -2555,8 +2555,8 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
             }}
           >
             <svg
-              width="16"
-              height="16"
+              width={isMobile ? "14" : "16"}
+              height={isMobile ? "14" : "16"}
               viewBox="0 0 24 24"
               fill="none"
               stroke="white"
@@ -2573,135 +2573,147 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
           <span
             style={{
               color: '#FFFFFF',
-              fontSize: '14px',
+              fontSize: isMobile ? '12px' : '14px',
               fontWeight: 500,
               whiteSpace: 'nowrap',
+              flexShrink: 1,
+              minWidth: 0,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
             }}
           >
             {unsavedChangesCount} Unsaved Change{unsavedChangesCount !== 1 ? 's' : ''}
           </span>
 
-          {/* Undo/Redo Buttons */}
-          <div style={{ display: 'flex', gap: '0px', alignItems: 'center', flexShrink: 0 }}>
-            <button
-              onClick={handleUndo}
-              disabled={undoHistory.length === 0}
-              style={{
-                width: '29.5px',
-                height: '29.5px',
-                padding: '6px',
-                borderRadius: '6px',
-                border: 'none',
-                backgroundColor: 'transparent',
-                color: undoHistory.length === 0 ? '#6B7280' : '#FFFFFF',
-                fontSize: '13px',
-                fontWeight: 500,
-                cursor: undoHistory.length === 0 ? 'not-allowed' : 'pointer',
-                transition: 'background-color 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                opacity: 1,
-                boxSizing: 'border-box',
-              }}
-              onMouseEnter={(e) => {
-                if (undoHistory.length > 0) {
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke={undoHistory.length === 0 ? '#6B7280' : '#FFFFFF'}
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+          {/* Undo/Redo Buttons - Hidden on mobile */}
+          {!isMobile && (
+            <div style={{ display: 'flex', gap: '0px', alignItems: 'center', flexShrink: 0 }}>
+              <button
+                onClick={handleUndo}
+                disabled={undoHistory.length === 0}
+                style={{
+                  width: '29.5px',
+                  height: '29.5px',
+                  padding: '6px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  color: undoHistory.length === 0 ? '#6B7280' : '#FFFFFF',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  cursor: undoHistory.length === 0 ? 'not-allowed' : 'pointer',
+                  transition: 'background-color 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: 1,
+                  boxSizing: 'border-box',
+                }}
+                onMouseEnter={(e) => {
+                  if (undoHistory.length > 0) {
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
               >
-                <path d="M3 7v6h6" />
-                <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
-              </svg>
-            </button>
-            <button
-              onClick={handleRedo}
-              disabled={redoHistory.length === 0}
-              style={{
-                width: '29.5px',
-                height: '29.5px',
-                padding: '6px',
-                borderRadius: '6px',
-                border: 'none',
-                borderLeftWidth: '0.5px',
-                borderLeftStyle: 'solid',
-                borderLeftColor: '#374151',
-                backgroundColor: 'transparent',
-                color: redoHistory.length === 0 ? '#6B7280' : '#FFFFFF',
-                fontSize: '13px',
-                fontWeight: 500,
-                cursor: redoHistory.length === 0 ? 'not-allowed' : 'pointer',
-                transition: 'background-color 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                opacity: 1,
-                boxSizing: 'border-box',
-              }}
-              onMouseEnter={(e) => {
-                if (redoHistory.length > 0) {
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke={redoHistory.length === 0 ? '#6B7280' : '#FFFFFF'}
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={undoHistory.length === 0 ? '#6B7280' : '#FFFFFF'}
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M3 7v6h6" />
+                  <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
+                </svg>
+              </button>
+              <button
+                onClick={handleRedo}
+                disabled={redoHistory.length === 0}
+                style={{
+                  width: '29.5px',
+                  height: '29.5px',
+                  padding: '6px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  borderLeftWidth: '0.5px',
+                  borderLeftStyle: 'solid',
+                  borderLeftColor: '#374151',
+                  backgroundColor: 'transparent',
+                  color: redoHistory.length === 0 ? '#6B7280' : '#FFFFFF',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  cursor: redoHistory.length === 0 ? 'not-allowed' : 'pointer',
+                  transition: 'background-color 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: 1,
+                  boxSizing: 'border-box',
+                }}
+                onMouseEnter={(e) => {
+                  if (redoHistory.length > 0) {
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
               >
-                <path d="M21 7v6h-6" />
-                <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" />
-              </svg>
-            </button>
-          </div>
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={redoHistory.length === 0 ? '#6B7280' : '#FFFFFF'}
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M21 7v6h-6" />
+                  <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" />
+                </svg>
+              </button>
+            </div>
+          )}
 
           {/* Action Buttons */}
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginLeft: 'auto' }}>
+          <div style={{ display: 'flex', gap: isMobile ? '8px' : '10px', alignItems: 'center', marginLeft: isMobile ? '8px' : 'auto', flexShrink: 0 }}>
             <button
               onClick={handleCancelChanges}
               style={{
-                width: '52px',
+                width: isMobile ? '56px' : '52px',
                 height: '23px',
                 borderRadius: '4px',
-                border: 'none',
+                borderWidth: '1px',
+                borderStyle: 'solid',
+                borderColor: '#374151',
                 backgroundColor: '#374151',
                 color: '#FFFFFF',
-                fontSize: '13px',
+                fontSize: isMobile ? '12px' : '13px',
                 fontWeight: 500,
                 cursor: 'pointer',
                 transition: 'background-color 0.2s',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                gap: '10px',
                 opacity: 1,
                 boxSizing: 'border-box',
+                flexShrink: 0,
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = '#4B5563';
+                e.currentTarget.style.borderColor = '#4B5563';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = '#374151';
+                e.currentTarget.style.borderColor = '#374151';
               }}
             >
               Cancel
@@ -2709,27 +2721,33 @@ const PackagingTable = ({ data = [], onStartClick, onInProgressClick, searchQuer
             <button
               onClick={handleSaveChanges}
               style={{
-                width: '52px',
+                width: isMobile ? '56px' : '52px',
                 height: '23px',
                 borderRadius: '4px',
-                border: 'none',
+                borderWidth: '1px',
+                borderStyle: 'solid',
+                borderColor: '#3B82F6',
                 backgroundColor: '#3B82F6',
                 color: '#FFFFFF',
-                fontSize: '13px',
+                fontSize: isMobile ? '12px' : '13px',
                 fontWeight: 500,
                 cursor: 'pointer',
                 transition: 'background-color 0.2s',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                gap: '10px',
                 opacity: 1,
                 boxSizing: 'border-box',
+                flexShrink: 0,
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = '#2563EB';
+                e.currentTarget.style.borderColor = '#2563EB';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = '#3B82F6';
+                e.currentTarget.style.borderColor = '#3B82F6';
               }}
             >
               Save

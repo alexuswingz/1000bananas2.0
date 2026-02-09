@@ -153,11 +153,11 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
         style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: '16px',
+          gap: '12px',
           padding: '0 16px',
           paddingLeft: '16px',
           paddingRight: '16px',
-          alignItems: 'stretch',
+          alignItems: 'center',
           backgroundColor: isDarkMode ? '#000000' : '#F3F4F6',
           minHeight: '100vh',
         }}
@@ -174,10 +174,10 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
               key={row.id || index}
               data-mobile-card
               style={{
-                width: '100%',
-                minHeight: 'auto',
-                padding: '16px',
-                gap: '16px',
+                width: '343px',
+                height: '196px',
+                padding: '12px',
+                gap: '12px',
                 borderRadius: '12px',
                 border: row.isSplit 
                   ? `1px solid ${isDarkMode ? 'rgba(59, 130, 246, 0.4)' : 'rgba(59, 130, 246, 0.3)'}`
@@ -235,8 +235,8 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
                 }}
                 style={{
                   position: 'absolute',
-                  top: '16px',
-                  right: '16px',
+                  top: '12px',
+                  right: '12px',
                   width: '24px',
                   height: '24px',
                   padding: '0',
@@ -257,14 +257,14 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
               </button>
 
               {/* Card Content - Image + Details */}
-              <div style={{ display: 'flex', gap: '12px', flex: 1, alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', minHeight: 0, marginBottom: '12px' }}>
                 {/* Product Image Container */}
                 <div 
                   style={{ 
                     flexShrink: 0,
                     position: 'relative',
                     width: '120px',
-                    height: '160px',
+                    height: '137px',
                     borderRadius: '8px',
                     backgroundColor: '#1F2937',
                     border: '1px solid #374151',
@@ -318,9 +318,9 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
                 </div>
 
                 {/* Product Info */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px', minWidth: 0, padding: 0, margin: 0 }}>
+                <div style={{ width: '203px', height: '137px', display: 'flex', flexDirection: 'column', gap: '8px', padding: 0, margin: 0, opacity: 1, overflow: 'hidden' }}>
                   {/* Title and Subtitle */}
-                  <div style={{ display: 'block', position: 'relative', paddingRight: '32px', paddingLeft: 0, paddingTop: 0, paddingBottom: 0, margin: 0, width: '100%' }}>
+                  <div style={{ display: 'block', position: 'relative', paddingRight: '32px', paddingLeft: 0, paddingTop: 0, paddingBottom: 0, margin: 0, width: '100%', flexShrink: 0 }}>
                     <h3
                       style={{
                         fontSize: '16px',
@@ -328,19 +328,22 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
                         color: isDarkMode ? '#F9FAFB' : '#111827',
                         margin: 0,
                         padding: 0,
-                        marginBottom: '4px',
-                        lineHeight: '1.3',
+                        marginBottom: '2px',
+                        lineHeight: '1.2',
                         textAlign: 'left',
                         fontFamily: 'system-ui, -apple-system, sans-serif',
                         width: '100%',
                         wordBreak: 'break-word',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
                       }}
                     >
                       {row.product || 'Cherry Tree Fertilizer'}
                     </h3>
                     <p
                       style={{
-                        fontSize: '14px',
+                        fontSize: '12px',
                         fontWeight: 400,
                         color: isDarkMode ? '#9CA3AF' : '#6B7280',
                         margin: 0,
@@ -348,46 +351,157 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
                         textAlign: 'left',
                         fontFamily: 'system-ui, -apple-system, sans-serif',
                         width: '100%',
+                        lineHeight: '1.2',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
                       }}
                     >
                       {row.brand || 'TPS Plant Foods'} • {row.size || '1 Gallon'}
                     </p>
                   </div>
 
-                  {/* Product Details List */}
+                  {/* Product Details List - Two Column Grid */}
                   <div
                     style={{
-                      display: 'block',
-                      fontSize: '14px',
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: '4px 12px',
+                      fontSize: '12px',
                       fontFamily: 'system-ui, -apple-system, sans-serif',
                       width: '100%',
                       padding: 0,
                       margin: 0,
+                      flex: 1,
+                      minHeight: 0,
                     }}
                   >
-                    <div style={{ textAlign: 'left', lineHeight: '1.5', width: '100%', display: 'block', marginBottom: '12px', padding: 0, marginLeft: 0, marginRight: 0, marginTop: 0 }}>
-                      <span style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: 400, display: 'inline' }}>Formula: </span>
-                      <span style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 700, display: 'inline' }}>{row.formula || 'F.Ultra Grow'}</span>
+                    {/* Formula */}
+                    <div style={{ 
+                      textAlign: 'left', 
+                      lineHeight: '1.3', 
+                      color: isDarkMode ? '#9CA3AF' : '#6B7280', 
+                      fontWeight: 400,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      Formula:
                     </div>
-                    <div style={{ textAlign: 'left', lineHeight: '1.5', width: '100%', display: 'block', marginBottom: '12px', padding: 0, marginLeft: 0, marginRight: 0 }}>
-                      <span style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: 400, display: 'inline' }}>TPS Ship #: </span>
-                      <span style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 700, display: 'inline' }}>{row.tpsShipNumber || '10-01-2025'}</span>
+                    <div style={{ 
+                      textAlign: 'right', 
+                      lineHeight: '1.3', 
+                      color: isDarkMode ? '#F9FAFB' : '#111827', 
+                      fontWeight: 700,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {row.formula || 'F.Ultra Grow'}
                     </div>
+
+                    {/* TPS Ship # */}
+                    <div style={{ 
+                      textAlign: 'left', 
+                      lineHeight: '1.3', 
+                      color: isDarkMode ? '#9CA3AF' : '#6B7280', 
+                      fontWeight: 400,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      TPS Ship #:
+                    </div>
+                    <div style={{ 
+                      textAlign: 'right', 
+                      lineHeight: '1.3', 
+                      color: isDarkMode ? '#F9FAFB' : '#111827', 
+                      fontWeight: 700,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {row.tpsShipNumber || '10-01-2025'}
+                    </div>
+
+                    {/* Label Location */}
                     {row.labelLocation && (
-                      <div style={{ textAlign: 'left', lineHeight: '1.5', width: '100%', display: 'block', marginBottom: '12px', padding: 0, marginLeft: 0, marginRight: 0 }}>
-                        <span style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: 400, display: 'inline' }}>Label Location: </span>
-                        <span style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 700, display: 'inline' }}>{row.labelLocation || 'LBL-PLANT-218'}</span>
-                      </div>
+                      <>
+                        <div style={{ 
+                          textAlign: 'left', 
+                          lineHeight: '1.3', 
+                          color: isDarkMode ? '#9CA3AF' : '#6B7280', 
+                          fontWeight: 400,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}>
+                          Label Location:
+                        </div>
+                        <div style={{ 
+                          textAlign: 'right', 
+                          lineHeight: '1.3', 
+                          color: isDarkMode ? '#F9FAFB' : '#111827', 
+                          fontWeight: 700,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}>
+                          {row.labelLocation || 'LBL-PLANT-218'}
+                        </div>
+                      </>
                     )}
-                    <div style={{ textAlign: 'left', lineHeight: '1.5', width: '100%', display: 'block', marginBottom: '12px', padding: 0, marginLeft: 0, marginRight: 0 }}>
-                      <span style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: 400, display: 'inline' }}>QTY: </span>
-                      <span style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 700, display: 'inline' }}>{row.qty ? row.qty.toLocaleString() : '72,000'}</span>
+
+                    {/* QTY */}
+                    <div style={{ 
+                      textAlign: 'left', 
+                      lineHeight: '1.3', 
+                      color: isDarkMode ? '#9CA3AF' : '#6B7280', 
+                      fontWeight: 400,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      QTY:
                     </div>
+                    <div style={{ 
+                      textAlign: 'right', 
+                      lineHeight: '1.3', 
+                      color: isDarkMode ? '#F9FAFB' : '#111827', 
+                      fontWeight: 700,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {row.qty ? row.qty.toLocaleString() : '72,000'}
+                    </div>
+
+                    {/* Case # */}
                     {row.caseNumber && (
-                      <div style={{ textAlign: 'left', lineHeight: '1.5', width: '100%', display: 'block', marginBottom: '0', padding: 0, marginLeft: 0, marginRight: 0 }}>
-                        <span style={{ color: isDarkMode ? '#9CA3AF' : '#6B7280', fontWeight: 400, display: 'inline' }}>Case #: </span>
-                        <span style={{ color: isDarkMode ? '#F9FAFB' : '#111827', fontWeight: 700, display: 'inline' }}>{row.caseNumber || 488}</span>
-                      </div>
+                      <>
+                        <div style={{ 
+                          textAlign: 'left', 
+                          lineHeight: '1.3', 
+                          color: isDarkMode ? '#9CA3AF' : '#6B7280', 
+                          fontWeight: 400,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}>
+                          Case #:
+                        </div>
+                        <div style={{ 
+                          textAlign: 'right', 
+                          lineHeight: '1.3', 
+                          color: isDarkMode ? '#F9FAFB' : '#111827', 
+                          fontWeight: 700,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}>
+                          {row.caseNumber || 488}
+                        </div>
+                      </>
                     )}
                   </div>
                 </div>
@@ -396,8 +510,8 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
               {/* Done Button */}
               <button
                 style={{
-                  width: '100%',
-                  height: '40px',
+                  width: '319px',
+                  height: '23px',
                   borderRadius: '8px',
                   border: 'none',
                   backgroundColor: '#10B981',
@@ -410,6 +524,8 @@ const PackagingArchiveTable = ({ data = [], searchQuery = '' }) => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  gap: '10px',
+                  opacity: 1,
                   transition: 'all 0.2s ease',
                 }}
                 onMouseEnter={(e) => {
