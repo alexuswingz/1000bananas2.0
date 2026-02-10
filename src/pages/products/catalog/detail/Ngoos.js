@@ -1680,15 +1680,28 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     );
   };
 
-  // Show loading state
+  // Show loading state (same outer size as loaded content so modal doesn't shrink)
   if (loading) {
     return (
-      <div className={`${themeClasses.bg} rounded-xl border ${themeClasses.border} shadow-sm`}>
+      <div
+        className={`${themeClasses.bg} rounded-xl border ${themeClasses.border} shadow-sm`}
+        style={{
+          width: inventoryOnly ? '100%' : '100%',
+          maxWidth: inventoryOnly ? '100%' : 'none',
+          margin: inventoryOnly ? '0' : '0 auto',
+          backgroundColor: '#1A2235',
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: inventoryOnly ? '562px' : '680px',
+          outline: 'none',
+          paddingBottom: '1rem'
+        }}
+      >
         <div className={`px-6 py-4 border-b ${themeClasses.border}`}>
           <h2 className={`text-lg font-semibold ${themeClasses.text}`}>N-GOOS Inventory</h2>
         </div>
-        <div style={{ padding: '3rem', textAlign: 'center' }}>
-          <div style={{ display: 'inline-block' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 0 }}>
+          <div style={{ textAlign: 'center' }}>
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" style={{ margin: '0 auto' }}></div>
             <p className={`mt-4 text-sm ${themeClasses.textSecondary}`}>Loading N-GOOS data...</p>
           </div>

@@ -199,6 +199,7 @@ const NgoosModal = ({
           width: '90vw',
           maxWidth: '1009px',
           height: 'auto',
+          minHeight: '722px',
           maxHeight: '90vh',
           borderRadius: '12px',
           boxShadow: '0 24px 80px rgba(15,23,42,0.75)',
@@ -359,9 +360,10 @@ const NgoosModal = ({
           </div>
         </div>
 
-        {/* Main content - Using Ngoos component - No scrolling */}
+        {/* Main content - Using Ngoos component - minHeight keeps modal same height when Ngoos is loading */}
         <div style={{ 
           flex: 1,
+          minHeight: '662px',
           backgroundColor: isDarkMode ? '#1A2235' : '#F9FAFB',
           overflow: 'auto',
         }}>
