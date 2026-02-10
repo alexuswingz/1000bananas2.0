@@ -136,6 +136,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   });
   const [currentProductAsin, setCurrentProductAsin] = useState(null);
   const [chartLoadError, setChartLoadError] = useState(null); // e.g. CORS / network when chart fails on live
+  const [lineAnimationDone, setLineAnimationDone] = useState(false); // true after Potential Units Sold line finishes drawing
   const [visibleSalesMetrics, setVisibleSalesMetrics] = useState(['units_sold', 'sales']);
   const [visibleAdsMetrics, setVisibleAdsMetrics] = useState(['total_sales', 'tacos']);
   const [hoveredSegment, setHoveredSegment] = useState(null); // 'fba', 'total', 'forecast', or null
@@ -162,6 +163,49 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
       'organic_sales_pct'
     ]
   });
+
+  // Stable key for doiSettings so effects/memos only run when values change, not on every parent re-render.
+  // Prevents chart reset when hovering buckets, clicking chart, zooming, or hovering settings (Chart Resetting Bug).
+  const doiSettingsKey = doiSettings
+    ? `${doiSettings.amazonDoiGoal ?? ''}_${doiSettings.inboundLeadTime ?? ''}_${doiSettings.manufactureLeadTime ?? ''}`
+    : '';
+
+  // Single primitive "request key" so we only refetch when it actually changes (never on zoom/hover/click).
+  const fetchRequestKey = [
+    data?.child_asin ?? data?.childAsin,
+    selectedView,
+    metricsDays,
+    salesVelocityWeight,
+    svVelocityWeight,
+    inventoryOnly,
+    doiGoalDays,
+    doiSettingsKey
+  ].join('_');
+  const lastFetchRequestKeyRef = useRef('');
+  // Don't clear zoom until the chart line has finished drawing, then wait 10s so it doesn't reset.
+  const gracePeriodEndRef = useRef(0);
+  const CHART_GRACE_PERIOD_MS = 10000;
+  const CHART_LINE_ANIMATION_MS = 2000; // Wait for line animation to finish before starting grace period
+
+  // Reset zoom only when time range or product changes (not on hover/click/zoom).
+  // Skip reset for 10 seconds after load so refresh doesn't cause an immediate reset.
+  // When view is "All Time" never clear zoom — it already shows full range and clearing caused graph to reset.
+  const childAsinForZoomReset = data?.child_asin ?? data?.childAsin;
+  const prevZoomResetDepsRef = useRef({ selectedView: null, childAsin: null });
+  useEffect(() => {
+    if (selectedView === 'All Time') return;
+    if (!childAsinForZoomReset) return;
+    if (Date.now() < gracePeriodEndRef.current) return;
+    const prev = prevZoomResetDepsRef.current;
+    const viewChanged = prev.selectedView !== selectedView;
+    const productChanged = prev.childAsin !== childAsinForZoomReset;
+    prevZoomResetDepsRef.current = { selectedView, childAsin: childAsinForZoomReset };
+    if (!viewChanged && !productChanged) return;
+    setZoomDomain({ left: null, right: null });
+    setZoomHistory([]);
+    setZoomBox({ startTimestamp: null, endTimestamp: null });
+    setChartRangeSelection({ startTimestamp: null, endTimestamp: null });
+  }, [selectedView, childAsinForZoomReset]);
 
   // Ensure the forecast settings indicator shows when this product already
   // has active custom forecast/DOI settings (e.g. from the Add Products page).
@@ -225,8 +269,11 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     }
   }, [data?.child_asin, data?.childAsin, currentProductAsin]);
 
-  // Fetch N-GOOS data from API
+  // Fetch N-GOOS data from API — only when fetchRequestKey changes (not on zoom/hover/click).
   useEffect(() => {
+    if (fetchRequestKey === lastFetchRequestKeyRef.current) return;
+    lastFetchRequestKeyRef.current = fetchRequestKey;
+
     const fetchNgoosData = async () => {
       const childAsin = data?.child_asin || data?.childAsin;
       
@@ -317,18 +364,29 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         });
       } finally {
         setLoading(false);
+        // Start grace period only after the chart line has time to finish animating, so it doesn't refresh mid-draw.
+        const startGraceAt = Date.now() + CHART_LINE_ANIMATION_MS;
+        gracePeriodEndRef.current = startGraceAt + CHART_GRACE_PERIOD_MS;
       }
     };
 
       fetchNgoosData();
-    }, [data?.child_asin, data?.childAsin, selectedView, metricsDays, salesVelocityWeight, svVelocityWeight, inventoryOnly, doiGoalDays, doiSettings]);
+    }, [fetchRequestKey]);
 
-  // Sync tempDoiSettings when doiSettings prop changes
+  // Clear bucket hover and line-animation state when load starts so hover during load doesn't reset the graph.
+  useEffect(() => {
+    if (loading) {
+      setHoveredSegment(null);
+      setLineAnimationDone(false);
+    }
+  }, [loading]);
+
+  // Sync tempDoiSettings when doiSettings values change (stable key avoids reset on parent re-render)
   useEffect(() => {
     if (doiSettings) {
       setTempDoiSettings(doiSettings);
     }
-  }, [doiSettings]);
+  }, [doiSettingsKey]);
 
   // Open forecast settings modal when openForecastSettings prop is true
   useEffect(() => {
@@ -479,7 +537,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
       forecast: Math.round(unitsToMake), // Show units to make, not days
       adjustment: Math.round(adjustment)
     };
-  }, [forecastData, inventoryData, overrideUnitsToMake, doiSettings]);
+  }, [forecastData, inventoryData, overrideUnitsToMake, doiSettingsKey]);
 
   // Reset user-adjusted units when forecast/override changes (e.g. DOI settings)
   useEffect(() => {
@@ -730,7 +788,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     if (chartMinValue === Infinity) chartMinValue = 0;
     
     return { data: combinedData, maxValue: chartMaxValue, minValue: chartMinValue };
-  }, [chartData, forecastData, selectedView, doiGoalDays, doiSettings]);
+  }, [chartData, forecastData, selectedView, doiGoalDays, doiSettingsKey]);
 
   // Y-axis tick values for Unit Forecast chart: only numbers in the data range (min to max of graph)
   const unitForecastYTicks = useMemo(() => {
@@ -891,6 +949,19 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     });
     return () => cancelAnimationFrame(id);
   }, [hasChartData]);
+
+  // Wait for Potential Units Sold line to finish drawing before allowing bucket hover (hover during animation interrupts the line).
+  useEffect(() => {
+    if (loading || !chartDeferredReady) {
+      setLineAnimationDone(false);
+      return;
+    }
+    const id = setTimeout(() => setLineAnimationDone(true), CHART_LINE_ANIMATION_MS);
+    return () => clearTimeout(id);
+  }, [loading, chartDeferredReady]);
+
+  // Allow bucket hover only after graph has loaded and the line animation has finished.
+  const chartReadyForBucketHover = !loading && chartDeferredReady && lineAnimationDone;
 
   // Sum of Units Sold and Potential Units Sold for the drag-selected range
   const chartRangeSum = useMemo(() => {
@@ -2404,16 +2475,10 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           gap: inventoryOnly ? '0.75rem' : '1.5rem', 
           marginBottom: inventoryOnly ? '0.75rem' : '2rem' 
         }}>
-          {/* FBA Available Card */}
+          {/* FBA Available Card — hover only after graph loaded so hover during load doesn't reset */}
           <div 
-            onMouseEnter={() => {
-              console.log('Hovering FBA Available');
-              setHoveredSegment('fba');
-            }}
-            onMouseLeave={() => {
-              console.log('Leaving FBA Available');
-              setHoveredSegment(null);
-            }}
+            onMouseEnter={() => { if (chartReadyForBucketHover) setHoveredSegment('fba'); }}
+            onMouseLeave={() => { if (chartReadyForBucketHover) setHoveredSegment(null); }}
             style={{ 
               borderRadius: '0.5rem', 
               padding: inventoryOnly ? '0.75rem 1rem' : '1rem 1.25rem',
@@ -2465,16 +2530,10 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             </div>
           </div>
 
-          {/* Total Inventory Card */}
+          {/* Total Inventory Card — hover only after graph loaded so hover during load doesn't reset */}
           <div 
-            onMouseEnter={() => {
-              console.log('Hovering Total Inventory');
-              setHoveredSegment('total');
-            }}
-            onMouseLeave={() => {
-              console.log('Leaving Total Inventory');
-              setHoveredSegment(null);
-            }}
+            onMouseEnter={() => { if (chartReadyForBucketHover) setHoveredSegment('total'); }}
+            onMouseLeave={() => { if (chartReadyForBucketHover) setHoveredSegment(null); }}
             style={{ 
               borderRadius: '0.5rem', 
               padding: inventoryOnly ? '0.75rem 1rem' : '1rem 1.25rem',
@@ -2526,16 +2585,10 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             </div>
           </div>
 
-          {/* Forecast Card */}
+          {/* Forecast Card — hover only after graph loaded so hover during load doesn't reset */}
           <div 
-            onMouseEnter={() => {
-              console.log('Hovering Forecast');
-              setHoveredSegment('forecast');
-            }}
-            onMouseLeave={() => {
-              console.log('Leaving Forecast');
-              setHoveredSegment(null);
-            }}
+            onMouseEnter={() => { if (chartReadyForBucketHover) setHoveredSegment('forecast'); }}
+            onMouseLeave={() => { if (chartReadyForBucketHover) setHoveredSegment(null); }}
             style={{ 
               borderRadius: '0.5rem', 
               padding: inventoryOnly ? '0.75rem 1rem' : '1rem 1.25rem',
