@@ -861,6 +861,57 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     };
   }, [chartData, forecastData, selectedView]);
 
+  // Start of "today" (00:00:00) for determining if selection is entirely in future (forecast)
+  const todayStartTs = useMemo(() => {
+    const chart = chartData;
+    const todaySource = chart?.metadata?.today ?? chart?.today ?? forecastData?.current_date ?? null;
+    if (!todaySource) return null;
+    const d = new Date(todaySource);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0).getTime();
+  }, [chartData, forecastData]);
+
+  // Timestamp where the "Today" dashed line is drawn (same logic as chart: closest data point to today) so highlight cap aligns with the line
+  const todayLineTimestamp = useMemo(() => {
+    const data = chartDisplayData?.data;
+    if (!data?.length) return todayStartTs;
+    const todaySource = chartData?.metadata?.today ?? chartData?.today ?? forecastData?.current_date ?? null;
+    const todayTs = todaySource ? new Date(todaySource).setHours(0, 0, 0, 0) : new Date().setHours(0, 0, 0, 0);
+    let todayPoint = null;
+    let minDiff = Infinity;
+    data.forEach((p) => {
+      const pointDay = new Date(p.timestamp).setHours(0, 0, 0, 0);
+      const diff = Math.abs(pointDay - todayTs);
+      if (diff < minDiff) {
+        minDiff = diff;
+        todayPoint = p;
+      }
+    });
+    return todayPoint != null ? todayPoint.timestamp : todayStartTs;
+  }, [chartDisplayData?.data, chartData, forecastData, todayStartTs]);
+
+  // Effective range for selection: cap at Today line so highlight never passes through the Today dashed line into forecast; when highlighting forecast only, start the highlight at the Today line
+  const chartRangeSelectionEffective = useMemo(() => {
+    if (chartRangeSelection.startTimestamp == null || chartRangeSelection.endTimestamp == null) return null;
+    const lo = Math.min(chartRangeSelection.startTimestamp, chartRangeSelection.endTimestamp);
+    const hi = Math.max(chartRangeSelection.startTimestamp, chartRangeSelection.endTimestamp);
+    const capTs = todayLineTimestamp ?? todayStartTs;
+    let displayLo = lo;
+    let displayHi = hi;
+    let sumHi = hi;
+    const isForecastOnly = todayStartTs != null && lo >= todayStartTs;
+    if (capTs != null) {
+      if (lo < capTs && hi >= capTs) {
+        // Selection spans past today: cap highlight and sum at Today line (no forecast in highlight)
+        displayHi = capTs;
+        sumHi = capTs;
+      } else if (isForecastOnly) {
+        // Selection is entirely in future: start the highlight at the Today dashed line so forecast highlight begins there
+        displayLo = capTs;
+      }
+    }
+    return { displayLo, displayHi, sumLo: lo, sumHi, isForecastOnly };
+  }, [chartRangeSelection.startTimestamp, chartRangeSelection.endTimestamp, todayLineTimestamp, todayStartTs]);
+
   // Zoom range as timestamps: used so both ends of the grabbed range are visible on the axis
   const chartXDomainWhenZoomed = useMemo(() => {
     if (zoomDomain.left == null || zoomDomain.right == null) return null;
@@ -979,22 +1030,21 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   // Animate chart on initial load and when zoom changes; no animation on hover/modal only.
   const chartLineAnimationActive = !lineAnimationDone || zoomAnimationActive;
 
-  // Sum of Units Sold and Potential Units Sold for the drag-selected range
+  // Sum of Units Sold and Potential Units Sold for the drag-selected range (capped at today when selection spans past today)
   const chartRangeSum = useMemo(() => {
-    if (!chartDisplayData?.data?.length || chartRangeSelection.startTimestamp == null || chartRangeSelection.endTimestamp == null) return null;
+    if (!chartDisplayData?.data?.length || !chartRangeSelectionEffective) return null;
     const data = chartDisplayData.data;
-    const lo = Math.min(chartRangeSelection.startTimestamp, chartRangeSelection.endTimestamp);
-    const hi = Math.max(chartRangeSelection.startTimestamp, chartRangeSelection.endTimestamp);
+    const { sumLo, sumHi, isForecastOnly } = chartRangeSelectionEffective;
     let unitsSold = 0;
     let unitsSmoothed = 0;
     data.forEach((d) => {
-      if (d.timestamp >= lo && d.timestamp <= hi) {
+      if (d.timestamp >= sumLo && d.timestamp <= sumHi) {
         unitsSold += Number(d.unitsSold) || 0;
         unitsSmoothed += Number(d.forecastBase ?? d.unitsSmooth) || 0;
       }
     });
-    return { unitsSold, unitsSmoothed };
-  }, [chartDisplayData?.data, chartRangeSelection.startTimestamp, chartRangeSelection.endTimestamp]);
+    return { unitsSold, unitsSmoothed, isForecastOnly };
+  }, [chartDisplayData?.data, chartRangeSelectionEffective]);
 
   // Map client X to timestamp using the chart's actual plot area and current visible domain (zoom or time-window)
   const getTimestampFromClientX = (clientX) => {
@@ -1040,12 +1090,16 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     const t = getTimestampFromClientX(e.clientX);
     if (t == null) return;
     e.preventDefault(); // prevent text/element selection when dragging on chart
-    // Zoom tool: two clicks to set zoom range, then return to Off state
+    // Zoom tool: support two methods — (1) click, move, click again; (2) click+hold+drag, release
     if (zoomToolActive) {
       if (zoomFirstClickTimestamp == null) {
+        // First interaction: set first point and start drag box so user can either drag or click again
         setZoomFirstClickTimestamp(t);
+        zoomBoxDragRef.current = { startTimestamp: t, endTimestamp: t };
+        setZoomBox({ startTimestamp: t, endTimestamp: t });
         return;
       }
+      // Second click: apply zoom from first click to this click (method 1)
       const lo = Math.min(zoomFirstClickTimestamp, t);
       const hi = Math.max(zoomFirstClickTimestamp, t);
       if (hi > lo) {
@@ -1059,6 +1113,8 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
       setZoomToolActive(false);
       setZoomFirstClickTimestamp(null);
       setZoomPreviewTimestamp(null);
+      zoomBoxDragRef.current = { startTimestamp: null, endTimestamp: null };
+      setZoomBox({ startTimestamp: null, endTimestamp: null });
       return;
     }
     if (zKeyHeld) {
@@ -1073,7 +1129,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   };
 
   const handleChartRangeMouseMove = (e) => {
-    // Zoom tool: show preview band from first click to current mouse position
+    // Zoom tool: show preview (for banner); drag band is from zoomBox when user is dragging
     if (zoomToolActive && zoomFirstClickTimestamp != null) {
       const t = getTimestampFromClientX(e.clientX);
       setZoomPreviewTimestamp(t != null ? t : null);
@@ -1137,6 +1193,12 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           };
           setZoomHistory((hist) => [...hist, zoomDomain]);
           setZoomDomain({ left: toLocalDateStr(lo), right: toLocalDateStr(hi) });
+          // If zoom tool was active (click+hold+drag), turn it off after applying zoom
+          if (zoomToolActive) {
+            setZoomToolActive(false);
+            setZoomFirstClickTimestamp(null);
+            setZoomPreviewTimestamp(null);
+          }
         }
       }
       zoomBoxDragRef.current = { startTimestamp: null, endTimestamp: null };
@@ -2681,7 +2743,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               </p>
             </div>
             {/* Range selection stats - same row as Unit Forecast (no Reset; click chart to clear) */}
-            {chartRangeSum != null && (() => {
+            {chartRangeSum != null && chartRangeSelectionEffective != null && (() => {
               const unitCost = Number(
                 productDetails?.product?.cost ??
                 productDetails?.product?.price ??
@@ -2693,17 +2755,33 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               ) || 0;
               const unitsDiff = chartRangeSum.unitsSmoothed - chartRangeSum.unitsSold;
               const revenueGap = unitsDiff * unitCost;
+              const isForecast = chartRangeSum.isForecastOnly === true;
+              const dateRangeStr = `${new Date(chartRangeSelectionEffective.displayLo).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} – ${new Date(chartRangeSelectionEffective.displayHi).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
               return (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap', fontSize: inventoryOnly ? '0.75rem' : '0.8125rem' }}>
-                  <span style={{ color: '#94a3b8' }}>
-                    UNITS SOLD: <strong style={{ color: '#e2e8f0', fontWeight: 600 }}>{chartRangeSum.unitsSold.toLocaleString()}</strong>
-                  </span>
-                  <span style={{ color: '#94a3b8' }}>
-                    POT. UNITS SOLD: <strong style={{ color: '#22c55e', fontWeight: 600 }}>{chartRangeSum.unitsSmoothed.toLocaleString()}</strong>
-                  </span>
-                  <span style={{ color: '#94a3b8' }}>
-                    REVENUE GAP: <strong style={{ color: '#22c55e', fontWeight: 600 }}>{revenueGap.toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
-                  </span>
+                  <span style={{ color: '#64748b', marginRight: '0.25rem' }} title="Selected date range">{dateRangeStr}</span>
+                  {isForecast ? (
+                    <>
+                      <span style={{ color: '#94a3b8' }}>
+                        FORECASTED UNITS: <strong style={{ color: '#22c55e', fontWeight: 600 }}>{chartRangeSum.unitsSmoothed.toLocaleString()}</strong>
+                      </span>
+                      <span style={{ color: '#94a3b8' }}>
+                        FORECASTED REVENUE: <strong style={{ color: '#22c55e', fontWeight: 600 }}>{(chartRangeSum.unitsSmoothed * unitCost).toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span style={{ color: '#94a3b8' }}>
+                        UNITS SOLD: <strong style={{ color: '#e2e8f0', fontWeight: 600 }}>{chartRangeSum.unitsSold.toLocaleString()}</strong>
+                      </span>
+                      <span style={{ color: '#94a3b8' }}>
+                        POT. UNITS SOLD: <strong style={{ color: '#22c55e', fontWeight: 600 }}>{chartRangeSum.unitsSmoothed.toLocaleString()}</strong>
+                      </span>
+                      <span style={{ color: '#94a3b8' }}>
+                        REVENUE GAP: <strong style={{ color: '#22c55e', fontWeight: 600 }}>{revenueGap.toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                      </span>
+                    </>
+                  )}
                 </div>
               );
             })()}
@@ -2711,7 +2789,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               {/* Zoom tool: click to turn On (blue), then click two points on chart to zoom; Reset appears when zoomed */}
               <button
                 type="button"
-                title={zoomToolActive ? 'Click two points on the chart to zoom into that period' : 'Zoom: click to enable, then click two points on the chart'}
+                title={zoomToolActive ? 'Click two points to zoom, or click and drag then release' : 'Zoom: click to enable, then click two points or click-drag-release to zoom'}
                 onClick={() => {
                   if (zoomToolActive) {
                     setZoomFirstClickTimestamp(null);
@@ -3051,7 +3129,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           </div>
 
 
-          {/* Chart Area - Hold Z and drag to zoom; drag without Z to sum Units Sold / Potential Units Sold. */}
+          {/* Chart Area - Zoom tool: click twice or click-drag-release; Hold Z and drag to zoom; drag without Z to sum Units Sold / Potential Units Sold. */}
           <div
             ref={chartContainerRef}
             className="ngoos-chart-area"
@@ -3107,7 +3185,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                     {new Date(zoomPreviewTimestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   </span>
                 ) : (
-                  <span style={{ color: '#64748b' }}>move or click to set end</span>
+                  <span style={{ color: '#64748b' }}>drag or click to set end</span>
                 )}
               </div>
             )}
@@ -3595,11 +3673,11 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                       strokeDasharray="4 2"
                     />
                   )}
-                  {/* Drag-selection range highlight (Units Sold sum) */}
-                  {chartRangeSelection.startTimestamp != null && chartRangeSelection.endTimestamp != null && (
+                  {/* Drag-selection range highlight (capped at today when selection spans past today) */}
+                  {chartRangeSelectionEffective != null && (
                     <ReferenceArea
-                      x1={Math.min(chartRangeSelection.startTimestamp, chartRangeSelection.endTimestamp)}
-                      x2={Math.max(chartRangeSelection.startTimestamp, chartRangeSelection.endTimestamp)}
+                      x1={chartRangeSelectionEffective.displayLo}
+                      x2={chartRangeSelectionEffective.displayHi}
                       fill="#3b82f6"
                       fillOpacity={0.15}
                       yAxisId="left"
@@ -3607,8 +3685,8 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                       strokeOpacity={0.5}
                     />
                   )}
-                  {/* Zoom tool: grab preview from first click to current mouse (or second click) */}
-                  {zoomFirstClickTimestamp != null && zoomPreviewTimestamp != null && (
+                  {/* Zoom tool: grab preview from first click to current mouse (only when not dragging; drag uses zoomBox above) */}
+                  {zoomFirstClickTimestamp != null && zoomPreviewTimestamp != null && (zoomBox.startTimestamp == null || zoomBox.startTimestamp === zoomBox.endTimestamp) && (
                     <ReferenceArea
                       x1={Math.min(zoomFirstClickTimestamp, zoomPreviewTimestamp)}
                       x2={Math.max(zoomFirstClickTimestamp, zoomPreviewTimestamp)}
