@@ -137,6 +137,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   const [currentProductAsin, setCurrentProductAsin] = useState(null);
   const [chartLoadError, setChartLoadError] = useState(null); // e.g. CORS / network when chart fails on live
   const [lineAnimationDone, setLineAnimationDone] = useState(false); // true after line has had time to finish drawing so bucket hover doesn't interrupt
+  const [zoomAnimationActive, setZoomAnimationActive] = useState(false); // true right after zoom changes so chart animates on zoom
   const [visibleSalesMetrics, setVisibleSalesMetrics] = useState(['units_sold', 'sales']);
   const [visibleAdsMetrics, setVisibleAdsMetrics] = useState(['total_sales', 'tacos']);
   const [hoveredSegment, setHoveredSegment] = useState(null); // 'fba', 'total', 'forecast', or null
@@ -960,8 +961,23 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     return () => clearTimeout(id);
   }, [loading, chartDeferredReady]);
 
+  // When user zooms (zoomDomain changes), enable chart animation for this transition only.
+  const prevZoomDomainRef = useRef({ left: null, right: null });
+  useEffect(() => {
+    const prev = prevZoomDomainRef.current;
+    const changed = prev.left !== zoomDomain?.left || prev.right !== zoomDomain?.right;
+    prevZoomDomainRef.current = { left: zoomDomain?.left ?? null, right: zoomDomain?.right ?? null };
+    if (!changed) return;
+    setZoomAnimationActive(true);
+    const id = setTimeout(() => setZoomAnimationActive(false), CHART_LINE_ANIMATION_MS);
+    return () => clearTimeout(id);
+  }, [zoomDomain?.left, zoomDomain?.right]);
+
   // Allow bucket hover only after graph has loaded and the line animation has finished.
   const chartReadyForBucketHover = !loading && chartDeferredReady && lineAnimationDone;
+
+  // Animate chart on initial load and when zoom changes; no animation on hover/modal only.
+  const chartLineAnimationActive = !lineAnimationDone || zoomAnimationActive;
 
   // Sum of Units Sold and Potential Units Sold for the drag-selected range
   const chartRangeSum = useMemo(() => {
@@ -3108,6 +3124,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 style={responsiveContainerStyle}
               >
                   <ComposedChart
+                  key={`unit-forecast-${data?.child_asin ?? data?.childAsin ?? 'unknown'}-${selectedView}`}
                   data={chartDataForDisplay}
                   margin={{ top: 20, right: 20, left: 0, bottom: 20 }}
                   style={composedChartStyle}
@@ -3252,9 +3269,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                             }
                             // Use exact timestamps so zones strike at the right dates
                             const opacity = isHovered ? 0.6 : 0.2;
-                            if (hoveredSegment) {
-                              console.log(`Period ${idx}: color=${originalColor}, mapped=${mappedColor}, hoveredSegment=${hoveredSegment}, isHovered=${isHovered}, opacity=${opacity}`);
-                            }
                             return (
                               <ReferenceArea
                                 key={`period-${idx}`}
@@ -3608,7 +3622,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                     />
                   )}
                   
-                  {/* Units Sold Area (Historical) */}
+                  {/* Units Sold Area (Historical) - animate only on first load so hover/modal don't reset graph */}
                   <Area 
                     yAxisId="left"
                     type="monotone" 
@@ -3618,6 +3632,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                     fill="url(#unitsSoldGradient)"
                     name="Units Sold"
                     connectNulls={false}
+                    isAnimationActive={chartLineAnimationActive}
                   />
                   
                   {/* Smoothed Units Sold - Orange solid line (Potential Units Sold) */}
@@ -3630,6 +3645,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                     dot={false}
                     name="Potential Units Sold"
                     connectNulls={false}
+                    isAnimationActive={chartLineAnimationActive}
                   />
                   
                   {/* Forecast - Orange dashed line (only line in forecast region) */}
@@ -3643,6 +3659,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                     dot={false}
                     name="Forecast"
                     connectNulls={false}
+                    isAnimationActive={chartLineAnimationActive}
                   />
                   
                 </ComposedChart>
