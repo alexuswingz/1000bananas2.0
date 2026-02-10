@@ -360,10 +360,12 @@ const NgoosModal = ({
           </div>
         </div>
 
-        {/* Main content - Using Ngoos component - minHeight keeps modal same height when Ngoos is loading */}
+        {/* Main content - Using Ngoos component - flex column so Sales/Ads same height as Inventory */}
         <div style={{ 
           flex: 1,
           minHeight: '662px',
+          display: 'flex',
+          flexDirection: 'column',
           backgroundColor: isDarkMode ? '#1A2235' : '#F9FAFB',
           overflow: 'auto',
         }}>

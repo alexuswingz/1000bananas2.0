@@ -1879,7 +1879,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
 
   return (
     <div 
-      className={`${themeClasses.bg} rounded-xl border ${themeClasses.border} shadow-sm`} 
+      className={activeTab === 'sales' ? `${themeClasses.bg} rounded-xl border-0 shadow-none` : `${themeClasses.bg} rounded-xl border ${themeClasses.border} shadow-sm`} 
       style={{ 
         width: inventoryOnly ? '100%' : '100%', 
         maxWidth: inventoryOnly ? '100%' : 'none', 
@@ -1888,8 +1888,10 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,
+        ...(inventoryOnly ? { flex: 1, minHeight: '662px' } : {}),
         outline: 'none',
-        paddingBottom: '1rem'
+        paddingBottom: '1rem',
+        ...(activeTab === 'sales' ? { border: 'none', boxShadow: 'none' } : {})
       }}
     >
       {/* Tab Navigation - Hidden when inventoryOnly is true */}
@@ -3855,892 +3857,171 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         </div>
       )}
 
-      {/* Sales Tab Content */}
+      {/* Sales Tab Content - BOOST Coming Soon (same layout as Inventory: tabs when inventoryOnly, same wrapper) */}
       {activeTab === 'sales' && (
-          <div style={{ backgroundColor: '#1A2235' }}>
-            {/* Header with Controls */}
-            <div className="px-6 pt-6" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1rem', gap: '1rem' }}>
-              {/* Metric Controller */}
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', flex: 1 }}>
-                <span style={{ fontSize: '0.75rem', color: '#94a3b8', alignSelf: 'center', marginRight: '0.5rem', fontWeight: '600', textTransform: 'uppercase' }}>
-                  Metrics:
-                </span>
-                {SALES_METRICS.map(metric => {
-                  const isVisible = visibleSalesMetrics.includes(metric.id);
-                  return (
-                    <button
-                      key={metric.id}
-                      onClick={() => toggleSalesMetric(metric.id)}
-                      style={{
-                        padding: '0.375rem 0.75rem',
-                        borderRadius: '0.375rem',
-                        backgroundColor: isVisible ? metric.color + '20' : 'transparent',
-                        border: `2px solid ${isVisible ? metric.color : '#475569'}`,
-                        color: isVisible ? metric.color : '#94a3b8',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.375rem',
-                        opacity: isVisible ? 1 : 0.6
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-1px)';
-                        e.currentTarget.style.opacity = '1';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.opacity = isVisible ? '1' : '0.6';
-                      }}
-                    >
-                      <div style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        backgroundColor: isVisible ? metric.color : '#475569'
-                      }} />
-                      {metric.label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Period Selectors */}
-              <div style={{ display: 'flex', gap: '0.75rem', flexShrink: 0 }}>
-                <select 
-                  value={metricsDays}
-                  onChange={(e) => setMetricsDays(Number(e.target.value))}
-                  style={{ 
-                    padding: '0.5rem 1rem', 
-                    borderRadius: '0.5rem', 
-                    backgroundColor: '#1e293b', 
-                    color: '#fff',
-                    border: '1px solid #334155',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    minWidth: '100px'
-                  }}
-                >
-                  <option value={7}>7 Days</option>
-                  <option value={30}>30 Days</option>
-                  <option value={60}>60 Days</option>
-                  <option value={90}>90 Days</option>
-                </select>
-                
-                <select 
-                  style={{ 
-                    padding: '0.5rem 1rem', 
-                    borderRadius: '0.5rem', 
-                    backgroundColor: '#1e293b', 
-                    color: '#fff',
-                    border: '1px solid #334155',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    minWidth: '120px'
-                  }}
-                >
-                  <option value="prior">Prior Period</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Graph Section: 70% Graph + 30% Banana Factors */}
-            <div className="px-6" style={{ display: 'grid', gridTemplateColumns: '70% 30%', gap: '1.5rem', marginBottom: '1.5rem', minHeight: '400px' }}>
-              {/* Left: Graph (70%) */}
-              <div className={themeClasses.cardBg} style={{ borderRadius: '0.75rem', padding: '1.5rem', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                <div style={{ flex: 1, minHeight: 300 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={salesChartData?.chart_data || []}>
-                    <CartesianGrid 
-                      strokeDasharray="4 4" 
-                      stroke="rgba(148, 163, 184, 0.45)" 
-                      vertical={false} 
-                      horizontal={true}
-                      strokeWidth={1} 
-                    />
-                    <XAxis 
-                      dataKey="date" 
-                      stroke="#64748b"
-                      style={{ fontSize: '0.75rem' }}
-                      tickLine={false}
-                      tickFormatter={(value) => {
-                        const date = new Date(value);
-                        return `${date.getMonth() + 1}/${date.getDate()}`;
-                      }}
-                    />
-                    <YAxis 
-                      stroke="#64748b"
-                      style={{ fontSize: '0.75rem' }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#0f172a', 
-                        border: '1px solid #334155',
-                        borderRadius: '0.5rem',
-                        color: '#fff',
-                        fontSize: '0.875rem'
-                      }}
-                      formatter={(value, name) => {
-                        const metric = SALES_METRICS.find(m => m.label === name);
-                        if (metric) {
-                          return [formatChartValue(value, metric.formatType), name];
-                        }
-                        return [value, name];
-                      }}
-                    />
-                    {/* Dynamically render visible metrics */}
-                    {visibleSalesMetrics.length > 0 && SALES_METRICS
-                      .filter(metric => visibleSalesMetrics.includes(metric.id))
-                      .map((metric) => {
-                        console.log('Rendering Sales metric:', metric.id, metric.valueKey, 'Sample data:', salesChartData?.chart_data?.[0]?.[metric.valueKey]);
-                        return (
-                          <Line 
-                            key={metric.id}
-                            type="monotone" 
-                            dataKey={metric.valueKey} 
-                            stroke={metric.color} 
-                            strokeWidth={2.5}
-                            name={metric.label}
-                            dot={false}
-                            connectNulls
-                          />
-                        );
-                      })}
-                  </ComposedChart>
-                </ResponsiveContainer>
+          <div style={{ backgroundColor: '#1A2235', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            {/* Same compact tab bar as Inventory when inventoryOnly */}
+            {inventoryOnly && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '1rem',
+                marginTop: '0.9375rem',
+                padding: '0 1rem'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  gap: '0.25rem',
+                  backgroundColor: '#0f172a',
+                  borderRadius: '0.5rem',
+                  padding: '4px',
+                  width: '325px',
+                  height: '32px',
+                  border: '1px solid #334155',
+                  alignItems: 'center',
+                  boxSizing: 'border-box'
+                }}>
+                  <button
+                    onClick={() => setActiveTab('forecast')}
+                    style={{
+                      padding: '0',
+                      fontSize: '1rem',
+                      fontWeight: '500',
+                      color: activeTab === 'forecast' ? '#fff' : '#94a3b8',
+                      backgroundColor: activeTab === 'forecast' ? '#2563EB' : 'transparent',
+                      border: 'none',
+                      borderRadius: '0.25rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      flex: 1,
+                      height: '23px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    Inventory
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('sales')}
+                    style={{
+                      padding: '0',
+                      fontSize: '1rem',
+                      fontWeight: '500',
+                      color: activeTab === 'sales' ? '#fff' : '#94a3b8',
+                      backgroundColor: activeTab === 'sales' ? '#2563EB' : 'transparent',
+                      border: 'none',
+                      borderRadius: '0.25rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      flex: 1,
+                      height: '23px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    Sales
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('ads')}
+                    style={{
+                      padding: '0',
+                      fontSize: '1rem',
+                      fontWeight: '500',
+                      color: activeTab === 'ads' ? '#fff' : '#94a3b8',
+                      backgroundColor: activeTab === 'ads' ? '#2563EB' : 'transparent',
+                      border: 'none',
+                      borderRadius: '0.25rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      flex: 1,
+                      height: '23px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    Ads
+                  </button>
                 </div>
               </div>
-
-              {/* Right: Banana Factors (30%) */}
-              <div className={themeClasses.cardBg} style={{ borderRadius: '0.75rem', padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#fff', marginBottom: '1.5rem' }}>Banana Factors</h3>
-                
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {/* Sessions */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid #334155' }}>
-                    <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Sessions</span>
-                    <span style={{ fontSize: '0.875rem', fontWeight: '600', color: metrics?.changes?.sessions >= 0 ? '#22c55e' : '#ef4444' }}>
-                      {metrics?.current_period?.sessions?.toLocaleString() || '0'}
-                    </span>
-                  </div>
-
-                  {/* Conversion Rate */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid #334155' }}>
-                    <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Conversion Rate</span>
-                    <span style={{ fontSize: '0.875rem', fontWeight: '600', color: metrics?.changes?.conversion_rate >= 0 ? '#22c55e' : '#ef4444' }}>
-                      {metrics?.current_period?.conversion_rate?.toFixed(2) || '0.00'}%
-                    </span>
-                  </div>
-
-                  {/* TACOS */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid #334155' }}>
-                    <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>TACOS</span>
-                    <span style={{ fontSize: '0.875rem', fontWeight: '600', color: metrics?.changes?.tacos <= 0 ? '#22c55e' : '#ef4444' }}>
-                      {metrics?.current_period?.tacos?.toFixed(2) || '0.00'}%
-                    </span>
-                  </div>
+            )}
+            {/* Coming Soon content - centered, same as image */}
+            <div className={inventoryOnly ? '' : 'px-6 pb-6'} style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: 0,
+              overflow: 'auto',
+              padding: inventoryOnly ? '1rem' : '3rem'
+            }}>
+              <div style={{ textAlign: 'center', maxWidth: '420px', marginTop: '-50px' }}>
+                {/* BOOST / Bolt icon */}
+                <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'center' }}>
+                  <img src="/assets/Bolt.png" alt="BOOST" style={{ width: '98px', height: '98px', objectFit: 'contain' }} />
                 </div>
-
-                {/* Perform Analysis Button */}
-                <button 
-                  onClick={handlePerformAnalysis}
+                <h2 style={{ fontSize: '1.75rem', fontWeight: '700', color: '#fff', marginBottom: '0.75rem' }}>BOOST is Coming Soon!</h2>
+                <p style={{ fontSize: '1rem', color: '#94a3b8', marginBottom: '1.5rem', lineHeight: 1.5 }}>
+                  Supercharge your sales velocity with BOOST. Stay tuned for updates.
+                </p>
+                <button
+                  onClick={() => setActiveTab('forecast')}
                   style={{
-                    marginTop: 'auto',
-                    padding: '0.75rem',
-                    backgroundColor: '#3b82f6',
+                    minWidth: '133px',
+                    height: '31px',
+                    padding: '0 10px',
+                    marginLeft: '142px',
+                    backgroundColor: '#334155',
                     color: '#fff',
-                    borderRadius: '0.5rem',
-                    border: 'none',
+                    borderRadius: '6px',
+                    border: '1px solid #475569',
                     fontSize: '0.875rem',
-                    fontWeight: '600',
+                    fontWeight: '500',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '0.5rem'
+                    boxSizing: 'border-box'
                   }}
                 >
-                  <svg style={{ width: '1rem', height: '1rem' }} fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/>
-                  </svg>
-                  Perform Analysis
+                  Back to Inventory
                 </button>
-                <div style={{ fontSize: '0.625rem', color: '#64748b', textAlign: 'center', marginTop: '0.5rem' }}>
-                  Powered by Banana Brain AI
-                </div>
               </div>
-            </div>
-
-            {/* Bottom Section: Metrics Grid */}
-            <div className="px-6 pb-6" style={{ position: 'relative' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem' }}>
-                  {getCurrentMetrics().map(metricId => {
-                    const metric = availableMetrics.find(m => m.id === metricId);
-                    if (!metric) return null;
-                    const metricData = getMetricValue(metricId);
-                    const changeColor = metricData.invertColor 
-                      ? (metricData.change >= 0 ? '#ef4444' : '#22c55e')
-                      : (metricData.change >= 0 ? '#22c55e' : '#ef4444');
-                    
-                    // Determine chart metric visibility
-                    const chartMetric = (activeTab === 'sales' ? SALES_METRICS : ADS_METRICS).find(m => m.id === metricId);
-                    const isVisibleOnChart = chartMetric && (activeTab === 'sales' ? visibleSalesMetrics : visibleAdsMetrics).includes(metricId);
-                    const borderColor = isVisibleOnChart ? chartMetric.color : '#334155';
-                    const toggleMetric = activeTab === 'sales' ? toggleSalesMetric : toggleAdsMetric;
-                    
-                    return (
-                      <div 
-                        key={metricId} 
-                        onClick={() => chartMetric && toggleMetric(metricId)}
-                        style={{ 
-                          padding: '1.5rem', 
-                          backgroundColor: '#0f1729', 
-                          borderRadius: '0.75rem', 
-                          border: `2px solid ${borderColor}`, 
-                          textAlign: 'center',
-                          cursor: chartMetric ? 'pointer' : 'default',
-                          transition: 'all 0.2s',
-                          position: 'relative'
-                        }}
-                        onMouseEnter={(e) => {
-                          if (chartMetric) {
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                            e.currentTarget.style.boxShadow = `0 4px 12px ${borderColor}40`;
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (chartMetric) {
-                            e.currentTarget.style.transform = 'translateY(0)';
-                            e.currentTarget.style.boxShadow = 'none';
-                          }
-                        }}
-                      >
-                        {isVisibleOnChart && (
-                          <div style={{
-                            position: 'absolute',
-                            top: '0.5rem',
-                            right: '0.5rem',
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            backgroundColor: chartMetric.color,
-                            boxShadow: `0 0 8px ${chartMetric.color}`
-                          }} />
-                        )}
-                        <div style={{ fontSize: '2rem', fontWeight: '700', color: '#fff', marginBottom: '0.25rem' }}>
-                          {metricData.prefix}{metricData.value}
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                          {metric.label} 
-                          {metricData.change !== null && (
-                            <span style={{ color: changeColor, fontWeight: '600' }}>
-                              {' '}{metricData.change >= 0 ? '+' : ''}{metricData.change?.toFixed(1)}%
-                            </span>
-                          )}
-                        </div>
-                        {chartMetric && (
-                          <div style={{ fontSize: '0.625rem', color: '#64748b', marginTop: '0.5rem' }}>
-                            {isVisibleOnChart ? '📊 On chart' : 'Click to show'}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  {/* Add Metric Button */}
-                  <div 
-                    onClick={() => setShowMetricSelector(true)}
-                    style={{ 
-                      padding: '1.5rem',
-                      backgroundColor: 'transparent',
-                      borderRadius: '0.75rem',
-                      border: '1px dashed #475569',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: '2rem', color: '#94a3b8', marginBottom: '0.25rem' }}>+</div>
-                      <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Add Metric</div>
-                    </div>
-                  </div>
-              </div>
-
-              {/* Metric Selector Modal */}
-              {showMetricSelector && (
-                <div style={{
-                  position: 'fixed',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 1000
-                }}
-                onClick={() => setShowMetricSelector(false)}
-                >
-                  <div style={{
-                    backgroundColor: '#1e293b',
-                    borderRadius: '0.75rem',
-                    padding: '1.5rem',
-                    width: '400px',
-                    maxHeight: '600px',
-                    display: 'flex',
-                    flexDirection: 'column'
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  >
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#fff', marginBottom: '1rem' }}>Metrics</h3>
-                    
-                    {/* Search Input */}
-                    <div style={{ position: 'relative', marginBottom: '1rem' }}>
-                      <input
-                        type="text"
-                        placeholder="Search metrics..."
-                        value={metricSearch}
-                        onChange={(e) => setMetricSearch(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '0.75rem 2.5rem 0.75rem 1rem',
-                          backgroundColor: '#334155',
-                          border: 'none',
-                          borderRadius: '0.5rem',
-                          color: '#fff',
-                          fontSize: '0.875rem'
-                        }}
-                      />
-                      <svg style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', width: '1.25rem', height: '1.25rem', color: '#94a3b8' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                    </div>
-
-                    {/* Results and Clear */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                      <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>
-                        {filteredMetrics.length} results
-                      </span>
-                      <div>
-                        <span style={{ fontSize: '0.875rem', color: '#3b82f6', marginRight: '0.5rem' }}>
-                          {getCurrentMetrics().length} selected
-                        </span>
-                        <button onClick={clearAllMetrics} style={{ fontSize: '0.875rem', color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
-                          Clear all
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Metric List */}
-                    <div style={{ flex: 1, overflowY: 'auto', marginBottom: '1rem' }}>
-                      {filteredMetrics.map(metric => (
-                        <div
-                          key={metric.id}
-                          onClick={() => toggleMetric(metric.id)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '0.75rem',
-                            marginBottom: '0.5rem',
-                            borderRadius: '0.5rem',
-                            cursor: 'pointer',
-                            backgroundColor: getCurrentMetrics().includes(metric.id) ? '#334155' : 'transparent'
-                          }}
-                        >
-                          <div style={{
-                            width: '1.25rem',
-                            height: '1.25rem',
-                            borderRadius: '50%',
-                            border: `2px solid ${getCurrentMetrics().includes(metric.id) ? '#3b82f6' : '#64748b'}`,
-                            backgroundColor: getCurrentMetrics().includes(metric.id) ? '#3b82f6' : 'transparent',
-                            marginRight: '0.75rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}>
-                            {getCurrentMetrics().includes(metric.id) && (
-                              <div style={{ width: '0.5rem', height: '0.5rem', borderRadius: '50%', backgroundColor: '#fff' }} />
-                            )}
-                          </div>
-                          <span style={{ fontSize: '0.875rem', color: '#fff' }}>{metric.label}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Close Button */}
-                    <button
-                      onClick={() => setShowMetricSelector(false)}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        backgroundColor: '#3b82f6',
-                        color: '#fff',
-                        borderRadius: '0.5rem',
-                        border: 'none',
-                        fontSize: '0.875rem',
-                        fontWeight: '600',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Done
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
       )}
 
-      {/* Ads Tab Content */}
+      {/* Ads Tab Content - ZAP Coming Soon */}
       {activeTab === 'ads' && (
-          <div style={{ backgroundColor: '#1A2235' }}>
-            {/* Header with Controls */}
-            <div className="px-6 pt-6" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1rem', gap: '1rem' }}>
-              {/* Metric Controller */}
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', flex: 1 }}>
-                <span style={{ fontSize: '0.75rem', color: '#94a3b8', alignSelf: 'center', marginRight: '0.5rem', fontWeight: '600', textTransform: 'uppercase' }}>
-                  Metrics:
-                </span>
-                {ADS_METRICS.map(metric => {
-                  const isVisible = visibleAdsMetrics.includes(metric.id);
-                  return (
-                    <button
-                      key={metric.id}
-                      onClick={() => toggleAdsMetric(metric.id)}
-                      style={{
-                        padding: '0.375rem 0.75rem',
-                        borderRadius: '0.375rem',
-                        backgroundColor: isVisible ? metric.color + '20' : 'transparent',
-                        border: `2px solid ${isVisible ? metric.color : '#475569'}`,
-                        color: isVisible ? metric.color : '#94a3b8',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.375rem',
-                        opacity: isVisible ? 1 : 0.6
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-1px)';
-                        e.currentTarget.style.opacity = '1';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.opacity = isVisible ? '1' : '0.6';
-                      }}
-                    >
-                      <div style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        backgroundColor: isVisible ? metric.color : '#475569'
-                      }} />
-                      {metric.label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Period Selectors */}
-              <div style={{ display: 'flex', gap: '0.75rem', flexShrink: 0 }}>
-                <select 
-                  value={metricsDays}
-                  onChange={(e) => setMetricsDays(Number(e.target.value))}
-                  style={{ 
-                    padding: '0.5rem 1rem', 
-                    borderRadius: '0.5rem', 
-                    backgroundColor: '#1e293b', 
-                    color: '#fff',
-                    border: '1px solid #334155',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    minWidth: '100px'
-                  }}
-                >
-                  <option value={7}>7 Days</option>
-                  <option value={30}>30 Days</option>
-                  <option value={60}>60 Days</option>
-                  <option value={90}>90 Days</option>
-                </select>
-                
-                <select 
-                  style={{ 
-                    padding: '0.5rem 1rem', 
-                    borderRadius: '0.5rem', 
-                    backgroundColor: '#1e293b', 
-                    color: '#fff',
-                    border: '1px solid #334155',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    minWidth: '120px'
-                  }}
-                >
-                  <option value="prior">Prior Period</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Graph Section: 70% Graph + 30% Banana Factors */}
-            <div className="px-6" style={{ display: 'grid', gridTemplateColumns: '70% 30%', gap: '1.5rem', marginBottom: '1.5rem', minHeight: '400px' }}>
-              {/* Left: Graph (70%) */}
-              <div className={themeClasses.cardBg} style={{ borderRadius: '0.75rem', padding: '1.5rem', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                <div style={{ flex: 1, minHeight: 300 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={adsChartData?.chart_data || []}>
-                    <CartesianGrid 
-                      strokeDasharray="4 4" 
-                      stroke="rgba(148, 163, 184, 0.45)" 
-                      vertical={false} 
-                      horizontal={true}
-                      strokeWidth={1} 
-                    />
-                    <XAxis 
-                      dataKey="date" 
-                      stroke="#64748b"
-                      style={{ fontSize: '0.75rem' }}
-                      tickLine={false}
-                      tickFormatter={(value) => {
-                        const date = new Date(value);
-                        return `${date.getMonth() + 1}/${date.getDate()}`;
-                      }}
-                    />
-                    <YAxis 
-                      stroke="#64748b"
-                      style={{ fontSize: '0.75rem' }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#0f172a', 
-                        border: '1px solid #334155',
-                        borderRadius: '0.5rem',
-                        color: '#fff',
-                        fontSize: '0.875rem'
-                      }}
-                      formatter={(value, name) => {
-                        const metric = ADS_METRICS.find(m => m.label === name);
-                        if (metric) {
-                          return [formatChartValue(value, metric.formatType), name];
-                        }
-                        return [value, name];
-                      }}
-                    />
-                    {/* Dynamically render visible metrics */}
-                    {visibleAdsMetrics.length > 0 && ADS_METRICS
-                      .filter(metric => visibleAdsMetrics.includes(metric.id))
-                      .map((metric) => {
-                        console.log('Rendering Ads metric:', metric.id, metric.valueKey, 'Sample data:', adsChartData?.chart_data?.[0]?.[metric.valueKey]);
-                        return (
-                          <Line 
-                            key={metric.id}
-                            type="monotone" 
-                            dataKey={metric.valueKey} 
-                            stroke={metric.color} 
-                            strokeWidth={2.5}
-                            name={metric.label}
-                            dot={false}
-                            connectNulls
-                          />
-                        );
-                      })}
-                  </ComposedChart>
-                </ResponsiveContainer>
+          <div style={{ backgroundColor: '#1A2235', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            {inventoryOnly && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', marginTop: '0.9375rem', padding: '0 1rem' }}>
+                <div style={{ display: 'flex', gap: '0.25rem', backgroundColor: '#0f172a', borderRadius: '0.5rem', padding: '4px', width: '325px', height: '32px', border: '1px solid #334155', alignItems: 'center', boxSizing: 'border-box' }}>
+                  <button onClick={() => setActiveTab('forecast')} style={{ padding: '0', fontSize: '1rem', fontWeight: '500', color: activeTab === 'forecast' ? '#fff' : '#94a3b8', backgroundColor: activeTab === 'forecast' ? '#2563EB' : 'transparent', border: 'none', borderRadius: '0.25rem', cursor: 'pointer', transition: 'all 0.2s', flex: 1, height: '23px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Inventory</button>
+                  <button onClick={() => setActiveTab('sales')} style={{ padding: '0', fontSize: '1rem', fontWeight: '500', color: activeTab === 'sales' ? '#fff' : '#94a3b8', backgroundColor: activeTab === 'sales' ? '#2563EB' : 'transparent', border: 'none', borderRadius: '0.25rem', cursor: 'pointer', transition: 'all 0.2s', flex: 1, height: '23px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Sales</button>
+                  <button onClick={() => setActiveTab('ads')} style={{ padding: '0', fontSize: '1rem', fontWeight: '500', color: activeTab === 'ads' ? '#fff' : '#94a3b8', backgroundColor: activeTab === 'ads' ? '#2563EB' : 'transparent', border: 'none', borderRadius: '0.25rem', cursor: 'pointer', transition: 'all 0.2s', flex: 1, height: '23px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Ads</button>
                 </div>
               </div>
-
-              {/* Right: Banana Factors (30%) */}
-              <div className={themeClasses.cardBg} style={{ borderRadius: '0.75rem', padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#fff', marginBottom: '1.5rem' }}>Banana Factors</h3>
-                
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {/* Sessions */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid #334155' }}>
-                    <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Sessions</span>
-                    <span style={{ fontSize: '0.875rem', fontWeight: '600', color: metrics?.changes?.sessions >= 0 ? '#22c55e' : '#ef4444' }}>
-                      {metrics?.changes?.sessions >= 0 ? '+' : ''}{metrics?.changes?.sessions?.toFixed(1) || '0.0'}%
-                    </span>
-                  </div>
-
-                  {/* Conversion Rate */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid #334155' }}>
-                    <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Conversion Rate</span>
-                    <span style={{ fontSize: '0.875rem', fontWeight: '600', color: metrics?.changes?.conversion_rate >= 0 ? '#22c55e' : '#ef4444' }}>
-                      {metrics?.changes?.conversion_rate >= 0 ? '+' : ''}{metrics?.changes?.conversion_rate?.toFixed(1) || '0.0'}%
-                    </span>
-                  </div>
-
-                  {/* TACOS */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid #334155' }}>
-                    <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>TACOS</span>
-                    <span style={{ fontSize: '0.875rem', fontWeight: '600', color: metrics?.changes?.tacos <= 0 ? '#22c55e' : '#ef4444' }}>
-                      {metrics?.changes?.tacos >= 0 ? '+' : ''}{metrics?.changes?.tacos?.toFixed(1) || '0.0'}%
-                    </span>
+            )}
+            <div className={inventoryOnly ? '' : 'px-6 pb-6'} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 0, overflow: 'auto', padding: inventoryOnly ? '1rem' : '3rem' }}>
+              <div style={{ textAlign: 'center', maxWidth: '420px', marginTop: '-50px' }}>
+                <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'center' }}>
+                  <div style={{ width: 98, height: 98, borderRadius: '50%', border: '1px solid rgba(168, 85, 247, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(30, 27, 75, 0.6)' }}>
+                    <svg width="56" height="56" viewBox="0 0 24 24" fill="none" style={{ color: '#a855f7' }}>
+                      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="currentColor" />
+                    </svg>
                   </div>
                 </div>
-
-                {/* Perform Analysis Button */}
-                <button 
-                  onClick={handlePerformAnalysis}
-                  style={{
-                    marginTop: 'auto',
-                    padding: '0.75rem',
-                    backgroundColor: '#3b82f6',
-                    color: '#fff',
-                    borderRadius: '0.5rem',
-                    border: 'none',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.5rem'
-                  }}
-                >
-                  <svg style={{ width: '1rem', height: '1rem' }} fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/>
-                  </svg>
-                  Perform Analysis
+                <h2 style={{ fontSize: '1.75rem', fontWeight: '700', color: '#fff', marginBottom: '0.75rem' }}>ZAP is Coming Soon!</h2>
+                <p style={{ fontSize: '1rem', color: '#94a3b8', marginBottom: '1.5rem', lineHeight: 1.5 }}>Ad management is on the horizon. Get ready to zap your competition.</p>
+                <button onClick={() => setActiveTab('forecast')} style={{ minWidth: '133px', height: '31px', padding: '0 10px', backgroundColor: '#334155', color: '#fff', borderRadius: '6px', border: '1px solid #475569', fontSize: '0.875rem', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>
+                  Back to Inventory
                 </button>
-                <div style={{ fontSize: '0.625rem', color: '#64748b', textAlign: 'center', marginTop: '0.5rem' }}>
-                  Powered by Banana Brain AI
-                </div>
               </div>
-            </div>
-
-            {/* Bottom Section: Metrics Grid */}
-            <div className="px-6 pb-6" style={{ position: 'relative' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem' }}>
-                  {getCurrentMetrics().map(metricId => {
-                    const metric = availableMetrics.find(m => m.id === metricId);
-                    if (!metric) return null;
-                    const metricData = getMetricValue(metricId);
-                    const changeColor = metricData.invertColor 
-                      ? (metricData.change >= 0 ? '#ef4444' : '#22c55e')
-                      : (metricData.change >= 0 ? '#22c55e' : '#ef4444');
-                    
-                    // Determine chart metric visibility
-                    const chartMetric = (activeTab === 'sales' ? SALES_METRICS : ADS_METRICS).find(m => m.id === metricId);
-                    const isVisibleOnChart = chartMetric && (activeTab === 'sales' ? visibleSalesMetrics : visibleAdsMetrics).includes(metricId);
-                    const borderColor = isVisibleOnChart ? chartMetric.color : '#334155';
-                    const toggleMetric = activeTab === 'sales' ? toggleSalesMetric : toggleAdsMetric;
-                    
-                    return (
-                      <div 
-                        key={metricId} 
-                        onClick={() => chartMetric && toggleMetric(metricId)}
-                        style={{ 
-                          padding: '1.5rem', 
-                          backgroundColor: '#0f1729', 
-                          borderRadius: '0.75rem', 
-                          border: `2px solid ${borderColor}`, 
-                          textAlign: 'center',
-                          cursor: chartMetric ? 'pointer' : 'default',
-                          transition: 'all 0.2s',
-                          position: 'relative'
-                        }}
-                        onMouseEnter={(e) => {
-                          if (chartMetric) {
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                            e.currentTarget.style.boxShadow = `0 4px 12px ${borderColor}40`;
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (chartMetric) {
-                            e.currentTarget.style.transform = 'translateY(0)';
-                            e.currentTarget.style.boxShadow = 'none';
-                          }
-                        }}
-                      >
-                        {isVisibleOnChart && (
-                          <div style={{
-                            position: 'absolute',
-                            top: '0.5rem',
-                            right: '0.5rem',
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            backgroundColor: chartMetric.color,
-                            boxShadow: `0 0 8px ${chartMetric.color}`
-                          }} />
-                        )}
-                        <div style={{ fontSize: '2rem', fontWeight: '700', color: '#fff', marginBottom: '0.25rem' }}>
-                          {metricData.prefix}{metricData.value}
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                          {metric.label} 
-                          {metricData.change !== null && (
-                            <span style={{ color: changeColor, fontWeight: '600' }}>
-                              {' '}{metricData.change >= 0 ? '+' : ''}{metricData.change?.toFixed(1)}%
-                            </span>
-                          )}
-                        </div>
-                        {chartMetric && (
-                          <div style={{ fontSize: '0.625rem', color: '#64748b', marginTop: '0.5rem' }}>
-                            {isVisibleOnChart ? '📊 On chart' : 'Click to show'}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  {/* Add Metric Button */}
-                  <div 
-                    onClick={() => setShowMetricSelector(true)}
-                    style={{ 
-                      padding: '1.5rem',
-                      backgroundColor: 'transparent',
-                      borderRadius: '0.75rem',
-                      border: '1px dashed #475569',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: '2rem', color: '#94a3b8', marginBottom: '0.25rem' }}>+</div>
-                      <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Add Metric</div>
-                    </div>
-                  </div>
-              </div>
-
-              {/* Metric Selector Modal */}
-              {showMetricSelector && (
-                <div style={{
-                  position: 'fixed',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 1000
-                }}
-                onClick={() => setShowMetricSelector(false)}
-                >
-                  <div style={{
-                    backgroundColor: '#1e293b',
-                    borderRadius: '0.75rem',
-                    padding: '1.5rem',
-                    width: '400px',
-                    maxHeight: '600px',
-                    display: 'flex',
-                    flexDirection: 'column'
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  >
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#fff', marginBottom: '1rem' }}>Metrics</h3>
-                    
-                    {/* Search Input */}
-                    <div style={{ position: 'relative', marginBottom: '1rem' }}>
-                      <input
-                        type="text"
-                        placeholder="Search metrics..."
-                        value={metricSearch}
-                        onChange={(e) => setMetricSearch(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '0.75rem 2.5rem 0.75rem 1rem',
-                          backgroundColor: '#334155',
-                          border: 'none',
-                          borderRadius: '0.5rem',
-                          color: '#fff',
-                          fontSize: '0.875rem'
-                        }}
-                      />
-                      <svg style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', width: '1.25rem', height: '1.25rem', color: '#94a3b8' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                    </div>
-
-                    {/* Results and Clear */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                      <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>
-                        {filteredMetrics.length} results
-                      </span>
-                      <div>
-                        <span style={{ fontSize: '0.875rem', color: '#3b82f6', marginRight: '0.5rem' }}>
-                          {getCurrentMetrics().length} selected
-                        </span>
-                        <button onClick={clearAllMetrics} style={{ fontSize: '0.875rem', color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
-                          Clear all
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Metric List */}
-                    <div style={{ flex: 1, overflowY: 'auto', marginBottom: '1rem' }}>
-                      {filteredMetrics.map(metric => (
-                        <div
-                          key={metric.id}
-                          onClick={() => toggleMetric(metric.id)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '0.75rem',
-                            marginBottom: '0.5rem',
-                            borderRadius: '0.5rem',
-                            cursor: 'pointer',
-                            backgroundColor: getCurrentMetrics().includes(metric.id) ? '#334155' : 'transparent'
-                          }}
-                        >
-                          <div style={{
-                            width: '1.25rem',
-                            height: '1.25rem',
-                            borderRadius: '50%',
-                            border: `2px solid ${getCurrentMetrics().includes(metric.id) ? '#3b82f6' : '#64748b'}`,
-                            backgroundColor: getCurrentMetrics().includes(metric.id) ? '#3b82f6' : 'transparent',
-                            marginRight: '0.75rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}>
-                            {getCurrentMetrics().includes(metric.id) && (
-                              <div style={{ width: '0.5rem', height: '0.5rem', borderRadius: '50%', backgroundColor: '#fff' }} />
-                            )}
-                          </div>
-                          <span style={{ fontSize: '0.875rem', color: '#fff' }}>{metric.label}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Close Button */}
-                    <button
-                      onClick={() => setShowMetricSelector(false)}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        backgroundColor: '#3b82f6',
-                        color: '#fff',
-                        borderRadius: '0.5rem',
-                        border: 'none',
-                        fontSize: '0.875rem',
-                        fontWeight: '600',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Done
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
       )}
