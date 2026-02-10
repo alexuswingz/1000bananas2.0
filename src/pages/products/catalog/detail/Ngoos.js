@@ -136,7 +136,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   });
   const [currentProductAsin, setCurrentProductAsin] = useState(null);
   const [chartLoadError, setChartLoadError] = useState(null); // e.g. CORS / network when chart fails on live
-  const [lineAnimationDone, setLineAnimationDone] = useState(false); // true after Potential Units Sold line finishes drawing
+  const [lineAnimationDone, setLineAnimationDone] = useState(false); // true after line has had time to finish drawing so bucket hover doesn't interrupt
   const [visibleSalesMetrics, setVisibleSalesMetrics] = useState(['units_sold', 'sales']);
   const [visibleAdsMetrics, setVisibleAdsMetrics] = useState(['total_sales', 'tacos']);
   const [hoveredSegment, setHoveredSegment] = useState(null); // 'fba', 'total', 'forecast', or null
@@ -950,7 +950,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     return () => cancelAnimationFrame(id);
   }, [hasChartData]);
 
-  // Wait for Potential Units Sold line to finish drawing before allowing bucket hover (hover during animation interrupts the line).
+  // Wait for Potential Units Sold line to finish animating before allowing bucket hover (hover during animation interrupts the line).
   useEffect(() => {
     if (loading || !chartDeferredReady) {
       setLineAnimationDone(false);
@@ -3620,7 +3620,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                     connectNulls={false}
                   />
                   
-                  {/* Smoothed Units Sold - Orange solid line (historical only; stops at today) */}
+                  {/* Smoothed Units Sold - Orange solid line (Potential Units Sold) */}
                   <Line 
                     yAxisId="left"
                     type="monotone" 
