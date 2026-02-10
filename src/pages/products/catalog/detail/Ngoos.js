@@ -115,7 +115,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   const [showAIModal, setShowAIModal] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [showForecastSettingsTooltip, setShowForecastSettingsTooltip] = useState(false);
   const [showForecastSettingsModal, setShowForecastSettingsModal] = useState(false);
   const [showTemporaryConfirmModal, setShowTemporaryConfirmModal] = useState(false);
   const [dontRemindAgain, setDontRemindAgain] = useState(false);
@@ -190,6 +189,20 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
       case '2 Years': return 104;
       case 'All Time': return 260;      // ~5 years
       default: return 52;
+    }
+  };
+
+  // Chart visible window: days before today and days after today for the selected view.
+  // ≤1 year: same period before and after. >1 year: full period before, 1 year after.
+  const getChartWindowDays = (view) => {
+    const oneYearDays = 365;
+    switch (view) {
+      case '30 Day': return { daysBefore: 30, daysAfter: 30 };
+      case '6 Months': return { daysBefore: 182, daysAfter: 182 };
+      case '1 Year': return { daysBefore: oneYearDays, daysAfter: oneYearDays };
+      case '2 Years': return { daysBefore: 730, daysAfter: oneYearDays };
+      case 'All Time': return { daysBefore: 260 * 7, daysAfter: oneYearDays }; // ~5 years before, 1 year after
+      default: return { daysBefore: oneYearDays, daysAfter: oneYearDays };
     }
   };
 
@@ -774,6 +787,21 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     return new Date(y, m - 1, d, 0, 0, 0, 0).getTime();
   };
 
+  // Visible time window for chart based on selected view: X days before today, Y days after today.
+  const chartVisibleWindow = useMemo(() => {
+    const chart = chartData;
+    const todaySource = chart?.metadata?.today ?? chart?.today ?? forecastData?.current_date ?? null;
+    if (!todaySource) return null;
+    const today = new Date(todaySource);
+    const todayTs = today.getTime();
+    const { daysBefore, daysAfter } = getChartWindowDays(selectedView);
+    const msPerDay = 24 * 60 * 60 * 1000;
+    return {
+      startTs: todayTs - daysBefore * msPerDay,
+      endTs: todayTs + daysAfter * msPerDay
+    };
+  }, [chartData, forecastData, selectedView]);
+
   // Zoom range as timestamps: used so both ends of the grabbed range are visible on the axis
   const chartXDomainWhenZoomed = useMemo(() => {
     if (zoomDomain.left == null || zoomDomain.right == null) return null;
@@ -782,14 +810,15 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     return [zoomMin, zoomMax];
   }, [zoomDomain?.left, zoomDomain?.right]);
 
-  // Effective X domain as [minTs, maxTs] for tick generation
+  // Effective X domain as [minTs, maxTs] for tick generation (visible window when not zoomed)
   const chartXDomainTimestamps = useMemo(() => {
     const data = chartDisplayData?.data;
     if (!data?.length) return null;
     if (chartXDomainWhenZoomed?.length === 2) return chartXDomainWhenZoomed;
+    if (chartVisibleWindow) return [chartVisibleWindow.startTs, chartVisibleWindow.endTs];
     const timestamps = data.map((d) => (typeof d.timestamp === 'number' ? d.timestamp : new Date(d.timestamp).getTime()));
     return [Math.min(...timestamps), Math.max(...timestamps)];
-  }, [chartDisplayData?.data, chartXDomainWhenZoomed]);
+  }, [chartDisplayData?.data, chartXDomainWhenZoomed, chartVisibleWindow]);
 
   // Same month indices for every year so the axis is consistent (Jan, Apr, Jul, Oct).
   // Number of months can be reduced on narrow screens to avoid crowding.
@@ -828,18 +857,27 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     return ticks.filter((t) => t >= tMin && t <= tMax);
   }, [chartXDomainTimestamps, chartAxisWidth]);
 
-  // Chart data actually shown: when zoomed, filter to zoom range so the graph visibly zooms
+  // Chart data actually shown: filter to visible window (or zoom range when zoomed)
   const chartDataForDisplay = useMemo(() => {
     const data = chartDisplayData?.data;
     if (!data?.length) return [];
-    if (zoomDomain.left == null || zoomDomain.right == null) return data;
-    const zoomMin = parseZoomDateToLocal(zoomDomain.left, false);
-    const zoomMax = parseZoomDateToLocal(zoomDomain.right, true);
-    return data.filter((d) => {
-      const t = typeof d.timestamp === 'number' ? d.timestamp : new Date(d.timestamp).getTime();
-      return t >= zoomMin && t <= zoomMax;
-    });
-  }, [chartDisplayData?.data, zoomDomain?.left, zoomDomain?.right]);
+    if (zoomDomain.left != null && zoomDomain.right != null) {
+      const zoomMin = parseZoomDateToLocal(zoomDomain.left, false);
+      const zoomMax = parseZoomDateToLocal(zoomDomain.right, true);
+      return data.filter((d) => {
+        const t = typeof d.timestamp === 'number' ? d.timestamp : new Date(d.timestamp).getTime();
+        return t >= zoomMin && t <= zoomMax;
+      });
+    }
+    if (chartVisibleWindow) {
+      const { startTs, endTs } = chartVisibleWindow;
+      return data.filter((d) => {
+        const t = typeof d.timestamp === 'number' ? d.timestamp : new Date(d.timestamp).getTime();
+        return t >= startTs && t <= endTs;
+      });
+    }
+    return data;
+  }, [chartDisplayData?.data, zoomDomain?.left, zoomDomain?.right, chartVisibleWindow]);
 
   // Defer chart mount by one frame so container has layout; avoids Recharts width/height -1 warning
   const hasChartData = (chartDataForDisplay?.length ?? 0) > 0;
@@ -871,14 +909,21 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     return { unitsSold, unitsSmoothed };
   }, [chartDisplayData?.data, chartRangeSelection.startTimestamp, chartRangeSelection.endTimestamp]);
 
-  // Map client X to timestamp using the chart's actual plot area and current visible domain (zoom-aware)
+  // Map client X to timestamp using the chart's actual plot area and current visible domain (zoom or time-window)
   const getTimestampFromClientX = (clientX) => {
     const data = chartDisplayData?.data;
     if (!chartContainerRef.current || !data?.length) return null;
     const dataMin = data[0].timestamp;
     const dataMax = data[data.length - 1].timestamp;
-    const visibleMin = zoomDomain.left != null ? parseZoomDateToLocal(zoomDomain.left, false) : dataMin;
-    const visibleMax = zoomDomain.right != null ? parseZoomDateToLocal(zoomDomain.right, true) : dataMax;
+    let visibleMin = dataMin;
+    let visibleMax = dataMax;
+    if (zoomDomain.left != null && zoomDomain.right != null) {
+      visibleMin = parseZoomDateToLocal(zoomDomain.left, false);
+      visibleMax = parseZoomDateToLocal(zoomDomain.right, true);
+    } else if (chartVisibleWindow) {
+      visibleMin = chartVisibleWindow.startTs;
+      visibleMax = chartVisibleWindow.endTs;
+    }
     const container = chartContainerRef.current;
     let plotEl = container.querySelector('.recharts-cartesian-grid');
     const gridRect = plotEl?.getBoundingClientRect();
@@ -1308,7 +1353,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     setTempMarketAdjustment(marketAdjustment);
     setTempDoiSettings(doiSettings || { amazonDoiGoal: 130, inboundLeadTime: 30, manufactureLeadTime: 7 });
     setShowForecastSettingsModal(true);
-    setShowForecastSettingsTooltip(false);
   };
 
   const calculateTotalDOI = (settings) => {
@@ -2616,20 +2660,15 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                   position: 'relative',
                   display: 'inline-block'
                 }}
-                onMouseEnter={() => {
-                  // Don't show forecast settings tooltip if indicator tooltip is showing
-                  if (!showIndicatorTooltip) {
-                    setShowForecastSettingsTooltip(true);
-                  }
-                }}
-                onMouseLeave={() => setShowForecastSettingsTooltip(false)}
               >
                 <button 
+                  type="button"
                   title="Forecast Settings"
+                  onClick={handleOpenForecastSettingsModal}
                   style={{ 
                     padding: '0.5rem', 
                     color: '#94a3b8', 
-                    backgroundColor: showForecastSettingsTooltip ? 'rgba(59, 130, 246, 0.1)' : 'transparent', 
+                    backgroundColor: 'transparent', 
                     border: 'none', 
                     borderRadius: '0.375rem',
                     cursor: 'pointer',
@@ -2659,7 +2698,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                     onMouseEnter={(e) => {
                       e.stopPropagation();
                       setShowIndicatorTooltip(true);
-                      setShowForecastSettingsTooltip(false);
                     }}
                   >
                     <div
@@ -2715,7 +2753,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                           onMouseEnter={(e) => {
                             e.stopPropagation();
                             setShowIndicatorTooltip(true);
-                            setShowForecastSettingsTooltip(false);
                           }}
                           onMouseLeave={(e) => {
                             e.stopPropagation();
@@ -2726,7 +2763,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                           onMouseEnter={(e) => {
                             e.stopPropagation();
                             setShowIndicatorTooltip(true);
-                            setShowForecastSettingsTooltip(false);
                           }}
                           onMouseLeave={(e) => {
                             e.stopPropagation();
@@ -2877,52 +2913,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                       </>
                     )}
                   </div>
-                )}
-                {showForecastSettingsTooltip && (
-                  <>
-                    {/* Invisible bridge to keep tooltip visible when moving mouse down */}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        width: '120px',
-                        height: '8px',
-                        pointerEvents: 'auto',
-                      }}
-                    />
-                    <div
-                      onClick={handleOpenForecastSettingsModal}
-                      style={{
-                        position: 'absolute',
-                        top: 'calc(100% + 8px)',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        backgroundColor: '#1A1F2E',
-                        color: '#E5E7EB',
-                        padding: '6px 10px',
-                        borderRadius: '6px',
-                        fontSize: '0.75rem',
-                        fontWeight: 500,
-                        whiteSpace: 'nowrap',
-                        zIndex: 1000,
-                        cursor: 'pointer',
-                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3)',
-                        transition: 'background-color 0.2s',
-                        pointerEvents: 'auto',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#2563EB';
-                        setShowForecastSettingsTooltip(true);
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#1A1F2E';
-                      }}
-                    >
-                      Forecast Settings
-                    </div>
-                  </>
                 )}
               </div>
               <select 
@@ -3079,7 +3069,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                     dataKey="timestamp"
                     type="number"
                     scale="time"
-                    domain={chartXDomainWhenZoomed ?? ['dataMin', 'dataMax']}
+                    domain={chartXDomainWhenZoomed ?? (chartXDomainTimestamps ? [chartXDomainTimestamps[0], chartXDomainTimestamps[1]] : ['dataMin', 'dataMax'])}
                     axisLine={false}
                     tickLine={false}
                     // Brighter tick color + extra margin so dates are always visible
@@ -3115,8 +3105,8 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                   />
                   <Tooltip 
                     content={(props) => {
-                      // Hide tooltip when zooming (zoom tool active or zoomed in)
-                      if (zoomToolActive || zoomDomain.left != null || zoomDomain.right != null) return null;
+                      // Hide tooltip only while zoom tool is active (selecting two points); show when zoomed in
+                      if (zoomToolActive) return null;
                       if (!props.active || !props.payload?.length) return null;
                       const inner = <CustomTooltip {...props} />;
                       const pos = chartCursorRef.current;
@@ -3216,6 +3206,61 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                           ))}
                           {periods.length > 0 && (
                             <ReferenceLine x={new Date(periods[periods.length - 1].end_date).getTime()} stroke="#3b82f6" strokeDasharray="3 3" strokeWidth={1} strokeOpacity={0.7} yAxisId="left" />
+                          )}
+                          {/* Hover: dotted line at segment end with date label */}
+                          {hoveredSegment === 'fba' && periods[0] && (
+                            <ReferenceLine
+                              x={new Date(periods[0].end_date).getTime()}
+                              stroke="#e5e7eb"
+                              strokeDasharray="6 4"
+                              strokeWidth={2}
+                              strokeOpacity={0.95}
+                              yAxisId="left"
+                              label={{
+                                value: new Date(periods[0].end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                                position: 'top',
+                                fill: '#e5e7eb',
+                                fontSize: 11,
+                                fontWeight: 500,
+                                offset: 6
+                              }}
+                            />
+                          )}
+                          {hoveredSegment === 'total' && periods[1] && (
+                            <ReferenceLine
+                              x={new Date(periods[1].end_date).getTime()}
+                              stroke="#e5e7eb"
+                              strokeDasharray="6 4"
+                              strokeWidth={2}
+                              strokeOpacity={0.95}
+                              yAxisId="left"
+                              label={{
+                                value: new Date(periods[1].end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                                position: 'top',
+                                fill: '#e5e7eb',
+                                fontSize: 11,
+                                fontWeight: 500,
+                                offset: 6
+                              }}
+                            />
+                          )}
+                          {hoveredSegment === 'forecast' && periods.length > 0 && (
+                            <ReferenceLine
+                              x={new Date(periods[periods.length - 1].end_date).getTime()}
+                              stroke="#e5e7eb"
+                              strokeDasharray="6 4"
+                              strokeWidth={2}
+                              strokeOpacity={0.95}
+                              yAxisId="left"
+                              label={{
+                                value: new Date(periods[periods.length - 1].end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                                position: 'top',
+                                fill: '#e5e7eb',
+                                fontSize: 11,
+                                fontWeight: 500,
+                                offset: 6
+                              }}
+                            />
                           )}
                           
                           {/* Today marker from backend or calculated */}
@@ -3397,6 +3442,61 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                         )}
                         {hasBlueSpan && (
                           <ReferenceLine x={forecastPoint.timestamp} stroke="#3b82f6" strokeDasharray="3 3" strokeWidth={1} strokeOpacity={0.7} yAxisId="left" />
+                        )}
+                        {/* Hover: dotted line at segment end with date label */}
+                        {hoveredSegment === 'fba' && hasVioletSpan && fbaPoint && (
+                          <ReferenceLine
+                            x={fbaPoint.timestamp}
+                            stroke="#e5e7eb"
+                            strokeDasharray="6 4"
+                            strokeWidth={2}
+                            strokeOpacity={0.95}
+                            yAxisId="left"
+                            label={{
+                              value: new Date(fbaPoint.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                              position: 'top',
+                              fill: '#e5e7eb',
+                              fontSize: 11,
+                              fontWeight: 500,
+                              offset: 6
+                            }}
+                          />
+                        )}
+                        {hoveredSegment === 'total' && hasGreenSpan && greenEndTimestamp != null && (
+                          <ReferenceLine
+                            x={greenEndTimestamp}
+                            stroke="#e5e7eb"
+                            strokeDasharray="6 4"
+                            strokeWidth={2}
+                            strokeOpacity={0.95}
+                            yAxisId="left"
+                            label={{
+                              value: new Date(greenEndTimestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                              position: 'top',
+                              fill: '#e5e7eb',
+                              fontSize: 11,
+                              fontWeight: 500,
+                              offset: 6
+                            }}
+                          />
+                        )}
+                        {hoveredSegment === 'forecast' && forecastPoint && (
+                          <ReferenceLine
+                            x={forecastPoint.timestamp}
+                            stroke="#e5e7eb"
+                            strokeDasharray="6 4"
+                            strokeWidth={2}
+                            strokeOpacity={0.95}
+                            yAxisId="left"
+                            label={{
+                              value: new Date(forecastPoint.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                              position: 'top',
+                              fill: '#e5e7eb',
+                              fontSize: 11,
+                              fontWeight: 500,
+                              offset: 6
+                            }}
+                          />
                         )}
                       </>
                     );
