@@ -1144,18 +1144,25 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         .planning-table-scroll::-webkit-scrollbar {
           width: 12px;
           height: 12px;
+          background-color: ${isDarkMode ? '#111827' : '#F3F4F6'} !important;
+          background: ${isDarkMode ? '#111827' : '#F3F4F6'} !important;
         }
         .planning-table-scroll::-webkit-scrollbar-track {
-          background: ${isDarkMode ? '#1E293B' : '#F3F4F6'};
+          background-color: ${isDarkMode ? '#111827' : '#F3F4F6'} !important;
+          background: ${isDarkMode ? '#111827' : '#F3F4F6'} !important;
           border-radius: 6px;
         }
         .planning-table-scroll::-webkit-scrollbar-thumb {
           background: ${isDarkMode ? '#475569' : '#9CA3AF'};
           border-radius: 6px;
-          border: 2px solid ${isDarkMode ? '#1E293B' : '#F3F4F6'};
+          border: 2px solid ${isDarkMode ? '#111827' : '#F3F4F6'};
         }
         .planning-table-scroll::-webkit-scrollbar-thumb:hover {
           background: ${isDarkMode ? '#64748B' : '#6B7280'};
+        }
+        .planning-table-scroll::-webkit-scrollbar-corner {
+          background-color: ${isDarkMode ? '#111827' : '#F3F4F6'} !important;
+          background: ${isDarkMode ? '#111827' : '#F3F4F6'} !important;
         }
 
         /* Horizontal scrollbar - hidden by default */
@@ -1170,16 +1177,18 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         /* Horizontal scrollbar - visible when scrolling */
         .planning-table-scroll.is-scrolling::-webkit-scrollbar:horizontal {
           height: 10px;
-          background: transparent;
+          background-color: ${isDarkMode ? '#111827' : '#F3F4F6'} !important;
+          background: ${isDarkMode ? '#111827' : '#F3F4F6'} !important;
         }
         .planning-table-scroll.is-scrolling::-webkit-scrollbar-track:horizontal {
-          background: ${isDarkMode ? '#1E293B' : '#F3F4F6'};
+          background-color: ${isDarkMode ? '#111827' : '#F3F4F6'} !important;
+          background: ${isDarkMode ? '#111827' : '#F3F4F6'} !important;
           border-radius: 6px;
         }
         .planning-table-scroll.is-scrolling::-webkit-scrollbar-thumb:horizontal {
           background: ${isDarkMode ? '#475569' : '#9CA3AF'};
           border-radius: 6px;
-          border: 2px solid ${isDarkMode ? '#1E293B' : '#F3F4F6'};
+          border: 2px solid ${isDarkMode ? '#111827' : '#F3F4F6'};
           transition: background 0.3s ease;
         }
         .planning-table-scroll.is-scrolling::-webkit-scrollbar-thumb:horizontal:hover {
@@ -1189,14 +1198,14 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         /* Firefox scrollbar styling */
         .planning-table-scroll {
           scrollbar-width: thin;
-          scrollbar-color: ${isDarkMode ? '#475569 #1E293B' : '#9CA3AF #F3F4F6'};
+          scrollbar-color: ${isDarkMode ? '#475569 #111827' : '#9CA3AF #F3F4F6'};
         }
         .planning-table-scroll:not(.is-scrolling) {
           scrollbar-width: none;
         }
         .planning-table-scroll.is-scrolling {
           scrollbar-width: thin;
-          scrollbar-color: ${isDarkMode ? '#475569 #1E293B' : '#9CA3AF #F3F4F6'};
+          scrollbar-color: ${isDarkMode ? '#475569 #111827' : '#9CA3AF #F3F4F6'};
         }
       `}</style>
       {/* Informational Cards */}

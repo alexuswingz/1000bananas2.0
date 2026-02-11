@@ -87,6 +87,7 @@ const NewShipmentTable = ({
   const [hoveredQtyIndex, setHoveredQtyIndex] = useState(null);
   const [hoveredAddIndex, setHoveredAddIndex] = useState(null);
   const [hoveredWarningIndex, setHoveredWarningIndex] = useState(null);
+  const [hoveredInventoryWarningIndex, setHoveredInventoryWarningIndex] = useState(null);
   const qtyContainerRefs = useRef({});
   const popupRefs = useRef({});
   const qtyInputRefs = useRef({});
@@ -216,59 +217,104 @@ const NewShipmentTable = ({
     
     style.textContent = `
       .new-shipment-table-scroll {
-        /* Firefox - always show scrollbar */
-        scrollbar-width: auto !important;
-        -ms-overflow-style: scrollbar !important;
-        /* Prevent layout shifts */
+        /* Firefox - hidden by default, show on hover/scroll */
+        scrollbar-width: thin;
+        scrollbar-color: transparent transparent;
         box-sizing: border-box !important;
-        /* Force scrollbar to always be visible */
-        overflow-y: scroll !important;
+        overflow-y: overlay !important;
       }
-      /* Webkit - always show vertical scrollbar (width: 12px) */
+      .new-shipment-table-scroll:hover,
+      .new-shipment-table-scroll.is-scrolling {
+        scrollbar-color: ${isDarkMode ? '#64748B' : '#6B7280'} transparent;
+      }
+      /* Webkit - overlay scrollbar, hidden by default, only show when scrolling */
       .new-shipment-table-scroll::-webkit-scrollbar {
-        width: 12px !important;
-        height: 4px !important;
-        -webkit-appearance: none !important;
-        display: block !important;
-        visibility: visible !important;
+        width: 0 !important;
+        height: 0 !important;
+        background: transparent !important;
       }
-      .new-shipment-table-scroll::-webkit-scrollbar:vertical {
-        width: 12px !important;
-        display: block !important;
-        visibility: visible !important;
-      }
-      .new-shipment-table-scroll::-webkit-scrollbar-track {
-        background: ${isDarkMode ? '#1E293B' : '#F3F4F6'} !important;
-        border-radius: 6px !important;
-        display: block !important;
-        visibility: visible !important;
-        -webkit-box-shadow: inset 0 0 2px ${isDarkMode ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.1)'} !important;
-      }
-      .new-shipment-table-scroll::-webkit-scrollbar-thumb {
-        background: ${isDarkMode ? '#64748B' : '#6B7280'} !important;
-        border-radius: 6px !important;
-        border: 2px solid ${isDarkMode ? '#1E293B' : '#F3F4F6'} !important;
-        min-height: 30px !important;
-        cursor: pointer !important;
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-      }
-      .new-shipment-table-scroll::-webkit-scrollbar-thumb:hover {
-        background: ${isDarkMode ? '#94A3B8' : '#4B5563'} !important;
-      }
-      /* Make horizontal scrollbar more visible when scrolling horizontally or on hover */
+      /* Show horizontal scrollbar only when there's overflow and user is scrolling/hovering */
       .new-shipment-table-scroll.scrolling-horizontal::-webkit-scrollbar,
       .new-shipment-table-scroll:hover::-webkit-scrollbar {
         height: 8px !important;
+        width: 0 !important;
       }
+      .new-shipment-table-scroll::-webkit-scrollbar:vertical {
+        width: 12px !important;
+        background: transparent !important;
+      }
+      .new-shipment-table-scroll::-webkit-scrollbar-track {
+        background: transparent !important;
+        border-radius: 6px !important;
+      }
+      .new-shipment-table-scroll::-webkit-scrollbar-thumb {
+        background: transparent !important;
+        border-radius: 6px !important;
+        border: 2px solid transparent !important;
+        min-height: 30px !important;
+        cursor: pointer !important;
+      }
+      /* Show scrollbar on hover or while scrolling */
+      .new-shipment-table-scroll:hover::-webkit-scrollbar-thumb,
+      .new-shipment-table-scroll.is-scrolling::-webkit-scrollbar-thumb {
+        background: ${isDarkMode ? '#64748B' : '#6B7280'} !important;
+        border: 2px solid ${isDarkMode ? '#1F2937' : '#F3F4F6'} !important;
+      }
+      .new-shipment-table-scroll:hover::-webkit-scrollbar-thumb:hover,
+      .new-shipment-table-scroll.is-scrolling::-webkit-scrollbar-thumb:hover {
+        background: ${isDarkMode ? '#94A3B8' : '#4B5563'} !important;
+      }
+      /* Horizontal scrollbar - already handled above */
       .new-shipment-table-scroll.scrolling-horizontal::-webkit-scrollbar-thumb,
       .new-shipment-table-scroll:hover::-webkit-scrollbar-thumb {
         background: ${isDarkMode ? '#4B5563' : '#9CA3AF'} !important;
       }
       .new-shipment-table-scroll.scrolling-horizontal::-webkit-scrollbar-thumb:hover,
       .new-shipment-table-scroll:hover::-webkit-scrollbar-thumb:hover {
-        background: ${isDarkMode ? '#6B7280' : '#6B7280'} !important;
+        background: ${isDarkMode ? '#94A3B8' : '#6B7280'} !important;
+      }
+      /* Ensure table structure integrity - prevent row splitting */
+      .new-shipment-table-scroll table {
+        table-layout: auto !important;
+        border-collapse: separate !important;
+        border-spacing: 0 !important;
+        width: max-content !important;
+        min-width: 100% !important;
+        display: table !important;
+      }
+      .new-shipment-table-scroll thead {
+        display: table-header-group !important;
+      }
+      .new-shipment-table-scroll tbody {
+        display: table-row-group !important;
+      }
+      .new-shipment-table-scroll tr {
+        display: table-row !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+      .new-shipment-table-scroll th,
+      .new-shipment-table-scroll td {
+        display: table-cell !important;
+        word-break: keep-all !important;
+        overflow-wrap: normal !important;
+        box-sizing: border-box !important;
+      }
+      /* Prevent row breaking - ensure cells stay in their rows */
+      /* Ensure rows scroll together */
+      .new-shipment-table-scroll tbody tr {
+        position: relative !important;
+      }
+      /* Make table feel seamless and continuous - no visual boundaries */
+      .new-shipment-table-scroll {
+        /* Remove visual boundaries that make table feel "capped" */
+        background: transparent !important;
+      }
+      /* Ensure table extends naturally without compression */
+      .new-shipment-table-scroll table {
+        margin: 0 !important;
+        /* Allow table to extend naturally */
+        max-width: none !important;
       }
     `;
   }, [isDarkMode]);
@@ -328,6 +374,25 @@ const NewShipmentTable = ({
       }
     };
   }, []);
+
+  // Auto-show scrollbar while scrolling in non-table (card) view
+  useEffect(() => {
+    const container = nonTableContainerRef.current;
+    if (!container) return;
+    let scrollTimeout;
+    const handleScroll = () => {
+      container.classList.add('is-scrolling');
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        container.classList.remove('is-scrolling');
+      }, 1000);
+    };
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      clearTimeout(scrollTimeout);
+    };
+  }, [tableMode]);
   
   // Clean up any invalid brand filters when account changes or on mount
   // If a brand filter has all brands selected, treat it as no filter
@@ -3457,26 +3522,43 @@ const NewShipmentTable = ({
           }
         `}</style>
         <style>{`
+          .non-table-scroll-container {
+            overflow-y: overlay !important;
+            scrollbar-width: thin;
+            scrollbar-color: transparent transparent;
+          }
+          .non-table-scroll-container:hover,
+          .non-table-scroll-container.is-scrolling {
+            scrollbar-color: ${isDarkMode ? '#475569' : '#9CA3AF'} transparent;
+          }
           .non-table-scroll-container::-webkit-scrollbar {
             width: 10px;
+            background: transparent;
           }
           .non-table-scroll-container::-webkit-scrollbar-track {
-            background: ${isDarkMode ? '#1E293B' : '#F3F4F6'};
+            background: transparent;
             border-radius: 0 16px 16px 0;
           }
           .non-table-scroll-container::-webkit-scrollbar-thumb {
-            background: ${isDarkMode ? '#475569' : '#9CA3AF'};
+            background: transparent;
             border-radius: 5px;
+            border: 2px solid transparent;
+            transition: background 0.3s;
+          }
+          .non-table-scroll-container:hover::-webkit-scrollbar-thumb,
+          .non-table-scroll-container.is-scrolling::-webkit-scrollbar-thumb {
+            background: ${isDarkMode ? '#475569' : '#9CA3AF'};
             border: 2px solid ${isDarkMode ? '#1E293B' : '#F3F4F6'};
           }
-          .non-table-scroll-container::-webkit-scrollbar-thumb:hover {
+          .non-table-scroll-container:hover::-webkit-scrollbar-thumb:hover,
+          .non-table-scroll-container.is-scrolling::-webkit-scrollbar-thumb:hover {
             background: ${isDarkMode ? '#64748B' : '#6B7280'};
           }
         `}</style>
         <div
           ref={nonTableContainerRef}
           className={`${themeClasses.cardBg} ${themeClasses.border} border rounded-xl shadow-sm non-table-scroll-container`}
-          style={{ marginTop: '1.25rem', overflowY: 'auto', overflowX: 'hidden', borderRadius: '16px', maxHeight: 'calc(100vh - 260px)' }}
+          style={{ marginTop: '1.25rem', overflowY: 'overlay', overflowX: 'hidden', borderRadius: '16px', maxHeight: 'calc(100vh - 260px)' }}
         >
           {/* Header Row */}
           <div
@@ -4159,83 +4241,71 @@ const NewShipmentTable = ({
                     </div>
                   </div>
 
-                  {/* INVENTORY Column (number in white; Out of Stock / No Sales tags when applicable) */}
+                  {/* INVENTORY Column (number with warning icon for Sold Out / No Sales) */}
                   {(() => {
                     const totalInv = Number(row.totalInventory) || 0;
                     const hasSalesHistory = (Number(row.sales30Day) || Number(row.sales7Day) || 0) > 0;
                     const isOutOfStock = totalInv === 0;
                     const isNoSales = !hasSalesHistory;
+                    const warningColor = isOutOfStock ? '#EF4444' : isNoSales ? '#F97316' : null;
+                    const warningLabel = isOutOfStock ? 'Sold Out' : isNoSales ? 'No Sales' : null;
                     return (
-                      <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '6px', fontSize: '14px', fontWeight: 500, color: isDarkMode ? '#FFFFFF' : '#111827', paddingLeft: '16px', marginLeft: '-255px', marginRight: '20px', minWidth: '140px', height: '23px' }}>
-                        {isOutOfStock ? (
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'flex-start',
-                            gap: '4px',
-                            backgroundColor: '#F5D7D7',
-                            borderRadius: '24px',
-                            padding: '0 8px',
-                            border: 'none',
-                            height: '20px',
-                            minHeight: '20px',
-                            maxHeight: '20px',
-                            boxSizing: 'border-box',
-                            width: 'fit-content',
-                            marginLeft: '-15px'
-                          }}>
-                            <span style={{
-                              width: '12px',
-                              height: '12px',
+                      <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '6px', fontSize: '14px', fontWeight: 500, color: isDarkMode ? '#FFFFFF' : '#111827', paddingLeft: '16px', marginLeft: '-255px', marginRight: '20px', minWidth: '140px', height: '23px', position: 'relative', overflow: 'visible' }}>
+                        {warningColor && (
+                          <span
+                            className="inventory-warning-icon"
+                            onMouseEnter={() => setHoveredInventoryWarningIndex(index)}
+                            onMouseLeave={() => setHoveredInventoryWarningIndex(null)}
+                            style={{
+                              width: '14px',
+                              height: '14px',
                               borderRadius: '50%',
-                              backgroundColor: '#EF4444',
+                              backgroundColor: warningColor,
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              flexShrink: 0
-                            }}>
-                              <span style={{ color: '#FFFFFF', fontWeight: 700, fontSize: '10px', lineHeight: 1 }}>!</span>
-                            </span>
-                            <span style={{ color: '#EF4444', fontWeight: 700, fontSize: '12px', lineHeight: 1 }}>
-                              Sold Out
-                            </span>
-                          </div>
-                        ) : isNoSales ? (
-                          <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'flex-start',
-                            gap: '4px',
-                            backgroundColor: '#FFF4E6',
-                            borderRadius: '24px',
-                            padding: '0 8px',
-                            border: 'none',
-                            height: '20px',
-                            minHeight: '20px',
-                            maxHeight: '20px',
-                            boxSizing: 'border-box',
-                            width: 'fit-content',
-                            marginLeft: '-15px'
-                          }}>
-                            <span style={{
-                              width: '12px',
-                              height: '12px',
-                              borderRadius: '50%',
-                              backgroundColor: '#F97316',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              flexShrink: 0
-                            }}>
-                              <span style={{ color: '#FFFFFF', fontWeight: 700, fontSize: '10px', lineHeight: 1 }}>!</span>
-                            </span>
-                            <span style={{ color: '#F97316', fontWeight: 700, fontSize: '12px', lineHeight: 1 }}>
-                              No Sales
-                            </span>
-                          </div>
-                        ) : (
-                          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', height: '100%', width: 'fit-content', marginLeft: '20px' }}>{totalInv.toLocaleString()}</span>
+                              flexShrink: 0,
+                              cursor: 'default',
+                              position: 'relative',
+                              overflow: 'visible',
+                            }}
+                          >
+                            <span style={{ color: '#FFFFFF', fontWeight: 700, fontSize: '9px', lineHeight: 1 }}>!</span>
+                            {hoveredInventoryWarningIndex === index && (
+                              <span
+                                className="inventory-warning-tooltip"
+                                style={{
+                                  position: 'absolute',
+                                  bottom: 'calc(100% + 8px)',
+                                  left: '50%',
+                                  transform: 'translateX(-50%)',
+                                  width: '71px',
+                                  height: '31px',
+                                  borderRadius: '8px',
+                                  borderWidth: '1px',
+                                  borderStyle: 'solid',
+                                  borderColor: isDarkMode ? '#374151' : '#E5E7EB',
+                                  paddingTop: '8px',
+                                  paddingRight: '12px',
+                                  paddingBottom: '8px',
+                                  paddingLeft: '12px',
+                                  boxSizing: 'border-box',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '10px',
+                                  backgroundColor: '#1F2937',
+                                  color: '#FFFFFF',
+                                  fontSize: '12px',
+                                  fontWeight: 500,
+                                  whiteSpace: 'nowrap',
+                                  zIndex: 50,
+                                }}
+                              >{warningLabel}</span>
+                            )}
+                          </span>
                         )}
+                        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', height: '100%', width: 'fit-content' }}>{totalInv.toLocaleString()}</span>
                       </div>
                     );
                   })()}
@@ -5544,7 +5614,7 @@ const NewShipmentTable = ({
         }
         .new-shipment-table-scroll {
           scrollbar-width: thin !important;
-          scrollbar-color: ${isDarkMode ? '#64748B #1E293B' : '#6B7280 #F3F4F6'} !important;
+          scrollbar-color: ${isDarkMode ? '#64748B #1F2937' : '#6B7280 #F3F4F6'} !important;
           overflow-y: auto !important;
         }
         /* Always show vertical scrollbar when content overflows */
@@ -5559,7 +5629,7 @@ const NewShipmentTable = ({
           display: block !important;
         }
         .new-shipment-table-scroll::-webkit-scrollbar-track {
-          background: ${isDarkMode ? '#1E293B' : '#F3F4F6'} !important;
+          background: ${isDarkMode ? '#1F2937' : '#F3F4F6'} !important;
           border-radius: 6px;
           display: block !important;
           visibility: visible !important;
@@ -5568,7 +5638,7 @@ const NewShipmentTable = ({
         .new-shipment-table-scroll::-webkit-scrollbar-thumb {
           background: ${isDarkMode ? '#64748B' : '#6B7280'} !important;
           border-radius: 6px;
-          border: 2px solid ${isDarkMode ? '#1E293B' : '#F3F4F6'} !important;
+          border: 2px solid ${isDarkMode ? '#1F2937' : '#F3F4F6'} !important;
           min-height: 30px;
           cursor: pointer;
           display: block !important;
@@ -5589,7 +5659,34 @@ const NewShipmentTable = ({
         }
         .new-shipment-table-scroll.scrolling-horizontal::-webkit-scrollbar-thumb:hover,
         .new-shipment-table-scroll:hover::-webkit-scrollbar-thumb:hover {
-          background: ${isDarkMode ? '#6B7280' : '#6B7280'} !important;
+          background: ${isDarkMode ? '#94A3B8' : '#6B7280'} !important;
+        }
+        /* Custom styled tooltip for inventory warning icons */
+        .inventory-warning-icon {
+          position: relative;
+        }
+        .inventory-warning-icon .inventory-warning-tooltip {
+          display: none !important;
+          background-color: #1F2937;
+          color: #FFFFFF;
+          font-size: 12px;
+          font-weight: 500;
+          white-space: nowrap;
+          pointer-events: none;
+          z-index: 50;
+        }
+        .inventory-warning-icon .inventory-warning-tooltip::after {
+          content: '';
+          position: absolute;
+          top: 100%;
+          left: 50%;
+          transform: translateX(-50%);
+          border-width: 5px;
+          border-style: solid;
+          border-color: #1F2937 transparent transparent transparent;
+        }
+        .inventory-warning-icon:hover .inventory-warning-tooltip {
+          display: flex !important;
         }
       `}</style>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '12px' }}>
@@ -5612,54 +5709,58 @@ const NewShipmentTable = ({
           <option value="unchecked">Unchecked</option>
         </select>
       </div>
-      {/* Outer scrollable wrapper */}
+      {/* Outer wrapper - no height constraints, let page scroll */}
       <div
         className="new-shipment-table-scroll"
         style={{
           marginTop: '1.25rem',
-          overflowY: 'auto',
-          overflowX: 'visible',
-          maxHeight: 'calc(100vh - 520px)',
-          height: 'calc(100vh - 520px)',
           position: 'relative',
+          paddingBottom: hideFooter ? '0' : '97px', // Add padding to prevent content from being cut off by fixed footer (65px height + 16px bottom + 16px extra spacing)
         }}
       >
         <div
         ref={tableContainerRef}
-        className={`${themeClasses.cardBg} ${themeClasses.border} border shadow-sm new-shipment-table-scroll ${isScrollingHorizontally ? 'scrolling-horizontal' : ''}`}
+        className={`new-shipment-table-scroll ${isScrollingHorizontally ? 'scrolling-horizontal' : ''}`}
         style={{ 
-          borderRadius: '6px', 
           overflowX: 'auto', 
-          overflowY: 'auto',
+          overflowY: 'visible',
           width: '100%',
           WebkitOverflowScrolling: 'touch',
           position: 'relative',
           minHeight: '400px', // Minimum height to ensure usability
           display: 'block',
+          // Remove visual boundaries to make table feel seamless
+          border: 'none',
+          boxShadow: 'none',
         }}
       >
-      <div 
-        style={{ 
-        width: '100%',
-        position: 'relative',
-      }}>
         <table
           style={{
             width: 'max-content',
             minWidth: '100%',
             borderCollapse: 'separate',
             borderSpacing: 0,
-            tableLayout: 'fixed',
+            tableLayout: 'auto',
+            display: 'table',
+            position: 'relative',
           }}
         >
           <thead className={themeClasses.headerBg} style={{
             position: '-webkit-sticky',
             position: 'sticky',
             top: 0,
-            zIndex: 100,
+            zIndex: 1000,
             backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
+            display: 'table-header-group',
           }}>
-            <tr style={{ height: '40px', maxHeight: '40px' }}>
+            <tr style={{ 
+              height: '40px', 
+              maxHeight: '40px',
+              position: 'sticky',
+              top: 0,
+              zIndex: 1000,
+              backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
+            }}>
               {/* Sticky columns */}
               <th style={{ 
                 padding: '0 0.75rem', 
@@ -5673,8 +5774,8 @@ const NewShipmentTable = ({
                 position: 'sticky',
                 left: 0,
                 top: 0,
-                zIndex: 20,
-                backgroundColor: '#1C2634',
+                zIndex: 1020,
+                backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
                 boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
                 borderTopLeftRadius: '16px',
                 borderRight: '1px solid #FFFFFF',
@@ -5695,8 +5796,8 @@ const NewShipmentTable = ({
                   position: 'sticky',
                   left: '40px',
                   top: 0,
-                  zIndex: 20,
-                  backgroundColor: '#1C2634',
+                  zIndex: 1020,
+                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
                   width: '150px',
                   minWidth: '150px',
                   maxWidth: '150px',
@@ -5741,8 +5842,8 @@ const NewShipmentTable = ({
                   position: 'sticky',
                   left: '190px',
                   top: 0,
-                  zIndex: 20,
-                  backgroundColor: '#1C2634',
+                  zIndex: 1020,
+                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
                   width: '200px',
                   minWidth: '200px',
                   maxWidth: '200px',
@@ -5787,8 +5888,8 @@ const NewShipmentTable = ({
                   position: 'sticky',
                   left: '390px',
                   top: 0,
-                  zIndex: 20,
-                  backgroundColor: '#1C2634',
+                  zIndex: 1020,
+                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
                   width: '120px',
                   minWidth: '120px',
                   maxWidth: '120px',
@@ -5831,8 +5932,8 @@ const NewShipmentTable = ({
                   textAlign: 'center',
                   position: 'sticky',
                   top: 0,
-                  zIndex: 10,
-                  backgroundColor: '#1C2634',
+                  zIndex: 1010,
+                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
@@ -5873,8 +5974,8 @@ const NewShipmentTable = ({
                   textAlign: 'center',
                   position: 'sticky',
                   top: 0,
-                  zIndex: 10,
-                  backgroundColor: '#1C2634',
+                  zIndex: 1010,
+                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
@@ -5935,8 +6036,8 @@ const NewShipmentTable = ({
                   textAlign: 'center',
                   position: 'sticky',
                   top: 0,
-                  zIndex: 10,
-                  backgroundColor: '#1C2634',
+                  zIndex: 1010,
+                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
@@ -5997,7 +6098,7 @@ const NewShipmentTable = ({
                   textAlign: 'center',
                   position: 'sticky',
                   top: 0,
-                  zIndex: 10,
+                  zIndex: 1010,
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
@@ -6010,7 +6111,7 @@ const NewShipmentTable = ({
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
                   color: (hasActiveColumnFilter('forecast') || openFilterColumns.has('forecast')) ? '#3B82F6' : '#FFFFFF',
-                  backgroundColor: '#1C2634',
+                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', position: 'relative' }}>
@@ -6039,7 +6140,7 @@ const NewShipmentTable = ({
                   textAlign: 'center',
                   position: 'sticky',
                   top: 0,
-                  zIndex: 10,
+                  zIndex: 1010,
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
@@ -6052,7 +6153,7 @@ const NewShipmentTable = ({
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
                   color: (hasActiveColumnFilter('sales7Day') || openFilterColumns.has('sales7Day')) ? '#3B82F6' : '#FFFFFF',
-                  backgroundColor: '#1C2634',
+                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', position: 'relative' }}>
@@ -6081,7 +6182,7 @@ const NewShipmentTable = ({
                   textAlign: 'center',
                   position: 'sticky',
                   top: 0,
-                  zIndex: 10,
+                  zIndex: 1010,
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
@@ -6094,7 +6195,7 @@ const NewShipmentTable = ({
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
                   color: (hasActiveColumnFilter('sales30Day') || openFilterColumns.has('sales30Day')) ? '#3B82F6' : '#FFFFFF',
-                  backgroundColor: '#1C2634',
+                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', position: 'relative' }}>
@@ -6123,7 +6224,7 @@ const NewShipmentTable = ({
                   textAlign: 'center',
                   position: 'sticky',
                   top: 0,
-                  zIndex: 10,
+                  zIndex: 1010,
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
@@ -6136,7 +6237,7 @@ const NewShipmentTable = ({
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
                   color: (hasActiveColumnFilter('sales4Month') || openFilterColumns.has('sales4Month')) ? '#3B82F6' : '#FFFFFF',
-                  backgroundColor: '#1C2634',
+                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', position: 'relative' }}>
@@ -6165,7 +6266,7 @@ const NewShipmentTable = ({
                   textAlign: 'center',
                   position: 'sticky',
                   top: 0,
-                  zIndex: 10,
+                  zIndex: 1010,
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
@@ -6178,7 +6279,7 @@ const NewShipmentTable = ({
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
                   color: (hasActiveColumnFilter('formula') || openFilterColumns.has('formula')) ? '#3B82F6' : '#FFFFFF',
-                  backgroundColor: '#1C2634',
+                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', position: 'relative' }}>
@@ -6207,7 +6308,7 @@ const NewShipmentTable = ({
                   textAlign: 'center',
                   position: 'sticky',
                   top: 0,
-                  zIndex: 10,
+                  zIndex: 1010,
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
@@ -6220,7 +6321,7 @@ const NewShipmentTable = ({
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
                   color: '#FFFFFF',
-                  backgroundColor: '#1C2634',
+                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', position: 'relative', width: '100%' }}>
@@ -6267,7 +6368,7 @@ const NewShipmentTable = ({
                   textAlign: 'center',
                   position: 'sticky',
                   top: 0,
-                  zIndex: 10,
+                  zIndex: 1010,
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
@@ -6280,7 +6381,7 @@ const NewShipmentTable = ({
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
                   color: '#FFFFFF',
-                  backgroundColor: '#1C2634',
+                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
@@ -6325,7 +6426,7 @@ const NewShipmentTable = ({
                   textAlign: 'center',
                   position: 'sticky',
                   top: 0,
-                  zIndex: 10,
+                  zIndex: 1010,
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
@@ -6338,7 +6439,7 @@ const NewShipmentTable = ({
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
                   color: '#FFFFFF',
-                  backgroundColor: '#1C2634',
+                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
@@ -6383,7 +6484,7 @@ const NewShipmentTable = ({
                   textAlign: 'center',
                   position: 'sticky',
                   top: 0,
-                  zIndex: 10,
+                  zIndex: 1010,
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
@@ -6396,7 +6497,7 @@ const NewShipmentTable = ({
                   letterSpacing: '0%',
                   textTransform: 'uppercase',
                   color: '#FFFFFF',
-                  backgroundColor: '#1C2634',
+                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
@@ -6445,8 +6546,8 @@ const NewShipmentTable = ({
                 position: 'sticky',
                 right: 0,
                 top: 0,
-                zIndex: 20,
-                backgroundColor: '#1C2634',
+                zIndex: 1020,
+                backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
                 boxShadow: '-2px 0 4px rgba(0,0,0,0.1)',
                 borderRight: '1px solid #FFFFFF',
                 borderTopRightRadius: '16px',
@@ -6459,7 +6560,12 @@ const NewShipmentTable = ({
             {currentRows.map((row) => {
               const index = row._originalIndex;
               return (
-              <tr key={`${row.id}-${index}`} style={{ height: '40px', maxHeight: '40px' }}>
+              <tr key={`${row.id}-${index}`} style={{ 
+                height: '40px', 
+                maxHeight: '40px',
+                display: 'table-row',
+                position: 'relative',
+              }}>
                 {/* Sticky columns */}
                 <td style={{ 
                   padding: '0.65rem 0.75rem', 
@@ -7169,9 +7275,7 @@ const NewShipmentTable = ({
           </tbody>
         </table>
       </div>
-      {/* End of inner wrapper div */}
-    </div>
-    {/* End of table container div */}
+      {/* End of table container div */}
       </div>
       {/* End of outer scrollable wrapper */}
     
