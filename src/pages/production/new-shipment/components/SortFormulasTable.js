@@ -1019,7 +1019,7 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
       setFirstBatchQty(1); // Always set first batch to 1
       setIsSplitModalOpen(true);
     } else if (action === 'undoSplit') {
-      handleUndoSplit(formula);
+      handleUndoSingleSplit(formula);
     } else if (action === 'undoAllSplits') {
       handleUndoAllSplits(formula);
     }
@@ -1164,7 +1164,76 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
     return splitCount > 0;
   };
 
-  // Handler for undoing a single split (from a split item)
+  // Handler for undoing a single split line (merge this row into a sibling; if only one split, merges back to one)
+  const handleUndoSingleSplit = (splitFormula) => {
+    if (!splitFormula || !splitFormula.splitTag) return;
+
+    const formulaName = splitFormula.formula;
+    const allSplitFormulas = formulas.filter(f =>
+      f.formula === formulaName && f.splitTag
+    );
+
+    if (allSplitFormulas.length === 0) return;
+
+    if (allSplitFormulas.length === 1) {
+      handleUndoSplit(splitFormula);
+      return;
+    }
+
+    const targetFormula = allSplitFormulas.find(f => f.id !== splitFormula.id) || allSplitFormulas[0];
+    const mergedQty = (targetFormula.qty || 0) + (splitFormula.qty || 0);
+    const mergedVolume = Math.round(((targetFormula.volume || 0) + (splitFormula.volume || 0)) * 100) / 100;
+
+    const remainingSplits = allSplitFormulas
+      .filter(f => f.id !== splitFormula.id)
+      .map(f => f.id === targetFormula.id ? { ...f, qty: mergedQty, volume: mergedVolume } : f);
+
+    const originalId = splitFormula.originalId || splitFormula.id;
+    const oneRowLeft = remainingSplits.length === 1;
+
+    const newFormulas = formulas.map(f => {
+      if (f.id === splitFormula.id) return null;
+      if (f.id === targetFormula.id) {
+        const updated = { ...f, qty: mergedQty, volume: mergedVolume };
+        if (oneRowLeft) {
+          updated.id = originalId;
+          updated.splitTag = undefined;
+          updated.originalId = undefined;
+        }
+        return updated;
+      }
+      return f;
+    }).filter(Boolean);
+
+    if (shipmentId) {
+      try {
+        const storedSplits = localStorage.getItem(`sortFormulasSplits_${shipmentId}`);
+        const existingSplits = storedSplits ? JSON.parse(storedSplits) : [];
+        const filteredSplits = existingSplits.filter(s => s.formulaName !== formulaName);
+
+        if (remainingSplits.length >= 2) {
+          const sorted = [...remainingSplits].sort((a, b) =>
+            (a.splitTag && b.splitTag) ? a.splitTag.localeCompare(b.splitTag) : 0
+          );
+          filteredSplits.push({
+            formulaName,
+            firstBatch: { qty: sorted[0].qty, volume: sorted[0].volume },
+            secondBatch: { qty: sorted[1].qty, volume: sorted[1].volume },
+            additionalBatches: sorted.slice(2).map(f => ({ qty: f.qty, volume: f.volume })),
+          });
+        }
+        localStorage.setItem(`sortFormulasSplits_${shipmentId}`, JSON.stringify(filteredSplits));
+      } catch (error) {
+        console.error('Error updating sort formulas splits in localStorage:', error);
+      }
+    }
+
+    setFormulas(newFormulas);
+    saveFormulaOrder(newFormulas);
+    showInfoToast(`Undo split for ${formulaName}`, `Merged this line into another (${allSplitFormulas.length - 1} split line(s) remaining).`);
+  };
+
+  // Handler for undoing a single split (from a split item) – merges all split rows back into one
   const handleUndoSplit = (splitFormula) => {
     if (!splitFormula || !splitFormula.splitTag) return;
     
@@ -2117,138 +2186,91 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                         overflow: 'hidden',
                       }}
                     >
-                      {/* Split Formula - show for all formulas */}
-                      <button
-                        type="button"
-                        onClick={() => handleMenuAction('split', formula)}
-                        style={{
-                          width: '100%',
-                          padding: '10px 16px',
-                          textAlign: 'left',
-                          background: 'transparent',
-                          border: 'none',
-                          color: isDarkMode ? '#E5E7EB' : '#374151',
-                          fontSize: '14px',
-                          fontWeight: 400,
-                          cursor: 'pointer',
-                          transition: 'background-color 0.2s',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '12px',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                        }}
-                      >
-                        <svg 
-                          width="16" 
-                          height="16" 
-                          viewBox="0 0 16 16" 
-                          fill="none" 
-                          xmlns="http://www.w3.org/2000/svg"
-                          style={{ flexShrink: 0 }}
-                        >
-                          {/* Vertical line */}
-                          <line 
-                            x1="8" 
-                            y1="10" 
-                            x2="8" 
-                            y2="14" 
-                            stroke="currentColor" 
-                            strokeWidth="1.5" 
-                            strokeLinecap="round"
-                          />
-                          {/* Left branch pointing up and left */}
-                          <line 
-                            x1="8" 
-                            y1="10" 
-                            x2="4.5" 
-                            y2="6.5" 
-                            stroke="currentColor" 
-                            strokeWidth="1.5" 
-                            strokeLinecap="round"
-                          />
-                          <polygon 
-                            points="4.5,6.5 4,6 3.5,6.5" 
-                            fill="currentColor"
-                          />
-                          {/* Right branch pointing up and right */}
-                          <line 
-                            x1="8" 
-                            y1="10" 
-                            x2="11.5" 
-                            y2="6.5" 
-                            stroke="currentColor" 
-                            strokeWidth="1.5" 
-                            strokeLinecap="round"
-                          />
-                          <polygon 
-                            points="11.5,6.5 12,6 12.5,6.5" 
-                            fill="currentColor"
-                          />
-                        </svg>
-                        <span>Split Formula</span>
-                      </button>
-                      
-                      {/* Show Undo All Splits option for split items */}
-                      {formula.splitTag && (
-                        <button
-                          type="button"
-                          onClick={() => handleMenuAction('undoAllSplits', formula)}
-                          style={{
-                            width: '100%',
-                            padding: '10px 16px',
-                            textAlign: 'left',
-                            background: 'transparent',
-                            border: 'none',
-                            color: isDarkMode ? '#E5E7EB' : '#374151',
-                            fontSize: '14px',
-                            fontWeight: 400,
-                            cursor: 'pointer',
-                            transition: 'background-color 0.2s',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '12px',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }}
-                        >
-                          <svg 
-                            width="16" 
-                            height="16" 
-                            viewBox="0 0 16 16" 
-                            fill="none" 
-                            xmlns="http://www.w3.org/2000/svg"
-                            style={{ flexShrink: 0 }}
+                      {/* Parent only: Split Formula (unsplit row or split row that is parent) */}
+                      {(() => {
+                        const isParent = !formula.splitTag || (() => {
+                          const siblings = formulas.filter(f => f.formula === formula.formula && f.splitTag);
+                          return siblings.length <= 1 || formula.qty === Math.max(...siblings.map(f => f.qty || 0));
+                        })();
+                        if (!isParent) return null;
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => handleMenuAction('split', formula)}
+                            style={{
+                              width: '100%', padding: '10px 16px', textAlign: 'left', background: 'transparent', border: 'none',
+                              color: isDarkMode ? '#E5E7EB' : '#374151', fontSize: '14px', fontWeight: 400, cursor: 'pointer',
+                              transition: 'background-color 0.2s', display: 'flex', alignItems: 'center', gap: '12px',
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                           >
-                            {/* Arrow pointing left (undo icon) */}
-                            <path 
-                              d="M3 8L1 6L3 4" 
-                              stroke="currentColor" 
-                              strokeWidth="1.5" 
-                              strokeLinecap="round" 
-                              strokeLinejoin="round"
-                            />
-                            <line 
-                              x1="1" 
-                              y1="6" 
-                              x2="15" 
-                              y2="6" 
-                              stroke="currentColor" 
-                              strokeWidth="1.5" 
-                              strokeLinecap="round"
-                            />
-                          </svg>
-                          <span>Undo All Splits</span>
-                        </button>
-                      )}
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+                              <line x1="8" y1="10" x2="8" y2="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                              <line x1="8" y1="10" x2="4.5" y2="6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                              <polygon points="4.5,6.5 4,6 3.5,6.5" fill="currentColor" />
+                              <line x1="8" y1="10" x2="11.5" y2="6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                              <polygon points="11.5,6.5 12,6 12.5,6.5" fill="currentColor" />
+                            </svg>
+                            <span>Split Formula</span>
+                          </button>
+                        );
+                      })()}
+                      {/* Parent only: Undo All Splits */}
+                      {(() => {
+                        const isParent = !formula.splitTag || (() => {
+                          const siblings = formulas.filter(f => f.formula === formula.formula && f.splitTag);
+                          return siblings.length <= 1 || formula.qty === Math.max(...siblings.map(f => f.qty || 0));
+                        })();
+                        if (!isParent) return null;
+                        if (formula.splitTag || hasSplits(formula)) {
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => handleMenuAction('undoAllSplits', formula)}
+                              style={{
+                                width: '100%', padding: '10px 16px', textAlign: 'left', background: 'transparent', border: 'none',
+                                color: isDarkMode ? '#E5E7EB' : '#374151', fontSize: '14px', fontWeight: 400, cursor: 'pointer',
+                                transition: 'background-color 0.2s', display: 'flex', alignItems: 'center', gap: '12px',
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6'; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+                                <path d="M3 8L1 6L3 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                <line x1="1" y1="6" x2="15" y2="6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                              </svg>
+                              <span>Undo All Splits</span>
+                            </button>
+                          );
+                        }
+                        return null;
+                      })()}
+                      {/* Child only: Undo Split */}
+                      {formula.splitTag && (() => {
+                        const siblings = formulas.filter(f => f.formula === formula.formula && f.splitTag);
+                        const isParent = siblings.length <= 1 || formula.qty === Math.max(...siblings.map(f => f.qty || 0));
+                        if (isParent) return null;
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => handleMenuAction('undoSplit', formula)}
+                            style={{
+                              width: '100%', padding: '10px 16px', textAlign: 'left', background: 'transparent', border: 'none',
+                              color: isDarkMode ? '#E5E7EB' : '#374151', fontSize: '14px', fontWeight: 400, cursor: 'pointer',
+                              transition: 'background-color 0.2s', display: 'flex', alignItems: 'center', gap: '12px',
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+                              <path d="M3 8L1 6L3 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                              <line x1="1" y1="6" x2="15" y2="6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                            </svg>
+                            <span>Undo Split</span>
+                          </button>
+                        );
+                      })()}
                     </div>,
                     document.body
                   )}
