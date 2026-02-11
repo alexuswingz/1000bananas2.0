@@ -2995,7 +2995,12 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                   </button>
                   
                   {/* Dropdown Menu */}
-                  {openMenuIndex === index && (
+                  {openMenuIndex === index && (() => {
+                    const menuSiblings = product.splitTag
+                      ? products.filter(p => (p.originalId || p.id) === (product.originalId || product.id) && p.splitTag)
+                      : [];
+                    const menuIsChild = !!product.splitTag && menuSiblings.length > 1 && product.qty !== Math.max(...menuSiblings.map(p => p.qty));
+                    return (
                     <div
                       ref={(el) => { menuRefs.current[index] = el; }}
                       style={{
@@ -3008,7 +3013,25 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                         border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
                         borderRadius: '8px',
                         boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                        minWidth: '160px',
+                        ...(menuIsChild ? {
+                          width: '123px',
+                          height: '44px',
+                          boxSizing: 'border-box',
+                          padding: '8px',
+                          gap: '4px',
+                          flexDirection: 'column',
+                          display: 'flex',
+                          borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                        } : {
+                          width: '147px',
+                          minHeight: '76px',
+                          boxSizing: 'border-box',
+                          padding: '8px',
+                          gap: '4px',
+                          flexDirection: 'column',
+                          display: 'flex',
+                          borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                        }),
                         zIndex: 1000,
                         overflow: 'hidden',
                       }}
@@ -3030,7 +3053,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                           onClick={() => handleMenuAction('split', product)}
                           style={{
                             width: '100%',
-                            padding: '10px 16px',
+                            padding: '8px',
                             textAlign: 'left',
                             background: 'transparent',
                             border: 'none',
@@ -3041,7 +3064,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                             transition: 'background-color 0.2s',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '12px',
+                            gap: '4px',
                           }}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6';
@@ -3050,53 +3073,17 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                             e.currentTarget.style.backgroundColor = 'transparent';
                           }}
                         >
-                          <svg 
-                            width="16" 
-                            height="16" 
-                            viewBox="0 0 16 16" 
-                            fill="none" 
-                            xmlns="http://www.w3.org/2000/svg"
-                            style={{ flexShrink: 0 }}
-                          >
-                            {/* Vertical line */}
-                            <line 
-                              x1="8" 
-                              y1="10" 
-                              x2="8" 
-                              y2="14" 
-                              stroke="currentColor" 
-                              strokeWidth="1.5" 
-                              strokeLinecap="round"
-                            />
-                            {/* Left branch pointing up and left */}
-                            <line 
-                              x1="8" 
-                              y1="10" 
-                              x2="4.5" 
-                              y2="6.5" 
-                              stroke="currentColor" 
-                              strokeWidth="1.5" 
-                              strokeLinecap="round"
-                            />
-                            <polygon 
-                              points="4.5,6.5 4,6 3.5,6.5" 
-                              fill="currentColor"
-                            />
-                            {/* Right branch pointing up and right */}
-                            <line 
-                              x1="8" 
-                              y1="10" 
-                              x2="11.5" 
-                              y2="6.5" 
-                              stroke="currentColor" 
-                              strokeWidth="1.5" 
-                              strokeLinecap="round"
-                            />
-                            <polygon 
-                              points="11.5,6.5 12,6 12.5,6.5" 
-                              fill="currentColor"
-                            />
-                          </svg>
+                          <img
+                            src="/assets/Icon=Split.png"
+                            alt=""
+                            style={{
+                              width: 16,
+                              height: 16,
+                              flexShrink: 0,
+                              display: 'block',
+                              ...(isDarkMode ? { filter: 'invert(1) brightness(1.1)' } : {}),
+                            }}
+                          />
                           <span>Split Product</span>
                         </button>
                       )}
@@ -3113,17 +3100,24 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                               type="button"
                               onClick={() => handleMenuAction('undoAllSplits', product)}
                               style={{
-                                width: '100%', padding: '10px 16px', textAlign: 'left', background: 'transparent', border: 'none',
+                                width: '100%', padding: '8px', textAlign: 'left', background: 'transparent', border: 'none',
                                 color: isDarkMode ? '#E5E7EB' : '#374151', fontSize: '14px', fontWeight: 400, cursor: 'pointer',
-                                transition: 'background-color 0.2s', display: 'flex', alignItems: 'center', gap: '12px',
+                                transition: 'background-color 0.2s', display: 'flex', alignItems: 'center', gap: '4px',
                               }}
                               onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6'; }}
                               onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                             >
-                              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-                                <path d="M3 8L1 6L3 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                <line x1="1" y1="6" x2="15" y2="6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                              </svg>
+                              <img
+                                src="/assets/Icon=Merge.png"
+                                alt=""
+                                style={{
+                                  width: 16,
+                                  height: 16,
+                                  flexShrink: 0,
+                                  display: 'block',
+                                  ...(isDarkMode ? { filter: 'invert(1) brightness(1.1)' } : {}),
+                                }}
+                              />
                               <span>Undo All Splits</span>
                             </button>
                           );
@@ -3134,24 +3128,31 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                               type="button"
                               onClick={() => handleMenuAction('undoAllSplits', product)}
                               style={{
-                                width: '100%', padding: '10px 16px', textAlign: 'left', background: 'transparent', border: 'none',
+                                width: '100%', padding: '8px', textAlign: 'left', background: 'transparent', border: 'none',
                                 color: isDarkMode ? '#E5E7EB' : '#374151', fontSize: '14px', fontWeight: 400, cursor: 'pointer',
-                                transition: 'background-color 0.2s', display: 'flex', alignItems: 'center', gap: '12px',
+                                transition: 'background-color 0.2s', display: 'flex', alignItems: 'center', gap: '4px',
                               }}
                               onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6'; }}
                               onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                             >
-                              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-                                <path d="M3 8L1 6L3 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                <line x1="1" y1="6" x2="15" y2="6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                              </svg>
+                              <img
+                                src="/assets/Icon=Merge.png"
+                                alt=""
+                                style={{
+                                  width: 16,
+                                  height: 16,
+                                  flexShrink: 0,
+                                  display: 'block',
+                                  ...(isDarkMode ? { filter: 'invert(1) brightness(1.1)' } : {}),
+                                }}
+                              />
                               <span>Undo All Splits</span>
                             </button>
                           );
                         }
                         return null;
                       })()}
-                      {/* Child only: Undo Split (split row that is not parent) */}
+                      {/* Child only: Undo Split (tab size: 123px × 44px, padding 8px, gap 4px) */}
                       {product.splitTag && (() => {
                         const originalId = product.originalId || product.id;
                         const siblings = products.filter(p => (p.originalId || p.id) === originalId && p.splitTag);
@@ -3162,23 +3163,42 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                             type="button"
                             onClick={() => handleMenuAction('undoSplit', product)}
                             style={{
-                              width: '100%', padding: '10px 16px', textAlign: 'left', background: 'transparent', border: 'none',
-                              color: isDarkMode ? '#E5E7EB' : '#374151', fontSize: '14px', fontWeight: 400, cursor: 'pointer',
-                              transition: 'background-color 0.2s', display: 'flex', alignItems: 'center', gap: '12px',
+                              width: '100%',
+                              height: '100%',
+                              padding: '8px',
+                              background: 'transparent',
+                              border: 'none',
+                              color: isDarkMode ? '#E5E7EB' : '#374151',
+                              fontSize: '14px',
+                              fontWeight: 400,
+                              cursor: 'pointer',
+                              transition: 'background-color 0.2s',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '4px',
                             }}
                             onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6'; }}
                             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                           >
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-                              <path d="M3 8L1 6L3 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                              <line x1="1" y1="6" x2="15" y2="6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                            </svg>
-                            <span>Undo Split</span>
+                            <img
+                              src="/assets/Icon=Merge.png"
+                              alt=""
+                              style={{
+                                width: 16,
+                                height: 16,
+                                flexShrink: 0,
+                                display: 'block',
+                                ...(isDarkMode ? { filter: 'invert(1) brightness(1.1)' } : {}),
+                              }}
+                            />
+                            <span style={{ lineHeight: 1 }}>Undo Split</span>
                           </button>
                         );
                       })()}
                     </div>
-                  )}
+                  );
+                  })()}
                 </td>
                   </tr>
                   {/* Inset separator line under this row, 16px from both ends */}

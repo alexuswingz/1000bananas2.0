@@ -2169,7 +2169,18 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                   </button>
                   
                   {/* Dropdown Menu - rendered in portal so it is not clipped by table overflow:hidden */}
-                  {openMenuIndex === index && menuPosition && ReactDOM.createPortal(
+                  {openMenuIndex === index && menuPosition && (() => {
+                    const menuSiblings = formulas.filter(f => f.formula === formula.formula && f.splitTag);
+                    const menuMaxQty = menuSiblings.length > 0 ? Math.max(...menuSiblings.map(f => f.qty || 0)) : 0;
+                    const menuHasMaxQty = (formula.qty || 0) >= menuMaxQty;
+                    const menuIsParent = !formula.splitTag || (menuSiblings.length > 0 && menuHasMaxQty && (() => {
+                      const withMaxQty = menuSiblings.filter(f => (f.qty || 0) === menuMaxQty);
+                      if (withMaxQty.length === 1) return withMaxQty[0].id === formula.id;
+                      const sorted = [...withMaxQty].sort((a, b) => (a.splitTag || '').localeCompare(b.splitTag || ''));
+                      return sorted[0] && sorted[0].id === formula.id;
+                    })());
+                    const menuIsChild = !!formula.splitTag && !menuIsParent;
+                    return ReactDOM.createPortal(
                     <div
                       ref={(el) => { if (el) menuRefs.current[index] = el; }}
                       style={{
@@ -2181,24 +2192,36 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                         border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
                         borderRadius: '8px',
                         boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                        minWidth: `${MENU_DROPDOWN_WIDTH}px`,
+                        ...(menuIsChild ? {
+                          width: '123px',
+                          height: '44px',
+                          boxSizing: 'border-box',
+                          padding: '8px',
+                          gap: '4px',
+                          flexDirection: 'column',
+                          display: 'flex',
+                          borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                        } : {
+                          width: '147px',
+                          minHeight: '76px',
+                          boxSizing: 'border-box',
+                          padding: '8px',
+                          gap: '4px',
+                          flexDirection: 'column',
+                          display: 'flex',
+                          borderBottom: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                        }),
                         zIndex: 10000,
                         overflow: 'hidden',
                       }}
                     >
                       {(() => {
-                        const siblings = formulas.filter(f => f.formula === formula.formula && f.splitTag);
-                        // Parent = unsplit row, or among split rows the one with the highest quantity (only that row gets Split Formula + Undo All Splits).
-                        const maxQty = siblings.length > 0 ? Math.max(...siblings.map(f => f.qty || 0)) : 0;
-                        const hasMaxQty = (formula.qty || 0) >= maxQty;
-                        const isParent = !formula.splitTag || (siblings.length > 0 && hasMaxQty && (() => {
-                          const withMaxQty = siblings.filter(f => (f.qty || 0) === maxQty);
-                          if (withMaxQty.length === 1) return withMaxQty[0].id === formula.id;
-                          const sorted = [...withMaxQty].sort((a, b) => (a.splitTag || '').localeCompare(b.splitTag || ''));
-                          return sorted[0] && sorted[0].id === formula.id;
-                        })());
-                        const isChild = !!formula.splitTag && !isParent;
-                        // Parent: only Split Formula and Undo All Splits
+                        const siblings = menuSiblings;
+                        const maxQty = menuMaxQty;
+                        const hasMaxQty = menuHasMaxQty;
+                        const isParent = menuIsParent;
+                        const isChild = menuIsChild;
+                        // Parent: only Split Formula and Undo All Splits (tab size: 147px × 76px, padding 8px, gap 4px)
                         if (isParent) {
                           return (
                             <>
@@ -2206,20 +2229,24 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                                 type="button"
                                 onClick={() => handleMenuAction('split', formula)}
                                 style={{
-                                  width: '100%', padding: '10px 16px', textAlign: 'left', background: 'transparent', border: 'none',
+                                  width: '100%', padding: '8px', textAlign: 'left', background: 'transparent', border: 'none',
                                   color: isDarkMode ? '#E5E7EB' : '#374151', fontSize: '14px', fontWeight: 400, cursor: 'pointer',
-                                  transition: 'background-color 0.2s', display: 'flex', alignItems: 'center', gap: '12px',
+                                  transition: 'background-color 0.2s', display: 'flex', alignItems: 'center', gap: '4px',
                                 }}
                                 onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6'; }}
                                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                               >
-                                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-                                  <line x1="8" y1="10" x2="8" y2="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                                  <line x1="8" y1="10" x2="4.5" y2="6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                                  <polygon points="4.5,6.5 4,6 3.5,6.5" fill="currentColor" />
-                                  <line x1="8" y1="10" x2="11.5" y2="6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                                  <polygon points="11.5,6.5 12,6 12.5,6.5" fill="currentColor" />
-                                </svg>
+                                <img
+                                  src="/assets/Icon=Split.png"
+                                  alt=""
+                                  style={{
+                                    width: 16,
+                                    height: 16,
+                                    flexShrink: 0,
+                                    display: 'block',
+                                    ...(isDarkMode ? { filter: 'invert(1) brightness(1.1)' } : {}),
+                                  }}
+                                />
                                 <span>Split Formula</span>
                               </button>
                               {(formula.splitTag || hasSplits(formula)) && (
@@ -2227,42 +2254,67 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                                   type="button"
                                   onClick={() => handleMenuAction('undoAllSplits', formula)}
                                   style={{
-                                    width: '100%', padding: '10px 16px', textAlign: 'left', background: 'transparent', border: 'none',
+                                    width: '100%', padding: '8px', textAlign: 'left', background: 'transparent', border: 'none',
                                     color: isDarkMode ? '#E5E7EB' : '#374151', fontSize: '14px', fontWeight: 400, cursor: 'pointer',
-                                    transition: 'background-color 0.2s', display: 'flex', alignItems: 'center', gap: '12px',
+                                    transition: 'background-color 0.2s', display: 'flex', alignItems: 'center', gap: '4px',
                                   }}
                                   onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6'; }}
                                   onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                                 >
-                                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-                                    <path d="M3 8L1 6L3 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                    <line x1="1" y1="6" x2="15" y2="6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                                  </svg>
+                                  <img
+                                    src="/assets/Icon=Merge.png"
+                                    alt=""
+                                    style={{
+                                      width: 16,
+                                      height: 16,
+                                      flexShrink: 0,
+                                      display: 'block',
+                                      ...(isDarkMode ? { filter: 'invert(1) brightness(1.1)' } : {}),
+                                    }}
+                                  />
                                   <span>Undo All Splits</span>
                                 </button>
                               )}
                             </>
                           );
                         }
-                        // Child: only Undo Split
+                        // Child: only Undo Split (tab size: 123px × 44px, padding 8px, gap 4px, border-bottom 1px)
                         if (isChild) {
                           return (
                             <button
                               type="button"
                               onClick={() => handleMenuAction('undoSplit', formula)}
                               style={{
-                                width: '100%', padding: '10px 16px', textAlign: 'left', background: 'transparent', border: 'none',
-                                color: isDarkMode ? '#E5E7EB' : '#374151', fontSize: '14px', fontWeight: 400, cursor: 'pointer',
-                                transition: 'background-color 0.2s', display: 'flex', alignItems: 'center', gap: '12px',
+                                width: '100%',
+                                height: '100%',
+                                padding: '8px',
+                                background: 'transparent',
+                                border: 'none',
+                                color: isDarkMode ? '#E5E7EB' : '#374151',
+                                fontSize: '14px',
+                                fontWeight: 400,
+                                cursor: 'pointer',
+                                transition: 'background-color 0.2s',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '4px',
                               }}
                               onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = isDarkMode ? '#374151' : '#F3F4F6'; }}
                               onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                             >
-                              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
-                                <path d="M3 8L1 6L3 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                <line x1="1" y1="6" x2="15" y2="6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                              </svg>
-                              <span>Undo Split</span>
+                              <img
+                                src="/assets/Icon=Merge.png"
+                                alt=""
+                                style={{
+                                  width: 16,
+                                  height: 16,
+                                  flexShrink: 0,
+                                  display: 'block',
+                                  ...(isDarkMode ? { filter: 'invert(1) brightness(1.1)' } : {}),
+                                }}
+                              />
+                              <span style={{ lineHeight: 1 }}>Undo Split</span>
                             </button>
                           );
                         }
@@ -2270,7 +2322,8 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
                       })()}
                     </div>,
                     document.body
-                  )}
+                  );
+                  })()}
                 </td>
               </tr>
               {/* Inset separator line under this row, 16px from both ends */}
