@@ -172,7 +172,13 @@ const NewShipmentTable = ({
   const nonTableFilterDropdownRef = useRef(null);
   const [nonTableFilters, setNonTableFilters] = useState({});
   const nonTableContainerRef = useRef(null);
-  
+  const nonTableDataScrollRef = useRef(null);
+  const nonTableDataScrollWrapperRef = useRef(null);
+  const [showDataScrollThumb, setShowDataScrollThumb] = useState(false);
+  const [dataScrollMetrics, setDataScrollMetrics] = useState({ scrollTop: 0, scrollHeight: 0, clientHeight: 0 });
+  const nonTableThumbDragRef = useRef(false);
+  const nonTableThumbRef = useRef(null);
+
   // Horizontal scrollbar visibility state
   const tableContainerRef = useRef(null);
   const [isScrollingHorizontally, setIsScrollingHorizontally] = useState(false);
@@ -375,25 +381,160 @@ const NewShipmentTable = ({
     };
   }, []);
 
-  // Auto-show scrollbar while scrolling in non-table (card) view
+  // Custom thumb: rAF loop updates thumb every frame while scrolling so it never lags behind
   useEffect(() => {
-    const container = nonTableContainerRef.current;
+    const container = nonTableDataScrollRef.current;
     if (!container) return;
     let scrollTimeout;
+    let scrollActive = false;
+    let rafId = null;
+    let cachedScrollable = null;
+    let cachedTrackHeight = null;
+    let cachedThumbHeight = null;
+
+    const updateThumb = () => {
+      const thumbEl = nonTableThumbRef.current;
+      if (!thumbEl || nonTableThumbDragRef.current) return;
+      if (cachedScrollable == null || cachedScrollable <= 0) return;
+      const scrollTop = container.scrollTop;
+      const thumbTop = (scrollTop / cachedScrollable) * cachedTrackHeight;
+      thumbEl.style.transform = `translateY(${thumbTop}px)`;
+    };
+
+    const tick = () => {
+      if (!scrollActive) return;
+      updateThumb();
+      rafId = requestAnimationFrame(tick);
+    };
+
     const handleScroll = () => {
+      if (nonTableThumbDragRef.current) return;
+      const thumbEl = nonTableThumbRef.current;
+      if (!thumbEl) return;
+      if (cachedScrollable == null) {
+        const sh = container.scrollHeight;
+        const ch = container.clientHeight;
+        cachedScrollable = sh - ch;
+        if (cachedScrollable <= 0) return;
+        cachedThumbHeight = Math.max(20, (ch / sh) * ch);
+        cachedTrackHeight = ch - cachedThumbHeight;
+      }
+      if (cachedScrollable <= 0) return;
+      scrollActive = true;
+      thumbEl.classList.add('non-table-thumb-scroll-visible');
       container.classList.add('is-scrolling');
+      updateThumb();
+      if (rafId == null) rafId = requestAnimationFrame(tick);
       clearTimeout(scrollTimeout);
       scrollTimeout = setTimeout(() => {
+        scrollActive = false;
+        if (rafId != null) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+        cachedScrollable = null;
+        cachedTrackHeight = null;
+        cachedThumbHeight = null;
+        const el = nonTableThumbRef.current;
+        if (el) el.classList.remove('non-table-thumb-scroll-visible');
+        setDataScrollMetrics({
+          scrollTop: container.scrollTop,
+          scrollHeight: container.scrollHeight,
+          clientHeight: container.clientHeight,
+        });
         container.classList.remove('is-scrolling');
-      }, 1000);
+        setShowDataScrollThumb(false);
+      }, 1500);
     };
+    const handleWheel = () => {
+      if (nonTableThumbDragRef.current) return;
+      const thumbEl = nonTableThumbRef.current;
+      if (!thumbEl) return;
+      if (cachedScrollable == null) {
+        const sh = container.scrollHeight;
+        const ch = container.clientHeight;
+        cachedScrollable = sh - ch;
+        if (cachedScrollable <= 0) return;
+        cachedThumbHeight = Math.max(20, (ch / sh) * ch);
+        cachedTrackHeight = ch - cachedThumbHeight;
+      }
+      if (cachedScrollable <= 0) return;
+      scrollActive = true;
+      thumbEl.classList.add('non-table-thumb-scroll-visible');
+      container.classList.add('is-scrolling');
+      updateThumb();
+      if (rafId == null) rafId = requestAnimationFrame(tick);
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        scrollActive = false;
+        if (rafId != null) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+        cachedScrollable = null;
+        cachedTrackHeight = null;
+        cachedThumbHeight = null;
+        const el = nonTableThumbRef.current;
+        if (el) el.classList.remove('non-table-thumb-scroll-visible');
+        setDataScrollMetrics({
+          scrollTop: container.scrollTop,
+          scrollHeight: container.scrollHeight,
+          clientHeight: container.clientHeight,
+        });
+        container.classList.remove('is-scrolling');
+        setShowDataScrollThumb(false);
+      }, 1500);
+    };
+
     container.addEventListener('scroll', handleScroll, { passive: true });
+    container.addEventListener('wheel', handleWheel, { passive: true });
     return () => {
+      scrollActive = false;
+      if (rafId != null) cancelAnimationFrame(rafId);
       container.removeEventListener('scroll', handleScroll);
+      container.removeEventListener('wheel', handleWheel);
       clearTimeout(scrollTimeout);
     };
   }, [tableMode]);
-  
+
+  // Custom scroll thumb drag (non-table data cell) – only thumb is visible, no track
+  const handleNonTableThumbMouseDown = useCallback((e) => {
+    e.preventDefault();
+    const container = nonTableDataScrollRef.current;
+    const thumbEl = nonTableThumbRef.current;
+    if (!container || !thumbEl) return;
+    nonTableThumbDragRef.current = true;
+    const startY = e.clientY;
+    const startScrollTop = container.scrollTop;
+    const scrollHeight = container.scrollHeight;
+    const clientHeight = container.clientHeight;
+    const scrollable = scrollHeight - clientHeight;
+    if (scrollable <= 0) return;
+    const thumbHeight = Math.max(20, (clientHeight / scrollHeight) * clientHeight);
+    const trackHeight = clientHeight - thumbHeight;
+    if (trackHeight <= 0) return;
+    const ratio = scrollable / trackHeight;
+    const onMouseMove = (e2) => {
+      const deltaY = e2.clientY - startY;
+      const newScrollTop = Math.max(0, Math.min(scrollable, startScrollTop + deltaY * ratio));
+      container.scrollTop = newScrollTop;
+      const thumbTop = (newScrollTop / scrollable) * (clientHeight - thumbHeight);
+      thumbEl.style.transform = `translateY(${thumbTop}px)`;
+    };
+    const onMouseUp = () => {
+      nonTableThumbDragRef.current = false;
+      setDataScrollMetrics({
+        scrollTop: container.scrollTop,
+        scrollHeight: container.scrollHeight,
+        clientHeight: container.clientHeight,
+      });
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, []);
+
   // Clean up any invalid brand filters when account changes or on mount
   // If a brand filter has all brands selected, treat it as no filter
   // Also clear filter if it has fewer brands than expected for the account
@@ -3522,43 +3663,30 @@ const NewShipmentTable = ({
           }
         `}</style>
         <style>{`
-          .non-table-scroll-container {
-            overflow-y: overlay !important;
-            scrollbar-width: thin;
-            scrollbar-color: transparent transparent;
+          .non-table-data-scroll {
+            overflow-y: auto;
+            overflow-x: hidden;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            will-change: scroll-position;
           }
-          .non-table-scroll-container:hover,
-          .non-table-scroll-container.is-scrolling {
-            scrollbar-color: ${isDarkMode ? '#475569' : '#9CA3AF'} transparent;
+          .non-table-data-scroll::-webkit-scrollbar {
+            width: 0;
+            height: 0;
+            display: none;
           }
-          .non-table-scroll-container::-webkit-scrollbar {
-            width: 10px;
-            background: transparent;
+          .non-table-thumb.non-table-thumb-scroll-visible {
+            opacity: 1 !important;
+            pointer-events: auto !important;
           }
-          .non-table-scroll-container::-webkit-scrollbar-track {
-            background: transparent;
-            border-radius: 0 16px 16px 0;
-          }
-          .non-table-scroll-container::-webkit-scrollbar-thumb {
-            background: transparent;
-            border-radius: 5px;
-            border: 2px solid transparent;
-            transition: background 0.3s;
-          }
-          .non-table-scroll-container:hover::-webkit-scrollbar-thumb,
-          .non-table-scroll-container.is-scrolling::-webkit-scrollbar-thumb {
-            background: ${isDarkMode ? '#475569' : '#9CA3AF'};
-            border: 2px solid ${isDarkMode ? '#1E293B' : '#F3F4F6'};
-          }
-          .non-table-scroll-container:hover::-webkit-scrollbar-thumb:hover,
-          .non-table-scroll-container.is-scrolling::-webkit-scrollbar-thumb:hover {
-            background: ${isDarkMode ? '#64748B' : '#6B7280'};
+          .non-table-thumb {
+            will-change: transform;
           }
         `}</style>
         <div
           ref={nonTableContainerRef}
-          className={`${themeClasses.cardBg} ${themeClasses.border} border rounded-xl shadow-sm non-table-scroll-container`}
-          style={{ marginTop: '1.25rem', overflowY: 'overlay', overflowX: 'hidden', borderRadius: '16px', maxHeight: 'calc(100vh - 260px)' }}
+          className={`${themeClasses.cardBg} ${themeClasses.border} border rounded-xl shadow-sm`}
+          style={{ marginTop: '1.25rem', overflowX: 'hidden', borderRadius: '16px' }}
         >
           {/* Header Row */}
           <div
@@ -3872,8 +4000,40 @@ const NewShipmentTable = ({
             </div>
           </div>
 
-          {/* Product Rows */}
-          <div>
+          {/* Product Rows - scrollable data cell with custom thumb-only scrollbar */}
+          <div
+            ref={nonTableDataScrollWrapperRef}
+            style={{ position: 'relative', maxHeight: 'calc(100vh - 260px)' }}
+            onMouseEnter={() => {
+              const el = nonTableDataScrollRef.current;
+              if (el) {
+                const scrollTop = el.scrollTop;
+                const scrollHeight = el.scrollHeight;
+                const clientHeight = el.clientHeight;
+                setDataScrollMetrics({ scrollTop, scrollHeight, clientHeight });
+                setShowDataScrollThumb(true);
+                const thumbEl = nonTableThumbRef.current;
+                if (thumbEl && scrollHeight > clientHeight) {
+                  thumbEl.classList.add('non-table-thumb-scroll-visible');
+                  const scrollable = scrollHeight - clientHeight;
+                  const thumbHeight = Math.max(20, (clientHeight / scrollHeight) * clientHeight);
+                  const trackHeight = clientHeight - thumbHeight;
+                  const thumbTop = (scrollTop / scrollable) * trackHeight;
+                  thumbEl.style.transform = `translateY(${thumbTop}px)`;
+                }
+              }
+            }}
+            onMouseLeave={() => {
+              const thumbEl = nonTableThumbRef.current;
+              if (thumbEl) thumbEl.classList.remove('non-table-thumb-scroll-visible');
+              setShowDataScrollThumb(false);
+            }}
+          >
+            <div
+              ref={nonTableDataScrollRef}
+              className="non-table-data-scroll"
+              style={{ maxHeight: 'calc(100vh - 260px)', height: '100%' }}
+            >
             {currentRows.map((row, arrayIndex) => {
               const index = row._originalIndex !== undefined ? row._originalIndex : arrayIndex;
               const effectiveAddedRows = addedRows;
@@ -5069,6 +5229,36 @@ const NewShipmentTable = ({
                 </div>
               );
             })}
+            </div>
+            {dataScrollMetrics.scrollHeight > dataScrollMetrics.clientHeight && (
+              <div
+                ref={nonTableThumbRef}
+                className="non-table-thumb"
+                role="scrollbar"
+                aria-orientation="vertical"
+                aria-valuenow={dataScrollMetrics.scrollTop}
+                aria-valuemin={0}
+                aria-valuemax={Math.max(0, dataScrollMetrics.scrollHeight - dataScrollMetrics.clientHeight)}
+                onMouseDown={handleNonTableThumbMouseDown}
+                style={{
+                  position: 'absolute',
+                  right: '6px',
+                  top: 0,
+                  width: '8px',
+                  height: Math.max(20, dataScrollMetrics.scrollHeight > 0 ? (dataScrollMetrics.clientHeight / dataScrollMetrics.scrollHeight) * dataScrollMetrics.clientHeight : 0),
+                  transform: dataScrollMetrics.clientHeight > 0 && dataScrollMetrics.scrollHeight > dataScrollMetrics.clientHeight
+                    ? `translateY(${(dataScrollMetrics.scrollTop / (dataScrollMetrics.scrollHeight - dataScrollMetrics.clientHeight)) * (dataScrollMetrics.clientHeight - Math.max(20, (dataScrollMetrics.clientHeight / dataScrollMetrics.scrollHeight) * dataScrollMetrics.clientHeight))}px)`
+                    : 'translateY(0)',
+                  borderRadius: '5px',
+                  backgroundColor: isDarkMode ? '#475569' : '#9CA3AF',
+                  cursor: 'grab',
+                  pointerEvents: showDataScrollThumb ? 'auto' : 'none',
+                  zIndex: 10,
+                  opacity: showDataScrollThumb ? 1 : 0,
+                  transition: 'opacity 0.2s ease',
+                }}
+              />
+            )}
           </div>
         </div>
 
