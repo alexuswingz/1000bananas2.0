@@ -2479,6 +2479,10 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.fba?.available ?? 0).toLocaleString()}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>Reserved:</span>
+                <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.fba?.reserved ?? 0).toLocaleString()}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                 <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>Inbound:</span>
                 <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.fba?.inbound ?? 0).toLocaleString()}</span>
               </div>
@@ -2508,6 +2512,14 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                 <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>Available:</span>
                 <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.awd?.available ?? 0).toLocaleString()}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>Outbound to FBA:</span>
+                <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.awd?.outbound_to_fba ?? 0).toLocaleString()}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>Reserved:</span>
+                <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.awd?.reserved ?? 0).toLocaleString()}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                 <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>Inbound:</span>
@@ -2543,6 +2555,14 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                 <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>181-270:</span>
                 <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.fbaAge?.buckets?.['181-270'] ?? 0).toLocaleString()}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>271-365:</span>
+                <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.fbaAge?.buckets?.['271-365'] ?? 0).toLocaleString()}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>365+:</span>
+                <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.fbaAge?.buckets?.['365+'] ?? 0).toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -2740,9 +2760,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div>
               <h3 style={{ fontSize: inventoryOnly ? '0.85rem' : '1rem', fontWeight: '600', color: '#fff', marginBottom: '0.25rem' }}>Unit Forecast</h3>
-              <p style={{ fontSize: inventoryOnly ? '0.75rem' : '0.875rem', color: '#94a3b8' }}>
-                {productDetails?.product?.size || data?.size || data?.variations?.[0] || '8oz'} Forecast
-              </p>
             </div>
             {/* Range selection stats - same row as Unit Forecast (no Reset; click chart to clear) */}
             {chartRangeSum != null && chartRangeSelectionEffective != null && (() => {
@@ -4010,15 +4027,11 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             <div className={inventoryOnly ? '' : 'px-6 pb-6'} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 0, overflow: 'auto', padding: inventoryOnly ? '1rem' : '3rem' }}>
               <div style={{ textAlign: 'center', maxWidth: '420px', marginTop: '-50px' }}>
                 <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'center' }}>
-                  <div style={{ width: 98, height: 98, borderRadius: '50%', border: '1px solid rgba(168, 85, 247, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(30, 27, 75, 0.6)' }}>
-                    <svg width="56" height="56" viewBox="0 0 24 24" fill="none" style={{ color: '#a855f7' }}>
-                      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="currentColor" />
-                    </svg>
-                  </div>
+                  <img src="/assets/Bolt (1).png" alt="ZAP" style={{ width: '98px', height: '98px', objectFit: 'contain' }} />
                 </div>
                 <h2 style={{ fontSize: '1.75rem', fontWeight: '700', color: '#fff', marginBottom: '0.75rem' }}>ZAP is Coming Soon!</h2>
                 <p style={{ fontSize: '1rem', color: '#94a3b8', marginBottom: '1.5rem', lineHeight: 1.5 }}>Ad management is on the horizon. Get ready to zap your competition.</p>
-                <button onClick={() => setActiveTab('forecast')} style={{ minWidth: '133px', height: '31px', padding: '0 10px', backgroundColor: '#334155', color: '#fff', borderRadius: '6px', border: '1px solid #475569', fontSize: '0.875rem', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>
+                <button onClick={() => setActiveTab('forecast')} style={{ minWidth: '133px', height: '31px', padding: '0 10px', marginLeft: '140px', backgroundColor: '#334155', color: '#fff', borderRadius: '6px', border: '1px solid #475569', fontSize: '0.875rem', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>
                   Back to Inventory
                 </button>
               </div>

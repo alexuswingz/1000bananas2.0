@@ -4339,6 +4339,10 @@ const NewShipmentTable = ({
                             console.log('New state:', newState);
                             return newState;
                           });
+                          if (rawQtyInputValues.current[index] !== undefined) {
+                            rawQtyInputValues.current[index] = undefined;
+                            setQtyInputUpdateTrigger(prev => prev + 1);
+                          }
                           // Remove from manually edited set when reset to suggestion
                           manuallyEditedIndices.current.delete(index);
                           // Clear any stored label-inventory suggestion usage for this product
@@ -4409,10 +4413,14 @@ const NewShipmentTable = ({
                           <path d="M9.4 4L11 5.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
                         </svg>
                       </button>
-                      {/* Quantity input - clean rounded rectangle */}
+                      {/* Quantity input - clean rounded rectangle. In non-table mode we allow free typing and only round to nearest increment on blur/Enter. */}
                       <input 
                         type="text" 
                         value={(() => {
+                          // While user is typing, show raw string so they can enter e.g. "120" without "1" rounding to 60
+                          if (rawQtyInputValues.current[index] !== undefined) {
+                            return rawQtyInputValues.current[index];
+                          }
                           const qty = effectiveQtyValues[index];
                           const atDoiGoal = (row.suggestedQty ?? row.units_to_make ?? row.unitsToMake ?? -1) === 0 ||
                             (row.doiTotal || row.daysOfInventory || 0) >= (forecastRange || 120);
@@ -4423,21 +4431,30 @@ const NewShipmentTable = ({
                           return isNaN(numQty) ? (atDoiGoal ? '0' : '') : numQty.toLocaleString();
                         })()}
                         onChange={(e) => { 
-                          const inputValue = e.target.value.replace(/,/g, ''); 
-                          manuallyEditedIndices.current.add(index); 
-                          if (inputValue === '' || inputValue === '-') { 
-                            effectiveSetQtyValues(prev => ({ ...prev, [index]: '' })); 
-                          } else { 
-                            const numValue = parseInt(inputValue, 10); 
-                            if (!isNaN(numValue) && numValue >= 0) { 
-                              effectiveSetQtyValues(prev => ({ ...prev, [index]: numValue })); 
-                            } 
-                          }
+                          const inputValue = e.target.value.replace(/,/g, '').replace(/\D/g, '');
+                          manuallyEditedIndices.current.add(index);
+                          // Store raw string only; do not commit to parent until blur or Enter
+                          rawQtyInputValues.current[index] = inputValue;
                           setQtyInputUpdateTrigger(prev => prev + 1);
+                        }}
+                        onBlur={(e) => {
+                          const raw = (rawQtyInputValues.current[index] ?? e.target.value).toString().replace(/,/g, '').replace(/\D/g, '');
+                          rawQtyInputValues.current[index] = undefined;
+                          setQtyInputUpdateTrigger(prev => prev + 1);
+                          if (raw === '') {
+                            effectiveSetQtyValues(prev => ({ ...prev, [index]: '' }));
+                            return;
+                          }
+                          const num = parseInt(raw, 10);
+                          if (Number.isNaN(num) || num < 0) {
+                            return;
+                          }
+                          const rounded = roundQtyToNearestCase(num, row);
+                          effectiveSetQtyValues(prev => ({ ...prev, [index]: rounded }));
                         }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
-                            e.target.blur(); // Remove focus after Enter
+                            e.target.blur(); // Blur triggers onBlur which rounds and commits
                           }
                         }}
                         onClick={(e) => e.stopPropagation()} 
@@ -4481,6 +4498,12 @@ const NewShipmentTable = ({
                           onClick={(e) => {
                             e.stopPropagation();
                             if (nonTableSelectedIndices.size > 1 && nonTableSelectedIndices.has(index)) {
+                              nonTableSelectedIndices.forEach(selectedIndex => {
+                                if (rawQtyInputValues.current[selectedIndex] !== undefined) {
+                                  rawQtyInputValues.current[selectedIndex] = undefined;
+                                }
+                              });
+                              setQtyInputUpdateTrigger(prev => prev + 1);
                               effectiveSetQtyValues(prev => {
                                 const newValues = { ...prev };
                                 nonTableSelectedIndices.forEach(selectedIndex => {
@@ -4496,6 +4519,9 @@ const NewShipmentTable = ({
                                 return newValues;
                               });
                             } else {
+                              if (rawQtyInputValues.current[index] !== undefined) {
+                                rawQtyInputValues.current[index] = undefined;
+                              }
                               const currentQty = effectiveQtyValues[index] ?? 0;
                               const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
                               const increment = getQtyIncrement(row);
@@ -4532,6 +4558,12 @@ const NewShipmentTable = ({
                           onClick={(e) => {
                             e.stopPropagation();
                             if (nonTableSelectedIndices.size > 1 && nonTableSelectedIndices.has(index)) {
+                              nonTableSelectedIndices.forEach(selectedIndex => {
+                                if (rawQtyInputValues.current[selectedIndex] !== undefined) {
+                                  rawQtyInputValues.current[selectedIndex] = undefined;
+                                }
+                              });
+                              setQtyInputUpdateTrigger(prev => prev + 1);
                               effectiveSetQtyValues(prev => {
                                 const newValues = { ...prev };
                                 nonTableSelectedIndices.forEach(selectedIndex => {
@@ -4548,6 +4580,9 @@ const NewShipmentTable = ({
                                 return newValues;
                               });
                             } else {
+                              if (rawQtyInputValues.current[index] !== undefined) {
+                                rawQtyInputValues.current[index] = undefined;
+                              }
                               const currentQty = effectiveQtyValues[index] ?? 0;
                               const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
                               if (numQty <= 0) return;
