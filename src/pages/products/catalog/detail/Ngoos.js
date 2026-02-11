@@ -2394,12 +2394,11 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                   {productDetails?.product?.name || data?.product || 'Product Name'}
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
-                  <div style={{ fontSize: '0.6875rem', color: '#64758B', lineHeight: 1.2, minHeight: '14px', display: 'flex', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 500 }}>SIZE:</span> <span style={{ color: '#64758B' }}>{productDetails?.product?.size || data?.size || data?.variations?.[0] || 'N/A'}</span>
+                  <div style={{ fontSize: '0.8125rem', lineHeight: 1.2, minHeight: '16px', display: 'flex', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 500, color: '#94a3b8' }}>SIZE:</span><span style={{ color: '#fff', marginLeft: '6px' }}>{productDetails?.product?.size || data?.size || data?.variations?.[0] || 'N/A'}</span>
                   </div>
-                  <div style={{ fontSize: '0.6875rem', color: '#64758B', display: 'flex', alignItems: 'center', gap: '6px', lineHeight: 1.2, minHeight: '14px' }}>
-                    <span style={{ fontWeight: 500 }}>ASIN:</span> 
-                    <span style={{ color: '#64758B' }}>{productDetails?.product?.asin || data?.child_asin || data?.childAsin || 'N/A'}</span>
+                  <div style={{ fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '6px', lineHeight: 1.2, minHeight: '16px' }}>
+                    <span style={{ fontWeight: 500, color: '#94a3b8' }}>ASIN:</span> <span style={{ color: '#fff' }}>{productDetails?.product?.asin || data?.child_asin || data?.childAsin || 'N/A'}</span>
                     {(productDetails?.product?.asin || data?.child_asin || data?.childAsin) && (
                       <img 
                         src="/assets/copyy.png" 
@@ -2439,15 +2438,15 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                             });
                           }
                         }}
-                        style={{ width: '14px', height: '14px', cursor: 'pointer', flexShrink: 0 }} 
+                        style={{ width: '14px', height: '14px', cursor: 'pointer', flexShrink: 0, filter: 'brightness(0) invert(1)' }} 
                       />
                     )}
                   </div>
-                  <div style={{ fontSize: '0.6875rem', color: '#64758B', lineHeight: 1.2, minHeight: '14px', display: 'flex', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 500 }}>BRAND:</span> <span style={{ color: '#64758B' }}>{productDetails?.product?.brand || data?.brand || 'N/A'}</span>
+                  <div style={{ fontSize: '0.8125rem', lineHeight: 1.2, minHeight: '16px', display: 'flex', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 500, color: '#94a3b8' }}>BRAND:</span><span style={{ color: '#fff', marginLeft: '6px' }}>{productDetails?.product?.brand || data?.brand || 'N/A'}</span>
                   </div>
-                  <div style={{ fontSize: '0.6875rem', color: '#64758B', lineHeight: 1.2, minHeight: '14px', display: 'flex', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 500 }}>SKU:</span> <span style={{ color: '#64758B' }}>{productDetails?.product?.sku || data?.childSku || data?.sku || data?.sku_id || data?.skuId || data?.catalog_sku || data?.child_sku || data?.child_sku_final || 'N/A'}</span>
+                  <div style={{ fontSize: '0.8125rem', lineHeight: 1.2, minHeight: '16px', display: 'flex', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 500, color: '#94a3b8' }}>SKU:</span><span style={{ color: '#fff', marginLeft: '6px' }}>{productDetails?.product?.sku || data?.childSku || data?.sku || data?.sku_id || data?.skuId || data?.catalog_sku || data?.child_sku || data?.child_sku_final || 'N/A'}</span>
                   </div>
                 </div>
               </div>
