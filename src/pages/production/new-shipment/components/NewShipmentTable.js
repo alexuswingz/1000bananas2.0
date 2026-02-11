@@ -3419,10 +3419,27 @@ const NewShipmentTable = ({
             pointer-events: auto !important;
           }
         `}</style>
+        <style>{`
+          .non-table-scroll-container::-webkit-scrollbar {
+            width: 10px;
+          }
+          .non-table-scroll-container::-webkit-scrollbar-track {
+            background: ${isDarkMode ? '#1E293B' : '#F3F4F6'};
+            border-radius: 0 16px 16px 0;
+          }
+          .non-table-scroll-container::-webkit-scrollbar-thumb {
+            background: ${isDarkMode ? '#475569' : '#9CA3AF'};
+            border-radius: 5px;
+            border: 2px solid ${isDarkMode ? '#1E293B' : '#F3F4F6'};
+          }
+          .non-table-scroll-container::-webkit-scrollbar-thumb:hover {
+            background: ${isDarkMode ? '#64748B' : '#6B7280'};
+          }
+        `}</style>
         <div
           ref={nonTableContainerRef}
-          className={`${themeClasses.cardBg} ${themeClasses.border} border rounded-xl shadow-sm`}
-          style={{ marginTop: '1.25rem', overflow: 'hidden', borderRadius: '16px' }}
+          className={`${themeClasses.cardBg} ${themeClasses.border} border rounded-xl shadow-sm non-table-scroll-container`}
+          style={{ marginTop: '1.25rem', overflowY: 'auto', overflowX: 'hidden', borderRadius: '16px', maxHeight: 'calc(100vh - 260px)' }}
         >
           {/* Header Row */}
           <div
@@ -4913,8 +4930,8 @@ const NewShipmentTable = ({
           </div>
         </div>
 
-        {/* Header Filter Dropdowns */}
-        {Array.from(openFilterColumns).map((columnKey) => {
+      {/* Header Filter Dropdowns */}
+      {Array.from(openFilterColumns).map((columnKey) => {
           if (!filterIconRefs.current[columnKey]) return null;
           return (
             <SortFormulasFilterDropdown
@@ -5454,22 +5471,20 @@ const NewShipmentTable = ({
           -moz-appearance: textfield;
         }
         .new-shipment-table-scroll {
-          scrollbar-width: auto !important;
+          scrollbar-width: thin !important;
           scrollbar-color: ${isDarkMode ? '#64748B #1E293B' : '#6B7280 #F3F4F6'} !important;
-          overflow-y: scroll !important;
+          overflow-y: auto !important;
         }
-        /* Always show vertical scrollbar */
+        /* Always show vertical scrollbar when content overflows */
         .new-shipment-table-scroll::-webkit-scrollbar {
           width: 12px !important;
           height: 4px;
           -webkit-appearance: none;
           display: block !important;
-          visibility: visible !important;
         }
         .new-shipment-table-scroll::-webkit-scrollbar:vertical {
           width: 12px !important;
           display: block !important;
-          visibility: visible !important;
         }
         .new-shipment-table-scroll::-webkit-scrollbar-track {
           background: ${isDarkMode ? '#1E293B' : '#F3F4F6'} !important;
@@ -5525,23 +5540,32 @@ const NewShipmentTable = ({
           <option value="unchecked">Unchecked</option>
         </select>
       </div>
+      {/* Outer scrollable wrapper */}
       <div
-      ref={tableContainerRef}
-      className={`${themeClasses.cardBg} ${themeClasses.border} border shadow-sm new-shipment-table-scroll ${isScrollingHorizontally ? 'scrolling-horizontal' : ''}`}
-      style={{ 
-        marginTop: '1.25rem', 
-        borderRadius: '6px', 
-        overflowX: 'auto', 
-        overflowY: 'scroll',
-        width: '100%',
-        WebkitOverflowScrolling: 'touch',
-        position: 'relative',
-        height: 'calc(100vh - 520px)', // Fixed height to create scroll context
-        maxHeight: 'calc(100vh - 520px)', // Ensure it doesn't exceed viewport
-        minHeight: '400px', // Minimum height to ensure usability
-        display: 'block',
-      }}
-    >
+        className="new-shipment-table-scroll"
+        style={{
+          marginTop: '1.25rem',
+          overflowY: 'auto',
+          overflowX: 'visible',
+          maxHeight: 'calc(100vh - 520px)',
+          height: 'calc(100vh - 520px)',
+          position: 'relative',
+        }}
+      >
+        <div
+        ref={tableContainerRef}
+        className={`${themeClasses.cardBg} ${themeClasses.border} border shadow-sm new-shipment-table-scroll ${isScrollingHorizontally ? 'scrolling-horizontal' : ''}`}
+        style={{ 
+          borderRadius: '6px', 
+          overflowX: 'auto', 
+          overflowY: 'auto',
+          width: '100%',
+          WebkitOverflowScrolling: 'touch',
+          position: 'relative',
+          minHeight: '400px', // Minimum height to ensure usability
+          display: 'block',
+        }}
+      >
       <div 
         style={{ 
         width: '100%',
@@ -7073,7 +7097,11 @@ const NewShipmentTable = ({
           </tbody>
         </table>
       </div>
+      {/* End of inner wrapper div */}
     </div>
+    {/* End of table container div */}
+      </div>
+      {/* End of outer scrollable wrapper */}
     
       {/* Timeline Filter Modal for Table Mode (DOI Goal) */}
     {openFilterIndex === 'doi-goal' && (
