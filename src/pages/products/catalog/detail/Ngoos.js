@@ -3635,7 +3635,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                               fill: '#e5e7eb',
                               fontSize: 11,
                               fontWeight: 500,
-                              offset: 6
+                              offset: 16
                             }}
                           />
                         )}
@@ -3653,7 +3653,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                               fill: '#e5e7eb',
                               fontSize: 11,
                               fontWeight: 500,
-                              offset: 6
+                              offset: 16
                             }}
                           />
                         )}
@@ -3671,7 +3671,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                               fill: '#e5e7eb',
                               fontSize: 11,
                               fontWeight: 500,
-                              offset: 6
+                              offset: 16
                             }}
                           />
                         )}
