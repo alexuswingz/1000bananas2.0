@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 /**
  * DOI Settings Popover Component
@@ -67,9 +68,11 @@ const DOISettingsPopover = ({
 }) => {
   const [isOpen, setIsOpen] = useState(openByDefault);
   const [badgeHover, setBadgeHover] = useState(false);
+  const [tooltipRect, setTooltipRect] = useState(null);
   const tooltipCloseTimeoutRef = useRef(null);
   const popoverRef = useRef(null);
   const buttonRef = useRef(null);
+  const badgeRef = useRef(null);
   
   // Loading state
   const [loading, setLoading] = useState(false);
@@ -134,6 +137,30 @@ const DOISettingsPopover = ({
       if (tooltipCloseTimeoutRef.current) clearTimeout(tooltipCloseTimeoutRef.current);
     };
   }, []);
+
+  // Position tooltip above badge; update on hover and on scroll/resize so it isn't cut off by parent overflow
+  const updateTooltipRect = useRef(() => {
+    if (badgeRef.current) {
+      const rect = badgeRef.current.getBoundingClientRect();
+      setTooltipRect({ left: rect.left, top: rect.top, width: rect.width, height: rect.height });
+    }
+  });
+
+  useEffect(() => {
+    if (!badgeHover) {
+      setTooltipRect(null);
+      return;
+    }
+    const raf = requestAnimationFrame(() => updateTooltipRect.current());
+    const onScrollOrResize = () => updateTooltipRect.current();
+    window.addEventListener('scroll', onScrollOrResize, true);
+    window.addEventListener('resize', onScrollOrResize);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('scroll', onScrollOrResize, true);
+      window.removeEventListener('resize', onScrollOrResize);
+    };
+  }, [badgeHover]);
 
   // Load settings from API on mount (or use initialSettings if provided)
   useEffect(() => {
@@ -371,6 +398,7 @@ const DOISettingsPopover = ({
         </button>
         {showCustomDoiBadge && onRevertDoi && (
           <span
+            ref={badgeRef}
             style={{ position: 'absolute', top: '-6px', right: '-6px', zIndex: 2 }}
             onMouseEnter={() => {
               if (tooltipCloseTimeoutRef.current) {
@@ -418,16 +446,16 @@ const DOISettingsPopover = ({
             >
               !
             </button>
-            {badgeHover && (
+            {badgeHover && tooltipRect && createPortal(
               <div
                 role="tooltip"
                 style={{
-                  position: 'absolute',
-                  bottom: 'calc(100% + 10px)',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
+                  position: 'fixed',
+                  left: tooltipRect.left + tooltipRect.width / 2,
+                  top: tooltipRect.top - 10,
+                  transform: 'translate(-50%, -100%)',
                   width: '200px',
-                  height: '92px',
+                  minHeight: '92px',
                   display: 'flex',
                   flexDirection: 'column',
                   padding: '10px 12px',
@@ -497,7 +525,8 @@ const DOISettingsPopover = ({
                     borderTop: `6px solid ${theme.popoverBg}`,
                   }}
                 />
-              </div>
+              </div>,
+              document.body
             )}
           </span>
         )}
