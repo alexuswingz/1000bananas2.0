@@ -123,6 +123,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   const [displayUnitsOverride, setDisplayUnitsOverride] = useState(null); // user-adjusted units in N-GOOS modal (arrows)
   const [settingsApplied, setSettingsApplied] = useState(false);
   const [showIndicatorTooltip, setShowIndicatorTooltip] = useState(false);
+  const [timeRangeSelectFocused, setTimeRangeSelectFocused] = useState(false);
   const [salesVelocityWeight, setSalesVelocityWeight] = useState(25);
   const [svVelocityWeight, setSvVelocityWeight] = useState(15);
   const [tempSalesVelocityWeight, setTempSalesVelocityWeight] = useState(25);
@@ -2774,10 +2775,10 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               const unitsDiff = chartRangeSum.unitsSmoothed - chartRangeSum.unitsSold;
               const revenueGap = unitsDiff * unitCost;
               const isForecast = chartRangeSum.isForecastOnly === true;
-              const dateRangeStr = `${new Date(chartRangeSelectionEffective.displayLo).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} – ${new Date(chartRangeSelectionEffective.displayHi).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+              const dateRangeStr = `${new Date(chartRangeSelectionEffective.displayLo).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })} - ${new Date(chartRangeSelectionEffective.displayHi).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })}`;
               return (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap', fontSize: inventoryOnly ? '0.75rem' : '0.8125rem' }}>
-                  <span style={{ color: '#64748b', marginRight: '0.25rem' }} title="Selected date range">{dateRangeStr}</span>
+                  <span style={{ color: '#e2e8f0', marginRight: '0.25rem', width: '102px', height: '20px', padding: '4px 8px', border: '1px solid #334155', borderRadius: '4px', backgroundColor: '#1A2235', boxShadow: '0 1px 2px rgba(0,0,0,0.2)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', fontSize: '0.625rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title="Selected date range">{dateRangeStr}</span>
                   {isForecast ? (
                     <>
                       <span style={{ color: '#94a3b8' }}>
@@ -2803,7 +2804,33 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 </div>
               );
             })()}
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {(zoomDomain.left != null || zoomDomain.right != null) && (
+                <button
+                  type="button"
+                  onClick={handleZoomReset}
+                  style={{
+                    width: '57px',
+                    height: '23px',
+                    padding: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.75rem',
+                    color: '#3B82F6',
+                    backgroundColor: '#0f172a',
+                    border: '1px solid #3B82F6',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 500,
+                    boxSizing: 'border-box',
+                    transform: 'translateX(5px)'
+                  }}
+                  title={zoomHistory.length > 0 ? 'Return to previous zoom level' : 'Return to full view'}
+                >
+                  Reset
+                </button>
+              )}
               {/* Zoom tool: click to turn On (blue), then click two points on chart to zoom; Reset appears when zoomed */}
               <button
                 type="button"
@@ -2825,7 +2852,8 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                   transition: 'all 0.2s',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  transform: 'translateX(10px)'
                 }}
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
@@ -3096,13 +3124,16 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               <select 
                 value={selectedView}
                 onChange={(e) => setSelectedView(e.target.value)}
+                onFocus={() => setTimeRangeSelectFocused(true)}
+                onBlur={() => setTimeRangeSelectFocused(false)}
                 style={{ 
                   padding: '0 0.625rem', 
                   paddingRight: '1.75rem',
                   borderRadius: '0.25rem', 
                   backgroundColor: '#1A1F2E', 
                   color: '#fff',
-                  border: '1px solid #2D3748',
+                  border: timeRangeSelectFocused ? '1px solid #3B82F6' : '1px solid #2D3748',
+                  outline: 'none',
                   fontSize: '0.875rem',
                   fontWeight: 500,
                   cursor: 'pointer',
@@ -3123,26 +3154,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 <option value="2 Years">2 Years</option>
                 <option value="All Time">All Time</option>
               </select>
-              {(zoomDomain.left != null || zoomDomain.right != null) && (
-                <button
-                  type="button"
-                  onClick={handleZoomReset}
-                  style={{
-                    marginLeft: '0.5rem',
-                    padding: '0.25rem 0.5rem',
-                    fontSize: '0.75rem',
-                    color: '#94a3b8',
-                    background: 'rgba(30, 41, 59, 0.8)',
-                    border: '1px solid #475569',
-                    borderRadius: '0.25rem',
-                    cursor: 'pointer',
-                    fontWeight: 500
-                  }}
-                  title={zoomHistory.length > 0 ? 'Return to previous zoom level' : 'Return to full view'}
-                >
-                  Reset zoom
-                </button>
-              )}
             </div>
           </div>
 
