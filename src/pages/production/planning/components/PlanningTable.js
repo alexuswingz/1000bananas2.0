@@ -1166,7 +1166,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
       const thumbTop = (newScrollTop / scrollable) * (clientHeight - thumbHeight);
       thumbEl.style.transform = `translateY(${thumbTop}px)`;
     };
-    const onMouseUp = () => {
+    const onMouseUp = (e) => {
       planningThumbDragRef.current = false;
       setPlanningScrollMetrics({
         scrollTop: container.scrollTop,
@@ -1175,6 +1175,16 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
       });
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
+      // If cursor left the wrapper during drag, hide thumb now that drag ended
+      const wrapper = container.parentElement;
+      if (e && wrapper) {
+        const at = document.elementFromPoint(e.clientX, e.clientY);
+        if (!at || !wrapper.contains(at)) {
+          const thumbEl = planningThumbRef.current;
+          if (thumbEl) thumbEl.classList.remove('planning-table-thumb-scroll-visible');
+          setShowPlanningThumb(false);
+        }
+      }
     };
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
@@ -1529,6 +1539,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
           }
         }}
         onMouseLeave={() => {
+          if (planningThumbDragRef.current) return; // Keep thumb visible while user is dragging it
           const thumbEl = planningThumbRef.current;
           if (thumbEl) thumbEl.classList.remove('planning-table-thumb-scroll-visible');
           setShowPlanningThumb(false);

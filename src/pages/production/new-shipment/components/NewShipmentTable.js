@@ -521,7 +521,7 @@ const NewShipmentTable = ({
       const thumbTop = (newScrollTop / scrollable) * (clientHeight - thumbHeight);
       thumbEl.style.transform = `translateY(${thumbTop}px)`;
     };
-    const onMouseUp = () => {
+    const onMouseUp = (e) => {
       nonTableThumbDragRef.current = false;
       setDataScrollMetrics({
         scrollTop: container.scrollTop,
@@ -530,6 +530,16 @@ const NewShipmentTable = ({
       });
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
+      // If cursor left the wrapper during drag, hide thumb now that drag ended
+      const wrapper = nonTableDataScrollWrapperRef.current;
+      if (e && wrapper) {
+        const at = document.elementFromPoint(e.clientX, e.clientY);
+        if (!at || !wrapper.contains(at)) {
+          const thumbEl = nonTableThumbRef.current;
+          if (thumbEl) thumbEl.classList.remove('non-table-thumb-scroll-visible');
+          setShowDataScrollThumb(false);
+        }
+      }
     };
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
@@ -4024,6 +4034,7 @@ const NewShipmentTable = ({
               }
             }}
             onMouseLeave={() => {
+              if (nonTableThumbDragRef.current) return; // Keep thumb visible while user is dragging it
               const thumbEl = nonTableThumbRef.current;
               if (thumbEl) thumbEl.classList.remove('non-table-thumb-scroll-visible');
               setShowDataScrollThumb(false);
