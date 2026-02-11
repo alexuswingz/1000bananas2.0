@@ -3281,12 +3281,14 @@ const NewShipmentTable = ({
       setNonTableSelectedIndices(newSelected);
       setNonTableLastSelectedIndex(arrayIndex);
     } else {
-      // Regular click: Select/deselect only this item
+      // Regular click: Toggle this item (add/remove) so multiple products can be selected
+      const newSelected = new Set(nonTableSelectedIndices);
       if (willBeChecked) {
-        setNonTableSelectedIndices(new Set([originalIndex]));
+        newSelected.add(originalIndex);
       } else {
-        setNonTableSelectedIndices(new Set());
+        newSelected.delete(originalIndex);
       }
+      setNonTableSelectedIndices(newSelected);
       setNonTableLastSelectedIndex(arrayIndex);
     }
   };

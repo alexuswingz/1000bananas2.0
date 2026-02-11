@@ -1646,10 +1646,7 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
         }}
       >
       {/* Table Container */}
-      <div style={{ 
-        overflowY: 'auto',
-        overflowX: 'auto' 
-      }}>
+      <div style={{ overflowX: 'auto' }}>
         <div
           style={{
             border: '1px solid #334155',
@@ -1663,11 +1660,7 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
           backgroundColor: isDarkMode ? '#1A2235' : '#FFFFFF',
         }}>
           {/* Header */}
-          <thead style={{
-            position: 'sticky',
-            top: 0,
-            zIndex: 10
-          }}>
+          <thead>
             <tr style={{
               backgroundColor: '#1A2235',
               borderBottom: 'none',
