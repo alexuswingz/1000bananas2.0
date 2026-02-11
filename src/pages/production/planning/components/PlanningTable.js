@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 import ShipmentDetailsModal from './ShipmentDetailsModal';
@@ -977,6 +977,11 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
   const tableContainerRef = useRef(null);
   const [isScrolling, setIsScrolling] = useState(false);
   const scrollTimeoutRef = useRef(null);
+  const planningThumbRef = useRef(null);
+  const planningThumbDragRef = useRef(false);
+  const [planningScrollMetrics, setPlanningScrollMetrics] = useState({ scrollTop: 0, scrollHeight: 0, clientHeight: 0 });
+  const [showPlanningThumb, setShowPlanningThumb] = useState(false);
+
   useEffect(() => {
     const prevRowIds = new Set(prevRowsRef.current.map(r => r.id));
     
@@ -1019,6 +1024,160 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         clearTimeout(scrollTimeoutRef.current);
       }
     };
+  }, []);
+
+  // Custom thumb: sync thumb position on scroll/wheel, show on hover/scroll
+  useEffect(() => {
+    const container = tableContainerRef.current;
+    if (!container) return;
+    let scrollTimeout;
+    let scrollActive = false;
+    let rafId = null;
+    let cachedScrollable = null;
+    let cachedTrackHeight = null;
+    let cachedThumbHeight = null;
+
+    const updateThumb = () => {
+      const thumbEl = planningThumbRef.current;
+      if (!thumbEl || planningThumbDragRef.current) return;
+      if (cachedScrollable == null || cachedScrollable <= 0) return;
+      const scrollTop = container.scrollTop;
+      const thumbTop = (scrollTop / cachedScrollable) * cachedTrackHeight;
+      thumbEl.style.transform = `translateY(${thumbTop}px)`;
+    };
+
+    const tick = () => {
+      if (!scrollActive) return;
+      updateThumb();
+      rafId = requestAnimationFrame(tick);
+    };
+
+    const handleScrollSync = () => {
+      if (planningThumbDragRef.current) return;
+      const thumbEl = planningThumbRef.current;
+      if (!thumbEl) return;
+      if (cachedScrollable == null) {
+        const sh = container.scrollHeight;
+        const ch = container.clientHeight;
+        cachedScrollable = sh - ch;
+        if (cachedScrollable <= 0) return;
+        cachedThumbHeight = Math.max(20, (ch / sh) * ch);
+        cachedTrackHeight = ch - cachedThumbHeight;
+      }
+      if (cachedScrollable <= 0) return;
+      scrollActive = true;
+      thumbEl.classList.add('planning-table-thumb-scroll-visible');
+      container.classList.add('is-scrolling');
+      updateThumb();
+      if (rafId == null) rafId = requestAnimationFrame(tick);
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        scrollActive = false;
+        if (rafId != null) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+        cachedScrollable = null;
+        cachedTrackHeight = null;
+        cachedThumbHeight = null;
+        const el = planningThumbRef.current;
+        if (el) el.classList.remove('planning-table-thumb-scroll-visible');
+        setPlanningScrollMetrics({
+          scrollTop: container.scrollTop,
+          scrollHeight: container.scrollHeight,
+          clientHeight: container.clientHeight,
+        });
+        container.classList.remove('is-scrolling');
+        setShowPlanningThumb(false);
+      }, 1500);
+    };
+
+    const handleWheel = () => {
+      if (planningThumbDragRef.current) return;
+      const thumbEl = planningThumbRef.current;
+      if (!thumbEl) return;
+      if (cachedScrollable == null) {
+        const sh = container.scrollHeight;
+        const ch = container.clientHeight;
+        cachedScrollable = sh - ch;
+        if (cachedScrollable <= 0) return;
+        cachedThumbHeight = Math.max(20, (ch / sh) * ch);
+        cachedTrackHeight = ch - cachedThumbHeight;
+      }
+      if (cachedScrollable <= 0) return;
+      scrollActive = true;
+      thumbEl.classList.add('planning-table-thumb-scroll-visible');
+      container.classList.add('is-scrolling');
+      updateThumb();
+      if (rafId == null) rafId = requestAnimationFrame(tick);
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        scrollActive = false;
+        if (rafId != null) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+        cachedScrollable = null;
+        cachedTrackHeight = null;
+        cachedThumbHeight = null;
+        const el = planningThumbRef.current;
+        if (el) el.classList.remove('planning-table-thumb-scroll-visible');
+        setPlanningScrollMetrics({
+          scrollTop: container.scrollTop,
+          scrollHeight: container.scrollHeight,
+          clientHeight: container.clientHeight,
+        });
+        container.classList.remove('is-scrolling');
+        setShowPlanningThumb(false);
+      }, 1500);
+    };
+
+    container.addEventListener('scroll', handleScrollSync, { passive: true });
+    container.addEventListener('wheel', handleWheel, { passive: true });
+    return () => {
+      scrollActive = false;
+      if (rafId != null) cancelAnimationFrame(rafId);
+      container.removeEventListener('scroll', handleScrollSync);
+      container.removeEventListener('wheel', handleWheel);
+      clearTimeout(scrollTimeout);
+    };
+  }, []);
+
+  const handlePlanningThumbMouseDown = useCallback((e) => {
+    e.preventDefault();
+    const container = tableContainerRef.current;
+    const thumbEl = planningThumbRef.current;
+    if (!container || !thumbEl) return;
+    planningThumbDragRef.current = true;
+    const startY = e.clientY;
+    const startScrollTop = container.scrollTop;
+    const scrollHeight = container.scrollHeight;
+    const clientHeight = container.clientHeight;
+    const scrollable = scrollHeight - clientHeight;
+    if (scrollable <= 0) return;
+    const thumbHeight = Math.max(20, (clientHeight / scrollHeight) * clientHeight);
+    const trackHeight = clientHeight - thumbHeight;
+    if (trackHeight <= 0) return;
+    const ratio = scrollable / trackHeight;
+    const onMouseMove = (e2) => {
+      const deltaY = e2.clientY - startY;
+      const newScrollTop = Math.max(0, Math.min(scrollable, startScrollTop + deltaY * ratio));
+      container.scrollTop = newScrollTop;
+      const thumbTop = (newScrollTop / scrollable) * (clientHeight - thumbHeight);
+      thumbEl.style.transform = `translateY(${thumbTop}px)`;
+    };
+    const onMouseUp = () => {
+      planningThumbDragRef.current = false;
+      setPlanningScrollMetrics({
+        scrollTop: container.scrollTop,
+        scrollHeight: container.scrollHeight,
+        clientHeight: container.clientHeight,
+      });
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
   }, []);
 
   const displayRows = getFilteredAndSortedRows();
@@ -1140,72 +1299,30 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
   return (
     <>
       <style>{`
-        /* Vertical scrollbar - always styled */
+        /* Hide scrollbars - content remains scrollable */
         .planning-table-scroll::-webkit-scrollbar {
-          width: 12px;
-          height: 12px;
-          background-color: ${isDarkMode ? '#111827' : '#F3F4F6'} !important;
-          background: ${isDarkMode ? '#111827' : '#F3F4F6'} !important;
+          width: 0;
+          height: 0;
+          display: none;
         }
-        .planning-table-scroll::-webkit-scrollbar-track {
-          background-color: ${isDarkMode ? '#111827' : '#F3F4F6'} !important;
-          background: ${isDarkMode ? '#111827' : '#F3F4F6'} !important;
-          border-radius: 6px;
-        }
-        .planning-table-scroll::-webkit-scrollbar-thumb {
-          background: ${isDarkMode ? '#475569' : '#9CA3AF'};
-          border-radius: 6px;
-          border: 2px solid ${isDarkMode ? '#111827' : '#F3F4F6'};
-        }
-        .planning-table-scroll::-webkit-scrollbar-thumb:hover {
-          background: ${isDarkMode ? '#64748B' : '#6B7280'};
-        }
+        .planning-table-scroll::-webkit-scrollbar-track,
+        .planning-table-scroll::-webkit-scrollbar-thumb,
         .planning-table-scroll::-webkit-scrollbar-corner {
-          background-color: ${isDarkMode ? '#111827' : '#F3F4F6'} !important;
-          background: ${isDarkMode ? '#111827' : '#F3F4F6'} !important;
+          display: none;
         }
 
-        /* Horizontal scrollbar - hidden by default */
-        .planning-table-scroll:not(.is-scrolling)::-webkit-scrollbar:horizontal {
-          height: 0px;
-          background: transparent;
-        }
-        .planning-table-scroll:not(.is-scrolling)::-webkit-scrollbar-thumb:horizontal {
-          background: transparent;
-        }
-
-        /* Horizontal scrollbar - visible when scrolling */
-        .planning-table-scroll.is-scrolling::-webkit-scrollbar:horizontal {
-          height: 10px;
-          background-color: ${isDarkMode ? '#111827' : '#F3F4F6'} !important;
-          background: ${isDarkMode ? '#111827' : '#F3F4F6'} !important;
-        }
-        .planning-table-scroll.is-scrolling::-webkit-scrollbar-track:horizontal {
-          background-color: ${isDarkMode ? '#111827' : '#F3F4F6'} !important;
-          background: ${isDarkMode ? '#111827' : '#F3F4F6'} !important;
-          border-radius: 6px;
-        }
-        .planning-table-scroll.is-scrolling::-webkit-scrollbar-thumb:horizontal {
-          background: ${isDarkMode ? '#475569' : '#9CA3AF'};
-          border-radius: 6px;
-          border: 2px solid ${isDarkMode ? '#111827' : '#F3F4F6'};
-          transition: background 0.3s ease;
-        }
-        .planning-table-scroll.is-scrolling::-webkit-scrollbar-thumb:horizontal:hover {
-          background: ${isDarkMode ? '#64748B' : '#6B7280'};
-        }
-
-        /* Firefox scrollbar styling */
+        /* Firefox - hide scrollbar */
         .planning-table-scroll {
-          scrollbar-width: thin;
-          scrollbar-color: ${isDarkMode ? '#475569 #111827' : '#9CA3AF #F3F4F6'};
-        }
-        .planning-table-scroll:not(.is-scrolling) {
           scrollbar-width: none;
         }
-        .planning-table-scroll.is-scrolling {
-          scrollbar-width: thin;
-          scrollbar-color: ${isDarkMode ? '#475569 #111827' : '#9CA3AF #F3F4F6'};
+
+        /* Custom thumb (same as NewShipmentTable add products non-table mode) */
+        .planning-table-thumb.planning-table-thumb-scroll-visible {
+          opacity: 1 !important;
+          pointer-events: auto !important;
+        }
+        .planning-table-thumb {
+          will-change: transform;
         }
       `}</style>
       {/* Informational Cards */}
@@ -1391,20 +1508,47 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
       </div>
 
       <div
-        ref={tableContainerRef}
-        className={`border rounded-xl planning-table-scroll${isScrolling ? ' is-scrolling' : ''}`}
-        style={{ 
-          overflowX: 'auto',
-          overflowY: 'auto',
-          position: 'relative',
-          backgroundColor: '#111827',
-          borderColor: '#111827',
-          borderWidth: '1px',
-          borderStyle: 'solid',
-          minHeight: 'auto',
-          maxHeight: 'calc(100vh - 300px)', // Constrain height to enable scrolling
+        style={{ position: 'relative', maxHeight: 'calc(100vh - 300px)' }}
+        onMouseEnter={() => {
+          const el = tableContainerRef.current;
+          if (el) {
+            const scrollTop = el.scrollTop;
+            const scrollHeight = el.scrollHeight;
+            const clientHeight = el.clientHeight;
+            setPlanningScrollMetrics({ scrollTop, scrollHeight, clientHeight });
+            setShowPlanningThumb(true);
+            const thumbEl = planningThumbRef.current;
+            if (thumbEl && scrollHeight > clientHeight) {
+              thumbEl.classList.add('planning-table-thumb-scroll-visible');
+              const scrollable = scrollHeight - clientHeight;
+              const thumbHeight = Math.max(20, (clientHeight / scrollHeight) * clientHeight);
+              const trackHeight = clientHeight - thumbHeight;
+              const thumbTop = (scrollTop / scrollable) * trackHeight;
+              thumbEl.style.transform = `translateY(${thumbTop}px)`;
+            }
+          }
+        }}
+        onMouseLeave={() => {
+          const thumbEl = planningThumbRef.current;
+          if (thumbEl) thumbEl.classList.remove('planning-table-thumb-scroll-visible');
+          setShowPlanningThumb(false);
         }}
       >
+        <div
+          ref={tableContainerRef}
+          className={`border rounded-xl planning-table-scroll${isScrolling ? ' is-scrolling' : ''}`}
+          style={{ 
+            overflowX: 'auto',
+            overflowY: 'auto',
+            position: 'relative',
+            backgroundColor: '#111827',
+            borderColor: '#111827',
+            borderWidth: '1px',
+            borderStyle: 'solid',
+            minHeight: 'auto',
+            maxHeight: 'calc(100vh - 300px)', // Constrain height to enable scrolling
+          }}
+        >
         {/* Table with 100% width to fit container */}
         <table
           style={{
@@ -2314,7 +2458,37 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
           isDarkMode={isDarkMode}
         />
       )}
-    </div>
+        </div>
+        {planningScrollMetrics.scrollHeight > planningScrollMetrics.clientHeight && (
+          <div
+            ref={planningThumbRef}
+            className="planning-table-thumb"
+            role="scrollbar"
+            aria-orientation="vertical"
+            aria-valuenow={planningScrollMetrics.scrollTop}
+            aria-valuemin={0}
+            aria-valuemax={Math.max(0, planningScrollMetrics.scrollHeight - planningScrollMetrics.clientHeight)}
+            onMouseDown={handlePlanningThumbMouseDown}
+            style={{
+              position: 'absolute',
+              right: '6px',
+              top: 0,
+              width: '8px',
+              height: Math.max(20, planningScrollMetrics.scrollHeight > 0 ? (planningScrollMetrics.clientHeight / planningScrollMetrics.scrollHeight) * planningScrollMetrics.clientHeight : 0),
+              transform: planningScrollMetrics.clientHeight > 0 && planningScrollMetrics.scrollHeight > planningScrollMetrics.clientHeight
+                ? `translateY(${(planningScrollMetrics.scrollTop / (planningScrollMetrics.scrollHeight - planningScrollMetrics.clientHeight)) * (planningScrollMetrics.clientHeight - Math.max(20, (planningScrollMetrics.clientHeight / planningScrollMetrics.scrollHeight) * planningScrollMetrics.clientHeight))}px)`
+                : 'translateY(0)',
+              borderRadius: '5px',
+              backgroundColor: isDarkMode ? '#475569' : '#9CA3AF',
+              cursor: 'grab',
+              pointerEvents: showPlanningThumb ? 'auto' : 'none',
+              zIndex: 10,
+              opacity: showPlanningThumb ? 1 : 0,
+              transition: 'opacity 0.2s ease',
+            }}
+          />
+        )}
+      </div>
     
     {/* Shipment Details Modal */}
     <ShipmentDetailsModal
