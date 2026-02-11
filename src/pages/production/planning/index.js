@@ -927,7 +927,7 @@ const Planning = () => {
   };
 
   return (
-    <div className={`min-h-screen ${themeClasses.pageBg}`}>
+    <div className={themeClasses.pageBg} style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <PlanningHeader
         activeTab={activeTab}
         onTabChange={setActiveTab}
@@ -959,9 +959,10 @@ const Planning = () => {
       />
 
       {/* Content */}
-      <div style={{ padding: '1rem 2rem 2rem 2rem' }}>
-        {/* Shipments tab */}
-        {activeTab === 'shipments' && (
+      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+        <div style={{ padding: '1rem 2rem 2rem 2rem' }}>
+          {/* Shipments tab */}
+          {activeTab === 'shipments' && (
           <>
             {loading && <div style={{ textAlign: 'center', padding: '2rem' }}>Loading shipments...</div>}
             {error && <div style={{ textAlign: 'center', padding: '2rem', color: '#EF4444' }}>{error}</div>}
@@ -982,10 +983,11 @@ const Planning = () => {
           </>
         )}
 
-        {/* Archive tab */}
-        {activeTab === 'archive' && (
-          <ArchiveTable rows={shipments.filter(s => s.status === 'archived')} />
-        )}
+          {/* Archive tab */}
+          {activeTab === 'archive' && (
+            <ArchiveTable rows={shipments.filter(s => s.status === 'archived')} />
+          )}
+        </div>
       </div>
 
       {/* Toast Notification for Shipment Booked */}

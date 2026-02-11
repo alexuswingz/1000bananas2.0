@@ -13,6 +13,11 @@ const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
   const [expandedShipmentId, setExpandedShipmentId] = useState(null);
   const [shipmentProducts, setShipmentProducts] = useState({});
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const containerRef = useRef(null);
+  const [isScrolling, setIsScrolling] = useState(false);
+  const [isScrollingHorizontally, setIsScrollingHorizontally] = useState(false);
+  const scrollTimeoutRef = useRef(null);
+  const lastScrollLeftRef = useRef(0);
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -24,6 +29,127 @@ const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
   };
 
   const columnBorderColor = isDarkMode ? 'rgba(55, 65, 81, 0.9)' : '#E5E7EB';
+
+  // Add style tag for scrollbar visibility
+  useEffect(() => {
+    const styleId = 'shipments-table-scrollbar-style';
+    let style = document.getElementById(styleId);
+    
+    if (!style) {
+      style = document.createElement('style');
+      style.id = styleId;
+      document.head.appendChild(style);
+    }
+    
+    style.textContent = `
+      .shipments-table-container {
+        /* Firefox - always show thin scrollbar */
+        scrollbar-width: thin !important;
+        -ms-overflow-style: auto !important;
+        /* Prevent layout shifts */
+        box-sizing: border-box !important;
+      }
+      /* Webkit - default state: hide horizontal scrollbar (height: 0), show vertical (width: 8px) */
+      .shipments-table-container::-webkit-scrollbar {
+        width: 8px !important;
+        height: 0 !important;
+        background: transparent !important;
+        -webkit-appearance: none !important;
+      }
+      .shipments-table-container::-webkit-scrollbar-track {
+        background: transparent !important;
+      }
+      .shipments-table-container::-webkit-scrollbar-thumb {
+        background: ${isDarkMode ? '#4B5563' : '#9CA3AF'} !important;
+        border-radius: 4px !important;
+        transition: background 0.2s ease !important;
+      }
+      .shipments-table-container::-webkit-scrollbar-thumb:hover {
+        background: ${isDarkMode ? '#6B7280' : '#6B7280'} !important;
+      }
+      /* Show horizontal scrollbar when scrolling horizontally */
+      .shipments-table-container.scrolling-horizontal::-webkit-scrollbar {
+        height: 8px !important;
+      }
+      /* Ensure table header stays sticky and doesn't collapse */
+      .shipments-table-container thead {
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 20 !important;
+        background-color: #334155 !important;
+        display: table-header-group !important;
+        isolation: isolate !important;
+      }
+      .shipments-table-container thead tr {
+        background-color: #334155 !important;
+        position: relative !important;
+      }
+      .shipments-table-container thead th {
+        background-color: #334155 !important;
+        background-clip: padding-box !important;
+        box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1) !important;
+        white-space: nowrap !important;
+        overflow: visible !important;
+      }
+      .shipments-table-container thead tr {
+        display: table-row !important;
+      }
+      /* Ensure table maintains structure */
+      .shipments-table-container table {
+        width: 100% !important;
+        min-width: max-content !important;
+        border-collapse: separate !important;
+        border-spacing: 0 !important;
+      }
+      /* Ensure tbody rows are below header */
+      .shipments-table-container tbody {
+        position: relative !important;
+        z-index: 1 !important;
+      }
+      .shipments-table-container tbody tr {
+        position: relative !important;
+        z-index: 1 !important;
+      }
+    `;
+  }, [isDarkMode]);
+
+
+  // Handle scroll events to show/hide horizontal scrollbar
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const currentScrollLeft = container.scrollLeft;
+      const hasHorizontalScroll = container.scrollWidth > container.clientWidth;
+      
+      // Check if horizontal scrolling occurred
+      if (hasHorizontalScroll && currentScrollLeft !== lastScrollLeftRef.current) {
+        setIsScrollingHorizontally(true);
+        lastScrollLeftRef.current = currentScrollLeft;
+      }
+      
+      // Clear existing timeout
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+      
+      // Hide horizontal scrollbar after scrolling stops (800ms delay)
+      scrollTimeoutRef.current = setTimeout(() => {
+        setIsScrollingHorizontally(false);
+      }, 800);
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, []);
+
 
   const isFilterActive = (key) => {
     const hasFilter = filters[key] !== undefined;
@@ -307,18 +433,36 @@ const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
 
   return (
     <div
-      className={`${themeClasses.cardBg} ${themeClasses.border} border rounded-xl shadow-sm`}
-      style={{ position: 'relative' }}
+      ref={containerRef}
+      className={`${themeClasses.cardBg} ${themeClasses.border} border rounded-xl shadow-sm shipments-table-container ${isScrollingHorizontally ? 'scrolling-horizontal' : ''}`}
+      style={{ 
+        position: 'relative',
+        overflowY: 'auto',
+        overflowX: 'auto',
+        maxHeight: '600px',
+        width: '100%',
+        minWidth: 0,
+      }}
     >
       <table
         style={{
           width: '100%',
+          minWidth: 'max-content',
           borderCollapse: 'separate',
           borderSpacing: 0,
         }}
       >
-        <thead className={themeClasses.headerBg}>
-          <tr>
+        <thead className={themeClasses.headerBg} style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 20,
+          backgroundColor: '#334155',
+          display: 'table-header-group',
+        }}>
+          <tr style={{
+            display: 'table-row',
+            backgroundColor: '#334155',
+          }}>
             {columns.map((col, index) => (
               <th
                 key={col.key}
@@ -332,6 +476,8 @@ const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
                 style={{
                   padding: '0.75rem 1rem',
                   width: `${col.width}px`,
+                  minWidth: `${col.width}px`,
+                  maxWidth: `${col.width}px`,
                   borderRight:
                     index < columns.length - 1 ? `1px solid ${columnBorderColor}` : undefined,
                 }}

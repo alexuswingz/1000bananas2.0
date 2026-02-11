@@ -4,7 +4,7 @@ import { useSidebar } from '../../../../context/SidebarContext';
 import SortProductsFilterDropdown from './SortProductsFilterDropdown';
 import { showInfoToast } from '../../../../utils/notifications';
 
-const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipmentId = null, onCompleteClick = null }) => {
+const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipmentId = null, onCompleteClick = null, tableMode = false }) => {
   const { isDarkMode } = useTheme();
   const { sidebarWidth } = useSidebar();
   const [draggedIndex, setDraggedIndex] = useState(null);
@@ -15,13 +15,65 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
   const filterIconRefs = useRef({});
   const filterDropdownRefs = useRef({}); // Store refs to dropdown DOM elements
   const tableContainerRef = useRef(null);
+  const scrollContainerRef = useRef(null);
   const [filters, setFilters] = useState({});
+  
+  // Handle horizontal scrollbar visibility - show when scrolling horizontally
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+
+    let scrollTimeout;
+    let lastScrollLeft = scrollContainer.scrollLeft;
+    let isScrolling = false;
+    
+    const handleScroll = () => {
+      const currentScrollLeft = scrollContainer.scrollLeft;
+      const hasHorizontalScroll = scrollContainer.scrollWidth > scrollContainer.clientWidth;
+      
+      // If there's horizontal overflow and we're scrolling, show the scrollbar
+      if (hasHorizontalScroll) {
+        // Check if scrolling horizontally (scrollLeft changed) or if mouse is over the container
+        if (currentScrollLeft !== lastScrollLeft || isScrolling) {
+          scrollContainer.classList.add('scrolling-horizontal');
+          isScrolling = true;
+          lastScrollLeft = currentScrollLeft;
+        }
+      }
+      
+      // Remove class after scrolling stops
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        scrollContainer.classList.remove('scrolling-horizontal');
+        isScrolling = false;
+      }, 300); // Increased timeout to keep scrollbar visible longer
+    };
+    
+    // Also show scrollbar on mouse move over container (for dragging scrollbar)
+    const handleMouseMove = () => {
+      if (scrollContainer.scrollWidth > scrollContainer.clientWidth) {
+        scrollContainer.classList.add('scrolling-horizontal');
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+          scrollContainer.classList.remove('scrolling-horizontal');
+        }, 300);
+      }
+    };
+
+    scrollContainer.addEventListener('scroll', handleScroll);
+    scrollContainer.addEventListener('mousemove', handleMouseMove);
+    return () => {
+      scrollContainer.removeEventListener('scroll', handleScroll);
+      scrollContainer.removeEventListener('mousemove', handleMouseMove);
+      clearTimeout(scrollTimeout);
+    };
+  }, []);
   // sortConfig is now an array of sort objects: [{column: 'size', order: 'asc'}, {column: 'formula', order: 'asc'}]
   // The order in the array determines the sort priority (first = primary, second = secondary, etc.)
   const [sortConfig, setSortConfig] = useState([]);
   
-  // Selection state for bulk operations
-  const [selectedIndices, setSelectedIndices] = useState(() => new Set());
+    // Selection state for bulk operations
+    const [selectedIndices, setSelectedIndices] = useState(() => new Set());
   const [lastSelectedIndex, setLastSelectedIndex] = useState(null);
 
   // Split functionality state
@@ -2304,6 +2356,69 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
             transform: scaleX(1);
           }
         }
+
+        ${!tableMode ? `
+        /*
+         * Scrollbar styling (only when table mode is OFF)
+         * - Vertical scrollbar: visible
+         * - Horizontal scrollbar: hidden by default, shown only while user is actively scrolling horizontally
+         */
+        .sort-products-table-scroll {
+          /* Enable scrolling on both axes - CRITICAL for scrolling to work */
+          touch-action: pan-y pan-x;
+          -webkit-overflow-scrolling: touch;
+          overscroll-behavior: contain;
+
+          /* Show scrollbars in Firefox */
+          scrollbar-width: thin;
+          scrollbar-color: ${isDarkMode ? '#475569 #1E293B' : '#9CA3AF #F3F4F6'};
+          
+          /* Ensure the container can receive scroll events */
+          will-change: scroll-position;
+        }
+
+        /* Base scrollbar styling for WebKit (Chrome, Edge, Safari) */
+        .sort-products-table-scroll::-webkit-scrollbar {
+          width: 12px !important;   /* Show vertical scrollbar - force with !important */
+          height: 0;     /* Hide horizontal scrollbar by default */
+          -webkit-appearance: none;
+          display: block !important; /* Ensure scrollbar is displayed */
+        }
+        
+        .sort-products-table-scroll::-webkit-scrollbar-track {
+          background: ${isDarkMode ? '#1E293B' : '#F3F4F6'} !important;
+          border-radius: 6px;
+          display: block !important;
+        }
+        
+        .sort-products-table-scroll::-webkit-scrollbar-thumb {
+          background: ${isDarkMode ? '#475569' : '#9CA3AF'} !important;
+          border-radius: 6px;
+          border: 2px solid ${isDarkMode ? '#1E293B' : '#F3F4F6'};
+          min-height: 20px;
+          cursor: pointer;
+          display: block !important;
+        }
+        
+        .sort-products-table-scroll::-webkit-scrollbar-thumb:hover {
+          background: ${isDarkMode ? '#64748B' : '#6B7280'} !important;
+        }
+
+        /* When actively scrolling horizontally, temporarily show a thin horizontal scrollbar */
+        .sort-products-table-scroll.scrolling-horizontal::-webkit-scrollbar {
+          height: 8px; /* Show horizontal scrollbar while scrolling */
+        }
+
+        .sort-products-table-scroll.scrolling-horizontal::-webkit-scrollbar-track {
+          background: ${isDarkMode ? '#020617' : '#E5E7EB'};
+          border-radius: 999px;
+        }
+
+        .sort-products-table-scroll.scrolling-horizontal::-webkit-scrollbar-thumb {
+          background: ${isDarkMode ? '#4B5563' : '#9CA3AF'};
+          border-radius: 999px;
+        }
+        ` : ''}
       `}</style>
       <div 
         ref={tableContainerRef}
@@ -2312,30 +2427,50 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
           borderRadius: '12px',
           // No outer stroke (prevents dark vertical lines on sides)
           border: 'none',
-          overflow: 'hidden',
+          overflow: 'hidden', // Keep hidden to prevent layout issues
         }}
       >
       {/* Table Container */}
-      <div style={{ overflowX: 'auto' }}>
-        <div
-          style={{
-            // Table border color matches design (#334155)
-            border: '1px solid #334155',
-            borderRadius: '12px',
-            overflow: 'hidden',
-          }}
-        >
+      <div 
+        ref={scrollContainerRef}
+        className="sort-products-table-scroll"
+        style={{ 
+          overflowY: !tableMode ? 'scroll' : 'auto', // Force vertical scrollbar when table mode is OFF
+          overflowX: 'auto', // Enable horizontal scrolling
+          WebkitOverflowScrolling: 'touch', // Smooth scrolling on iOS
+          border: '1px solid #334155',
+          borderRadius: '12px',
+          height: 'calc(100vh - 300px)', // Fixed height to create scroll context
+          maxHeight: 'calc(100vh - 300px)', // Ensure it doesn't exceed viewport
+          minHeight: '400px', // Minimum height to ensure usability
+          width: '100%', // Ensure full width
+          position: 'relative', // Ensure proper positioning context
+          display: 'block', // Ensure it's a block element for proper scrolling
+          overscrollBehavior: 'contain', // Prevent scroll chaining
+        }}
+      >
         <table style={{
-          width: '100%',
-          borderCollapse: 'collapse',
+          width: 'max-content', // Allow table to be wider than container for horizontal scrolling
+          minWidth: '100%', // Ensure table is at least as wide as container
+          borderCollapse: 'separate',
+          borderSpacing: 0,
           backgroundColor: isDarkMode ? '#1A2235' : '#FFFFFF',
+          tableLayout: 'auto',
         }}>
           {/* Header */}
-          <thead>
+          <thead style={{
+            position: '-webkit-sticky',
+            position: 'sticky',
+            top: 0,
+            zIndex: 100,
+            backgroundColor: isDarkMode ? '#1A2235' : '#FFFFFF',
+            display: 'table-header-group'
+          }}>
             <tr style={{
-              backgroundColor: '#1A2235',
+              backgroundColor: isDarkMode ? '#1A2235' : '#FFFFFF',
               borderBottom: 'none',
               height: '56px',
+              display: 'table-row'
             }}>
               {columns.map((column) => {
                 const isActive = hasActiveFilter(column.key);
@@ -2358,6 +2493,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                     borderRight: 'none',
                     height: '56px',
                     position: column.key === 'drag' || column.key === 'menu' ? 'static' : 'relative',
+                    backgroundColor: isDarkMode ? '#1A2235' : '#FFFFFF', // Ensure background color for sticky header
                   }}
                 >
                   {column.key === 'drag' || column.key === 'menu' ? (
@@ -3023,7 +3159,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                           onClick={() => handleMenuAction('undoAllSplits', product)}
                           style={{
                             width: '100%',
-                            padding: '10px 16px',
+                            ping: '10px 16px',
                             textAlign: 'left',
                             background: 'transparent',
                             border: 'none',
@@ -3127,7 +3263,6 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
             })}
           </tbody>
         </table>
-        </div>
       </div>
 
       {/* Column Filter Dropdowns - Multiple can be open at once */}

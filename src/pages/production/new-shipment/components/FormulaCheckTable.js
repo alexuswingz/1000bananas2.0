@@ -758,14 +758,22 @@ const FormulaCheckTable = ({
           </div>
         )}
         {/* Table Container */}
-        <div style={{ overflowX: 'auto' }}>
+        <div style={{ 
+          overflowY: 'auto',
+          overflowX: 'auto' 
+        }}>
         <table style={{
           width: '100%',
           borderCollapse: 'collapse',
           borderSpacing: 0,
         }}>
           {/* Header */}
-          <thead style={{ backgroundColor: '#1A2235' }}>
+          <thead style={{ 
+            backgroundColor: '#1A2235',
+            position: 'sticky',
+            top: 0,
+            zIndex: 10
+          }}>
             {/* Header row */}
             <tr
               style={{

@@ -975,6 +975,8 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
   // Clear sorted order when new shipments are added and ensure they're visible
   const prevRowsRef = useRef(rows);
   const tableContainerRef = useRef(null);
+  const [isScrolling, setIsScrolling] = useState(false);
+  const scrollTimeoutRef = useRef(null);
   useEffect(() => {
     const prevRowIds = new Set(prevRowsRef.current.map(r => r.id));
     
@@ -994,6 +996,30 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
     
     prevRowsRef.current = rows;
   }, [rows]);
+
+  // Handle scroll events to show/hide horizontal scrollbar
+  useEffect(() => {
+    const container = tableContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      setIsScrolling(true);
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+      scrollTimeoutRef.current = setTimeout(() => {
+        setIsScrolling(false);
+      }, 1200);
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const displayRows = getFilteredAndSortedRows();
   
@@ -1113,6 +1139,66 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
 
   return (
     <>
+      <style>{`
+        /* Vertical scrollbar - always styled */
+        .planning-table-scroll::-webkit-scrollbar {
+          width: 12px;
+          height: 12px;
+        }
+        .planning-table-scroll::-webkit-scrollbar-track {
+          background: ${isDarkMode ? '#1E293B' : '#F3F4F6'};
+          border-radius: 6px;
+        }
+        .planning-table-scroll::-webkit-scrollbar-thumb {
+          background: ${isDarkMode ? '#475569' : '#9CA3AF'};
+          border-radius: 6px;
+          border: 2px solid ${isDarkMode ? '#1E293B' : '#F3F4F6'};
+        }
+        .planning-table-scroll::-webkit-scrollbar-thumb:hover {
+          background: ${isDarkMode ? '#64748B' : '#6B7280'};
+        }
+
+        /* Horizontal scrollbar - hidden by default */
+        .planning-table-scroll:not(.is-scrolling)::-webkit-scrollbar:horizontal {
+          height: 0px;
+          background: transparent;
+        }
+        .planning-table-scroll:not(.is-scrolling)::-webkit-scrollbar-thumb:horizontal {
+          background: transparent;
+        }
+
+        /* Horizontal scrollbar - visible when scrolling */
+        .planning-table-scroll.is-scrolling::-webkit-scrollbar:horizontal {
+          height: 10px;
+          background: transparent;
+        }
+        .planning-table-scroll.is-scrolling::-webkit-scrollbar-track:horizontal {
+          background: ${isDarkMode ? '#1E293B' : '#F3F4F6'};
+          border-radius: 6px;
+        }
+        .planning-table-scroll.is-scrolling::-webkit-scrollbar-thumb:horizontal {
+          background: ${isDarkMode ? '#475569' : '#9CA3AF'};
+          border-radius: 6px;
+          border: 2px solid ${isDarkMode ? '#1E293B' : '#F3F4F6'};
+          transition: background 0.3s ease;
+        }
+        .planning-table-scroll.is-scrolling::-webkit-scrollbar-thumb:horizontal:hover {
+          background: ${isDarkMode ? '#64748B' : '#6B7280'};
+        }
+
+        /* Firefox scrollbar styling */
+        .planning-table-scroll {
+          scrollbar-width: thin;
+          scrollbar-color: ${isDarkMode ? '#475569 #1E293B' : '#9CA3AF #F3F4F6'};
+        }
+        .planning-table-scroll:not(.is-scrolling) {
+          scrollbar-width: none;
+        }
+        .planning-table-scroll.is-scrolling {
+          scrollbar-width: thin;
+          scrollbar-color: ${isDarkMode ? '#475569 #1E293B' : '#9CA3AF #F3F4F6'};
+        }
+      `}</style>
       {/* Informational Cards */}
       <div
         style={{
@@ -1297,16 +1383,17 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
 
       <div
         ref={tableContainerRef}
-        className="border rounded-xl"
+        className={`border rounded-xl planning-table-scroll${isScrolling ? ' is-scrolling' : ''}`}
         style={{ 
-          overflowX: 'hidden',
-          overflowY: 'visible',
+          overflowX: 'auto',
+          overflowY: 'auto',
           position: 'relative',
           backgroundColor: '#111827',
           borderColor: '#111827',
           borderWidth: '1px',
           borderStyle: 'solid',
           minHeight: 'auto',
+          maxHeight: 'calc(100vh - 300px)', // Constrain height to enable scrolling
         }}
       >
         {/* Table with 100% width to fit container */}
@@ -1322,6 +1409,9 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         <thead
           style={{
             backgroundColor: '#111827',
+            position: 'sticky',
+            top: 0,
+            zIndex: 100
           }}
         >
           <tr style={{ height: 'auto' }}>
@@ -1459,6 +1549,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                 padding: '1rem 1rem',
                 width: '14%',
                 height: 'auto',
+                backgroundColor: '#111827',
                 borderRight: 'none',
                 boxSizing: 'border-box',
               }}

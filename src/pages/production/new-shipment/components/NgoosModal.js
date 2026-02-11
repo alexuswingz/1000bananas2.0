@@ -184,7 +184,7 @@ const NgoosModal = ({
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 50,
+        zIndex: 2000,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -199,13 +199,15 @@ const NgoosModal = ({
           width: '90vw',
           maxWidth: '1009px',
           height: 'auto',
+          minHeight: '722px',
           maxHeight: '90vh',
           borderRadius: '12px',
           boxShadow: '0 24px 80px rgba(15,23,42,0.75)',
           border: `1px solid ${isDarkMode ? '#1F2937' : '#E5E7EB'}`,
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          zIndex: 2100,
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -359,9 +361,12 @@ const NgoosModal = ({
           </div>
         </div>
 
-        {/* Main content - Using Ngoos component - No scrolling */}
+        {/* Main content - Using Ngoos component - flex column so Sales/Ads same height as Inventory */}
         <div style={{ 
           flex: 1,
+          minHeight: '662px',
+          display: 'flex',
+          flexDirection: 'column',
           backgroundColor: isDarkMode ? '#1A2235' : '#F9FAFB',
           overflow: 'auto',
         }}>
@@ -409,7 +414,7 @@ const NgoosModal = ({
           style={{
             position: 'fixed',
             inset: 0,
-            zIndex: 60,
+            zIndex: 2200,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

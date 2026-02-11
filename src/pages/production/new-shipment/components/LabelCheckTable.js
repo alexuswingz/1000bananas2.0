@@ -1210,13 +1210,21 @@ const LabelCheckTable = ({
 
       {/* Expanded Table */}
       {(hideHeader || isExpanded) && (
-        <div style={{ overflowX: 'auto' }}>
+        <div style={{ 
+          overflowY: 'auto',
+          overflowX: 'auto'
+        }}>
           <table style={{
             width: '100%',
             borderCollapse: 'collapse',
             borderSpacing: 0,
           }}>
-            <thead style={{ backgroundColor: '#1A2235' }}>
+            <thead style={{ 
+              backgroundColor: '#1A2235',
+              position: 'sticky',
+              top: 0,
+              zIndex: 10
+            }}>
               <tr style={{ 
                 height: '66px', 
                 maxHeight: '66px',

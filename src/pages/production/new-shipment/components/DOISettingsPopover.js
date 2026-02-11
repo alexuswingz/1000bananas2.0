@@ -387,7 +387,7 @@ const DOISettingsPopover = ({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                onRevertDoi();
+                setBadgeHover(true);
               }}
               style={{
                 width: '20px',

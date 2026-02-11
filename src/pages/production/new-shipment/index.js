@@ -2731,11 +2731,15 @@ const NewShipment = () => {
     const searchWords = searchLower.split(/\s+/).filter(w => w.length > 0);
     
     // Filter products but preserve _originalIndex
-    // Search ONLY product titles so formula/bottle/label matches don't show unrelated products
+    // Search in product name, ASIN, and size fields
     const filtered = productsWithIndex.filter(product => {
       const productTitle = (product.product || '').toLowerCase();
-      // ALL search words must be found in the product title only
-      return searchWords.every(word => productTitle.includes(word));
+      const productAsin = (product.childAsin || product.asin || '').toLowerCase();
+      const productSize = (product.size || '').toLowerCase();
+      // Combine all searchable fields
+      const searchableText = `${productTitle} ${productAsin} ${productSize}`;
+      // ALL search words must be found in any of the searchable fields
+      return searchWords.every(word => searchableText.includes(word));
     });
     
     return filtered;
@@ -2747,7 +2751,7 @@ const NewShipment = () => {
   }
 
   return (
-    <div className={`min-h-screen ${themeClasses.pageBg}`} style={{ paddingBottom: (activeAction === 'add-products' || activeAction === 'formula-check' || activeAction === 'label-check' || activeAction === 'book-shipment' || activeAction === 'sort-products' || activeAction === 'sort-formulas') ? '100px' : '0px' }}>
+    <div className={themeClasses.pageBg} style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <NewShipmentHeader
         tableMode={tableMode}
         onTableModeToggle={() => setTableMode(!tableMode)}
@@ -2769,8 +2773,9 @@ const NewShipment = () => {
         hideActionsDropdown={hideActionsDropdown}
       />
 
-      <div style={{ padding: '0 1.5rem' }}>
-        {activeAction === 'add-products' && (
+      <div style={{ flex: 1, overflowY: (activeAction === 'sort-products' || activeAction === 'add-products') ? 'hidden' : 'auto', overflowX: 'hidden', paddingBottom: (activeAction === 'add-products' || activeAction === 'formula-check' || activeAction === 'label-check' || activeAction === 'book-shipment' || activeAction === 'sort-products' || activeAction === 'sort-formulas') ? '100px' : '0px' }}>
+        <div style={{ padding: '0 1.5rem' }}>
+          {activeAction === 'add-products' && (
           <>
             {/* Products Table Header */}
             <div
@@ -3125,6 +3130,7 @@ const NewShipment = () => {
               shipmentType={shipmentData.shipmentType}
               shipmentId={shipmentId}
               onCompleteClick={handleCompleteClick}
+              tableMode={tableMode}
             />
           </div>
         )}
@@ -3636,6 +3642,7 @@ const NewShipment = () => {
               </div>
           </div>
         )}
+      </div>
       </div>
 
       {/* Shared footer is now handled by individual table components */}
@@ -4361,7 +4368,6 @@ const NewShipment = () => {
           </div>
         </>
       )}
-
     </div>
   );
 };

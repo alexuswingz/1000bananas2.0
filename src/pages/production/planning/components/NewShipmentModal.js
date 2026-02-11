@@ -113,7 +113,8 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 50,
+        // Make sure modal sits above sticky headers / tabs
+        zIndex: 2000,
       }}
       onClick={onClose}
     >
@@ -126,6 +127,8 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
           border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
           boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
           backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+          // Ensure modal content is above overlayed elements inside the page
+          zIndex: 2100,
         }}
         onClick={(e) => e.stopPropagation()}
       >

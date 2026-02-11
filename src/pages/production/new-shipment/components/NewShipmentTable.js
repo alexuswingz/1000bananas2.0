@@ -171,6 +171,12 @@ const NewShipmentTable = ({
   const nonTableFilterDropdownRef = useRef(null);
   const [nonTableFilters, setNonTableFilters] = useState({});
   const nonTableContainerRef = useRef(null);
+  
+  // Horizontal scrollbar visibility state
+  const tableContainerRef = useRef(null);
+  const [isScrollingHorizontally, setIsScrollingHorizontally] = useState(false);
+  const scrollTimeoutRef = useRef(null);
+  const lastScrollLeftRef = useRef(0);
 
   // Shipment Stats popup (three-dots next to Export for Upload)
   const [shipmentStatsMenuOpen, setShipmentStatsMenuOpen] = useState(false);
@@ -196,6 +202,132 @@ const NewShipmentTable = ({
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, [shipmentStatsMenuOpen]);
+
+  // Add style tag for horizontal scrollbar visibility
+  useEffect(() => {
+    const styleId = 'new-shipment-table-scrollbar-style';
+    let style = document.getElementById(styleId);
+    
+    if (!style) {
+      style = document.createElement('style');
+      style.id = styleId;
+      document.head.appendChild(style);
+    }
+    
+    style.textContent = `
+      .new-shipment-table-scroll {
+        /* Firefox - always show scrollbar */
+        scrollbar-width: auto !important;
+        -ms-overflow-style: scrollbar !important;
+        /* Prevent layout shifts */
+        box-sizing: border-box !important;
+        /* Force scrollbar to always be visible */
+        overflow-y: scroll !important;
+      }
+      /* Webkit - always show vertical scrollbar (width: 12px) */
+      .new-shipment-table-scroll::-webkit-scrollbar {
+        width: 12px !important;
+        height: 4px !important;
+        -webkit-appearance: none !important;
+        display: block !important;
+        visibility: visible !important;
+      }
+      .new-shipment-table-scroll::-webkit-scrollbar:vertical {
+        width: 12px !important;
+        display: block !important;
+        visibility: visible !important;
+      }
+      .new-shipment-table-scroll::-webkit-scrollbar-track {
+        background: ${isDarkMode ? '#1E293B' : '#F3F4F6'} !important;
+        border-radius: 6px !important;
+        display: block !important;
+        visibility: visible !important;
+        -webkit-box-shadow: inset 0 0 2px ${isDarkMode ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.1)'} !important;
+      }
+      .new-shipment-table-scroll::-webkit-scrollbar-thumb {
+        background: ${isDarkMode ? '#64748B' : '#6B7280'} !important;
+        border-radius: 6px !important;
+        border: 2px solid ${isDarkMode ? '#1E293B' : '#F3F4F6'} !important;
+        min-height: 30px !important;
+        cursor: pointer !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+      }
+      .new-shipment-table-scroll::-webkit-scrollbar-thumb:hover {
+        background: ${isDarkMode ? '#94A3B8' : '#4B5563'} !important;
+      }
+      /* Make horizontal scrollbar more visible when scrolling horizontally or on hover */
+      .new-shipment-table-scroll.scrolling-horizontal::-webkit-scrollbar,
+      .new-shipment-table-scroll:hover::-webkit-scrollbar {
+        height: 8px !important;
+      }
+      .new-shipment-table-scroll.scrolling-horizontal::-webkit-scrollbar-thumb,
+      .new-shipment-table-scroll:hover::-webkit-scrollbar-thumb {
+        background: ${isDarkMode ? '#4B5563' : '#9CA3AF'} !important;
+      }
+      .new-shipment-table-scroll.scrolling-horizontal::-webkit-scrollbar-thumb:hover,
+      .new-shipment-table-scroll:hover::-webkit-scrollbar-thumb:hover {
+        background: ${isDarkMode ? '#6B7280' : '#6B7280'} !important;
+      }
+    `;
+  }, [isDarkMode]);
+
+  // Handle scroll events to show/hide horizontal scrollbar
+  useEffect(() => {
+    const container = tableContainerRef.current;
+    if (!container) return;
+
+    const checkHorizontalScroll = () => {
+      const hasHorizontalScroll = container.scrollWidth > container.clientWidth;
+      // Always show scrollbar if there's horizontal overflow
+      setIsScrollingHorizontally(hasHorizontalScroll);
+    };
+
+    const handleScroll = () => {
+      const currentScrollLeft = container.scrollLeft;
+      const hasHorizontalScroll = container.scrollWidth > container.clientWidth;
+      
+      // Always show scrollbar if there's horizontal scroll available
+      if (hasHorizontalScroll) {
+        setIsScrollingHorizontally(true);
+        lastScrollLeftRef.current = currentScrollLeft;
+        
+        // Don't hide it automatically - keep it visible when there's overflow
+        // The hover state will handle visibility
+      } else {
+        // No horizontal scroll available, ensure it's hidden
+        setIsScrollingHorizontally(false);
+      }
+    };
+
+    // Handle wheel events for horizontal scrolling
+    const handleWheel = (e) => {
+      // Check if this is a horizontal scroll (shift+wheel or trackpad horizontal scroll)
+      if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        handleScroll();
+      }
+    };
+
+    // Check on mount and resize
+    checkHorizontalScroll();
+    const resizeObserver = new ResizeObserver(() => {
+      checkHorizontalScroll();
+    });
+    resizeObserver.observe(container);
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    container.addEventListener('wheel', handleWheel, { passive: true });
+    
+    return () => {
+      resizeObserver.disconnect();
+      container.removeEventListener('scroll', handleScroll);
+      container.removeEventListener('wheel', handleWheel);
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, []);
   
   // Clean up any invalid brand filters when account changes or on mount
   // If a brand filter has all brands selected, treat it as no filter
@@ -3300,7 +3432,9 @@ const NewShipmentTable = ({
               backgroundColor: '#1A2235',
               alignItems: 'center',
               gap: '32px',
-              position: 'relative'
+              position: 'sticky',
+              top: 0,
+              zIndex: 100
             }}
           >
             {/* Border line with 30px margin on both sides */}
@@ -5317,6 +5451,57 @@ const NewShipmentTable = ({
         input[type="number"] {
           -moz-appearance: textfield;
         }
+        .new-shipment-table-scroll {
+          scrollbar-width: auto !important;
+          scrollbar-color: ${isDarkMode ? '#64748B #1E293B' : '#6B7280 #F3F4F6'} !important;
+          overflow-y: scroll !important;
+        }
+        /* Always show vertical scrollbar */
+        .new-shipment-table-scroll::-webkit-scrollbar {
+          width: 12px !important;
+          height: 4px;
+          -webkit-appearance: none;
+          display: block !important;
+          visibility: visible !important;
+        }
+        .new-shipment-table-scroll::-webkit-scrollbar:vertical {
+          width: 12px !important;
+          display: block !important;
+          visibility: visible !important;
+        }
+        .new-shipment-table-scroll::-webkit-scrollbar-track {
+          background: ${isDarkMode ? '#1E293B' : '#F3F4F6'} !important;
+          border-radius: 6px;
+          display: block !important;
+          visibility: visible !important;
+          -webkit-box-shadow: inset 0 0 2px ${isDarkMode ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.1)'} !important;
+        }
+        .new-shipment-table-scroll::-webkit-scrollbar-thumb {
+          background: ${isDarkMode ? '#64748B' : '#6B7280'} !important;
+          border-radius: 6px;
+          border: 2px solid ${isDarkMode ? '#1E293B' : '#F3F4F6'} !important;
+          min-height: 30px;
+          cursor: pointer;
+          display: block !important;
+          visibility: visible !important;
+          opacity: 1 !important;
+        }
+        .new-shipment-table-scroll::-webkit-scrollbar-thumb:hover {
+          background: ${isDarkMode ? '#94A3B8' : '#4B5563'} !important;
+        }
+        /* Make horizontal scrollbar more visible when scrolling or hovering */
+        .new-shipment-table-scroll.scrolling-horizontal::-webkit-scrollbar,
+        .new-shipment-table-scroll:hover::-webkit-scrollbar {
+          height: 8px !important;
+        }
+        .new-shipment-table-scroll.scrolling-horizontal::-webkit-scrollbar-thumb,
+        .new-shipment-table-scroll:hover::-webkit-scrollbar-thumb {
+          background: ${isDarkMode ? '#4B5563' : '#9CA3AF'} !important;
+        }
+        .new-shipment-table-scroll.scrolling-horizontal::-webkit-scrollbar-thumb:hover,
+        .new-shipment-table-scroll:hover::-webkit-scrollbar-thumb:hover {
+          background: ${isDarkMode ? '#6B7280' : '#6B7280'} !important;
+        }
       `}</style>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '12px' }}>
         <label style={{ fontSize: '0.85rem', color: isDarkMode ? '#D1D5DB' : '#4B5563' }}>Show:</label>
@@ -5339,14 +5524,25 @@ const NewShipmentTable = ({
         </select>
       </div>
       <div
-      className={`${themeClasses.cardBg} ${themeClasses.border} border shadow-sm`}
-      style={{ marginTop: '1.25rem', borderRadius: '6px', overflow: 'hidden' }}
-    >
-      <div style={{ 
+      ref={tableContainerRef}
+      className={`${themeClasses.cardBg} ${themeClasses.border} border shadow-sm new-shipment-table-scroll ${isScrollingHorizontally ? 'scrolling-horizontal' : ''}`}
+      style={{ 
+        marginTop: '1.25rem', 
+        borderRadius: '6px', 
         overflowX: 'auto', 
-        overflowY: 'visible',
+        overflowY: 'scroll',
         width: '100%',
         WebkitOverflowScrolling: 'touch',
+        position: 'relative',
+        height: 'calc(100vh - 520px)', // Fixed height to create scroll context
+        maxHeight: 'calc(100vh - 520px)', // Ensure it doesn't exceed viewport
+        minHeight: '400px', // Minimum height to ensure usability
+        display: 'block',
+      }}
+    >
+      <div 
+        style={{ 
+        width: '100%',
         position: 'relative',
       }}>
         <table
@@ -5358,7 +5554,13 @@ const NewShipmentTable = ({
             tableLayout: 'fixed',
           }}
         >
-          <thead className={themeClasses.headerBg}>
+          <thead className={themeClasses.headerBg} style={{
+            position: '-webkit-sticky',
+            position: 'sticky',
+            top: 0,
+            zIndex: 100,
+            backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
+          }}>
             <tr style={{ height: '40px', maxHeight: '40px' }}>
               {/* Sticky columns */}
               <th style={{ 
@@ -5372,7 +5574,8 @@ const NewShipmentTable = ({
                 textAlign: 'center',
                 position: 'sticky',
                 left: 0,
-                zIndex: 6,
+                top: 0,
+                zIndex: 20,
                 backgroundColor: '#1C2634',
                 boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
                 borderTopLeftRadius: '16px',
@@ -5393,7 +5596,8 @@ const NewShipmentTable = ({
                   textAlign: 'center',
                   position: 'sticky',
                   left: '40px',
-                  zIndex: 6,
+                  top: 0,
+                  zIndex: 20,
                   backgroundColor: '#1C2634',
                   width: '150px',
                   minWidth: '150px',
@@ -5438,7 +5642,8 @@ const NewShipmentTable = ({
                   textAlign: 'center',
                   position: 'sticky',
                   left: '190px',
-                  zIndex: 6,
+                  top: 0,
+                  zIndex: 20,
                   backgroundColor: '#1C2634',
                   width: '200px',
                   minWidth: '200px',
@@ -5483,7 +5688,8 @@ const NewShipmentTable = ({
                   textAlign: 'center',
                   position: 'sticky',
                   left: '390px',
-                  zIndex: 6,
+                  top: 0,
+                  zIndex: 20,
                   backgroundColor: '#1C2634',
                   width: '120px',
                   minWidth: '120px',
@@ -5524,7 +5730,11 @@ const NewShipmentTable = ({
                 className="group"
                 style={{ 
                   padding: '0 1rem', 
-                  textAlign: 'center', 
+                  textAlign: 'center',
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 10,
+                  backgroundColor: '#1C2634',
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
@@ -5562,13 +5772,16 @@ const NewShipmentTable = ({
                 className="group"
                 style={{ 
                   padding: '12px 16px', 
-                  textAlign: 'center', 
+                  textAlign: 'center',
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 10,
+                  backgroundColor: '#1C2634',
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
                   borderRight: '1px solid #FFFFFF',
                   boxSizing: 'border-box',
-                  backgroundColor: '#1C2634',
                 }}
               >
                 <div style={{ position: 'relative', width: '100%' }}>
@@ -5621,13 +5834,16 @@ const NewShipmentTable = ({
                 className="group"
                 style={{ 
                   padding: '12px 16px', 
-                  textAlign: 'center', 
+                  textAlign: 'center',
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 10,
+                  backgroundColor: '#1C2634',
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
                   borderRight: '1px solid #FFFFFF',
                   boxSizing: 'border-box',
-                  backgroundColor: '#1C2634',
                 }}
               >
                 <div style={{ position: 'relative', width: '100%' }}>
@@ -5680,7 +5896,10 @@ const NewShipmentTable = ({
                 className="group"
                 style={{ 
                   padding: '12px 16px', 
-                  textAlign: 'center', 
+                  textAlign: 'center',
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 10,
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
@@ -5719,7 +5938,10 @@ const NewShipmentTable = ({
                 className="group"
                 style={{ 
                   padding: '12px 16px', 
-                  textAlign: 'center', 
+                  textAlign: 'center',
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 10,
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
@@ -5758,7 +5980,10 @@ const NewShipmentTable = ({
                 className="group"
                 style={{ 
                   padding: '12px 16px', 
-                  textAlign: 'center', 
+                  textAlign: 'center',
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 10,
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
@@ -5797,7 +6022,10 @@ const NewShipmentTable = ({
                 className="group"
                 style={{ 
                   padding: '12px 16px', 
-                  textAlign: 'center', 
+                  textAlign: 'center',
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 10,
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
@@ -5836,7 +6064,10 @@ const NewShipmentTable = ({
                 className="group"
                 style={{ 
                   padding: '12px 16px', 
-                  textAlign: 'center', 
+                  textAlign: 'center',
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 10,
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
@@ -5875,7 +6106,10 @@ const NewShipmentTable = ({
                 className="group"
                 style={{ 
                   padding: '12px 16px', 
-                  textAlign: 'center', 
+                  textAlign: 'center',
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 10,
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
@@ -5889,7 +6123,6 @@ const NewShipmentTable = ({
                   textTransform: 'uppercase',
                   color: '#FFFFFF',
                   backgroundColor: '#1C2634',
-                  position: 'relative',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', position: 'relative', width: '100%' }}>
@@ -5933,7 +6166,10 @@ const NewShipmentTable = ({
                 className="group"
                 style={{ 
                   padding: '12px 16px', 
-                  textAlign: 'center', 
+                  textAlign: 'center',
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 10,
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
@@ -5988,7 +6224,10 @@ const NewShipmentTable = ({
                 className="group"
                 style={{ 
                   padding: '12px 16px', 
-                  textAlign: 'center', 
+                  textAlign: 'center',
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 10,
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
@@ -6043,7 +6282,10 @@ const NewShipmentTable = ({
                 className="group"
                 style={{ 
                   padding: '12px 16px', 
-                  textAlign: 'center', 
+                  textAlign: 'center',
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 10,
                   width: '143px',
                   height: '40px',
                   maxHeight: '40px',
@@ -6104,7 +6346,8 @@ const NewShipmentTable = ({
                 textAlign: 'center',
                 position: 'sticky',
                 right: 0,
-                zIndex: 6,
+                top: 0,
+                zIndex: 20,
                 backgroundColor: '#1C2634',
                 boxShadow: '-2px 0 4px rgba(0,0,0,0.1)',
                 borderRight: '1px solid #FFFFFF',

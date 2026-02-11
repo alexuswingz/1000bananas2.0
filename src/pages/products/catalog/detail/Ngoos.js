@@ -115,7 +115,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   const [showAIModal, setShowAIModal] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [showForecastSettingsTooltip, setShowForecastSettingsTooltip] = useState(false);
   const [showForecastSettingsModal, setShowForecastSettingsModal] = useState(false);
   const [showTemporaryConfirmModal, setShowTemporaryConfirmModal] = useState(false);
   const [dontRemindAgain, setDontRemindAgain] = useState(false);
@@ -137,6 +136,8 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   });
   const [currentProductAsin, setCurrentProductAsin] = useState(null);
   const [chartLoadError, setChartLoadError] = useState(null); // e.g. CORS / network when chart fails on live
+  const [lineAnimationDone, setLineAnimationDone] = useState(false); // true after line has had time to finish drawing so bucket hover doesn't interrupt
+  const [zoomAnimationActive, setZoomAnimationActive] = useState(false); // true right after zoom changes so chart animates on zoom
   const [visibleSalesMetrics, setVisibleSalesMetrics] = useState(['units_sold', 'sales']);
   const [visibleAdsMetrics, setVisibleAdsMetrics] = useState(['total_sales', 'tacos']);
   const [hoveredSegment, setHoveredSegment] = useState(null); // 'fba', 'total', 'forecast', or null
@@ -163,6 +164,49 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
       'organic_sales_pct'
     ]
   });
+
+  // Stable key for doiSettings so effects/memos only run when values change, not on every parent re-render.
+  // Prevents chart reset when hovering buckets, clicking chart, zooming, or hovering settings (Chart Resetting Bug).
+  const doiSettingsKey = doiSettings
+    ? `${doiSettings.amazonDoiGoal ?? ''}_${doiSettings.inboundLeadTime ?? ''}_${doiSettings.manufactureLeadTime ?? ''}`
+    : '';
+
+  // Single primitive "request key" so we only refetch when it actually changes (never on zoom/hover/click).
+  const fetchRequestKey = [
+    data?.child_asin ?? data?.childAsin,
+    selectedView,
+    metricsDays,
+    salesVelocityWeight,
+    svVelocityWeight,
+    inventoryOnly,
+    doiGoalDays,
+    doiSettingsKey
+  ].join('_');
+  const lastFetchRequestKeyRef = useRef('');
+  // Don't clear zoom until the chart line has finished drawing, then wait 10s so it doesn't reset.
+  const gracePeriodEndRef = useRef(0);
+  const CHART_GRACE_PERIOD_MS = 10000;
+  const CHART_LINE_ANIMATION_MS = 2000; // Wait for line animation to finish before starting grace period
+
+  // Reset zoom only when time range or product changes (not on hover/click/zoom).
+  // Skip reset for 10 seconds after load so refresh doesn't cause an immediate reset.
+  // When view is "All Time" never clear zoom — it already shows full range and clearing caused graph to reset.
+  const childAsinForZoomReset = data?.child_asin ?? data?.childAsin;
+  const prevZoomResetDepsRef = useRef({ selectedView: null, childAsin: null });
+  useEffect(() => {
+    if (selectedView === 'All Time') return;
+    if (!childAsinForZoomReset) return;
+    if (Date.now() < gracePeriodEndRef.current) return;
+    const prev = prevZoomResetDepsRef.current;
+    const viewChanged = prev.selectedView !== selectedView;
+    const productChanged = prev.childAsin !== childAsinForZoomReset;
+    prevZoomResetDepsRef.current = { selectedView, childAsin: childAsinForZoomReset };
+    if (!viewChanged && !productChanged) return;
+    setZoomDomain({ left: null, right: null });
+    setZoomHistory([]);
+    setZoomBox({ startTimestamp: null, endTimestamp: null });
+    setChartRangeSelection({ startTimestamp: null, endTimestamp: null });
+  }, [selectedView, childAsinForZoomReset]);
 
   // Ensure the forecast settings indicator shows when this product already
   // has active custom forecast/DOI settings (e.g. from the Add Products page).
@@ -193,6 +237,20 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     }
   };
 
+  // Chart visible window: days before today and days after today for the selected view.
+  // ≤1 year: same period before and after. >1 year: full period before, 1 year after.
+  const getChartWindowDays = (view) => {
+    const oneYearDays = 365;
+    switch (view) {
+      case '30 Day': return { daysBefore: 30, daysAfter: 30 };
+      case '6 Months': return { daysBefore: 182, daysAfter: 182 };
+      case '1 Year': return { daysBefore: oneYearDays, daysAfter: oneYearDays };
+      case '2 Years': return { daysBefore: 730, daysAfter: oneYearDays };
+      case 'All Time': return { daysBefore: 260 * 7, daysAfter: oneYearDays }; // ~5 years before, 1 year after
+      default: return { daysBefore: oneYearDays, daysAfter: oneYearDays };
+    }
+  };
+
   // Reset weights to default when product changes
   useEffect(() => {
     const childAsin = data?.child_asin || data?.childAsin;
@@ -212,8 +270,11 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     }
   }, [data?.child_asin, data?.childAsin, currentProductAsin]);
 
-  // Fetch N-GOOS data from API
+  // Fetch N-GOOS data from API — only when fetchRequestKey changes (not on zoom/hover/click).
   useEffect(() => {
+    if (fetchRequestKey === lastFetchRequestKeyRef.current) return;
+    lastFetchRequestKeyRef.current = fetchRequestKey;
+
     const fetchNgoosData = async () => {
       const childAsin = data?.child_asin || data?.childAsin;
       
@@ -304,18 +365,29 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         });
       } finally {
         setLoading(false);
+        // Start grace period only after the chart line has time to finish animating, so it doesn't refresh mid-draw.
+        const startGraceAt = Date.now() + CHART_LINE_ANIMATION_MS;
+        gracePeriodEndRef.current = startGraceAt + CHART_GRACE_PERIOD_MS;
       }
     };
 
       fetchNgoosData();
-    }, [data?.child_asin, data?.childAsin, selectedView, metricsDays, salesVelocityWeight, svVelocityWeight, inventoryOnly, doiGoalDays, doiSettings]);
+    }, [fetchRequestKey]);
 
-  // Sync tempDoiSettings when doiSettings prop changes
+  // Clear bucket hover and line-animation state when load starts so hover during load doesn't reset the graph.
+  useEffect(() => {
+    if (loading) {
+      setHoveredSegment(null);
+      setLineAnimationDone(false);
+    }
+  }, [loading]);
+
+  // Sync tempDoiSettings when doiSettings values change (stable key avoids reset on parent re-render)
   useEffect(() => {
     if (doiSettings) {
       setTempDoiSettings(doiSettings);
     }
-  }, [doiSettings]);
+  }, [doiSettingsKey]);
 
   // Open forecast settings modal when openForecastSettings prop is true
   useEffect(() => {
@@ -466,7 +538,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
       forecast: Math.round(unitsToMake), // Show units to make, not days
       adjustment: Math.round(adjustment)
     };
-  }, [forecastData, inventoryData, overrideUnitsToMake, doiSettings]);
+  }, [forecastData, inventoryData, overrideUnitsToMake, doiSettingsKey]);
 
   // Reset user-adjusted units when forecast/override changes (e.g. DOI settings)
   useEffect(() => {
@@ -717,7 +789,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     if (chartMinValue === Infinity) chartMinValue = 0;
     
     return { data: combinedData, maxValue: chartMaxValue, minValue: chartMinValue };
-  }, [chartData, forecastData, selectedView, doiGoalDays, doiSettings]);
+  }, [chartData, forecastData, selectedView, doiGoalDays, doiSettingsKey]);
 
   // Y-axis tick values for Unit Forecast chart: only numbers in the data range (min to max of graph)
   const unitForecastYTicks = useMemo(() => {
@@ -774,6 +846,72 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     return new Date(y, m - 1, d, 0, 0, 0, 0).getTime();
   };
 
+  // Visible time window for chart based on selected view: X days before today, Y days after today.
+  const chartVisibleWindow = useMemo(() => {
+    const chart = chartData;
+    const todaySource = chart?.metadata?.today ?? chart?.today ?? forecastData?.current_date ?? null;
+    if (!todaySource) return null;
+    const today = new Date(todaySource);
+    const todayTs = today.getTime();
+    const { daysBefore, daysAfter } = getChartWindowDays(selectedView);
+    const msPerDay = 24 * 60 * 60 * 1000;
+    return {
+      startTs: todayTs - daysBefore * msPerDay,
+      endTs: todayTs + daysAfter * msPerDay
+    };
+  }, [chartData, forecastData, selectedView]);
+
+  // Start of "today" (00:00:00) for determining if selection is entirely in future (forecast)
+  const todayStartTs = useMemo(() => {
+    const chart = chartData;
+    const todaySource = chart?.metadata?.today ?? chart?.today ?? forecastData?.current_date ?? null;
+    if (!todaySource) return null;
+    const d = new Date(todaySource);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0).getTime();
+  }, [chartData, forecastData]);
+
+  // Timestamp where the "Today" dashed line is drawn (same logic as chart: closest data point to today) so highlight cap aligns with the line
+  const todayLineTimestamp = useMemo(() => {
+    const data = chartDisplayData?.data;
+    if (!data?.length) return todayStartTs;
+    const todaySource = chartData?.metadata?.today ?? chartData?.today ?? forecastData?.current_date ?? null;
+    const todayTs = todaySource ? new Date(todaySource).setHours(0, 0, 0, 0) : new Date().setHours(0, 0, 0, 0);
+    let todayPoint = null;
+    let minDiff = Infinity;
+    data.forEach((p) => {
+      const pointDay = new Date(p.timestamp).setHours(0, 0, 0, 0);
+      const diff = Math.abs(pointDay - todayTs);
+      if (diff < minDiff) {
+        minDiff = diff;
+        todayPoint = p;
+      }
+    });
+    return todayPoint != null ? todayPoint.timestamp : todayStartTs;
+  }, [chartDisplayData?.data, chartData, forecastData, todayStartTs]);
+
+  // Effective range for selection: cap at Today line so highlight never passes through the Today dashed line into forecast; when highlighting forecast only, start the highlight at the Today line
+  const chartRangeSelectionEffective = useMemo(() => {
+    if (chartRangeSelection.startTimestamp == null || chartRangeSelection.endTimestamp == null) return null;
+    const lo = Math.min(chartRangeSelection.startTimestamp, chartRangeSelection.endTimestamp);
+    const hi = Math.max(chartRangeSelection.startTimestamp, chartRangeSelection.endTimestamp);
+    const capTs = todayLineTimestamp ?? todayStartTs;
+    let displayLo = lo;
+    let displayHi = hi;
+    let sumHi = hi;
+    const isForecastOnly = todayStartTs != null && lo >= todayStartTs;
+    if (capTs != null) {
+      if (lo < capTs && hi >= capTs) {
+        // Selection spans past today: cap highlight and sum at Today line (no forecast in highlight)
+        displayHi = capTs;
+        sumHi = capTs;
+      } else if (isForecastOnly) {
+        // Selection is entirely in future: start the highlight at the Today dashed line so forecast highlight begins there
+        displayLo = capTs;
+      }
+    }
+    return { displayLo, displayHi, sumLo: lo, sumHi, isForecastOnly };
+  }, [chartRangeSelection.startTimestamp, chartRangeSelection.endTimestamp, todayLineTimestamp, todayStartTs]);
+
   // Zoom range as timestamps: used so both ends of the grabbed range are visible on the axis
   const chartXDomainWhenZoomed = useMemo(() => {
     if (zoomDomain.left == null || zoomDomain.right == null) return null;
@@ -782,14 +920,15 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     return [zoomMin, zoomMax];
   }, [zoomDomain?.left, zoomDomain?.right]);
 
-  // Effective X domain as [minTs, maxTs] for tick generation
+  // Effective X domain as [minTs, maxTs] for tick generation (visible window when not zoomed)
   const chartXDomainTimestamps = useMemo(() => {
     const data = chartDisplayData?.data;
     if (!data?.length) return null;
     if (chartXDomainWhenZoomed?.length === 2) return chartXDomainWhenZoomed;
+    if (chartVisibleWindow) return [chartVisibleWindow.startTs, chartVisibleWindow.endTs];
     const timestamps = data.map((d) => (typeof d.timestamp === 'number' ? d.timestamp : new Date(d.timestamp).getTime()));
     return [Math.min(...timestamps), Math.max(...timestamps)];
-  }, [chartDisplayData?.data, chartXDomainWhenZoomed]);
+  }, [chartDisplayData?.data, chartXDomainWhenZoomed, chartVisibleWindow]);
 
   // Same month indices for every year so the axis is consistent (Jan, Apr, Jul, Oct).
   // Number of months can be reduced on narrow screens to avoid crowding.
@@ -828,18 +967,27 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     return ticks.filter((t) => t >= tMin && t <= tMax);
   }, [chartXDomainTimestamps, chartAxisWidth]);
 
-  // Chart data actually shown: when zoomed, filter to zoom range so the graph visibly zooms
+  // Chart data actually shown: filter to visible window (or zoom range when zoomed)
   const chartDataForDisplay = useMemo(() => {
     const data = chartDisplayData?.data;
     if (!data?.length) return [];
-    if (zoomDomain.left == null || zoomDomain.right == null) return data;
-    const zoomMin = parseZoomDateToLocal(zoomDomain.left, false);
-    const zoomMax = parseZoomDateToLocal(zoomDomain.right, true);
-    return data.filter((d) => {
-      const t = typeof d.timestamp === 'number' ? d.timestamp : new Date(d.timestamp).getTime();
-      return t >= zoomMin && t <= zoomMax;
-    });
-  }, [chartDisplayData?.data, zoomDomain?.left, zoomDomain?.right]);
+    if (zoomDomain.left != null && zoomDomain.right != null) {
+      const zoomMin = parseZoomDateToLocal(zoomDomain.left, false);
+      const zoomMax = parseZoomDateToLocal(zoomDomain.right, true);
+      return data.filter((d) => {
+        const t = typeof d.timestamp === 'number' ? d.timestamp : new Date(d.timestamp).getTime();
+        return t >= zoomMin && t <= zoomMax;
+      });
+    }
+    if (chartVisibleWindow) {
+      const { startTs, endTs } = chartVisibleWindow;
+      return data.filter((d) => {
+        const t = typeof d.timestamp === 'number' ? d.timestamp : new Date(d.timestamp).getTime();
+        return t >= startTs && t <= endTs;
+      });
+    }
+    return data;
+  }, [chartDisplayData?.data, zoomDomain?.left, zoomDomain?.right, chartVisibleWindow]);
 
   // Defer chart mount by one frame so container has layout; avoids Recharts width/height -1 warning
   const hasChartData = (chartDataForDisplay?.length ?? 0) > 0;
@@ -854,31 +1002,65 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     return () => cancelAnimationFrame(id);
   }, [hasChartData]);
 
-  // Sum of Units Sold and Potential Units Sold for the drag-selected range
+  // Wait for Potential Units Sold line to finish animating before allowing bucket hover (hover during animation interrupts the line).
+  useEffect(() => {
+    if (loading || !chartDeferredReady) {
+      setLineAnimationDone(false);
+      return;
+    }
+    const id = setTimeout(() => setLineAnimationDone(true), CHART_LINE_ANIMATION_MS);
+    return () => clearTimeout(id);
+  }, [loading, chartDeferredReady]);
+
+  // When user zooms (zoomDomain changes), enable chart animation for this transition only.
+  const prevZoomDomainRef = useRef({ left: null, right: null });
+  useEffect(() => {
+    const prev = prevZoomDomainRef.current;
+    const changed = prev.left !== zoomDomain?.left || prev.right !== zoomDomain?.right;
+    prevZoomDomainRef.current = { left: zoomDomain?.left ?? null, right: zoomDomain?.right ?? null };
+    if (!changed) return;
+    setZoomAnimationActive(true);
+    const id = setTimeout(() => setZoomAnimationActive(false), CHART_LINE_ANIMATION_MS);
+    return () => clearTimeout(id);
+  }, [zoomDomain?.left, zoomDomain?.right]);
+
+  // Allow bucket hover only after graph has loaded and the line animation has finished.
+  const chartReadyForBucketHover = !loading && chartDeferredReady && lineAnimationDone;
+
+  // Animate chart on initial load and when zoom changes; no animation on hover/modal only.
+  const chartLineAnimationActive = !lineAnimationDone || zoomAnimationActive;
+
+  // Sum of Units Sold and Potential Units Sold for the drag-selected range (capped at today when selection spans past today)
   const chartRangeSum = useMemo(() => {
-    if (!chartDisplayData?.data?.length || chartRangeSelection.startTimestamp == null || chartRangeSelection.endTimestamp == null) return null;
+    if (!chartDisplayData?.data?.length || !chartRangeSelectionEffective) return null;
     const data = chartDisplayData.data;
-    const lo = Math.min(chartRangeSelection.startTimestamp, chartRangeSelection.endTimestamp);
-    const hi = Math.max(chartRangeSelection.startTimestamp, chartRangeSelection.endTimestamp);
+    const { sumLo, sumHi, isForecastOnly } = chartRangeSelectionEffective;
     let unitsSold = 0;
     let unitsSmoothed = 0;
     data.forEach((d) => {
-      if (d.timestamp >= lo && d.timestamp <= hi) {
+      if (d.timestamp >= sumLo && d.timestamp <= sumHi) {
         unitsSold += Number(d.unitsSold) || 0;
         unitsSmoothed += Number(d.forecastBase ?? d.unitsSmooth) || 0;
       }
     });
-    return { unitsSold, unitsSmoothed };
-  }, [chartDisplayData?.data, chartRangeSelection.startTimestamp, chartRangeSelection.endTimestamp]);
+    return { unitsSold, unitsSmoothed, isForecastOnly };
+  }, [chartDisplayData?.data, chartRangeSelectionEffective]);
 
-  // Map client X to timestamp using the chart's actual plot area and current visible domain (zoom-aware)
+  // Map client X to timestamp using the chart's actual plot area and current visible domain (zoom or time-window)
   const getTimestampFromClientX = (clientX) => {
     const data = chartDisplayData?.data;
     if (!chartContainerRef.current || !data?.length) return null;
     const dataMin = data[0].timestamp;
     const dataMax = data[data.length - 1].timestamp;
-    const visibleMin = zoomDomain.left != null ? parseZoomDateToLocal(zoomDomain.left, false) : dataMin;
-    const visibleMax = zoomDomain.right != null ? parseZoomDateToLocal(zoomDomain.right, true) : dataMax;
+    let visibleMin = dataMin;
+    let visibleMax = dataMax;
+    if (zoomDomain.left != null && zoomDomain.right != null) {
+      visibleMin = parseZoomDateToLocal(zoomDomain.left, false);
+      visibleMax = parseZoomDateToLocal(zoomDomain.right, true);
+    } else if (chartVisibleWindow) {
+      visibleMin = chartVisibleWindow.startTs;
+      visibleMax = chartVisibleWindow.endTs;
+    }
     const container = chartContainerRef.current;
     let plotEl = container.querySelector('.recharts-cartesian-grid');
     const gridRect = plotEl?.getBoundingClientRect();
@@ -908,12 +1090,16 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     const t = getTimestampFromClientX(e.clientX);
     if (t == null) return;
     e.preventDefault(); // prevent text/element selection when dragging on chart
-    // Zoom tool: two clicks to set zoom range, then return to Off state
+    // Zoom tool: support two methods — (1) click, move, click again; (2) click+hold+drag, release
     if (zoomToolActive) {
       if (zoomFirstClickTimestamp == null) {
+        // First interaction: set first point and start drag box so user can either drag or click again
         setZoomFirstClickTimestamp(t);
+        zoomBoxDragRef.current = { startTimestamp: t, endTimestamp: t };
+        setZoomBox({ startTimestamp: t, endTimestamp: t });
         return;
       }
+      // Second click: apply zoom from first click to this click (method 1)
       const lo = Math.min(zoomFirstClickTimestamp, t);
       const hi = Math.max(zoomFirstClickTimestamp, t);
       if (hi > lo) {
@@ -927,6 +1113,8 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
       setZoomToolActive(false);
       setZoomFirstClickTimestamp(null);
       setZoomPreviewTimestamp(null);
+      zoomBoxDragRef.current = { startTimestamp: null, endTimestamp: null };
+      setZoomBox({ startTimestamp: null, endTimestamp: null });
       return;
     }
     if (zKeyHeld) {
@@ -941,7 +1129,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   };
 
   const handleChartRangeMouseMove = (e) => {
-    // Zoom tool: show preview band from first click to current mouse position
+    // Zoom tool: show preview (for banner); drag band is from zoomBox when user is dragging
     if (zoomToolActive && zoomFirstClickTimestamp != null) {
       const t = getTimestampFromClientX(e.clientX);
       setZoomPreviewTimestamp(t != null ? t : null);
@@ -1005,6 +1193,12 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           };
           setZoomHistory((hist) => [...hist, zoomDomain]);
           setZoomDomain({ left: toLocalDateStr(lo), right: toLocalDateStr(hi) });
+          // If zoom tool was active (click+hold+drag), turn it off after applying zoom
+          if (zoomToolActive) {
+            setZoomToolActive(false);
+            setZoomFirstClickTimestamp(null);
+            setZoomPreviewTimestamp(null);
+          }
         }
       }
       zoomBoxDragRef.current = { startTimestamp: null, endTimestamp: null };
@@ -1308,7 +1502,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     setTempMarketAdjustment(marketAdjustment);
     setTempDoiSettings(doiSettings || { amazonDoiGoal: 130, inboundLeadTime: 30, manufactureLeadTime: 7 });
     setShowForecastSettingsModal(true);
-    setShowForecastSettingsTooltip(false);
   };
 
   const calculateTotalDOI = (settings) => {
@@ -1636,15 +1829,28 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     );
   };
 
-  // Show loading state
+  // Show loading state (same outer size as loaded content so modal doesn't shrink)
   if (loading) {
     return (
-      <div className={`${themeClasses.bg} rounded-xl border ${themeClasses.border} shadow-sm`}>
+      <div
+        className={`${themeClasses.bg} rounded-xl border ${themeClasses.border} shadow-sm`}
+        style={{
+          width: inventoryOnly ? '100%' : '100%',
+          maxWidth: inventoryOnly ? '100%' : 'none',
+          margin: inventoryOnly ? '0' : '0 auto',
+          backgroundColor: '#1A2235',
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: inventoryOnly ? '562px' : '680px',
+          outline: 'none',
+          paddingBottom: '1rem'
+        }}
+      >
         <div className={`px-6 py-4 border-b ${themeClasses.border}`}>
           <h2 className={`text-lg font-semibold ${themeClasses.text}`}>N-GOOS Inventory</h2>
         </div>
-        <div style={{ padding: '3rem', textAlign: 'center' }}>
-          <div style={{ display: 'inline-block' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 0 }}>
+          <div style={{ textAlign: 'center' }}>
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" style={{ margin: '0 auto' }}></div>
             <p className={`mt-4 text-sm ${themeClasses.textSecondary}`}>Loading N-GOOS data...</p>
           </div>
@@ -1673,7 +1879,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
 
   return (
     <div 
-      className={`${themeClasses.bg} rounded-xl border ${themeClasses.border} shadow-sm`} 
+      className={activeTab === 'sales' ? `${themeClasses.bg} rounded-xl border-0 shadow-none` : `${themeClasses.bg} rounded-xl border ${themeClasses.border} shadow-sm`} 
       style={{ 
         width: inventoryOnly ? '100%' : '100%', 
         maxWidth: inventoryOnly ? '100%' : 'none', 
@@ -1682,8 +1888,10 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,
+        ...(inventoryOnly ? { flex: 1, minHeight: '662px' } : {}),
         outline: 'none',
-        paddingBottom: '1rem'
+        paddingBottom: '1rem',
+        ...(activeTab === 'sales' ? { border: 'none', boxShadow: 'none' } : {})
       }}
     >
       {/* Tab Navigation - Hidden when inventoryOnly is true */}
@@ -2347,16 +2555,10 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           gap: inventoryOnly ? '0.75rem' : '1.5rem', 
           marginBottom: inventoryOnly ? '0.75rem' : '2rem' 
         }}>
-          {/* FBA Available Card */}
+          {/* FBA Available Card — hover only after graph loaded so hover during load doesn't reset */}
           <div 
-            onMouseEnter={() => {
-              console.log('Hovering FBA Available');
-              setHoveredSegment('fba');
-            }}
-            onMouseLeave={() => {
-              console.log('Leaving FBA Available');
-              setHoveredSegment(null);
-            }}
+            onMouseEnter={() => { if (chartReadyForBucketHover) setHoveredSegment('fba'); }}
+            onMouseLeave={() => { if (chartReadyForBucketHover) setHoveredSegment(null); }}
             style={{ 
               borderRadius: '0.5rem', 
               padding: inventoryOnly ? '0.75rem 1rem' : '1rem 1.25rem',
@@ -2408,16 +2610,10 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             </div>
           </div>
 
-          {/* Total Inventory Card */}
+          {/* Total Inventory Card — hover only after graph loaded so hover during load doesn't reset */}
           <div 
-            onMouseEnter={() => {
-              console.log('Hovering Total Inventory');
-              setHoveredSegment('total');
-            }}
-            onMouseLeave={() => {
-              console.log('Leaving Total Inventory');
-              setHoveredSegment(null);
-            }}
+            onMouseEnter={() => { if (chartReadyForBucketHover) setHoveredSegment('total'); }}
+            onMouseLeave={() => { if (chartReadyForBucketHover) setHoveredSegment(null); }}
             style={{ 
               borderRadius: '0.5rem', 
               padding: inventoryOnly ? '0.75rem 1rem' : '1rem 1.25rem',
@@ -2469,16 +2665,10 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             </div>
           </div>
 
-          {/* Forecast Card */}
+          {/* Forecast Card — hover only after graph loaded so hover during load doesn't reset */}
           <div 
-            onMouseEnter={() => {
-              console.log('Hovering Forecast');
-              setHoveredSegment('forecast');
-            }}
-            onMouseLeave={() => {
-              console.log('Leaving Forecast');
-              setHoveredSegment(null);
-            }}
+            onMouseEnter={() => { if (chartReadyForBucketHover) setHoveredSegment('forecast'); }}
+            onMouseLeave={() => { if (chartReadyForBucketHover) setHoveredSegment(null); }}
             style={{ 
               borderRadius: '0.5rem', 
               padding: inventoryOnly ? '0.75rem 1rem' : '1rem 1.25rem',
@@ -2555,7 +2745,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               </p>
             </div>
             {/* Range selection stats - same row as Unit Forecast (no Reset; click chart to clear) */}
-            {chartRangeSum != null && (() => {
+            {chartRangeSum != null && chartRangeSelectionEffective != null && (() => {
               const unitCost = Number(
                 productDetails?.product?.cost ??
                 productDetails?.product?.price ??
@@ -2567,17 +2757,33 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               ) || 0;
               const unitsDiff = chartRangeSum.unitsSmoothed - chartRangeSum.unitsSold;
               const revenueGap = unitsDiff * unitCost;
+              const isForecast = chartRangeSum.isForecastOnly === true;
+              const dateRangeStr = `${new Date(chartRangeSelectionEffective.displayLo).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} – ${new Date(chartRangeSelectionEffective.displayHi).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
               return (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap', fontSize: inventoryOnly ? '0.75rem' : '0.8125rem' }}>
-                  <span style={{ color: '#94a3b8' }}>
-                    UNITS SOLD: <strong style={{ color: '#e2e8f0', fontWeight: 600 }}>{chartRangeSum.unitsSold.toLocaleString()}</strong>
-                  </span>
-                  <span style={{ color: '#94a3b8' }}>
-                    POT. UNITS SOLD: <strong style={{ color: '#22c55e', fontWeight: 600 }}>{chartRangeSum.unitsSmoothed.toLocaleString()}</strong>
-                  </span>
-                  <span style={{ color: '#94a3b8' }}>
-                    REVENUE GAP: <strong style={{ color: '#22c55e', fontWeight: 600 }}>{revenueGap.toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
-                  </span>
+                  <span style={{ color: '#64748b', marginRight: '0.25rem' }} title="Selected date range">{dateRangeStr}</span>
+                  {isForecast ? (
+                    <>
+                      <span style={{ color: '#94a3b8' }}>
+                        FORECASTED UNITS: <strong style={{ color: '#22c55e', fontWeight: 600 }}>{chartRangeSum.unitsSmoothed.toLocaleString()}</strong>
+                      </span>
+                      <span style={{ color: '#94a3b8' }}>
+                        FORECASTED REVENUE: <strong style={{ color: '#22c55e', fontWeight: 600 }}>{(chartRangeSum.unitsSmoothed * unitCost).toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span style={{ color: '#94a3b8' }}>
+                        UNITS SOLD: <strong style={{ color: '#e2e8f0', fontWeight: 600 }}>{chartRangeSum.unitsSold.toLocaleString()}</strong>
+                      </span>
+                      <span style={{ color: '#94a3b8' }}>
+                        POT. UNITS SOLD: <strong style={{ color: '#22c55e', fontWeight: 600 }}>{chartRangeSum.unitsSmoothed.toLocaleString()}</strong>
+                      </span>
+                      <span style={{ color: '#94a3b8' }}>
+                        REVENUE GAP: <strong style={{ color: '#22c55e', fontWeight: 600 }}>{revenueGap.toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                      </span>
+                    </>
+                  )}
                 </div>
               );
             })()}
@@ -2585,7 +2791,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               {/* Zoom tool: click to turn On (blue), then click two points on chart to zoom; Reset appears when zoomed */}
               <button
                 type="button"
-                title={zoomToolActive ? 'Click two points on the chart to zoom into that period' : 'Zoom: click to enable, then click two points on the chart'}
+                title={zoomToolActive ? 'Click two points to zoom, or click and drag then release' : 'Zoom: click to enable, then click two points or click-drag-release to zoom'}
                 onClick={() => {
                   if (zoomToolActive) {
                     setZoomFirstClickTimestamp(null);
@@ -2616,20 +2822,15 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                   position: 'relative',
                   display: 'inline-block'
                 }}
-                onMouseEnter={() => {
-                  // Don't show forecast settings tooltip if indicator tooltip is showing
-                  if (!showIndicatorTooltip) {
-                    setShowForecastSettingsTooltip(true);
-                  }
-                }}
-                onMouseLeave={() => setShowForecastSettingsTooltip(false)}
               >
                 <button 
+                  type="button"
                   title="Forecast Settings"
+                  onClick={handleOpenForecastSettingsModal}
                   style={{ 
                     padding: '0.5rem', 
                     color: '#94a3b8', 
-                    backgroundColor: showForecastSettingsTooltip ? 'rgba(59, 130, 246, 0.1)' : 'transparent', 
+                    backgroundColor: 'transparent', 
                     border: 'none', 
                     borderRadius: '0.375rem',
                     cursor: 'pointer',
@@ -2659,7 +2860,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                     onMouseEnter={(e) => {
                       e.stopPropagation();
                       setShowIndicatorTooltip(true);
-                      setShowForecastSettingsTooltip(false);
                     }}
                   >
                     <div
@@ -2715,7 +2915,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                           onMouseEnter={(e) => {
                             e.stopPropagation();
                             setShowIndicatorTooltip(true);
-                            setShowForecastSettingsTooltip(false);
                           }}
                           onMouseLeave={(e) => {
                             e.stopPropagation();
@@ -2726,7 +2925,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                           onMouseEnter={(e) => {
                             e.stopPropagation();
                             setShowIndicatorTooltip(true);
-                            setShowForecastSettingsTooltip(false);
                           }}
                           onMouseLeave={(e) => {
                             e.stopPropagation();
@@ -2878,52 +3076,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                     )}
                   </div>
                 )}
-                {showForecastSettingsTooltip && (
-                  <>
-                    {/* Invisible bridge to keep tooltip visible when moving mouse down */}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        width: '120px',
-                        height: '8px',
-                        pointerEvents: 'auto',
-                      }}
-                    />
-                    <div
-                      onClick={handleOpenForecastSettingsModal}
-                      style={{
-                        position: 'absolute',
-                        top: 'calc(100% + 8px)',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        backgroundColor: '#1A1F2E',
-                        color: '#E5E7EB',
-                        padding: '6px 10px',
-                        borderRadius: '6px',
-                        fontSize: '0.75rem',
-                        fontWeight: 500,
-                        whiteSpace: 'nowrap',
-                        zIndex: 1000,
-                        cursor: 'pointer',
-                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3)',
-                        transition: 'background-color 0.2s',
-                        pointerEvents: 'auto',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#2563EB';
-                        setShowForecastSettingsTooltip(true);
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#1A1F2E';
-                      }}
-                    >
-                      Forecast Settings
-                    </div>
-                  </>
-                )}
               </div>
               <select 
                 value={selectedView}
@@ -2979,7 +3131,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
           </div>
 
 
-          {/* Chart Area - Hold Z and drag to zoom; drag without Z to sum Units Sold / Potential Units Sold. */}
+          {/* Chart Area - Zoom tool: click twice or click-drag-release; Hold Z and drag to zoom; drag without Z to sum Units Sold / Potential Units Sold. */}
           <div
             ref={chartContainerRef}
             className="ngoos-chart-area"
@@ -3035,7 +3187,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                     {new Date(zoomPreviewTimestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   </span>
                 ) : (
-                  <span style={{ color: '#64748b' }}>move or click to set end</span>
+                  <span style={{ color: '#64748b' }}>drag or click to set end</span>
                 )}
               </div>
             )}
@@ -3052,6 +3204,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 style={responsiveContainerStyle}
               >
                   <ComposedChart
+                  key={`unit-forecast-${data?.child_asin ?? data?.childAsin ?? 'unknown'}-${selectedView}`}
                   data={chartDataForDisplay}
                   margin={{ top: 20, right: 20, left: 0, bottom: 20 }}
                   style={composedChartStyle}
@@ -3079,7 +3232,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                     dataKey="timestamp"
                     type="number"
                     scale="time"
-                    domain={chartXDomainWhenZoomed ?? ['dataMin', 'dataMax']}
+                    domain={chartXDomainWhenZoomed ?? (chartXDomainTimestamps ? [chartXDomainTimestamps[0], chartXDomainTimestamps[1]] : ['dataMin', 'dataMax'])}
                     axisLine={false}
                     tickLine={false}
                     // Brighter tick color + extra margin so dates are always visible
@@ -3115,8 +3268,8 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                   />
                   <Tooltip 
                     content={(props) => {
-                      // Hide tooltip when zooming (zoom tool active or zoomed in)
-                      if (zoomToolActive || zoomDomain.left != null || zoomDomain.right != null) return null;
+                      // Hide tooltip only while zoom tool is active (selecting two points); show when zoomed in
+                      if (zoomToolActive) return null;
                       if (!props.active || !props.payload?.length) return null;
                       const inner = <CustomTooltip {...props} />;
                       const pos = chartCursorRef.current;
@@ -3196,9 +3349,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                             }
                             // Use exact timestamps so zones strike at the right dates
                             const opacity = isHovered ? 0.6 : 0.2;
-                            if (hoveredSegment) {
-                              console.log(`Period ${idx}: color=${originalColor}, mapped=${mappedColor}, hoveredSegment=${hoveredSegment}, isHovered=${isHovered}, opacity=${opacity}`);
-                            }
                             return (
                               <ReferenceArea
                                 key={`period-${idx}`}
@@ -3216,6 +3366,61 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                           ))}
                           {periods.length > 0 && (
                             <ReferenceLine x={new Date(periods[periods.length - 1].end_date).getTime()} stroke="#3b82f6" strokeDasharray="3 3" strokeWidth={1} strokeOpacity={0.7} yAxisId="left" />
+                          )}
+                          {/* Hover: dotted line at segment end with date label */}
+                          {hoveredSegment === 'fba' && periods[0] && (
+                            <ReferenceLine
+                              x={new Date(periods[0].end_date).getTime()}
+                              stroke="#e5e7eb"
+                              strokeDasharray="6 4"
+                              strokeWidth={2}
+                              strokeOpacity={0.95}
+                              yAxisId="left"
+                              label={{
+                                value: new Date(periods[0].end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                                position: 'top',
+                                fill: '#e5e7eb',
+                                fontSize: 11,
+                                fontWeight: 500,
+                                offset: 6
+                              }}
+                            />
+                          )}
+                          {hoveredSegment === 'total' && periods[1] && (
+                            <ReferenceLine
+                              x={new Date(periods[1].end_date).getTime()}
+                              stroke="#e5e7eb"
+                              strokeDasharray="6 4"
+                              strokeWidth={2}
+                              strokeOpacity={0.95}
+                              yAxisId="left"
+                              label={{
+                                value: new Date(periods[1].end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                                position: 'top',
+                                fill: '#e5e7eb',
+                                fontSize: 11,
+                                fontWeight: 500,
+                                offset: 6
+                              }}
+                            />
+                          )}
+                          {hoveredSegment === 'forecast' && periods.length > 0 && (
+                            <ReferenceLine
+                              x={new Date(periods[periods.length - 1].end_date).getTime()}
+                              stroke="#e5e7eb"
+                              strokeDasharray="6 4"
+                              strokeWidth={2}
+                              strokeOpacity={0.95}
+                              yAxisId="left"
+                              label={{
+                                value: new Date(periods[periods.length - 1].end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                                position: 'top',
+                                fill: '#e5e7eb',
+                                fontSize: 11,
+                                fontWeight: 500,
+                                offset: 6
+                              }}
+                            />
                           )}
                           
                           {/* Today marker from backend or calculated */}
@@ -3398,6 +3603,61 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                         {hasBlueSpan && (
                           <ReferenceLine x={forecastPoint.timestamp} stroke="#3b82f6" strokeDasharray="3 3" strokeWidth={1} strokeOpacity={0.7} yAxisId="left" />
                         )}
+                        {/* Hover: dotted line at segment end with date label */}
+                        {hoveredSegment === 'fba' && hasVioletSpan && fbaPoint && (
+                          <ReferenceLine
+                            x={fbaPoint.timestamp}
+                            stroke="#e5e7eb"
+                            strokeDasharray="6 4"
+                            strokeWidth={2}
+                            strokeOpacity={0.95}
+                            yAxisId="left"
+                            label={{
+                              value: new Date(fbaPoint.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                              position: 'top',
+                              fill: '#e5e7eb',
+                              fontSize: 11,
+                              fontWeight: 500,
+                              offset: 6
+                            }}
+                          />
+                        )}
+                        {hoveredSegment === 'total' && hasGreenSpan && greenEndTimestamp != null && (
+                          <ReferenceLine
+                            x={greenEndTimestamp}
+                            stroke="#e5e7eb"
+                            strokeDasharray="6 4"
+                            strokeWidth={2}
+                            strokeOpacity={0.95}
+                            yAxisId="left"
+                            label={{
+                              value: new Date(greenEndTimestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                              position: 'top',
+                              fill: '#e5e7eb',
+                              fontSize: 11,
+                              fontWeight: 500,
+                              offset: 6
+                            }}
+                          />
+                        )}
+                        {hoveredSegment === 'forecast' && forecastPoint && (
+                          <ReferenceLine
+                            x={forecastPoint.timestamp}
+                            stroke="#e5e7eb"
+                            strokeDasharray="6 4"
+                            strokeWidth={2}
+                            strokeOpacity={0.95}
+                            yAxisId="left"
+                            label={{
+                              value: new Date(forecastPoint.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                              position: 'top',
+                              fill: '#e5e7eb',
+                              fontSize: 11,
+                              fontWeight: 500,
+                              offset: 6
+                            }}
+                          />
+                        )}
                       </>
                     );
                   })()}
@@ -3415,11 +3675,11 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                       strokeDasharray="4 2"
                     />
                   )}
-                  {/* Drag-selection range highlight (Units Sold sum) */}
-                  {chartRangeSelection.startTimestamp != null && chartRangeSelection.endTimestamp != null && (
+                  {/* Drag-selection range highlight (capped at today when selection spans past today) */}
+                  {chartRangeSelectionEffective != null && (
                     <ReferenceArea
-                      x1={Math.min(chartRangeSelection.startTimestamp, chartRangeSelection.endTimestamp)}
-                      x2={Math.max(chartRangeSelection.startTimestamp, chartRangeSelection.endTimestamp)}
+                      x1={chartRangeSelectionEffective.displayLo}
+                      x2={chartRangeSelectionEffective.displayHi}
                       fill="#3b82f6"
                       fillOpacity={0.15}
                       yAxisId="left"
@@ -3427,8 +3687,8 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                       strokeOpacity={0.5}
                     />
                   )}
-                  {/* Zoom tool: grab preview from first click to current mouse (or second click) */}
-                  {zoomFirstClickTimestamp != null && zoomPreviewTimestamp != null && (
+                  {/* Zoom tool: grab preview from first click to current mouse (only when not dragging; drag uses zoomBox above) */}
+                  {zoomFirstClickTimestamp != null && zoomPreviewTimestamp != null && (zoomBox.startTimestamp == null || zoomBox.startTimestamp === zoomBox.endTimestamp) && (
                     <ReferenceArea
                       x1={Math.min(zoomFirstClickTimestamp, zoomPreviewTimestamp)}
                       x2={Math.max(zoomFirstClickTimestamp, zoomPreviewTimestamp)}
@@ -3442,7 +3702,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                     />
                   )}
                   
-                  {/* Units Sold Area (Historical) */}
+                  {/* Units Sold Area (Historical) - animate only on first load so hover/modal don't reset graph */}
                   <Area 
                     yAxisId="left"
                     type="monotone" 
@@ -3452,9 +3712,10 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                     fill="url(#unitsSoldGradient)"
                     name="Units Sold"
                     connectNulls={false}
+                    isAnimationActive={chartLineAnimationActive}
                   />
                   
-                  {/* Smoothed Units Sold - Orange solid line (historical only; stops at today) */}
+                  {/* Smoothed Units Sold - Orange solid line (Potential Units Sold) */}
                   <Line 
                     yAxisId="left"
                     type="monotone" 
@@ -3464,6 +3725,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                     dot={false}
                     name="Potential Units Sold"
                     connectNulls={false}
+                    isAnimationActive={chartLineAnimationActive}
                   />
                   
                   {/* Forecast - Orange dashed line (only line in forecast region) */}
@@ -3477,6 +3739,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                     dot={false}
                     name="Forecast"
                     connectNulls={false}
+                    isAnimationActive={chartLineAnimationActive}
                   />
                   
                 </ComposedChart>
@@ -3594,892 +3857,171 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         </div>
       )}
 
-      {/* Sales Tab Content */}
+      {/* Sales Tab Content - BOOST Coming Soon (same layout as Inventory: tabs when inventoryOnly, same wrapper) */}
       {activeTab === 'sales' && (
-          <div style={{ backgroundColor: '#1A2235' }}>
-            {/* Header with Controls */}
-            <div className="px-6 pt-6" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1rem', gap: '1rem' }}>
-              {/* Metric Controller */}
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', flex: 1 }}>
-                <span style={{ fontSize: '0.75rem', color: '#94a3b8', alignSelf: 'center', marginRight: '0.5rem', fontWeight: '600', textTransform: 'uppercase' }}>
-                  Metrics:
-                </span>
-                {SALES_METRICS.map(metric => {
-                  const isVisible = visibleSalesMetrics.includes(metric.id);
-                  return (
-                    <button
-                      key={metric.id}
-                      onClick={() => toggleSalesMetric(metric.id)}
-                      style={{
-                        padding: '0.375rem 0.75rem',
-                        borderRadius: '0.375rem',
-                        backgroundColor: isVisible ? metric.color + '20' : 'transparent',
-                        border: `2px solid ${isVisible ? metric.color : '#475569'}`,
-                        color: isVisible ? metric.color : '#94a3b8',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.375rem',
-                        opacity: isVisible ? 1 : 0.6
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-1px)';
-                        e.currentTarget.style.opacity = '1';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.opacity = isVisible ? '1' : '0.6';
-                      }}
-                    >
-                      <div style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        backgroundColor: isVisible ? metric.color : '#475569'
-                      }} />
-                      {metric.label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Period Selectors */}
-              <div style={{ display: 'flex', gap: '0.75rem', flexShrink: 0 }}>
-                <select 
-                  value={metricsDays}
-                  onChange={(e) => setMetricsDays(Number(e.target.value))}
-                  style={{ 
-                    padding: '0.5rem 1rem', 
-                    borderRadius: '0.5rem', 
-                    backgroundColor: '#1e293b', 
-                    color: '#fff',
-                    border: '1px solid #334155',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    minWidth: '100px'
-                  }}
-                >
-                  <option value={7}>7 Days</option>
-                  <option value={30}>30 Days</option>
-                  <option value={60}>60 Days</option>
-                  <option value={90}>90 Days</option>
-                </select>
-                
-                <select 
-                  style={{ 
-                    padding: '0.5rem 1rem', 
-                    borderRadius: '0.5rem', 
-                    backgroundColor: '#1e293b', 
-                    color: '#fff',
-                    border: '1px solid #334155',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    minWidth: '120px'
-                  }}
-                >
-                  <option value="prior">Prior Period</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Graph Section: 70% Graph + 30% Banana Factors */}
-            <div className="px-6" style={{ display: 'grid', gridTemplateColumns: '70% 30%', gap: '1.5rem', marginBottom: '1.5rem', minHeight: '400px' }}>
-              {/* Left: Graph (70%) */}
-              <div className={themeClasses.cardBg} style={{ borderRadius: '0.75rem', padding: '1.5rem', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                <div style={{ flex: 1, minHeight: 300 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={salesChartData?.chart_data || []}>
-                    <CartesianGrid 
-                      strokeDasharray="4 4" 
-                      stroke="rgba(148, 163, 184, 0.45)" 
-                      vertical={false} 
-                      horizontal={true}
-                      strokeWidth={1} 
-                    />
-                    <XAxis 
-                      dataKey="date" 
-                      stroke="#64748b"
-                      style={{ fontSize: '0.75rem' }}
-                      tickLine={false}
-                      tickFormatter={(value) => {
-                        const date = new Date(value);
-                        return `${date.getMonth() + 1}/${date.getDate()}`;
-                      }}
-                    />
-                    <YAxis 
-                      stroke="#64748b"
-                      style={{ fontSize: '0.75rem' }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#0f172a', 
-                        border: '1px solid #334155',
-                        borderRadius: '0.5rem',
-                        color: '#fff',
-                        fontSize: '0.875rem'
-                      }}
-                      formatter={(value, name) => {
-                        const metric = SALES_METRICS.find(m => m.label === name);
-                        if (metric) {
-                          return [formatChartValue(value, metric.formatType), name];
-                        }
-                        return [value, name];
-                      }}
-                    />
-                    {/* Dynamically render visible metrics */}
-                    {visibleSalesMetrics.length > 0 && SALES_METRICS
-                      .filter(metric => visibleSalesMetrics.includes(metric.id))
-                      .map((metric) => {
-                        console.log('Rendering Sales metric:', metric.id, metric.valueKey, 'Sample data:', salesChartData?.chart_data?.[0]?.[metric.valueKey]);
-                        return (
-                          <Line 
-                            key={metric.id}
-                            type="monotone" 
-                            dataKey={metric.valueKey} 
-                            stroke={metric.color} 
-                            strokeWidth={2.5}
-                            name={metric.label}
-                            dot={false}
-                            connectNulls
-                          />
-                        );
-                      })}
-                  </ComposedChart>
-                </ResponsiveContainer>
+          <div style={{ backgroundColor: '#1A2235', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            {/* Same compact tab bar as Inventory when inventoryOnly */}
+            {inventoryOnly && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '1rem',
+                marginTop: '0.9375rem',
+                padding: '0 1rem'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  gap: '0.25rem',
+                  backgroundColor: '#0f172a',
+                  borderRadius: '0.5rem',
+                  padding: '4px',
+                  width: '325px',
+                  height: '32px',
+                  border: '1px solid #334155',
+                  alignItems: 'center',
+                  boxSizing: 'border-box'
+                }}>
+                  <button
+                    onClick={() => setActiveTab('forecast')}
+                    style={{
+                      padding: '0',
+                      fontSize: '1rem',
+                      fontWeight: '500',
+                      color: activeTab === 'forecast' ? '#fff' : '#94a3b8',
+                      backgroundColor: activeTab === 'forecast' ? '#2563EB' : 'transparent',
+                      border: 'none',
+                      borderRadius: '0.25rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      flex: 1,
+                      height: '23px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    Inventory
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('sales')}
+                    style={{
+                      padding: '0',
+                      fontSize: '1rem',
+                      fontWeight: '500',
+                      color: activeTab === 'sales' ? '#fff' : '#94a3b8',
+                      backgroundColor: activeTab === 'sales' ? '#2563EB' : 'transparent',
+                      border: 'none',
+                      borderRadius: '0.25rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      flex: 1,
+                      height: '23px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    Sales
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('ads')}
+                    style={{
+                      padding: '0',
+                      fontSize: '1rem',
+                      fontWeight: '500',
+                      color: activeTab === 'ads' ? '#fff' : '#94a3b8',
+                      backgroundColor: activeTab === 'ads' ? '#2563EB' : 'transparent',
+                      border: 'none',
+                      borderRadius: '0.25rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      flex: 1,
+                      height: '23px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    Ads
+                  </button>
                 </div>
               </div>
-
-              {/* Right: Banana Factors (30%) */}
-              <div className={themeClasses.cardBg} style={{ borderRadius: '0.75rem', padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#fff', marginBottom: '1.5rem' }}>Banana Factors</h3>
-                
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {/* Sessions */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid #334155' }}>
-                    <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Sessions</span>
-                    <span style={{ fontSize: '0.875rem', fontWeight: '600', color: metrics?.changes?.sessions >= 0 ? '#22c55e' : '#ef4444' }}>
-                      {metrics?.current_period?.sessions?.toLocaleString() || '0'}
-                    </span>
-                  </div>
-
-                  {/* Conversion Rate */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid #334155' }}>
-                    <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Conversion Rate</span>
-                    <span style={{ fontSize: '0.875rem', fontWeight: '600', color: metrics?.changes?.conversion_rate >= 0 ? '#22c55e' : '#ef4444' }}>
-                      {metrics?.current_period?.conversion_rate?.toFixed(2) || '0.00'}%
-                    </span>
-                  </div>
-
-                  {/* TACOS */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid #334155' }}>
-                    <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>TACOS</span>
-                    <span style={{ fontSize: '0.875rem', fontWeight: '600', color: metrics?.changes?.tacos <= 0 ? '#22c55e' : '#ef4444' }}>
-                      {metrics?.current_period?.tacos?.toFixed(2) || '0.00'}%
-                    </span>
-                  </div>
+            )}
+            {/* Coming Soon content - centered, same as image */}
+            <div className={inventoryOnly ? '' : 'px-6 pb-6'} style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: 0,
+              overflow: 'auto',
+              padding: inventoryOnly ? '1rem' : '3rem'
+            }}>
+              <div style={{ textAlign: 'center', maxWidth: '420px', marginTop: '-50px' }}>
+                {/* BOOST / Bolt icon */}
+                <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'center' }}>
+                  <img src="/assets/Bolt.png" alt="BOOST" style={{ width: '98px', height: '98px', objectFit: 'contain' }} />
                 </div>
-
-                {/* Perform Analysis Button */}
-                <button 
-                  onClick={handlePerformAnalysis}
+                <h2 style={{ fontSize: '1.75rem', fontWeight: '700', color: '#fff', marginBottom: '0.75rem' }}>BOOST is Coming Soon!</h2>
+                <p style={{ fontSize: '1rem', color: '#94a3b8', marginBottom: '1.5rem', lineHeight: 1.5 }}>
+                  Supercharge your sales velocity with BOOST. Stay tuned for updates.
+                </p>
+                <button
+                  onClick={() => setActiveTab('forecast')}
                   style={{
-                    marginTop: 'auto',
-                    padding: '0.75rem',
-                    backgroundColor: '#3b82f6',
+                    minWidth: '133px',
+                    height: '31px',
+                    padding: '0 10px',
+                    marginLeft: '142px',
+                    backgroundColor: '#334155',
                     color: '#fff',
-                    borderRadius: '0.5rem',
-                    border: 'none',
+                    borderRadius: '6px',
+                    border: '1px solid #475569',
                     fontSize: '0.875rem',
-                    fontWeight: '600',
+                    fontWeight: '500',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '0.5rem'
+                    boxSizing: 'border-box'
                   }}
                 >
-                  <svg style={{ width: '1rem', height: '1rem' }} fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/>
-                  </svg>
-                  Perform Analysis
+                  Back to Inventory
                 </button>
-                <div style={{ fontSize: '0.625rem', color: '#64748b', textAlign: 'center', marginTop: '0.5rem' }}>
-                  Powered by Banana Brain AI
-                </div>
               </div>
-            </div>
-
-            {/* Bottom Section: Metrics Grid */}
-            <div className="px-6 pb-6" style={{ position: 'relative' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem' }}>
-                  {getCurrentMetrics().map(metricId => {
-                    const metric = availableMetrics.find(m => m.id === metricId);
-                    if (!metric) return null;
-                    const metricData = getMetricValue(metricId);
-                    const changeColor = metricData.invertColor 
-                      ? (metricData.change >= 0 ? '#ef4444' : '#22c55e')
-                      : (metricData.change >= 0 ? '#22c55e' : '#ef4444');
-                    
-                    // Determine chart metric visibility
-                    const chartMetric = (activeTab === 'sales' ? SALES_METRICS : ADS_METRICS).find(m => m.id === metricId);
-                    const isVisibleOnChart = chartMetric && (activeTab === 'sales' ? visibleSalesMetrics : visibleAdsMetrics).includes(metricId);
-                    const borderColor = isVisibleOnChart ? chartMetric.color : '#334155';
-                    const toggleMetric = activeTab === 'sales' ? toggleSalesMetric : toggleAdsMetric;
-                    
-                    return (
-                      <div 
-                        key={metricId} 
-                        onClick={() => chartMetric && toggleMetric(metricId)}
-                        style={{ 
-                          padding: '1.5rem', 
-                          backgroundColor: '#0f1729', 
-                          borderRadius: '0.75rem', 
-                          border: `2px solid ${borderColor}`, 
-                          textAlign: 'center',
-                          cursor: chartMetric ? 'pointer' : 'default',
-                          transition: 'all 0.2s',
-                          position: 'relative'
-                        }}
-                        onMouseEnter={(e) => {
-                          if (chartMetric) {
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                            e.currentTarget.style.boxShadow = `0 4px 12px ${borderColor}40`;
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (chartMetric) {
-                            e.currentTarget.style.transform = 'translateY(0)';
-                            e.currentTarget.style.boxShadow = 'none';
-                          }
-                        }}
-                      >
-                        {isVisibleOnChart && (
-                          <div style={{
-                            position: 'absolute',
-                            top: '0.5rem',
-                            right: '0.5rem',
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            backgroundColor: chartMetric.color,
-                            boxShadow: `0 0 8px ${chartMetric.color}`
-                          }} />
-                        )}
-                        <div style={{ fontSize: '2rem', fontWeight: '700', color: '#fff', marginBottom: '0.25rem' }}>
-                          {metricData.prefix}{metricData.value}
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                          {metric.label} 
-                          {metricData.change !== null && (
-                            <span style={{ color: changeColor, fontWeight: '600' }}>
-                              {' '}{metricData.change >= 0 ? '+' : ''}{metricData.change?.toFixed(1)}%
-                            </span>
-                          )}
-                        </div>
-                        {chartMetric && (
-                          <div style={{ fontSize: '0.625rem', color: '#64748b', marginTop: '0.5rem' }}>
-                            {isVisibleOnChart ? '📊 On chart' : 'Click to show'}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  {/* Add Metric Button */}
-                  <div 
-                    onClick={() => setShowMetricSelector(true)}
-                    style={{ 
-                      padding: '1.5rem',
-                      backgroundColor: 'transparent',
-                      borderRadius: '0.75rem',
-                      border: '1px dashed #475569',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: '2rem', color: '#94a3b8', marginBottom: '0.25rem' }}>+</div>
-                      <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Add Metric</div>
-                    </div>
-                  </div>
-              </div>
-
-              {/* Metric Selector Modal */}
-              {showMetricSelector && (
-                <div style={{
-                  position: 'fixed',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 1000
-                }}
-                onClick={() => setShowMetricSelector(false)}
-                >
-                  <div style={{
-                    backgroundColor: '#1e293b',
-                    borderRadius: '0.75rem',
-                    padding: '1.5rem',
-                    width: '400px',
-                    maxHeight: '600px',
-                    display: 'flex',
-                    flexDirection: 'column'
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  >
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#fff', marginBottom: '1rem' }}>Metrics</h3>
-                    
-                    {/* Search Input */}
-                    <div style={{ position: 'relative', marginBottom: '1rem' }}>
-                      <input
-                        type="text"
-                        placeholder="Search metrics..."
-                        value={metricSearch}
-                        onChange={(e) => setMetricSearch(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '0.75rem 2.5rem 0.75rem 1rem',
-                          backgroundColor: '#334155',
-                          border: 'none',
-                          borderRadius: '0.5rem',
-                          color: '#fff',
-                          fontSize: '0.875rem'
-                        }}
-                      />
-                      <svg style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', width: '1.25rem', height: '1.25rem', color: '#94a3b8' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                    </div>
-
-                    {/* Results and Clear */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                      <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>
-                        {filteredMetrics.length} results
-                      </span>
-                      <div>
-                        <span style={{ fontSize: '0.875rem', color: '#3b82f6', marginRight: '0.5rem' }}>
-                          {getCurrentMetrics().length} selected
-                        </span>
-                        <button onClick={clearAllMetrics} style={{ fontSize: '0.875rem', color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
-                          Clear all
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Metric List */}
-                    <div style={{ flex: 1, overflowY: 'auto', marginBottom: '1rem' }}>
-                      {filteredMetrics.map(metric => (
-                        <div
-                          key={metric.id}
-                          onClick={() => toggleMetric(metric.id)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '0.75rem',
-                            marginBottom: '0.5rem',
-                            borderRadius: '0.5rem',
-                            cursor: 'pointer',
-                            backgroundColor: getCurrentMetrics().includes(metric.id) ? '#334155' : 'transparent'
-                          }}
-                        >
-                          <div style={{
-                            width: '1.25rem',
-                            height: '1.25rem',
-                            borderRadius: '50%',
-                            border: `2px solid ${getCurrentMetrics().includes(metric.id) ? '#3b82f6' : '#64748b'}`,
-                            backgroundColor: getCurrentMetrics().includes(metric.id) ? '#3b82f6' : 'transparent',
-                            marginRight: '0.75rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}>
-                            {getCurrentMetrics().includes(metric.id) && (
-                              <div style={{ width: '0.5rem', height: '0.5rem', borderRadius: '50%', backgroundColor: '#fff' }} />
-                            )}
-                          </div>
-                          <span style={{ fontSize: '0.875rem', color: '#fff' }}>{metric.label}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Close Button */}
-                    <button
-                      onClick={() => setShowMetricSelector(false)}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        backgroundColor: '#3b82f6',
-                        color: '#fff',
-                        borderRadius: '0.5rem',
-                        border: 'none',
-                        fontSize: '0.875rem',
-                        fontWeight: '600',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Done
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
       )}
 
-      {/* Ads Tab Content */}
+      {/* Ads Tab Content - ZAP Coming Soon */}
       {activeTab === 'ads' && (
-          <div style={{ backgroundColor: '#1A2235' }}>
-            {/* Header with Controls */}
-            <div className="px-6 pt-6" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '1rem', gap: '1rem' }}>
-              {/* Metric Controller */}
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', flex: 1 }}>
-                <span style={{ fontSize: '0.75rem', color: '#94a3b8', alignSelf: 'center', marginRight: '0.5rem', fontWeight: '600', textTransform: 'uppercase' }}>
-                  Metrics:
-                </span>
-                {ADS_METRICS.map(metric => {
-                  const isVisible = visibleAdsMetrics.includes(metric.id);
-                  return (
-                    <button
-                      key={metric.id}
-                      onClick={() => toggleAdsMetric(metric.id)}
-                      style={{
-                        padding: '0.375rem 0.75rem',
-                        borderRadius: '0.375rem',
-                        backgroundColor: isVisible ? metric.color + '20' : 'transparent',
-                        border: `2px solid ${isVisible ? metric.color : '#475569'}`,
-                        color: isVisible ? metric.color : '#94a3b8',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.375rem',
-                        opacity: isVisible ? 1 : 0.6
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-1px)';
-                        e.currentTarget.style.opacity = '1';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.opacity = isVisible ? '1' : '0.6';
-                      }}
-                    >
-                      <div style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        backgroundColor: isVisible ? metric.color : '#475569'
-                      }} />
-                      {metric.label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Period Selectors */}
-              <div style={{ display: 'flex', gap: '0.75rem', flexShrink: 0 }}>
-                <select 
-                  value={metricsDays}
-                  onChange={(e) => setMetricsDays(Number(e.target.value))}
-                  style={{ 
-                    padding: '0.5rem 1rem', 
-                    borderRadius: '0.5rem', 
-                    backgroundColor: '#1e293b', 
-                    color: '#fff',
-                    border: '1px solid #334155',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    minWidth: '100px'
-                  }}
-                >
-                  <option value={7}>7 Days</option>
-                  <option value={30}>30 Days</option>
-                  <option value={60}>60 Days</option>
-                  <option value={90}>90 Days</option>
-                </select>
-                
-                <select 
-                  style={{ 
-                    padding: '0.5rem 1rem', 
-                    borderRadius: '0.5rem', 
-                    backgroundColor: '#1e293b', 
-                    color: '#fff',
-                    border: '1px solid #334155',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    cursor: 'pointer',
-                    minWidth: '120px'
-                  }}
-                >
-                  <option value="prior">Prior Period</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Graph Section: 70% Graph + 30% Banana Factors */}
-            <div className="px-6" style={{ display: 'grid', gridTemplateColumns: '70% 30%', gap: '1.5rem', marginBottom: '1.5rem', minHeight: '400px' }}>
-              {/* Left: Graph (70%) */}
-              <div className={themeClasses.cardBg} style={{ borderRadius: '0.75rem', padding: '1.5rem', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                <div style={{ flex: 1, minHeight: 300 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={adsChartData?.chart_data || []}>
-                    <CartesianGrid 
-                      strokeDasharray="4 4" 
-                      stroke="rgba(148, 163, 184, 0.45)" 
-                      vertical={false} 
-                      horizontal={true}
-                      strokeWidth={1} 
-                    />
-                    <XAxis 
-                      dataKey="date" 
-                      stroke="#64748b"
-                      style={{ fontSize: '0.75rem' }}
-                      tickLine={false}
-                      tickFormatter={(value) => {
-                        const date = new Date(value);
-                        return `${date.getMonth() + 1}/${date.getDate()}`;
-                      }}
-                    />
-                    <YAxis 
-                      stroke="#64748b"
-                      style={{ fontSize: '0.75rem' }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#0f172a', 
-                        border: '1px solid #334155',
-                        borderRadius: '0.5rem',
-                        color: '#fff',
-                        fontSize: '0.875rem'
-                      }}
-                      formatter={(value, name) => {
-                        const metric = ADS_METRICS.find(m => m.label === name);
-                        if (metric) {
-                          return [formatChartValue(value, metric.formatType), name];
-                        }
-                        return [value, name];
-                      }}
-                    />
-                    {/* Dynamically render visible metrics */}
-                    {visibleAdsMetrics.length > 0 && ADS_METRICS
-                      .filter(metric => visibleAdsMetrics.includes(metric.id))
-                      .map((metric) => {
-                        console.log('Rendering Ads metric:', metric.id, metric.valueKey, 'Sample data:', adsChartData?.chart_data?.[0]?.[metric.valueKey]);
-                        return (
-                          <Line 
-                            key={metric.id}
-                            type="monotone" 
-                            dataKey={metric.valueKey} 
-                            stroke={metric.color} 
-                            strokeWidth={2.5}
-                            name={metric.label}
-                            dot={false}
-                            connectNulls
-                          />
-                        );
-                      })}
-                  </ComposedChart>
-                </ResponsiveContainer>
+          <div style={{ backgroundColor: '#1A2235', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            {inventoryOnly && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', marginTop: '0.9375rem', padding: '0 1rem' }}>
+                <div style={{ display: 'flex', gap: '0.25rem', backgroundColor: '#0f172a', borderRadius: '0.5rem', padding: '4px', width: '325px', height: '32px', border: '1px solid #334155', alignItems: 'center', boxSizing: 'border-box' }}>
+                  <button onClick={() => setActiveTab('forecast')} style={{ padding: '0', fontSize: '1rem', fontWeight: '500', color: activeTab === 'forecast' ? '#fff' : '#94a3b8', backgroundColor: activeTab === 'forecast' ? '#2563EB' : 'transparent', border: 'none', borderRadius: '0.25rem', cursor: 'pointer', transition: 'all 0.2s', flex: 1, height: '23px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Inventory</button>
+                  <button onClick={() => setActiveTab('sales')} style={{ padding: '0', fontSize: '1rem', fontWeight: '500', color: activeTab === 'sales' ? '#fff' : '#94a3b8', backgroundColor: activeTab === 'sales' ? '#2563EB' : 'transparent', border: 'none', borderRadius: '0.25rem', cursor: 'pointer', transition: 'all 0.2s', flex: 1, height: '23px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Sales</button>
+                  <button onClick={() => setActiveTab('ads')} style={{ padding: '0', fontSize: '1rem', fontWeight: '500', color: activeTab === 'ads' ? '#fff' : '#94a3b8', backgroundColor: activeTab === 'ads' ? '#2563EB' : 'transparent', border: 'none', borderRadius: '0.25rem', cursor: 'pointer', transition: 'all 0.2s', flex: 1, height: '23px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Ads</button>
                 </div>
               </div>
-
-              {/* Right: Banana Factors (30%) */}
-              <div className={themeClasses.cardBg} style={{ borderRadius: '0.75rem', padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#fff', marginBottom: '1.5rem' }}>Banana Factors</h3>
-                
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {/* Sessions */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid #334155' }}>
-                    <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Sessions</span>
-                    <span style={{ fontSize: '0.875rem', fontWeight: '600', color: metrics?.changes?.sessions >= 0 ? '#22c55e' : '#ef4444' }}>
-                      {metrics?.changes?.sessions >= 0 ? '+' : ''}{metrics?.changes?.sessions?.toFixed(1) || '0.0'}%
-                    </span>
-                  </div>
-
-                  {/* Conversion Rate */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid #334155' }}>
-                    <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Conversion Rate</span>
-                    <span style={{ fontSize: '0.875rem', fontWeight: '600', color: metrics?.changes?.conversion_rate >= 0 ? '#22c55e' : '#ef4444' }}>
-                      {metrics?.changes?.conversion_rate >= 0 ? '+' : ''}{metrics?.changes?.conversion_rate?.toFixed(1) || '0.0'}%
-                    </span>
-                  </div>
-
-                  {/* TACOS */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid #334155' }}>
-                    <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>TACOS</span>
-                    <span style={{ fontSize: '0.875rem', fontWeight: '600', color: metrics?.changes?.tacos <= 0 ? '#22c55e' : '#ef4444' }}>
-                      {metrics?.changes?.tacos >= 0 ? '+' : ''}{metrics?.changes?.tacos?.toFixed(1) || '0.0'}%
-                    </span>
+            )}
+            <div className={inventoryOnly ? '' : 'px-6 pb-6'} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 0, overflow: 'auto', padding: inventoryOnly ? '1rem' : '3rem' }}>
+              <div style={{ textAlign: 'center', maxWidth: '420px', marginTop: '-50px' }}>
+                <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'center' }}>
+                  <div style={{ width: 98, height: 98, borderRadius: '50%', border: '1px solid rgba(168, 85, 247, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(30, 27, 75, 0.6)' }}>
+                    <svg width="56" height="56" viewBox="0 0 24 24" fill="none" style={{ color: '#a855f7' }}>
+                      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="currentColor" />
+                    </svg>
                   </div>
                 </div>
-
-                {/* Perform Analysis Button */}
-                <button 
-                  onClick={handlePerformAnalysis}
-                  style={{
-                    marginTop: 'auto',
-                    padding: '0.75rem',
-                    backgroundColor: '#3b82f6',
-                    color: '#fff',
-                    borderRadius: '0.5rem',
-                    border: 'none',
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.5rem'
-                  }}
-                >
-                  <svg style={{ width: '1rem', height: '1rem' }} fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/>
-                  </svg>
-                  Perform Analysis
+                <h2 style={{ fontSize: '1.75rem', fontWeight: '700', color: '#fff', marginBottom: '0.75rem' }}>ZAP is Coming Soon!</h2>
+                <p style={{ fontSize: '1rem', color: '#94a3b8', marginBottom: '1.5rem', lineHeight: 1.5 }}>Ad management is on the horizon. Get ready to zap your competition.</p>
+                <button onClick={() => setActiveTab('forecast')} style={{ minWidth: '133px', height: '31px', padding: '0 10px', backgroundColor: '#334155', color: '#fff', borderRadius: '6px', border: '1px solid #475569', fontSize: '0.875rem', fontWeight: '500', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>
+                  Back to Inventory
                 </button>
-                <div style={{ fontSize: '0.625rem', color: '#64748b', textAlign: 'center', marginTop: '0.5rem' }}>
-                  Powered by Banana Brain AI
-                </div>
               </div>
-            </div>
-
-            {/* Bottom Section: Metrics Grid */}
-            <div className="px-6 pb-6" style={{ position: 'relative' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem' }}>
-                  {getCurrentMetrics().map(metricId => {
-                    const metric = availableMetrics.find(m => m.id === metricId);
-                    if (!metric) return null;
-                    const metricData = getMetricValue(metricId);
-                    const changeColor = metricData.invertColor 
-                      ? (metricData.change >= 0 ? '#ef4444' : '#22c55e')
-                      : (metricData.change >= 0 ? '#22c55e' : '#ef4444');
-                    
-                    // Determine chart metric visibility
-                    const chartMetric = (activeTab === 'sales' ? SALES_METRICS : ADS_METRICS).find(m => m.id === metricId);
-                    const isVisibleOnChart = chartMetric && (activeTab === 'sales' ? visibleSalesMetrics : visibleAdsMetrics).includes(metricId);
-                    const borderColor = isVisibleOnChart ? chartMetric.color : '#334155';
-                    const toggleMetric = activeTab === 'sales' ? toggleSalesMetric : toggleAdsMetric;
-                    
-                    return (
-                      <div 
-                        key={metricId} 
-                        onClick={() => chartMetric && toggleMetric(metricId)}
-                        style={{ 
-                          padding: '1.5rem', 
-                          backgroundColor: '#0f1729', 
-                          borderRadius: '0.75rem', 
-                          border: `2px solid ${borderColor}`, 
-                          textAlign: 'center',
-                          cursor: chartMetric ? 'pointer' : 'default',
-                          transition: 'all 0.2s',
-                          position: 'relative'
-                        }}
-                        onMouseEnter={(e) => {
-                          if (chartMetric) {
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                            e.currentTarget.style.boxShadow = `0 4px 12px ${borderColor}40`;
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (chartMetric) {
-                            e.currentTarget.style.transform = 'translateY(0)';
-                            e.currentTarget.style.boxShadow = 'none';
-                          }
-                        }}
-                      >
-                        {isVisibleOnChart && (
-                          <div style={{
-                            position: 'absolute',
-                            top: '0.5rem',
-                            right: '0.5rem',
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            backgroundColor: chartMetric.color,
-                            boxShadow: `0 0 8px ${chartMetric.color}`
-                          }} />
-                        )}
-                        <div style={{ fontSize: '2rem', fontWeight: '700', color: '#fff', marginBottom: '0.25rem' }}>
-                          {metricData.prefix}{metricData.value}
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                          {metric.label} 
-                          {metricData.change !== null && (
-                            <span style={{ color: changeColor, fontWeight: '600' }}>
-                              {' '}{metricData.change >= 0 ? '+' : ''}{metricData.change?.toFixed(1)}%
-                            </span>
-                          )}
-                        </div>
-                        {chartMetric && (
-                          <div style={{ fontSize: '0.625rem', color: '#64748b', marginTop: '0.5rem' }}>
-                            {isVisibleOnChart ? '📊 On chart' : 'Click to show'}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  {/* Add Metric Button */}
-                  <div 
-                    onClick={() => setShowMetricSelector(true)}
-                    style={{ 
-                      padding: '1.5rem',
-                      backgroundColor: 'transparent',
-                      borderRadius: '0.75rem',
-                      border: '1px dashed #475569',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: '2rem', color: '#94a3b8', marginBottom: '0.25rem' }}>+</div>
-                      <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Add Metric</div>
-                    </div>
-                  </div>
-              </div>
-
-              {/* Metric Selector Modal */}
-              {showMetricSelector && (
-                <div style={{
-                  position: 'fixed',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 1000
-                }}
-                onClick={() => setShowMetricSelector(false)}
-                >
-                  <div style={{
-                    backgroundColor: '#1e293b',
-                    borderRadius: '0.75rem',
-                    padding: '1.5rem',
-                    width: '400px',
-                    maxHeight: '600px',
-                    display: 'flex',
-                    flexDirection: 'column'
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  >
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#fff', marginBottom: '1rem' }}>Metrics</h3>
-                    
-                    {/* Search Input */}
-                    <div style={{ position: 'relative', marginBottom: '1rem' }}>
-                      <input
-                        type="text"
-                        placeholder="Search metrics..."
-                        value={metricSearch}
-                        onChange={(e) => setMetricSearch(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: '0.75rem 2.5rem 0.75rem 1rem',
-                          backgroundColor: '#334155',
-                          border: 'none',
-                          borderRadius: '0.5rem',
-                          color: '#fff',
-                          fontSize: '0.875rem'
-                        }}
-                      />
-                      <svg style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', width: '1.25rem', height: '1.25rem', color: '#94a3b8' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                    </div>
-
-                    {/* Results and Clear */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                      <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>
-                        {filteredMetrics.length} results
-                      </span>
-                      <div>
-                        <span style={{ fontSize: '0.875rem', color: '#3b82f6', marginRight: '0.5rem' }}>
-                          {getCurrentMetrics().length} selected
-                        </span>
-                        <button onClick={clearAllMetrics} style={{ fontSize: '0.875rem', color: '#3b82f6', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
-                          Clear all
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Metric List */}
-                    <div style={{ flex: 1, overflowY: 'auto', marginBottom: '1rem' }}>
-                      {filteredMetrics.map(metric => (
-                        <div
-                          key={metric.id}
-                          onClick={() => toggleMetric(metric.id)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '0.75rem',
-                            marginBottom: '0.5rem',
-                            borderRadius: '0.5rem',
-                            cursor: 'pointer',
-                            backgroundColor: getCurrentMetrics().includes(metric.id) ? '#334155' : 'transparent'
-                          }}
-                        >
-                          <div style={{
-                            width: '1.25rem',
-                            height: '1.25rem',
-                            borderRadius: '50%',
-                            border: `2px solid ${getCurrentMetrics().includes(metric.id) ? '#3b82f6' : '#64748b'}`,
-                            backgroundColor: getCurrentMetrics().includes(metric.id) ? '#3b82f6' : 'transparent',
-                            marginRight: '0.75rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}>
-                            {getCurrentMetrics().includes(metric.id) && (
-                              <div style={{ width: '0.5rem', height: '0.5rem', borderRadius: '50%', backgroundColor: '#fff' }} />
-                            )}
-                          </div>
-                          <span style={{ fontSize: '0.875rem', color: '#fff' }}>{metric.label}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Close Button */}
-                    <button
-                      onClick={() => setShowMetricSelector(false)}
-                      style={{
-                        width: '100%',
-                        padding: '0.75rem',
-                        backgroundColor: '#3b82f6',
-                        color: '#fff',
-                        borderRadius: '0.5rem',
-                        border: 'none',
-                        fontSize: '0.875rem',
-                        fontWeight: '600',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Done
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
       )}
