@@ -2612,7 +2612,7 @@ const NewShipmentTable = ({
 
   // Helper: determine step size for qty increments
   const getQtyIncrement = (row) => {
-    const sizeRaw = row?.size || '';
+    const sizeRaw = (row?.size || row?.product || '').toString();
     const size = sizeRaw.toLowerCase();
     const sizeCompact = size.replace(/\s+/g, '');
 
@@ -2624,7 +2624,8 @@ const NewShipmentTable = ({
       sizeCompact.includes('6oz') ||
       size.includes('6 oz') ||
       size.includes('6-ounce') ||
-      size.includes('6 ounce');
+      size.includes('6 ounce') ||
+      /\b6\s*oz\b/i.test(size);
 
     // 1/2 lb bag products also use 40-unit increments
     const isHalfPoundBag =
@@ -2632,7 +2633,12 @@ const NewShipmentTable = ({
       size.includes('1/2 lb') ||
       size.includes('0.5lb') ||
       size.includes('0.5 lb') ||
-      size.includes('half lb');
+      size.includes('half lb') ||
+      size.includes('half pound') ||
+      size.includes('.5 lb') ||
+      sizeCompact.includes('.5lb') ||
+      /\b1\/2\s*lb\b/i.test(size) ||
+      /\b0\.5\s*lb\b/i.test(size);
 
     if (isSixOz || isHalfPoundBag) return 40;
 
@@ -2641,7 +2647,8 @@ const NewShipmentTable = ({
       sizeCompact.includes('1lb') ||
       size.includes('1 lb') ||
       size.includes('1-pound') ||
-      size.includes('1 pound');
+      size.includes('1 pound') ||
+      /\b1\s*lb\b/i.test(size);
     if (isOnePound) return 25;
 
     // 25 lb products should use single-unit increments
@@ -2657,16 +2664,26 @@ const NewShipmentTable = ({
       sizeCompact.includes('5lb') ||
       size.includes('5 lb') ||
       size.includes('5-pound') ||
-      size.includes('5 pound');
+      size.includes('5 pound') ||
+      /\b5\s*lb\b/i.test(size);
     if (isFivePound) return 5;
 
     // Gallon products change in case increments (4 units)
-    if (size.includes('gallon') || size.includes('gal ')) return 4;
+    if (size.includes('gallon') || size.includes('gal ') || sizeCompact.endsWith('gal') || /\d\s*gal\b/.test(size) || /\d+gal/.test(sizeCompact)) return 4;
 
     // Quart products change in case increments (12 units)
-    if (size.includes('quart') || size.includes(' qt')) return 12;
+    if (size.includes('quart') || size.includes(' qt') || sizeCompact.endsWith('qt') || /\d\s*qt\b/.test(size) || /\d+qt/.test(sizeCompact)) return 12;
 
     return 1;
+  };
+
+  // Round quantity to nearest case increment (for non-table mode Add)
+  const roundQtyToNearestCase = (qty, row) => {
+    const num = typeof qty === 'number' ? qty : parseInt(qty, 10) || 0;
+    if (num <= 0) return num;
+    const increment = getQtyIncrement(row);
+    if (increment <= 1) return num;
+    return Math.round(num / increment) * increment;
   };
 
   // Keyboard support for bulk increase/decrease (non-table mode)
@@ -3315,7 +3332,8 @@ const NewShipmentTable = ({
     if (!tableMode && nonTableSelectedIndices.size > 1 && nonTableSelectedIndices.has(index)) {
       // Determine if we're adding or removing based on the clicked row's state
       const isRemoving = newAdded.has(row.id);
-      
+      const qtyUpdates = {};
+
       // Apply the action to all selected rows
       nonTableSelectedIndices.forEach(selectedIndex => {
         const selectedRow = currentRows.find(r => r._originalIndex === selectedIndex);
@@ -3325,25 +3343,36 @@ const NewShipmentTable = ({
             newAdded.delete(selectedRow.id);
           } else {
             // Check if quantity is greater than 0 before adding
-            let currentQty = typeof effectiveQtyValues[selectedIndex] === 'number' 
-              ? effectiveQtyValues[selectedIndex] 
-              : (effectiveQtyValues[selectedIndex] === '' || effectiveQtyValues[selectedIndex] === null || effectiveQtyValues[selectedIndex] === undefined) 
-                ? 0 
+            let currentQty = typeof effectiveQtyValues[selectedIndex] === 'number'
+              ? effectiveQtyValues[selectedIndex]
+              : (effectiveQtyValues[selectedIndex] === '' || effectiveQtyValues[selectedIndex] === null || effectiveQtyValues[selectedIndex] === undefined)
+                ? 0
                 : parseInt(effectiveQtyValues[selectedIndex], 10) || 0;
-            
+
             // In non-table mode, if quantity is 0, use totalInventory from Ngoos
             if (!tableMode && currentQty === 0 && selectedRow.totalInventory) {
               currentQty = selectedRow.totalInventory;
-              // Update the qty value to use totalInventory
-              effectiveSetQtyValues(prev => ({ ...prev, [selectedIndex]: currentQty }));
             }
-            
-            if (currentQty > 0) {
+
+            // In non-table mode, round quantity to nearest case when adding
+            const roundedQty = !tableMode ? roundQtyToNearestCase(currentQty, selectedRow) : currentQty;
+            if (roundedQty > 0) {
+              qtyUpdates[selectedIndex] = roundedQty;
               newAdded.add(selectedRow.id);
             }
           }
         }
       });
+
+      if (Object.keys(qtyUpdates).length > 0) {
+        effectiveSetQtyValues(prev => ({ ...prev, ...qtyUpdates }));
+        Object.keys(qtyUpdates).forEach((idx) => {
+          if (rawQtyInputValues.current[idx] !== undefined) {
+            rawQtyInputValues.current[idx] = undefined;
+          }
+        });
+        setQtyInputUpdateTrigger((t) => t + 1);
+      }
     } else {
       // Single product add/remove
       if (newAdded.has(row.id)) {
@@ -3351,25 +3380,33 @@ const NewShipmentTable = ({
         newAdded.delete(row.id);
       } else {
         // Check if quantity is 0 before adding
-        let currentQty = typeof effectiveQtyValues[index] === 'number' 
-          ? effectiveQtyValues[index] 
-          : (effectiveQtyValues[index] === '' || effectiveQtyValues[index] === null || effectiveQtyValues[index] === undefined) 
-            ? 0 
+        let currentQty = typeof effectiveQtyValues[index] === 'number'
+          ? effectiveQtyValues[index]
+          : (effectiveQtyValues[index] === '' || effectiveQtyValues[index] === null || effectiveQtyValues[index] === undefined)
+            ? 0
             : parseInt(effectiveQtyValues[index], 10) || 0;
-        
+
         // In non-table mode, if quantity is 0, use totalInventory from Ngoos
         if (!tableMode && currentQty === 0 && row.totalInventory) {
           currentQty = row.totalInventory;
-          // Update the qty value to use totalInventory
-          effectiveSetQtyValues(prev => ({ ...prev, [index]: currentQty }));
         }
-        
-        if (currentQty === 0) {
-          // Don't add if quantity is still 0 after trying to use totalInventory
+
+        // In non-table mode, round quantity to nearest case when adding (e.g. 61 or 56 -> 60 for 8oz)
+        const roundedQty = !tableMode ? roundQtyToNearestCase(currentQty, row) : currentQty;
+
+        if (roundedQty === 0) {
           return;
         }
-        
-        // Add - mark as added (qty value already set above if needed)
+
+        // Persist rounded quantity so the field shows the nearest case (e.g. 56 or 61 -> 60 for 8oz)
+        if (!tableMode) {
+          effectiveSetQtyValues(prev => ({ ...prev, [index]: roundedQty }));
+          if (rawQtyInputValues.current[index] !== undefined) {
+            rawQtyInputValues.current[index] = undefined;
+          }
+          setQtyInputUpdateTrigger((t) => t + 1);
+        }
+
         newAdded.add(row.id);
       }
     }
