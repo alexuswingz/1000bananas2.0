@@ -3196,13 +3196,13 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             {chartDataForDisplay.length > 0 && chartDeferredReady ? (
               <ResponsiveContainer
                 width="100%"
-                height={inventoryOnly ? 188 : 420}
+                height={inventoryOnly ? 212 : 444}
                 style={responsiveContainerStyle}
               >
                   <ComposedChart
                   key={`unit-forecast-${data?.child_asin ?? data?.childAsin ?? 'unknown'}-${selectedView}`}
                   data={chartDataForDisplay}
-                  margin={{ top: 20, right: 20, left: 0, bottom: 20 }}
+                  margin={{ top: 44, right: 20, left: 0, bottom: 20 }}
                   style={composedChartStyle}
                 >
                   <defs>
@@ -3378,7 +3378,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                                 fill: '#e5e7eb',
                                 fontSize: 11,
                                 fontWeight: 500,
-                                offset: 6
+                                offset: 20
                               }}
                             />
                           )}
@@ -3396,7 +3396,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                                 fill: '#e5e7eb',
                                 fontSize: 11,
                                 fontWeight: 500,
-                                offset: 6
+                                offset: 20
                               }}
                             />
                           )}
@@ -3414,7 +3414,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                                 fill: '#e5e7eb',
                                 fontSize: 11,
                                 fontWeight: 500,
-                                offset: 6
+                                offset: 20
                               }}
                             />
                           )}
@@ -3614,7 +3614,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                               fill: '#e5e7eb',
                               fontSize: 11,
                               fontWeight: 500,
-                              offset: 6
+                              offset: 20
                             }}
                           />
                         )}
@@ -3632,7 +3632,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                               fill: '#e5e7eb',
                               fontSize: 11,
                               fontWeight: 500,
-                              offset: 6
+                              offset: 20
                             }}
                           />
                         )}
@@ -3650,7 +3650,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                               fill: '#e5e7eb',
                               fontSize: 11,
                               fontWeight: 500,
-                              offset: 6
+                              offset: 20
                             }}
                           />
                         )}
