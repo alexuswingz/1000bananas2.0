@@ -5910,13 +5910,14 @@ const NewShipmentTable = ({
           <option value="unchecked">Unchecked</option>
         </select>
       </div>
-      {/* Outer wrapper - no height constraints, let page scroll */}
+      {/* Outer wrapper - dark background in dark mode to match design */}
       <div
-        className="new-shipment-table-scroll"
         style={{
           marginTop: '1.25rem',
           position: 'relative',
-          paddingBottom: hideFooter ? '0' : '97px', // Add padding to prevent content from being cut off by fixed footer (65px height + 16px bottom + 16px extra spacing)
+          paddingBottom: hideFooter ? '0' : '97px',
+          backgroundColor: isDarkMode ? '#1A2235' : 'transparent',
+          borderRadius: isDarkMode ? '12px' : 0,
         }}
       >
         <div
@@ -5924,18 +5925,20 @@ const NewShipmentTable = ({
         className={`new-shipment-table-scroll ${isScrollingHorizontally ? 'scrolling-horizontal' : ''}`}
         style={{ 
           overflowX: 'auto', 
-          overflowY: 'visible',
+          overflowY: 'auto',
           width: '100%',
           WebkitOverflowScrolling: 'touch',
           position: 'relative',
-          minHeight: '400px', // Minimum height to ensure usability
+          minHeight: '400px',
+          maxHeight: 'calc(100vh - 280px)',
           display: 'block',
-          // Remove visual boundaries to make table feel seamless
           border: 'none',
           boxShadow: 'none',
+          backgroundColor: isDarkMode ? '#1A2235' : undefined,
         }}
       >
         <table
+          data-add-products-table="true"
           style={{
             width: 'max-content',
             minWidth: '100%',
@@ -5944,6 +5947,7 @@ const NewShipmentTable = ({
             tableLayout: 'auto',
             display: 'table',
             position: 'relative',
+            backgroundColor: isDarkMode ? '#1A2235' : undefined,
           }}
         >
           <thead className={themeClasses.headerBg} style={{
@@ -5951,1525 +5955,717 @@ const NewShipmentTable = ({
             position: 'sticky',
             top: 0,
             zIndex: 1000,
-            backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
+            backgroundColor: isDarkMode ? '#1A2235' : '#F8FAFC',
             display: 'table-header-group',
+            borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
           }}>
             <tr style={{ 
-              height: '40px', 
-              maxHeight: '40px',
+              height: '58px', 
+              maxHeight: '58px',
               position: 'sticky',
               top: 0,
               zIndex: 1000,
-              backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
+              backgroundColor: isDarkMode ? '#1A2235' : '#F8FAFC',
             }}>
-              {/* Sticky columns */}
+              {/* Add Products table columns - dark theme to match design */}
               <th style={{ 
+                borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
                 padding: '0 0.75rem', 
                 width: '40px', 
                 minWidth: '40px',
                 maxWidth: '40px',
-                height: '40px',
-                maxHeight: '40px',
+                height: '58px',
+                maxHeight: '58px',
                 boxSizing: 'border-box',
                 textAlign: 'center',
                 position: 'sticky',
                 left: 0,
                 top: 0,
                 zIndex: 1020,
-                backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
-                boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
-                borderTopLeftRadius: '16px',
-                borderRight: '1px solid #FFFFFF',
+                backgroundColor: isDarkMode ? '#1A2235' : '#F8FAFC',
               }}>
                 <input 
                   type="checkbox" 
-                  style={{ cursor: 'pointer' }}
+                  style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#3B82F6', border: isDarkMode ? '1px solid rgba(255,255,255,0.5)' : undefined }}
                   checked={allSelected}
                   ref={selectAllCheckboxRef}
                   onChange={handleSelectAll}
                 />
               </th>
-              <th 
-                className="group"
-                style={{ 
-                  padding: '0 0.75rem', 
-                  textAlign: 'center',
-                  position: 'sticky',
-                  left: '40px',
-                  top: 0,
-                  zIndex: 1020,
-                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
-                  width: '150px',
-                  minWidth: '150px',
-                  maxWidth: '150px',
-                  height: '40px',
-                  maxHeight: '40px',
-                  boxSizing: 'border-box',
-                  boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: 600,
-                  fontSize: '12px',
-                  lineHeight: '100%',
-                  letterSpacing: '0%',
-                  textTransform: 'uppercase',
-                  color: (hasActiveColumnFilter('brand') || openFilterColumns.has('brand')) ? '#3B82F6' : '#FFFFFF',
-                  borderRight: '1px solid #FFFFFF',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', position: 'relative' }}>
-                  <span>BRAND</span>
-                  <img
-                    ref={(el) => {
-                      if (el) filterIconRefs.current['brand'] = el;
-                    }}
-                    src="/assets/Vector (1).png"
-                    alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('brand') || openFilterColumns.has('brand') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                    style={{ 
-                      width: '12px', 
-                      height: '12px',
-                      cursor: 'pointer',
-                      filter: hasActiveColumnFilter('brand') || openFilterColumns.has('brand') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
-                    }}
-                    onClick={(e) => handleFilterClick('brand', e)}
-                  />
-                </div>
-              </th>
-              <th 
-                className="group"
-                style={{ 
-                  padding: '0 0.75rem', 
-                  textAlign: 'center',
-                  position: 'sticky',
-                  left: '190px',
-                  top: 0,
-                  zIndex: 1020,
-                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
-                  width: '200px',
-                  minWidth: '200px',
-                  maxWidth: '200px',
-                  height: '40px',
-                  maxHeight: '40px',
-                  boxSizing: 'border-box',
-                  boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: 600,
-                  fontSize: '12px',
-                  lineHeight: '100%',
-                  letterSpacing: '0%',
-                  textTransform: 'uppercase',
-                  color: (hasActiveColumnFilter('product') || openFilterColumns.has('product')) ? '#3B82F6' : '#FFFFFF',
-                  borderRight: '1px solid #FFFFFF',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', position: 'relative' }}>
-                  <span>PRODUCT</span>
-                  <img
-                    ref={(el) => {
-                      if (el) filterIconRefs.current['product'] = el;
-                    }}
-                    src="/assets/Vector (1).png"
-                    alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('product') || openFilterColumns.has('product') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                    style={{ 
-                      width: '12px', 
-                      height: '12px',
-                      cursor: 'pointer',
-                      filter: hasActiveColumnFilter('product') || openFilterColumns.has('product') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
-                    }}
-                    onClick={(e) => handleFilterClick('product', e)}
-                  />
-                </div>
-              </th>
-              <th 
-                className="group"
-                style={{ 
-                  padding: '0 1rem', 
-                  textAlign: 'center',
-                  position: 'sticky',
-                  left: '390px',
-                  top: 0,
-                  zIndex: 1020,
-                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
-                  width: '120px',
-                  minWidth: '120px',
-                  maxWidth: '120px',
-                  height: '40px',
-                  maxHeight: '40px',
-                  boxSizing: 'border-box',
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: 600,
-                  fontSize: '12px',
-                  lineHeight: '100%',
-                  letterSpacing: '0%',
-                  textTransform: 'uppercase',
-                  color: (hasActiveColumnFilter('size') || openFilterColumns.has('size')) ? '#3B82F6' : '#FFFFFF',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', position: 'relative' }}>
-                  <span>SIZE</span>
-                  <img
-                    ref={(el) => {
-                      if (el) filterIconRefs.current['size'] = el;
-                    }}
-                    src="/assets/Vector (1).png"
-                    alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('size') || openFilterColumns.has('size') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                    style={{ 
-                      width: '12px', 
-                      height: '12px',
-                      cursor: 'pointer',
-                      filter: hasActiveColumnFilter('size') || openFilterColumns.has('size') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
-                    }}
-                    onClick={(e) => handleFilterClick('size', e)}
-                  />
-                </div>
-              </th>
-              {/* Scrollable columns */}
-              <th 
-                className="group"
-                style={{ 
-                  padding: '0 1rem', 
-                  textAlign: 'center',
-                  position: 'sticky',
-                  top: 0,
-                  zIndex: 1010,
-                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
-                  width: '143px',
-                  height: '40px',
-                  maxHeight: '40px',
-                  borderRight: '1px solid #FFFFFF',
-                  boxSizing: 'border-box',
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: 600,
-                  fontSize: '12px',
-                  lineHeight: '100%',
-                  letterSpacing: '0%',
-                  textTransform: 'uppercase',
-                  color: (hasActiveColumnFilter('qty') || openFilterColumns.has('qty')) ? '#3B82F6' : '#FFFFFF',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
-                  <span>QTY</span>
-                  <img
-                    ref={(el) => {
-                      if (el) filterIconRefs.current['qty'] = el;
-                    }}
-                    src="/assets/Vector (1).png"
-                    alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('qty') || openFilterColumns.has('qty') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                    style={{ 
-                      width: '12px', 
-                      height: '12px',
-                      cursor: 'pointer',
-                      filter: hasActiveColumnFilter('qty') || openFilterColumns.has('qty') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
-                    }}
-                    onClick={(e) => handleFilterClick('qty', e)}
-                  />
-                </div>
-              </th>
-              <th 
-                className="group"
-                style={{ 
-                  padding: '12px 16px', 
-                  textAlign: 'center',
-                  position: 'sticky',
-                  top: 0,
-                  zIndex: 1010,
-                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
-                  width: '143px',
-                  height: '40px',
-                  maxHeight: '40px',
-                  borderRight: '1px solid #FFFFFF',
-                  boxSizing: 'border-box',
-                }}
-              >
-                <div style={{ position: 'relative', width: '100%' }}>
-                  <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '2px',
-                  }}>
-                    <span style={{ 
-                      fontSize: '0.75rem', 
-                      fontWeight: 700, 
-                      lineHeight: 1.1, 
-                      color: (hasActiveColumnFilter('fbaAvailable') || openFilterColumns.has('fbaAvailable')) ? '#3B82F6' : '#FFFFFF',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                    }}>INVENTORY</span>
-                    <span style={{ 
-                      fontSize: '0.6rem', 
-                      fontWeight: 400, 
-                      lineHeight: 1.1, 
-                      color: (hasActiveColumnFilter('fbaAvailable') || openFilterColumns.has('fbaAvailable')) ? '#3B82F6' : '#FFFFFF',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                    }}>FBA AVAILABLE (DAYS)</span>
-                  </div>
-                  <img
-                    ref={(el) => {
-                      if (el) filterIconRefs.current['fbaAvailable'] = el;
-                    }}
-                    src="/assets/Vector (1).png"
-                    alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('fbaAvailable') || openFilterColumns.has('fbaAvailable') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                    style={{ 
-                      width: '12px', 
-                      height: '12px',
-                      position: 'absolute',
-                      right: '0',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      cursor: 'pointer',
-                      filter: hasActiveColumnFilter('fbaAvailable') || openFilterColumns.has('fbaAvailable') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
-                    }}
-                    onClick={(e) => handleFilterClick('fbaAvailable', e)}
-                  />
-                </div>
-              </th>
-              <th 
-                className="group"
-                style={{ 
-                  padding: '12px 16px', 
-                  textAlign: 'center',
-                  position: 'sticky',
-                  top: 0,
-                  zIndex: 1010,
-                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
-                  width: '143px',
-                  height: '40px',
-                  maxHeight: '40px',
-                  borderRight: '1px solid #FFFFFF',
-                  boxSizing: 'border-box',
-                }}
-              >
-                <div style={{ position: 'relative', width: '100%' }}>
-                  <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '2px',
-                  }}>
-                    <span style={{ 
-                      fontSize: '0.75rem', 
-                      fontWeight: 700, 
-                      lineHeight: 1.1, 
-                      color: (hasActiveColumnFilter('totalInventory') || openFilterColumns.has('totalInventory')) ? '#3B82F6' : '#FFFFFF',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                    }}>INVENTORY</span>
-                    <span style={{ 
-                      fontSize: '0.6rem', 
-                      fontWeight: 400, 
-                      lineHeight: 1.1, 
-                      color: (hasActiveColumnFilter('totalInventory') || openFilterColumns.has('totalInventory')) ? '#3B82F6' : '#FFFFFF',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                    }}>TOTAL (DAYS)</span>
-                  </div>
-                  <img
-                    ref={(el) => {
-                      if (el) filterIconRefs.current['totalInventory'] = el;
-                    }}
-                    src="/assets/Vector (1).png"
-                    alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('totalInventory') || openFilterColumns.has('totalInventory') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                    style={{ 
-                      width: '12px', 
-                      height: '12px',
-                      position: 'absolute',
-                      right: '0',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      cursor: 'pointer',
-                      filter: hasActiveColumnFilter('totalInventory') || openFilterColumns.has('totalInventory') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
-                    }}
-                    onClick={(e) => handleFilterClick('totalInventory', e)}
-                  />
-                </div>
-              </th>
-              <th 
-                className="group"
-                style={{ 
-                  padding: '12px 16px', 
-                  textAlign: 'center',
-                  position: 'sticky',
-                  top: 0,
-                  zIndex: 1010,
-                  width: '143px',
-                  height: '40px',
-                  maxHeight: '40px',
-                  borderRight: '1px solid #FFFFFF',
-                  boxSizing: 'border-box',
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: 600,
-                  fontSize: '12px',
-                  lineHeight: '100%',
-                  letterSpacing: '0%',
-                  textTransform: 'uppercase',
-                  color: (hasActiveColumnFilter('forecast') || openFilterColumns.has('forecast')) ? '#3B82F6' : '#FFFFFF',
-                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', position: 'relative' }}>
-                  <span>FORECAST</span>
-                  <img
-                    ref={(el) => {
-                      if (el) filterIconRefs.current['forecast'] = el;
-                    }}
-                    src="/assets/Vector (1).png"
-                    alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('forecast') || openFilterColumns.has('forecast') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                    style={{ 
-                      width: '12px', 
-                      height: '12px',
-                      cursor: 'pointer',
-                      filter: hasActiveColumnFilter('forecast') || openFilterColumns.has('forecast') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
-                    }}
-                    onClick={(e) => handleFilterClick('forecast', e)}
-                  />
-                </div>
-              </th>
-              <th 
-                className="group"
-                style={{ 
-                  padding: '12px 16px', 
-                  textAlign: 'center',
-                  position: 'sticky',
-                  top: 0,
-                  zIndex: 1010,
-                  width: '143px',
-                  height: '40px',
-                  maxHeight: '40px',
-                  borderRight: '1px solid #FFFFFF',
-                  boxSizing: 'border-box',
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: 600,
-                  fontSize: '12px',
-                  lineHeight: '100%',
-                  letterSpacing: '0%',
-                  textTransform: 'uppercase',
-                  color: (hasActiveColumnFilter('sales7Day') || openFilterColumns.has('sales7Day')) ? '#3B82F6' : '#FFFFFF',
-                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', position: 'relative' }}>
-                  <span>7 DAY SALES</span>
-                  <img
-                    ref={(el) => {
-                      if (el) filterIconRefs.current['sales7Day'] = el;
-                    }}
-                    src="/assets/Vector (1).png"
-                    alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('sales7Day') || openFilterColumns.has('sales7Day') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                    style={{ 
-                      width: '12px', 
-                      height: '12px',
-                      cursor: 'pointer',
-                      filter: hasActiveColumnFilter('sales7Day') || openFilterColumns.has('sales7Day') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
-                    }}
-                    onClick={(e) => handleFilterClick('sales7Day', e)}
-                  />
-                </div>
-              </th>
-              <th 
-                className="group"
-                style={{ 
-                  padding: '12px 16px', 
-                  textAlign: 'center',
-                  position: 'sticky',
-                  top: 0,
-                  zIndex: 1010,
-                  width: '143px',
-                  height: '40px',
-                  maxHeight: '40px',
-                  borderRight: '1px solid #FFFFFF',
-                  boxSizing: 'border-box',
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: 600,
-                  fontSize: '12px',
-                  lineHeight: '100%',
-                  letterSpacing: '0%',
-                  textTransform: 'uppercase',
-                  color: (hasActiveColumnFilter('sales30Day') || openFilterColumns.has('sales30Day')) ? '#3B82F6' : '#FFFFFF',
-                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', position: 'relative' }}>
-                  <span>30 DAY SALES</span>
-                  <img
-                    ref={(el) => {
-                      if (el) filterIconRefs.current['sales30Day'] = el;
-                    }}
-                    src="/assets/Vector (1).png"
-                    alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('sales30Day') || openFilterColumns.has('sales30Day') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                    style={{ 
-                      width: '12px', 
-                      height: '12px',
-                      cursor: 'pointer',
-                      filter: hasActiveColumnFilter('sales30Day') || openFilterColumns.has('sales30Day') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
-                    }}
-                    onClick={(e) => handleFilterClick('sales30Day', e)}
-                  />
-                </div>
-              </th>
-              <th 
-                className="group"
-                style={{ 
-                  padding: '12px 16px', 
-                  textAlign: 'center',
-                  position: 'sticky',
-                  top: 0,
-                  zIndex: 1010,
-                  width: '143px',
-                  height: '40px',
-                  maxHeight: '40px',
-                  borderRight: '1px solid #FFFFFF',
-                  boxSizing: 'border-box',
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: 600,
-                  fontSize: '12px',
-                  lineHeight: '100%',
-                  letterSpacing: '0%',
-                  textTransform: 'uppercase',
-                  color: (hasActiveColumnFilter('sales4Month') || openFilterColumns.has('sales4Month')) ? '#3B82F6' : '#FFFFFF',
-                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', position: 'relative' }}>
-                  <span>4 MONTH SALES</span>
-                  <img
-                    ref={(el) => {
-                      if (el) filterIconRefs.current['sales4Month'] = el;
-                    }}
-                    src="/assets/Vector (1).png"
-                    alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('sales4Month') || openFilterColumns.has('sales4Month') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                    style={{ 
-                      width: '12px', 
-                      height: '12px',
-                      cursor: 'pointer',
-                      filter: hasActiveColumnFilter('sales4Month') || openFilterColumns.has('sales4Month') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
-                    }}
-                    onClick={(e) => handleFilterClick('sales4Month', e)}
-                  />
-                </div>
-              </th>
-              <th 
-                className="group"
-                style={{ 
-                  padding: '12px 16px', 
-                  textAlign: 'center',
-                  position: 'sticky',
-                  top: 0,
-                  zIndex: 1010,
-                  width: '143px',
-                  height: '40px',
-                  maxHeight: '40px',
-                  borderRight: '1px solid #FFFFFF',
-                  boxSizing: 'border-box',
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: 600,
-                  fontSize: '12px',
-                  lineHeight: '100%',
-                  letterSpacing: '0%',
-                  textTransform: 'uppercase',
-                  color: (hasActiveColumnFilter('formula') || openFilterColumns.has('formula')) ? '#3B82F6' : '#FFFFFF',
-                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', position: 'relative' }}>
-                  <span>FORMULA</span>
-                  <img
-                    ref={(el) => {
-                      if (el) filterIconRefs.current['formula'] = el;
-                    }}
-                    src="/assets/Vector (1).png"
-                    alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('formula') || openFilterColumns.has('formula') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                    style={{ 
-                      width: '12px', 
-                      height: '12px',
-                      cursor: 'pointer',
-                      filter: hasActiveColumnFilter('formula') || openFilterColumns.has('formula') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
-                    }}
-                    onClick={(e) => handleFilterClick('formula', e)}
-                  />
-                </div>
-              </th>
-              <th 
-                className="group"
-                style={{ 
-                  padding: '12px 16px', 
-                  textAlign: 'center',
-                  position: 'sticky',
-                  top: 0,
-                  zIndex: 1010,
-                  width: '143px',
-                  height: '40px',
-                  maxHeight: '40px',
-                  borderRight: '1px solid #FFFFFF',
-                  boxSizing: 'border-box',
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: 600,
-                  fontSize: '12px',
-                  lineHeight: '100%',
-                  letterSpacing: '0%',
-                  textTransform: 'uppercase',
-                  color: '#FFFFFF',
-                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', position: 'relative', width: '100%' }}>
-                  <span style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '4px',
-                    color: (hasActiveColumnFilter('bottles') || openFilterColumns.has('bottles')) ? '#3B82F6' : '#FFFFFF',
-                  }}>
-                    BOTTLES
-                    {(hasActiveColumnFilter('bottles') || openFilterColumns.has('bottles')) && (
-                      <span style={{ 
-                        display: 'inline-block',
-                        width: '6px', 
-                        height: '6px', 
-                        borderRadius: '50%', 
-                        backgroundColor: '#10B981',
-                      }} />
-                    )}
-                  </span>
-                  <img
-                    src="/assets/Vector (1).png"
-                    alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('bottles') || openFilterColumns.has('bottles') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                    ref={(el) => {
-                      if (el) filterIconRefs.current['bottles'] = el;
-                    }}
-                    onClick={(e) => handleFilterClick('bottles', e)}
-                    style={{ 
-                      width: '12px', 
-                      height: '12px',
-                      cursor: 'pointer',
-                      filter: hasActiveColumnFilter('bottles') || openFilterColumns.has('bottles') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
-                      position: 'absolute',
-                      right: '0',
-                    }}
-                  />
-                </div>
-              </th>
-              <th 
-                className="group"
-                style={{ 
-                  padding: '12px 16px', 
-                  textAlign: 'center',
-                  position: 'sticky',
-                  top: 0,
-                  zIndex: 1010,
-                  width: '143px',
-                  height: '40px',
-                  maxHeight: '40px',
-                  borderRight: '1px solid #FFFFFF',
-                  boxSizing: 'border-box',
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: 600,
-                  fontSize: '12px',
-                  lineHeight: '100%',
-                  letterSpacing: '0%',
-                  textTransform: 'uppercase',
-                  color: '#FFFFFF',
-                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                  <span style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '4px',
-                    color: (hasActiveColumnFilter('closures') || openFilterColumns.has('closures')) ? '#3B82F6' : '#FFFFFF',
-                  }}>
-                    CLOSURES
-                    {(hasActiveColumnFilter('closures') || openFilterColumns.has('closures')) && (
-                      <span style={{ 
-                        display: 'inline-block',
-                        width: '6px', 
-                        height: '6px', 
-                        borderRadius: '50%', 
-                        backgroundColor: '#10B981',
-                      }} />
-                    )}
-                  </span>
-                  <img
-                    src="/assets/Vector (1).png"
-                    alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('closures') || openFilterColumns.has('closures') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                    ref={(el) => {
-                      if (el) filterIconRefs.current['closures'] = el;
-                    }}
-                    onClick={(e) => handleFilterClick('closures', e)}
-                    style={{ 
-                      width: '12px', 
-                      height: '12px',
-                      cursor: 'pointer',
-                      filter: hasActiveColumnFilter('closures') || openFilterColumns.has('closures') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
-                    }}
-                  />
-                </div>
-              </th>
-              <th 
-                className="group"
-                style={{ 
-                  padding: '12px 16px', 
-                  textAlign: 'center',
-                  position: 'sticky',
-                  top: 0,
-                  zIndex: 1010,
-                  width: '143px',
-                  height: '40px',
-                  maxHeight: '40px',
-                  borderRight: '1px solid #FFFFFF',
-                  boxSizing: 'border-box',
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: 600,
-                  fontSize: '12px',
-                  lineHeight: '100%',
-                  letterSpacing: '0%',
-                  textTransform: 'uppercase',
-                  color: '#FFFFFF',
-                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                  <span style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '4px',
-                    color: (hasActiveColumnFilter('boxes') || openFilterColumns.has('boxes')) ? '#3B82F6' : '#FFFFFF',
-                  }}>
-                    BOXES
-                    {(hasActiveColumnFilter('boxes') || openFilterColumns.has('boxes')) && (
-                      <span style={{ 
-                        display: 'inline-block',
-                        width: '6px', 
-                        height: '6px', 
-                        borderRadius: '50%', 
-                        backgroundColor: '#10B981',
-                      }} />
-                    )}
-                  </span>
-                  <img
-                    src="/assets/Vector (1).png"
-                    alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('boxes') || openFilterColumns.has('boxes') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                    ref={(el) => {
-                      if (el) filterIconRefs.current['boxes'] = el;
-                    }}
-                    onClick={(e) => handleFilterClick('boxes', e)}
-                    style={{ 
-                      width: '12px', 
-                      height: '12px',
-                      cursor: 'pointer',
-                      filter: hasActiveColumnFilter('boxes') || openFilterColumns.has('boxes') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
-                    }}
-                  />
-                </div>
-              </th>
-              <th 
-                className="group"
-                style={{ 
-                  padding: '12px 16px', 
-                  textAlign: 'center',
-                  position: 'sticky',
-                  top: 0,
-                  zIndex: 1010,
-                  width: '143px',
-                  height: '40px',
-                  maxHeight: '40px',
-                  borderRight: '1px solid #FFFFFF',
-                  boxSizing: 'border-box',
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: 600,
-                  fontSize: '12px',
-                  lineHeight: '100%',
-                  letterSpacing: '0%',
-                  textTransform: 'uppercase',
-                  color: '#FFFFFF',
-                  backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                  <span style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '4px',
-                    color: (hasActiveColumnFilter('labels') || openFilterColumns.has('labels')) ? '#3B82F6' : '#FFFFFF',
-                  }}>
-                    LABELS
-                    {(hasActiveColumnFilter('labels') || openFilterColumns.has('labels')) && (
-                      <span style={{ 
-                        display: 'inline-block',
-                        width: '6px', 
-                        height: '6px', 
-                        borderRadius: '50%', 
-                        backgroundColor: '#10B981',
-                      }} />
-                    )}
-                  </span>
-                  <img
-                    src="/assets/Vector (1).png"
-                    alt="Filter"
-                    className={`w-3 h-3 transition-opacity ${hasActiveColumnFilter('labels') || openFilterColumns.has('labels') ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                    ref={(el) => {
-                      if (el) filterIconRefs.current['labels'] = el;
-                    }}
-                    onClick={(e) => handleFilterClick('labels', e)}
-                    style={{ 
-                      width: '12px', 
-                      height: '12px',
-                      cursor: 'pointer',
-                      filter: hasActiveColumnFilter('labels') || openFilterColumns.has('labels') ? 'brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(196deg) brightness(95%) contrast(96%)' : 'none',
-                    }}
-                  />
-                </div>
-              </th>
-              {/* Sticky three dots */}
               <th style={{ 
-                padding: '0 1rem', 
-                width: '40px',
-                height: '40px',
-                maxHeight: '40px',
-                boxSizing: 'border-box',
-                textAlign: 'center',
+                borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
+                padding: '0 0.75rem', 
+                textAlign: 'left',
                 position: 'sticky',
-                right: 0,
+                left: '40px',
                 top: 0,
                 zIndex: 1020,
-                backgroundColor: isDarkMode ? '#1C2634' : '#FFFFFF',
-                boxShadow: '-2px 0 4px rgba(0,0,0,0.1)',
-                borderRight: '1px solid #FFFFFF',
-                borderTopRightRadius: '16px',
+                backgroundColor: isDarkMode ? '#1A2235' : '#F8FAFC',
+                width: '150px',
+                minWidth: '150px',
+                height: '58px',
+                maxHeight: '58px',
+                boxSizing: 'border-box',
+                fontFamily: 'Inter, sans-serif',
+                fontWeight: 600,
+                fontSize: '12px',
+                textTransform: 'uppercase',
+                color: '#64758B',
               }}>
-                <span style={{ color: '#FFFFFF', fontSize: '1rem' }}>⋮</span>
+                <span>BRAND</span>
+              </th>
+              <th style={{ 
+                borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
+                padding: '0 0.75rem', 
+                textAlign: 'center',
+                position: 'sticky',
+                left: '190px',
+                top: 0,
+                zIndex: 1020,
+                backgroundColor: isDarkMode ? '#1A2235' : '#F8FAFC',
+                width: '320px',
+                minWidth: '320px',
+                height: '58px',
+                maxHeight: '58px',
+                boxSizing: 'border-box',
+                fontFamily: 'Inter, sans-serif',
+                fontWeight: 600,
+                fontSize: '12px',
+                textTransform: 'uppercase',
+                color: '#64758B',
+              }}>
+                <span>PRODUCT</span>
+              </th>
+              <th style={{ 
+                borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
+                padding: '0 1rem', 
+                textAlign: 'center',
+                position: 'sticky',
+                left: '510px',
+                top: 0,
+                zIndex: 1020,
+                backgroundColor: isDarkMode ? '#1A2235' : '#F8FAFC',
+                width: '180px',
+                minWidth: '180px',
+                height: '58px',
+                maxHeight: '58px',
+                boxSizing: 'border-box',
+                fontFamily: 'Inter, sans-serif',
+                fontWeight: 600,
+                fontSize: '12px',
+                textTransform: 'uppercase',
+                color: '#64758B',
+              }}>
+                <span>UNITS TO MAKE</span>
+              </th>
+              <th style={{ 
+                borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
+                padding: '0 0.75rem', 
+                textAlign: 'center',
+                top: 0,
+                zIndex: 1010,
+                backgroundColor: isDarkMode ? '#1A2235' : '#F8FAFC',
+                width: '120px',
+                minWidth: '120px',
+                height: '58px',
+                maxHeight: '58px',
+                boxSizing: 'border-box',
+                fontFamily: 'Inter, sans-serif',
+                fontWeight: 600,
+                fontSize: '12px',
+                textTransform: 'uppercase',
+                color: '#64758B',
+              }}>
+                <span>VARIATION 1</span>
+              </th>
+              <th style={{ 
+                borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
+                padding: '0 0.75rem', 
+                textAlign: 'center',
+                top: 0,
+                zIndex: 1010,
+                backgroundColor: isDarkMode ? '#1A2235' : '#F8FAFC',
+                width: '120px',
+                minWidth: '120px',
+                height: '58px',
+                maxHeight: '58px',
+                boxSizing: 'border-box',
+                fontFamily: 'Inter, sans-serif',
+                fontWeight: 600,
+                fontSize: '12px',
+                textTransform: 'uppercase',
+                color: '#64758B',
+              }}>
+                <span>VARIATION 2</span>
+              </th>
+              <th style={{ 
+                borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
+                padding: '0 0.75rem', 
+                textAlign: 'center',
+                top: 0,
+                zIndex: 1010,
+                backgroundColor: isDarkMode ? '#1A2235' : '#F8FAFC',
+                width: '130px',
+                minWidth: '130px',
+                height: '58px',
+                maxHeight: '58px',
+                boxSizing: 'border-box',
+                fontFamily: 'Inter, sans-serif',
+                fontWeight: 600,
+                fontSize: '12px',
+                textTransform: 'uppercase',
+                color: '#64758B',
+              }}>
+                <span>PARENT ASIN</span>
+              </th>
+              <th style={{ 
+                borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
+                padding: '0 0.75rem', 
+                textAlign: 'center',
+                top: 0,
+                zIndex: 1010,
+                backgroundColor: isDarkMode ? '#1A2235' : '#F8FAFC',
+                width: '130px',
+                minWidth: '130px',
+                height: '58px',
+                maxHeight: '58px',
+                boxSizing: 'border-box',
+                fontFamily: 'Inter, sans-serif',
+                fontWeight: 600,
+                fontSize: '12px',
+                textTransform: 'uppercase',
+                color: '#64758B',
+              }}>
+                <span>CHILD ASIN</span>
+              </th>
+              <th style={{ 
+                borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
+                padding: '0 0.75rem', 
+                textAlign: 'center',
+                top: 0,
+                zIndex: 1010,
+                backgroundColor: isDarkMode ? '#1A2235' : '#F8FAFC',
+                width: '100px',
+                minWidth: '100px',
+                height: '58px',
+                maxHeight: '58px',
+                boxSizing: 'border-box',
+                fontFamily: 'Inter, sans-serif',
+                fontWeight: 600,
+                fontSize: '12px',
+                textTransform: 'uppercase',
+                color: '#64758B',
+              }}>
+                <span>IN</span>
+              </th>
+              <th style={{ 
+                borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
+                padding: '0 0.75rem', 
+                textAlign: 'center',
+                top: 0,
+                zIndex: 1010,
+                backgroundColor: isDarkMode ? '#1A2235' : '#F8FAFC',
+                width: '110px',
+                minWidth: '110px',
+                height: '58px',
+                maxHeight: '58px',
+                boxSizing: 'border-box',
+                fontFamily: 'Inter, sans-serif',
+                fontWeight: 600,
+                fontSize: '12px',
+                textTransform: 'uppercase',
+                color: '#64758B',
+              }}>
+                <span>INVENTORY</span>
+              </th>
+              <th style={{ 
+                borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
+                padding: '0 0.75rem', 
+                textAlign: 'center',
+                top: 0,
+                zIndex: 1010,
+                backgroundColor: isDarkMode ? '#1A2235' : '#F8FAFC',
+                width: '100px',
+                minWidth: '100px',
+                height: '58px',
+                maxHeight: '58px',
+                boxSizing: 'border-box',
+                fontFamily: 'Inter, sans-serif',
+                fontWeight: 600,
+                fontSize: '12px',
+                textTransform: 'uppercase',
+                color: '#64758B',
+              }}>
+                <span>TOTAL DOI</span>
+              </th>
+              <th style={{ 
+                borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
+                padding: '0 0.75rem', 
+                textAlign: 'center',
+                top: 0,
+                zIndex: 1010,
+                backgroundColor: isDarkMode ? '#1A2235' : '#F8FAFC',
+                width: '130px',
+                minWidth: '130px',
+                height: '58px',
+                maxHeight: '58px',
+                boxSizing: 'border-box',
+                fontFamily: 'Inter, sans-serif',
+                fontWeight: 600,
+                fontSize: '12px',
+                textTransform: 'uppercase',
+                color: '#64758B',
+              }}>
+                <span>FBA AVAILABLE DOI</span>
+              </th>
+              <th style={{ 
+                borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
+                padding: '0 0.75rem', 
+                textAlign: 'center',
+                top: 0,
+                zIndex: 1010,
+                backgroundColor: isDarkMode ? '#1A2235' : '#F8FAFC',
+                width: '120px',
+                minWidth: '120px',
+                height: '58px',
+                maxHeight: '58px',
+                boxSizing: 'border-box',
+                fontFamily: 'Inter, sans-serif',
+                fontWeight: 600,
+                fontSize: '12px',
+                textTransform: 'uppercase',
+                color: '#64758B',
+              }}>
+                <span>VELOCITY TREND</span>
+              </th>
+              <th style={{ 
+                borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
+                padding: '0 0.75rem', 
+                textAlign: 'center',
+                top: 0,
+                zIndex: 1010,
+                backgroundColor: isDarkMode ? '#1A2235' : '#F8FAFC',
+                width: '150px',
+                minWidth: '150px',
+                height: '58px',
+                maxHeight: '58px',
+                boxSizing: 'border-box',
+                fontFamily: 'Inter, sans-serif',
+                fontWeight: 600,
+                fontSize: '12px',
+                textTransform: 'uppercase',
+                color: '#64758B',
+              }}>
+                <span>7 DAY UNITS ORDERED</span>
+              </th>
+              <th style={{ 
+                borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
+                padding: '0 0.75rem', 
+                textAlign: 'center',
+                top: 0,
+                zIndex: 1010,
+                backgroundColor: isDarkMode ? '#1A2235' : '#F8FAFC',
+                width: '150px',
+                minWidth: '150px',
+                height: '58px',
+                maxHeight: '58px',
+                boxSizing: 'border-box',
+                fontFamily: 'Inter, sans-serif',
+                fontWeight: 600,
+                fontSize: '12px',
+                textTransform: 'uppercase',
+                color: '#64758B',
+              }}>
+                <span>30 DAY UNITS ORDERED</span>
+              </th>
+              <th style={{ 
+                borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
+                padding: '0 0.75rem', 
+                textAlign: 'center',
+                top: 0,
+                zIndex: 1010,
+                backgroundColor: isDarkMode ? '#1A2235' : '#F8FAFC',
+                width: '150px',
+                minWidth: '150px',
+                height: '58px',
+                maxHeight: '58px',
+                boxSizing: 'border-box',
+                fontFamily: 'Inter, sans-serif',
+                fontWeight: 600,
+                fontSize: '12px',
+                textTransform: 'uppercase',
+                color: '#64758B',
+              }}>
+                <span>90 DAY UNITS ORDERED</span>
+              </th>
+              <th style={{ 
+                borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
+                padding: '0 0.75rem', 
+                textAlign: 'center',
+                top: 0,
+                zIndex: 1010,
+                backgroundColor: isDarkMode ? '#1A2235' : '#F8FAFC',
+                width: '100px',
+                minWidth: '100px',
+                height: '58px',
+                maxHeight: '58px',
+                boxSizing: 'border-box',
+                fontFamily: 'Inter, sans-serif',
+                fontWeight: 600,
+                fontSize: '12px',
+                textTransform: 'uppercase',
+                color: '#64758B',
+              }}>
+                <span>FBA TOTAL</span>
+              </th>
+              <th style={{ 
+                borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
+                padding: '0 0.75rem', 
+                textAlign: 'center',
+                top: 0,
+                zIndex: 1010,
+                backgroundColor: isDarkMode ? '#1A2235' : '#F8FAFC',
+                width: '120px',
+                minWidth: '120px',
+                height: '58px',
+                maxHeight: '58px',
+                boxSizing: 'border-box',
+                fontFamily: 'Inter, sans-serif',
+                fontWeight: 600,
+                fontSize: '12px',
+                textTransform: 'uppercase',
+                color: '#64758B',
+              }}>
+                <span>FBA AVAILABLE</span>
+              </th>
+              <th style={{ 
+                borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
+                padding: '0 0.75rem', 
+                textAlign: 'center',
+                top: 0,
+                zIndex: 1010,
+                backgroundColor: isDarkMode ? '#1A2235' : '#F8FAFC',
+                width: '100px',
+                minWidth: '100px',
+                height: '58px',
+                maxHeight: '58px',
+                boxSizing: 'border-box',
+                fontFamily: 'Inter, sans-serif',
+                fontWeight: 600,
+                fontSize: '12px',
+                textTransform: 'uppercase',
+                color: '#64758B',
+              }}>
+                <span>AWD TOTAL</span>
               </th>
             </tr>
           </thead>
           <tbody>
             {currentRows.map((row) => {
               const index = row._originalIndex;
+              const rowSeparatorBorder = { borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0' };
               return (
               <tr key={`${row.id}-${index}`} style={{ 
-                height: '40px', 
-                maxHeight: '40px',
+                height: '58px', 
+                maxHeight: '58px',
                 display: 'table-row',
                 position: 'relative',
+                backgroundColor: isDarkMode ? '#1A2235' : '#FFFFFF',
               }}>
-                {/* Sticky columns */}
+                {/* Checkbox - square with white border in dark mode */}
                 <td style={{ 
-                  padding: '0.65rem 0.75rem', 
+                  ...rowSeparatorBorder,
+                  padding: '0 0.75rem', 
                   textAlign: 'center',
                   position: 'sticky',
                   left: 0,
                   zIndex: 5,
-                  backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                  backgroundColor: isDarkMode ? '#1A2235' : '#FFFFFF',
                   width: '40px',
                   minWidth: '40px',
                   maxWidth: '40px',
-                  height: '40px',
+                  height: '58px',
                   verticalAlign: 'middle',
-                  boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
-                  borderTop: '1px solid #E5E7EB',
                 }}>
                   <input 
                     type="checkbox" 
-                    style={{ cursor: 'pointer' }}
+                    style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#3B82F6', border: isDarkMode ? '1px solid rgba(255,255,255,0.5)' : undefined }}
                     checked={selectedRows.has(row.id)}
                     onChange={(e) => handleRowSelect(row.id, e)}
                   />
                 </td>
                 <td style={{ 
-                  padding: '0.65rem 0.75rem', 
-                  fontSize: '0.85rem',
-                  textAlign: 'center',
+                  ...rowSeparatorBorder,
+                  padding: '0.5rem 0.75rem', 
+                  fontSize: '0.875rem',
+                  textAlign: 'left',
                   position: 'sticky',
                   left: '40px',
                   zIndex: 5,
-                  backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                  backgroundColor: isDarkMode ? '#1A2235' : '#FFFFFF',
                   width: '150px',
                   minWidth: '150px',
                   maxWidth: '150px',
-                  height: '40px',
+                  height: '58px',
                   verticalAlign: 'middle',
-                  boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
-                  borderTop: '1px solid #E5E7EB',
-                }} className={themeClasses.text}>
+                  color: isDarkMode ? '#FFFFFF' : '#1E293B',
+                }}>
                   {row.brand}
                 </td>
                 <td style={{ 
-                  padding: '0.65rem 0.75rem', 
-                  fontSize: '0.85rem',
-                  textAlign: 'center',
+                  ...rowSeparatorBorder,
+                  padding: '0.5rem 0.75rem', 
+                  fontSize: '0.875rem',
+                  textAlign: 'left',
                   position: 'sticky',
                   left: '190px',
                   zIndex: 5,
-                  backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-                  height: '40px',
+                  backgroundColor: isDarkMode ? '#1A2235' : '#FFFFFF',
+                  height: '58px',
                   verticalAlign: 'middle',
-                  width: '200px',
-                  minWidth: '200px',
-                  maxWidth: '200px',
-                  boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
-                  borderTop: '1px solid #E5E7EB',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                    <button
-                      type="button"
-                      onClick={() => onProductClick(row)}
-                      className="text-xs text-blue-500 hover:text-blue-600"
-                      style={{ textDecoration: 'underline', cursor: 'pointer' }}
-                    >
-                      {row.product.length > 18 ? `${row.product.substring(0, 18)}...` : row.product}
-                    </button>
-                    {topSellerIds.has(row.id) && (
-                      <span
-                        style={{
-                          fontSize: '9px',
-                          fontWeight: 700,
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.02em',
-                          color: '#B45309',
-                          backgroundColor: '#FEF3C7',
-                          padding: '2px 6px',
-                          borderRadius: '6px',
-                        }}
-                        title="Top 2 by 7-day (last week) & 30-day sales"
-                      >
-                        Best Seller
-                      </span>
-                    )}
-                  </div>
-                </td>
-                <td style={{ 
-                  padding: '0.65rem 1rem', 
-                  fontSize: '0.85rem',
-                  textAlign: 'center',
-                  position: 'sticky',
-                  left: '390px',
-                  zIndex: 5,
-                  backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-                  width: '120px',
-                  minWidth: '120px',
-                  maxWidth: '120px',
-                  height: '40px',
-                  verticalAlign: 'middle',
-                  borderTop: '1px solid #E5E7EB',
-                  borderRight: 'none',
-                }} className={themeClasses.textSecondary}>
-                  {row.size}
-                </td>
-                {/* Scrollable columns */}
-                <td style={{ 
-                  padding: '0.65rem 1rem', 
-                  textAlign: 'center',
-                  width: '143px',
-                  height: '40px',
-                  verticalAlign: 'middle',
-                  boxSizing: 'border-box',
-                  borderTop: '1px solid #E5E7EB',
-                  borderLeft: 'none',
-                }}>
-                  <div style={{ position: 'relative', display: 'block' }}>
-                    <div
-                      ref={(el) => {
-                        if (el) qtyContainerRefs.current[index] = el;
-                      }}
-                      onMouseEnter={() => setHoveredQtyIndex(index)}
-                      onMouseLeave={() => setHoveredQtyIndex(null)}
-                      title={isQtyExceedingLabels(row, index) ? `Exceeds available labels (${getAvailableLabelsForRow(row, index).toLocaleString()} available)` : ''}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '4px',
-                        backgroundColor: isQtyExceedingLabels(row, index) 
-                          ? (isDarkMode ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.05)')
-                          : (isDarkMode ? '#1F2937' : '#FFFFFF'),
-                        borderRadius: '6px',
-                        border: isQtyExceedingLabels(row, index) 
-                          ? '1px solid #EF4444' 
-                          : (isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB'),
-                        padding: '4px 6px',
-                        width: '107px',
-                        height: '24px',
-                        boxSizing: 'border-box',
-                        position: 'relative',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {(() => {
-                        const forecastValue = row.weeklyForecast || row.forecast || 0;
-                        const qtyValue = effectiveQtyValues[index];
-                        // Only show reset if value has been manually edited by user and differs from forecast
-                        const isValueSet = qtyValue !== undefined && qtyValue !== null && qtyValue !== '';
-                        const isManuallyEdited = manuallyEditedIndices.current.has(index);
-                        const currentQty = typeof qtyValue === 'number' 
-                          ? qtyValue 
-                          : isValueSet 
-                            ? parseInt(qtyValue, 10) || 0
-                            : 0;
-                        const hasChanged = isValueSet && isManuallyEdited && currentQty !== forecastValue;
-                        
-                        return hasChanged ? (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              effectiveSetQtyValues(prev => ({
-                                ...prev,
-                                [index]: forecastValue,
-                              }));
-                              // Remove from manually edited set when reset to forecast
-                              manuallyEditedIndices.current.delete(index);
-                            }}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              border: 'none',
-                              backgroundColor: 'transparent',
-                              cursor: 'pointer',
-                              padding: 0,
-                              margin: 0,
-                              flexShrink: 0,
-                            }}
-                          >
-                            <img
-                              src="/assets/reset.png"
-                              alt="Reset quantity"
-                              style={{
-                                display: 'block',
-                                width: '9px',
-                                height: '9px',
-                                objectFit: 'contain',
-                              }}
-                            />
-                          </button>
-                        ) : null;
-                      })()}
-                      <input
-                        key={`qty-input-${index}`}
-                        ref={(el) => {
-                          if (el) qtyInputRefs.current[index] = el;
-                        }}
-                        type="number"
-                        min="0"
-                        step={(() => {
-                          const size = row.size?.toLowerCase() || '';
-                          if (size.includes('8oz')) return 60;
-                          if (size.includes('quart')) return 12;
-                          if (size.includes('gallon')) return 4;
-                          return 1;
-                        })()}
-                        data-row-index={index}
-                        value={(() => {
-                          // Show raw input value while typing, otherwise show rounded value
-                          if (rawQtyInputValues.current[index] !== undefined) {
-                            return rawQtyInputValues.current[index];
-                          }
-                          const qtyValue = effectiveQtyValues[index];
-                          return qtyValue !== undefined && qtyValue !== null && qtyValue !== '' ? String(qtyValue) : '';
-                        })()}
-                        onChange={(e) => {
-                          const inputValue = e.target.value;
-                          // Mark this field as manually edited
-                          manuallyEditedIndices.current.add(index);
-                          
-                          // Store raw input value (no rounding while typing)
-                          if (inputValue === '' || inputValue === '-') {
-                            rawQtyInputValues.current[index] = '';
-                          } else {
-                            // Store raw value for display while typing
-                            rawQtyInputValues.current[index] = inputValue;
-                          }
-                          // Force a minimal re-render to update the input value
-                          setQtyInputUpdateTrigger(prev => prev + 1);
-                        }}
-                        onBlur={(e) => {
-                          const inputValue = e.target.value;
-                          // Round and validate when user finishes typing
-                          if (inputValue === '' || inputValue === '-') {
-                            rawQtyInputValues.current[index] = undefined;
-                            effectiveSetQtyValues(prev => ({
-                              ...prev,
-                              [index]: ''
-                            }));
-                          } else {
-                            const numValue = parseInt(inputValue, 10);
-                            if (!isNaN(numValue) && numValue >= 0) {
-                              // No rounding - use value as-is
-                              rawQtyInputValues.current[index] = undefined; // Clear raw value
-                              effectiveSetQtyValues(prev => ({
-                                ...prev,
-                                [index]: numValue
-                              }));
-                            } else {
-                              // Invalid input, clear it
-                              rawQtyInputValues.current[index] = undefined;
-                              effectiveSetQtyValues(prev => ({
-                                ...prev,
-                                [index]: ''
-                              }));
-                            }
-                          }
-                          
-                          // Close popup if open when blurring
-                          if (clickedQtyIndex === index) {
-                            setClickedQtyIndex(null);
-                          }
-                        }}
-                        onKeyDown={(e) => {
-                          // Round and validate when user presses Enter
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            const inputValue = e.target.value;
-                            if (inputValue === '' || inputValue === '-') {
-                              rawQtyInputValues.current[index] = undefined;
-                              effectiveSetQtyValues(prev => ({
-                                ...prev,
-                                [index]: ''
-                              }));
-                            } else {
-                              const numValue = parseInt(inputValue, 10);
-                              if (!isNaN(numValue) && numValue >= 0) {
-                                // No rounding - use value as-is
-                                rawQtyInputValues.current[index] = undefined; // Clear raw value
-                                effectiveSetQtyValues(prev => ({
-                                  ...prev,
-                                  [index]: numValue
-                                }));
-                              } else {
-                                // Invalid input, clear it
-                                rawQtyInputValues.current[index] = undefined;
-                                effectiveSetQtyValues(prev => ({
-                                  ...prev,
-                                  [index]: ''
-                                }));
-                              }
-                            }
-                            e.target.blur(); // Remove focus after Enter
-                          }
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const labelsAvailable = getAvailableLabelsForRow(row, index);
-                          const labelsNeeded = effectiveQtyValues[index] ?? 0;
-                          // Only show popup if labels needed exceed available
-                          if (labelsNeeded > labelsAvailable) {
-                            // Toggle popup: close if already open, open if closed
-                            setClickedQtyIndex(clickedQtyIndex === index ? null : index);
-                          }
-                        }}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          flex: 1,
-                          border: 'none',
-                          outline: 'none',
-                          backgroundColor: 'transparent',
-                          fontSize: '0.875rem',
-                          fontWeight: 500,
-                          color: isDarkMode ? '#FFFFFF' : '#111827',
-                          textAlign: 'center',
-                          padding: 0,
-                          margin: 0,
-                          MozAppearance: 'textfield',
-                          WebkitAppearance: 'none',
-                          minWidth: 0,
-                        }}
-                        onFocus={(e) => {
-                          e.target.select();
-                        }}
-                        onWheel={(e) => {
-                          e.target.blur();
-                        }}
-                      />
-                      {hoveredQtyIndex === index && (
-                        <div
-                          style={{
-                            position: 'absolute',
-                            right: '2px',
-                            top: '50%',
-                            transform: 'translateY(-50%)',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0',
-                            height: '20px',
-                            width: '14px',
-                          }}
-                        >
-                          {/* Up / down controls */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              const currentQty = effectiveQtyValues[index] ?? 0;
-                              const numQty =
-                                typeof currentQty === 'number'
-                                  ? currentQty
-                                  : currentQty === '' ||
-                                    currentQty === null ||
-                                    currentQty === undefined
-                                  ? 0
-                                  : parseInt(currentQty, 10) || 0;
-                              
-                              // Use size-based increment (e.g. 60 units for 8oz)
-                              const increment = getQtyIncrement(rows[index] || currentRows.find(r => r._originalIndex === index) || {});
-                              
-                              const newQty = Math.max(0, numQty + increment);
-                              // Mark as manually edited since user clicked increment button
-                              manuallyEditedIndices.current.add(index);
-                              effectiveSetQtyValues(prev => ({
-                                ...prev,
-                                [index]: newQty,
-                              }));
-                            }}
-                            style={{
-                              width: '100%',
-                              height: '50%',
-                              border: 'none',
-                              backgroundColor: 'transparent',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              padding: 0,
-                              margin: 0,
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#F3F4F6';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = 'transparent';
-                            }}
-                          >
-                            <svg
-                              width="8"
-                              height="8"
-                              viewBox="0 0 8 8"
-                              fill="none"
-                              xmlns="http://www.w3.org/2000/svg"
-                            >
-                              <path d="M4 2L6 5H2L4 2Z" fill="#6B7280" />
-                            </svg>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              const currentQty = effectiveQtyValues[index] ?? 0;
-                              const numQty =
-                                typeof currentQty === 'number'
-                                  ? currentQty
-                                  : currentQty === '' ||
-                                    currentQty === null ||
-                                    currentQty === undefined
-                                  ? 0
-                                  : parseInt(currentQty, 10) || 0;
-                              
-                              // Stop at 0 - don't allow going negative
-                              if (numQty <= 0) {
-                                return;
-                              }
-                              
-                              // Use size-based increment (e.g. 60 units for 8oz)
-                              const increment = getQtyIncrement(rows[index] || currentRows.find(r => r._originalIndex === index) || {});
-                              
-                              const newQty = Math.max(0, numQty - increment);
-                              // Mark as manually edited since user clicked decrement button
-                              manuallyEditedIndices.current.add(index);
-                              effectiveSetQtyValues(prev => ({
-                                ...prev,
-                                [index]: newQty,
-                              }));
-                            }}
-                            style={{
-                              width: '100%',
-                              height: '50%',
-                              border: 'none',
-                              backgroundColor: 'transparent',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              padding: 0,
-                              margin: 0,
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = '#F3F4F6';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = 'transparent';
-                            }}
-                          >
-                            <svg
-                              width="8"
-                              height="8"
-                              viewBox="0 0 8 8"
-                              fill="none"
-                              xmlns="http://www.w3.org/2000/svg"
-                            >
-                              <path d="M4 6L2 3H6L4 6Z" fill="#6B7280" />
-                            </svg>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    {/* Label warning icon - shown when QTY exceeds labels, positioned absolutely to not affect alignment */}
-                    {(() => {
-                      const labelsAvailable = getAvailableLabelsForRow(row, index);
-                      const labelsNeeded = effectiveQtyValues[index] ?? 0;
-                      // Only show warning if labels needed exceed available
-                      if (labelsNeeded > labelsAvailable && labelsNeeded > 0) {
-                        return (
-                          <>
-                            <span
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setClickedQtyIndex(clickedQtyIndex === index ? null : index);
-                              }}
-                              onMouseEnter={() => setHoveredWarningIndex(index)}
-                              onMouseLeave={() => setHoveredWarningIndex(null)}
-                              style={{
-                                position: 'absolute',
-                                left: '119px',
-                                top: '50%',
-                                transform: 'translateY(-50%)',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                width: '18px',
-                                height: '18px',
-                                borderRadius: '50%',
-                                backgroundColor: '#FEE2E2',
-                                color: '#DC2626',
-                                fontSize: '12px',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                zIndex: 10,
-                              }}
-                            >
-                              !
-                            </span>
-                            {/* Custom tooltip for warning icon */}
-                            {hoveredWarningIndex === index && (
-                              <div
-                                style={{
-                                  position: 'absolute',
-                                  left: '64px', // 55px to the left of the warning icon (119px - 55px)
-                                  top: '50%',
-                                  transform: 'translateY(calc(-50% - 30px))',
-                                  backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-                                  color: isDarkMode ? '#E5E7EB' : '#111827',
-                                  padding: '6px 10px',
-                                  borderRadius: '6px',
-                                  fontSize: '11px',
-                                  fontWeight: 500,
-                                  whiteSpace: 'nowrap',
-                                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                                  border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
-                                  zIndex: 9,
-                                  pointerEvents: 'none',
-                                }}
-                              >
-                                Labels Available: {labelsAvailable.toLocaleString()}
-                              </div>
-                            )}
-                          </>
-                        );
-                      }
-                      return null;
-                    })()}
-                  </div>
-                </td>
-                <td style={{ 
-                  padding: '12px 16px', 
-                  fontSize: '0.85rem', 
-                  textAlign: 'center', 
-                  width: '143px',
-                  height: '40px',
-                  verticalAlign: 'middle',
-                  boxSizing: 'border-box',
-                  borderTop: '1px solid #E5E7EB',
-                  fontWeight: 600,
-                  color: (() => {
-                    const fbaVal = Number(row.doiFba ?? row.doiTotal) || 0;
-                    return fbaVal >= 30 ? '#22C55E' : fbaVal >= 20 ? '#F97316' : '#EF4444';
-                  })(),
-                }}>
-                  {row.doiFba || row.doiTotal || 0}
-                </td>
-                {(() => {
-                  const totalInv = Number(row.totalInventory ?? row.doiTotal ?? row.daysOfInventory) || 0;
-                  return (
-                    <td style={{ 
-                      padding: '12px 16px', 
-                      fontSize: '0.85rem', 
-                      textAlign: 'center', 
-                      width: '143px',
-                      height: '40px',
-                      verticalAlign: 'middle',
-                      boxSizing: 'border-box',
-                      borderTop: '1px solid #E5E7EB',
-                      fontWeight: 600,
-                      color: isDarkMode ? '#FFFFFF' : '#111827',
-                    }}>
-                      {(row.totalInventory ?? row.doiTotal ?? row.daysOfInventory ?? 0).toLocaleString()}
-                    </td>
-                  );
-                })()}
-                <td style={{ 
-                  padding: '12px 16px', 
-                  fontSize: '0.85rem', 
-                  textAlign: 'center', 
-                  width: '143px',
-                  height: '40px',
-                  verticalAlign: 'middle',
-                  boxSizing: 'border-box',
-                  borderTop: '1px solid #E5E7EB',
-                  fontWeight: 600,
-                  color: '#3B82F6', // Blue - matches Forecast legend
-                }}>
-                  {row.weeklyForecast || row.forecast || 0}
-                </td>
-                <td style={{ 
-                  padding: '12px 16px', 
-                  fontSize: '0.85rem', 
-                  textAlign: 'center', 
-                  width: '143px',
-                  height: '40px',
-                  verticalAlign: 'middle',
-                  boxSizing: 'border-box',
-                  borderTop: '1px solid #E5E7EB',
-                }} className={themeClasses.text}>
-                  {row.sales7Day || 0}
-                </td>
-                <td style={{ 
-                  padding: '12px 16px', 
-                  fontSize: '0.85rem', 
-                  textAlign: 'center', 
-                  width: '143px',
-                  height: '40px',
-                  verticalAlign: 'middle',
-                  boxSizing: 'border-box',
-                  borderTop: '1px solid #E5E7EB',
-                }} className={themeClasses.text}>
-                  {row.sales30Day || 0}
-                </td>
-                <td style={{ 
-                  padding: '12px 16px', 
-                  fontSize: '0.85rem', 
-                  textAlign: 'center', 
-                  width: '143px',
-                  height: '40px',
-                  verticalAlign: 'middle',
-                  boxSizing: 'border-box',
-                  borderTop: '1px solid #E5E7EB',
-                }} className={themeClasses.text}>
-                  {Math.round((row.sales30Day || 0) * 4)}
-                </td>
-                <td style={{ 
-                  padding: '12px 16px', 
-                  fontSize: '0.85rem', 
-                  textAlign: 'center', 
-                  width: '143px',
-                  height: '40px',
-                  verticalAlign: 'middle',
-                  boxSizing: 'border-box',
-                  borderTop: '1px solid #E5E7EB',
-                }} className={themeClasses.text}>
-                  {row.formula_name || ''}
-                </td>
-                <td style={{ 
-                  padding: '12px 16px', 
-                  fontSize: '0.85rem', 
-                  textAlign: 'center', 
-                  width: '143px',
-                  height: '40px',
-                  verticalAlign: 'middle',
-                  boxSizing: 'border-box',
-                  borderTop: '1px solid #E5E7EB',
-                }} className={themeClasses.text}>
-                  {row.bottleInventory || row.bottle_inventory || 0}
-                </td>
-                <td style={{ 
-                  padding: '12px 16px', 
-                  fontSize: '0.85rem', 
-                  textAlign: 'center', 
-                  width: '143px',
-                  height: '40px',
-                  verticalAlign: 'middle',
-                  boxSizing: 'border-box',
-                  borderTop: '1px solid #E5E7EB',
-                }} className={themeClasses.text}>
-                  {row.closureInventory || row.closure_inventory || 0}
-                </td>
-                <td style={{ 
-                  padding: '12px 16px', 
-                  fontSize: '0.85rem', 
-                  textAlign: 'center', 
-                  width: '143px',
-                  height: '40px',
-                  verticalAlign: 'middle',
-                  boxSizing: 'border-box',
-                  borderTop: '1px solid #E5E7EB',
-                }} className={themeClasses.text}>
-                  {row.boxInventory || row.box_inventory || 0}
-                </td>
-                <td style={{ 
-                  padding: '12px 16px', 
-                  fontSize: '0.85rem', 
-                  textAlign: 'center', 
-                  width: '143px',
-                  height: '40px',
-                  verticalAlign: 'middle',
-                  boxSizing: 'border-box',
-                  borderTop: '1px solid #E5E7EB',
-                }} className={themeClasses.text}>
-                  {row.labelsAvailable || row.label_inventory || row.labels_available || 0}
-                </td>
-                {/* Sticky three dots */}
-                <td style={{ 
-                  padding: '0.65rem 1rem', 
-                  textAlign: 'center',
-                  position: 'sticky',
-                  right: 0,
-                  zIndex: 5,
-                  backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-                  height: '40px',
-                  verticalAlign: 'middle',
-                  boxShadow: '-2px 0 4px rgba(0,0,0,0.1)',
-                  borderTop: '1px solid #E5E7EB',
+                  width: '320px',
+                  minWidth: '320px',
+                  maxWidth: '320px',
                 }}>
                   <button
                     type="button"
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                      cursor: 'pointer',
-                      fontSize: '1rem',
+                    onClick={() => onProductClick && onProductClick(row)}
+                    style={{ 
+                      color: '#3B82F6', 
+                      textDecoration: 'underline', 
+                      cursor: 'pointer', 
+                      background: 'none', 
+                      border: 'none', 
+                      padding: 0, 
+                      fontSize: '0.875rem',
+                      textAlign: 'left',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: '100%',
+                      display: 'block',
                     }}
                   >
-                    ⋮
+                    {(row.product || '').length > 80 ? `${(row.product || '').substring(0, 80)}...` : (row.product || '')}
                   </button>
+                </td>
+                {/* UNITS TO MAKE: dark input + blue Add button */}
+                <td style={{ 
+                  ...rowSeparatorBorder,
+                  padding: '0.5rem 0.75rem', 
+                  textAlign: 'center',
+                  width: '180px',
+                  minWidth: '180px',
+                  height: '58px',
+                  verticalAlign: 'middle',
+                  boxSizing: 'border-box',
+                  position: 'sticky',
+                  left: '510px',
+                  zIndex: 5,
+                  backgroundColor: isDarkMode ? '#1A2235' : '#FFFFFF',
+                }}>
+                  <div style={{ display: 'inline-flex', flexDirection: 'row', alignItems: 'center', gap: '4px', width: '100%', justifyContent: 'center' }}>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      ref={(el) => { if (el) qtyInputRefs.current[index] = el; }}
+                      data-row-index={index}
+                      value={rawQtyInputValues.current[index] !== undefined ? rawQtyInputValues.current[index] : (effectiveQtyValues[index] !== undefined && effectiveQtyValues[index] !== null && effectiveQtyValues[index] !== '' ? Number(effectiveQtyValues[index]).toLocaleString() : '')}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/,/g, '');
+                        if (v === '' || /^\d+$/.test(v)) {
+                          rawQtyInputValues.current[index] = v;
+                          setQtyInputUpdateTrigger(t => t + 1);
+                          if (v !== '') manuallyEditedIndices.current.add(index);
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const v = (e.target.value || '').replace(/,/g, '');
+                        rawQtyInputValues.current[index] = undefined;
+                        if (v === '') effectiveSetQtyValues(prev => ({ ...prev, [index]: '' }));
+                        else {
+                          const num = parseInt(v, 10);
+                          if (!isNaN(num) && num >= 0) effectiveSetQtyValues(prev => ({ ...prev, [index]: num }));
+                        }
+                        setQtyInputUpdateTrigger(t => t + 1);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        width: '107px',
+                        minWidth: '107px',
+                        height: '34px',
+                        padding: '8px 6px',
+                        borderRadius: '8px',
+                        border: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
+                        outline: 'none',
+                        backgroundColor: isDarkMode ? '#1A2235' : '#F8FAFC',
+                        color: isDarkMode ? '#FFFFFF' : '#0F172A',
+                        fontSize: '0.875rem',
+                        fontWeight: 500,
+                        textAlign: 'center',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleAddClick(row, index); }}
+                      onMouseEnter={() => setHoveredAddIndex(index)}
+                      onMouseLeave={() => setHoveredAddIndex(null)}
+                      style={{
+                        display: 'inline-flex',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '10px',
+                        width: '64px',
+                        minWidth: '64px',
+                        height: '24px',
+                        padding: '0 10px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        backgroundColor: '#3B82F6',
+                        color: '#FFFFFF',
+                        fontSize: '0.8125rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        boxSizing: 'border-box',
+                      }}
+                    >
+                      <span style={{ fontSize: '1rem', lineHeight: 1 }}>+</span> Add
+                    </button>
+                  </div>
+                </td>
+                <td style={{ 
+                  ...rowSeparatorBorder,
+                  padding: '0.5rem 0.75rem', 
+                  fontSize: '0.875rem',
+                  textAlign: 'center',
+                  width: '120px',
+                  minWidth: '120px',
+                  height: '58px',
+                  verticalAlign: 'middle',
+                  boxSizing: 'border-box',
+                  color: isDarkMode ? '#FFFFFF' : '#334155',
+                }}>
+                  {row.variation1 || row.variation_1 || (Array.isArray(row.variations) && row.variations[0]) || '-'}
+                </td>
+                <td style={{ 
+                  ...rowSeparatorBorder,
+                  padding: '0.5rem 0.75rem', 
+                  fontSize: '0.875rem',
+                  textAlign: 'center',
+                  width: '120px',
+                  minWidth: '120px',
+                  height: '58px',
+                  verticalAlign: 'middle',
+                  boxSizing: 'border-box',
+                  color: isDarkMode ? '#FFFFFF' : '#334155',
+                }}>
+                  {row.variation2 || row.variation_2 || (Array.isArray(row.variations) && row.variations[1]) || '-'}
+                </td>
+                <td style={{ 
+                  ...rowSeparatorBorder,
+                  padding: '0.5rem 0.75rem', 
+                  fontSize: '0.875rem',
+                  textAlign: 'center',
+                  width: '130px',
+                  minWidth: '130px',
+                  height: '58px',
+                  verticalAlign: 'middle',
+                  boxSizing: 'border-box',
+                  color: isDarkMode ? '#FFFFFF' : '#334155',
+                }}>
+                  {row.parent_asin || row.parentAsin || '-'}
+                </td>
+                <td style={{ 
+                  ...rowSeparatorBorder,
+                  padding: '0.5rem 0.75rem', 
+                  fontSize: '0.875rem',
+                  textAlign: 'center',
+                  width: '130px',
+                  minWidth: '130px',
+                  height: '58px',
+                  verticalAlign: 'middle',
+                  boxSizing: 'border-box',
+                  color: isDarkMode ? '#FFFFFF' : '#334155',
+                }}>
+                  {row.child_asin || row.childAsin || row.asin || '-'}
+                </td>
+                <td style={{ 
+                  ...rowSeparatorBorder,
+                  padding: '0.5rem 0.75rem', 
+                  fontSize: '0.875rem',
+                  textAlign: 'center',
+                  width: '100px',
+                  minWidth: '100px',
+                  height: '58px',
+                  verticalAlign: 'middle',
+                  boxSizing: 'border-box',
+                  color: isDarkMode ? '#FFFFFF' : '#334155',
+                }}>
+                  {row.fbaAvailable ?? row.totalInventory ?? row.doiTotal ?? '-'}
+                </td>
+                <td style={{ ...rowSeparatorBorder, padding: '0.5rem 0.75rem', fontSize: '0.875rem', textAlign: 'center', width: '110px', minWidth: '110px', height: '58px', verticalAlign: 'middle', boxSizing: 'border-box', color: isDarkMode ? '#FFFFFF' : '#334155' }}>
+                  {row.totalInventory ?? row.label_inventory ?? row.labels_available ?? '-'}
+                </td>
+                <td style={{ 
+                  ...rowSeparatorBorder,
+                  padding: '0.5rem 0.75rem', 
+                  fontSize: '0.875rem',
+                  textAlign: 'center',
+                  width: '100px',
+                  minWidth: '100px',
+                  height: '58px',
+                  verticalAlign: 'middle',
+                  boxSizing: 'border-box',
+                  color: isDarkMode ? '#3B82F6' : '#2563EB',
+                  fontWeight: 500,
+                }}>
+                  {(() => {
+                    const v = row.doiTotal ?? row.daysOfInventory ?? row.totalInventory;
+                    if (v === undefined || v === null || v === '') return '-';
+                    return typeof v === 'number' ? v.toLocaleString() : String(v);
+                  })()}
+                </td>
+                <td style={{ 
+                  ...rowSeparatorBorder,
+                  padding: '0.5rem 0.75rem', 
+                  fontSize: '0.875rem',
+                  textAlign: 'center',
+                  width: '130px',
+                  minWidth: '130px',
+                  height: '58px',
+                  verticalAlign: 'middle',
+                  boxSizing: 'border-box',
+                  color: isDarkMode ? '#A78BFA' : '#7C3AED',
+                  fontWeight: 500,
+                }}>
+                  {(() => {
+                    const v = row.doiFba ?? row.fbaAvailable ?? row.doiFbaAvailable;
+                    if (v === undefined || v === null || v === '') return '-';
+                    return typeof v === 'number' ? v.toLocaleString() : String(v);
+                  })()}
+                </td>
+                <td style={{ ...rowSeparatorBorder, padding: '0.5rem 0.75rem', fontSize: '0.875rem', textAlign: 'center', width: '120px', minWidth: '120px', height: '58px', verticalAlign: 'middle', boxSizing: 'border-box', color: isDarkMode ? '#FFFFFF' : '#334155' }}>
+                  {row.velocityTrend ?? row.velocity_trend ?? '-'}
+                </td>
+                <td style={{ ...rowSeparatorBorder, padding: '0.5rem 0.75rem', fontSize: '0.875rem', textAlign: 'center', width: '150px', minWidth: '150px', height: '58px', verticalAlign: 'middle', boxSizing: 'border-box', color: isDarkMode ? '#FFFFFF' : '#334155' }}>
+                  {row.sales7Day ?? row.sales_7_day ?? row.unitsOrdered7 ?? row.units_ordered_7 ?? '-'}
+                </td>
+                <td style={{ ...rowSeparatorBorder, padding: '0.5rem 0.75rem', fontSize: '0.875rem', textAlign: 'center', width: '150px', minWidth: '150px', height: '58px', verticalAlign: 'middle', boxSizing: 'border-box', color: isDarkMode ? '#FFFFFF' : '#334155' }}>
+                  {row.sales30Day ?? row.sales_30_day ?? row.unitsOrdered30 ?? row.units_ordered_30 ?? '-'}
+                </td>
+                <td style={{ ...rowSeparatorBorder, padding: '0.5rem 0.75rem', fontSize: '0.875rem', textAlign: 'center', width: '150px', minWidth: '150px', height: '58px', verticalAlign: 'middle', boxSizing: 'border-box', color: isDarkMode ? '#FFFFFF' : '#334155' }}>
+                  {row.sales90Day ?? row.sales_90_day ?? row.unitsOrdered90 ?? row.units_ordered_90 ?? '-'}
+                </td>
+                <td style={{ ...rowSeparatorBorder, padding: '0.5rem 0.75rem', fontSize: '0.875rem', textAlign: 'center', width: '100px', minWidth: '100px', height: '58px', verticalAlign: 'middle', boxSizing: 'border-box', color: isDarkMode ? '#FFFFFF' : '#334155' }}>
+                  {row.fbaTotal ?? row.fba_total ?? '-'}
+                </td>
+                <td style={{ ...rowSeparatorBorder, padding: '0.5rem 0.75rem', fontSize: '0.875rem', textAlign: 'center', width: '120px', minWidth: '120px', height: '58px', verticalAlign: 'middle', boxSizing: 'border-box', color: isDarkMode ? '#FFFFFF' : '#334155' }}>
+                  {row.fbaAvailable ?? row.fba_available ?? '-'}
+                </td>
+                <td style={{ ...rowSeparatorBorder, padding: '0.5rem 0.75rem', fontSize: '0.875rem', textAlign: 'center', width: '100px', minWidth: '100px', height: '58px', verticalAlign: 'middle', boxSizing: 'border-box', color: isDarkMode ? '#FFFFFF' : '#334155' }}>
+                  {row.awdTotal ?? row.awd_total ?? '-'}
                 </td>
               </tr>
             ); })}
