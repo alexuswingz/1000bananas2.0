@@ -311,16 +311,28 @@ const NewShipmentTable = ({
       .new-shipment-table-scroll tbody tr {
         position: relative !important;
       }
-      /* Make table feel seamless and continuous - no visual boundaries */
       .new-shipment-table-scroll {
-        /* Remove visual boundaries that make table feel "capped" */
         background: transparent !important;
       }
-      /* Ensure table extends naturally without compression */
+      /* Ensure table extends naturally without compression; add outer border */
       .new-shipment-table-scroll table {
         margin: 0 !important;
-        /* Allow table to extend naturally */
         max-width: none !important;
+        border: 1px solid ${isDarkMode ? '#334155' : '#E2E8F0'} !important;
+        border-radius: 8px !important;
+      }
+      /* Checkbox: default (unchecked) - no inline background so :checked can apply */
+      .new-shipment-checkbox {
+        background-color: ${isDarkMode ? '#1A2235' : '#FFFFFF'} !important;
+      }
+      /* Checkbox: checked state - blue background + white check mark */
+      .new-shipment-checkbox:checked {
+        background-color: #3B82F6 !important;
+        border-color: #3B82F6 !important;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%278%27 viewBox=%270 0 10 8%27 fill=%27none%27%3E%3Cpath d=%27M1 4L4 7L9 1%27 stroke=%27white%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E") !important;
+        background-repeat: no-repeat !important;
+        background-position: center !important;
+        background-size: 10px 8px !important;
       }
     `;
   }, [isDarkMode]);
@@ -3301,41 +3313,19 @@ const NewShipmentTable = ({
     }
   }, [openFilterIndex]);
 
-  // Handle select all checkbox
+  // Handle select all checkbox: check = select all rows, uncheck = uncheck all data cells
   const handleSelectAll = (e) => {
     if (e.target.checked) {
-      const selectedIds = new Set();
-      const addedIds = new Set();
-      
-      // Only select/add rows with non-zero quantity
-      currentRows.forEach(row => {
-        const index = row._originalIndex;
-        const currentQty = typeof effectiveQtyValues[index] === 'number' 
-          ? effectiveQtyValues[index] 
-          : (effectiveQtyValues[index] === '' || effectiveQtyValues[index] === null || effectiveQtyValues[index] === undefined) 
-            ? 0 
-            : parseInt(effectiveQtyValues[index], 10) || 0;
-        
-        if (currentQty > 0) {
-          selectedIds.add(row.id);
-          if (tableMode) {
-            addedIds.add(row.id);
-          }
-        }
-      });
-      
+      // Select all current rows (all data cell checkboxes checked)
+      const selectedIds = new Set(currentRows.map(row => row.id));
       setSelectedRows(selectedIds);
       if (tableMode) {
+        const addedIds = new Set(currentRows.map(row => row.id));
         setAddedRows(addedIds);
         if (onAddedRowsChange) onAddedRowsChange(addedIds);
       }
-      
-      // Update checkbox state if not all rows were selected
-      if (selectAllCheckboxRef.current && selectedIds.size < currentRows.length) {
-        selectAllCheckboxRef.current.indeterminate = selectedIds.size > 0;
-        selectAllCheckboxRef.current.checked = false;
-      }
     } else {
+      // Uncheck all data cells
       setSelectedRows(new Set());
       if (tableMode) {
         const newAdded = new Set();
@@ -3745,7 +3735,17 @@ const NewShipmentTable = ({
                   ref={nonTableSelectAllCheckboxRef}
                   checked={nonTableAllSelected}
                   onChange={handleNonTableSelectAll}
-                  style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                  style={{
+                    cursor: 'pointer',
+                    width: '16px',
+                    height: '16px',
+                    border: '1px solid #94A3B8',
+                    borderRadius: '4px',
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    pointerEvents: 'auto',
+                  }}
+                  className="new-shipment-checkbox"
                   aria-label="Select all products"
                 />
               </label>
@@ -4215,6 +4215,7 @@ const NewShipmentTable = ({
                     {/* Checkbox for bulk selection */}
                     <label
                       style={{
+                        position: 'relative',
                         display: 'inline-flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -4230,12 +4231,17 @@ const NewShipmentTable = ({
                         onChange={(e) => handleNonTableCheckboxClick(e, arrayIndex, index)}
                         style={{
                           position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '16px',
+                          height: '16px',
                           opacity: 0,
-                          width: 0,
-                          height: 0,
                           margin: 0,
-                          pointerEvents: 'none'
+                          cursor: 'pointer',
+                          pointerEvents: 'auto',
+                          zIndex: 2,
                         }}
+                        aria-label="Select row"
                       />
                       <span
                         style={{
@@ -4245,7 +4251,7 @@ const NewShipmentTable = ({
                           border: '1px solid',
                           borderColor: isSelected
                             ? (isDarkMode ? '#3B82F6' : '#3B82F6')
-                            : (isDarkMode ? '#64748B' : '#94A3B8'),
+                            : '#94A3B8',
                           backgroundColor: isSelected 
                             ? (isDarkMode ? '#3B82F6' : '#3B82F6')
                             : (isDarkMode ? '#1A2235' : '#F9FAFB'),
@@ -4253,7 +4259,8 @@ const NewShipmentTable = ({
                           alignItems: 'center',
                           justifyContent: 'center',
                           flexShrink: 0,
-                          transition: 'background-color 0.2s, border-color 0.2s'
+                          transition: 'background-color 0.2s, border-color 0.2s',
+                          pointerEvents: 'none',
                         }}
                       >
                         {isSelected && (
@@ -5862,6 +5869,27 @@ const NewShipmentTable = ({
         .new-shipment-table-scroll:hover::-webkit-scrollbar-thumb:hover {
           background: ${isDarkMode ? '#94A3B8' : '#6B7280'} !important;
         }
+        /* Table mode: border on table container only */
+        .new-shipment-table-scroll table {
+          border: 1px solid ${isDarkMode ? '#334155' : '#E2E8F0'} !important;
+          border-radius: 8px !important;
+        }
+        /* Table mode: header row +10px height (68px total) */
+        .new-shipment-table-scroll thead tr,
+        .new-shipment-table-scroll thead th {
+          height: 68px !important;
+          max-height: 68px !important;
+        }
+        /* Checkbox checked: blue + white check (table mode) */
+        .new-shipment-checkbox { background-color: ${isDarkMode ? '#1A2235' : '#FFFFFF'} !important; }
+        .new-shipment-checkbox:checked {
+          background-color: #3B82F6 !important;
+          border-color: #3B82F6 !important;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%278%27 viewBox=%270 0 10 8%27 fill=%27none%27%3E%3Cpath d=%27M1 4L4 7L9 1%27 stroke=%27white%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E") !important;
+          background-repeat: no-repeat !important;
+          background-position: center !important;
+          background-size: 10px 8px !important;
+        }
         /* Custom styled tooltip for inventory warning icons */
         .inventory-warning-icon {
           position: relative;
@@ -5932,7 +5960,8 @@ const NewShipmentTable = ({
           minHeight: '400px',
           maxHeight: 'calc(100vh - 280px)',
           display: 'block',
-          border: 'none',
+          border: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
+          borderRadius: '8px',
           boxShadow: 'none',
           backgroundColor: isDarkMode ? '#1A2235' : undefined,
         }}
@@ -5948,6 +5977,8 @@ const NewShipmentTable = ({
             display: 'table',
             position: 'relative',
             backgroundColor: isDarkMode ? '#1A2235' : undefined,
+            border: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
+            borderRadius: '8px',
           }}
         >
           <thead className={themeClasses.headerBg} style={{
@@ -5984,13 +6015,26 @@ const NewShipmentTable = ({
                 zIndex: 1020,
                 backgroundColor: isDarkMode ? '#1A2235' : '#F8FAFC',
               }}>
-                <input 
-                  type="checkbox" 
-                  style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#3B82F6', border: isDarkMode ? '1px solid rgba(255,255,255,0.5)' : undefined }}
+                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', width: '100%', height: '100%', minHeight: '58px', margin: 0 }}>
+                  <input 
+                    type="checkbox" 
+                  style={{
+                    cursor: 'pointer',
+                    width: '16px',
+                    height: '16px',
+                    accentColor: '#3B82F6',
+                    border: '1px solid #94A3B8',
+                    borderRadius: '4px',
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    pointerEvents: 'auto',
+                  }}
+                  className="new-shipment-checkbox"
                   checked={allSelected}
-                  ref={selectAllCheckboxRef}
-                  onChange={handleSelectAll}
-                />
+                    ref={selectAllCheckboxRef}
+                    onChange={handleSelectAll}
+                  />
+                </label>
               </th>
               <th style={{ 
                 borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
@@ -6387,12 +6431,25 @@ const NewShipmentTable = ({
                   height: '58px',
                   verticalAlign: 'middle',
                 }}>
-                  <input 
-                    type="checkbox" 
-                    style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#3B82F6', border: isDarkMode ? '1px solid rgba(255,255,255,0.5)' : undefined }}
-                    checked={selectedRows.has(row.id)}
-                    onChange={(e) => handleRowSelect(row.id, e)}
-                  />
+                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', width: '100%', height: '100%', minHeight: '58px', margin: 0 }}>
+                    <input 
+                      type="checkbox" 
+                      style={{
+                        cursor: 'pointer',
+                        width: '16px',
+                        height: '16px',
+                        accentColor: '#3B82F6',
+                        border: '1px solid #94A3B8',
+                        borderRadius: '4px',
+                        appearance: 'none',
+                        WebkitAppearance: 'none',
+                        pointerEvents: 'auto',
+                      }}
+                      className="new-shipment-checkbox"
+                      checked={selectedRows.has(row.id)}
+                      onChange={(e) => handleRowSelect(row.id, e)}
+                    />
+                  </label>
                 </td>
                 <td style={{ 
                   ...rowSeparatorBorder,
