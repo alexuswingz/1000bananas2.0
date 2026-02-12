@@ -128,10 +128,45 @@ const NgoosModal = ({
   const currentPosition = currentProductIndex >= 0 ? currentProductIndex + 1 : 0;
   const totalProducts = allProducts.length;
   
+  // Check if inventory is 0 or sold out
+  const totalInventory = selectedRow?.totalInventory || selectedRow?.total_inventory || 0;
+  const fbaAvailable = selectedRow?.fbaAvailable || selectedRow?.fba_available || 0;
+  const isInventoryZeroOrSoldOut = totalInventory === 0 || fbaAvailable === 0;
+  
   // Get units_to_make from selectedRow (passed from table) to ensure consistency
   // This matches exactly what's shown in the table's QTY/Units to Make column
-  // Fallback to freshly fetched forecastData only if selectedRow doesn't have it
-  const forecastUnits = selectedRow?.units_to_make ?? selectedRow?.suggestedQty ?? forecastData?.units_to_make ?? 0;
+  // The table checks in this order: suggestedQty, units_to_make, unitsToMake
+  // If inventory is 0 or sold out, prioritize units_to_make from Add Products page
+  // Ensure we use the exact value (not normalized) when inventory is 0
+  let forecastUnits;
+  if (isInventoryZeroOrSoldOut) {
+    // When inventory is 0, use the exact units_to_make value from Add Products page
+    // Check in the same order as the table: suggestedQty first, then units_to_make, then unitsToMake
+    const unitsToMake = selectedRow?.suggestedQty ?? 
+                        selectedRow?.units_to_make ?? 
+                        selectedRow?.unitsToMake ?? 
+                        selectedRow?.weeklyForecast ??
+                        selectedRow?.forecast ??
+                        null;
+    // Convert to number, but preserve 0 if it's explicitly 0
+    if (unitsToMake != null) {
+      forecastUnits = Number(unitsToMake);
+      // Ensure it's not NaN
+      if (isNaN(forecastUnits)) {
+        forecastUnits = 0;
+      }
+    } else {
+      forecastUnits = 0;
+    }
+  } else {
+    // Normal flow: use selectedRow value or fallback to forecastData
+    // Match table order: suggestedQty first
+    forecastUnits = selectedRow?.suggestedQty ?? 
+                    selectedRow?.units_to_make ?? 
+                    selectedRow?.unitsToMake ??
+                    forecastData?.units_to_make ?? 
+                    0;
+  }
   
   // Get ACTUAL available label inventory (accounting for labels already used in current shipment)
   // labelsAvailable prop is already calculated by parent to subtract used labels

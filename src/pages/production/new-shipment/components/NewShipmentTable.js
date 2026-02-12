@@ -88,6 +88,10 @@ const NewShipmentTable = ({
   const [hoveredAddIndex, setHoveredAddIndex] = useState(null);
   const [hoveredWarningIndex, setHoveredWarningIndex] = useState(null);
   const [hoveredInventoryWarningIndex, setHoveredInventoryWarningIndex] = useState(null);
+  const [inventoryTooltipPosition, setInventoryTooltipPosition] = useState({ top: 0, left: 0, visible: false, label: '' });
+  const [labelsTooltipPosition, setLabelsTooltipPosition] = useState({ top: 0, left: 0, visible: false, labelsAvailable: 0 });
+  const inventoryWarningIconRefs = useRef({});
+  const labelsWarningIconRefs = useRef({});
   const qtyContainerRefs = useRef({});
   const popupRefs = useRef({});
   const qtyInputRefs = useRef({});
@@ -508,6 +512,72 @@ const NewShipmentTable = ({
       clearTimeout(scrollTimeout);
     };
   }, [tableMode]);
+
+  // Update tooltip positions on scroll/resize when tooltips are visible
+  useEffect(() => {
+    if (inventoryTooltipPosition.visible && hoveredInventoryWarningIndex !== null) {
+      const updatePosition = () => {
+        const icon = inventoryWarningIconRefs.current[hoveredInventoryWarningIndex];
+        if (icon) {
+          const rect = icon.getBoundingClientRect();
+          const headerHeight = 67; // Sticky header height
+          const tooltipHeight = 31; // Approximate tooltip height
+          const spaceAbove = rect.top;
+          const spaceBelow = window.innerHeight - rect.bottom;
+          // If not enough space above or would be clipped by header, position below
+          const positionAbove = spaceAbove >= tooltipHeight + 8 && rect.top > headerHeight + 8;
+          const tooltipTop = positionAbove 
+            ? rect.top - tooltipHeight - 8
+            : rect.bottom + 8;
+          setInventoryTooltipPosition(prev => ({
+            ...prev,
+            top: tooltipTop,
+            left: rect.left + rect.width / 2,
+          }));
+        }
+      };
+      updatePosition();
+      window.addEventListener('scroll', updatePosition, true);
+      window.addEventListener('resize', updatePosition);
+      return () => {
+        window.removeEventListener('scroll', updatePosition, true);
+        window.removeEventListener('resize', updatePosition);
+      };
+    }
+  }, [inventoryTooltipPosition.visible, hoveredInventoryWarningIndex]);
+
+  // Update labels tooltip positions on scroll/resize when tooltips are visible
+  useEffect(() => {
+    if (labelsTooltipPosition.visible && hoveredWarningIndex !== null) {
+      const updatePosition = () => {
+        const icon = labelsWarningIconRefs.current[hoveredWarningIndex];
+        if (icon) {
+          const rect = icon.getBoundingClientRect();
+          const headerHeight = 67; // Sticky header height
+          const tooltipHeight = 31; // Approximate tooltip height
+          const spaceAbove = rect.top;
+          const spaceBelow = window.innerHeight - rect.bottom;
+          // If not enough space above or would be clipped by header, position below
+          const positionAbove = spaceAbove >= tooltipHeight + 8 && rect.top > headerHeight + 8;
+          const tooltipTop = positionAbove 
+            ? rect.top - tooltipHeight - 8
+            : rect.bottom + 8;
+          setLabelsTooltipPosition(prev => ({
+            ...prev,
+            top: tooltipTop,
+            left: rect.left + rect.width / 2,
+          }));
+        }
+      };
+      updatePosition();
+      window.addEventListener('scroll', updatePosition, true);
+      window.addEventListener('resize', updatePosition);
+      return () => {
+        window.removeEventListener('scroll', updatePosition, true);
+        window.removeEventListener('resize', updatePosition);
+      };
+    }
+  }, [labelsTooltipPosition.visible, hoveredWarningIndex]);
 
   // Custom scroll thumb drag (non-table data cell) – only thumb is visible, no track
   const handleNonTableThumbMouseDown = useCallback((e) => {
@@ -2914,6 +2984,24 @@ const NewShipmentTable = ({
     return Math.round(num / increment) * increment;
   };
 
+  // Round quantity up to nearest case increment
+  const roundQtyUpToNearestCase = (qty, row) => {
+    const num = typeof qty === 'number' ? qty : parseInt(qty, 10) || 0;
+    if (num <= 0) return num;
+    const increment = getQtyIncrement(row);
+    if (increment <= 1) return num;
+    return Math.ceil(num / increment) * increment;
+  };
+
+  // Round quantity down to nearest case increment
+  const roundQtyDownToNearestCase = (qty, row) => {
+    const num = typeof qty === 'number' ? qty : parseInt(qty, 10) || 0;
+    if (num <= 0) return 0;
+    const increment = getQtyIncrement(row);
+    if (increment <= 1) return num;
+    return Math.floor(num / increment) * increment;
+  };
+
   // Keyboard support for bulk increase/decrease (non-table mode)
   useEffect(() => {
     if (tableMode || nonTableSelectedIndices.size === 0) {
@@ -3665,7 +3753,7 @@ const NewShipmentTable = ({
         <style>{`
           .non-table-data-scroll {
             overflow-y: auto;
-            overflow-x: hidden;
+            overflow-x: visible;
             scrollbar-width: none;
             -ms-overflow-style: none;
             will-change: scroll-position;
@@ -4013,7 +4101,7 @@ const NewShipmentTable = ({
           {/* Product Rows - scrollable data cell with custom thumb-only scrollbar */}
           <div
             ref={nonTableDataScrollWrapperRef}
-            style={{ position: 'relative', maxHeight: 'calc(100vh - 260px)' }}
+            style={{ position: 'relative', maxHeight: 'calc(100vh - 260px)', overflow: 'visible' }}
             onMouseEnter={() => {
               const el = nonTableDataScrollRef.current;
               if (el) {
@@ -4196,7 +4284,9 @@ const NewShipmentTable = ({
                     msUserSelect: 'none', // IE/Edge
                     boxSizing: 'border-box',
                     position: 'relative',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    zIndex: hoveredInventoryWarningIndex === index ? 10001 : 'auto',
+                    overflow: 'visible',
                   }}
                 >
                   {/* Border line with 30px margin on both sides */}
@@ -4428,15 +4518,41 @@ const NewShipmentTable = ({
                     const warningColor = isOutOfStock ? '#EF4444' : isNoSales ? '#F97316' : null;
                     const warningLabel = isOutOfStock ? 'Sold Out' : isNoSales ? 'No Sales' : null;
                     return (
-                      <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '6px', fontSize: '14px', fontWeight: 500, color: isDarkMode ? '#FFFFFF' : '#111827', paddingLeft: '16px', marginLeft: '-255px', marginRight: '20px', minWidth: '140px', height: '23px', position: 'relative', overflow: 'visible' }}>
+                      <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '6px', fontSize: '14px', fontWeight: 500, color: isDarkMode ? '#FFFFFF' : '#111827', paddingLeft: '16px', marginLeft: '-255px', marginRight: '20px', minWidth: '140px', height: '23px', position: 'relative', overflow: 'visible', zIndex: hoveredInventoryWarningIndex === index ? 100000 : 1 }}>
                         {warningColor && (
                           <span
+                            ref={(el) => { if (el) inventoryWarningIconRefs.current[index] = el; }}
                             className="inventory-warning-icon"
-                            onMouseEnter={() => setHoveredInventoryWarningIndex(index)}
-                            onMouseLeave={() => setHoveredInventoryWarningIndex(null)}
+                            onMouseEnter={() => {
+                              setHoveredInventoryWarningIndex(index);
+                              // Calculate tooltip position
+                              const icon = inventoryWarningIconRefs.current[index];
+                              if (icon) {
+                                const rect = icon.getBoundingClientRect();
+                                const headerHeight = 67; // Sticky header height
+                                const tooltipHeight = 31; // Approximate tooltip height
+                                const spaceAbove = rect.top;
+                                const spaceBelow = window.innerHeight - rect.bottom;
+                                // If not enough space above or would be clipped by header, position below
+                                const positionAbove = spaceAbove >= tooltipHeight + 8 && rect.top > headerHeight + 8;
+                                const tooltipTop = positionAbove 
+                                  ? rect.top - tooltipHeight - 8
+                                  : rect.bottom + 8;
+                                setInventoryTooltipPosition({
+                                  top: tooltipTop,
+                                  left: rect.left + rect.width / 2,
+                                  visible: true,
+                                  label: warningLabel
+                                });
+                              }
+                            }}
+                            onMouseLeave={() => {
+                              setHoveredInventoryWarningIndex(null);
+                              setInventoryTooltipPosition(prev => ({ ...prev, visible: false }));
+                            }}
                             style={{
-                              width: '14px',
-                              height: '14px',
+                              width: '18px',
+                              height: '18px',
                               borderRadius: '50%',
                               backgroundColor: warningColor,
                               display: 'flex',
@@ -4446,41 +4562,10 @@ const NewShipmentTable = ({
                               cursor: 'default',
                               position: 'relative',
                               overflow: 'visible',
+                              zIndex: hoveredInventoryWarningIndex === index ? 100000 : 'auto',
                             }}
                           >
-                            <span style={{ color: '#FFFFFF', fontWeight: 700, fontSize: '9px', lineHeight: 1 }}>!</span>
-                            {hoveredInventoryWarningIndex === index && (
-                              <span
-                                className="inventory-warning-tooltip"
-                                style={{
-                                  position: 'absolute',
-                                  bottom: 'calc(100% + 8px)',
-                                  left: '50%',
-                                  transform: 'translateX(-50%)',
-                                  width: '71px',
-                                  height: '31px',
-                                  borderRadius: '8px',
-                                  borderWidth: '1px',
-                                  borderStyle: 'solid',
-                                  borderColor: isDarkMode ? '#374151' : '#E5E7EB',
-                                  paddingTop: '8px',
-                                  paddingRight: '12px',
-                                  paddingBottom: '8px',
-                                  paddingLeft: '12px',
-                                  boxSizing: 'border-box',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: '10px',
-                                  backgroundColor: '#1F2937',
-                                  color: '#FFFFFF',
-                                  fontSize: '12px',
-                                  fontWeight: 500,
-                                  whiteSpace: 'nowrap',
-                                  zIndex: 50,
-                                }}
-                              >{warningLabel}</span>
-                            )}
+                            <span style={{ color: '#FFFFFF', fontWeight: 700, fontSize: '12px', lineHeight: 1 }}>!</span>
                           </span>
                         )}
                         <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', height: '100%', width: 'fit-content' }}>{totalInv.toLocaleString()}</span>
@@ -4489,7 +4574,7 @@ const NewShipmentTable = ({
                   })()}
 
                   {/* UNITS TO MAKE Column - match header: same padding so content aligns under header */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '8px', paddingLeft: '16px', marginLeft: '-300px', marginRight: '20px', position: 'relative', minWidth: '220px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '8px', paddingLeft: '16px', marginLeft: '-300px', marginRight: '20px', position: 'relative', minWidth: '220px', zIndex: hoveredWarningIndex === index ? 10001 : 'auto' }}>
                     {/* Label warning icon - shown when QTY exceeds labels, positioned on the left */}
                     {(() => {
                       const labelsAvailable = getAvailableLabelsForRow(row, index);
@@ -4500,14 +4585,42 @@ const NewShipmentTable = ({
                           <>
                             <span
                               ref={(el) => {
-                                if (el) warningIconRefs.current[index] = el;
+                                if (el) {
+                                  warningIconRefs.current[index] = el;
+                                  labelsWarningIconRefs.current[index] = el;
+                                }
                               }}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setClickedQtyIndex(clickedQtyIndex === index ? null : index);
                               }}
-                              onMouseEnter={() => setHoveredWarningIndex(index)}
-                              onMouseLeave={() => setHoveredWarningIndex(null)}
+                              onMouseEnter={() => {
+                                setHoveredWarningIndex(index);
+                                // Calculate tooltip position
+                                const icon = labelsWarningIconRefs.current[index];
+                                if (icon) {
+                                  const rect = icon.getBoundingClientRect();
+                                  const headerHeight = 67; // Sticky header height
+                                  const tooltipHeight = 31; // Approximate tooltip height
+                                  const spaceAbove = rect.top;
+                                  const spaceBelow = window.innerHeight - rect.bottom;
+                                  // If not enough space above or would be clipped by header, position below
+                                  const positionAbove = spaceAbove >= tooltipHeight + 8 && rect.top > headerHeight + 8;
+                                  const tooltipTop = positionAbove 
+                                    ? rect.top - tooltipHeight - 8
+                                    : rect.bottom + 8;
+                                  setLabelsTooltipPosition({
+                                    top: tooltipTop,
+                                    left: rect.left + rect.width / 2,
+                                    visible: true,
+                                    labelsAvailable: labelsAvailable
+                                  });
+                                }
+                              }}
+                              onMouseLeave={() => {
+                                setHoveredWarningIndex(null);
+                                setLabelsTooltipPosition(prev => ({ ...prev, visible: false }));
+                              }}
                               style={{
                                 position: 'absolute',
                                 left: 'calc(50% - 257px)',
@@ -4524,35 +4637,11 @@ const NewShipmentTable = ({
                                 fontSize: '12px',
                                 fontWeight: 700,
                                 cursor: 'pointer',
-                                zIndex: 10,
+                                zIndex: hoveredWarningIndex === index ? 100000 : 10,
                               }}
                             >
                               !
                             </span>
-                            {/* Custom tooltip for warning icon */}
-                            {hoveredWarningIndex === index && (
-                              <div
-                                style={{
-                                  position: 'absolute',
-                                  left: 'calc(50% - 312px)', // 55px to the left of the warning icon
-                                  top: '50%',
-                                  transform: 'translateY(calc(-50% - 30px))',
-                                  backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-                                  color: isDarkMode ? '#E5E7EB' : '#111827',
-                                  padding: '6px 10px',
-                                  borderRadius: '6px',
-                                  fontSize: '11px',
-                                  fontWeight: 500,
-                                  whiteSpace: 'nowrap',
-                                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                                  border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
-                                  zIndex: 9,
-                                  pointerEvents: 'none',
-                                }}
-                              >
-                                Labels Available: {labelsAvailable.toLocaleString()}
-                              </div>
-                            )}
                           </>
                         );
                       }
@@ -4563,7 +4652,7 @@ const NewShipmentTable = ({
                       ref={(el) => {
                         if (el) qtyContainerRefs.current[index] = el;
                       }}
-                      style={{ position: 'relative', width: '110px', height: '28px' }}
+                      style={{ position: 'relative', width: '110px', height: '28px', cursor: 'text' }}
                       onMouseEnter={() => setHoveredQtyIndex(index)}
                       onMouseLeave={() => setHoveredQtyIndex(null)}
                     >
@@ -4663,6 +4752,9 @@ const NewShipmentTable = ({
                       </button>
                       {/* Quantity input - clean rounded rectangle. In non-table mode we allow free typing and only round to nearest increment on blur/Enter. */}
                       <input 
+                        ref={(el) => {
+                          if (el) qtyInputRefs.current[index] = el;
+                        }}
                         type="text" 
                         value={(() => {
                           // While user is typing, show raw string so they can enter e.g. "120" without "1" rounding to 60
@@ -4697,15 +4789,20 @@ const NewShipmentTable = ({
                           if (Number.isNaN(num) || num < 0) {
                             return;
                           }
-                          const rounded = roundQtyToNearestCase(num, row);
-                          effectiveSetQtyValues(prev => ({ ...prev, [index]: rounded }));
+                          // Don't round on blur - allow custom values to be entered
+                          effectiveSetQtyValues(prev => ({ ...prev, [index]: num }));
+                        }}
+                        onFocus={(e) => {
+                          e.target.select(); // Select all text when focused for easy replacement
+                          e.stopPropagation();
                         }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
-                            e.target.blur(); // Blur triggers onBlur which rounds and commits
+                            e.target.blur(); // Blur triggers onBlur which commits the value as-is (no rounding)
                           }
                         }}
-                        onClick={(e) => e.stopPropagation()} 
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()} 
                         style={{ 
                           width: '100%',
                           height: '100%',
@@ -4722,7 +4819,10 @@ const NewShipmentTable = ({
                           paddingLeft: '28px',
                           paddingRight: '28px',
                           boxSizing: 'border-box',
-                          cursor: 'text'
+                          cursor: 'text',
+                          position: 'relative',
+                          zIndex: 2,
+                          pointerEvents: 'auto'
                         }}
                         onWheel={(e) => e.target.blur()}
                       />
@@ -4738,7 +4838,8 @@ const NewShipmentTable = ({
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: '0px',
-                          zIndex: 1,
+                          zIndex: 3,
+                          pointerEvents: 'none',
                         }}
                       >
                         {/* Increment arrow (top) */}
@@ -4757,10 +4858,18 @@ const NewShipmentTable = ({
                                 nonTableSelectedIndices.forEach(selectedIndex => {
                                   const selectedRow = currentRows.find(r => r._originalIndex === selectedIndex);
                                   if (selectedRow) {
-                                    const currentQty = newValues[selectedIndex] ?? 0;
+                                    // Get current value (from raw input if available, otherwise from effective values)
+                                    const rawValue = rawQtyInputValues.current[selectedIndex];
+                                    const currentQty = rawValue !== undefined 
+                                      ? (typeof rawValue === 'number' ? rawValue : parseInt(rawValue, 10) || 0)
+                                      : (newValues[selectedIndex] ?? 0);
                                     const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
+                                    // Round up to nearest case increment (don't add another increment)
                                     const increment = getQtyIncrement(selectedRow);
-                                    newValues[selectedIndex] = numQty + increment;
+                                    const rounded = roundQtyUpToNearestCase(numQty, selectedRow);
+                                    // If already at a case increment, add one increment; otherwise just round to nearest increment above
+                                    const newValue = rounded === numQty ? rounded + increment : rounded;
+                                    newValues[selectedIndex] = newValue;
                                     manuallyEditedIndices.current.add(selectedIndex);
                                   }
                                 });
@@ -4770,12 +4879,19 @@ const NewShipmentTable = ({
                               if (rawQtyInputValues.current[index] !== undefined) {
                                 rawQtyInputValues.current[index] = undefined;
                               }
-                              const currentQty = effectiveQtyValues[index] ?? 0;
+                              // Get current value (from raw input if available, otherwise from effective values)
+                              const rawValue = rawQtyInputValues.current[index];
+                              const currentQty = rawValue !== undefined 
+                                ? (typeof rawValue === 'number' ? rawValue : parseInt(rawValue, 10) || 0)
+                                : (effectiveQtyValues[index] ?? 0);
                               const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
+                              // Round up to nearest case increment (don't add another increment)
                               const increment = getQtyIncrement(row);
-                              const newQty = numQty + increment;
+                              const rounded = roundQtyUpToNearestCase(numQty, row);
+                              // If already at a case increment, add one increment; otherwise just round to nearest increment above
+                              const newValue = rounded === numQty ? rounded + increment : rounded;
                               manuallyEditedIndices.current.add(index);
-                              effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty }));
+                              effectiveSetQtyValues(prev => ({ ...prev, [index]: newValue }));
                               setQtyInputUpdateTrigger(prev => prev + 1);
                             }
                           }}
@@ -4792,6 +4908,7 @@ const NewShipmentTable = ({
                             justifyContent: 'center',
                             padding: 0,
                             outline: 'none',
+                            pointerEvents: 'auto',
                           }}
                           onMouseEnter={(e) => { e.currentTarget.style.color = isDarkMode ? '#D1D5DB' : '#374151'; }}
                           onMouseLeave={(e) => { e.currentTarget.style.color = isDarkMode ? '#9CA3AF' : '#6B7280'; }}
@@ -4817,11 +4934,19 @@ const NewShipmentTable = ({
                                 nonTableSelectedIndices.forEach(selectedIndex => {
                                   const selectedRow = currentRows.find(r => r._originalIndex === selectedIndex);
                                   if (selectedRow) {
-                                    const currentQty = newValues[selectedIndex] ?? 0;
+                                    // Get current value (from raw input if available, otherwise from effective values)
+                                    const rawValue = rawQtyInputValues.current[selectedIndex];
+                                    const currentQty = rawValue !== undefined 
+                                      ? (typeof rawValue === 'number' ? rawValue : parseInt(rawValue, 10) || 0)
+                                      : (newValues[selectedIndex] ?? 0);
                                     const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
                                     if (numQty <= 0) return;
+                                    // Round down to nearest case increment (don't subtract another increment)
                                     const increment = getQtyIncrement(selectedRow);
-                                    newValues[selectedIndex] = Math.max(0, numQty - increment);
+                                    const rounded = roundQtyDownToNearestCase(numQty, selectedRow);
+                                    // If already at a case increment, subtract one increment; otherwise just round to nearest increment below
+                                    const newValue = rounded === numQty ? Math.max(0, rounded - increment) : rounded;
+                                    newValues[selectedIndex] = newValue;
                                     manuallyEditedIndices.current.add(selectedIndex);
                                   }
                                 });
@@ -4831,13 +4956,20 @@ const NewShipmentTable = ({
                               if (rawQtyInputValues.current[index] !== undefined) {
                                 rawQtyInputValues.current[index] = undefined;
                               }
-                              const currentQty = effectiveQtyValues[index] ?? 0;
+                              // Get current value (from raw input if available, otherwise from effective values)
+                              const rawValue = rawQtyInputValues.current[index];
+                              const currentQty = rawValue !== undefined 
+                                ? (typeof rawValue === 'number' ? rawValue : parseInt(rawValue, 10) || 0)
+                                : (effectiveQtyValues[index] ?? 0);
                               const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
                               if (numQty <= 0) return;
+                              // Round down to nearest case increment (don't subtract another increment)
                               const increment = getQtyIncrement(row);
-                              const newQty = Math.max(0, numQty - increment);
+                              const rounded = roundQtyDownToNearestCase(numQty, row);
+                              // If already at a case increment, subtract one increment; otherwise just round to nearest increment below
+                              const newValue = rounded === numQty ? Math.max(0, rounded - increment) : rounded;
                               manuallyEditedIndices.current.add(index);
-                              effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty }));
+                              effectiveSetQtyValues(prev => ({ ...prev, [index]: newValue }));
                               setQtyInputUpdateTrigger(prev => prev + 1);
                             }
                           }}
@@ -4957,7 +5089,7 @@ const NewShipmentTable = ({
                             color: '#9CA3AF',
                             margin: 0,
                             lineHeight: '14px',
-                            overflow: 'hidden',
+                            overflow: 'visible',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
                           }}>
@@ -5811,6 +5943,55 @@ const NewShipmentTable = ({
         )}
         </>
         )}
+        {/* Fixed position tooltips to avoid clipping by sticky header */}
+        {inventoryTooltipPosition.visible && createPortal(
+          <div
+            style={{
+              position: 'fixed',
+              top: `${inventoryTooltipPosition.top}px`,
+              left: `${inventoryTooltipPosition.left}px`,
+              transform: 'translateX(-50%)',
+              backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+              color: isDarkMode ? '#E5E7EB' : '#111827',
+              padding: '6px 10px',
+              borderRadius: '6px',
+              fontSize: '11px',
+              fontWeight: 500,
+              whiteSpace: 'nowrap',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+              border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+              zIndex: 100000,
+              pointerEvents: 'none',
+            }}
+          >
+            {inventoryTooltipPosition.label}
+          </div>,
+          document.body
+        )}
+        {labelsTooltipPosition.visible && createPortal(
+          <div
+            style={{
+              position: 'fixed',
+              top: `${labelsTooltipPosition.top}px`,
+              left: `${labelsTooltipPosition.left}px`,
+              transform: 'translateX(-50%)',
+              backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+              color: isDarkMode ? '#E5E7EB' : '#111827',
+              padding: '6px 10px',
+              borderRadius: '6px',
+              fontSize: '11px',
+              fontWeight: 500,
+              whiteSpace: 'nowrap',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+              border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+              zIndex: 100000,
+              pointerEvents: 'none',
+            }}
+          >
+            Labels Available: {labelsTooltipPosition.labelsAvailable.toLocaleString()}
+          </div>,
+          document.body
+        )}
       </>
     );
   }
@@ -6487,9 +6668,679 @@ const NewShipmentTable = ({
                   backgroundColor: isDarkMode ? '#1A2235' : '#FFFFFF',
                   height: '58px',
                   verticalAlign: 'middle',
-                  width: '320px',
-                  minWidth: '320px',
-                  maxWidth: '320px',
+                  width: '200px',
+                  minWidth: '200px',
+                  maxWidth: '200px',
+                  boxShadow: '2px 0 4px rgba(0,0,0,0.1)',
+                  borderTop: '1px solid #E5E7EB',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => onProductClick(row)}
+                      className="text-xs text-blue-500 hover:text-blue-600"
+                      style={{ textDecoration: 'underline', cursor: 'pointer' }}
+                    >
+                      {row.product.length > 18 ? `${row.product.substring(0, 18)}...` : row.product}
+                    </button>
+                    {topSellerIds.has(row.id) && (
+                      <span
+                        style={{
+                          fontSize: '9px',
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.02em',
+                          color: '#B45309',
+                          backgroundColor: '#FEF3C7',
+                          padding: '2px 6px',
+                          borderRadius: '6px',
+                        }}
+                        title="Top 2 by 7-day (last week) & 30-day sales"
+                      >
+                        Best Seller
+                      </span>
+                    )}
+                  </div>
+                </td>
+                <td style={{ 
+                  padding: '0.65rem 1rem', 
+                  fontSize: '0.85rem',
+                  textAlign: 'center',
+                  position: 'sticky',
+                  left: '390px',
+                  zIndex: 5,
+                  backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                  width: '120px',
+                  minWidth: '120px',
+                  maxWidth: '120px',
+                  height: '40px',
+                  verticalAlign: 'middle',
+                  borderTop: '1px solid #E5E7EB',
+                  borderRight: 'none',
+                }} className={themeClasses.textSecondary}>
+                  {row.size}
+                </td>
+                {/* Scrollable columns */}
+                <td style={{ 
+                  padding: '0.65rem 1rem', 
+                  textAlign: 'center',
+                  width: '143px',
+                  height: '40px',
+                  verticalAlign: 'middle',
+                  boxSizing: 'border-box',
+                  borderTop: '1px solid #E5E7EB',
+                  borderLeft: 'none',
+                }}>
+                  <div style={{ position: 'relative', display: 'block', zIndex: hoveredWarningIndex === index ? 10001 : 'auto' }}>
+                    <div
+                      ref={(el) => {
+                        if (el) qtyContainerRefs.current[index] = el;
+                      }}
+                      onMouseEnter={() => setHoveredQtyIndex(index)}
+                      onMouseLeave={() => setHoveredQtyIndex(null)}
+                      title={isQtyExceedingLabels(row, index) ? `Exceeds available labels (${getAvailableLabelsForRow(row, index).toLocaleString()} available)` : ''}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px',
+                        backgroundColor: isQtyExceedingLabels(row, index) 
+                          ? (isDarkMode ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.05)')
+                          : (isDarkMode ? '#1F2937' : '#FFFFFF'),
+                        borderRadius: '6px',
+                        border: isQtyExceedingLabels(row, index) 
+                          ? '1px solid #EF4444' 
+                          : (isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB'),
+                        padding: '4px 6px',
+                        width: '107px',
+                        height: '24px',
+                        boxSizing: 'border-box',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        cursor: 'text',
+                      }}
+                    >
+                      {(() => {
+                        const forecastValue = row.weeklyForecast || row.forecast || 0;
+                        const qtyValue = effectiveQtyValues[index];
+                        // Only show reset if value has been manually edited by user and differs from forecast
+                        const isValueSet = qtyValue !== undefined && qtyValue !== null && qtyValue !== '';
+                        const isManuallyEdited = manuallyEditedIndices.current.has(index);
+                        const currentQty = typeof qtyValue === 'number' 
+                          ? qtyValue 
+                          : isValueSet 
+                            ? parseInt(qtyValue, 10) || 0
+                            : 0;
+                        const hasChanged = isValueSet && isManuallyEdited && currentQty !== forecastValue;
+                        
+                        return hasChanged ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              effectiveSetQtyValues(prev => ({
+                                ...prev,
+                                [index]: forecastValue,
+                              }));
+                              // Remove from manually edited set when reset to forecast
+                              manuallyEditedIndices.current.delete(index);
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              border: 'none',
+                              backgroundColor: 'transparent',
+                              cursor: 'pointer',
+                              padding: 0,
+                              margin: 0,
+                              flexShrink: 0,
+                            }}
+                          >
+                            <img
+                              src="/assets/reset.png"
+                              alt="Reset quantity"
+                              style={{
+                                display: 'block',
+                                width: '9px',
+                                height: '9px',
+                                objectFit: 'contain',
+                              }}
+                            />
+                          </button>
+                        ) : null;
+                      })()}
+                      <input
+                        key={`qty-input-${index}`}
+                        ref={(el) => {
+                          if (el) qtyInputRefs.current[index] = el;
+                        }}
+                        type="number"
+                        min="0"
+                        step={(() => {
+                          const size = row.size?.toLowerCase() || '';
+                          if (size.includes('8oz')) return 60;
+                          if (size.includes('quart')) return 12;
+                          if (size.includes('gallon')) return 4;
+                          return 1;
+                        })()}
+                        data-row-index={index}
+                        value={(() => {
+                          // Show raw input value while typing, otherwise show rounded value
+                          if (rawQtyInputValues.current[index] !== undefined) {
+                            return rawQtyInputValues.current[index];
+                          }
+                          const qtyValue = effectiveQtyValues[index];
+                          return qtyValue !== undefined && qtyValue !== null && qtyValue !== '' ? String(qtyValue) : '';
+                        })()}
+                        onChange={(e) => {
+                          const inputValue = e.target.value;
+                          // Mark this field as manually edited
+                          manuallyEditedIndices.current.add(index);
+                          
+                          // Store raw input value (no rounding while typing)
+                          if (inputValue === '' || inputValue === '-') {
+                            rawQtyInputValues.current[index] = '';
+                          } else {
+                            // Store raw value for display while typing
+                            rawQtyInputValues.current[index] = inputValue;
+                          }
+                          // Force a minimal re-render to update the input value
+                          setQtyInputUpdateTrigger(prev => prev + 1);
+                        }}
+                        onBlur={(e) => {
+                          const inputValue = e.target.value;
+                          // Round and validate when user finishes typing
+                          if (inputValue === '' || inputValue === '-') {
+                            rawQtyInputValues.current[index] = undefined;
+                            effectiveSetQtyValues(prev => ({
+                              ...prev,
+                              [index]: ''
+                            }));
+                          } else {
+                            const numValue = parseInt(inputValue, 10);
+                            if (!isNaN(numValue) && numValue >= 0) {
+                              // No rounding - use value as-is
+                              rawQtyInputValues.current[index] = undefined; // Clear raw value
+                              effectiveSetQtyValues(prev => ({
+                                ...prev,
+                                [index]: numValue
+                              }));
+                            } else {
+                              // Invalid input, clear it
+                              rawQtyInputValues.current[index] = undefined;
+                              effectiveSetQtyValues(prev => ({
+                                ...prev,
+                                [index]: ''
+                              }));
+                            }
+                          }
+                          
+                          // Close popup if open when blurring
+                          if (clickedQtyIndex === index) {
+                            setClickedQtyIndex(null);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          // Round and validate when user presses Enter
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const inputValue = e.target.value;
+                            if (inputValue === '' || inputValue === '-') {
+                              rawQtyInputValues.current[index] = undefined;
+                              effectiveSetQtyValues(prev => ({
+                                ...prev,
+                                [index]: ''
+                              }));
+                            } else {
+                              const numValue = parseInt(inputValue, 10);
+                              if (!isNaN(numValue) && numValue >= 0) {
+                                // No rounding - use value as-is
+                                rawQtyInputValues.current[index] = undefined; // Clear raw value
+                                effectiveSetQtyValues(prev => ({
+                                  ...prev,
+                                  [index]: numValue
+                                }));
+                              } else {
+                                // Invalid input, clear it
+                                rawQtyInputValues.current[index] = undefined;
+                                effectiveSetQtyValues(prev => ({
+                                  ...prev,
+                                  [index]: ''
+                                }));
+                              }
+                            }
+                            e.target.blur(); // Remove focus after Enter
+                          }
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const labelsAvailable = getAvailableLabelsForRow(row, index);
+                          const labelsNeeded = effectiveQtyValues[index] ?? 0;
+                          // Only show popup if labels needed exceed available
+                          if (labelsNeeded > labelsAvailable) {
+                            // Toggle popup: close if already open, open if closed
+                            setClickedQtyIndex(clickedQtyIndex === index ? null : index);
+                          }
+                        }}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          flex: 1,
+                          border: 'none',
+                          outline: 'none',
+                          backgroundColor: 'transparent',
+                          fontSize: '0.875rem',
+                          fontWeight: 500,
+                          color: isDarkMode ? '#FFFFFF' : '#111827',
+                          textAlign: 'center',
+                          padding: 0,
+                          margin: 0,
+                          MozAppearance: 'textfield',
+                          WebkitAppearance: 'none',
+                          minWidth: 0,
+                          cursor: 'text',
+                          zIndex: 2,
+                          position: 'relative',
+                          pointerEvents: 'auto',
+                        }}
+                        onFocus={(e) => {
+                          e.target.select();
+                        }}
+                        onWheel={(e) => {
+                          e.target.blur();
+                        }}
+                      />
+                      {hoveredQtyIndex === index && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            right: '2px',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0',
+                            height: '20px',
+                            width: '14px',
+                            zIndex: 3,
+                            pointerEvents: 'none',
+                          }}
+                        >
+                          {/* Up / down controls */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              // Get current value (from raw input if available, otherwise from effective values)
+                              const rawValue = rawQtyInputValues.current[index];
+                              const currentQty = rawValue !== undefined 
+                                ? (typeof rawValue === 'number' ? rawValue : parseInt(rawValue, 10) || 0)
+                                : (effectiveQtyValues[index] ?? 0);
+                              const numQty =
+                                typeof currentQty === 'number'
+                                  ? currentQty
+                                  : currentQty === '' ||
+                                    currentQty === null ||
+                                    currentQty === undefined
+                                  ? 0
+                                  : parseInt(currentQty, 10) || 0;
+                              
+                              // Clear raw input value
+                              if (rawQtyInputValues.current[index] !== undefined) {
+                                rawQtyInputValues.current[index] = undefined;
+                              }
+                              
+                              // Round up to nearest case increment, then add increment for continuous increments
+                              const row = rows[index] || currentRows.find(r => r._originalIndex === index) || {};
+                              const increment = getQtyIncrement(row);
+                              const rounded = roundQtyUpToNearestCase(numQty, row);
+                              
+                              // Mark as manually edited since user clicked increment button
+                              manuallyEditedIndices.current.add(index);
+                              effectiveSetQtyValues(prev => ({
+                                ...prev,
+                                [index]: rounded + increment,
+                              }));
+                            }}
+                            style={{
+                              width: '100%',
+                              height: '50%',
+                              border: 'none',
+                              backgroundColor: 'transparent',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: 0,
+                              margin: 0,
+                              pointerEvents: 'auto',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#F3F4F6';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
+                          >
+                            <svg
+                              width="8"
+                              height="8"
+                              viewBox="0 0 8 8"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path d="M4 2L6 5H2L4 2Z" fill="#6B7280" />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              // Get current value (from raw input if available, otherwise from effective values)
+                              const rawValue = rawQtyInputValues.current[index];
+                              const currentQty = rawValue !== undefined 
+                                ? (typeof rawValue === 'number' ? rawValue : parseInt(rawValue, 10) || 0)
+                                : (effectiveQtyValues[index] ?? 0);
+                              const numQty =
+                                typeof currentQty === 'number'
+                                  ? currentQty
+                                  : currentQty === '' ||
+                                    currentQty === null ||
+                                    currentQty === undefined
+                                  ? 0
+                                  : parseInt(currentQty, 10) || 0;
+                              
+                              // Stop at 0 - don't allow going negative
+                              if (numQty <= 0) {
+                                return;
+                              }
+                              
+                              // Clear raw input value
+                              if (rawQtyInputValues.current[index] !== undefined) {
+                                rawQtyInputValues.current[index] = undefined;
+                              }
+                              
+                              // Round down to nearest case increment, then subtract increment for continuous decrements
+                              const row = rows[index] || currentRows.find(r => r._originalIndex === index) || {};
+                              const increment = getQtyIncrement(row);
+                              const rounded = roundQtyDownToNearestCase(numQty, row);
+                              
+                              // Mark as manually edited since user clicked decrement button
+                              manuallyEditedIndices.current.add(index);
+                              effectiveSetQtyValues(prev => ({
+                                ...prev,
+                                [index]: Math.max(0, rounded - increment),
+                              }));
+                            }}
+                            style={{
+                              width: '100%',
+                              height: '50%',
+                              border: 'none',
+                              backgroundColor: 'transparent',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: 0,
+                              margin: 0,
+                              pointerEvents: 'auto',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = '#F3F4F6';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
+                          >
+                            <svg
+                              width="8"
+                              height="8"
+                              viewBox="0 0 8 8"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path d="M4 6L2 3H6L4 6Z" fill="#6B7280" />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    {/* Label warning icon - shown when QTY exceeds labels, positioned absolutely to not affect alignment */}
+                    {(() => {
+                      const labelsAvailable = getAvailableLabelsForRow(row, index);
+                      const labelsNeeded = effectiveQtyValues[index] ?? 0;
+                      // Only show warning if labels needed exceed available
+                      if (labelsNeeded > labelsAvailable && labelsNeeded > 0) {
+                        return (
+                          <>
+                            <span
+                              ref={(el) => {
+                                if (el) {
+                                  warningIconRefs.current[index] = el;
+                                  labelsWarningIconRefs.current[index] = el;
+                                }
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setClickedQtyIndex(clickedQtyIndex === index ? null : index);
+                              }}
+                              onMouseEnter={() => setHoveredWarningIndex(index)}
+                              onMouseLeave={() => setHoveredWarningIndex(null)}
+                              style={{
+                                position: 'absolute',
+                                left: '119px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '18px',
+                                height: '18px',
+                                borderRadius: '50%',
+                                backgroundColor: '#FEE2E2',
+                                color: '#DC2626',
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                zIndex: hoveredWarningIndex === index ? 100000 : 10,
+                              }}
+                            >
+                              !
+                              {hoveredWarningIndex === index && (
+                                <div
+                                  style={{
+                                    position: 'absolute',
+                                    bottom: 'calc(100% + 8px)',
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                                    color: isDarkMode ? '#E5E7EB' : '#111827',
+                                    padding: '6px 10px',
+                                    borderRadius: '6px',
+                                    fontSize: '11px',
+                                    fontWeight: 500,
+                                    whiteSpace: 'nowrap',
+                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                                    border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+                                    zIndex: 100000,
+                                    pointerEvents: 'none',
+                                  }}
+                                >
+                                  Labels Available: {labelsAvailable.toLocaleString()}
+                                </div>
+                              )}
+                            </span>
+                          </>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </div>
+                </td>
+                <td style={{ 
+                  padding: '12px 16px', 
+                  fontSize: '0.85rem', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  verticalAlign: 'middle',
+                  boxSizing: 'border-box',
+                  borderTop: '1px solid #E5E7EB',
+                  fontWeight: 600,
+                  color: (() => {
+                    const fbaVal = Number(row.doiFba ?? row.doiTotal) || 0;
+                    return fbaVal >= 30 ? '#22C55E' : fbaVal >= 20 ? '#F97316' : '#EF4444';
+                  })(),
+                }}>
+                  {row.doiFba || row.doiTotal || 0}
+                </td>
+                {(() => {
+                  const totalInv = Number(row.totalInventory ?? row.doiTotal ?? row.daysOfInventory) || 0;
+                  return (
+                    <td style={{ 
+                      padding: '12px 16px', 
+                      fontSize: '0.85rem', 
+                      textAlign: 'center', 
+                      width: '143px',
+                      height: '40px',
+                      verticalAlign: 'middle',
+                      boxSizing: 'border-box',
+                      borderTop: '1px solid #E5E7EB',
+                      fontWeight: 600,
+                      color: isDarkMode ? '#FFFFFF' : '#111827',
+                    }}>
+                      {(row.totalInventory ?? row.doiTotal ?? row.daysOfInventory ?? 0).toLocaleString()}
+                    </td>
+                  );
+                })()}
+                <td style={{ 
+                  padding: '12px 16px', 
+                  fontSize: '0.85rem', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  verticalAlign: 'middle',
+                  boxSizing: 'border-box',
+                  borderTop: '1px solid #E5E7EB',
+                  fontWeight: 600,
+                  color: '#3B82F6', // Blue - matches Forecast legend
+                }}>
+                  {row.weeklyForecast || row.forecast || 0}
+                </td>
+                <td style={{ 
+                  padding: '12px 16px', 
+                  fontSize: '0.85rem', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  verticalAlign: 'middle',
+                  boxSizing: 'border-box',
+                  borderTop: '1px solid #E5E7EB',
+                }} className={themeClasses.text}>
+                  {row.sales7Day || 0}
+                </td>
+                <td style={{ 
+                  padding: '12px 16px', 
+                  fontSize: '0.85rem', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  verticalAlign: 'middle',
+                  boxSizing: 'border-box',
+                  borderTop: '1px solid #E5E7EB',
+                }} className={themeClasses.text}>
+                  {row.sales30Day || 0}
+                </td>
+                <td style={{ 
+                  padding: '12px 16px', 
+                  fontSize: '0.85rem', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  verticalAlign: 'middle',
+                  boxSizing: 'border-box',
+                  borderTop: '1px solid #E5E7EB',
+                }} className={themeClasses.text}>
+                  {Math.round((row.sales30Day || 0) * 4)}
+                </td>
+                <td style={{ 
+                  padding: '12px 16px', 
+                  fontSize: '0.85rem', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  verticalAlign: 'middle',
+                  boxSizing: 'border-box',
+                  borderTop: '1px solid #E5E7EB',
+                }} className={themeClasses.text}>
+                  {row.formula_name || ''}
+                </td>
+                <td style={{ 
+                  padding: '12px 16px', 
+                  fontSize: '0.85rem', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  verticalAlign: 'middle',
+                  boxSizing: 'border-box',
+                  borderTop: '1px solid #E5E7EB',
+                }} className={themeClasses.text}>
+                  {row.bottleInventory || row.bottle_inventory || 0}
+                </td>
+                <td style={{ 
+                  padding: '12px 16px', 
+                  fontSize: '0.85rem', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  verticalAlign: 'middle',
+                  boxSizing: 'border-box',
+                  borderTop: '1px solid #E5E7EB',
+                }} className={themeClasses.text}>
+                  {row.closureInventory || row.closure_inventory || 0}
+                </td>
+                <td style={{ 
+                  padding: '12px 16px', 
+                  fontSize: '0.85rem', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  verticalAlign: 'middle',
+                  boxSizing: 'border-box',
+                  borderTop: '1px solid #E5E7EB',
+                }} className={themeClasses.text}>
+                  {row.boxInventory || row.box_inventory || 0}
+                </td>
+                <td style={{ 
+                  padding: '12px 16px', 
+                  fontSize: '0.85rem', 
+                  textAlign: 'center', 
+                  width: '143px',
+                  height: '40px',
+                  verticalAlign: 'middle',
+                  boxSizing: 'border-box',
+                  borderTop: '1px solid #E5E7EB',
+                }} className={themeClasses.text}>
+                  {row.labelsAvailable || row.label_inventory || row.labels_available || 0}
+                </td>
+                {/* Sticky three dots */}
+                <td style={{ 
+                  padding: '0.65rem 1rem', 
+                  textAlign: 'center',
+                  position: 'sticky',
+                  right: 0,
+                  zIndex: 5,
+                  backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                  height: '40px',
+                  verticalAlign: 'middle',
+                  boxShadow: '-2px 0 4px rgba(0,0,0,0.1)',
+                  borderTop: '1px solid #E5E7EB',
                 }}>
                   <button
                     type="button"

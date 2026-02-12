@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
 import { getShipmentProducts } from '../../../../services/productionApi';
+import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
+import 'overlayscrollbars/overlayscrollbars.css';
 
 const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
   const { isDarkMode } = useTheme();
@@ -14,11 +16,10 @@ const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
   const [shipmentProducts, setShipmentProducts] = useState({});
   const [loadingProducts, setLoadingProducts] = useState(false);
   const containerRef = useRef(null);
-  const [isScrolling, setIsScrolling] = useState(false);
+  const osInstanceRef = useRef(null);
   const [isScrollingHorizontally, setIsScrollingHorizontally] = useState(false);
   const scrollTimeoutRef = useRef(null);
   const lastScrollLeftRef = useRef(0);
-  const [scrollbarWidth, setScrollbarWidth] = useState(0);
 
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
@@ -43,182 +44,51 @@ const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
     }
     
     style.textContent = `
-      .shipments-table-container {
-        /* Firefox - always show thin scrollbar without buttons */
-        scrollbar-width: thin !important;
-        scrollbar-color: ${isDarkMode ? '#4B5563 #1F2937' : '#9CA3AF #F3F4F6'} !important;
-        -ms-overflow-style: auto !important;
-        /* Prevent layout shifts - reserve space for scrollbar on both edges */
-        scrollbar-gutter: stable both-edges !important;
-        box-sizing: border-box !important;
-        /* Always show scrollbar to reserve space */
-        overflow-y: scroll !important;
+      /* OverlayScrollbars styling - hide track, style thumb */
+      .shipments-table-container .os-scrollbar {
+        --os-size: 12px;
+        --os-padding-perpendicular: 0px;
+        --os-padding-axis: 0px;
+        --os-track-border-radius: 0px;
+        --os-track-bg: transparent;
+        --os-track-bg-hover: transparent;
+        --os-track-bg-active: transparent;
+        --os-track-border: none;
+        --os-track-border-hover: none;
+        --os-track-border-active: none;
       }
-      /* Webkit - default state: hide horizontal scrollbar (height: 0), show vertical (width: 8px) */
-      .shipments-table-container::-webkit-scrollbar {
-        width: 8px !important;
-        height: 0 !important;
+      .shipments-table-container .os-scrollbar-track {
         background: transparent !important;
-        -webkit-appearance: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
       }
-      /* Completely remove scrollbar buttons - most aggressive approach */
-      .shipments-table-container::-webkit-scrollbar-button {
-        -webkit-appearance: none !important;
-        appearance: none !important;
-        display: none !important;
-        width: 0 !important;
-        height: 0 !important;
-        background: none !important;
+      .shipments-table-container .os-scrollbar-handle {
+        background: ${isDarkMode ? '#64748B' : '#6B7280'} !important;
+        border-radius: 6px !important;
         border: none !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-        pointer-events: none !important;
-        min-width: 0 !important;
-        min-height: 0 !important;
-        max-width: 0 !important;
-        max-height: 0 !important;
+        min-height: 30px !important;
+        transition: opacity 0.3s ease-out, background 0.2s ease !important;
       }
-      /* Target all possible scrollbar button states */
-      .shipments-table-container::-webkit-scrollbar-button:vertical,
-      .shipments-table-container::-webkit-scrollbar-button:horizontal,
-      .shipments-table-container::-webkit-scrollbar-button:vertical:start,
-      .shipments-table-container::-webkit-scrollbar-button:vertical:end,
-      .shipments-table-container::-webkit-scrollbar-button:horizontal:start,
-      .shipments-table-container::-webkit-scrollbar-button:horizontal:end {
-        -webkit-appearance: none !important;
-        appearance: none !important;
-        display: none !important;
-        width: 0 !important;
-        height: 0 !important;
-        background: none !important;
-        border: none !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-        pointer-events: none !important;
-        min-width: 0 !important;
-        min-height: 0 !important;
-        max-width: 0 !important;
-        max-height: 0 !important;
+      .shipments-table-container .os-scrollbar-handle:hover {
+        background: ${isDarkMode ? '#94A3B8' : '#4B5563'} !important;
       }
-      .shipments-table-container::-webkit-scrollbar-track {
-        background: ${isDarkMode ? '#1F2937' : '#F3F4F6'} !important;
-        /* Ensure track always reserves space */
-        -webkit-appearance: none !important;
-        width: 8px !important;
+      .shipments-table-container .os-scrollbar-vertical {
+        width: 12px !important;
+        right: 0 !important;
       }
-      .shipments-table-container::-webkit-scrollbar-thumb {
-        background: ${isDarkMode ? '#4B5563' : '#9CA3AF'} !important;
-        border-radius: 4px !important;
-        transition: background 0.2s ease !important;
-      }
-      .shipments-table-container::-webkit-scrollbar-thumb:hover {
-        background: ${isDarkMode ? '#6B7280' : '#6B7280'} !important;
-      }
-      /* Completely hide scrollbar buttons (up/down arrows) - all variations */
-      .shipments-table-container::-webkit-scrollbar-button {
-        display: none !important;
-        width: 0 !important;
-        height: 0 !important;
-        background: transparent !important;
-        -webkit-appearance: none !important;
-        appearance: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-      }
-      .shipments-table-container::-webkit-scrollbar-button:start:decrement,
-      .shipments-table-container::-webkit-scrollbar-button:end:increment {
-        display: none !important;
-        width: 0 !important;
-        height: 0 !important;
-        background: transparent !important;
-        -webkit-appearance: none !important;
-        appearance: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-      }
-      .shipments-table-container::-webkit-scrollbar-button:vertical:start:decrement,
-      .shipments-table-container::-webkit-scrollbar-button:vertical:end:increment {
-        display: none !important;
-        width: 0 !important;
-        height: 0 !important;
-        background: transparent !important;
-        -webkit-appearance: none !important;
-        appearance: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-      }
-      .shipments-table-container::-webkit-scrollbar-button:horizontal:start:decrement,
-      .shipments-table-container::-webkit-scrollbar-button:horizontal:end:increment {
-        display: none !important;
-        width: 0 !important;
-        height: 0 !important;
-        background: transparent !important;
-        -webkit-appearance: none !important;
-        appearance: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-      }
-      .shipments-table-container::-webkit-scrollbar-button:single-button {
-        display: none !important;
-        width: 0 !important;
-        height: 0 !important;
-        background: transparent !important;
-        -webkit-appearance: none !important;
-        appearance: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-      }
-      .shipments-table-container::-webkit-scrollbar-button:double-button {
-        display: none !important;
-        width: 0 !important;
-        height: 0 !important;
-        background: transparent !important;
-        -webkit-appearance: none !important;
-        appearance: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-      }
-      .shipments-table-container::-webkit-scrollbar-button:vertical:single-button:start:decrement,
-      .shipments-table-container::-webkit-scrollbar-button:vertical:single-button:end:increment,
-      .shipments-table-container::-webkit-scrollbar-button:horizontal:single-button:start:decrement,
-      .shipments-table-container::-webkit-scrollbar-button:horizontal:single-button:end:increment {
-        display: none !important;
-        width: 0 !important;
-        height: 0 !important;
-        background: transparent !important;
-        -webkit-appearance: none !important;
-        appearance: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-      }
-      /* Show horizontal scrollbar when scrolling horizontally */
-      .shipments-table-container.scrolling-horizontal::-webkit-scrollbar {
+      .shipments-table-container .os-scrollbar-horizontal {
         height: 8px !important;
+        bottom: 0 !important;
       }
-      .shipments-table-container.scrolling-horizontal::-webkit-scrollbar-button {
-        display: none !important;
-        width: 0 !important;
-        height: 0 !important;
-        background: transparent !important;
-        -webkit-appearance: none !important;
-        appearance: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
+      .shipments-table-container .os-scrollbar-horizontal .os-scrollbar-handle {
+        background: ${isDarkMode ? '#4B5563' : '#9CA3AF'} !important;
       }
-      .shipments-table-container.scrolling-horizontal::-webkit-scrollbar-button:start:decrement,
-      .shipments-table-container.scrolling-horizontal::-webkit-scrollbar-button:end:increment {
+      .shipments-table-container .os-scrollbar-horizontal .os-scrollbar-handle:hover {
+        background: ${isDarkMode ? '#94A3B8' : '#6B7280'} !important;
+      }
+      /* Hide scrollbar buttons */
+      .shipments-table-container .os-scrollbar-corner {
         display: none !important;
-        width: 0 !important;
-        height: 0 !important;
-        background: transparent !important;
-        -webkit-appearance: none !important;
-        appearance: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
       }
       /* Ensure table header stays sticky and doesn't collapse */
       .shipments-table-container thead {
@@ -267,22 +137,6 @@ const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
         position: relative !important;
       }
       /* Ensure thead stays fixed when scrolling - duplicate removed, using above definition */
-      /* Force container to always reserve scrollbar space - ensure width is stable */
-      .shipments-table-container {
-        /* Container should maintain stable width */
-        width: 100% !important;
-        /* Ensure scrollbar gutter reserves space properly */
-        scrollbar-gutter: stable both-edges !important;
-        /* Always show scrollbar to reserve space */
-        overflow-y: scroll !important;
-      }
-      /* Force scrollbar track to always be visible to prevent layout shift */
-      .shipments-table-container::-webkit-scrollbar-track {
-        background: ${isDarkMode ? '#1F2937' : '#F3F4F6'} !important;
-        /* Ensure track always reserves space */
-        -webkit-appearance: none !important;
-        width: 8px !important;
-      }
       /* Ensure tbody rows are below header */
       .shipments-table-container tbody {
         position: relative !important;
@@ -292,85 +146,96 @@ const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
         position: relative !important;
         z-index: 1 !important;
       }
+      /* Ensure Sold Out container and any status containers appear above sticky header */
+      .shipments-table-wrapper > *:not(.shipments-table-container) {
+        position: relative;
+        z-index: 101 !important;
+      }
+      .shipments-table-wrapper [class*="sold-out"],
+      .shipments-table-wrapper [class*="SoldOut"],
+      .shipments-table-wrapper [data-sold-out] {
+        z-index: 101 !important;
+      }
     `;
   }, [isDarkMode]);
 
 
-  // Handle scroll events to show/hide horizontal scrollbar and prevent layout shift
+  // Handle horizontal scroll detection for OverlayScrollbars
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+    let viewport = null;
+    let resizeObserver = null;
+    let timeoutId = null;
+    let handleScroll = null;
 
-    // Function to ensure scrollbar space is always reserved to prevent layout shift
-    const ensureStableLayout = () => {
-      // Force scrollbar to always be visible to reserve space
-      container.style.overflowY = 'scroll';
-      
-      // Calculate current scrollbar width
-      const currentScrollbarWidth = container.offsetWidth - container.clientWidth;
-      setScrollbarWidth(currentScrollbarWidth || 8);
-      
-      // Always reserve 8px space to prevent layout shift
-      // Use padding when scrollbar not visible, remove when visible
-      // This ensures the table width doesn't change when scrollbar appears/disappears
-      if (currentScrollbarWidth === 0 || currentScrollbarWidth < 8) {
-        // No scrollbar visible or smaller than expected, reserve space with padding
-        container.style.paddingRight = '8px';
-      } else {
-        // Scrollbar is visible and taking space, remove padding
-        container.style.paddingRight = '0px';
+    // Wait for OverlayScrollbars instance to be ready
+    const checkInstance = () => {
+      const osInstance = osInstanceRef.current;
+      if (!osInstance) {
+        // Retry after a short delay if instance not ready
+        timeoutId = setTimeout(checkInstance, 50);
+        return;
       }
-      
-      // Force table to maintain width by using the container's clientWidth
-      // This accounts for the scrollbar space already reserved
-      const table = container.querySelector('table');
-      if (table) {
-        // Use clientWidth which excludes scrollbar, ensuring stable width
-        const availableWidth = container.clientWidth;
-        // Only set if it's different to avoid unnecessary reflows
-        if (table.offsetWidth !== availableWidth) {
-          table.style.width = `${availableWidth}px`;
+
+      // Get the viewport element (the actual scrollable element)
+      viewport = osInstance.getElements().viewport;
+      if (!viewport) {
+        timeoutId = setTimeout(checkInstance, 50);
+        return;
+      }
+
+      const checkHorizontalScroll = () => {
+        if (!viewport) return;
+        const hasHorizontalScroll = viewport.scrollWidth > viewport.clientWidth;
+        setIsScrollingHorizontally(hasHorizontalScroll);
+      };
+
+      handleScroll = () => {
+        if (!viewport) return;
+        const currentScrollLeft = viewport.scrollLeft;
+        
+        // Check if horizontal scrolling occurred
+        if (currentScrollLeft !== lastScrollLeftRef.current) {
+          setIsScrollingHorizontally(true);
+          lastScrollLeftRef.current = currentScrollLeft;
         }
-      }
+        
+        // Clear existing timeout
+        if (scrollTimeoutRef.current) {
+          clearTimeout(scrollTimeoutRef.current);
+        }
+        
+        // Update horizontal scroll state after scrolling stops
+        scrollTimeoutRef.current = setTimeout(() => {
+          checkHorizontalScroll();
+        }, 100);
+      };
+
+      // Check on mount
+      checkHorizontalScroll();
+      
+      // Listen to scroll events on the viewport
+      viewport.addEventListener('scroll', handleScroll, { passive: true });
+      
+      // Also check on resize
+      resizeObserver = new ResizeObserver(() => {
+        checkHorizontalScroll();
+      });
+      resizeObserver.observe(viewport);
     };
 
-    const handleScroll = () => {
-      const currentScrollLeft = container.scrollLeft;
-      const hasHorizontalScroll = container.scrollWidth > container.clientWidth;
-      
-      // Check if horizontal scrolling occurred
-      if (hasHorizontalScroll && currentScrollLeft !== lastScrollLeftRef.current) {
-        setIsScrollingHorizontally(true);
-        lastScrollLeftRef.current = currentScrollLeft;
-      }
-      
-      // Clear existing timeout
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
-      
-      // Hide horizontal scrollbar after scrolling stops (800ms delay)
-      scrollTimeoutRef.current = setTimeout(() => {
-        setIsScrollingHorizontally(false);
-      }, 800);
-    };
+    // Start checking for instance
+    checkInstance();
 
-    // Ensure stable layout on mount and resize
-    ensureStableLayout();
-    const resizeObserver = new ResizeObserver(() => {
-      ensureStableLayout();
-    });
-    resizeObserver.observe(container);
-
-    // Also check after a short delay to catch any dynamic content changes
-    const timeoutId = setTimeout(ensureStableLayout, 100);
-
-    container.addEventListener('scroll', handleScroll, { passive: true });
-    
     return () => {
-      container.removeEventListener('scroll', handleScroll);
-      resizeObserver.disconnect();
-      clearTimeout(timeoutId);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      if (viewport && handleScroll) {
+        viewport.removeEventListener('scroll', handleScroll);
+      }
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
       if (scrollTimeoutRef.current) {
         clearTimeout(scrollTimeoutRef.current);
       }
@@ -658,23 +523,43 @@ const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
     { key: 'action', label: 'Action', width: 100, align: 'center' },
   ];
 
+  // OverlayScrollbars options - overlay scrollbar with auto-hide
+  const scrollbarOptions = {
+    scrollbars: {
+      visibility: 'auto', // Auto-hide when not scrolling
+      autoHide: 'scroll', // Hide when not actively scrolling
+      autoHideDelay: 800, // Delay before hiding (ms)
+      theme: isDarkMode ? 'os-theme-dark' : 'os-theme-light',
+    },
+    overflow: {
+      x: 'auto',
+      y: 'auto',
+    },
+  };
+
   return (
     <div
-      ref={containerRef}
-      className={`${themeClasses.cardBg} ${themeClasses.border} border rounded-xl shadow-sm shipments-table-container ${isScrollingHorizontally ? 'scrolling-horizontal' : ''}`}
+      className={`${themeClasses.cardBg} ${themeClasses.border} border rounded-xl shadow-sm shipments-table-wrapper`}
       style={{ 
         position: 'relative',
-        overflowY: 'scroll',
-        overflowX: 'auto',
-        maxHeight: '600px',
         width: '100%',
-        minWidth: 0,
-        scrollbarGutter: 'stable',
-        boxSizing: 'border-box',
-        // Padding will be dynamically set by JavaScript to always reserve 8px space
-        // (padding when scrollbar not visible, removed when scrollbar is visible)
+        maxHeight: '600px',
       }}
     >
+      <OverlayScrollbarsComponent
+        ref={(ref) => {
+          containerRef.current = ref;
+          if (ref) {
+            osInstanceRef.current = ref.osInstance();
+          }
+        }}
+        options={scrollbarOptions}
+        className="shipments-table-container"
+        style={{ 
+          maxHeight: '600px',
+          width: '100%',
+        }}
+      >
       <table
         style={{
           width: '100%',
@@ -1084,6 +969,7 @@ const ShipmentsTable = ({ shipments, activeFilters, onFilterToggle }) => {
           })}
         </tbody>
       </table>
+      </OverlayScrollbarsComponent>
       
       {/* Filter Dropdown */}
       {openFilterColumn && (

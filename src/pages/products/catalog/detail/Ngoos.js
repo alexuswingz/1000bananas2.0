@@ -81,6 +81,22 @@ const getQtyIncrementForSize = (sizeRaw) => {
   return 1;
 };
 
+// Round quantity up to nearest case increment
+const roundQtyUpToNearestCase = (qty, increment) => {
+  const num = typeof qty === 'number' ? qty : parseInt(qty, 10) || 0;
+  if (num <= 0) return num;
+  if (increment <= 1) return num;
+  return Math.ceil(num / increment) * increment;
+};
+
+// Round quantity down to nearest case increment
+const roundQtyDownToNearestCase = (qty, increment) => {
+  const num = typeof qty === 'number' ? qty : parseInt(qty, 10) || 0;
+  if (num <= 0) return 0;
+  if (increment <= 1) return num;
+  return Math.floor(num / increment) * increment;
+};
+
 const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = null, overrideUnitsToMake = null, onAddUnits = null, labelsAvailable = null, openDoiSettings = false, openForecastSettings = false, onDoiSettingsChange = null, onForecastSettingsChange = null, hasActiveForecastSettings = false, isAlreadyAdded = false }) => {
   const { isDarkMode } = useTheme();
   const [selectedView, setSelectedView] = useState('All Time');
@@ -118,7 +134,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   const [showForecastSettingsModal, setShowForecastSettingsModal] = useState(false);
   const [showTemporaryConfirmModal, setShowTemporaryConfirmModal] = useState(false);
   const [dontRemindAgain, setDontRemindAgain] = useState(false);
-  const [hoveredWarning, setHoveredWarning] = useState(false);
   const [hoveredUnitsContainer, setHoveredUnitsContainer] = useState(false);
   const [displayUnitsOverride, setDisplayUnitsOverride] = useState(null); // user-adjusted units in N-GOOS modal (arrows)
   const [settingsApplied, setSettingsApplied] = useState(false);
@@ -2124,8 +2139,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 const sizeForIncrement = productDetails?.product?.size || data?.size || data?.variations?.[0] || '';
                 const increment = Math.max(1, getQtyIncrementForSize(sizeForIncrement) || 1);
                 const displayedUnits = displayUnitsOverride ?? timeline.unitsToMake ?? 0;
-                const availableLabels = labelsAvailable ?? 0;
-                const showLabelWarning = displayedUnits > availableLabels && displayedUnits > 0 && availableLabels !== null;
                 return (
                   <div
                     style={{
@@ -2221,57 +2234,6 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                         <path d="M3 4L6 1L9 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                     </button>
-                    {showLabelWarning && (
-                      <>
-                        <span
-                          onMouseEnter={() => setHoveredWarning(true)}
-                          onMouseLeave={() => setHoveredWarning(false)}
-                          style={{
-                            position: 'absolute',
-                            left: '-22px',
-                            top: '50%',
-                            transform: 'translateY(-50%)',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: '18px',
-                            height: '18px',
-                            borderRadius: '50%',
-                            backgroundColor: '#FEE2E2',
-                            color: '#DC2626',
-                            fontSize: '12px',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            zIndex: 10,
-                          }}
-                        >
-                          !
-                        </span>
-                        {hoveredWarning && (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              left: '-22px',
-                              top: '50%',
-                              transform: 'translate(calc(-100% - 8px + 80px), calc(-50% - 25px))',
-                              backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-                              color: isDarkMode ? '#E5E7EB' : '#111827',
-                              padding: '6px 10px',
-                              borderRadius: '6px',
-                              fontSize: '11px',
-                              fontWeight: 500,
-                              whiteSpace: 'nowrap',
-                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                              border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
-                              zIndex: 11,
-                              pointerEvents: 'none',
-                            }}
-                          >
-                            Labels Available: {availableLabels.toLocaleString()}
-                          </div>
-                        )}
-                      </>
-                    )}
                   </div>
                 );
               })()}
@@ -4788,7 +4750,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 fontSize: '0.875rem',
                 color: '#E2E8F0',
                 textAlign: 'center',
-                margin: 0,
+                margin: 0, 
                 lineHeight: '1.5',
               }}>
                 To keep these settings, use Save as Default.
