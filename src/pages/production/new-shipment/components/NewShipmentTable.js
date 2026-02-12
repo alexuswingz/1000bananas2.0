@@ -5233,14 +5233,15 @@ const NewShipmentTable = ({
                           opacity: 0,
                           pointerEvents: 'none',
                           transition: 'none',
-                          color: 'inherit',
-                          filter: 'brightness(0) saturate(100%) invert(50%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(95%) contrast(90%)',
                         }}
-                        aria-label="Analyze"
+                        aria-label="Open N-GOOS"
                       >
-                        <svg width="22" height="22" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M2.33333 10.5L5.25 7.58333L7.58333 9.91667L11.6667 5.83333M11.6667 5.83333V9.33333M11.6667 5.83333H8.16667" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
+                        <img
+                          src="/assets/Banana.png"
+                          alt="Open N-GOOS"
+                          style={{ width: '22px', height: '22px', objectFit: 'contain' }}
+                          draggable={false}
+                        />
                       </span>
                     </div>
                   </div>
