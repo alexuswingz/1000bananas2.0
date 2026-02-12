@@ -407,15 +407,16 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         fba: {
           total: (inv.fba_available || 0) + (inv.fba_reserved || 0) + (inv.fba_inbound || 0),
           available: inv.fba_available || 0,
-          reserved: inv.fba_reserved || 0,
-          inbound: inv.fba_inbound || 0
+          inbound: inv.fba_inbound || 0,
+          reserved: inv.fba_reserved || 0
         },
         awd: {
-          total: (inv.awd_available || 0) + (inv.awd_reserved || 0) + (inv.awd_inbound || 0),
+          total: (inv.awd_available || 0) + (inv.awd_reserved || 0) + (inv.awd_inbound || 0) + (inv.awd_outbound_to_fba || 0) + (inv.awd_unfulfillable || 0),
           outbound_to_fba: inv.awd_outbound_to_fba || 0,
           available: inv.awd_available || 0,
+          inbound: inv.awd_inbound || 0,
           reserved: inv.awd_reserved || 0,
-          inbound: inv.awd_inbound || 0
+          unfulfillable: inv.awd_unfulfillable || 0
         },
         fbaAge: inv.fba_age ? {
           oldest_days: inv.fba_age.oldest_days,
@@ -437,14 +438,16 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
       fba: {
         total: 0,
         available: 0,
-        reserved: 0,
-        inbound: 0
+        inbound: 0,
+        reserved: 0
       },
       awd: {
         total: 0,
         outbound_to_fba: 0,
         available: 0,
-        reserved: 0
+        inbound: 0,
+        reserved: 0,
+        unfulfillable: 0
       }
     };
     const fallbackFbaAge = forecastData?.inventory?.fba_age;
@@ -2479,12 +2482,12 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.fba?.available ?? 0).toLocaleString()}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>Reserved:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.fba?.reserved ?? 0).toLocaleString()}</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                 <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>Inbound:</span>
                 <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.fba?.inbound ?? 0).toLocaleString()}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>Reserved:</span>
+                <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.fba?.reserved ?? 0).toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -2514,16 +2517,20 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.awd?.available ?? 0).toLocaleString()}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>Outbound to FBA:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.awd?.outbound_to_fba ?? 0).toLocaleString()}</span>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>Inbound:</span>
+                <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.awd?.inbound ?? 0).toLocaleString()}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                 <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>Reserved:</span>
                 <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.awd?.reserved ?? 0).toLocaleString()}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>Inbound:</span>
-                <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.awd?.inbound ?? 0).toLocaleString()}</span>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>Outbound:</span>
+                <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.awd?.outbound_to_fba ?? 0).toLocaleString()}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <span style={{ fontSize: inventoryOnly ? '0.75rem' : '0.8125rem', color: '#94a3b8', fontWeight: 400 }}>Unfulfillable:</span>
+                <span style={{ fontSize: inventoryOnly ? '0.875rem' : '1rem', color: '#fff', fontWeight: 500, textAlign: 'right' }}>{(inventoryData?.awd?.unfulfillable ?? 0).toLocaleString()}</span>
               </div>
             </div>
           </div>
