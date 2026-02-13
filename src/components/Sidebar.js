@@ -7,7 +7,7 @@ import { useSidebar } from '../context/SidebarContext';
 const Sidebar = (props = {}) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isDarkMode, toggleTheme } = useTheme();
+  const { isDarkMode } = useTheme();
   const { company, getEnabledWorkspaceModules, getEnabledProductModules } = useCompany();
   const { isMinimized, setIsMinimized } = useSidebar();
   
@@ -443,27 +443,6 @@ const Sidebar = (props = {}) => {
             <img src="/assets/settings-icon.png" alt="Settings" className="w-5 h-5 object-contain" />
             {!isMinimized && <span>Settings</span>}
           </div>
-
-          {/* Dark Theme Toggle */}
-          {!isMinimized ? (
-            <div className={`flex items-center justify-between px-4 py-2.5 text-sm ${themeClasses.text} ${themeClasses.hover} rounded-lg cursor-pointer transition-all`} onClick={toggleTheme}>
-              <div className="flex items-center gap-3">
-                <img src="/assets/toggle.png" alt="Theme" className="w-5 h-5 object-contain opacity-70" />
-                <span>Dark Theme</span>
-              </div>
-              <div className={`w-10 h-5 rounded-full transition-colors ${isDarkMode ? 'bg-blue-500' : 'bg-gray-400'} relative`}>
-                <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-transform ${isDarkMode ? 'translate-x-5' : 'translate-x-0.5'}`}></div>
-              </div>
-            </div>
-          ) : (
-            <div 
-              className={`flex items-center justify-center px-4 py-2.5 text-sm ${themeClasses.text} ${themeClasses.hover} rounded-lg cursor-pointer transition-all`} 
-              onClick={toggleTheme}
-              title="Toggle Theme"
-            >
-              <img src="/assets/toggle.png" alt="Theme" className="w-5 h-5 object-contain opacity-70" />
-            </div>
-          )}
 
           {/* Divider */}
           <div className={`${themeClasses.border} border-t my-2`}></div>
