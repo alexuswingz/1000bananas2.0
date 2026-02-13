@@ -316,7 +316,7 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                     zIndex: 100,
                   }}
                 >
-                  {['FBA', 'AWD', 'Hazmat'].map((option) => (
+                  {['FBA', 'AWD', 'Parcel', 'Production Order'].map((option) => (
                     <button
                       key={option}
                       type="button"
@@ -327,6 +327,9 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                       }}
                       style={{
                         width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
                         textAlign: 'left',
                         padding: '10px 12px',
                         fontSize: '14px',
@@ -342,6 +345,13 @@ const NewShipmentModal = ({ isOpen, onClose, newShipment, setNewShipment }) => {
                         ? (isDarkMode ? '#4B5563' : '#F3F4F6') 
                         : (isDarkMode ? '#374151' : '#FFFFFF')}
                     >
+                      {newShipment.shipmentType === option ? (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+                          <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      ) : (
+                        <span style={{ width: 16, flexShrink: 0 }} />
+                      )}
                       {option}
                     </button>
                   ))}

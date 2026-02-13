@@ -2154,12 +2154,16 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
                     if (typeValue === 'fba') return 'FBA';
                     if (typeValue === 'awd') return 'AWD';
                     if (typeValue === 'hazmat') return 'Hazmat';
+                    if (typeValue === 'parcel') return 'Parcel';
+                    if (typeValue === 'production order') return 'Production Order';
                     
                     // If no type field, try to extract from shipment number
                     const shipment = (row.shipment || '').toUpperCase();
                     if (shipment.includes('FBA')) return 'FBA';
                     if (shipment.includes('AWD')) return 'AWD';
                     if (shipment.includes('HAZMAT')) return 'Hazmat';
+                    if (shipment.includes('PARCEL')) return 'Parcel';
+                    if (shipment.includes('PRODUCTION')) return 'Production Order';
                     
                     // Default fallback
                     return 'AWD';

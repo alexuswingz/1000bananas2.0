@@ -2,14 +2,17 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../../../context/ThemeContext';
 
-// Shipment type options (FBA, AWD, Hazmat)
-const TYPE_OPTIONS = ['FBA', 'AWD', 'Hazmat'];
+// Shipment type options (FBA, AWD, Parcel, Production Order)
+const TYPE_OPTIONS = ['FBA', 'AWD', 'Parcel', 'Production Order'];
 
 // Carrier options
 const CARRIER_OPTIONS = ['UPS', 'FedEx', 'USPS', 'DHL', 'Other'];
 
 const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
   const { isDarkMode } = useTheme();
+  
+  // Shipment is "booked" when Book Shipment step is completed; only then show Amazon #, Ref ID, Ship From/To, Carrier
+  const isBooked = row?.bookShipment === 'completed';
   
   // Edit mode state - fields are read-only until user clicks "Edit Info"
   const [isEditMode, setIsEditMode] = useState(false);
@@ -366,6 +369,9 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
                       }}
                       style={{
                         width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
                         textAlign: 'left',
                         padding: '10px 12px',
                         fontSize: '14px',
@@ -387,6 +393,13 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
                           : (isDarkMode ? '#1F2937' : '#FFFFFF');
                       }}
                     >
+                      {type === option ? (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+                          <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      ) : (
+                        <span style={{ width: 16, flexShrink: 0 }} />
+                      )}
                       {option}
                     </button>
                   ))}
@@ -395,298 +408,303 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
             </div>
           </div>
 
-          {/* Amazon Shipment #* */}
-          <div>
-            <label
-              style={{
-                fontSize: '13px',
-                fontWeight: 500,
-                display: 'block',
-                marginBottom: '8px',
-                color: isDarkMode ? '#E5E7EB' : '#374151',
-              }}
-            >
-              Amazon Shipment #<span style={{ color: '#EF4444' }}>*</span>
-            </label>
-            <input
-              type="text"
-              value={amazonShipmentNumber}
-              onChange={(e) => setAmazonShipmentNumber(e.target.value)}
-              placeholder="FBAXXXXXXXXX"
-              disabled={!isEditMode}
-              readOnly={!isEditMode}
-              onFocus={() => isEditMode && setFocusedField('amazonShipmentNumber')}
-              onBlur={() => setFocusedField(null)}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: isEditMode && focusedField === 'amazonShipmentNumber'
-                  ? '1px solid #3B82F6'
-                  : isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
-                borderRadius: '6px',
-                fontSize: '14px',
-                color: isEditMode
-                  ? (isDarkMode ? '#E5E7EB' : '#111827')
-                  : (isDarkMode ? '#9CA3AF' : '#6B7280'),
-                backgroundColor: isEditMode
-                  ? (isDarkMode ? '#374151' : '#FFFFFF')
-                  : (isDarkMode ? '#111827' : '#F9FAFB'),
-                outline: 'none',
-                cursor: isEditMode ? 'text' : 'not-allowed',
-                transition: 'border-color 0.2s ease',
-              }}
-            />
-          </div>
-
-          {/* Amazon Ref ID* */}
-          <div>
-            <label
-              style={{
-                fontSize: '13px',
-                fontWeight: 500,
-                display: 'block',
-                marginBottom: '8px',
-                color: isDarkMode ? '#E5E7EB' : '#374151',
-              }}
-            >
-              Amazon Ref ID<span style={{ color: '#EF4444' }}>*</span>
-            </label>
-            <input
-              type="text"
-              value={amazonRefId}
-              onChange={(e) => setAmazonRefId(e.target.value)}
-              placeholder="XXXXXXXX"
-              disabled={!isEditMode}
-              readOnly={!isEditMode}
-              onFocus={() => isEditMode && setFocusedField('amazonRefId')}
-              onBlur={() => setFocusedField(null)}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: isEditMode && focusedField === 'amazonRefId'
-                  ? '1px solid #3B82F6'
-                  : isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
-                borderRadius: '6px',
-                fontSize: '14px',
-                color: isEditMode
-                  ? (isDarkMode ? '#E5E7EB' : '#111827')
-                  : (isDarkMode ? '#9CA3AF' : '#6B7280'),
-                backgroundColor: isEditMode
-                  ? (isDarkMode ? '#374151' : '#FFFFFF')
-                  : (isDarkMode ? '#111827' : '#F9FAFB'),
-                outline: 'none',
-                cursor: isEditMode ? 'text' : 'not-allowed',
-                transition: 'border-color 0.2s ease',
-              }}
-            />
-          </div>
-
-          {/* Ship From - stacked full width */}
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label
-              style={{
-                fontSize: '13px',
-                fontWeight: 500,
-                display: 'block',
-                marginBottom: '8px',
-                color: isDarkMode ? '#E5E7EB' : '#374151',
-              }}
-            >
-              Ship From
-            </label>
-            <input
-              type="text"
-              value={shipFrom}
-              onChange={(e) => setShipFrom(e.target.value)}
-              placeholder="Enter Shipment Location..."
-              disabled={!isEditMode}
-              readOnly={!isEditMode}
-              onFocus={() => isEditMode && setFocusedField('shipFrom')}
-              onBlur={() => setFocusedField(null)}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: isEditMode && focusedField === 'shipFrom'
-                  ? '1px solid #3B82F6'
-                  : isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
-                borderRadius: '6px',
-                fontSize: '14px',
-                color: isEditMode
-                  ? (isDarkMode ? '#E5E7EB' : '#111827')
-                  : (isDarkMode ? '#9CA3AF' : '#6B7280'),
-                backgroundColor: isEditMode
-                  ? (isDarkMode ? '#374151' : '#FFFFFF')
-                  : (isDarkMode ? '#111827' : '#F9FAFB'),
-                outline: 'none',
-                cursor: isEditMode ? 'text' : 'not-allowed',
-                transition: 'border-color 0.2s ease',
-              }}
-            />
-          </div>
-
-          {/* Ship To - stacked full width */}
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label
-              style={{
-                fontSize: '13px',
-                fontWeight: 500,
-                display: 'block',
-                marginBottom: '8px',
-                color: isDarkMode ? '#E5E7EB' : '#374151',
-              }}
-            >
-              Ship To
-            </label>
-            <input
-              type="text"
-              value={shipTo}
-              onChange={(e) => setShipTo(e.target.value)}
-              placeholder="Enter Shipment Destination..."
-              disabled={!isEditMode}
-              readOnly={!isEditMode}
-              onFocus={() => isEditMode && setFocusedField('shipTo')}
-              onBlur={() => setFocusedField(null)}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
-                border: isEditMode && focusedField === 'shipTo'
-                  ? '1px solid #3B82F6'
-                  : isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
-                borderRadius: '6px',
-                fontSize: '14px',
-                color: isEditMode
-                  ? (isDarkMode ? '#E5E7EB' : '#111827')
-                  : (isDarkMode ? '#9CA3AF' : '#6B7280'),
-                backgroundColor: isEditMode
-                  ? (isDarkMode ? '#374151' : '#FFFFFF')
-                  : (isDarkMode ? '#111827' : '#F9FAFB'),
-                outline: 'none',
-                cursor: isEditMode ? 'text' : 'not-allowed',
-                transition: 'border-color 0.2s ease',
-              }}
-            />
-          </div>
-
-          {/* Carrier - stacked full width */}
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label
-              style={{
-                fontSize: '13px',
-                fontWeight: 500,
-                display: 'block',
-                marginBottom: '8px',
-                color: isDarkMode ? '#E5E7EB' : '#374151',
-              }}
-            >
-              Carrier
-            </label>
-            <div ref={carrierRef} style={{ position: 'relative' }}>
-              <button
-                type="button"
-                disabled={!isEditMode}
-                onClick={() => isEditMode && setCarrierOpen((prev) => !prev)}
-                onFocus={() => isEditMode && setFocusedField('carrier')}
-                onBlur={() => setFocusedField(null)}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '10px 12px',
-                  border: isEditMode && (focusedField === 'carrier' || carrierOpen)
-                    ? '1px solid #3B82F6'
-                    : isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
-                  borderRadius: '6px',
-                  backgroundColor: isEditMode
-                    ? (isDarkMode ? '#374151' : '#FFFFFF')
-                    : (isDarkMode ? '#111827' : '#F9FAFB'),
-                  cursor: isEditMode ? 'pointer' : 'not-allowed',
-                  fontSize: '14px',
-                  color: carrier
-                    ? (isEditMode ? (isDarkMode ? '#E5E7EB' : '#111827') : (isDarkMode ? '#9CA3AF' : '#6B7280'))
-                    : (isDarkMode ? '#6B7280' : '#9CA3AF'),
-                  outline: 'none',
-                  transition: 'border-color 0.2s ease',
-                }}
-              >
-                <span>{carrier || 'Select Carrier Name...'}</span>
-                <svg
+          {/* Shown only after shipment is booked */}
+          {isBooked && (
+            <>
+              {/* Amazon Shipment #* */}
+              <div>
+                <label
                   style={{
-                    width: '16px',
-                    height: '16px',
-                    color: '#9CA3AF',
-                    flexShrink: 0,
-                    transform: carrierOpen ? 'rotate(180deg)' : 'none',
-                    transition: 'transform 0.2s ease',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    display: 'block',
+                    marginBottom: '8px',
+                    color: isDarkMode ? '#E5E7EB' : '#374151',
                   }}
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
                 >
-                  <path
-                    d="M19 9L12 16L5 9"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-              {carrierOpen && isEditMode && (
-                <div
+                  Amazon Shipment #<span style={{ color: '#EF4444' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  value={amazonShipmentNumber}
+                  onChange={(e) => setAmazonShipmentNumber(e.target.value)}
+                  placeholder="FBAXXXXXXXXX"
+                  disabled={!isEditMode}
+                  readOnly={!isEditMode}
+                  onFocus={() => isEditMode && setFocusedField('amazonShipmentNumber')}
+                  onBlur={() => setFocusedField(null)}
                   style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    marginTop: '4px',
-                    backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-                    border: isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: isEditMode && focusedField === 'amazonShipmentNumber'
+                      ? '1px solid #3B82F6'
+                      : isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
                     borderRadius: '6px',
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-                    overflow: 'hidden',
-                    zIndex: 100,
+                    fontSize: '14px',
+                    color: isEditMode
+                      ? (isDarkMode ? '#E5E7EB' : '#111827')
+                      : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+                    backgroundColor: isEditMode
+                      ? (isDarkMode ? '#374151' : '#FFFFFF')
+                      : (isDarkMode ? '#111827' : '#F9FAFB'),
+                    outline: 'none',
+                    cursor: isEditMode ? 'text' : 'not-allowed',
+                    transition: 'border-color 0.2s ease',
+                  }}
+                />
+              </div>
+
+              {/* Amazon Ref ID* */}
+              <div>
+                <label
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    display: 'block',
+                    marginBottom: '8px',
+                    color: isDarkMode ? '#E5E7EB' : '#374151',
                   }}
                 >
-                  {CARRIER_OPTIONS.map((option) => (
-                    <button
-                      key={option}
-                      type="button"
-                      onClick={() => {
-                        setCarrier(option);
-                        setCarrierOpen(false);
-                        setFocusedField(null);
-                      }}
+                  Amazon Ref ID<span style={{ color: '#EF4444' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  value={amazonRefId}
+                  onChange={(e) => setAmazonRefId(e.target.value)}
+                  placeholder="XXXXXXXX"
+                  disabled={!isEditMode}
+                  readOnly={!isEditMode}
+                  onFocus={() => isEditMode && setFocusedField('amazonRefId')}
+                  onBlur={() => setFocusedField(null)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: isEditMode && focusedField === 'amazonRefId'
+                      ? '1px solid #3B82F6'
+                      : isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    color: isEditMode
+                      ? (isDarkMode ? '#E5E7EB' : '#111827')
+                      : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+                    backgroundColor: isEditMode
+                      ? (isDarkMode ? '#374151' : '#FFFFFF')
+                      : (isDarkMode ? '#111827' : '#F9FAFB'),
+                    outline: 'none',
+                    cursor: isEditMode ? 'text' : 'not-allowed',
+                    transition: 'border-color 0.2s ease',
+                  }}
+                />
+              </div>
+
+              {/* Ship From - stacked full width */}
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    display: 'block',
+                    marginBottom: '8px',
+                    color: isDarkMode ? '#E5E7EB' : '#374151',
+                  }}
+                >
+                  Ship From
+                </label>
+                <input
+                  type="text"
+                  value={shipFrom}
+                  onChange={(e) => setShipFrom(e.target.value)}
+                  placeholder="Enter Shipment Location..."
+                  disabled={!isEditMode}
+                  readOnly={!isEditMode}
+                  onFocus={() => isEditMode && setFocusedField('shipFrom')}
+                  onBlur={() => setFocusedField(null)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: isEditMode && focusedField === 'shipFrom'
+                      ? '1px solid #3B82F6'
+                      : isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    color: isEditMode
+                      ? (isDarkMode ? '#E5E7EB' : '#111827')
+                      : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+                    backgroundColor: isEditMode
+                      ? (isDarkMode ? '#374151' : '#FFFFFF')
+                      : (isDarkMode ? '#111827' : '#F9FAFB'),
+                    outline: 'none',
+                    cursor: isEditMode ? 'text' : 'not-allowed',
+                    transition: 'border-color 0.2s ease',
+                  }}
+                />
+              </div>
+
+              {/* Ship To - stacked full width */}
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    display: 'block',
+                    marginBottom: '8px',
+                    color: isDarkMode ? '#E5E7EB' : '#374151',
+                  }}
+                >
+                  Ship To
+                </label>
+                <input
+                  type="text"
+                  value={shipTo}
+                  onChange={(e) => setShipTo(e.target.value)}
+                  placeholder="Enter Shipment Destination..."
+                  disabled={!isEditMode}
+                  readOnly={!isEditMode}
+                  onFocus={() => isEditMode && setFocusedField('shipTo')}
+                  onBlur={() => setFocusedField(null)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: isEditMode && focusedField === 'shipTo'
+                      ? '1px solid #3B82F6'
+                      : isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    color: isEditMode
+                      ? (isDarkMode ? '#E5E7EB' : '#111827')
+                      : (isDarkMode ? '#9CA3AF' : '#6B7280'),
+                    backgroundColor: isEditMode
+                      ? (isDarkMode ? '#374151' : '#FFFFFF')
+                      : (isDarkMode ? '#111827' : '#F9FAFB'),
+                    outline: 'none',
+                    cursor: isEditMode ? 'text' : 'not-allowed',
+                    transition: 'border-color 0.2s ease',
+                  }}
+                />
+              </div>
+
+              {/* Carrier - stacked full width */}
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    display: 'block',
+                    marginBottom: '8px',
+                    color: isDarkMode ? '#E5E7EB' : '#374151',
+                  }}
+                >
+                  Carrier
+                </label>
+                <div ref={carrierRef} style={{ position: 'relative' }}>
+                  <button
+                    type="button"
+                    disabled={!isEditMode}
+                    onClick={() => isEditMode && setCarrierOpen((prev) => !prev)}
+                    onFocus={() => isEditMode && setFocusedField('carrier')}
+                    onBlur={() => setFocusedField(null)}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 12px',
+                      border: isEditMode && (focusedField === 'carrier' || carrierOpen)
+                        ? '1px solid #3B82F6'
+                        : isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
+                      borderRadius: '6px',
+                      backgroundColor: isEditMode
+                        ? (isDarkMode ? '#374151' : '#FFFFFF')
+                        : (isDarkMode ? '#111827' : '#F9FAFB'),
+                      cursor: isEditMode ? 'pointer' : 'not-allowed',
+                      fontSize: '14px',
+                      color: carrier
+                        ? (isEditMode ? (isDarkMode ? '#E5E7EB' : '#111827') : (isDarkMode ? '#9CA3AF' : '#6B7280'))
+                        : (isDarkMode ? '#6B7280' : '#9CA3AF'),
+                      outline: 'none',
+                      transition: 'border-color 0.2s ease',
+                    }}
+                  >
+                    <span>{carrier || 'Select Carrier Name...'}</span>
+                    <svg
                       style={{
-                        width: '100%',
-                        textAlign: 'left',
-                        padding: '10px 12px',
-                        fontSize: '14px',
-                        color: isDarkMode ? '#E5E7EB' : '#111827',
-                        backgroundColor: carrier === option
-                          ? (isDarkMode ? '#374151' : '#F3F4F6')
-                          : (isDarkMode ? '#1F2937' : '#FFFFFF'),
-                        border: 'none',
-                        cursor: 'pointer',
+                        width: '16px',
+                        height: '16px',
+                        color: '#9CA3AF',
+                        flexShrink: 0,
+                        transform: carrierOpen ? 'rotate(180deg)' : 'none',
+                        transition: 'transform 0.2s ease',
                       }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = carrier === option
-                          ? (isDarkMode ? '#374151' : '#F3F4F6')
-                          : (isDarkMode ? '#374151' : '#F3F4F6');
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = carrier === option
-                          ? (isDarkMode ? '#374151' : '#F3F4F6')
-                          : (isDarkMode ? '#1F2937' : '#FFFFFF');
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M19 9L12 16L5 9"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                  {carrierOpen && isEditMode && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        marginTop: '4px',
+                        backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                        border: isDarkMode ? '1px solid #4B5563' : '1px solid #D1D5DB',
+                        borderRadius: '6px',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                        overflow: 'hidden',
+                        zIndex: 100,
                       }}
                     >
-                      {option}
-                    </button>
-                  ))}
+                      {CARRIER_OPTIONS.map((option) => (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() => {
+                            setCarrier(option);
+                            setCarrierOpen(false);
+                            setFocusedField(null);
+                          }}
+                          style={{
+                            width: '100%',
+                            textAlign: 'left',
+                            padding: '10px 12px',
+                            fontSize: '14px',
+                            color: isDarkMode ? '#E5E7EB' : '#111827',
+                            backgroundColor: carrier === option
+                              ? (isDarkMode ? '#374151' : '#F3F4F6')
+                              : (isDarkMode ? '#1F2937' : '#FFFFFF'),
+                            border: 'none',
+                            cursor: 'pointer',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = carrier === option
+                              ? (isDarkMode ? '#374151' : '#F3F4F6')
+                              : (isDarkMode ? '#374151' : '#F3F4F6');
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = carrier === option
+                              ? (isDarkMode ? '#374151' : '#F3F4F6')
+                              : (isDarkMode ? '#1F2937' : '#FFFFFF');
+                          }}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Modal footer */}
@@ -722,7 +740,7 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
           </button>
           <button
             type="button"
-            disabled={isEditMode && (!shipmentName || !type || !amazonShipmentNumber || !amazonRefId)}
+            disabled={isEditMode && (isBooked ? (!shipmentName || !type || !amazonShipmentNumber || !amazonRefId) : (!shipmentName || !type))}
             onClick={handleEditInfo}
             style={{
               width: isEditMode ? '115px' : 'fit-content',
@@ -735,16 +753,16 @@ const ShipmentDetailsModal = ({ isOpen, onClose, row, onUpdate }) => {
               fontSize: '14px',
               fontWeight: 500,
               backgroundColor: isEditMode 
-                ? (!shipmentName || !type || !amazonShipmentNumber || !amazonRefId ? '#9CA3AF' : '#3B82F6')
+                ? (isBooked ? (!shipmentName || !type || !amazonShipmentNumber || !amazonRefId ? '#9CA3AF' : '#3B82F6') : (!shipmentName || !type ? '#9CA3AF' : '#3B82F6'))
                 : 'transparent',
               color: isEditMode ? '#FFFFFF' : (isDarkMode ? '#60A5FA' : '#3B82F6'),
-              cursor: (isEditMode && (!shipmentName || !type || !amazonShipmentNumber || !amazonRefId)) ? 'not-allowed' : 'pointer',
+              cursor: (isEditMode && (isBooked ? (!shipmentName || !type || !amazonShipmentNumber || !amazonRefId) : (!shipmentName || !type))) ? 'not-allowed' : 'pointer',
               display: 'flex',
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
               gap: isEditMode ? '0' : '8px',
-              boxShadow: isEditMode && shipmentName && type && amazonShipmentNumber && amazonRefId ? '0 1px 3px rgba(0, 0, 0, 0.1)' : 'none',
+              boxShadow: isEditMode && (isBooked ? (shipmentName && type && amazonShipmentNumber && amazonRefId) : (shipmentName && type)) ? '0 1px 3px rgba(0, 0, 0, 0.1)' : 'none',
               transition: 'all 0.2s ease',
             }}
           >
