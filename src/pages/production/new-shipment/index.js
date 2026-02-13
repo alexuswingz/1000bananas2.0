@@ -471,9 +471,21 @@ const NewShipment = () => {
     const prevSettings = doiSettingsValues;
     setDoiSettingsValues(newSettings);
     setForecastRange(String(totalDoi));
-    // Only persist and show "custom DOI" when user explicitly clicked Apply or Save as Default
-    if (source === 'apply' || source === 'saveAsDefault') {
-      // Clear appliedDoiForShipment to remove the exclamation icon after changing DOI goal
+    
+    if (source === 'apply') {
+      // Apply: Set appliedDoiForShipment to show exclamation icon and persist for this shipment
+      setAppliedDoiForShipment(newSettings);
+      try {
+        const key = getShipmentDoiStorageKey(shipmentId);
+        localStorage.setItem(key, JSON.stringify({
+          settings: newSettings,
+          totalDoi: totalDoi,
+        }));
+      } catch (e) {
+        console.warn('Failed to persist applied DOI:', e);
+      }
+    } else if (source === 'saveAsDefault') {
+      // Save as Default: Clear appliedDoiForShipment to remove exclamation icon
       setAppliedDoiForShipment(null);
       try {
         const key = getShipmentDoiStorageKey(shipmentId);
