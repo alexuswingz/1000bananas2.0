@@ -1683,10 +1683,12 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
 
   const filteredFormulas = getFilteredAndSortedFormulas();
 
-  // Footer summary metrics (match Sort Products footer)
+  // Footer summary metrics (match Sort Products footer exactly)
   const totalProducts = filteredFormulas.length;
   const totalUnits = (shipmentProducts || []).reduce((sum, p) => sum + (p.qty || 0), 0);
-  const totalFormulas = new Set(filteredFormulas.map((f) => f.formula)).length;
+  const totalFormulas = Array.from(
+    new Set(filteredFormulas.map((f) => f.formula).filter(Boolean))
+  ).length;
   const totalSizeSwaps = 0;
   const totalFormulaChanges = 0;
   const totalTimeHours = 0;
@@ -2715,7 +2717,7 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
         </>
       )}
 
-      {/* Footer */}
+      {/* Footer - match Sort Products: same condition, labels, and FORMULAS count */}
       {onCompleteClick && (
         <div
           style={{
@@ -2739,7 +2741,7 @@ const SortFormulasTable = ({ shipmentProducts = [], shipmentId = null, onComplet
             boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
           }}
         >
-          {/* Metrics */}
+          {/* Metrics - same order and labels as Sort Products */}
           <div
             style={{
               display: 'flex',

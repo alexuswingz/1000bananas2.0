@@ -1811,14 +1811,26 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     setLastClickTime(currentTime);
   };
 
-  // Chart tooltip: date, units sold, potential units sold only; shown below x-axis
+  // Chart tooltip: date, units sold, potential units sold; in forecast/future area show Forecasted Units
   const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload || !payload.length) return null;
-    const date = new Date(label);
-    const tooltipKeys = ['unitsSold', 'forecastBase'];
+    const point = (payload.find((p) => p.payload != null) ?? payload[0])?.payload; // raw data row (has isForecast, timestamp, forecastAdjusted)
+    const date = new Date(point?.timestamp ?? label);
+    const pointTs = typeof (point?.timestamp) === 'number' ? point.timestamp : (typeof label === 'number' ? label : new Date(label).getTime());
+    // Treat as forecast: explicit flag, or timestamp >= today, or data shape (has forecastAdjusted, no unitsSold)
+    const hasForecastValue = point?.forecastAdjusted != null || payload.some((e) => e.dataKey === 'forecastAdjusted' && e.value != null);
+    const hasHistoricalValues = (point?.unitsSold != null || point?.forecastBase != null) && point?.isForecast !== true;
+    const isForecast =
+      point?.isForecast === true ||
+      (todayStartTs != null && pointTs >= todayStartTs) ||
+      (hasForecastValue && !hasHistoricalValues);
+
+    const tooltipKeys = ['unitsSold', 'forecastBase', 'forecastAdjusted'];
     const filtered = payload.filter((entry) => tooltipKeys.includes(entry.dataKey));
     const unitsSoldEntry = filtered.find((e) => e.dataKey === 'unitsSold');
     const potentialEntry = filtered.find((e) => e.dataKey === 'forecastBase');
+    const forecastAdjustedEntry = filtered.find((e) => e.dataKey === 'forecastAdjusted');
+    const forecastedValue = point?.forecastAdjusted ?? forecastAdjustedEntry?.value;
 
     const formatVal = (v) => (v == null || v === '' ? '—' : (typeof v === 'number' ? Math.round(v).toLocaleString() : String(v)));
 
@@ -1838,12 +1850,20 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         <p style={{ color: '#fff', fontWeight: '600', margin: 0, fontSize: '0.875rem' }}>
           {date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
         </p>
-        <p style={{ color: '#6b7280', margin: 0, fontSize: '0.75rem', fontWeight: '500' }}>
-          Units Sold: <span style={{ color: '#fff', fontWeight: '600' }}>{formatVal(unitsSoldEntry?.value)}</span>
-        </p>
-        <p style={{ color: '#f97316', margin: 0, fontSize: '0.75rem', fontWeight: '500' }}>
-          Potential Units Sold: <span style={{ color: '#fff', fontWeight: '600' }}>{formatVal(potentialEntry?.value)}</span>
-        </p>
+        {isForecast ? (
+          <p style={{ color: '#22c55e', margin: 0, fontSize: '0.75rem', fontWeight: '500' }}>
+            Forecasted Units: <span style={{ color: '#fff', fontWeight: '600' }}>{formatVal(forecastedValue)}</span>
+          </p>
+        ) : (
+          <>
+            <p style={{ color: '#6b7280', margin: 0, fontSize: '0.75rem', fontWeight: '500' }}>
+              Units Sold: <span style={{ color: '#fff', fontWeight: '600' }}>{formatVal(unitsSoldEntry?.value)}</span>
+            </p>
+            <p style={{ color: '#f97316', margin: 0, fontSize: '0.75rem', fontWeight: '500' }}>
+              Potential Units Sold: <span style={{ color: '#fff', fontWeight: '600' }}>{formatVal(potentialEntry?.value)}</span>
+            </p>
+          </>
+        )}
       </div>
     );
   };
