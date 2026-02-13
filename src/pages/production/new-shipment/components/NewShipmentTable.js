@@ -3759,14 +3759,15 @@ const NewShipmentTable = ({
       <>
         {/* Pure CSS hover - fastest possible (browser native) */}
         <style>{`
-          .non-table-row[data-selected="true"][data-dark="true"]:hover {
-            background-color: #234A6F !important;
+          /* Row highlight: same width as separator (30px inset), decreased intensity */
+          .non-table-row[data-selected="true"][data-dark="true"]:hover .non-table-row-highlight {
+            background-color: #1E3A52 !important;
           }
-          .non-table-row[data-selected="true"][data-dark="false"]:hover {
-            background-color: #E3EFFE !important;
+          .non-table-row[data-selected="true"][data-dark="false"]:hover .non-table-row-highlight {
+            background-color: #D1E0F7 !important;
           }
-          .non-table-row[data-selected="false"]:hover {
-            background-color: #1D2933 !important;
+          .non-table-row[data-selected="false"]:hover .non-table-row-highlight {
+            background-color: #1A2636 !important;
           }
           .non-table-row:hover .pencil-icon-hover {
             opacity: 1 !important;
@@ -4296,13 +4297,7 @@ const NewShipmentTable = ({
                     minHeight: '66px',
                     maxHeight: '66px',
                     padding: '8px 16px',
-                    backgroundColor: (() => {
-                      if (isSelected) {
-                        return isDarkMode ? '#1E3A5F' : '#DBEAFE';
-                      } else {
-                        return '#1A2235';
-                      }
-                    })(),
+                    backgroundColor: '#1A2235',
                     alignItems: 'center',
                     gap: '32px',
                     userSelect: 'none', // Prevent text selection
@@ -4316,6 +4311,26 @@ const NewShipmentTable = ({
                     overflow: 'visible',
                   }}
                 >
+                  {/* Highlight layer: same width as separator (30px inset), decreased intensity */}
+                  <div
+                    className="non-table-row-highlight"
+                    aria-hidden
+                    style={{
+                      position: 'absolute',
+                      left: '30px',
+                      right: '30px',
+                      top: 0,
+                      bottom: 0,
+                      zIndex: 0,
+                      backgroundColor: (() => {
+                        if (isSelected) {
+                          return isDarkMode ? '#1A2F4A' : '#E8F0FA';
+                        }
+                        return 'transparent';
+                      })(),
+                      pointerEvents: 'none',
+                    }}
+                  />
                   {/* Border line with 30px margin on both sides */}
                   <div
                     style={{
@@ -4324,11 +4339,12 @@ const NewShipmentTable = ({
                       left: '30px',
                       right: '30px',
                       height: '1px',
-                      backgroundColor: isDarkMode ? '#374151' : '#E5E7EB'
+                      backgroundColor: isDarkMode ? '#374151' : '#E5E7EB',
+                      zIndex: 1,
                     }}
                   />
                   {/* PRODUCTS Column */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', position: 'relative', zIndex: 1 }}>
                     {/* Checkbox for bulk selection */}
                     <label
                       style={{
@@ -4410,18 +4426,35 @@ const NewShipmentTable = ({
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: 0 }}>
                       {/* Product Name + Best Seller badge */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        <span 
-                          style={{ 
-                            fontSize: '14px', 
-                            fontWeight: 500, 
-                            color: isDarkMode ? '#F9FAFB' : '#111827',
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onProductClick && arrayIndex < currentRows.length) {
+                              const clickedRow = currentRows[arrayIndex];
+                              onProductClick(clickedRow, false);
+                            }
+                          }}
+                          style={{
+                            fontSize: '14px',
+                            fontWeight: 500,
+                            color: '#3B82F6',
+                            textDecoration: 'underline',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap'
+                            whiteSpace: 'nowrap',
+                            background: 'none',
+                            border: 'none',
+                            padding: 0,
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            fontFamily: 'inherit',
                           }}
+                          className="hover:opacity-80"
+                          aria-label={`Open ${row.product || 'product'} details`}
                         >
                           {row.product}
-                        </span>
+                        </button>
                         {topSellerIds.has(row.id) && (
                           <span
                             style={{
@@ -4545,7 +4578,7 @@ const NewShipmentTable = ({
                     const warningColor = isOutOfStock ? '#EF4444' : isNoSales ? '#F97316' : null;
                     const warningLabel = isOutOfStock ? 'Sold Out' : isNoSales ? 'No Sales' : null;
                     return (
-                      <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '6px', fontSize: '14px', fontWeight: 500, color: isDarkMode ? '#FFFFFF' : '#111827', paddingLeft: '16px', marginLeft: '-255px', marginRight: '20px', minWidth: '140px', height: '23px', position: 'relative', overflow: 'visible', zIndex: hoveredInventoryWarningIndex === index ? 100000 : 1 }}>
+                      <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '6px', fontSize: '14px', fontWeight: 500, color: isDarkMode ? '#FFFFFF' : '#111827', paddingLeft: '16px', marginLeft: '-255px', marginRight: '20px', minWidth: '140px', height: '23px', position: 'relative', overflow: 'visible', zIndex: hoveredInventoryWarningIndex === index ? 100000 : 2 }}>
                         {warningColor && (
                           <span
                             ref={(el) => { if (el) inventoryWarningIconRefs.current[index] = el; }}
@@ -4601,7 +4634,7 @@ const NewShipmentTable = ({
                   })()}
 
                   {/* UNITS TO MAKE Column - match header: same padding so content aligns under header */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '8px', paddingLeft: '16px', marginLeft: '-300px', marginRight: '20px', position: 'relative', minWidth: '220px', zIndex: hoveredWarningIndex === index ? 10001 : 'auto' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '8px', paddingLeft: '16px', marginLeft: '-300px', marginRight: '20px', position: 'relative', minWidth: '220px', zIndex: hoveredWarningIndex === index ? 10001 : 2 }}>
                     {/* Label warning icon - shown when QTY exceeds labels, positioned on the left */}
                     {(() => {
                       const labelsAvailable = getAvailableLabelsForRow(row, index);
@@ -5176,7 +5209,7 @@ const NewShipmentTable = ({
 
                   {/* DOI (DAYS) Column - fixed height so FBA bar doesn't move row; no overflow hidden so bars aren't cut; clickable to open row */}
                   <div 
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingLeft: '16px', marginLeft: '-275px', marginRight: '20px', position: 'relative', height: '100%', minHeight: 0 }}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingLeft: '16px', marginLeft: '-275px', marginRight: '20px', position: 'relative', height: '100%', minHeight: 0, zIndex: 2 }}
                   >
                     <button
                       type="button"

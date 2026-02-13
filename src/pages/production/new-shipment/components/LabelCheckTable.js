@@ -1691,7 +1691,7 @@ const LabelCheckTable = ({
                           style={{ 
                             fontSize: '14px', 
                             fontWeight: 500, 
-                            color: '#3B82F6',
+                            color: isDarkMode ? '#FFFFFF' : '#374151',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
@@ -1703,11 +1703,11 @@ const LabelCheckTable = ({
                             textDecoration: 'none'
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.color = '#2563EB';
+                            e.currentTarget.style.color = isDarkMode ? '#E5E7EB' : '#111827';
                             e.currentTarget.style.textDecoration = 'underline';
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.color = '#3B82F6';
+                            e.currentTarget.style.color = isDarkMode ? '#FFFFFF' : '#374151';
                             e.currentTarget.style.textDecoration = 'none';
                           }}
                         >

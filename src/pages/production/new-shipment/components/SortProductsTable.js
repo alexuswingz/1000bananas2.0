@@ -2786,7 +2786,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                           style={{
                             fontSize: '13px',
                             fontWeight: 500,
-                            color: '#38BDF8',
+                            color: '#FFFFFF',
                             whiteSpace: 'nowrap',
                             textOverflow: 'ellipsis',
                             overflow: 'hidden',

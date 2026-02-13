@@ -353,7 +353,7 @@ const Sidebar = (props = {}) => {
                 {expandedMenus.production && (
                   <>
                     <div className={subSubMenuItemClass('/production/planning')} onClick={() => navigate('/dashboard/production/planning')}>
-                      Planning
+                      Shipments
                     </div>
                     <div className={subSubMenuItemClass('/production/manufacturing')} onClick={() => navigate('/dashboard/production/manufacturing')}>
                       Manufacturing
@@ -411,7 +411,7 @@ const Sidebar = (props = {}) => {
                 <div className={`text-xs ${themeClasses.textSecondary} px-2 py-1.5 ${themeClasses.hover} rounded cursor-pointer`} onClick={() => navigate('/dashboard/supply-chain/raw-materials')}>• Raw Materials</div>
                 
                 <div className={`text-xs font-semibold ${themeClasses.text} mt-2 px-2`}>Production</div>
-                <div className={`text-xs ${themeClasses.textSecondary} px-2 py-1.5 ${themeClasses.hover} rounded cursor-pointer`} onClick={() => navigate('/dashboard/production/planning')}>• Planning</div>
+                <div className={`text-xs ${themeClasses.textSecondary} px-2 py-1.5 ${themeClasses.hover} rounded cursor-pointer`} onClick={() => navigate('/dashboard/production/planning')}>• Shipments</div>
                 <div className={`text-xs ${themeClasses.textSecondary} px-2 py-1.5 ${themeClasses.hover} rounded cursor-pointer`} onClick={() => navigate('/dashboard/production/manufacturing')}>• Manufacturing</div>
                 <div className={`text-xs ${themeClasses.textSecondary} px-2 py-1.5 ${themeClasses.hover} rounded cursor-pointer`} onClick={() => navigate('/dashboard/production/packaging')}>• Packaging</div>
                 <div className={`text-xs ${themeClasses.textSecondary} px-2 py-1.5 ${themeClasses.hover} rounded cursor-pointer`} onClick={() => navigate('/dashboard/production/inventory')}>• Inventory</div>

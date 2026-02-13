@@ -28,6 +28,74 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
   const [doiSettings, setDoiSettings] = useState(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true); // Track if this is the initial load
 
+  // Planning table footer legend: order + visibility (persisted in localStorage)
+  const LEGEND_STORAGE_KEY = 'planning-table-legend';
+  const defaultLegendOrder = ['notStarted', 'inProgress', 'incomplete', 'completed'];
+  const defaultLegendVisibility = { notStarted: true, inProgress: true, incomplete: true, completed: true };
+  const [legendStatOrder, setLegendStatOrder] = useState(() => {
+    try {
+      const raw = localStorage.getItem(LEGEND_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed.order) && parsed.order.length) return parsed.order;
+      }
+    } catch (_) {}
+    return defaultLegendOrder;
+  });
+  const [legendStatVisibility, setLegendStatVisibility] = useState(() => {
+    try {
+      const raw = localStorage.getItem(LEGEND_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.visibility && typeof parsed.visibility === 'object') return { ...defaultLegendVisibility, ...parsed.visibility };
+      }
+    } catch (_) {}
+    return defaultLegendVisibility;
+  });
+  const [legendDragOverId, setLegendDragOverId] = useState(null);
+  const [legendCustomizeOpen, setLegendCustomizeOpen] = useState(false);
+  const legendCustomizeRef = useRef(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LEGEND_STORAGE_KEY, JSON.stringify({ order: legendStatOrder, visibility: legendStatVisibility }));
+    } catch (_) {}
+  }, [legendStatOrder, legendStatVisibility]);
+
+  const LEGEND_STATS = {
+    notStarted: { label: 'Not Started', color: '#9CA3AF' },
+    inProgress: { label: 'In Progress', color: '#3B82F6' },
+    incomplete: { label: 'Incomplete', color: '#F59E0B' },
+    completed: { label: 'Completed', color: '#10B981' },
+  };
+
+  const handleLegendDragStart = (e, id) => {
+    e.dataTransfer.setData('text/plain', id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+  const handleLegendDragOver = (e, id) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setLegendDragOverId(id);
+  };
+  const handleLegendDragLeave = () => setLegendDragOverId(null);
+  const handleLegendDrop = (e, targetId) => {
+    e.preventDefault();
+    setLegendDragOverId(null);
+    const sourceId = e.dataTransfer.getData('text/plain');
+    if (!sourceId || sourceId === targetId) return;
+    setLegendStatOrder((prev) => {
+      const idx = prev.indexOf(sourceId);
+      const targetIdx = prev.indexOf(targetId);
+      if (idx === -1 || targetIdx === -1) return prev;
+      const next = [...prev];
+      next.splice(idx, 1);
+      next.splice(targetIdx, 0, sourceId);
+      return next;
+    });
+  };
+  const handleLegendDragEnd = () => setLegendDragOverId(null);
+
   const themeClasses = {
     cardBg: isDarkMode ? 'bg-dark-bg-secondary' : 'bg-white',
     text: isDarkMode ? 'text-dark-text-primary' : 'text-gray-900',
@@ -2516,7 +2584,7 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
       onUpdate={onUpdateShipment}
     />
     
-    {/* Key/Legend - Floating fixed on the right */}
+    {/* Key/Legend - Floating fixed on the right; draggable order + toggle visibility */}
     <div
       style={{
         position: 'fixed',
@@ -2533,85 +2601,133 @@ const PlanningTable = ({ rows, activeFilters, onFilterToggle, onRowClick, onLabe
         boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div
+      {legendStatOrder
+        .filter((id) => legendStatVisibility[id])
+        .map((id) => {
+          const stat = LEGEND_STATS[id];
+          if (!stat) return null;
+          const isDragOver = legendDragOverId === id;
+          return (
+            <div
+              key={id}
+              draggable
+              onDragStart={(e) => handleLegendDragStart(e, id)}
+              onDragOver={(e) => handleLegendDragOver(e, id)}
+              onDragLeave={handleLegendDragLeave}
+              onDrop={(e) => handleLegendDrop(e, id)}
+              onDragEnd={handleLegendDragEnd}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: 'grab',
+                padding: '4px 8px',
+                margin: '-4px -8px',
+                borderRadius: '6px',
+                backgroundColor: isDragOver ? (isDarkMode ? '#374151' : '#E5E7EB') : 'transparent',
+              }}
+            >
+              <div
+                style={{
+                  width: '20px',
+                  height: '20px',
+                  borderRadius: '20px',
+                  backgroundColor: stat.color,
+                  border: 'none',
+                  display: 'inline-block',
+                  flexShrink: 0,
+                }}
+              />
+              <span
+                style={{
+                  fontSize: '14px',
+                  color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                }}
+              >
+                {stat.label}
+              </span>
+            </div>
+          );
+        })}
+      <div style={{ position: 'relative' }} ref={legendCustomizeRef}>
+        <button
+          type="button"
+          onClick={() => setLegendCustomizeOpen((o) => !o)}
+          title="Show or hide stats"
           style={{
-            width: '20px',
-            height: '20px',
-            borderRadius: '20px',
-            backgroundColor: '#9CA3AF',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '28px',
+            height: '28px',
+            padding: 0,
             border: 'none',
-            display: 'inline-block',
-          }}
-        />
-        <span
-          style={{
-            fontSize: '14px',
+            borderRadius: '6px',
+            backgroundColor: legendCustomizeOpen ? (isDarkMode ? '#374151' : '#E5E7EB') : 'transparent',
             color: isDarkMode ? '#9CA3AF' : '#6B7280',
+            cursor: 'pointer',
           }}
         >
-          Not Started
-        </span>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div
-          style={{
-            width: '20px',
-            height: '20px',
-            borderRadius: '20px',
-            backgroundColor: '#3B82F6',
-            border: 'none',
-            display: 'inline-block',
-          }}
-        />
-        <span
-          style={{
-            fontSize: '14px',
-            color: isDarkMode ? '#9CA3AF' : '#6B7280',
-          }}
-        >
-          In Progress
-        </span>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div
-          style={{
-            width: '20px',
-            height: '20px',
-            borderRadius: '20px',
-            backgroundColor: '#F59E0B',
-            border: 'none',
-            display: 'inline-block',
-          }}
-        />
-        <span
-          style={{
-            fontSize: '14px',
-            color: isDarkMode ? '#9CA3AF' : '#6B7280',
-          }}
-        >
-          Incomplete
-        </span>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div
-          style={{
-            width: '20px',
-            height: '20px',
-            borderRadius: '20px',
-            backgroundColor: '#10B981',
-            border: 'none',
-            display: 'inline-block',
-          }}
-        />
-        <span
-          style={{
-            fontSize: '14px',
-            color: isDarkMode ? '#9CA3AF' : '#6B7280',
-          }}
-        >
-          Completed
-        </span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9.19 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9.19a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        </button>
+        {legendCustomizeOpen && (
+          <>
+            <div
+              role="button"
+              tabIndex={0}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => setLegendCustomizeOpen(false)}
+              style={{ position: 'fixed', inset: 0, zIndex: 49 }}
+              aria-label="Close"
+            />
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '100%',
+                right: 0,
+                marginBottom: '8px',
+                zIndex: 51,
+                minWidth: '160px',
+                padding: '8px',
+                borderRadius: '8px',
+                backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                border: isDarkMode ? '1px solid #374151' : '1px solid #E5E7EB',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+              }}
+            >
+              <div style={{ fontSize: '12px', fontWeight: 600, color: isDarkMode ? '#E5E7EB' : '#374151', marginBottom: '8px' }}>Show / hide stats</div>
+              {defaultLegendOrder.map((key) => {
+                const s = LEGEND_STATS[key];
+                if (!s) return null;
+                return (
+                  <label
+                    key={key}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '6px 8px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!!legendStatVisibility[key]}
+                      onChange={() => setLegendStatVisibility((prev) => ({ ...prev, [key]: !prev[key] }))}
+                      style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                    />
+                    <div style={{ width: '12px', height: '12px', borderRadius: '12px', backgroundColor: s.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: '13px', color: isDarkMode ? '#D1D5DB' : '#4B5563' }}>{s.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </>
+        )}
       </div>
     </div>
     </>
