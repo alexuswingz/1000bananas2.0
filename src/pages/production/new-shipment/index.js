@@ -473,15 +473,13 @@ const NewShipment = () => {
     setForecastRange(String(totalDoi));
     // Only persist and show "custom DOI" when user explicitly clicked Apply or Save as Default
     if (source === 'apply' || source === 'saveAsDefault') {
-      setAppliedDoiForShipment(newSettings);
+      // Clear appliedDoiForShipment to remove the exclamation icon after changing DOI goal
+      setAppliedDoiForShipment(null);
       try {
         const key = getShipmentDoiStorageKey(shipmentId);
-        localStorage.setItem(key, JSON.stringify({
-          totalDoi: totalDoi,
-          settings: newSettings,
-        }));
+        localStorage.removeItem(key); // Remove persisted custom DOI to clear the badge
       } catch (e) {
-        console.warn('Failed to persist applied DOI:', e);
+        console.warn('Failed to clear applied DOI:', e);
       }
     }
 

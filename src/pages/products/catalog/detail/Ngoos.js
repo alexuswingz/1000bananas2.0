@@ -133,6 +133,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showForecastSettingsModal, setShowForecastSettingsModal] = useState(false);
   const [showTemporaryConfirmModal, setShowTemporaryConfirmModal] = useState(false);
+  const [showSaveConfirmModal, setShowSaveConfirmModal] = useState(false);
   const [dontRemindAgain, setDontRemindAgain] = useState(false);
   const [hoveredUnitsContainer, setHoveredUnitsContainer] = useState(false);
   const [displayUnitsOverride, setDisplayUnitsOverride] = useState(null); // user-adjusted units in N-GOOS modal (arrows)
@@ -402,6 +403,13 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   useEffect(() => {
     if (doiSettings) {
       setTempDoiSettings(doiSettings);
+    }
+  }, [doiSettingsKey]);
+
+  // Remove exclamation point indicator when DOI settings are changed
+  useEffect(() => {
+    if (doiSettings) {
+      setSettingsApplied(false);
     }
   }, [doiSettingsKey]);
 
@@ -1530,17 +1538,10 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   };
 
   const handleApplyForecastSettings = () => {
-    // Check if user has previously checked "Don't remind me again"
-    const dontRemind = localStorage.getItem('forecast_settings_dont_remind') === 'true';
-    
-    if (dontRemind) {
-      // Apply directly without showing confirmation
-      applyForecastSettingsTemporarily();
-    } else {
-      // Close forecast settings modal and show confirmation modal
-      setShowForecastSettingsModal(false);
-      setShowTemporaryConfirmModal(true);
-    }
+    // Always show confirmation modal when Apply is clicked
+    // Close forecast settings modal and show confirmation modal
+    setShowForecastSettingsModal(false);
+    setShowTemporaryConfirmModal(true);
   };
 
   const applyForecastSettingsTemporarily = () => {
@@ -1563,24 +1564,27 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
     }
     setShowForecastSettingsModal(false);
     setShowTemporaryConfirmModal(false);
-    setSettingsApplied(true);
+    // Only set settingsApplied to true if forecast settings changed (not just DOI settings)
+    // This allows the exclamation to disappear when only DOI settings are changed
+    const forecastSettingsChanged = 
+      tempSalesVelocityWeight !== salesVelocityWeight ||
+      tempSvVelocityWeight !== svVelocityWeight ||
+      tempForecastModel !== forecastModel ||
+      tempMarketAdjustment !== marketAdjustment;
+    if (forecastSettingsChanged) {
+      setSettingsApplied(true);
+    }
     toast.success('Forecast settings applied', {
       description: `Model: ${tempForecastModel}, Market: ${tempMarketAdjustment}%, Sales Velocity: ${tempSalesVelocityWeight}%`
     });
   };
 
   const handleConfirmTemporaryApply = () => {
-    // Save "Don't remind me again" preference if checked
-    if (dontRemindAgain) {
-      localStorage.setItem('forecast_settings_dont_remind', 'true');
-    }
     applyForecastSettingsTemporarily();
-    setDontRemindAgain(false); // Reset checkbox state
   };
 
   const handleGoBackFromConfirm = () => {
     setShowTemporaryConfirmModal(false);
-    setDontRemindAgain(false); // Reset checkbox state
     // Reopen the forecast settings modal
     setShowForecastSettingsModal(true);
   };
@@ -1595,6 +1599,18 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   };
 
   const handleSaveForecastSettingsAsDefault = () => {
+    // Show confirmation modal instead of saving directly
+    setShowForecastSettingsModal(false);
+    setShowSaveConfirmModal(true);
+  };
+
+  const handleGoBackFromSaveConfirm = () => {
+    setShowSaveConfirmModal(false);
+    // Reopen the forecast settings modal
+    setShowForecastSettingsModal(true);
+  };
+
+  const handleConfirmSaveForecastSettings = () => {
     setSalesVelocityWeight(tempSalesVelocityWeight);
     setSvVelocityWeight(tempSvVelocityWeight);
     setForecastModel(tempForecastModel);
@@ -1624,7 +1640,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         marketAdjustment: tempMarketAdjustment
       });
     }
-    setShowForecastSettingsModal(false);
+    setShowSaveConfirmModal(false);
     toast.success('Forecast settings saved as default');
   };
 
@@ -4666,24 +4682,172 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         >
           <div
             style={{
-              backgroundColor: '#1A2235',
+              backgroundColor: '#1A2235 ',
               borderRadius: '12px',
               padding: '24px',
-              width: '418px',
+              width: '421px',
+              height: '196px',
+              boxShadow: '0 24px 80px rgba(15,23,42,0.75)',
+              border: '1px solid #1F2937',
+              borderWidth: '1px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '22px',
+              position: 'relative',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Warning Icon */}
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'center',
+              gap: '5px',
+            }}>
+              <div
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '16px',
+                  backgroundColor: '#FF9500',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '8px',
+                  fontSize: '1.5rem',
+                  fontWeight: 'bold',
+                  color: '#FFFFFF',
+                  opacity: 1,
+                }}
+              >
+                !
+              </div>
+            </div>
+
+            {/* Title */}
+            <h3 style={{
+              fontSize: '18px',
+              fontWeight: '700',
+              color: '#FFFFFF',
+              textAlign: 'center',
+              margin: 0,
+              marginTop: '-12px',
+            }}>
+              Save Forecast Settings as Default?
+            </h3>
+
+            {/* Body Text */}
+            <div style={{ marginTop: '-12px' }}>
+              <p style={{
+                fontSize: '14px',
+                color: '#E2E8F0',
+                textAlign: 'center',
+                margin: 0,
+                lineHeight: '1.5',
+              }}>
+                You're making a permanent change for this product only.
+              </p>
+            </div>
+
+            {/* Buttons */}
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'row',
+              gap: '10px',
+              width: '100%',
+            }}>
+              <button
+                onClick={handleGoBackFromConfirm}
+                style={{
+                  borderRadius: '4px',
+                  border: '1px solid #1F2937',
+                  borderWidth: '1px',
+                  backgroundColor: '#374151',
+                  color: '#FFFFFF',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                  width: '178.5px',
+                  height: '31px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxSizing: 'border-box',
+                  opacity: 1,
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#4B5563'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#374151'}
+              >
+                Go back
+              </button>
+              <button
+                onClick={handleConfirmTemporaryApply}
+                style={{
+                  borderRadius: '4px',
+                  border: '1px solid #1F2937',
+                  borderWidth: '1px',
+                  backgroundColor: '#3B82F6',
+                  color: '#FFFFFF',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                  width: '178.5px',
+                  height: '31px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxSizing: 'border-box',
+                  opacity: 1,
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#2563EB'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#3B82F6'}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save Forecast Settings as Default Confirmation Modal */}
+      {showSaveConfirmModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.6)',
+            backdropFilter: 'blur(3px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1001,
+          }}
+          onClick={handleGoBackFromSaveConfirm}
+        >
+          <div
+            style={{
+              backgroundColor: '#1A2235',
+              borderRadius: '12px',
+              padding: '32px',
+              width: '480px',
               height: 'auto',
-              minHeight: '257px',
+              minHeight: 'auto',
               boxShadow: '0 24px 80px rgba(15,23,42,0.75)',
               border: '1px solid #1F2937',
               display: 'flex',
               flexDirection: 'column',
-              gap: '24px',
+              gap: '20px',
               position: 'relative',
             }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* X Button */}
             <button
-              onClick={handleGoBackFromConfirm}
+              onClick={handleGoBackFromSaveConfirm}
               style={{
                 position: 'absolute',
                 top: '12px',
@@ -4749,112 +4913,39 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               color: '#FFFFFF',
               textAlign: 'center',
               margin: 0,
-              marginTop: '-12px',
+              marginTop: '0',
             }}>
-              Apply Forecast Settings Temporarily?
+              Save Forecast Settings as Default?
             </h3>
 
             {/* Body Text */}
-            <div style={{ marginTop: '-12px' }}>
+            <div style={{ marginTop: '0' }}>
               <p style={{
                 fontSize: '0.875rem',
                 color: '#E2E8F0',
                 textAlign: 'center',
                 margin: 0,
-                marginBottom: '0.5rem',
                 lineHeight: '1.5',
               }}>
-                You're making a temporary change for this product only.
+                You're making a permanent change for this product only.
               </p>
-              <p style={{
-                fontSize: '0.875rem',
-                color: '#E2E8F0',
-                textAlign: 'center',
-                margin: 0, 
-                lineHeight: '1.5',
-              }}>
-                To keep these settings, use Save as Default.
-              </p>
-            </div>
-
-            {/* Checkbox */}
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px',
-              justifyContent: 'center',
-            }}>
-              <div
-                onClick={() => setDontRemindAgain(!dontRemindAgain)}
-                style={{
-                  width: '16px',
-                  height: '16px',
-                  borderRadius: '3px',
-                  border: '1.5px solid #E2E8F0',
-                  backgroundColor: 'transparent',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 1px 2px rgba(226, 232, 240, 0.3)',
-                  transition: 'all 0.2s ease',
-                  flexShrink: 0,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#F3F4F6';
-                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(226, 232, 240, 0.4)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#E2E8F0';
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(226, 232, 240, 0.3)';
-                }}
-              >
-                {dontRemindAgain && (
-                  <svg
-                    width="10"
-                    height="10"
-                    viewBox="0 0 10 10"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M8 2.5L4 6.5L2 4.5"
-                      stroke="#E2E8F0"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                )}
-              </div>
-              <label
-                onClick={() => setDontRemindAgain(!dontRemindAgain)}
-                style={{
-                  fontSize: '0.875rem',
-                  color: '#C7C7CC',
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                }}
-              >
-                Don't remind me again
-              </label>
             </div>
 
             {/* Buttons */}
             <div style={{ 
               display: 'flex', 
-              flexDirection: 'row',
-              gap: '16px',
-              width: '100%',
+              gap: '12px',
+              justifyContent: 'center',
+              marginTop: '0',
             }}>
               <button
-                onClick={handleGoBackFromConfirm}
+                onClick={handleGoBackFromSaveConfirm}
                 style={{
                   padding: '8px 16px',
                   borderRadius: '6px',
-                  border: 'none',
-                  backgroundColor: '#FFFFFF',
-                  color: '#1F2937',
+                  border: '1px solid #4B5563',
+                  backgroundColor: '#1A2235',
+                  color: '#FFFFFF',
                   fontSize: '0.875rem',
                   fontWeight: '500',
                   cursor: 'pointer',
@@ -4866,13 +4957,13 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                   justifyContent: 'center',
                   boxSizing: 'border-box',
                 }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#F3F4F6'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = '#FFFFFF'}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#374151'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#1A2235'}
               >
                 Go back
               </button>
               <button
-                onClick={handleConfirmTemporaryApply}
+                onClick={handleConfirmSaveForecastSettings}
                 style={{
                   padding: '8px 16px',
                   borderRadius: '6px',

@@ -4653,6 +4653,9 @@ const NewShipmentTable = ({
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setClickedQtyIndex(clickedQtyIndex === index ? null : index);
+                                // Hide tooltip when clicking the icon
+                                setHoveredWarningIndex(null);
+                                setLabelsTooltipPosition(prev => ({ ...prev, visible: false }));
                               }}
                               onMouseEnter={() => {
                                 setHoveredWarningIndex(index);
@@ -5047,6 +5050,9 @@ const NewShipmentTable = ({
                             justifyContent: 'center',
                             padding: 0,
                             outline: 'none',
+                            pointerEvents: 'auto',
+                            position: 'relative',
+                            zIndex: 10,
                           }}
                           onMouseEnter={(e) => { e.currentTarget.style.color = isDarkMode ? '#D1D5DB' : '#374151'; }}
                           onMouseLeave={(e) => { e.currentTarget.style.color = isDarkMode ? '#9CA3AF' : '#6B7280'; }}
