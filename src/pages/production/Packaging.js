@@ -383,7 +383,7 @@ const Packaging = () => {
         // Show second toast - Formula added to floor inventory (with green background)
         setTimeout(() => {
           toast.success(
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2">
                 <path d="M20 6L9 17l-5-5" />
               </svg>
@@ -396,9 +396,14 @@ const Packaging = () => {
                 backgroundColor: '#D1FAE5',
                 border: '1px solid #6EE7B7',
                 borderRadius: '12px',
-                padding: '8px 12px',
-                minWidth: '400px',
+                width: '573px',
+                height: '36px',
+                paddingTop: '8px',
+                paddingRight: '12px',
+                paddingBottom: '8px',
+                paddingLeft: '12px',
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                boxSizing: 'border-box',
               },
               duration: 5000,
             }

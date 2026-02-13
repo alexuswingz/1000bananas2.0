@@ -137,12 +137,13 @@ const EnterRemainingQuantityModal = ({ isOpen, onClose, onConfirm, productData }
             onChange={(e) => setRemainingQuantity(e.target.value)}
             placeholder="Enter remaining quantity here..."
             style={{
-              width: '107px',
+              width: '100%',
+              maxWidth: '100%',
               height: '34px',
               paddingTop: '8px',
-              paddingRight: '6px',
+              paddingRight: '12px',
               paddingBottom: '8px',
-              paddingLeft: '6px',
+              paddingLeft: '12px',
               border: '1px solid #374151',
               borderRadius: '8px',
               fontSize: '14px',
@@ -151,6 +152,7 @@ const EnterRemainingQuantityModal = ({ isOpen, onClose, onConfirm, productData }
               marginBottom: '16px',
               boxSizing: 'border-box',
               opacity: 0.75,
+              display: 'block',
             }}
           />
 
@@ -201,7 +203,6 @@ const EnterRemainingQuantityModal = ({ isOpen, onClose, onConfirm, productData }
         <div
           style={{
             padding: '16px 24px',
-            borderTop: '1px solid #374151',
             display: 'flex',
             gap: '12px',
             justifyContent: 'flex-end',

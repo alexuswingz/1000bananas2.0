@@ -88,6 +88,10 @@ const NewShipmentTable = ({
   const [hoveredAddIndex, setHoveredAddIndex] = useState(null);
   const [hoveredWarningIndex, setHoveredWarningIndex] = useState(null);
   const [hoveredInventoryWarningIndex, setHoveredInventoryWarningIndex] = useState(null);
+  const [inventoryTooltipPosition, setInventoryTooltipPosition] = useState({ top: 0, left: 0, visible: false, label: '' });
+  const [labelsTooltipPosition, setLabelsTooltipPosition] = useState({ top: 0, left: 0, visible: false, labelsAvailable: 0 });
+  const inventoryWarningIconRefs = useRef({});
+  const labelsWarningIconRefs = useRef({});
   const qtyContainerRefs = useRef({});
   const popupRefs = useRef({});
   const qtyInputRefs = useRef({});
@@ -508,6 +512,72 @@ const NewShipmentTable = ({
       clearTimeout(scrollTimeout);
     };
   }, [tableMode]);
+
+  // Update tooltip positions on scroll/resize when tooltips are visible
+  useEffect(() => {
+    if (inventoryTooltipPosition.visible && hoveredInventoryWarningIndex !== null) {
+      const updatePosition = () => {
+        const icon = inventoryWarningIconRefs.current[hoveredInventoryWarningIndex];
+        if (icon) {
+          const rect = icon.getBoundingClientRect();
+          const headerHeight = 67; // Sticky header height
+          const tooltipHeight = 31; // Approximate tooltip height
+          const spaceAbove = rect.top;
+          const spaceBelow = window.innerHeight - rect.bottom;
+          // If not enough space above or would be clipped by header, position below
+          const positionAbove = spaceAbove >= tooltipHeight + 8 && rect.top > headerHeight + 8;
+          const tooltipTop = positionAbove 
+            ? rect.top - tooltipHeight - 8
+            : rect.bottom + 8;
+          setInventoryTooltipPosition(prev => ({
+            ...prev,
+            top: tooltipTop,
+            left: rect.left + rect.width / 2,
+          }));
+        }
+      };
+      updatePosition();
+      window.addEventListener('scroll', updatePosition, true);
+      window.addEventListener('resize', updatePosition);
+      return () => {
+        window.removeEventListener('scroll', updatePosition, true);
+        window.removeEventListener('resize', updatePosition);
+      };
+    }
+  }, [inventoryTooltipPosition.visible, hoveredInventoryWarningIndex]);
+
+  // Update labels tooltip positions on scroll/resize when tooltips are visible
+  useEffect(() => {
+    if (labelsTooltipPosition.visible && hoveredWarningIndex !== null) {
+      const updatePosition = () => {
+        const icon = labelsWarningIconRefs.current[hoveredWarningIndex];
+        if (icon) {
+          const rect = icon.getBoundingClientRect();
+          const headerHeight = 67; // Sticky header height
+          const tooltipHeight = 31; // Approximate tooltip height
+          const spaceAbove = rect.top;
+          const spaceBelow = window.innerHeight - rect.bottom;
+          // If not enough space above or would be clipped by header, position below
+          const positionAbove = spaceAbove >= tooltipHeight + 8 && rect.top > headerHeight + 8;
+          const tooltipTop = positionAbove 
+            ? rect.top - tooltipHeight - 8
+            : rect.bottom + 8;
+          setLabelsTooltipPosition(prev => ({
+            ...prev,
+            top: tooltipTop,
+            left: rect.left + rect.width / 2,
+          }));
+        }
+      };
+      updatePosition();
+      window.addEventListener('scroll', updatePosition, true);
+      window.addEventListener('resize', updatePosition);
+      return () => {
+        window.removeEventListener('scroll', updatePosition, true);
+        window.removeEventListener('resize', updatePosition);
+      };
+    }
+  }, [labelsTooltipPosition.visible, hoveredWarningIndex]);
 
   // Custom scroll thumb drag (non-table data cell) – only thumb is visible, no track
   const handleNonTableThumbMouseDown = useCallback((e) => {
@@ -2719,9 +2789,36 @@ const NewShipmentTable = ({
   }, [filteredRowsWithSelection, nonTableFilters, nonTableSortedRowOrder, nonTableSortField, nonTableSortOrder, tableMode, account, addedRows, effectiveQtyValues]);
 
   // When Best Sellers is active, always use nonTableFilteredRows (sorted); otherwise table mode uses filteredRowsWithSelection
-  const currentRows = (tableMode && nonTableFilters.fbaAvailable?.popularFilter !== 'bestSellers')
+  const baseCurrentRows = (tableMode && nonTableFilters.fbaAvailable?.popularFilter !== 'bestSellers')
     ? filteredRowsWithSelection
     : nonTableFilteredRows;
+
+  // Remove duplicate products in table mode (filter by normalized product name)
+  const currentRows = useMemo(() => {
+    if (!tableMode) return baseCurrentRows;
+    
+    const seen = new Set();
+    const uniqueRows = [];
+    
+    for (const row of baseCurrentRows) {
+      // Normalize product name for comparison (lowercase, trim)
+      const productKey = String(row.product || '').toLowerCase().trim();
+      
+      // Skip if we've already seen this product
+      if (productKey && seen.has(productKey)) {
+        continue;
+      }
+      
+      // Only track non-empty product names
+      if (productKey) {
+        seen.add(productKey);
+      }
+      
+      uniqueRows.push(row);
+    }
+    
+    return uniqueRows;
+  }, [baseCurrentRows, tableMode]);
 
   // "BEST SELLER" badge: only for Liquid Plant Food 8oz and Indoor Plant Food 8oz (per last week's report)
   const topSellerIds = useMemo(() => {
@@ -2912,6 +3009,24 @@ const NewShipmentTable = ({
     const increment = getQtyIncrement(row);
     if (increment <= 1) return num;
     return Math.round(num / increment) * increment;
+  };
+
+  // Round quantity up to nearest case increment
+  const roundQtyUpToNearestCase = (qty, row) => {
+    const num = typeof qty === 'number' ? qty : parseInt(qty, 10) || 0;
+    if (num <= 0) return num;
+    const increment = getQtyIncrement(row);
+    if (increment <= 1) return num;
+    return Math.ceil(num / increment) * increment;
+  };
+
+  // Round quantity down to nearest case increment
+  const roundQtyDownToNearestCase = (qty, row) => {
+    const num = typeof qty === 'number' ? qty : parseInt(qty, 10) || 0;
+    if (num <= 0) return 0;
+    const increment = getQtyIncrement(row);
+    if (increment <= 1) return num;
+    return Math.floor(num / increment) * increment;
   };
 
   // Keyboard support for bulk increase/decrease (non-table mode)
@@ -3665,7 +3780,7 @@ const NewShipmentTable = ({
         <style>{`
           .non-table-data-scroll {
             overflow-y: auto;
-            overflow-x: hidden;
+            overflow-x: visible;
             scrollbar-width: none;
             -ms-overflow-style: none;
             will-change: scroll-position;
@@ -4013,7 +4128,7 @@ const NewShipmentTable = ({
           {/* Product Rows - scrollable data cell with custom thumb-only scrollbar */}
           <div
             ref={nonTableDataScrollWrapperRef}
-            style={{ position: 'relative', maxHeight: 'calc(100vh - 260px)' }}
+            style={{ position: 'relative', maxHeight: 'calc(100vh - 260px)', overflow: 'visible' }}
             onMouseEnter={() => {
               const el = nonTableDataScrollRef.current;
               if (el) {
@@ -4196,7 +4311,9 @@ const NewShipmentTable = ({
                     msUserSelect: 'none', // IE/Edge
                     boxSizing: 'border-box',
                     position: 'relative',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    zIndex: hoveredInventoryWarningIndex === index ? 10001 : 'auto',
+                    overflow: 'visible',
                   }}
                 >
                   {/* Border line with 30px margin on both sides */}
@@ -4428,15 +4545,41 @@ const NewShipmentTable = ({
                     const warningColor = isOutOfStock ? '#EF4444' : isNoSales ? '#F97316' : null;
                     const warningLabel = isOutOfStock ? 'Sold Out' : isNoSales ? 'No Sales' : null;
                     return (
-                      <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '6px', fontSize: '14px', fontWeight: 500, color: isDarkMode ? '#FFFFFF' : '#111827', paddingLeft: '16px', marginLeft: '-255px', marginRight: '20px', minWidth: '140px', height: '23px', position: 'relative', overflow: 'visible' }}>
+                      <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '6px', fontSize: '14px', fontWeight: 500, color: isDarkMode ? '#FFFFFF' : '#111827', paddingLeft: '16px', marginLeft: '-255px', marginRight: '20px', minWidth: '140px', height: '23px', position: 'relative', overflow: 'visible', zIndex: hoveredInventoryWarningIndex === index ? 100000 : 1 }}>
                         {warningColor && (
                           <span
+                            ref={(el) => { if (el) inventoryWarningIconRefs.current[index] = el; }}
                             className="inventory-warning-icon"
-                            onMouseEnter={() => setHoveredInventoryWarningIndex(index)}
-                            onMouseLeave={() => setHoveredInventoryWarningIndex(null)}
+                            onMouseEnter={() => {
+                              setHoveredInventoryWarningIndex(index);
+                              // Calculate tooltip position
+                              const icon = inventoryWarningIconRefs.current[index];
+                              if (icon) {
+                                const rect = icon.getBoundingClientRect();
+                                const headerHeight = 67; // Sticky header height
+                                const tooltipHeight = 31; // Approximate tooltip height
+                                const spaceAbove = rect.top;
+                                const spaceBelow = window.innerHeight - rect.bottom;
+                                // If not enough space above or would be clipped by header, position below
+                                const positionAbove = spaceAbove >= tooltipHeight + 8 && rect.top > headerHeight + 8;
+                                const tooltipTop = positionAbove 
+                                  ? rect.top - tooltipHeight - 8
+                                  : rect.bottom + 8;
+                                setInventoryTooltipPosition({
+                                  top: tooltipTop,
+                                  left: rect.left + rect.width / 2,
+                                  visible: true,
+                                  label: warningLabel
+                                });
+                              }
+                            }}
+                            onMouseLeave={() => {
+                              setHoveredInventoryWarningIndex(null);
+                              setInventoryTooltipPosition(prev => ({ ...prev, visible: false }));
+                            }}
                             style={{
-                              width: '14px',
-                              height: '14px',
+                              width: '18px',
+                              height: '18px',
                               borderRadius: '50%',
                               backgroundColor: warningColor,
                               display: 'flex',
@@ -4446,41 +4589,10 @@ const NewShipmentTable = ({
                               cursor: 'default',
                               position: 'relative',
                               overflow: 'visible',
+                              zIndex: hoveredInventoryWarningIndex === index ? 100000 : 'auto',
                             }}
                           >
-                            <span style={{ color: '#FFFFFF', fontWeight: 700, fontSize: '9px', lineHeight: 1 }}>!</span>
-                            {hoveredInventoryWarningIndex === index && (
-                              <span
-                                className="inventory-warning-tooltip"
-                                style={{
-                                  position: 'absolute',
-                                  bottom: 'calc(100% + 8px)',
-                                  left: '50%',
-                                  transform: 'translateX(-50%)',
-                                  width: '71px',
-                                  height: '31px',
-                                  borderRadius: '8px',
-                                  borderWidth: '1px',
-                                  borderStyle: 'solid',
-                                  borderColor: isDarkMode ? '#374151' : '#E5E7EB',
-                                  paddingTop: '8px',
-                                  paddingRight: '12px',
-                                  paddingBottom: '8px',
-                                  paddingLeft: '12px',
-                                  boxSizing: 'border-box',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: '10px',
-                                  backgroundColor: '#1F2937',
-                                  color: '#FFFFFF',
-                                  fontSize: '12px',
-                                  fontWeight: 500,
-                                  whiteSpace: 'nowrap',
-                                  zIndex: 50,
-                                }}
-                              >{warningLabel}</span>
-                            )}
+                            <span style={{ color: '#FFFFFF', fontWeight: 700, fontSize: '12px', lineHeight: 1 }}>!</span>
                           </span>
                         )}
                         <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', height: '100%', width: 'fit-content' }}>{totalInv.toLocaleString()}</span>
@@ -4489,7 +4601,7 @@ const NewShipmentTable = ({
                   })()}
 
                   {/* UNITS TO MAKE Column - match header: same padding so content aligns under header */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '8px', paddingLeft: '16px', marginLeft: '-300px', marginRight: '20px', position: 'relative', minWidth: '220px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '8px', paddingLeft: '16px', marginLeft: '-300px', marginRight: '20px', position: 'relative', minWidth: '220px', zIndex: hoveredWarningIndex === index ? 10001 : 'auto' }}>
                     {/* Label warning icon - shown when QTY exceeds labels, positioned on the left */}
                     {(() => {
                       const labelsAvailable = getAvailableLabelsForRow(row, index);
@@ -4500,14 +4612,42 @@ const NewShipmentTable = ({
                           <>
                             <span
                               ref={(el) => {
-                                if (el) warningIconRefs.current[index] = el;
+                                if (el) {
+                                  warningIconRefs.current[index] = el;
+                                  labelsWarningIconRefs.current[index] = el;
+                                }
                               }}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setClickedQtyIndex(clickedQtyIndex === index ? null : index);
                               }}
-                              onMouseEnter={() => setHoveredWarningIndex(index)}
-                              onMouseLeave={() => setHoveredWarningIndex(null)}
+                              onMouseEnter={() => {
+                                setHoveredWarningIndex(index);
+                                // Calculate tooltip position
+                                const icon = labelsWarningIconRefs.current[index];
+                                if (icon) {
+                                  const rect = icon.getBoundingClientRect();
+                                  const headerHeight = 67; // Sticky header height
+                                  const tooltipHeight = 31; // Approximate tooltip height
+                                  const spaceAbove = rect.top;
+                                  const spaceBelow = window.innerHeight - rect.bottom;
+                                  // If not enough space above or would be clipped by header, position below
+                                  const positionAbove = spaceAbove >= tooltipHeight + 8 && rect.top > headerHeight + 8;
+                                  const tooltipTop = positionAbove 
+                                    ? rect.top - tooltipHeight - 8
+                                    : rect.bottom + 8;
+                                  setLabelsTooltipPosition({
+                                    top: tooltipTop,
+                                    left: rect.left + rect.width / 2,
+                                    visible: true,
+                                    labelsAvailable: labelsAvailable
+                                  });
+                                }
+                              }}
+                              onMouseLeave={() => {
+                                setHoveredWarningIndex(null);
+                                setLabelsTooltipPosition(prev => ({ ...prev, visible: false }));
+                              }}
                               style={{
                                 position: 'absolute',
                                 left: 'calc(50% - 257px)',
@@ -4524,35 +4664,11 @@ const NewShipmentTable = ({
                                 fontSize: '12px',
                                 fontWeight: 700,
                                 cursor: 'pointer',
-                                zIndex: 10,
+                                zIndex: hoveredWarningIndex === index ? 100000 : 10,
                               }}
                             >
                               !
                             </span>
-                            {/* Custom tooltip for warning icon */}
-                            {hoveredWarningIndex === index && (
-                              <div
-                                style={{
-                                  position: 'absolute',
-                                  left: 'calc(50% - 312px)', // 55px to the left of the warning icon
-                                  top: '50%',
-                                  transform: 'translateY(calc(-50% - 30px))',
-                                  backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-                                  color: isDarkMode ? '#E5E7EB' : '#111827',
-                                  padding: '6px 10px',
-                                  borderRadius: '6px',
-                                  fontSize: '11px',
-                                  fontWeight: 500,
-                                  whiteSpace: 'nowrap',
-                                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                                  border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
-                                  zIndex: 9,
-                                  pointerEvents: 'none',
-                                }}
-                              >
-                                Labels Available: {labelsAvailable.toLocaleString()}
-                              </div>
-                            )}
                           </>
                         );
                       }
@@ -4563,7 +4679,7 @@ const NewShipmentTable = ({
                       ref={(el) => {
                         if (el) qtyContainerRefs.current[index] = el;
                       }}
-                      style={{ position: 'relative', width: '110px', height: '28px' }}
+                      style={{ position: 'relative', width: '110px', height: '28px', cursor: 'text' }}
                       onMouseEnter={() => setHoveredQtyIndex(index)}
                       onMouseLeave={() => setHoveredQtyIndex(null)}
                     >
@@ -4663,6 +4779,9 @@ const NewShipmentTable = ({
                       </button>
                       {/* Quantity input - clean rounded rectangle. In non-table mode we allow free typing and only round to nearest increment on blur/Enter. */}
                       <input 
+                        ref={(el) => {
+                          if (el) qtyInputRefs.current[index] = el;
+                        }}
                         type="text" 
                         value={(() => {
                           // While user is typing, show raw string so they can enter e.g. "120" without "1" rounding to 60
@@ -4697,15 +4816,20 @@ const NewShipmentTable = ({
                           if (Number.isNaN(num) || num < 0) {
                             return;
                           }
-                          const rounded = roundQtyToNearestCase(num, row);
-                          effectiveSetQtyValues(prev => ({ ...prev, [index]: rounded }));
+                          // Don't round on blur - allow custom values to be entered
+                          effectiveSetQtyValues(prev => ({ ...prev, [index]: num }));
+                        }}
+                        onFocus={(e) => {
+                          e.target.select(); // Select all text when focused for easy replacement
+                          e.stopPropagation();
                         }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
-                            e.target.blur(); // Blur triggers onBlur which rounds and commits
+                            e.target.blur(); // Blur triggers onBlur which commits the value as-is (no rounding)
                           }
                         }}
-                        onClick={(e) => e.stopPropagation()} 
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()} 
                         style={{ 
                           width: '100%',
                           height: '100%',
@@ -4722,7 +4846,10 @@ const NewShipmentTable = ({
                           paddingLeft: '28px',
                           paddingRight: '28px',
                           boxSizing: 'border-box',
-                          cursor: 'text'
+                          cursor: 'text',
+                          position: 'relative',
+                          zIndex: 2,
+                          pointerEvents: 'auto'
                         }}
                         onWheel={(e) => e.target.blur()}
                       />
@@ -4738,7 +4865,8 @@ const NewShipmentTable = ({
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: '0px',
-                          zIndex: 1,
+                          zIndex: 3,
+                          pointerEvents: 'none',
                         }}
                       >
                         {/* Increment arrow (top) */}
@@ -4757,10 +4885,18 @@ const NewShipmentTable = ({
                                 nonTableSelectedIndices.forEach(selectedIndex => {
                                   const selectedRow = currentRows.find(r => r._originalIndex === selectedIndex);
                                   if (selectedRow) {
-                                    const currentQty = newValues[selectedIndex] ?? 0;
+                                    // Get current value (from raw input if available, otherwise from effective values)
+                                    const rawValue = rawQtyInputValues.current[selectedIndex];
+                                    const currentQty = rawValue !== undefined 
+                                      ? (typeof rawValue === 'number' ? rawValue : parseInt(rawValue, 10) || 0)
+                                      : (newValues[selectedIndex] ?? 0);
                                     const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
+                                    // Round up to nearest case increment (don't add another increment)
                                     const increment = getQtyIncrement(selectedRow);
-                                    newValues[selectedIndex] = numQty + increment;
+                                    const rounded = roundQtyUpToNearestCase(numQty, selectedRow);
+                                    // If already at a case increment, add one increment; otherwise just round to nearest increment above
+                                    const newValue = rounded === numQty ? rounded + increment : rounded;
+                                    newValues[selectedIndex] = newValue;
                                     manuallyEditedIndices.current.add(selectedIndex);
                                   }
                                 });
@@ -4770,12 +4906,19 @@ const NewShipmentTable = ({
                               if (rawQtyInputValues.current[index] !== undefined) {
                                 rawQtyInputValues.current[index] = undefined;
                               }
-                              const currentQty = effectiveQtyValues[index] ?? 0;
+                              // Get current value (from raw input if available, otherwise from effective values)
+                              const rawValue = rawQtyInputValues.current[index];
+                              const currentQty = rawValue !== undefined 
+                                ? (typeof rawValue === 'number' ? rawValue : parseInt(rawValue, 10) || 0)
+                                : (effectiveQtyValues[index] ?? 0);
                               const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
+                              // Round up to nearest case increment (don't add another increment)
                               const increment = getQtyIncrement(row);
-                              const newQty = numQty + increment;
+                              const rounded = roundQtyUpToNearestCase(numQty, row);
+                              // If already at a case increment, add one increment; otherwise just round to nearest increment above
+                              const newValue = rounded === numQty ? rounded + increment : rounded;
                               manuallyEditedIndices.current.add(index);
-                              effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty }));
+                              effectiveSetQtyValues(prev => ({ ...prev, [index]: newValue }));
                               setQtyInputUpdateTrigger(prev => prev + 1);
                             }
                           }}
@@ -4792,6 +4935,7 @@ const NewShipmentTable = ({
                             justifyContent: 'center',
                             padding: 0,
                             outline: 'none',
+                            pointerEvents: 'auto',
                           }}
                           onMouseEnter={(e) => { e.currentTarget.style.color = isDarkMode ? '#D1D5DB' : '#374151'; }}
                           onMouseLeave={(e) => { e.currentTarget.style.color = isDarkMode ? '#9CA3AF' : '#6B7280'; }}
@@ -4817,11 +4961,19 @@ const NewShipmentTable = ({
                                 nonTableSelectedIndices.forEach(selectedIndex => {
                                   const selectedRow = currentRows.find(r => r._originalIndex === selectedIndex);
                                   if (selectedRow) {
-                                    const currentQty = newValues[selectedIndex] ?? 0;
+                                    // Get current value (from raw input if available, otherwise from effective values)
+                                    const rawValue = rawQtyInputValues.current[selectedIndex];
+                                    const currentQty = rawValue !== undefined 
+                                      ? (typeof rawValue === 'number' ? rawValue : parseInt(rawValue, 10) || 0)
+                                      : (newValues[selectedIndex] ?? 0);
                                     const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
                                     if (numQty <= 0) return;
+                                    // Round down to nearest case increment (don't subtract another increment)
                                     const increment = getQtyIncrement(selectedRow);
-                                    newValues[selectedIndex] = Math.max(0, numQty - increment);
+                                    const rounded = roundQtyDownToNearestCase(numQty, selectedRow);
+                                    // If already at a case increment, subtract one increment; otherwise just round to nearest increment below
+                                    const newValue = rounded === numQty ? Math.max(0, rounded - increment) : rounded;
+                                    newValues[selectedIndex] = newValue;
                                     manuallyEditedIndices.current.add(selectedIndex);
                                   }
                                 });
@@ -4831,13 +4983,20 @@ const NewShipmentTable = ({
                               if (rawQtyInputValues.current[index] !== undefined) {
                                 rawQtyInputValues.current[index] = undefined;
                               }
-                              const currentQty = effectiveQtyValues[index] ?? 0;
+                              // Get current value (from raw input if available, otherwise from effective values)
+                              const rawValue = rawQtyInputValues.current[index];
+                              const currentQty = rawValue !== undefined 
+                                ? (typeof rawValue === 'number' ? rawValue : parseInt(rawValue, 10) || 0)
+                                : (effectiveQtyValues[index] ?? 0);
                               const numQty = typeof currentQty === 'number' ? currentQty : parseInt(currentQty, 10) || 0;
                               if (numQty <= 0) return;
+                              // Round down to nearest case increment (don't subtract another increment)
                               const increment = getQtyIncrement(row);
-                              const newQty = Math.max(0, numQty - increment);
+                              const rounded = roundQtyDownToNearestCase(numQty, row);
+                              // If already at a case increment, subtract one increment; otherwise just round to nearest increment below
+                              const newValue = rounded === numQty ? Math.max(0, rounded - increment) : rounded;
                               manuallyEditedIndices.current.add(index);
-                              effectiveSetQtyValues(prev => ({ ...prev, [index]: newQty }));
+                              effectiveSetQtyValues(prev => ({ ...prev, [index]: newValue }));
                               setQtyInputUpdateTrigger(prev => prev + 1);
                             }
                           }}
@@ -4957,7 +5116,7 @@ const NewShipmentTable = ({
                             color: '#9CA3AF',
                             margin: 0,
                             lineHeight: '14px',
-                            overflow: 'hidden',
+                            overflow: 'visible',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
                           }}>
@@ -5805,6 +5964,55 @@ const NewShipmentTable = ({
         )}
         </>
         )}
+        {/* Fixed position tooltips to avoid clipping by sticky header */}
+        {inventoryTooltipPosition.visible && createPortal(
+          <div
+            style={{
+              position: 'fixed',
+              top: `${inventoryTooltipPosition.top}px`,
+              left: `${inventoryTooltipPosition.left}px`,
+              transform: 'translateX(-50%)',
+              backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+              color: isDarkMode ? '#E5E7EB' : '#111827',
+              padding: '6px 10px',
+              borderRadius: '6px',
+              fontSize: '11px',
+              fontWeight: 500,
+              whiteSpace: 'nowrap',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+              border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+              zIndex: 100000,
+              pointerEvents: 'none',
+            }}
+          >
+            {inventoryTooltipPosition.label}
+          </div>,
+          document.body
+        )}
+        {labelsTooltipPosition.visible && createPortal(
+          <div
+            style={{
+              position: 'fixed',
+              top: `${labelsTooltipPosition.top}px`,
+              left: `${labelsTooltipPosition.left}px`,
+              transform: 'translateX(-50%)',
+              backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+              color: isDarkMode ? '#E5E7EB' : '#111827',
+              padding: '6px 10px',
+              borderRadius: '6px',
+              fontSize: '11px',
+              fontWeight: 500,
+              whiteSpace: 'nowrap',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+              border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
+              zIndex: 100000,
+              pointerEvents: 'none',
+            }}
+          >
+            Labels Available: {labelsTooltipPosition.labelsAvailable.toLocaleString()}
+          </div>,
+          document.body
+        )}
       </>
     );
   }
@@ -5930,7 +6138,7 @@ const NewShipmentTable = ({
           font-weight: 500;
           white-space: nowrap;
           pointer-events: none;
-          z-index: 50;
+          z-index: 100000;
         }
         .inventory-warning-icon .inventory-warning-tooltip::after {
           content: '';
@@ -6309,6 +6517,26 @@ const NewShipmentTable = ({
                 color: '#64758B',
               }}>
                 <span>VELOCITY TREND</span>
+              </th>
+              <th style={{ 
+                borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
+                padding: '0 0.75rem', 
+                textAlign: 'center',
+                top: 0,
+                zIndex: 1010,
+                backgroundColor: isDarkMode ? '#1A2235' : '#F8FAFC',
+                width: '143px',
+                minWidth: '143px',
+                height: '58px',
+                maxHeight: '58px',
+                boxSizing: 'border-box',
+                fontFamily: 'Inter, sans-serif',
+                fontWeight: 600,
+                fontSize: '12px',
+                textTransform: 'uppercase',
+                color: '#64758B',
+              }}>
+                <span>BOX INVENTORY</span>
               </th>
               <th style={{ 
                 borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
@@ -6733,6 +6961,20 @@ const NewShipmentTable = ({
                 </td>
                 <td style={{ ...rowSeparatorBorder, padding: '0.5rem 0.75rem', fontSize: '0.875rem', textAlign: 'center', width: '120px', minWidth: '120px', height: '58px', verticalAlign: 'middle', boxSizing: 'border-box', color: isDarkMode ? '#FFFFFF' : '#334155' }}>
                   {row.velocityTrend ?? row.velocity_trend ?? '-'}
+                </td>
+                <td style={{ 
+                  ...rowSeparatorBorder,
+                  padding: '0.5rem 0.75rem', 
+                  fontSize: '0.875rem',
+                  textAlign: 'center',
+                  width: '143px',
+                  minWidth: '143px',
+                  height: '58px',
+                  verticalAlign: 'middle',
+                  boxSizing: 'border-box',
+                  color: isDarkMode ? '#FFFFFF' : '#334155',
+                }}>
+                  {row.boxInventory || row.box_inventory || 0}
                 </td>
                 <td style={{ ...rowSeparatorBorder, padding: '0.5rem 0.75rem', fontSize: '0.875rem', textAlign: 'center', width: '150px', minWidth: '150px', height: '58px', verticalAlign: 'middle', boxSizing: 'border-box', color: isDarkMode ? '#FFFFFF' : '#334155' }}>
                   {row.sales7Day ?? row.sales_7_day ?? row.unitsOrdered7 ?? row.units_ordered_7 ?? '-'}
