@@ -3617,7 +3617,7 @@ const NewShipment = () => {
                     height: '31px',
                     borderRadius: '8px',
                     border: 'none',
-                    background: 'linear-gradient(to right, #007AFF, #004999)',
+                    backgroundColor: '#007AFF',
                     color: '#FFFFFF',
                     fontSize: '14px',
                     fontWeight: 500,
@@ -3631,10 +3631,10 @@ const NewShipment = () => {
                     boxSizing: 'border-box',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(to right, #0056CC, #003366)';
+                    e.currentTarget.style.backgroundColor = '#0056CC';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(to right, #007AFF, #004999)';
+                    e.currentTarget.style.backgroundColor = '#007AFF';
                   }}
                 >
                   Book Shipment
@@ -4341,7 +4341,7 @@ const NewShipment = () => {
                     padding: '0 12px',
                     borderRadius: '4px',
                     border: 'none',
-                    background: 'linear-gradient(to right, #007AFF, #004999)',
+                    backgroundColor: '#007AFF',
                     color: '#FFFFFF',
                     fontSize: '13px',
                     fontWeight: 600,
@@ -4355,10 +4355,10 @@ const NewShipment = () => {
                     textOverflow: 'ellipsis',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(to right, #0056CC, #003366)';
+                    e.currentTarget.style.backgroundColor = '#0056CC';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(to right, #007AFF, #004999)';
+                    e.currentTarget.style.backgroundColor = '#007AFF';
                   }}
                 >
                   Begin Sort Products

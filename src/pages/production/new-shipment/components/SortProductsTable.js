@@ -3650,7 +3650,7 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                 padding: '0 24px',
                 borderRadius: '999px',
                 border: 'none',
-                backgroundImage: 'linear-gradient(90deg, #2563EB 0%, #3B82F6 50%, #38BDF8 100%)',
+                backgroundColor: '#007AFF',
                 color: '#FFFFFF',
                 fontSize: '14px',
                 fontWeight: 600,
@@ -3661,13 +3661,11 @@ const SortProductsTable = ({ shipmentProducts = [], shipmentType = 'AWD', shipme
                 justifyContent: 'center',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundImage =
-                  'linear-gradient(90deg, #1D4ED8 0%, #2563EB 50%, #0EA5E9 100%)';
+                e.currentTarget.style.backgroundColor = '#0056CC';
                 e.currentTarget.style.transform = 'translateY(-1px)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundImage =
-                  'linear-gradient(90deg, #2563EB 0%, #3B82F6 50%, #38BDF8 100%)';
+                e.currentTarget.style.backgroundColor = '#007AFF';
                 e.currentTarget.style.transform = 'translateY(0)';
               }}
             >
