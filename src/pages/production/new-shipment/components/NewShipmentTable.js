@@ -5415,7 +5415,7 @@ const NewShipmentTable = ({
                             }}
                           />
                         </div>
-                        {Number(doiValue) < 30 && (
+                        {Number(doiValue) < 30 && totalInventory > 0 && (
                           <img
                             src="/assets/zxcvb.png"
                             alt="At risk"
