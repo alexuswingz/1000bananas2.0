@@ -1,6 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../../../context/ThemeContext';
+import LocationSelect from './LocationSelect';
+import AddLocationModal from './AddLocationModal';
+import CarrierSelect from './CarrierSelect';
+import AddCarrierModal from './AddCarrierModal';
 
 const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, totalBoxes = 0, onSave, onBookAndProceed }) => {
   const { isDarkMode } = useTheme();
@@ -41,13 +44,8 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
     shipTo: '',
     carrier: '',
   });
-  const [isCarrierDropdownOpen, setIsCarrierDropdownOpen] = useState(false);
-  const [customCarrierInput, setCustomCarrierInput] = useState('');
-  const carrierDropdownRef = useRef(null);
-  const carrierInputRef = useRef(null);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
-
-  const knownCarriers = ['WeShip', 'TopCarrier', 'Worldwide Express'];
+  const [addLocationForField, setAddLocationForField] = useState(null); // 'shipFrom' | 'shipTo'
+  const [isAddCarrierOpen, setIsAddCarrierOpen] = useState(false);
 
   // Get Amazon Shipment # format based on shipment type
   const getAmazonShipmentFormat = (type) => {
@@ -71,9 +69,9 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
         amazonShipmentNumber: format,
         amazonRefId: 'XXXXXXXX',
         shipping: 'UPS',
-        shipFrom: '',
-        shipTo: '',
-        carrier: '',
+        shipFrom: shipmentData.shipFrom || '',
+        shipTo: shipmentData.shipTo || '',
+        carrier: shipmentData.carrier || '',
       });
     }
   }, [shipmentData]);
@@ -88,62 +86,6 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
       }));
     }
   }, [editableData.shipmentType]);
-
-  // Calculate dropdown position and close when clicking outside
-  useEffect(() => {
-    const updateDropdownPosition = () => {
-      if (carrierInputRef.current && isCarrierDropdownOpen) {
-        const rect = carrierInputRef.current.getBoundingClientRect();
-        setDropdownPosition({
-          top: rect.bottom + 4,
-          left: rect.left,
-          width: rect.width,
-        });
-      }
-    };
-
-    const handleClickOutside = (event) => {
-      if (
-        carrierDropdownRef.current && 
-        !carrierDropdownRef.current.contains(event.target) &&
-        carrierInputRef.current &&
-        !carrierInputRef.current.contains(event.target)
-      ) {
-        setIsCarrierDropdownOpen(false);
-      }
-    };
-
-    if (isCarrierDropdownOpen) {
-      updateDropdownPosition();
-      window.addEventListener('resize', updateDropdownPosition);
-      window.addEventListener('scroll', updateDropdownPosition, true);
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => {
-        window.removeEventListener('resize', updateDropdownPosition);
-        window.removeEventListener('scroll', updateDropdownPosition, true);
-        document.removeEventListener('mousedown', handleClickOutside);
-      };
-    }
-  }, [isCarrierDropdownOpen]);
-
-  const handleCarrierSelect = (carrier) => {
-    setEditableData({ ...editableData, carrier });
-    setIsCarrierDropdownOpen(false);
-    setCustomCarrierInput('');
-  };
-
-  const handleUseCustomCarrier = () => {
-    if (customCarrierInput.trim()) {
-      handleCarrierSelect(customCarrierInput.trim());
-    }
-  };
-
-  const handleAddNewCarrier = () => {
-    // This would typically open a modal or navigate to add carrier page
-    // For now, we'll just close the dropdown
-    setIsCarrierDropdownOpen(false);
-    // You can add your logic here to add a new carrier to the system
-  };
 
   if (!isOpen) return null;
 
@@ -483,45 +425,36 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
               {/* Ship From - Full Width */}
               <div style={{ gridColumn: '1 / -1' }}>
                 <label
-              style={{
+                  style={{
                     display: 'block',
                     fontSize: '12px',
                     fontWeight: 500,
                     color: theme.labelColor,
                     marginBottom: '4px',
-              }}
-            >
+                  }}
+                >
                   Ship From<span style={{ color: '#EF4444', marginLeft: '4px' }}>*</span>
                 </label>
-                <input
-                  type="text"
+                <LocationSelect
                   value={editableData.shipFrom}
-                  onChange={(e) => setEditableData({ ...editableData, shipFrom: e.target.value })}
-                  placeholder="Enter Shipment Location"
-                style={{
-                    width: '100%',
+                  onChange={(v) => setEditableData((prev) => ({ ...prev, shipFrom: v }))}
+                  placeholder="Enter or select location..."
+                  onAddNewLocation={() => setAddLocationForField('shipFrom')}
+                  inputStyle={{
                     padding: '6px 10px',
-                    borderRadius: '6px',
+                    fontSize: '13px',
                     border: `1px solid ${theme.inputBorder}`,
                     backgroundColor: theme.inputBg,
                     color: theme.inputText,
-                    fontSize: '13px',
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = theme.focusBorder;
                   }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = theme.inputBorder;
-                  }}
+                  theme={theme}
                 />
-            </div>
+              </div>
 
               {/* Ship To - Full Width */}
               <div style={{ gridColumn: '1 / -1' }}>
                 <label
-                style={{
+                  style={{
                     display: 'block',
                     fontSize: '12px',
                     fontWeight: 500,
@@ -531,33 +464,24 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                 >
                   Ship To<span style={{ color: '#EF4444', marginLeft: '4px' }}>*</span>
                 </label>
-                <input
-                  type="text"
+                <LocationSelect
                   value={editableData.shipTo}
-                  onChange={(e) => setEditableData({ ...editableData, shipTo: e.target.value })}
-                  placeholder="Enter Shipment Destination"
-                  style={{
-                    width: '100%',
+                  onChange={(v) => setEditableData((prev) => ({ ...prev, shipTo: v }))}
+                  placeholder="Enter or select destination..."
+                  onAddNewLocation={() => setAddLocationForField('shipTo')}
+                  inputStyle={{
                     padding: '6px 10px',
-                    borderRadius: '6px',
+                    fontSize: '13px',
                     border: `1px solid ${theme.inputBorder}`,
                     backgroundColor: theme.inputBg,
                     color: theme.inputText,
-                    fontSize: '13px',
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = theme.focusBorder;
                   }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = theme.inputBorder;
-                  }}
+                  theme={theme}
                 />
-                </div>
+              </div>
 
               {/* Carrier - Full Width */}
-              <div style={{ gridColumn: '1 / -1', position: 'relative' }} ref={carrierDropdownRef}>
+              <div style={{ gridColumn: '1 / -1' }}>
                 <label
                   style={{
                     display: 'block',
@@ -569,185 +493,20 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
                 >
                   Carrier<span style={{ color: '#EF4444', marginLeft: '4px' }}>*</span>
                 </label>
-                <div
-                  ref={carrierInputRef}
-                  onClick={() => setIsCarrierDropdownOpen(!isCarrierDropdownOpen)}
-                  style={{
-                    width: '100%',
+                <CarrierSelect
+                  value={editableData.carrier}
+                  onChange={(v) => setEditableData((prev) => ({ ...prev, carrier: v }))}
+                  placeholder="Enter or select carrier..."
+                  onAddNewCarrier={() => setIsAddCarrierOpen(true)}
+                  inputStyle={{
                     padding: '6px 10px',
-                    borderRadius: '6px',
+                    fontSize: '13px',
                     border: `1px solid ${theme.inputBorder}`,
                     backgroundColor: theme.inputBg,
-                    color: editableData.carrier ? theme.inputText : theme.inputPlaceholder,
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                    boxSizing: 'border-box',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    minHeight: '28px',
+                    color: theme.inputText,
                   }}
-                >
-                  <span>{editableData.carrier || 'Select Carrier'}</span>
-                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M1 1L6 6L11 1" stroke={theme.carrierArrow} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-                
-                {isCarrierDropdownOpen && createPortal(
-                  <div
-                    ref={carrierDropdownRef}
-                    style={{
-                      position: 'fixed',
-                      top: `${dropdownPosition.top}px`,
-                      left: `${dropdownPosition.left}px`,
-                      width: `${dropdownPosition.width}px`,
-                      backgroundColor: theme.dropdownBg,
-                      border: `1px solid ${theme.dropdownBorder}`,
-                      borderRadius: '6px',
-                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                      zIndex: 10000,
-                      overflow: 'hidden',
-                    }}
-                  >
-                    {/* Known Carriers */}
-                    <div style={{ padding: '8px 10px', borderBottom: `1px solid ${theme.dropdownBorder}` }}>
-                      <div style={{
-                        fontSize: '11px',
-                        fontWeight: 500,
-                        color: theme.dropdownMuted,
-                        marginBottom: '6px',
-                      }}>
-                        Known Carriers:
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        {knownCarriers.map((carrier) => (
-                          <div
-                            key={carrier}
-                            onClick={() => handleCarrierSelect(carrier)}
-                            style={{
-                              padding: '4px 6px',
-                              cursor: 'pointer',
-                              borderRadius: '4px',
-                              color: theme.dropdownText,
-                              fontSize: '12px',
-                              transition: 'background-color 0.2s',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = theme.dropdownHover;
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = 'transparent';
-                            }}
-                          >
-                            {carrier}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Custom Entry */}
-                    <div style={{ padding: '8px 10px', borderBottom: `1px solid ${theme.dropdownBorder}` }}>
-                      <div style={{
-                        fontSize: '11px',
-                        fontWeight: 500,
-                        color: theme.dropdownMuted,
-                        marginBottom: '6px',
-                      }}>
-                        Custom Entry:
-                      </div>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <input
-                          type="text"
-                          value={customCarrierInput}
-                          onChange={(e) => setCustomCarrierInput(e.target.value)}
-                          placeholder="Enter custom carrier name here..."
-                          style={{
-                            flex: 1,
-                            padding: '4px 8px',
-                            borderRadius: '4px',
-                            border: `1px solid ${theme.inputBorder}`,
-                            backgroundColor: theme.inputBg,
-                            color: theme.inputText,
-                            fontSize: '12px',
-                            outline: 'none',
-                            boxSizing: 'border-box',
-                          }}
-                          onFocus={(e) => {
-                            e.target.style.borderColor = theme.focusBorder;
-                          }}
-                          onBlur={(e) => {
-                            e.target.style.borderColor = theme.inputBorder;
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              handleUseCustomCarrier();
-                            }
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={handleUseCustomCarrier}
-                          style={{
-                            padding: '4px 12px',
-                            borderRadius: '4px',
-                            border: 'none',
-                            backgroundColor: '#9CA3AF',
-                            color: '#FFFFFF',
-                            fontSize: '12px',
-                            fontWeight: 500,
-                            cursor: 'pointer',
-                            transition: 'background-color 0.2s',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#6B7280';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = '#9CA3AF';
-                          }}
-                        >
-                          Use
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Create a Carrier */}
-                    <div style={{ padding: '8px 10px' }}>
-                      <div style={{
-                        fontSize: '11px',
-                        fontWeight: 500,
-                        color: theme.dropdownMuted,
-                        marginBottom: '6px',
-                      }}>
-                        Create a Carrier:
-                      </div>
-                      <div
-                        onClick={handleAddNewCarrier}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          cursor: 'pointer',
-                          color: '#3B82F6',
-                          fontSize: '12px',
-                          padding: '2px 0',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.opacity = '0.8';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.opacity = '1';
-                        }}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M8 3V13M3 8H13" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                        <span>Add new carrier to system</span>
-                      </div>
-                    </div>
-                  </div>,
-                  document.body
-                )}
+                  theme={theme}
+                />
               </div>
           </div>
         </div>
@@ -814,6 +573,28 @@ const ShipmentDetailsModal = ({ isOpen, onClose, shipmentData, totalUnits = 0, t
           </div>
         </div>
       </div>
+
+      <AddLocationModal
+        isOpen={addLocationForField !== null}
+        onClose={() => setAddLocationForField(null)}
+        onSave={(displayValue) => {
+          if (addLocationForField === 'shipFrom') {
+            setEditableData((prev) => ({ ...prev, shipFrom: displayValue }));
+          } else if (addLocationForField === 'shipTo') {
+            setEditableData((prev) => ({ ...prev, shipTo: displayValue }));
+          }
+          setAddLocationForField(null);
+        }}
+      />
+
+      <AddCarrierModal
+        isOpen={isAddCarrierOpen}
+        onClose={() => setIsAddCarrierOpen(false)}
+        onSave={(carrierName) => {
+          setEditableData((prev) => ({ ...prev, carrier: carrierName }));
+          setIsAddCarrierOpen(false);
+        }}
+      />
     </>
   );
 };

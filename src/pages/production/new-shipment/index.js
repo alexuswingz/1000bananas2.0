@@ -29,6 +29,10 @@ import LabelCheckCommentModal from './components/LabelCheckCommentModal';
 import LabelCheckCompleteModal from './components/LabelCheckCompleteModal';
 import FormulaCheckCompleteModal from './components/FormulaCheckCompleteModal';
 import DOISettingsPopover, { getDefaultDoiSettings } from './components/DOISettingsPopover';
+import LocationSelect from './components/LocationSelect';
+import AddLocationModal from './components/AddLocationModal';
+import CarrierSelect from './components/CarrierSelect';
+import AddCarrierModal from './components/AddCarrierModal';
 
 // Per-shipment applied DOI persistence (Apply = for this shipment only; survives navigation)
 const SHIPMENT_DOI_STORAGE_PREFIX = 'shipment_doi_applied_';
@@ -141,7 +145,6 @@ const getAllowedBrandsForAccount = (account) => {
   return ACCOUNT_BRAND_MAPPING[account] || [];
 };
 
-const knownCarriers = ['WeShip', 'TopCarrier', 'Worldwide Express'];
 
 // Load hazmat classification data
 let hazmatClassificationMap = null;
@@ -189,6 +192,8 @@ const NewShipment = () => {
   // Store product-specific forecast settings (keyed by ASIN)
   const [productForecastSettings, setProductForecastSettings] = useState({});
   const [isShipmentDetailsOpen, setIsShipmentDetailsOpen] = useState(false);
+  const [addLocationForField, setAddLocationForField] = useState(null); // 'shipFrom' | 'shipTo' when Add Location modal is for that field
+  const [isAddCarrierOpen, setIsAddCarrierOpen] = useState(false);
   const [isExportTemplateOpen, setIsExportTemplateOpen] = useState(false);
   const [isSortProductsCompleteOpen, setIsSortProductsCompleteOpen] = useState(false);
   const [isSortFormulasCompleteOpen, setIsSortFormulasCompleteOpen] = useState(false);
@@ -206,11 +211,6 @@ const NewShipment = () => {
   const [labelCheckHasComment, setLabelCheckHasComment] = useState(false);
   const [isLabelCheckCompleteOpen, setIsLabelCheckCompleteOpen] = useState(false);
   const [selectedCarrier, setSelectedCarrier] = useState('');
-  const [isCarrierDropdownOpen, setIsCarrierDropdownOpen] = useState(false);
-  const [customCarrierName, setCustomCarrierName] = useState('');
-  const carrierDropdownRef = useRef(null);
-  const carrierButtonRef = useRef(null);
-  const [carrierDropdownPos, setCarrierDropdownPos] = useState({ top: 0, left: 0, width: 0 });
   const [isRecountMode, setIsRecountMode] = useState(false);
   const [varianceExceededRowIds, setVarianceExceededRowIds] = useState([]);
   const [labelCheckRows, setLabelCheckRows] = useState([]);
@@ -616,51 +616,9 @@ const NewShipment = () => {
     }
   }, [isTooltipPinned, showDOITooltip]);
 
-  // Close carrier dropdown on outside click
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (!isCarrierDropdownOpen) return;
-
-      const clickedInsideButton = carrierButtonRef.current?.contains(e.target);
-      const clickedInsideDropdown = carrierDropdownRef.current?.contains(e.target);
-
-      if (!clickedInsideButton && !clickedInsideDropdown) {
-        setIsCarrierDropdownOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isCarrierDropdownOpen]);
-
-  // Keep carrier dropdown aligned with trigger
-  useEffect(() => {
-    if (!isCarrierDropdownOpen || !carrierButtonRef.current) return;
-    const rect = carrierButtonRef.current.getBoundingClientRect();
-    setCarrierDropdownPos({
-      top: rect.bottom + 4,
-      left: rect.left,
-      width: rect.width,
-    });
-  }, [isCarrierDropdownOpen]);
-  
   // Generate unique shipment number
   const generateShipmentNumber = () => {
     return new Date().toISOString().split('T')[0].replace(/-/g, '.') + '-' + Date.now().toString().slice(-6);
-  };
-
-  const handleCarrierSelect = (carrier) => {
-    setSelectedCarrier(carrier);
-    setIsCarrierDropdownOpen(false);
-    setCustomCarrierName('');
-  };
-
-  const handleUseCustomCarrier = () => {
-    const trimmedName = customCarrierName.trim();
-    if (!trimmedName) return;
-    setSelectedCarrier(trimmedName);
-    setCustomCarrierName('');
-    setIsCarrierDropdownOpen(false);
   };
 
   const [shipmentData, setShipmentData] = useState({
@@ -3375,283 +3333,77 @@ const NewShipment = () => {
                 </div>
               </div>
 
-              {/* Row 3: Ship From */}
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '6px' }}>
-                  Ship From<span style={{ color: '#EF4444' }}>*</span>
-                </label>
-                <input
-                  type="text"
-                  value={shipmentData.shipFrom}
-                  onChange={(e) => setShipmentData({ ...shipmentData, shipFrom: e.target.value })}
-                  placeholder="Enter Shipment Location..."
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '6px',
-                    border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
-                    backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
-                    color: isDarkMode ? '#FFFFFF' : '#111827',
-                    fontSize: '14px',
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                    transition: 'border-color 0.2s',
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#3B82F6';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = isDarkMode ? '#374151' : '#E5E7EB';
-                  }}
-                />
+              {/* Ship From & Ship To side by side */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
+                      Ship From<span style={{ color: '#EF4444' }}>*</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setAddLocationForField('shipFrom')}
+                      style={{
+                        border: 'none',
+                        background: 'none',
+                        color: '#3B82F6',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        padding: 0,
+                      }}
+                    >
+                      + Add New Location
+                    </button>
+                  </div>
+                  <LocationSelect
+                    value={shipmentData.shipFrom}
+                    onChange={(v) => setShipmentData((prev) => ({ ...prev, shipFrom: v }))}
+                    placeholder="Enter or select location..."
+                    onAddNewLocation={() => setAddLocationForField('shipFrom')}
+                  />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280' }}>
+                      Ship To<span style={{ color: '#EF4444' }}>*</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setAddLocationForField('shipTo')}
+                      style={{
+                        border: 'none',
+                        background: 'none',
+                        color: '#3B82F6',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        padding: 0,
+                      }}
+                    >
+                      + Add New Location
+                    </button>
+                  </div>
+                  <LocationSelect
+                    value={shipmentData.shipTo}
+                    onChange={(v) => setShipmentData((prev) => ({ ...prev, shipTo: v }))}
+                    placeholder="Enter Shipment Destination..."
+                    onAddNewLocation={() => setAddLocationForField('shipTo')}
+                  />
+                </div>
               </div>
 
-              {/* Row 4: Ship To */}
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '6px' }}>
-                  Ship To<span style={{ color: '#EF4444' }}>*</span>
-                </label>
-                <input
-                  type="text"
-                  value={shipmentData.shipTo}
-                  onChange={(e) => setShipmentData({ ...shipmentData, shipTo: e.target.value })}
-                  placeholder="Enter Shipment Destination..."
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: '6px',
-                    border: `1px solid ${isDarkMode ? '#374151' : '#E5E7EB'}`,
-                    backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
-                    color: isDarkMode ? '#FFFFFF' : '#111827',
-                    fontSize: '14px',
-                    outline: 'none',
-                    boxSizing: 'border-box',
-                    transition: 'border-color 0.2s',
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#3B82F6';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = isDarkMode ? '#374151' : '#E5E7EB';
-                  }}
-                />
-              </div>
-
-              {/* Row 5: Carrier */}
-              <div style={{ marginBottom: '16px', position: 'relative' }}>
+              {/* Carrier - same width as left column (aligned with Ship From) */}
+              <div style={{ marginBottom: '16px', maxWidth: 'calc(50% - 8px)' }}>
                 <label style={{ display: 'block', fontSize: '12px', color: isDarkMode ? '#9CA3AF' : '#6B7280', marginBottom: '6px' }}>
                   Carrier<span style={{ color: '#EF4444' }}>*</span>
                 </label>
-                <div
-                  ref={carrierButtonRef}
-                  onClick={() => setIsCarrierDropdownOpen(!isCarrierDropdownOpen)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    paddingRight: '36px',
-                    borderRadius: '6px',
-                    border: `1px solid ${isCarrierDropdownOpen ? '#3B82F6' : (isDarkMode ? '#374151' : '#E5E7EB')}`,
-                    backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
-                    color: selectedCarrier ? (isDarkMode ? '#FFFFFF' : '#111827') : (isDarkMode ? '#9CA3AF' : '#9CA3AF'),
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                    boxSizing: 'border-box',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    minHeight: '42px',
-                    transition: 'border-color 0.2s',
-                    position: 'relative',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isCarrierDropdownOpen) {
-                      e.currentTarget.style.borderColor = '#3B82F6';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isCarrierDropdownOpen) {
-                      e.currentTarget.style.borderColor = isDarkMode ? '#374151' : '#E5E7EB';
-                    }
-                  }}
-                >
-                  <span>{selectedCarrier || 'Select Carrier Name...'}</span>
-                  <svg 
-                    width="12" 
-                    height="12" 
-                    viewBox="0 0 12 12" 
-                    fill="none" 
-                    xmlns="http://www.w3.org/2000/svg"
-                    style={{
-                      position: 'absolute',
-                      right: '12px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                    }}
-                  >
-                    <path 
-                      d="M3 4.5L6 7.5L9 4.5" 
-                      stroke={isDarkMode ? '#FFFFFF' : '#9CA3AF'} 
-                      strokeWidth="1.5" 
-                      strokeLinecap="round" 
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </div>
-
-                {isCarrierDropdownOpen && createPortal(
-                  <div
-                    ref={carrierDropdownRef}
-                    style={{
-                      position: 'fixed',
-                      top: `${carrierDropdownPos.top}px`,
-                      left: `${carrierDropdownPos.left}px`,
-                      width: `${carrierDropdownPos.width}px`,
-                      backgroundColor: isDarkMode ? '#374151' : '#FFFFFF',
-                      border: `1px solid ${isDarkMode ? '#4B5563' : '#E5E7EB'}`,
-                      borderRadius: '6px',
-                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                      zIndex: 10000,
-                      overflow: 'hidden',
-                    }}
-                  >
-                    {/* Known Carriers */}
-                    <div style={{ padding: '8px 10px', borderBottom: `1px solid ${isDarkMode ? '#4B5563' : '#E5E7EB'}` }}>
-                      <div style={{
-                        fontSize: '11px',
-                        fontWeight: 500,
-                        color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                        marginBottom: '6px',
-                      }}>
-                        Known Carriers:
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        {knownCarriers.map((carrier) => (
-                          <div
-                            key={carrier}
-                            onClick={() => handleCarrierSelect(carrier)}
-                            style={{
-                              padding: '4px 6px',
-                              cursor: 'pointer',
-                              borderRadius: '4px',
-                              color: isDarkMode ? '#FFFFFF' : '#111827',
-                              fontSize: '12px',
-                              transition: 'background-color 0.2s',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = isDarkMode ? '#4B5563' : '#F3F4F6';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = 'transparent';
-                            }}
-                          >
-                            {carrier}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Custom Entry */}
-                    <div style={{ padding: '8px 10px', borderBottom: `1px solid ${isDarkMode ? '#4B5563' : '#E5E7EB'}` }}>
-                      <div style={{
-                        fontSize: '11px',
-                        fontWeight: 500,
-                        color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                        marginBottom: '6px',
-                      }}>
-                        Custom Entry:
-                      </div>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <input
-                          type="text"
-                          value={customCarrierName}
-                          onChange={(e) => setCustomCarrierName(e.target.value)}
-                          placeholder="Enter custom carrier name here..."
-                          style={{
-                            flex: 1,
-                            padding: '4px 8px',
-                            borderRadius: '4px',
-                            border: `1px solid ${isDarkMode ? '#4B5563' : '#D1D5DB'}`,
-                            backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
-                            color: isDarkMode ? '#FFFFFF' : '#111827',
-                            fontSize: '12px',
-                            outline: 'none',
-                            boxSizing: 'border-box',
-                          }}
-                          onFocus={(e) => {
-                            e.target.style.borderColor = '#3B82F6';
-                          }}
-                          onBlur={(e) => {
-                            e.target.style.borderColor = isDarkMode ? '#4B5563' : '#D1D5DB';
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              handleUseCustomCarrier();
-                            }
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={handleUseCustomCarrier}
-                          style={{
-                            padding: '4px 12px',
-                            borderRadius: '4px',
-                            border: 'none',
-                            backgroundColor: '#3B82F6',
-                            color: '#FFFFFF',
-                            fontSize: '12px',
-                            fontWeight: 500,
-                            cursor: 'pointer',
-                            transition: 'background-color 0.2s',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#2563EB';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = '#3B82F6';
-                          }}
-                        >
-                          Use
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Create a Carrier */}
-                    <div style={{ padding: '8px 10px' }}>
-                      <div style={{
-                        fontSize: '11px',
-                        fontWeight: 500,
-                        color: isDarkMode ? '#9CA3AF' : '#6B7280',
-                        marginBottom: '6px',
-                      }}>
-                        Create a Carrier:
-                      </div>
-                      <div
-                        onClick={() => setIsCarrierDropdownOpen(false)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          cursor: 'pointer',
-                          color: '#3B82F6',
-                          fontSize: '12px',
-                          padding: '2px 0',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.opacity = '0.8';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.opacity = '1';
-                        }}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M8 3V13M3 8H13" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                        <span>Add new carrier to system</span>
-                      </div>
-                    </div>
-                  </div>,
-                  document.body
-                )}
+                <CarrierSelect
+                  value={selectedCarrier}
+                  onChange={setSelectedCarrier}
+                  placeholder="Select Carrier Name..."
+                  onAddNewCarrier={() => setIsAddCarrierOpen(true)}
+                />
               </div>
 
               {/* Book Shipment Button */}
@@ -3810,6 +3562,28 @@ const NewShipment = () => {
         totalBoxes={Math.ceil(totalBoxes)}
         onSave={handleSaveShipment}
         onBookAndProceed={handleBookAndProceed}
+      />
+
+      <AddLocationModal
+        isOpen={addLocationForField !== null}
+        onClose={() => setAddLocationForField(null)}
+        onSave={(displayValue) => {
+          if (addLocationForField === 'shipFrom') {
+            setShipmentData((prev) => ({ ...prev, shipFrom: displayValue }));
+          } else if (addLocationForField === 'shipTo') {
+            setShipmentData((prev) => ({ ...prev, shipTo: displayValue }));
+          }
+          setAddLocationForField(null);
+        }}
+      />
+
+      <AddCarrierModal
+        isOpen={isAddCarrierOpen}
+        onClose={() => setIsAddCarrierOpen(false)}
+        onSave={(carrierName) => {
+          setSelectedCarrier(carrierName);
+          setIsAddCarrierOpen(false);
+        }}
       />
 
       <ExportTemplateModal
