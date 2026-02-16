@@ -69,6 +69,8 @@ const NewShipmentTable = ({
   addProductsRedoStackLength = 0,
   onAddProductsUndo = null,
   onAddProductsRedo = null,
+  isCustomizeColumnsOpen: externalIsCustomizeColumnsOpen = null, // External control for modal
+  onCustomizeColumnsOpenChange = null, // Callback when modal state changes
 }) => {
   // Account to Brand mapping (for checking if all brands are selected)
   const ACCOUNT_BRAND_MAPPING = {
@@ -201,6 +203,77 @@ const NewShipmentTable = ({
     formulas: true,
     timeHours: true,
   });
+
+  // Column visibility state for Customize Columns feature
+  const [internalIsCustomizeColumnsOpen, setInternalIsCustomizeColumnsOpen] = useState(false);
+  const isCustomizeColumnsOpen = externalIsCustomizeColumnsOpen !== null ? externalIsCustomizeColumnsOpen : internalIsCustomizeColumnsOpen;
+  const setIsCustomizeColumnsOpen = (value) => {
+    if (onCustomizeColumnsOpenChange) {
+      onCustomizeColumnsOpenChange(value);
+    } else {
+      setInternalIsCustomizeColumnsOpen(value);
+    }
+  };
+
+  // Column definitions organized by category
+  const columnDefinitions = {
+    product: [
+      { id: 'brand', label: 'Brand' },
+      { id: 'product', label: 'Product' },
+      { id: 'variation1', label: 'Variation 1' },
+      { id: 'variation2', label: 'Variation 2' },
+      { id: 'parentAsin', label: 'Parent ASIN' },
+      { id: 'childAsin', label: 'Child ASIN' },
+    ],
+    forecast: [
+      { id: 'unitsToMake', label: 'Units to Make' },
+      { id: 'totalInventory', label: 'Total Inventory' },
+      { id: 'totalDoi', label: 'Total DOI' },
+      { id: 'fbaAvailableDoi', label: 'FBA Available DOI' },
+      { id: 'velocityTrend', label: 'Velocity Trend' },
+    ],
+    sales: [
+      { id: 'unitsOrdered7d', label: '7 Day Units Ordered' },
+      { id: 'unitsOrdered30d', label: '30 Days Units Ordered' },
+      { id: 'unitsOrdered90d', label: '90 Days Units Ordered' },
+      { id: 'sales70d', label: '70 Day Sales' },
+    ],
+    inventory: [
+      { id: 'inventory', label: 'Inventory' },
+    ],
+  };
+
+  // Column visibility state - initialize all as visible
+  const [columnVisibility, setColumnVisibility] = useState(() => {
+    const visibility = {};
+    Object.values(columnDefinitions).flat().forEach(col => {
+      visibility[col.id] = true;
+    });
+    return visibility;
+  });
+
+  // Default column visibility (all visible)
+  const defaultColumnVisibility = useMemo(() => {
+    const visibility = {};
+    Object.values(columnDefinitions).flat().forEach(col => {
+      visibility[col.id] = true;
+    });
+    return visibility;
+  }, []);
+
+  // Modal state
+  const [modalSearchQuery, setModalSearchQuery] = useState('');
+  const [modalSelectedCategory, setModalSelectedCategory] = useState('all');
+  const [tempColumnVisibility, setTempColumnVisibility] = useState(columnVisibility);
+
+  // Update temp visibility when modal opens or columnVisibility changes
+  useEffect(() => {
+    if (isCustomizeColumnsOpen) {
+      setTempColumnVisibility(columnVisibility);
+      setModalSearchQuery('');
+      setModalSelectedCategory('all');
+    }
+  }, [isCustomizeColumnsOpen, columnVisibility]);
 
   // Close Shipment Stats popup when clicking outside
   useEffect(() => {
@@ -7340,6 +7413,443 @@ const NewShipmentTable = ({
           </div>
         </div>
       )}
+
+      {/* Customize Columns Modal */}
+      {isCustomizeColumnsOpen && (() => {
+        // Get all columns
+        const allColumns = Object.values(columnDefinitions).flat();
+        
+        // Get counts for each category
+        const getCategoryCount = (category) => {
+          if (category === 'all') return allColumns.length;
+          return columnDefinitions[category]?.length || 0;
+        };
+
+        // Handle select all for a category
+        const handleSelectAll = (category) => {
+          const newVisibility = { ...tempColumnVisibility };
+          if (category === 'all') {
+            allColumns.forEach(col => {
+              newVisibility[col.id] = true;
+            });
+          } else {
+            columnDefinitions[category].forEach(col => {
+              newVisibility[col.id] = true;
+            });
+          }
+          setTempColumnVisibility(newVisibility);
+        };
+
+        // Handle reset to default
+        const handleResetToDefault = () => {
+          setTempColumnVisibility({ ...defaultColumnVisibility });
+        };
+
+        // Handle apply changes
+        const handleApplyChanges = () => {
+          setColumnVisibility(tempColumnVisibility);
+          setIsCustomizeColumnsOpen(false);
+        };
+
+        // Handle cancel
+        const handleCancel = () => {
+          setTempColumnVisibility(columnVisibility);
+          setIsCustomizeColumnsOpen(false);
+        };
+
+        return createPortal(
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10000,
+            }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) handleCancel();
+            }}
+          >
+            <div
+              style={{
+                width: '90%',
+                maxWidth: '900px',
+                height: '95vh',
+                maxHeight: '95vh',
+                backgroundColor: isDarkMode ? '#0F172A' : '#FFFFFF',
+                borderRadius: '12px',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '20px 24px',
+                  borderBottom: `1px solid ${isDarkMode ? '#1E293B' : '#E5E7EB'}`,
+                }}
+              >
+                <h2
+                  style={{
+                    margin: 0,
+                    fontSize: '18px',
+                    fontWeight: 600,
+                    color: isDarkMode ? '#F9FAFB' : '#111827',
+                  }}
+                >
+                  Customize Columns
+                </h2>
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    border: 'none',
+                    backgroundColor: 'transparent',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '6px',
+                    color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = isDarkMode ? '#1E293B' : '#F3F4F6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                    <path
+                      d="M15 5L5 15M5 5L15 15"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Content */}
+              <div
+                style={{
+                  display: 'flex',
+                  flex: 1,
+                  overflow: 'hidden',
+                }}
+              >
+                {/* Sidebar */}
+                <div
+                  style={{
+                    width: '200px',
+                    borderRight: `1px solid ${isDarkMode ? '#1E293B' : '#E5E7EB'}`,
+                    padding: '16px',
+                    overflowY: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                  }}
+                >
+                  {['all', 'product', 'forecast', 'sales', 'inventory'].map((category) => (
+                    <button
+                      key={category}
+                      type="button"
+                      onClick={() => setModalSelectedCategory(category)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        backgroundColor:
+                          modalSelectedCategory === category
+                            ? isDarkMode ? '#1E293B' : '#F3F4F6'
+                            : 'transparent',
+                        color: isDarkMode ? '#F9FAFB' : '#111827',
+                        fontSize: '14px',
+                        fontWeight: modalSelectedCategory === category ? 500 : 400,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        width: '100%',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (modalSelectedCategory !== category) {
+                          e.currentTarget.style.backgroundColor = isDarkMode ? '#1E293B' : '#F9FAFB';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (modalSelectedCategory !== category) {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }
+                      }}
+                    >
+                      <span style={{ textTransform: 'capitalize' }}>
+                        {category === 'all' ? 'All' : category}
+                      </span>
+                      <span
+                        style={{
+                          backgroundColor: isDarkMode ? '#334155' : '#E5E7EB',
+                          color: isDarkMode ? '#F9FAFB' : '#374151',
+                          padding: '2px 8px',
+                          borderRadius: '12px',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                        }}
+                      >
+                        {getCategoryCount(category)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Main Content */}
+                <div
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {/* Search Input */}
+                  <div
+                    style={{
+                      padding: '16px 24px',
+                      borderBottom: `1px solid ${isDarkMode ? '#1E293B' : '#E5E7EB'}`,
+                    }}
+                  >
+                    <input
+                      type="text"
+                      placeholder="Find a column..."
+                      value={modalSearchQuery}
+                      onChange={(e) => setModalSearchQuery(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        border: `1px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
+                        backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                        color: isDarkMode ? '#F9FAFB' : '#111827',
+                        fontSize: '14px',
+                        outline: 'none',
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#3B82F6';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = isDarkMode ? '#334155' : '#D1D5DB';
+                      }}
+                    />
+                  </div>
+
+                  {/* Column List */}
+                  <div
+                    style={{
+                      flex: 1,
+                      overflowY: 'auto',
+                      padding: '16px 24px',
+                    }}
+                  >
+                    {Object.entries(columnDefinitions).map(([categoryKey, columns]) => {
+                      const categoryColumns = columns.filter(col =>
+                        col.label.toLowerCase().includes(modalSearchQuery.toLowerCase())
+                      );
+                      if (categoryColumns.length === 0) return null;
+                      if (modalSelectedCategory !== 'all' && modalSelectedCategory !== categoryKey) return null;
+
+                      const categoryLabels = {
+                        product: 'PRODUCT',
+                        forecast: 'FORECAST',
+                        sales: 'SALES',
+                        inventory: 'INVENTORY',
+                      };
+
+                      const allSelected = categoryColumns.every(
+                        col => tempColumnVisibility[col.id]
+                      );
+
+                      return (
+                        <div key={categoryKey} style={{ marginBottom: '24px' }}>
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              marginBottom: '12px',
+                            }}
+                          >
+                            <h3
+                              style={{
+                                margin: 0,
+                                fontSize: '14px',
+                                fontWeight: 600,
+                                color: isDarkMode ? '#9CA3AF' : '#6B7280',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}
+                            >
+                              {categoryLabels[categoryKey]}
+                            </h3>
+                            <button
+                              type="button"
+                              onClick={() => handleSelectAll(categoryKey)}
+                              style={{
+                                border: 'none',
+                                backgroundColor: 'transparent',
+                                color: '#3B82F6',
+                                fontSize: '13px',
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                                padding: '4px 8px',
+                              }}
+                            >
+                              Select all
+                            </button>
+                          </div>
+                          <div
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(2, 1fr)',
+                              gap: '8px',
+                            }}
+                          >
+                            {categoryColumns.map((col) => (
+                              <label
+                                key={col.id}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '10px',
+                                  padding: '10px 12px',
+                                  borderRadius: '8px',
+                                  border: `1px solid ${isDarkMode ? '#334155' : '#E5E7EB'}`,
+                                  backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.borderColor = '#3B82F6';
+                                  e.currentTarget.style.backgroundColor = isDarkMode ? '#1E293B' : '#F9FAFB';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.borderColor = isDarkMode ? '#334155' : '#E5E7EB';
+                                  e.currentTarget.style.backgroundColor = isDarkMode ? '#1E293B' : '#FFFFFF';
+                                }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={tempColumnVisibility[col.id] || false}
+                                  onChange={(e) => {
+                                    setTempColumnVisibility({
+                                      ...tempColumnVisibility,
+                                      [col.id]: e.target.checked,
+                                    });
+                                  }}
+                                  style={{
+                                    width: '16px',
+                                    height: '16px',
+                                    cursor: 'pointer',
+                                    accentColor: '#3B82F6',
+                                  }}
+                                />
+                                <span
+                                  style={{
+                                    fontSize: '14px',
+                                    color: isDarkMode ? '#F9FAFB' : '#111827',
+                                  }}
+                                >
+                                  {col.label}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'flex-end',
+                  gap: '12px',
+                  padding: '16px 24px',
+                  borderTop: `1px solid ${isDarkMode ? '#1E293B' : '#E5E7EB'}`,
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: `1px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
+                    backgroundColor: 'transparent',
+                    color: isDarkMode ? '#F9FAFB' : '#374151',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetToDefault}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: `1px solid ${isDarkMode ? '#334155' : '#D1D5DB'}`,
+                    backgroundColor: 'transparent',
+                    color: isDarkMode ? '#F9FAFB' : '#374151',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Reset to Default
+                </button>
+                <button
+                  type="button"
+                  onClick={handleApplyChanges}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: '#3B82F6',
+                    color: '#FFFFFF',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Apply Changes
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        );
+      })()}
       </>
       )}
     </>

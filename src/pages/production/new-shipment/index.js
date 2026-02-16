@@ -223,6 +223,7 @@ const NewShipment = () => {
   const [labelCheckData, setLabelCheckData] = useState({ total: 0, completed: 0, remaining: 0 });
   const [shipmentProducts, setShipmentProducts] = useState([]); // Products loaded from existing shipment
   const [tableMode, setTableMode] = useState(false);
+  const [isCustomizeColumnsOpen, setIsCustomizeColumnsOpen] = useState(false);
   const [activeAction, setActiveAction] = useState('add-products');
   const [completedTabs, setCompletedTabs] = useState(new Set());
   const [addedRows, setAddedRows] = useState(new Set());
@@ -2797,10 +2798,11 @@ const NewShipment = () => {
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 gap: '16px',
+                overflow: 'visible',
               }}
             >
               {/* Left: Product Catalog Label and Navigation Tabs */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 1, minWidth: 0 }}>
                 {/* Product Catalog - Static Label */}
                 <div
                   style={{
@@ -2939,7 +2941,7 @@ const NewShipment = () => {
                 )}
 
               {/* Right: DOI Settings, Sort, and Search Input */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0 }}>
                 {/* DOI Settings Popover (blue exclamation badge on button when custom DOI applied) */}
                 <DOISettingsPopover
                   isDarkMode={isDarkMode}
@@ -2951,7 +2953,7 @@ const NewShipment = () => {
 
 
                 {/* Search Input */}
-                <div style={{ position: 'relative', width: '336px', height: '32px' }}>
+                <div style={{ position: 'relative', width: '280px', height: '32px', flexShrink: 0 }}>
                 <svg
                   width="16"
                   height="16"
@@ -3053,6 +3055,39 @@ const NewShipment = () => {
                   </button>
                 )}
                 </div>
+                {/* Columns Button - only show when tableMode is on */}
+                {tableMode && (
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomizeColumnsOpen(true)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '6px 12px',
+                      height: '32px',
+                      borderRadius: '6px',
+                      border: `1px solid ${isDarkMode ? '#475569' : '#D1D5DB'}`,
+                      backgroundColor: isDarkMode ? '#1F2937' : '#FFFFFF',
+                      color: isDarkMode ? '#F9FAFB' : '#111827',
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s, border-color 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = isDarkMode ? '#334155' : '#F3F4F6';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = isDarkMode ? '#1F2937' : '#FFFFFF';
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M2 2H6V6H2V2ZM10 2H14V6H10V2ZM2 10H6V14H2V10ZM10 10H14V14H10V10Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    Columns
+                  </button>
+                )}
               </div>
             </div>
 
@@ -3105,6 +3140,8 @@ const NewShipment = () => {
                     addProductsRedoStackLength={addProductsRedoStack.length}
                     onAddProductsUndo={handleAddProductsUndo}
                     onAddProductsRedo={handleAddProductsRedo}
+                    isCustomizeColumnsOpen={isCustomizeColumnsOpen}
+                    onCustomizeColumnsOpenChange={setIsCustomizeColumnsOpen}
                   />
                 )}
               </>
