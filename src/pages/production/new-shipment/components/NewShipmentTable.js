@@ -6384,6 +6384,7 @@ const NewShipmentTable = ({
                   />
                 </label>
               </th>
+              {columnVisibility['brand'] && (
               <th style={{ 
                 borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
                 padding: '0 0.75rem', 
@@ -6406,6 +6407,8 @@ const NewShipmentTable = ({
               }}>
                 <span>BRAND</span>
               </th>
+              )}
+              {columnVisibility['product'] && (
               <th style={{ 
                 borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
                 padding: '0 0.75rem', 
@@ -6428,6 +6431,8 @@ const NewShipmentTable = ({
               }}>
                 <span>PRODUCT</span>
               </th>
+              )}
+              {columnVisibility['unitsToMake'] && (
               <th style={{ 
                 borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
                 padding: '0 1rem', 
@@ -6450,6 +6455,8 @@ const NewShipmentTable = ({
               }}>
                 <span>UNITS TO MAKE</span>
               </th>
+              )}
+              {columnVisibility['variation1'] && (
               <th style={{ 
                 borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
                 padding: '0 0.75rem', 
@@ -6470,6 +6477,8 @@ const NewShipmentTable = ({
               }}>
                 <span>VARIATION 1</span>
               </th>
+              )}
+              {columnVisibility['variation2'] && (
               <th style={{ 
                 borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
                 padding: '0 0.75rem', 
@@ -6490,6 +6499,8 @@ const NewShipmentTable = ({
               }}>
                 <span>VARIATION 2</span>
               </th>
+              )}
+              {columnVisibility['parentAsin'] && (
               <th style={{ 
                 borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
                 padding: '0 0.75rem', 
@@ -6510,6 +6521,8 @@ const NewShipmentTable = ({
               }}>
                 <span>PARENT ASIN</span>
               </th>
+              )}
+              {columnVisibility['childAsin'] && (
               <th style={{ 
                 borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
                 padding: '0 0.75rem', 
@@ -6530,6 +6543,8 @@ const NewShipmentTable = ({
               }}>
                 <span>CHILD ASIN</span>
               </th>
+              )}
+              {columnVisibility['inventory'] && (
               <th style={{ 
                 borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
                 padding: '0 0.75rem', 
@@ -6550,6 +6565,8 @@ const NewShipmentTable = ({
               }}>
                 <span>IN</span>
               </th>
+              )}
+              {columnVisibility['inventory'] && (
               <th style={{ 
                 borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
                 padding: '0 0.75rem', 
@@ -6570,6 +6587,8 @@ const NewShipmentTable = ({
               }}>
                 <span>INVENTORY</span>
               </th>
+              )}
+              {columnVisibility['totalDoi'] && (
               <th style={{ 
                 borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
                 padding: '0 0.75rem', 
@@ -6590,6 +6609,8 @@ const NewShipmentTable = ({
               }}>
                 <span>TOTAL DOI</span>
               </th>
+              )}
+              {columnVisibility['fbaAvailableDoi'] && (
               <th style={{ 
                 borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
                 padding: '0 0.75rem', 
@@ -6610,6 +6631,8 @@ const NewShipmentTable = ({
               }}>
                 <span>FBA AVAILABLE DOI</span>
               </th>
+              )}
+              {columnVisibility['velocityTrend'] && (
               <th style={{ 
                 borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
                 padding: '0 0.75rem', 
@@ -6630,6 +6653,8 @@ const NewShipmentTable = ({
               }}>
                 <span>VELOCITY TREND</span>
               </th>
+              )}
+              {columnVisibility['totalInventory'] && (
               <th style={{ 
                 borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
                 padding: '0 0.75rem', 
@@ -6650,6 +6675,8 @@ const NewShipmentTable = ({
               }}>
                 <span>BOX INVENTORY</span>
               </th>
+              )}
+              {columnVisibility['unitsOrdered7d'] && (
               <th style={{ 
                 borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
                 padding: '0 0.75rem', 
@@ -6670,6 +6697,8 @@ const NewShipmentTable = ({
               }}>
                 <span>7 DAY UNITS ORDERED</span>
               </th>
+              )}
+              {columnVisibility['unitsOrdered30d'] && (
               <th style={{ 
                 borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
                 padding: '0 0.75rem', 
@@ -6690,6 +6719,8 @@ const NewShipmentTable = ({
               }}>
                 <span>30 DAY UNITS ORDERED</span>
               </th>
+              )}
+              {columnVisibility['unitsOrdered90d'] && (
               <th style={{ 
                 borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
                 padding: '0 0.75rem', 
@@ -6710,6 +6741,7 @@ const NewShipmentTable = ({
               }}>
                 <span>90 DAY UNITS ORDERED</span>
               </th>
+              )}
               <th style={{ 
                 borderBottom: isDarkMode ? '1px solid #334155' : '1px solid #E2E8F0',
                 padding: '0 0.75rem', 
@@ -6819,6 +6851,7 @@ const NewShipmentTable = ({
                     />
                   </label>
                 </td>
+                {columnVisibility['brand'] && (
                 <td style={{ 
                   ...rowSeparatorBorder,
                   padding: '0.5rem 0.75rem', 
@@ -6837,6 +6870,8 @@ const NewShipmentTable = ({
                 }}>
                   {row.brand}
                 </td>
+                )}
+                {columnVisibility['product'] && (
                 <td style={{ 
                   ...rowSeparatorBorder,
                   padding: '0.5rem 0.75rem', 
@@ -6874,7 +6909,9 @@ const NewShipmentTable = ({
                     {(row.product || '').length > 80 ? `${(row.product || '').substring(0, 80)}...` : (row.product || '')}
                   </button>
                 </td>
+                )}
                 {/* UNITS TO MAKE: dark input + blue Add button */}
+                {columnVisibility['unitsToMake'] && (
                 <td style={{ 
                   ...rowSeparatorBorder,
                   padding: '0.5rem 0.75rem', 
@@ -6960,6 +6997,8 @@ const NewShipmentTable = ({
                     </button>
                   </div>
                 </td>
+                )}
+                {columnVisibility['variation1'] && (
                 <td style={{ 
                   ...rowSeparatorBorder,
                   padding: '0.5rem 0.75rem', 
@@ -6974,6 +7013,8 @@ const NewShipmentTable = ({
                 }}>
                   {row.variation1 || row.variation_1 || (Array.isArray(row.variations) && row.variations[0]) || '-'}
                 </td>
+                )}
+                {columnVisibility['variation2'] && (
                 <td style={{ 
                   ...rowSeparatorBorder,
                   padding: '0.5rem 0.75rem', 
@@ -6988,6 +7029,8 @@ const NewShipmentTable = ({
                 }}>
                   {row.variation2 || row.variation_2 || (Array.isArray(row.variations) && row.variations[1]) || '-'}
                 </td>
+                )}
+                {columnVisibility['parentAsin'] && (
                 <td style={{ 
                   ...rowSeparatorBorder,
                   padding: '0.5rem 0.75rem', 
@@ -7002,6 +7045,8 @@ const NewShipmentTable = ({
                 }}>
                   {row.parent_asin || row.parentAsin || '-'}
                 </td>
+                )}
+                {columnVisibility['childAsin'] && (
                 <td style={{ 
                   ...rowSeparatorBorder,
                   padding: '0.5rem 0.75rem', 
@@ -7016,6 +7061,8 @@ const NewShipmentTable = ({
                 }}>
                   {row.child_asin || row.childAsin || row.asin || '-'}
                 </td>
+                )}
+                {columnVisibility['inventory'] && (
                 <td style={{ 
                   ...rowSeparatorBorder,
                   padding: '0.5rem 0.75rem', 
@@ -7030,9 +7077,13 @@ const NewShipmentTable = ({
                 }}>
                   {row.fbaAvailable ?? row.totalInventory ?? row.doiTotal ?? '-'}
                 </td>
+                )}
+                {columnVisibility['inventory'] && (
                 <td style={{ ...rowSeparatorBorder, padding: '0.5rem 0.75rem', fontSize: '0.875rem', textAlign: 'center', width: '110px', minWidth: '110px', height: '58px', verticalAlign: 'middle', boxSizing: 'border-box', color: isDarkMode ? '#FFFFFF' : '#334155' }}>
                   {row.totalInventory ?? row.label_inventory ?? row.labels_available ?? '-'}
                 </td>
+                )}
+                {columnVisibility['totalDoi'] && (
                 <td style={{ 
                   ...rowSeparatorBorder,
                   padding: '0.5rem 0.75rem', 
@@ -7052,6 +7103,8 @@ const NewShipmentTable = ({
                     return typeof v === 'number' ? v.toLocaleString() : String(v);
                   })()}
                 </td>
+                )}
+                {columnVisibility['fbaAvailableDoi'] && (
                 <td style={{ 
                   ...rowSeparatorBorder,
                   padding: '0.5rem 0.75rem', 
@@ -7071,9 +7124,13 @@ const NewShipmentTable = ({
                     return typeof v === 'number' ? v.toLocaleString() : String(v);
                   })()}
                 </td>
+                )}
+                {columnVisibility['velocityTrend'] && (
                 <td style={{ ...rowSeparatorBorder, padding: '0.5rem 0.75rem', fontSize: '0.875rem', textAlign: 'center', width: '120px', minWidth: '120px', height: '58px', verticalAlign: 'middle', boxSizing: 'border-box', color: isDarkMode ? '#FFFFFF' : '#334155' }}>
                   {row.velocityTrend ?? row.velocity_trend ?? '-'}
                 </td>
+                )}
+                {columnVisibility['totalInventory'] && (
                 <td style={{ 
                   ...rowSeparatorBorder,
                   padding: '0.5rem 0.75rem', 
@@ -7088,15 +7145,22 @@ const NewShipmentTable = ({
                 }}>
                   {row.boxInventory || row.box_inventory || 0}
                 </td>
+                )}
+                {columnVisibility['unitsOrdered7d'] && (
                 <td style={{ ...rowSeparatorBorder, padding: '0.5rem 0.75rem', fontSize: '0.875rem', textAlign: 'center', width: '150px', minWidth: '150px', height: '58px', verticalAlign: 'middle', boxSizing: 'border-box', color: isDarkMode ? '#FFFFFF' : '#334155' }}>
                   {row.sales7Day ?? row.sales_7_day ?? row.unitsOrdered7 ?? row.units_ordered_7 ?? '-'}
                 </td>
+                )}
+                {columnVisibility['unitsOrdered30d'] && (
                 <td style={{ ...rowSeparatorBorder, padding: '0.5rem 0.75rem', fontSize: '0.875rem', textAlign: 'center', width: '150px', minWidth: '150px', height: '58px', verticalAlign: 'middle', boxSizing: 'border-box', color: isDarkMode ? '#FFFFFF' : '#334155' }}>
                   {row.sales30Day ?? row.sales_30_day ?? row.unitsOrdered30 ?? row.units_ordered_30 ?? '-'}
                 </td>
+                )}
+                {columnVisibility['unitsOrdered90d'] && (
                 <td style={{ ...rowSeparatorBorder, padding: '0.5rem 0.75rem', fontSize: '0.875rem', textAlign: 'center', width: '150px', minWidth: '150px', height: '58px', verticalAlign: 'middle', boxSizing: 'border-box', color: isDarkMode ? '#FFFFFF' : '#334155' }}>
                   {row.sales90Day ?? row.sales_90_day ?? row.unitsOrdered90 ?? row.units_ordered_90 ?? '-'}
                 </td>
+                )}
                 <td style={{ ...rowSeparatorBorder, padding: '0.5rem 0.75rem', fontSize: '0.875rem', textAlign: 'center', width: '100px', minWidth: '100px', height: '58px', verticalAlign: 'middle', boxSizing: 'border-box', color: isDarkMode ? '#FFFFFF' : '#334155' }}>
                   {row.fbaTotal ?? row.fba_total ?? '-'}
                 </td>
@@ -7661,7 +7725,7 @@ const NewShipmentTable = ({
                   <div
                     style={{
                       flex: 1,
-                      overflowY: 'auto',
+                      overflowY: 'hidden',
                       padding: '16px 24px',
                     }}
                   >
