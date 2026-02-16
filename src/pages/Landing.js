@@ -41,6 +41,7 @@ import Inventory from './production/Inventory';
 import NewShipment from './production/new-shipment';
 import Notifications from './Notifications';
 import Settings from './Settings';
+import ActionItems from './ActionItems';
 
 const Landing = () => {
   const { isDarkMode } = useTheme();
@@ -90,6 +91,7 @@ const Landing = () => {
           <Route path="/production/inventory" element={<Inventory />} />
           <Route path="/production/shipment/new" element={<NewShipment />} />
           <Route path="/notifications" element={<Notifications />} />
+          <Route path="/action-items" element={<ActionItems />} />
           <Route path="/settings" element={<Settings />} />
           </Routes>
           </div>

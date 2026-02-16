@@ -419,6 +419,16 @@ const Sidebar = (props = {}) => {
             )}
           </div>
         )}
+
+        {/* Action Items */}
+        <div 
+          className={`${menuItemClass('/action-items')} ${isMinimized ? 'justify-center' : ''}`} 
+          onClick={() => navigate('/dashboard/action-items')}
+          title={isMinimized ? 'Action Items' : ''}
+        >
+          <img src="/assets/action-items-icon.png" alt="Action Items" className="w-5 h-5 object-contain" />
+          {!isMinimized && <span>Action Items</span>}
+        </div>
       </div>
 
       {/* Bottom Section - Notifications, Settings, Dark Theme, Logout */}
