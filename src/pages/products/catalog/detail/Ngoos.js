@@ -158,6 +158,9 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   const [visibleSalesMetrics, setVisibleSalesMetrics] = useState(['units_sold', 'sales']);
   const [visibleAdsMetrics, setVisibleAdsMetrics] = useState(['total_sales', 'tacos']);
   const [hoveredSegment, setHoveredSegment] = useState(null); // 'fba', 'total', 'forecast', or null
+  const [actionItemsExpanded, setActionItemsExpanded] = useState(false); // Action Items dropdown state
+  const [showActionItemModal, setShowActionItemModal] = useState(false); // Action Item modal state
+  const [selectedCategory, setSelectedCategory] = useState('Inventory'); // Selected category in modal
   const [selectedMetrics, setSelectedMetrics] = useState({
     sales: [
       'units_sold',
@@ -1950,22 +1953,28 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
   }
 
   return (
-    <div 
-      className={activeTab === 'sales' ? `${themeClasses.bg} rounded-xl border-0 shadow-none` : `${themeClasses.bg} rounded-xl border ${themeClasses.border} shadow-sm`} 
-      style={{ 
-        width: inventoryOnly ? '100%' : '100%', 
-        maxWidth: inventoryOnly ? '100%' : 'none', 
-        margin: inventoryOnly ? '0' : '0 auto',
-        backgroundColor: '#1A2235',
-        display: 'flex',
-        flexDirection: 'column',
-        minHeight: 0,
-        ...(inventoryOnly ? { flex: 1, minHeight: '662px' } : {}),
-        outline: 'none',
-        paddingBottom: '1rem',
-        ...(activeTab === 'sales' ? { border: 'none', boxShadow: 'none' } : {})
-      }}
-    >
+    <>
+      <style>{`
+        .hide-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
+      <div 
+        className={activeTab === 'sales' ? `${themeClasses.bg} rounded-xl border-0 shadow-none` : `${themeClasses.bg} rounded-xl border ${themeClasses.border} shadow-sm`} 
+        style={{ 
+          width: inventoryOnly ? '100%' : '100%', 
+          maxWidth: inventoryOnly ? '100%' : 'none', 
+          margin: inventoryOnly ? '0' : '0 auto',
+          backgroundColor: '#1A2235',
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
+          ...(inventoryOnly ? { flex: 1, minHeight: '662px' } : {}),
+          outline: 'none',
+          paddingBottom: '1rem',
+          ...(activeTab === 'sales' ? { border: 'none', boxShadow: 'none' } : {})
+        }}
+      >
       {/* Tab Navigation - Hidden when inventoryOnly is true */}
       {!inventoryOnly && (
         <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #334155', backgroundColor: '#1A2235' }}>
@@ -2341,6 +2350,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         )}
         
         {/* Main Grid - Horizontal layout when inventoryOnly; buckets scroll so they don't shrink (scrollbar hidden) */}
+        {!actionItemsExpanded && (
         <div className="scrollbar-hide" style={{ 
           display: 'flex', 
           gap: inventoryOnly ? '1rem' : '1.5rem', 
@@ -2589,8 +2599,10 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             </div>
           </div>
         </div>
+        )}
 
         {/* Three Metric Cards - FBA Available, Total Inventory, Forecast */}
+        {!actionItemsExpanded && (
         <div style={{ 
           display: 'grid', 
           gridTemplateColumns: inventoryOnly ? 'repeat(auto-fit, minmax(200px, 1fr))' : '1fr 1fr 1fr', 
@@ -2767,6 +2779,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             </div>
           </div>
         </div>
+        )}
 
         {/* Unit Forecast Chart - Compact when inventoryOnly */}
         <div className={themeClasses.cardBg} style={{ 
@@ -3902,6 +3915,1171 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             </div>
           </div>
         </div>
+
+        {/* Action Items Section */}
+        <div style={{
+          marginTop: '1.5rem',
+          backgroundColor: '#0F172A',
+          border: '1px solid #334155',
+          borderRadius: '12px',
+          overflow: 'hidden'
+        }}>
+          {!actionItemsExpanded && (
+            <button
+              onClick={() => setActionItemsExpanded(!actionItemsExpanded)}
+              style={{
+                width: '100%',
+                padding: '1rem 1.25rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#212937'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              <span style={{
+                fontSize: '1rem',
+                fontWeight: '600',
+                color: '#e2e8f0',
+                letterSpacing: '0.025em'
+              }}>
+                Action Items
+              </span>
+              <svg
+                style={{
+                  width: '20px',
+                  height: '20px',
+                  color: '#94a3b8',
+                  transform: actionItemsExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.2s ease'
+                }}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          )}
+          
+          {actionItemsExpanded && (
+            <>
+              {/* Header with Search and Close */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '16px 20px',
+                borderTop: '1px solid #334155',
+                backgroundColor: '#0F172A'
+              }}>
+                {/* Left: Title + Search */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <h3 style={{ fontSize: '1rem', fontWeight: '600', color: '#e2e8f0', margin: 0 }}>
+                    Action Items
+                  </h3>
+                  <div style={{ position: 'relative' }}>
+                    <svg style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', width: '14px', height: '14px', color: '#64748b' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <input
+                      type="text"
+                      placeholder="Search..."
+                      style={{
+                        backgroundColor: '#1a2332',
+                        border: '1px solid #334155',
+                        borderRadius: '6px',
+                        padding: '4px 12px 4px 32px',
+                        color: '#e2e8f0',
+                        fontSize: '0.875rem',
+                        outline: 'none',
+                        width: '180px',
+                        height: '24px',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                </div>
+                {/* Right: Close button */}
+                <button onClick={() => setActionItemsExpanded(false)} style={{ backgroundColor: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg style={{ width: '18px', height: '18px', color: '#94a3b8' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              {/* Content Area */}
+              <div style={{
+                padding: '16px',
+                backgroundColor: '#0F172A',
+                overflowY: 'auto',
+                overflowX: 'auto',
+                maxHeight: '500px',
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none'
+              }} className="hide-scrollbar">
+
+              {/* Four Column Layout */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(4, 1fr)',
+                gap: '12px',
+                minWidth: 'fit-content'
+              }}>
+                {/* Inventory Column */}
+                <div style={{
+                  backgroundColor: '#1a2332',
+                  borderRadius: '8px',
+                  padding: '10px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  height: '252px'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '10px'
+                  }}>
+                    <span style={{
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: '#e2e8f0'
+                    }}>
+                      Inventory
+                    </span>
+                    <span style={{
+                      backgroundColor: '#334155',
+                      color: '#94a3b8',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      padding: '0.125rem 0.5rem',
+                      borderRadius: '9999px'
+                    }}>
+                      1
+                    </span>
+                  </div>
+
+                  {/* Scrollable Items Container */}
+                  <div style={{
+                    flex: 1,
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
+                    marginBottom: '8px',
+                    scrollbarWidth: 'none',
+                    msOverflowStyle: 'none',
+                    WebkitOverflowScrolling: 'touch'
+                  }} className="hide-scrollbar">
+                  {/* Action Item: Low FBA Available */}
+                  <div style={{
+                    width: '100%',
+                    backgroundColor: '#1C2634',
+                    border: '1px solid #334155',
+                    borderRadius: '4px',
+                    padding: '8px',
+                    marginBottom: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    boxShadow: '0px 2px 4px 0px rgba(0, 0, 0, 0.15)'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
+                      <span style={{
+                        fontSize: '0.875rem',
+                        color: '#e2e8f0',
+                        fontWeight: '500'
+                      }}>
+                        Low FBA Available
+                      </span>
+                      <button style={{
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '0.25rem',
+                        display: 'flex',
+                        color: '#64748b'
+                      }}>
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                          <circle cx="8" cy="3" r="1.5"/>
+                          <circle cx="8" cy="8" r="1.5"/>
+                          <circle cx="8" cy="13" r="1.5"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        border: '2px solid #334155',
+                        backgroundColor: '#1e293b',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer'
+                      }}></div>
+                      <svg
+                        style={{
+                          width: '14px',
+                          height: '14px',
+                          color: '#64748b'
+                        }}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                      <div style={{ flex: 1 }}></div>
+                      <span style={{
+                        backgroundColor: '#10b981',
+                        color: '#ffffff',
+                        fontSize: '0.625rem',
+                        fontWeight: '700',
+                        padding: '0.125rem 0.375rem',
+                        borderRadius: '0.25rem',
+                        letterSpacing: '0.05em'
+                      }}>
+                        INV
+                      </span>
+                    </div>
+                  </div>
+                  </div>
+
+                  {/* Add action item button */}
+                  <button 
+                    onClick={() => setShowActionItemModal(true)}
+                    style={{
+                      backgroundColor: '#4B5563',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '1px 8px 4px 8px',
+                      color: '#94a3b8',
+                      fontSize: '0.8125rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      width: '100%',
+                      height: '24px'
+                    }}>
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add action item
+                  </button>
+                </div>
+
+                {/* Price Column */}
+                <div style={{
+                  backgroundColor: '#1a2332',
+                  borderRadius: '8px',
+                  padding: '10px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  height: '252px'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '10px'
+                  }}>
+                    <span style={{
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: '#e2e8f0'
+                    }}>
+                      Price
+                    </span>
+                    <span style={{
+                      backgroundColor: '#334155',
+                      color: '#94a3b8',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      padding: '0.125rem 0.5rem',
+                      borderRadius: '9999px'
+                    }}>
+                      1
+                    </span>
+                  </div>
+
+                  {/* Scrollable Items Container */}
+                  <div style={{
+                    flex: 1,
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
+                    marginBottom: '8px',
+                    scrollbarWidth: 'none',
+                    msOverflowStyle: 'none',
+                    WebkitOverflowScrolling: 'touch'
+                  }} className="hide-scrollbar">
+                  {/* Action Item: Price Edit */}
+                  <div style={{
+                    width: '100%',
+                    backgroundColor: '#1C2634',
+                    border: '1px solid #334155',
+                    borderRadius: '4px',
+                    padding: '8px',
+                    marginBottom: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    boxShadow: '0px 2px 4px 0px rgba(0, 0, 0, 0.15)'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
+                      <span style={{
+                        fontSize: '0.875rem',
+                        color: '#e2e8f0',
+                        fontWeight: '500'
+                      }}>
+                        Price Edit
+                      </span>
+                      <button style={{
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '0.25rem',
+                        display: 'flex',
+                        color: '#64748b'
+                      }}>
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                          <circle cx="8" cy="3" r="1.5"/>
+                          <circle cx="8" cy="8" r="1.5"/>
+                          <circle cx="8" cy="13" r="1.5"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        border: '2px solid #334155',
+                        backgroundColor: '#1e293b',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer'
+                      }}></div>
+                      <svg
+                        style={{
+                          width: '14px',
+                          height: '14px',
+                          color: '#64748b'
+                        }}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                      <div style={{ flex: 1 }}></div>
+                      <span style={{
+                        backgroundColor: '#ef4444',
+                        color: '#ffffff',
+                        fontSize: '0.625rem',
+                        fontWeight: '700',
+                        padding: '0.125rem 0.375rem',
+                        borderRadius: '0.25rem',
+                        letterSpacing: '0.05em'
+                      }}>
+                        CA
+                      </span>
+                    </div>
+                  </div>
+                  </div>
+
+                  {/* Add action item button */}
+                  <button 
+                    onClick={() => setShowActionItemModal(true)}
+                    style={{
+                      backgroundColor: '#4B5563',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '1px 8px 4px 8px',
+                      color: '#94a3b8',
+                      fontSize: '0.8125rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      width: '100%',
+                      height: '24px'
+                    }}>
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add action item
+                  </button>
+                </div>
+
+                {/* Ads Column */}
+                <div style={{
+                  backgroundColor: '#1a2332',
+                  borderRadius: '8px',
+                  padding: '10px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  height: '252px'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '10px'
+                  }}>
+                    <span style={{
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: '#e2e8f0'
+                    }}>
+                      Ads
+                    </span>
+                    <span style={{
+                      backgroundColor: '#334155',
+                      color: '#94a3b8',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      padding: '0.125rem 0.5rem',
+                      borderRadius: '9999px'
+                    }}>
+                      3
+                    </span>
+                  </div>
+
+                  {/* Scrollable Items Container */}
+                  <div style={{
+                    flex: 1,
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
+                    marginBottom: '8px',
+                    scrollbarWidth: 'none',
+                    msOverflowStyle: 'none',
+                    WebkitOverflowScrolling: 'touch'
+                  }} className="hide-scrollbar">
+                  {/* Action Item: TACOS Too High */}
+                  <div style={{
+                    width: '100%',
+                    backgroundColor: '#1C2634',
+                    border: '1px solid #334155',
+                    borderRadius: '4px',
+                    padding: '8px',
+                    marginBottom: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    boxShadow: '0px 2px 4px 0px rgba(0, 0, 0, 0.15)'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
+                      <span style={{
+                        fontSize: '0.875rem',
+                        color: '#e2e8f0',
+                        fontWeight: '500'
+                      }}>
+                        TACOS Too High
+                      </span>
+                      <button style={{
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '0.25rem',
+                        display: 'flex',
+                        color: '#64748b'
+                      }}>
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                          <circle cx="8" cy="3" r="1.5"/>
+                          <circle cx="8" cy="8" r="1.5"/>
+                          <circle cx="8" cy="13" r="1.5"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        border: '2px solid #334155',
+                        backgroundColor: '#1e293b',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer'
+                      }}></div>
+                      <svg
+                        style={{
+                          width: '14px',
+                          height: '14px',
+                          color: '#64748b'
+                        }}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                      <div style={{ flex: 1 }}></div>
+                      <span style={{
+                        backgroundColor: '#3b82f6',
+                        color: '#ffffff',
+                        fontSize: '0.625rem',
+                        fontWeight: '700',
+                        padding: '0.125rem 0.375rem',
+                        borderRadius: '0.25rem',
+                        letterSpacing: '0.05em'
+                      }}>
+                        JB
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Action Item: Keyword Sweep */}
+                  <div style={{
+                    width: '100%',
+                    backgroundColor: '#1C2634',
+                    border: '1px solid #334155',
+                    borderRadius: '4px',
+                    padding: '8px',
+                    marginBottom: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    boxShadow: '0px 2px 4px 0px rgba(0, 0, 0, 0.15)'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
+                      <span style={{
+                        fontSize: '0.875rem',
+                        color: '#e2e8f0',
+                        fontWeight: '500'
+                      }}>
+                        Keyword Sweep
+                      </span>
+                      <button style={{
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '0.25rem',
+                        display: 'flex',
+                        color: '#64748b'
+                      }}>
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                          <circle cx="8" cy="3" r="1.5"/>
+                          <circle cx="8" cy="8" r="1.5"/>
+                          <circle cx="8" cy="13" r="1.5"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        border: '2px solid #334155',
+                        backgroundColor: '#1e293b',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer'
+                      }}></div>
+                      <svg
+                        style={{
+                          width: '14px',
+                          height: '14px',
+                          color: '#64748b'
+                        }}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                      <div style={{ flex: 1 }}></div>
+                      <span style={{
+                        backgroundColor: '#3b82f6',
+                        color: '#ffffff',
+                        fontSize: '0.625rem',
+                        fontWeight: '700',
+                        padding: '0.125rem 0.375rem',
+                        borderRadius: '0.25rem',
+                        letterSpacing: '0.05em'
+                      }}>
+                        JB
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Action Item: Check TOS */}
+                  <div style={{
+                    width: '100%',
+                    backgroundColor: '#1C2634',
+                    border: '1px solid #334155',
+                    borderRadius: '4px',
+                    padding: '8px',
+                    marginBottom: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    boxShadow: '0px 2px 4px 0px rgba(0, 0, 0, 0.15)'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
+                      <span style={{
+                        fontSize: '0.875rem',
+                        color: '#e2e8f0',
+                        fontWeight: '500'
+                      }}>
+                        Check TOS
+                      </span>
+                      <button style={{
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '0.25rem',
+                        display: 'flex',
+                        color: '#64748b'
+                      }}>
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                          <circle cx="8" cy="3" r="1.5"/>
+                          <circle cx="8" cy="8" r="1.5"/>
+                          <circle cx="8" cy="13" r="1.5"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        border: '2px solid #334155',
+                        backgroundColor: '#1e293b',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer'
+                      }}></div>
+                      <svg
+                        style={{
+                          width: '14px',
+                          height: '14px',
+                          color: '#64748b'
+                        }}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                      <div style={{ flex: 1 }}></div>
+                      <span style={{
+                        backgroundColor: '#3b82f6',
+                        color: '#ffffff',
+                        fontSize: '0.625rem',
+                        fontWeight: '700',
+                        padding: '0.125rem 0.375rem',
+                        borderRadius: '0.25rem',
+                        letterSpacing: '0.05em'
+                      }}>
+                        JB
+                      </span>
+                    </div>
+                  </div>
+                  </div>
+
+                  {/* Add action item button */}
+                  <button 
+                    onClick={() => setShowActionItemModal(true)}
+                    style={{
+                      backgroundColor: '#4B5563',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '1px 8px 4px 8px',
+                      color: '#94a3b8',
+                      fontSize: '0.8125rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      width: '100%',
+                      height: '24px'
+                    }}>
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add action item
+                  </button>
+                </div>
+
+                {/* PDP Column */}
+                <div style={{
+                  backgroundColor: '#1a2332',
+                  borderRadius: '8px',
+                  padding: '10px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  height: '252px'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '10px'
+                  }}>
+                    <span style={{
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: '#e2e8f0'
+                    }}>
+                      PDP
+                    </span>
+                    <span style={{
+                      backgroundColor: '#334155',
+                      color: '#94a3b8',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      padding: '0.125rem 0.5rem',
+                      borderRadius: '9999px'
+                    }}>
+                      2
+                    </span>
+                  </div>
+
+                  {/* Scrollable Items Container */}
+                  <div style={{
+                    flex: 1,
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
+                    marginBottom: '8px',
+                    scrollbarWidth: 'none',
+                    msOverflowStyle: 'none',
+                    WebkitOverflowScrolling: 'touch'
+                  }} className="hide-scrollbar">
+                  {/* Action Item: Slide Edit */}
+                  <div style={{
+                    width: '100%',
+                    backgroundColor: '#1C2634',
+                    border: '1px solid #334155',
+                    borderRadius: '4px',
+                    padding: '8px',
+                    marginBottom: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    boxShadow: '0px 2px 4px 0px rgba(0, 0, 0, 0.15)'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
+                      <span style={{
+                        fontSize: '0.875rem',
+                        color: '#e2e8f0',
+                        fontWeight: '500'
+                      }}>
+                        Slide Edit
+                      </span>
+                      <button style={{
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '0.25rem',
+                        display: 'flex',
+                        color: '#64748b'
+                      }}>
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                          <circle cx="8" cy="3" r="1.5"/>
+                          <circle cx="8" cy="8" r="1.5"/>
+                          <circle cx="8" cy="13" r="1.5"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        border: '2px solid #334155',
+                        backgroundColor: '#1e293b',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer'
+                      }}></div>
+                      <svg
+                        style={{
+                          width: '14px',
+                          height: '14px',
+                          color: '#64748b'
+                        }}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                      <div style={{ flex: 1 }}></div>
+                      <span style={{
+                        backgroundColor: '#3b82f6',
+                        color: '#ffffff',
+                        fontSize: '0.625rem',
+                        fontWeight: '700',
+                        padding: '0.125rem 0.375rem',
+                        borderRadius: '0.25rem',
+                        letterSpacing: '0.05em'
+                      }}>
+                        JB
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Action Item: Change 2nd Bullet */}
+                  <div style={{
+                    width: '100%',
+                    backgroundColor: '#1C2634',
+                    border: '1px solid #334155',
+                    borderRadius: '4px',
+                    padding: '8px',
+                    marginBottom: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                    boxShadow: '0px 2px 4px 0px rgba(0, 0, 0, 0.15)'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
+                      <span style={{
+                        fontSize: '0.875rem',
+                        color: '#e2e8f0',
+                        fontWeight: '500'
+                      }}>
+                        Change 2nd Bullet
+                      </span>
+                      <button style={{
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '0.25rem',
+                        display: 'flex',
+                        color: '#64748b'
+                      }}>
+                        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                          <circle cx="8" cy="3" r="1.5"/>
+                          <circle cx="8" cy="8" r="1.5"/>
+                          <circle cx="8" cy="13" r="1.5"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        border: '2px solid #334155',
+                        backgroundColor: '#1e293b',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer'
+                      }}></div>
+                      <svg
+                        style={{
+                          width: '14px',
+                          height: '14px',
+                          color: '#64748b'
+                        }}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                      <div style={{ flex: 1 }}></div>
+                      <span style={{
+                        backgroundColor: '#3b82f6',
+                        color: '#ffffff',
+                        fontSize: '0.625rem',
+                        fontWeight: '700',
+                        padding: '0.125rem 0.375rem',
+                        borderRadius: '0.25rem',
+                        letterSpacing: '0.05em'
+                      }}>
+                        JB
+                      </span>
+                    </div>
+                  </div>
+                  </div>
+
+                  {/* Add action item button */}
+                  <button 
+                    onClick={() => setShowActionItemModal(true)}
+                    style={{
+                      backgroundColor: '#4B5563',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '1px 8px 4px 8px',
+                      color: '#94a3b8',
+                      fontSize: '0.8125rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      width: '100%',
+                      height: '24px'
+                    }}>
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add action item
+                  </button>
+                </div>
+              </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Action Item Modal */}
+        {showActionItemModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            paddingTop: '130px',
+            zIndex: 9999,
+            overflowY: 'auto'
+          }}
+          onClick={() => { setShowActionItemModal(false); setSelectedCategory('Inventory'); }}>
+            <div style={{
+              backgroundColor: '#1F2937',
+              borderRadius: '12px',
+              width: '600px',
+              minHeight: '606px',
+              border: '1px solid #374151',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)',
+              marginBottom: '60px'
+            }}
+            onClick={(e) => e.stopPropagation()}>
+              {/* Modal Header */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                width: '600px',
+                height: '56px',
+                padding: '16px 24px',
+                borderTopLeftRadius: '12px',
+                borderTopRightRadius: '12px',
+                borderBottom: '1px solid #2a3441',
+                backgroundColor: '#1e2736',
+                boxSizing: 'border-box'
+              }}>
+                <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#F9FAFB' }}>
+                  New Action Item
+                </h2>
+                <button onClick={() => setShowActionItemModal(false)} style={{ backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: '#9CA3AF', display: 'flex', padding: '2px' }}>
+                  <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+
+              {/* Modal Body — single column */}
+              <div style={{ backgroundColor: '#1e2736', padding: '20px 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+                {/* Select Product */}
+                <div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#9CA3AF', marginBottom: '6px' }}>
+                    Select Product <span style={{ color: '#EF4444' }}>*</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 12px', borderRadius: '8px', border: '1px solid #2a3441', backgroundColor: '#253042' }}>
+                    <svg width="14" height="14" fill="none" stroke="#6B7280" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                    <input type="text" placeholder="Search product by name or ASIN..." style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#9CA3AF', fontSize: '0.875rem' }} />
+                  </div>
+                </div>
+
+                {/* Category */}
+                <div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#9CA3AF', marginBottom: '8px' }}>
+                    Category <span style={{ color: '#EF4444' }}>*</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+                    {[
+                      { label: 'Inventory', icon: (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/>
+                        </svg>
+                      )},
+                      { label: 'Price', icon: (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>
+                        </svg>
+                      )},
+                      { label: 'Ads', icon: (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>
+                        </svg>
+                      )},
+                      { label: 'PDP', icon: (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                        </svg>
+                      )}
+                    ].map(({ label, icon }) => {
+                      const isActive = selectedCategory === label;
+                      return (
+                        <button
+                          key={label}
+                          onClick={() => setSelectedCategory(label)}
+                          style={{
+                            width: '126px',
+                            padding: '12px',
+                            borderRadius: '8px',
+                            border: isActive ? '1px solid #3B82F6' : '1px solid #334155',
+                            backgroundColor: isActive ? '#0F172A' : '#1E293B',
+                            color: isActive ? '#93C5FD' : '#9CA3AF',
+                            fontSize: '0.8125rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '4px',
+                            position: 'relative',
+                            boxSizing: 'border-box',
+                            minHeight: '63px',
+                            justifyContent: 'center',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {isActive && <div style={{ position: 'absolute', top: '6px', right: '6px', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#3B82F6' }} />}
+                          {icon}
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Subject */}
+                <div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#9CA3AF', marginBottom: '6px' }}>
+                    Subject <span style={{ color: '#EF4444' }}>*</span>
+                  </div>
+                  <input type="text" placeholder="Enter Subject..." style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #2a3441', backgroundColor: '#253042', color: '#E5E7EB', fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box' }} />
+                </div>
+
+                {/* Description */}
+                <div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#9CA3AF', marginBottom: '6px' }}>
+                    Description <span style={{ color: '#EF4444' }}>*</span>
+                  </div>
+                  <textarea placeholder="Enter Description..." rows={1} style={{ width: '552px', height: '58px', padding: '12px 16px', borderRadius: '8px', border: '1px solid #2a3441', backgroundColor: '#253042', color: '#E5E7EB', fontSize: '0.875rem', outline: 'none', resize: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                </div>
+
+                {/* Assignee + Due Date */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#9CA3AF', marginBottom: '6px' }}>
+                      Assignee <span style={{ color: '#EF4444' }}>*</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 12px', borderRadius: '8px', border: '1px solid #2a3441', backgroundColor: '#253042', color: '#6B7280', fontSize: '0.875rem', cursor: 'pointer' }}>
+                      <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A4.992 4.992 0 0112 15a4.992 4.992 0 016.879 2.804M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                      <span>Select Assignee</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#9CA3AF', marginBottom: '6px' }}>
+                      Due Date <span style={{ color: '#EF4444' }}>*</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 12px', borderRadius: '8px', border: '1px solid #2a3441', backgroundColor: '#253042', color: '#6B7280', fontSize: '0.875rem', cursor: 'pointer' }}>
+                      <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" strokeWidth={2}/><line x1="16" y1="2" x2="16" y2="6" strokeWidth={2}/><line x1="8" y1="2" x2="8" y2="6" strokeWidth={2}/><line x1="3" y1="10" x2="21" y2="10" strokeWidth={2}/></svg>
+                      <span>Select Due Date</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                width: '600px',
+                minHeight: '63px',
+                padding: '16px 24px',
+                gap: '10px',
+                backgroundColor: '#141C2D',
+                borderTop: '1px solid #2a3441',
+                borderRight: 'none',
+                borderBottom: 'none',
+                borderLeft: 'none',
+                borderBottomLeftRadius: '12px',
+                borderBottomRightRadius: '12px',
+                boxSizing: 'border-box'
+              }}>
+                <button onClick={() => { setShowActionItemModal(false); setSelectedCategory('Inventory'); }} style={{ width: '72px', height: '31px', borderRadius: '6px', border: '1px solid #334155', backgroundColor: '#252F42', color: '#E5E7EB', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', boxSizing: 'border-box' }}>
+                  Cancel
+                </button>
+                <button style={{
+                  width: '129px',
+                  height: '31px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: 'rgba(0, 122, 255, 0.5)',
+                  color: '#fff',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px'
+                }}>
+                  Create Shipment
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
         </div>
       )}
@@ -5005,6 +6183,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
         </div>
       )}
     </div>
+    </>
   );
 };
 
