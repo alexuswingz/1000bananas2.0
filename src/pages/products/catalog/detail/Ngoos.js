@@ -3918,7 +3918,7 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
 
         {/* Action Items Section */}
         <div style={{
-          marginTop: '1.5rem',
+          marginTop: 'calc(1.5rem - 10px)',
           backgroundColor: '#0F172A',
           border: '1px solid #334155',
           borderRadius: '12px',
