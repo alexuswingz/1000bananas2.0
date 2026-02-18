@@ -4878,24 +4878,22 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
             bottom: 0,
             backgroundColor: 'rgba(0, 0, 0, 0.75)',
             display: 'flex',
-            alignItems: 'flex-start',
+            alignItems: 'center',
             justifyContent: 'center',
-            paddingTop: '130px',
-            zIndex: 9999,
-            overflowY: 'auto'
+            zIndex: 9999
           }}
           onClick={() => { setShowActionItemModal(false); setSelectedCategory('Inventory'); }}>
             <div style={{
-              backgroundColor: '#1F2937',
+              backgroundColor: '#1A2235',
               borderRadius: '12px',
-              width: '600px',
-              minHeight: '606px',
-              border: '1px solid #374151',
+              width: '440px',
+              minHeight: '246px',
+              border: '1px solid #334155',
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
               boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)',
-              marginBottom: '60px'
+              marginTop: '400px'
             }}
             onClick={(e) => e.stopPropagation()}>
               {/* Modal Header */}
@@ -4904,135 +4902,73 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                width: '600px',
-                height: '56px',
-                padding: '16px 24px',
+                width: '440px',
+                height: '44px',
+                padding: '12px 16px',
                 borderTopLeftRadius: '12px',
                 borderTopRightRadius: '12px',
-                borderBottom: '1px solid #2a3441',
-                backgroundColor: '#1e2736',
+                borderBottom: '1px solid #334155',
+                backgroundColor: '#1A2235',
                 boxSizing: 'border-box'
               }}>
                 <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#F9FAFB' }}>
-                  New Action Item
+                  New {selectedCategory} Action Item
                 </h2>
-                <button onClick={() => setShowActionItemModal(false)} style={{ backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: '#9CA3AF', display: 'flex', padding: '2px' }}>
+                <button onClick={() => { setShowActionItemModal(false); setSelectedCategory('Inventory'); }} style={{ backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: '#9CA3AF', display: 'flex', padding: '2px' }}>
                   <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
 
-              {/* Modal Body — single column */}
-              <div style={{ backgroundColor: '#1e2736', padding: '20px 20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
-                {/* Select Product */}
-                <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#9CA3AF', marginBottom: '6px' }}>
-                    Select Product <span style={{ color: '#EF4444' }}>*</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 12px', borderRadius: '8px', border: '1px solid #2a3441', backgroundColor: '#253042' }}>
-                    <svg width="14" height="14" fill="none" stroke="#6B7280" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                    <input type="text" placeholder="Search product by name or ASIN..." style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#9CA3AF', fontSize: '0.875rem' }} />
-                  </div>
-                </div>
-
-                {/* Category */}
-                <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#9CA3AF', marginBottom: '8px' }}>
-                    Category <span style={{ color: '#EF4444' }}>*</span>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
-                    {[
-                      { label: 'Inventory', icon: (
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/>
-                        </svg>
-                      )},
-                      { label: 'Price', icon: (
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>
-                        </svg>
-                      )},
-                      { label: 'Ads', icon: (
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>
-                        </svg>
-                      )},
-                      { label: 'PDP', icon: (
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
-                        </svg>
-                      )}
-                    ].map(({ label, icon }) => {
-                      const isActive = selectedCategory === label;
-                      return (
-                        <button
-                          key={label}
-                          onClick={() => setSelectedCategory(label)}
-                          style={{
-                            width: '126px',
-                            padding: '12px',
-                            borderRadius: '8px',
-                            border: isActive ? '1px solid #3B82F6' : '1px solid #334155',
-                            backgroundColor: isActive ? '#0F172A' : '#1E293B',
-                            color: isActive ? '#93C5FD' : '#9CA3AF',
-                            fontSize: '0.8125rem',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            gap: '4px',
-                            position: 'relative',
-                            boxSizing: 'border-box',
-                            minHeight: '63px',
-                            justifyContent: 'center',
-                            transition: 'all 0.15s ease'
-                          }}
-                        >
-                          {isActive && <div style={{ position: 'absolute', top: '6px', right: '6px', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#3B82F6' }} />}
-                          {icon}
-                          {label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+              {/* Modal Body */}
+              <div style={{ backgroundColor: '#1e2736', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
                 {/* Subject */}
-                <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#9CA3AF', marginBottom: '6px' }}>
-                    Subject <span style={{ color: '#EF4444' }}>*</span>
-                  </div>
-                  <input type="text" placeholder="Enter Subject..." style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #2a3441', backgroundColor: '#253042', color: '#E5E7EB', fontSize: '0.875rem', outline: 'none', boxSizing: 'border-box' }} />
-                </div>
+                <input
+                  type="text"
+                  placeholder="Enter Subject..."
+                  style={{
+                    width: '408px',
+                    height: '23px',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    border: '1px solid #007AFF',
+                    backgroundColor: '#4B5563',
+                    color: '#E5E7EB',
+                    fontSize: '0.875rem',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                    gap: '16px'
+                  }}
+                />
 
                 {/* Description */}
-                <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#9CA3AF', marginBottom: '6px' }}>
-                    Description <span style={{ color: '#EF4444' }}>*</span>
-                  </div>
-                  <textarea placeholder="Enter Description..." rows={1} style={{ width: '552px', height: '58px', padding: '12px 16px', borderRadius: '8px', border: '1px solid #2a3441', backgroundColor: '#253042', color: '#E5E7EB', fontSize: '0.875rem', outline: 'none', resize: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }} />
-                </div>
+                <textarea
+                  placeholder="Enter Description..."
+                  style={{
+                    width: '408px',
+                    height: '52px',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    border: '1px solid #334155',
+                    backgroundColor: '#4B5563',
+                    color: '#E5E7EB',
+                    fontSize: '0.875rem',
+                    outline: 'none',
+                    resize: 'none',
+                    fontFamily: 'inherit',
+                    boxSizing: 'border-box'
+                  }}
+                />
 
                 {/* Assignee + Due Date */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#9CA3AF', marginBottom: '6px' }}>
-                      Assignee <span style={{ color: '#EF4444' }}>*</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 12px', borderRadius: '8px', border: '1px solid #2a3441', backgroundColor: '#253042', color: '#6B7280', fontSize: '0.875rem', cursor: 'pointer' }}>
-                      <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A4.992 4.992 0 0112 15a4.992 4.992 0 016.879 2.804M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                      <span>Select Assignee</span>
-                    </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 8px', borderRadius: '4px', border: '1px solid #334155', backgroundColor: '#4B5563', color: '#E5E7EB', fontSize: '0.875rem', cursor: 'pointer', width: '196px', height: '24px', boxSizing: 'border-box' }}>
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A4.992 4.992 0 0112 15a4.992 4.992 0 016.879 2.804M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    <span>Select Assignee</span>
                   </div>
-                  <div>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#9CA3AF', marginBottom: '6px' }}>
-                      Due Date <span style={{ color: '#EF4444' }}>*</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 12px', borderRadius: '8px', border: '1px solid #2a3441', backgroundColor: '#253042', color: '#6B7280', fontSize: '0.875rem', cursor: 'pointer' }}>
-                      <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" strokeWidth={2}/><line x1="16" y1="2" x2="16" y2="6" strokeWidth={2}/><line x1="8" y1="2" x2="8" y2="6" strokeWidth={2}/><line x1="3" y1="10" x2="21" y2="10" strokeWidth={2}/></svg>
-                      <span>Select Due Date</span>
-                    </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 8px', borderRadius: '4px', border: '1px solid #334155', backgroundColor: '#4B5563', color: '#E5E7EB', fontSize: '0.875rem', cursor: 'pointer', width: '196px', height: '24px', boxSizing: 'border-box' }}>
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" strokeWidth={2}/><line x1="16" y1="2" x2="16" y2="6" strokeWidth={2}/><line x1="8" y1="2" x2="8" y2="6" strokeWidth={2}/><line x1="3" y1="10" x2="21" y2="10" strokeWidth={2}/></svg>
+                    <span>Select Due Date</span>
                   </div>
                 </div>
               </div>
@@ -5040,40 +4976,27 @@ const Ngoos = ({ data, inventoryOnly = false, doiGoalDays = null, doiSettings = 
               {/* Modal Footer */}
               <div style={{
                 display: 'flex',
+                flexDirection: 'row',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                width: '600px',
-                minHeight: '63px',
-                padding: '16px 24px',
+                width: '440px',
+                minHeight: '47px',
+                padding: '12px 16px',
                 gap: '10px',
                 backgroundColor: '#141C2D',
-                borderTop: '1px solid #2a3441',
-                borderRight: 'none',
-                borderBottom: 'none',
-                borderLeft: 'none',
+                borderTop: '0',
+                borderRight: '1px solid #334155',
+                borderBottom: '1px solid #334155',
+                borderLeft: '1px solid #334155',
                 borderBottomLeftRadius: '12px',
                 borderBottomRightRadius: '12px',
                 boxSizing: 'border-box'
               }}>
-                <button onClick={() => { setShowActionItemModal(false); setSelectedCategory('Inventory'); }} style={{ width: '72px', height: '31px', borderRadius: '6px', border: '1px solid #334155', backgroundColor: '#252F42', color: '#E5E7EB', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', boxSizing: 'border-box' }}>
+                <button onClick={() => { setShowActionItemModal(false); setSelectedCategory('Inventory'); }} style={{ width: '64px', height: '23px', borderRadius: '4px', border: '1px solid #334155', backgroundColor: '#252F42', color: '#E5E7EB', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', boxSizing: 'border-box' }}>
                   Cancel
                 </button>
-                <button style={{
-                  width: '129px',
-                  height: '31px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  backgroundColor: 'rgba(0, 122, 255, 0.5)',
-                  color: '#fff',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '10px'
-                }}>
-                  Create Shipment
+                <button style={{ width: '63px', height: '23px', borderRadius: '4px', border: 'none', backgroundColor: 'rgba(0, 122, 255, 0.5)', color: '#fff', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', boxSizing: 'border-box' }}>
+                  Create
                 </button>
               </div>
             </div>
